@@ -239,21 +239,31 @@ Implementazioni: `hyperliquid` (SDK ufficiale) e `simulated` (replay, RF-25.04).
 
 ### 12.1 Decisione per F0-F1 (8 novembre 2026)
 
-**Hosting: la macchina del proprietario** (VM Windows 11 Pro su Hyper-V, 4 vCPU, 16 GB RAM, circa 27 GB liberi su disco al momento della decisione), con Docker Compose. Nessun credito Azure disponibile; nessun vincolo di regione. Costo cloud: zero. PostgreSQL in container.
+**Hosting: VPS Hetzner** (CX22: 2 vCPU, 4 GB, 40 GB, circa €4,49/mese; oppure CX32: 4 vCPU, 8 GB, 80 GB, circa €8,49/mese, prezzi di ottobre 2026 da verificare al momento dell'ordine), Ubuntu LTS, Docker Engine, `docker compose`. Nessun credito Azure disponibile; nessun vincolo di regione. PostgreSQL in container. Si parte da CX22 e si passa a CX32 (ridimensionamento in pochi minuti) se Prophet o il numero di flussi lo richiedono.
 
-Prerequisiti da sistemare sulla macchina (oggi assenti):
+Motivi: canone fisso minimo, sempre acceso, nessun compromesso sull'architettura (cinque container sempre attivi), nessun prerequisito sulla macchina del proprietario.
 
-1. **WSL2** non installato (`wsl --install`). La macchina è essa stessa una VM: serve la **virtualizzazione annidata** abilitata sull'host Hyper-V (`Set-VMProcessor -ExposeVirtualizationExtensions $true` sulla VM, da host, a VM spenta). Da verificare per primo: senza, Docker non parte.
-2. **Docker Desktop** (gratuito per uso personale) o, in alternativa, Docker Engine dentro una distribuzione WSL2 senza Docker Desktop.
-3. **Spazio disco**: immagini (Prophet con cmdstan pesa), volumi PostgreSQL e distribuzione WSL2 occupano decine di GB; liberare o aggiungere disco.
-4. **Esposizione**: in F0-F1 API e dashboard restano su `localhost`; Entra ID accetta redirect URI su `http://localhost`. Accesso da fuori, se servirà, tramite tunnel (Cloudflare Tunnel, Tailscale) senza aprire porte.
-5. **Uptime**: i flussi girano solo se la VM è accesa. Accettato per la fase testnet; un ciclo saltato è registrato come tale (RF-04.07).
+Alternative scartate e perché:
 
-**Backup**: nessun backup gestito. In F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale, con copia opzionale su uno storage qualsiasi: costo zero, un servizio in più nel compose. Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
+- **Macchina del proprietario** (VM Windows 11 su Hyper-V): Docker e WSL2 assenti, servirebbe virtualizzazione annidata dall'host, 27 GB liberi, uptime legato alla VM.
+- **GitHub Actions come runtime**: il cron non è puntuale (ritardi di decine di minuti, job saltati), nessuno stato, minuti a pagamento oltre 2.000/mese su repo privato, nessun processo sempre attivo per API e LiteLLM. Adatto solo allo "script unico" dei video, non a questa architettura.
+- **Oracle Cloud Free Tier** (ARM 4 OCPU / 24 GB gratis): capacità spesso non disponibile, sospensioni di account segnalate, immagini ARM da costruire. Tentabile come esperimento, non come base.
+- **Fly.io, Render, Koyeb, Railway**: 8-35 €/mese, ogni servizio fattura a parte.
+- **Azure Container Apps**: 30-45 €/mese con PostgreSQL gestito; scala a zero inutile con worker e gateway sempre attivi.
+
+Configurazione del nodo (F0):
+
+1. Ubuntu LTS, utente non root, accesso solo con chiave SSH, firewall `ufw` con sole porte 22 e 443; aggiornamenti automatici di sicurezza.
+2. Docker Engine + plugin compose; repository clonato o immagini da GHCR.
+3. Reverse proxy (Caddy) davanti ad `api`, con TLS automatico su un nome DNS; `postgres`, `litellm`, `forecaster` su rete interna del compose, mai esposti.
+4. Segreti in file `.env` con permessi 600, mai nel repository.
+5. Entra ID: redirect URI sul nome DNS pubblico (e `http://localhost` per lo sviluppo).
+
+**Backup**: in F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su Hetzner Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot Hetzner del server (+20% del canone). Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
 
 ### 12.2 Dopo F1
 
-- Lo stesso `compose.yaml` gira su una VPS (Hetzner CX22/CX32, 5-10 € al mese), su una VM Azure nel tenant del proprietario (10-20 €), o, con le stesse immagini, su Azure Container Apps con PostgreSQL gestito (30-45 €). Nessun cambio di codice.
+- Lo stesso `compose.yaml` gira su una VM Azure nel tenant del proprietario (10-20 €) o, con le stesse immagini, su Azure Container Apps con PostgreSQL gestito (30-45 €). Nessun cambio di codice.
 - Immagini pubblicate su GHCR dalla CI.
 - LLM: 96 cicli/giorno × asset × costo per chiamata, misurato in F1 prima di scegliere il modello di lungo periodo.
 - **CI**: GitHub Actions: ruff, mypy, pytest (unit sul rischio e sulla contabilità, integrazione con PostgreSQL in servizio), build immagini. Boards su ADO con `AB#id` nei commit.
@@ -272,7 +282,8 @@ Prerequisiti da sistemare sulla macchina (oggi assenti):
 | T6 | Scadenza API wallet (180 giorni). | Campo `expires_at` sul conto, notifica 14 giorni prima. |
 | T7 | Nonce con più worker. | Un API wallet per replica; in F1 una sola replica. |
 | T8 | Fonti esterne instabili (feed RSS, endpoint non ufficiali). | Isolamento per nodo, timeout, campione mancante registrato; chiusura della fonte se non praticabile (principio dei requisiti). |
-| T9 | Hosting su VM Hyper-V: virtualizzazione annidata, spazio disco, uptime legato alla macchina. | Verifica WSL2/Docker prima dello scheletro (12.1); `pg_dump` notturno da F1; spostamento su VPS con lo stesso compose quando serve continuità. |
+| T9 | Nodo singolo Hetzner: nessuna ridondanza, disco locale. | Accettato in testnet; `pg_dump` notturno su storage esterno da F1; lo stesso compose gira altrove in caso di guasto. |
+| T10 | Sviluppo locale sulla VM del proprietario senza Docker. | Sviluppare con Python locale contro PostgreSQL e LiteLLM sul nodo Hetzner (porte via tunnel SSH), oppure installare WSL2/Docker se la virtualizzazione annidata è disponibile. |
 
 ---
 
