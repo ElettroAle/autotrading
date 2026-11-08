@@ -1,0 +1,11 @@
+name: ruff-check
+description: Regole di stile e formattazione con ruff.
+runs:
+  using: composite
+  steps:
+    - name: Ruff lint
+      shell: bash
+      run: uv run ruff check --output-format=github .
+    - name: Ruff format
+      shell: bash
+      run: uv run ruff format --check .

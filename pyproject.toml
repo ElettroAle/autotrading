@@ -1,0 +1,94 @@
+[project]
+name = "autotrading"
+version = "0.0.0"
+description = "Piattaforma personale di trading automatico multi-tenant"
+requires-python = ">=3.15,<3.16"
+dependencies = [
+    "fastapi>=0.120",
+    "uvicorn>=0.38",
+]
+
+[dependency-groups]
+dev = [
+    "gherkin-official>=36",
+    "git-cliff>=2.10",
+    "httpx>=0.28",
+    "import-linter>=2.5",
+    "mypy>=1.18",
+    "pip-audit>=2.9",
+    "pytest>=8.4",
+    "pytest-bdd>=8.1",
+    "pytest-cov>=7.0",
+    "ruff>=0.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib", "--strict-markers", "-m", "not wip and not pipeline and not integration and not testnet"]
+testpaths = ["tests"]
+pythonpath = ["."]
+bdd_features_base_dir = "specs"
+markers = [
+    "wip: User Story non ancora consegnata, esclusa finché il tag resta nel .feature",
+    "pipeline: scenario provato da un'esecuzione reale della pipeline, non da pytest",
+    "integration: adapter contro la tecnologia vera",
+    "testnet: adapter Hyperliquid contro la testnet",
+]
+
+[tool.coverage.run]
+source = ["src/autotrading", "tools"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = ['if __name__ == "__main__":']
+
+[tool.ruff]
+line-length = 120
+target-version = "py315"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "B", "UP", "SIM", "RET", "ARG", "PT", "TRY", "EM", "S", "RUF", "PL"]
+ignore = ["PLR2004"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["autotrading", "tools", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603", "S607", "PLR0913"]
+"tools/**" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.15"
+strict = true
+files = ["src", "tests", "tools"]
+mypy_path = ["src", "."]
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["pytest_bdd.*"]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "autotrading"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Le dipendenze puntano solo verso il centro"
+type = "layers"
+layers = [
+    "autotrading.bootstrap",
+    "autotrading.adapters",
+    "autotrading.application",
+    "autotrading.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain e application non importano tecnologie"
+type = "forbidden"
+source_modules = ["autotrading.domain", "autotrading.application"]
+forbidden_modules = ["fastapi", "starlette", "pydantic", "uvicorn"]

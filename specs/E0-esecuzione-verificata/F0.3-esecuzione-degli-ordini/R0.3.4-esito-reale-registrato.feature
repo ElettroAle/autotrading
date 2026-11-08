@@ -1,5 +1,5 @@
 # language: it
-@R0.3.4
+@R0.3.4 @wip
 Funzionalità: R0.3.4 Registrazione dell'esito reale degli ordini
   Come utente
   Voglio che ogni ordine sia registrato con ciò che l'exchange ha effettivamente eseguito

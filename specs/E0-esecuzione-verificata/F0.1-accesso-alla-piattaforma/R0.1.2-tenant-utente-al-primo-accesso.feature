@@ -1,5 +1,5 @@
 # language: it
-@R0.1.2
+@R0.1.2 @wip
 Funzionalità: R0.1.2 Tenant dell'utente creato al primo accesso
   Come utente con il ruolo Utente
   Voglio trovare il mio tenant pronto al primo accesso

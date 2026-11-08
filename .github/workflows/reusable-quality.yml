@@ -1,0 +1,123 @@
+# Orchestratore dei controlli di qualità (R0.5.1). Un job per controllo: ogni job è un
+# controllo obbligatorio del ruleset di main, con il nome che compare nella pull request.
+name: reusable-quality
+
+on:
+  workflow_call:
+    inputs:
+      title:
+        description: Titolo della pull request
+        type: string
+        required: true
+    secrets:
+      SONAR_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  segreti:
+    name: segreti
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/gitleaks-scan
+
+  titolo:
+    name: titolo
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/conventional-title
+        with:
+          title: ${{ inputs.title }}
+
+  stile:
+    name: stile
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/ruff-check
+
+  tipi:
+    name: tipi
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/mypy-check
+
+  architettura:
+    name: architettura
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/import-contracts
+
+  specifiche:
+    name: specifiche
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/gherkin-validate
+
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/pytest-run
+
+  copertura-codice:
+    name: copertura del codice
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/coverage-gate
+
+  copertura-scenari:
+    name: copertura degli scenari
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/scenario-coverage
+
+  vulnerabilita:
+    name: vulnerabilità
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/pip-audit
+      - uses: ./.github/actions/image-build
+        with:
+          tag: autotrading:candidate
+      - uses: ./.github/actions/trivy-scan
+        with:
+          image: autotrading:candidate
+
+  analisi-statica:
+    name: analisi statica
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/sonarcloud-scan
+        with:
+          token: ${{ secrets.SONAR_TOKEN }}

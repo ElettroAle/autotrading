@@ -1,0 +1,11 @@
+name: pip-audit
+description: Vulnerabilità note nelle dipendenze Python; qualunque vulnerabilità blocca.
+runs:
+  using: composite
+  steps:
+    - name: Pip-audit
+      shell: bash
+      # The project itself is not published on PyPI: only its locked dependencies are audited.
+      run: |
+        uv export --frozen --no-emit-project --all-groups --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
+        uv run pip-audit --strict --disable-pip --requirement "$RUNNER_TEMP/requirements.txt" --progress-spinner off

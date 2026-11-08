@@ -1,0 +1,16 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    uses: ./.github/workflows/reusable-release.yml
+    permissions:
+      contents: write
+      packages: write
+    secrets: inherit

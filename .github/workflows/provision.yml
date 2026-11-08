@@ -1,0 +1,20 @@
+name: provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Installazione da creare
+        type: choice
+        options: [dev, prod]
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    uses: ./.github/workflows/reusable-provision.yml
+    with:
+      environment: ${{ inputs.environment }}
+    secrets: inherit

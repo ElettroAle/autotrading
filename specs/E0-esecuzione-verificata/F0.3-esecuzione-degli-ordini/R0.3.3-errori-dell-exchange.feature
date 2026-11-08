@@ -1,5 +1,5 @@
 # language: it
-@R0.3.3
+@R0.3.3 @wip
 Funzionalità: R0.3.3 Gestione degli errori dell'exchange sugli ordini
   Come utente
   Voglio che un ordine rifiutato dall'exchange sia riportato e registrato senza fermare la piattaforma

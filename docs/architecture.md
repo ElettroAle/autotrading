@@ -12,7 +12,7 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
 
 | Tema | Decisione | Motivo |
 |------|-----------|--------|
-| Linguaggio backend | **Python 3.12** | SDK ufficiale Hyperliquid, CCXT, Prophet, LangGraph: tutto l'ecosistema di riferimento è Python. |
+| Linguaggio backend | **Python 3.15** | SDK ufficiale Hyperliquid, CCXT, Prophet, LangGraph: tutto l'ecosistema di riferimento è Python. |
 | Esecuzione | **Container**, cloud agnostic | Nessun servizio proprietario di un cloud, a parte i fornitori dei modelli IA. Deve girare uguale su Docker Compose locale, su una VM, su Azure Container Apps o su Railway. Costi minimi. |
 | Database | **PostgreSQL 16** (scelta delegata) | Un solo database per tutto: dati di dominio, JSON dei contesti, serie temporali, stato di LangGraph, spesa di LiteLLM. Disponibile ovunque. |
 | Orchestrazione dell'agente | **LangGraph** | Grafo tipizzato con fan-out parallelo delle fonti; stessa base per comitato (6.28) e doppio timeframe (6.27). |
@@ -63,7 +63,7 @@ Sei container, tutti sostituibili e tutti senza dipendenze da un cloud specifico
 ```
 autotrading/
 ├── backend/
-│   ├── pyproject.toml              # uv/poetry, Python 3.12
+│   ├── pyproject.toml              # uv/poetry, Python 3.15
 │   └── autotrading/
 │       ├── api/                    # FastAPI: router per tenant, conti, flussi, cicli, comandi
 │       ├── worker/                 # scheduler, esecuzione cicli, riconciliazione, notifiche

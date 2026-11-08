@@ -1,0 +1,30 @@
+name: installation-host
+description: Trova la macchina dell'installazione e il suo nome pubblico derivato dall'indirizzo.
+inputs:
+  environment:
+    description: dev o prod
+    required: true
+  hcloud-token:
+    description: Token API Hetzner dell'ambiente
+    required: true
+outputs:
+  address:
+    description: Indirizzo IPv4 della macchina
+    value: ${{ steps.lookup.outputs.address }}
+  hostname:
+    description: Nome pubblico (sslip.io)
+    value: ${{ steps.lookup.outputs.hostname }}
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/hcloud-setup
+    - id: lookup
+      name: Indirizzo dell'installazione
+      shell: bash
+      env:
+        HCLOUD_TOKEN: ${{ inputs.hcloud-token }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        address="$(hcloud server ip "autotrading-${ENVIRONMENT}")"
+        echo "address=${address}" >> "$GITHUB_OUTPUT"
+        echo "hostname=${address//./-}.sslip.io" >> "$GITHUB_OUTPUT"

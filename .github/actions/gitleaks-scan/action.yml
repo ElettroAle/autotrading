@@ -1,0 +1,12 @@
+name: gitleaks-scan
+description: Cerca segreti nel codice e in tutta la storia dei commit (richiede checkout completo).
+runs:
+  using: composite
+  steps:
+    # Versione fissata come in Pipelines V3: una regola nuova a monte non deve far fallire
+    # codice che non è cambiato.
+    - name: Gitleaks
+      shell: bash
+      run: >-
+        docker run --rm -v "$GITHUB_WORKSPACE:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1
+        git /repo --redact --verbose --exit-code 1

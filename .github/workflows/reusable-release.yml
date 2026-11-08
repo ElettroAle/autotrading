@@ -1,0 +1,130 @@
+# Orchestratore TrunkFlow (R0.5.2, R0.5.3): un artefatto per integrazione, rilascio
+# automatico in dev, promozione dello stesso digest in prod dopo l'approvazione.
+# I segreti sono degli environment GitHub dev e prod, letti dai job che li dichiarano.
+name: reusable-release
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  versione:
+    name: versione
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/python-setup
+      - id: version
+        uses: ./.github/actions/release-version
+        with:
+          mode: prerelease
+
+  artefatto:
+    name: artefatto
+    needs: versione
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/image-build
+        with:
+          tag: autotrading:candidate
+      - uses: ./.github/actions/trivy-scan
+        with:
+          image: autotrading:candidate
+      - id: publish
+        uses: ./.github/actions/ghcr-publish
+        with:
+          local-image: autotrading:candidate
+          version: ${{ needs.versione.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  dev:
+    name: rilascio dev
+    needs: [versione, artefatto]
+    runs-on: ubuntu-24.04
+    environment: dev
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: host
+        uses: ./.github/actions/installation-host
+        with:
+          environment: dev
+          hcloud-token: ${{ secrets.HCLOUD_TOKEN }}
+      - uses: ./.github/actions/ssh-deploy
+        with:
+          address: ${{ steps.host.outputs.address }}
+          hostname: ${{ steps.host.outputs.hostname }}
+          environment: dev
+          version: ${{ needs.versione.outputs.version }}
+          image: ${{ needs.artefatto.outputs.image }}
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/health-check
+        with:
+          hostname: ${{ steps.host.outputs.hostname }}
+          environment: dev
+          version: ${{ needs.versione.outputs.version }}
+
+  prod:
+    name: promozione prod
+    needs: [artefatto, dev]
+    runs-on: ubuntu-24.04
+    environment: prod
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/python-setup
+      - id: release
+        uses: ./.github/actions/release-version
+        with:
+          mode: release
+      - uses: ./.github/actions/image-promote
+        with:
+          image: ${{ needs.artefatto.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - id: host
+        uses: ./.github/actions/installation-host
+        with:
+          environment: prod
+          hcloud-token: ${{ secrets.HCLOUD_TOKEN }}
+      - uses: ./.github/actions/ssh-deploy
+        with:
+          address: ${{ steps.host.outputs.address }}
+          hostname: ${{ steps.host.outputs.hostname }}
+          environment: prod
+          version: ${{ steps.release.outputs.version }}
+          image: ${{ needs.artefatto.outputs.image }}
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/health-check
+        with:
+          hostname: ${{ steps.host.outputs.hostname }}
+          environment: prod
+          version: ${{ steps.release.outputs.version }}

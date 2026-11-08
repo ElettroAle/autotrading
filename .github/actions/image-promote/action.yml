@@ -1,0 +1,27 @@
+name: image-promote
+description: Aggiunge la versione di rilascio allo stesso digest già provato in dev, senza ricostruire.
+inputs:
+  image:
+    description: Riferimento repository@sha256 dell'artefatto
+    required: true
+  version:
+    description: Versione di rilascio
+    required: true
+  token:
+    description: Token con permesso packages:write
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+    - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+    - name: Tag di rilascio sullo stesso digest
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        VERSION: ${{ inputs.version }}
+      run: docker buildx imagetools create --tag "${IMAGE%@*}:${VERSION}" "$IMAGE"

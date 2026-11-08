@@ -1,0 +1,44 @@
+# Orchestratore della creazione di un'installazione (R0.5.4).
+name: reusable-provision
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  installazione:
+    name: installazione ${{ inputs.environment }}
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - id: provision
+        uses: ./.github/actions/hcloud-provision
+        with:
+          environment: ${{ inputs.environment }}
+          hcloud-token: ${{ secrets.HCLOUD_TOKEN }}
+          deploy-public-key: ${{ vars.DEPLOY_SSH_PUBLIC_KEY }}
+          host-private-key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
+          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
+          server-type: ${{ vars.HCLOUD_SERVER_TYPE || 'cx23' }}
+          location: ${{ vars.HCLOUD_LOCATION || 'fsn1' }}
+      - id: host
+        if: ${{ steps.provision.outputs.created == 'true' }}
+        uses: ./.github/actions/installation-host
+        with:
+          environment: ${{ inputs.environment }}
+          hcloud-token: ${{ secrets.HCLOUD_TOKEN }}
+      - if: ${{ steps.provision.outputs.created == 'true' }}
+        uses: ./.github/actions/installation-start
+        with:
+          address: ${{ steps.host.outputs.address }}
+          hostname: ${{ steps.host.outputs.hostname }}
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
