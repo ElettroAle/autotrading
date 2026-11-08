@@ -1,0 +1,29 @@
+name: trivy-scan
+description: Vulnerabilità dell'immagine (pacchetti di sistema e Python); qualunque severità blocca.
+inputs:
+  image:
+    description: Riferimento locale dell'immagine
+    required: true
+runs:
+  using: composite
+  steps:
+    # Binario scaricato dalla release e verificato con il checksum pubblicato, invece di
+    # un'action di terzi.
+    - name: Installa Trivy
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        TRIVY_VERSION: 0.76.2
+      run: |
+        base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+        archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        curl -fsSLO "${base}/${archive}"
+        curl -fsSLO "${base}/trivy_${TRIVY_VERSION}_checksums.txt"
+        grep " ${archive}\$" "trivy_${TRIVY_VERSION}_checksums.txt" | sha256sum --check
+        tar -xzf "${archive}" trivy
+        echo "${RUNNER_TEMP}" >> "$GITHUB_PATH"
+    - name: Scansione dell'immagine
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+      run: trivy image --exit-code 1 --scanners vuln --no-progress "$IMAGE"

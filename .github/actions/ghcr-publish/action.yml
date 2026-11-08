@@ -1,0 +1,35 @@
+name: ghcr-publish
+description: Pubblica su GHCR l'immagine già costruita e scansionata; restituisce il riferimento per digest.
+inputs:
+  local-image:
+    description: Riferimento locale dell'immagine
+    required: true
+  version:
+    description: Versione con cui pubblicare
+    required: true
+  token:
+    description: Token con permesso packages:write
+    required: true
+outputs:
+  image:
+    description: Riferimento immutabile repository@sha256
+    value: ${{ steps.push.outputs.image }}
+runs:
+  using: composite
+  steps:
+    - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+    - id: push
+      name: Pubblica
+      shell: bash
+      env:
+        LOCAL_IMAGE: ${{ inputs.local-image }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+        docker tag "$LOCAL_IMAGE" "${repository}:${VERSION}"
+        docker push "${repository}:${VERSION}"
+        echo "image=$(docker inspect --format '{{index .RepoDigests 0}}' "${repository}:${VERSION}")" >> "$GITHUB_OUTPUT"

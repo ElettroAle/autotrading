@@ -1,5 +1,5 @@
 # language: it
-@R0.2.4
+@R0.2.4 @wip
 Funzionalità: R0.2.4 Sostituzione delle credenziali di un conto
   Come utente
   Voglio sostituire le credenziali di un mio conto

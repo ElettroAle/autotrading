@@ -1,0 +1,20 @@
+name: pytest-run
+description: Esegue unit test, scenari e test architetturale; pubblica i report di copertura e degli scenari.
+runs:
+  using: composite
+  steps:
+    - name: Pytest
+      shell: bash
+      run: >-
+        uv run pytest --cov --cov-report=term --cov-report=json --cov-report=xml
+        --cucumberjson=cucumber.json
+    - name: Pubblica i report
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: test-reports
+        path: |
+          coverage.json
+          coverage.xml
+          cucumber.json
+        if-no-files-found: error

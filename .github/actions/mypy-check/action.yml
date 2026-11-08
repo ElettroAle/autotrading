@@ -1,0 +1,8 @@
+name: mypy-check
+description: Controllo dei tipi con mypy strict.
+runs:
+  using: composite
+  steps:
+    - name: Mypy
+      shell: bash
+      run: uv run mypy

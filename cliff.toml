@@ -1,0 +1,46 @@
+# Unica sorgente delle regole Conventional Commits: da qui derivano il controllo del titolo
+# delle PR, la verifica dei commit alla promozione e il calcolo della versione
+# (tools/release_version.py). Ripreso da ElettroAle/Pipelines V3, senza il preprocessore
+# dei messaggi di merge di Azure DevOps.
+# Il gruppo finale "Altre modifiche" raccoglie i commit non conformi: il suo nome è
+# ripetuto in tools/release_version.py.
+
+[changelog]
+header = ""
+body = """
+## {{ version | default(value="Unreleased") | trim_start_matches(pat="v") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | split(pat="\n") | first | trim }}
+{%- endfor %}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+# 'BREAKING CHANGE:' come titolo non è Conventional (lo è solo come footer): lo si
+# riconduce a 'feat!:' come in Pipelines V3.
+commit_preprocessors = [
+  { pattern = '^BREAKING CHANGE: (.*)', replace = "feat!: ${1}" },
+]
+commit_parsers = [
+  { field = "merge_commit", pattern = "true", skip = true },
+  { field = "breaking", pattern = "true", group = "<!-- 0 -->Breaking" },
+  { message = '(?i)^feat(\(.+\))?:', group = "<!-- 1 -->Feature" },
+  { message = '(?i)^fix(\(.+\))?:', group = "<!-- 2 -->Fix" },
+  { message = '(?i)^(chore|docs|refactor|perf|test|ci|build|style|revert)(\(.+\))?:', group = "<!-- 3 -->Manutenzione" },
+  { message = ".*", group = "<!-- 9 -->Altre modifiche" },
+]
+filter_commits = false
+tag_pattern = '^v?[0-9]+\.[0-9]+\.[0-9]+$'
+topo_order = false
+sort_commits = "newest"
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
+initial_tag = "0.1.0"

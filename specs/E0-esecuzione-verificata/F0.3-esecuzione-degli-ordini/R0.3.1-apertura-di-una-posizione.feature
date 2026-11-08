@@ -1,5 +1,5 @@
 # language: it
-@R0.3.1
+@R0.3.1 @wip
 Funzionalità: R0.3.1 Apertura di una posizione sull'exchange
   Come piattaforma
   Voglio aprire una posizione long o short con leva e dimensione indicate

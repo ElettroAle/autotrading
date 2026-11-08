@@ -1,5 +1,5 @@
 # language: it
-@R0.3.2
+@R0.3.2 @wip
 Funzionalità: R0.3.2 Chiusura manuale di una posizione
   Come utente
   Voglio chiudere in qualunque momento una posizione aperta su un mio conto

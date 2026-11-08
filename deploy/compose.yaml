@@ -1,0 +1,33 @@
+# Installazione dev o prod sulla VPS. I valori arrivano dal file .env scritto dalla pipeline
+# (nessun segreto): immagine per digest, ambiente, versione, nome pubblico.
+name: autotrading
+
+services:
+  api:
+    image: ${API_IMAGE:-}
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
+      APP_VERSION: ${APP_VERSION:-}
+    read_only: true
+    restart: unless-stopped
+    networks: [internal]
+
+  caddy:
+    image: caddy:2.11.9-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME mancante}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [internal]
+
+networks:
+  internal: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

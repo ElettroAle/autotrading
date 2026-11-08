@@ -1,0 +1,32 @@
+name: health-check
+description: Attende fino a 2 minuti che l'installazione dichiari versione e ambiente attesi.
+inputs:
+  hostname:
+    description: Nome pubblico dell'installazione
+    required: true
+  environment:
+    description: dev o prod
+    required: true
+  version:
+    description: Versione attesa
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Controllo di salute
+      shell: bash
+      env:
+        PUBLIC_HOSTNAME: ${{ inputs.hostname }}
+        EXPECTED: '{"version":"${{ inputs.version }}","environment":"${{ inputs.environment }}"}'
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        for attempt in $(seq 1 24); do
+          actual="$(curl -fsS --max-time 4 "https://${PUBLIC_HOSTNAME}/health" || true)"
+          if [ "$actual" = "$EXPECTED" ]; then
+            echo "Installazione ${ENVIRONMENT}: ${actual}"
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "::error::controllo di salute non superato in ${ENVIRONMENT} (ultima risposta: ${actual:-nessuna})"
+        exit 1

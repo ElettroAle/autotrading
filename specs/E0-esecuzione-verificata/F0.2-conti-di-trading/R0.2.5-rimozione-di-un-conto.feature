@@ -1,5 +1,5 @@
 # language: it
-@R0.2.5
+@R0.2.5 @wip
 Funzionalità: R0.2.5 Rimozione di un conto
   Come utente
   Voglio rimuovere un conto che non uso più

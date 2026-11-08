@@ -1,5 +1,5 @@
 # language: it
-@R0.1.3
+@R0.1.3 @wip
 Funzionalità: R0.1.3 Isolamento dei dati tra tenant
   Come utente
   Voglio che nessun altro utente veda o modifichi ciò che appartiene al mio tenant

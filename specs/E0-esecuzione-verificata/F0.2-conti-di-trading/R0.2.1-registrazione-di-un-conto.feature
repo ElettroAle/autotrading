@@ -1,5 +1,5 @@
 # language: it
-@R0.2.1
+@R0.2.1 @wip
 Funzionalità: R0.2.1 Registrazione di un conto di trading
   Come utente
   Voglio registrare nel mio tenant un conto di trading con le sue credenziali

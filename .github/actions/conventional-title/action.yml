@@ -1,0 +1,14 @@
+name: conventional-title
+description: Verifica con git-cliff e cliff.toml che il titolo della pull request sia un Conventional Commit.
+inputs:
+  title:
+    description: Titolo della pull request
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Titolo Conventional Commits
+      shell: bash
+      env:
+        TITLE: ${{ inputs.title }}
+      run: uv run python -m tools.release_version title "$TITLE"

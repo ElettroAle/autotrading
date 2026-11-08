@@ -1,0 +1,8 @@
+name: import-contracts
+description: Regola delle dipendenze tra livelli con import-linter (contratti in pyproject.toml).
+runs:
+  using: composite
+  steps:
+    - name: Import-linter
+      shell: bash
+      run: uv run lint-imports

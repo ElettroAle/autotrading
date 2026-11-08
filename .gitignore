@@ -21,3 +21,16 @@ Thumbs.db
 *.log
 logs/
 data/raw/
+
+# Python and test reports
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.import_linter_cache/
+.coverage
+coverage.json
+coverage.xml
+cucumber.json

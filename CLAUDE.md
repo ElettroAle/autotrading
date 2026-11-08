@@ -83,6 +83,10 @@ src/autotrading/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
+tools/                          script Python della pipeline, fuori dall'esagono (.claude/rules/ci.md)
+deploy/                         cloud-init, compose e Caddyfile delle installazioni
+.github/                        workflow e action della pipeline TrunkFlow
+docs/adr/                       decisioni tecniche, una per file
 ```
 
 **Contesti** = aree di logica di business, non tecnologie. In E0: `tenancy`, `accounts`, `orders`,
@@ -157,6 +161,18 @@ vede rossa prima di diventare verde. Dettagli in `.claude/rules/tests.md`.
   (`docs/architecture.md`).
 - Il deploy passa sempre dalla pipeline GitHub Actions.
 
+## Decisioni tecniche (ADR)
+
+Ogni decisione tecnica presa da un lavoro vive in `docs/adr/NNNN-titolo.md`: stato, requisiti,
+contesto, decisione, alternative scartate, conseguenze. Il Task sulla board cita le ADR del lavoro.
+Una ADR accettata non si riscrive: la si sostituisce con una nuova che la dichiara superata.
+
+## Integrazione e rilascio
+
+Flusso TrunkFlow su `main` protetto: solo pull request integrate per squash, con tutti i controlli
+superati. Ogni integrazione pubblica un'immagine e la rilascia in dev; lo stesso digest va in prod
+con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0005`.
+
 ## Board
 
 Azure DevOps, organizzazione `fianialessandro`, progetto `AutoTrading`, processo Agile. Epic `E<n>`,
@@ -177,5 +193,6 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-hyperliquid.md` | `adapters/outbound/hyperliquid/**` |
 | `tech-openbao.md` | `adapters/outbound/openbao/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
+| `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |
 | `specs.md` | `specs/**` |

@@ -1,0 +1,29 @@
+name: release-version
+description: Calcola con git-cliff la versione di pre-release o crea il tag della versione di rilascio.
+inputs:
+  mode:
+    description: prerelease oppure release
+    required: true
+outputs:
+  version:
+    description: Versione calcolata
+    value: ${{ steps.compute.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: compute
+      name: Versione
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        RUN_NUMBER: ${{ github.run_number }}
+      run: |
+        if [ "$MODE" = "prerelease" ]; then
+          version="$(uv run python -m tools.release_version prerelease "$RUN_NUMBER")"
+        else
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          version="$(uv run python -m tools.release_version release)"
+          git push origin "v${version}"
+        fi
+        echo "version=${version}" >> "$GITHUB_OUTPUT"

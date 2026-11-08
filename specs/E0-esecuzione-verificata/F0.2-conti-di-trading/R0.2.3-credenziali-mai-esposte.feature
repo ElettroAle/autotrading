@@ -1,5 +1,5 @@
 # language: it
-@R0.2.3
+@R0.2.3 @wip
 Funzionalità: R0.2.3 Credenziali dei conti mai esposte
   Come utente
   Voglio che le credenziali che inserisco non siano mai più leggibili dopo il salvataggio

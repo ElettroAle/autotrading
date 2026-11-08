@@ -1,0 +1,8 @@
+name: gherkin-validate
+description: Valida la sintassi di tutti i file .feature con il parser Gherkin ufficiale.
+runs:
+  using: composite
+  steps:
+    - name: Sintassi Gherkin
+      shell: bash
+      run: uv run python -m tools.gherkin_check specs

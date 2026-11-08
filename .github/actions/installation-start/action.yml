@@ -1,0 +1,55 @@
+name: installation-start
+description: Attende la fine di cloud-init, avvia il reverse proxy e verifica il certificato HTTPS.
+inputs:
+  address:
+    description: Indirizzo della macchina
+    required: true
+  hostname:
+    description: Nome pubblico dell'installazione
+    required: true
+  ssh-private-key:
+    description: Chiave privata dell'utente deploy
+    required: true
+  host-public-key:
+    description: Chiave pubblica host attesa
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Avvia il reverse proxy
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
+        ADDRESS: ${{ inputs.address }}
+        PUBLIC_HOSTNAME: ${{ inputs.hostname }}
+      run: |
+        install -d -m 700 ~/.ssh
+        printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy
+        chmod 600 ~/.ssh/deploy
+        printf '%s %s\n' "$ADDRESS" "$HOST_PUBLIC_KEY" > ~/.ssh/known_hosts
+        target="deploy@${ADDRESS}"
+        ssh_options=(-i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5)
+        for attempt in $(seq 1 60); do
+          ssh "${ssh_options[@]}" "$target" true && break
+          sleep 5
+        done
+        ssh "${ssh_options[@]}" "$target" 'cloud-init status --wait'
+        scp "${ssh_options[@]}" deploy/compose.yaml deploy/Caddyfile "${target}:/opt/autotrading/"
+        printf 'PUBLIC_HOSTNAME=%s\n' "$PUBLIC_HOSTNAME" | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
+        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d caddy'
+    - name: Certificato HTTPS valido
+      shell: bash
+      env:
+        PUBLIC_HOSTNAME: ${{ inputs.hostname }}
+      run: |
+        for attempt in $(seq 1 36); do
+          curl -sS --max-time 4 -o /dev/null "https://${PUBLIC_HOSTNAME}/" && exit 0
+          sleep 5
+        done
+        echo "::error::il nome pubblico ${PUBLIC_HOSTNAME} non risponde in HTTPS con un certificato valido"
+        exit 1
+    - name: Rimuovi la chiave
+      if: ${{ always() }}
+      shell: bash
+      run: rm -f ~/.ssh/deploy
