@@ -8,6 +8,7 @@ Funzionalità: R0.3.1 Apertura di una posizione sull'exchange
   L'apertura non è un comando dell'utente: la usano la procedura di verifica e, in seguito, i flussi.
   Ogni ordine porta un identificativo assegnato dalla piattaforma, che lo collega a chi lo ha generato.
   L'ordine è a mercato con uno scostamento massimo di prezzo; oltre lo scostamento non viene eseguito.
+  Lo scostamento massimo è configurabile; il valore predefinito è 5%.
 
   Fuori ambito: ordini limite in attesa, chiusure parziali, stop loss e take profit.
 
@@ -25,8 +26,13 @@ Funzionalità: R0.3.1 Apertura di una posizione sull'exchange
       | long      | BTC   | 2    |
       | short     | ETH   | 3    |
 
-  Scenario: Prezzo oltre lo scostamento massimo
-    Dato che lo scostamento massimo di prezzo è 1%
+  Scenario: Scostamento massimo predefinito
+    Dato che lo scostamento massimo di prezzo non è configurato
+    Quando la piattaforma apre sul conto "test-1" una posizione "long" su "BTC" con leva 2 e valore 20 USDC
+    Allora l'ordine inviato accetta uno scostamento massimo del 5% dal prezzo corrente
+
+  Scenario: Prezzo oltre lo scostamento massimo configurato
+    Dato che lo scostamento massimo di prezzo è configurato all'1%
     E che il prezzo di "BTC" si muove di più dell'1% prima dell'esecuzione
     Quando la piattaforma apre sul conto "test-1" una posizione "long" su "BTC" con leva 2 e valore 20 USDC
     Allora l'ordine non è eseguito
