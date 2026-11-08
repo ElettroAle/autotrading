@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 from tools.feature_catalog import InvalidFeatureError, feature_files, parse_feature
+from tools.workspace import workspace_path
 
 
 def invalid_features(root: Path) -> list[str]:
@@ -17,7 +18,7 @@ def _problem_in(path: Path) -> str | None:
 
 
 def main(arguments: list[str]) -> int:
-    problems = invalid_features(Path(arguments[0]))
+    problems = invalid_features(workspace_path(arguments[0]))
     for problem in problems:
         print(problem, file=sys.stderr)
     return 1 if problems else 0

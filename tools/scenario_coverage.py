@@ -1,10 +1,10 @@
 import json
 import sys
 from collections import Counter
-from pathlib import Path
 from typing import Any
 
 from tools.feature_catalog import ExpectedScenario, expected_scenarios
+from tools.workspace import workspace_path
 
 
 def passed_runs(report: list[dict[str, Any]]) -> Counter[tuple[str, str]]:
@@ -31,7 +31,7 @@ def _passed(element: dict[str, Any]) -> bool:
 
 
 def main(arguments: list[str]) -> int:
-    specs, report = Path(arguments[0]), Path(arguments[1])
+    specs, report = workspace_path(arguments[0]), workspace_path(arguments[1])
     passed = passed_runs(json.loads(report.read_text(encoding="utf-8")))
     uncovered = uncovered_scenarios(expected_scenarios(specs), passed)
     for line in uncovered:

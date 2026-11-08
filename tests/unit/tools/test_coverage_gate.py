@@ -61,3 +61,18 @@ def test_main_accepts_full_coverage(tmp_path: Path) -> None:
     report.write_text(json.dumps({"files": {"src/autotrading/domain/a.py": summary(2, 2)}}), encoding="utf-8")
 
     assert main([str(report)]) == 0
+
+
+def test_pipeline_tools_stay_out_of_the_service_scopes() -> None:
+    report = {
+        "files": {
+            "src/autotrading/bootstrap.py": summary(10, 10),
+            "tools/release_version.py": summary(0, 10),
+            "tools/domain/x.py": summary(0, 10),
+        }
+    }
+
+    scopes = coverage_by_scope(report)
+
+    assert scopes["totale"] == Coverage(10, 10)
+    assert scopes["domain"] == Coverage(0, 0)

@@ -33,6 +33,7 @@ def test_missing_value_raises_typed_error(missing: str) -> None:
 def test_versioned_template_renders(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     for name, value in VALUES.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.chdir(Path(__file__).resolve().parents[3])
 
-    assert main([str(Path(__file__).resolve().parents[3] / "deploy" / "cloud-init.yaml")]) == 0
+    assert main(["deploy/cloud-init.yaml"]) == 0
     assert "ssh-ed25519 AAAA deploy" in capsys.readouterr().out

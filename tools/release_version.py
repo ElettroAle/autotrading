@@ -29,8 +29,8 @@ DETACHED_IDENTITY = ("-c", "user.name=title-check", "-c", "user.email=title-chec
 class Repository:
     path: Path
 
-    def run(self, *command: str) -> str:
-        completed = subprocess.run(command, cwd=self.path, capture_output=True, text=True, check=False)
+    def run(self, *command: str, stdin: str | None = None) -> str:
+        completed = subprocess.run(command, cwd=self.path, input=stdin, capture_output=True, text=True, check=False)
         if completed.returncode != 0:
             raise GitCommandError(list(command), completed.stderr.strip())
         return completed.stdout.strip()
@@ -44,7 +44,8 @@ class Repository:
 
 
 def is_conventional_title(repository: Repository, title: str) -> bool:
-    detached = repository.run("git", *DETACHED_IDENTITY, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", title)
+    # The title comes from the pull request: it travels on stdin, never as a command argument.
+    detached = repository.run("git", *DETACHED_IDENTITY, "commit-tree", "HEAD^{tree}", "-p", "HEAD", stdin=title)
     return not _unconventional_messages(repository, f"{detached}^..{detached}")
 
 

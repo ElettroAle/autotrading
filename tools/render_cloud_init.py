@@ -1,9 +1,9 @@
 import os
 import sys
-from pathlib import Path
 from string import Template
 
 from tools.errors import PipelineError
+from tools.workspace import workspace_path
 
 PRIVATE_KEY_INDENT = "    "
 REQUIRED_VALUES = ("DEPLOY_PUBLIC_KEY", "HOST_PRIVATE_KEY", "HOST_PUBLIC_KEY")
@@ -35,7 +35,7 @@ def _indented(block: str) -> str:
 
 
 def main(arguments: list[str]) -> int:
-    template = Path(arguments[0]).read_text(encoding="utf-8")
+    template = workspace_path(arguments[0]).read_text(encoding="utf-8")
     values = {name: os.environ.get(name, "") for name in REQUIRED_VALUES}
     sys.stdout.write(render(template, values))
     return 0

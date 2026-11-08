@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from tools.workspace import workspace_path
+
+SERVICE_ROOT = "autotrading"
 THRESHOLDS = {"domain": 90.0, "application": 90.0, "totale": 80.0}
 
 
@@ -23,6 +26,8 @@ class Coverage:
 def coverage_by_scope(report: dict[str, Any]) -> dict[str, Coverage]:
     scopes = {scope: Coverage(0, 0) for scope in THRESHOLDS}
     for path, data in report["files"].items():
+        if not _is_service(path):
+            continue
         file_coverage = _file_coverage(data["summary"])
         scopes["totale"] += file_coverage
         layer = _layer_of(path)
@@ -45,13 +50,18 @@ def _file_coverage(summary: dict[str, int]) -> Coverage:
     return Coverage(covered, total)
 
 
+# Pipeline tools are measured for SonarCloud, but the thresholds apply to the service only.
+def _is_service(path: str) -> bool:
+    return SERVICE_ROOT in Path(path.replace("\\", "/")).parts
+
+
 def _layer_of(path: str) -> str | None:
     parts = Path(path.replace("\\", "/")).parts
     return next((part for part in parts if part in ("domain", "application")), None)
 
 
 def main(arguments: list[str]) -> int:
-    report = json.loads(Path(arguments[0]).read_text(encoding="utf-8"))
+    report = json.loads(workspace_path(arguments[0]).read_text(encoding="utf-8"))
     problems = violations(coverage_by_scope(report))
     for problem in problems:
         print(problem, file=sys.stderr)
