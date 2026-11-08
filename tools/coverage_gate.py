@@ -16,7 +16,7 @@ class Coverage:
     def percent(self) -> float:
         return 100.0 if self.total == 0 else 100.0 * self.covered / self.total
 
-    def __add__(self, other: "Coverage") -> "Coverage":
+    def __add__(self, other: Coverage) -> Coverage:
         return Coverage(self.covered + other.covered, self.total + other.total)
 
 

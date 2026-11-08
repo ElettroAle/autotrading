@@ -2,7 +2,7 @@
 name = "autotrading"
 version = "0.0.0"
 description = "Piattaforma personale di trading automatico multi-tenant"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.15,<3.16"
 dependencies = [
     "fastapi>=0.120",
     "uvicorn>=0.38",
@@ -47,7 +47,7 @@ show_missing = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py315"
 src = ["src", "tests", "tools"]
 
 [tool.ruff.lint]
@@ -62,7 +62,7 @@ known-first-party = ["autotrading", "tools", "tests"]
 "tools/**" = ["S603", "S607"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.15"
 strict = true
 files = ["src", "tests", "tools"]
 mypy_path = ["src", "."]

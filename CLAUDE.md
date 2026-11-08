@@ -23,7 +23,7 @@ dal proprietario, copia isolata, rosso e verde, PR. Non esistono scorciatoie fuo
 
 ## Stack
 
-Python 3.12, uv, ruff, mypy (strict), pytest + pytest-bdd, import-linter. FastAPI, SQLAlchemy 2 +
+Python 3.15, uv, ruff, mypy (strict), pytest + pytest-bdd, import-linter. FastAPI, SQLAlchemy 2 +
 Alembic, PostgreSQL 16, OpenBao, SDK ufficiale Hyperliquid, Entra ID. Dettagli e motivazioni in
 `docs/architecture.md`.
 
@@ -171,7 +171,7 @@ Una ADR accettata non si riscrive: la si sostituisce con una nuova che la dichia
 
 Flusso TrunkFlow su `main` protetto: solo pull request integrate per squash, con tutti i controlli
 superati. Ogni integrazione pubblica un'immagine e la rilascia in dev; lo stesso digest va in prod
-con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0005`.
+con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0006`.
 
 ## Board
 

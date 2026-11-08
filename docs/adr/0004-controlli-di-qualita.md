@@ -36,4 +36,5 @@
 
 - Una vulnerabilità senza correzione disponibile, di qualunque severità, blocca le PR finché
   l'immagine base o la dipendenza non la risolvono: è il prezzo accettato del blocco totale.
+  L'immagine base Chainguard (ADR 0006) riduce i pacchetti di sistema al minimo e li ricostruisce ogni giorno.
 - I test di integrazione contro servizi entrano nei controlli con il primo adapter.
