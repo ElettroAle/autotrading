@@ -467,7 +467,12 @@ La dashboard è **privata**: ogni utente, previa autenticazione, vede e gestisce
 
 | ID | Requisito | Pri. | Fase | Fonte |
 |----|-----------|------|------|-------|
-| RF-27.01 | Un flusso può essere guidato da due agenti: uno **strategico** a bassa frequenza, che analizza il mercato su finestre lunghe (es. settimanali) e produce una "narrativa" o un indirizzo di fondo, e uno **esecutivo** a frequenza più alta che opera tenendone conto. | C | F5 | V4, V5 |
+| RF-27.01 | Un flusso può essere guidato da due agenti: uno **strategico** a bassa frequenza, che analizza il mercato su finestre lunghe (es. giornaliere o settimanali) e produce una "narrativa" o un indirizzo di fondo, e uno **esecutivo** a frequenza più alta (l'agente standard) che opera tenendone conto. | C | F5 | V4, V5 |
+| RF-27.02 | Il livello strategico è attivabile per flusso e ha configurazione propria: intervallo, fornitore e modello IA, fonti e timeframe lunghi, istruzioni. Il livello esecutivo resta configurato come oggi. | C | F5 | D |
+| RF-27.03 | La narrativa contiene, per ogni asset del flusso: orientamento di fondo (rialzista, ribassista, neutrale), livelli di prezzo rilevanti, direzioni da preferire o evitare, eventuali limiti suggeriti (es. leva massima), motivazione, validità. | C | F5 | V4, D |
+| RF-27.04 | La narrativa in vigore è inclusa nel contesto di ogni ciclo esecutivo e registrata con esso, così che per ogni decisione si sappia quale narrativa era attiva. | C | F5 | D |
+| RF-27.05 | La narrativa è, per impostazione predefinita, un **consiglio**: l'agente esecutivo può discostarsene motivando. In alternativa, per configurazione, è un **vincolo**: il modulo di rischio blocca le decisioni contrarie all'orientamento (es. short quando la narrativa indica long) e le registra come bloccate. | C | F5 | D |
+| RF-27.06 | Se la narrativa è assente o scaduta, l'agente esecutivo opera come in modalità agente unico e l'evento è registrato; il livello strategico viene rieseguito al suo prossimo intervallo. | C | F5 | D |
 
 ### 6.28 Feature avanzata: flusso multi-analista ("comitato")
 
@@ -580,4 +585,5 @@ Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima 
 | Filtro di rischio | Un'operazione oltre i limiti viene ridotta ai limiti ed eseguita. |
 | Replay storico | Sì: si possono rigiocare i flussi su dati storici. |
 | Spot e copy-trading | Fuori dalla prima versione; nel backlog come proposte a bassa priorità. |
+| Doppio timeframe | Agente strategico lento che produce una narrativa per asset, agente esecutivo veloce che la riceve nel contesto. Narrativa come consiglio di default, vincolo opzionale. Senza narrativa si opera come agente unico. |
 | Framework esterni | DeepFund e simili non vengono adottati come base; le loro idee (analisti con segnale unificato, dibattito, planner, gestore, memoria delle decisioni, cutoff dei modelli) diventano la feature avanzata 6.28. |
