@@ -34,16 +34,16 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
    CLI, script)  │  │ (F2)     │   │ (FastAPI) │   │          │  │        │  │
                  │  └──────────┘   └───────────┘   └──────────┘  └───┬────┘  │
                  │                                       ▲           │       │
-                 │                                       │           │       │
-                 │                                  ┌────┴────┐      │       │
-                 │                                  │ litellm │◀─────┘       │
-                 │                                  └────┬────┘              │
+                 │                                       │     ┌─────┴─────┐ │
+                 │                                  ┌────┴────┐│ forecaster│ │
+                 │                                  │ litellm ││ (Prophet) │ │
+                 │                                  └────┬────┘└───────────┘ │
                  └───────────────────────────────────────┼───────────────────┘
                                                          ▼
                     Fornitori IA · Hyperliquid (testnet/mainnet) · fonti esterne · Telegram · SMTP
 ```
 
-Cinque container (più uno opzionale), tutti sostituibili e tutti senza dipendenze da un cloud specifico:
+Sei container, tutti sostituibili e tutti senza dipendenze da un cloud specifico:
 
 | Container | Ruolo | Fase |
 |-----------|-------|------|
@@ -51,7 +51,7 @@ Cinque container (più uno opzionale), tutti sostituibili e tutti senza dipenden
 | `litellm` | Gateway verso i modelli IA; chiavi virtuali per tenant; registro spesa. | F1 |
 | `api` | Interfaccia programmatica (RF-21): autenticazione OIDC, tenancy, configurazione versionata, comandi, consultazione. Serve anche la dashboard statica in F2. | F0 |
 | `worker` | Pianificatore e ciclo decisionale dei flussi (RF-04), esecuzione ordini, contabilità virtuale, riconciliazione, notifiche. | F1 |
-| `forecaster` | **Opzionale, non in F1.** In F1 Prophet gira dentro `worker` (vedi sezione 10); estrazione in servizio separato solo se il peso lo richiede. | dopo F1 |
+| `forecaster` | Servizio interno per le previsioni Prophet (RF-08), isolato perché pesante (cmdstan) e condivisibile tra flussi. | F1 |
 | `dashboard` | Build statica React, servita da `api` o da un server statico. | F2 |
 
 `api` e `worker` sono lo stesso pacchetto Python avviato con comandi diversi: condividono modello di dominio, repository e adapter.
@@ -75,6 +75,7 @@ autotrading/
 │       ├── notify/                 # telegram, email
 │       ├── db/                     # SQLAlchemy 2 + Alembic
 │       └── settings.py
+├── forecaster/                     # servizio Prophet (FastAPI minimale)
 ├── dashboard/                      # React + TypeScript (F2)
 ├── deploy/
 │   ├── compose.yaml                # sviluppo e produzione piccola
@@ -161,7 +162,7 @@ class DataSource(Protocol):
     def render(self, samples: list[SourceSample], weight: float) -> str   # testo per il contesto
 ```
 
-Fonti F1: `indicators` (candele dall'exchange, calcolo con pandas-ta), `pivots`, `forecast` (Prophet, sezione 10), `sentiment` (CoinMarketCap Fear & Greed), `news` (RSS). F5: `whales`, `volumes`.
+Fonti F1: `indicators` (candele dall'exchange, calcolo con pandas-ta), `pivots`, `forecast` (chiama `forecaster`), `sentiment` (CoinMarketCap Fear & Greed), `news` (RSS). F5: `whales`, `volumes`.
 
 ### 6.2 Modello IA
 
@@ -204,7 +205,7 @@ Implementazioni: `hyperliquid` (SDK ufficiale) e `simulated` (replay, RF-25.04).
 - **Entra ID, limite da conoscere**: un tenant Entra "workforce" ospita bene utenti interni e guest invitati; per utenti esterni self-service serve Entra External ID o un altro IdP. Finché gli utenti sono pochi e invitati, Entra ID basta. L'app non cambia in entrambi i casi.
 - **Segreti degli utenti** (chiavi API wallet, API key fonti): cifrati a riposo con AES-GCM, chiave radice in variabile d'ambiente (`SECRETS_KEY`), ruotabile; mai restituiti dall'API, mai nei log, mai nel contesto LLM (RNF-04). Evoluzione: KMS del cloud o Vault, dietro la stessa interfaccia.
 - **LiteLLM**: una chiave virtuale per tenant con budget mensile; le API key dei fornitori stanno solo nella configurazione di LiteLLM, non nel database dell'app. Opzione futura: chiavi dei fornitori per tenant ("bring your own key").
-- **Rete**: solo `api` (e `dashboard`) esposti; `postgres` e `litellm` su rete interna del compose.
+- **Rete**: solo `api` (e `dashboard`) esposti; `postgres`, `litellm`, `forecaster` su rete interna del compose.
 
 ---
 
@@ -217,16 +218,12 @@ Implementazioni: `hyperliquid` (SDK ufficiale) e `simulated` (replay, RF-25.04).
 
 ---
 
-## 10. Forecast (Prophet)
+## 10. Forecaster (Prophet)
 
-Nei video Prophet viene addestrato da zero per ogni ticker a ogni ciclo, dentro lo stesso script del cron: con un flusso e tre asset basta. Da noi, con più flussi, più tenant e il replay, servono due accorgimenti; il resto resta uguale.
-
-- **In F1 Prophet gira dentro `worker`**, come fonte `forecast` ordinaria, con:
-  - **cache** in `forecasts` per asset + orizzonte + istante di riferimento: N flussi sullo stesso asset = un solo addestramento; il replay riusa le previsioni registrate;
-  - **process pool** (`ProcessPoolExecutor`) per non bloccare il loop asyncio durante l'addestramento.
-- Prophet accetta dati sub-giornalieri e `make_future_dataframe(freq=...)` a minuti o ore **[doc]**; modelli serializzabili in JSON (non pickle) **[doc]** se si vuole riaddestrare a intervallo invece che a ogni ciclo.
-- **Estrazione in container `forecaster`** solo se misurata necessaria (immagine troppo pesante, CPU contesa, più repliche del worker): stessa interfaccia `DataSource`, cambia solo da dove arriva il numero.
-- Alternativa futura dietro la stessa fonte: NeuralProphet o modelli di altro tipo (RF-08.05).
+- Servizio separato per non caricare il worker con cmdstan; API interna: `POST /forecast {asset, horizon, history_depth}` → previsione con intervallo.
+- Prophet accetta dati sub-giornalieri e `make_future_dataframe(freq=...)` a minuti o ore **[doc]**; modelli serializzati in JSON (non pickle) **[doc]** e messi in cache per asset, riaddestrati a intervallo configurabile.
+- Le previsioni sono condivise tra flussi dello stesso asset e orizzonte (RF-04.09 anticipato per questa fonte, con registrazione per ciclo).
+- Alternativa futura dietro la stessa API: NeuralProphet o modelli di altro tipo (RF-08.05).
 
 ---
 
@@ -240,7 +237,7 @@ Nei video Prophet viene addestrato da zero per ogni ticker a ogni ciclo, dentro 
 
 ## 12. Deployment e costi
 
-- **Sviluppo e produzione piccola**: `docker compose up` con i servizi di base; volumi per PostgreSQL. Lo stesso `compose.yaml` gira su una VM qualsiasi.
+- **Sviluppo e produzione piccola**: `docker compose up` con i sei servizi; volumi per PostgreSQL. Lo stesso `compose.yaml` gira su una VM qualsiasi.
 - **Cloud**: immagini pubblicate su GHCR dalla CI; qualunque servizio container (Azure Container Apps, Railway, Fly, una VM con Docker). Nessun servizio gestito obbligatorio: PostgreSQL può essere gestito (comodo per backup) o in container.
 - **Stima minima** (testnet, 1-3 flussi a 15 minuti): una VM da 2 vCPU / 4 GB o equivalente in container app, circa 15-30 € al mese; PostgreSQL gestito piccolo, 10-20 € se non in container; LLM: 96 cicli/giorno × asset × costo per chiamata, misurato in F1 prima di scegliere il modello di lungo periodo.
 - **CI**: GitHub Actions: ruff, mypy, pytest (unit sul rischio e sulla contabilità, integrazione con PostgreSQL in servizio), build immagini. Boards su ADO con `AB#id` nei commit.
@@ -253,7 +250,7 @@ Nei video Prophet viene addestrato da zero per ogni ticker a ogni ciclo, dentro 
 |---|-------|--------------------------------------|
 | T1 | Hyperliquid testnet: faucet, disponibilità ordini trigger, liquidità dei mercati. | Verificare in F0 con la procedura RF-19.05. |
 | T2 | LangGraph e LangChain evolvono velocemente (versioni major frequenti). | Fissare le versioni; isolare l'uso in `graph/`; il dominio non importa LangChain. |
-| T3 | Prophet: immagine pesante (cmdstan), addestramento lento con storici lunghi. | Cache per asset/orizzonte, process pool; servizio separato solo se misurato necessario. |
+| T3 | Prophet: immagine pesante (cmdstan), addestramento lento con storici lunghi. | Servizio separato, cache dei modelli, riaddestramento a intervalli, non a ogni ciclo. |
 | T4 | Costo LLM con più flussi e comitato. | Budget per tenant in LiteLLM; stima prima del salvataggio della configurazione (RF-28.08). |
 | T5 | Entra ID per utenti esterni self-service. | Entra ID workforce con inviti finché bastano; External ID o altro IdP OIDC dopo, senza cambi nell'app. |
 | T6 | Scadenza API wallet (180 giorni). | Campo `expires_at` sul conto, notifica 14 giorni prima. |
@@ -273,7 +270,7 @@ Nei video Prophet viene addestrato da zero per ogni ticker a ogni ciclo, dentro 
 **F1. Flussi autonomi senza dashboard**
 1. Modello dati completo (sezione 4), configurazione versionata, validazioni (RF-21.05), regola di conflitto.
 2. `litellm` in compose, catalogo modelli, client con output strutturato.
-3. Fonti `indicators`, `pivots`, `sentiment`, `news`, `forecast` (Prophet nel worker con cache).
+3. Fonti `indicators`, `pivots`, `sentiment`, `news`; `forecaster` con Prophet.
 4. Grafo del ciclo (sezione 5), rischio base, esecuzione, contabilità virtuale, persistenza, riconciliazione base.
 5. Worker con APScheduler e advisory lock; comandi avvio/pausa/stop.
 6. Notifiche Telegram essenziali.
