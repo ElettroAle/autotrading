@@ -8,6 +8,12 @@ Questo file è il contratto del repository: architettura del codice, nomenclatur
 organizzazione dei test sono **decisioni del proprietario**. Non si cambiano senza la sua approvazione.
 Le regole di dettaglio per percorso sono in `.claude/rules/` (indice in fondo).
 
+## Metodo di lavoro
+
+Ogni modifica a questo repository, dal requisito alla pull request, segue la skill
+`/shortrack:shortrack-deliver-requirement`: requisito con scenari Gherkin, board, disegno approvato
+dal proprietario, copia isolata, rosso e verde, PR. Non esistono scorciatoie fuori da questo metodo.
+
 ## Lingua
 
 - Conversazione, specifiche Gherkin, descrizioni sulla board, documenti: **italiano**.
