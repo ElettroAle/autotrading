@@ -18,7 +18,9 @@ Questo documento raccoglie le tecnologie, i servizi e le scelte implementative c
 | Wallet | Accesso tramite wallet (MetaMask nei video). Il deposito avviene in USDC; per le transazioni e per generare le API key serve anche ETH per il gas. Le credenziali usate sono indirizzo pubblico e chiave privata del wallet (o di un API wallet generato). | V2, V4 |
 | Binance | Citato solo per lo strumento di copy-trading (NO1 Tracker) che usa API key e secret Binance. | V1 |
 
-> **Isolamento dei flussi (RF-01.03).** Con più flussi sugli stessi asset, un unico conto non basta: una sola posizione per coin per conto renderebbe i flussi interdipendenti. Opzioni da valutare in progettazione: sub-account Hyperliquid (o vault) distinti per flusso, wallet separati, oppure un registro interno che attribuisce posizioni virtuali ai flussi. Da verificare se la testnet supporta i sub-account.
+> **Isolamento dei flussi (RF-03.03, 6.13).** Scelta funzionale: contabilità virtuale per flusso sempre, più regola di conflitto (niente asset in comune tra flussi dello stesso conto). Resta da valutare in progettazione se offrire anche la separazione fisica: sub-account Hyperliquid (o vault) distinti per flusso, wallet separati. Da verificare se la testnet supporta i sub-account e se l'exchange espone un identificativo cliente per ordine (utile per RF-19.07).
+
+> **Multi-tenant e interfaccia programmatica (6.1, 6.21).** Il modello dati va partizionato per utente fin dal primo schema. L'interfaccia programmatica di F1 è il candidato naturale per un'API autenticata che la dashboard riuserà; da decidere in progettazione.
 
 > **Nota di sicurezza.** Nei video la chiave privata del wallet è passata come variabile d'ambiente al servizio. In progettazione va preferito un API wallet dedicato al trading, senza facoltà di prelievo, con i segreti in un gestore di segreti.
 
@@ -79,7 +81,7 @@ Questo documento raccoglie le tecnologie, i servizi e le scelte implementative c
 | Voce | Cosa dicono le fonti | Fonte |
 |------|----------------------|-------|
 | Backend + frontend | Backend generato a partire dallo schema del database (endpoint per posizioni aperte, saldo, operazioni), frontend generato con strumenti di "vibe coding". | V4 |
-| Ricostruzione posizioni chiuse | Nella versione di V5 le posizioni chiuse sono **stimate** confrontando snapshot successivi. È più affidabile leggerle dallo storico dell'exchange o registrarle all'esecuzione (vedi RF-15.03). | V5 |
+| Ricostruzione posizioni chiuse | Nella versione di V5 le posizioni chiuse sono **stimate** confrontando snapshot successivi. È più affidabile leggerle dallo storico dell'exchange o registrarle all'esecuzione (vedi RF-19.03). | V5 |
 
 ## 9. Strumenti di sviluppo citati
 
