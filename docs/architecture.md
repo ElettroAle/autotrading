@@ -201,11 +201,44 @@ Implementazioni: `hyperliquid` (SDK ufficiale) e `simulated` (replay, RF-25.04).
 
 ## 8. Sicurezza e multi-tenant
 
-- **Autenticazione**: OIDC Authorization Code + PKCE per la dashboard, bearer JWT per API e script. Validazione firma e claim con JWKS dell'issuer. Mappa `sub` → `users.oidc_subject`; primo accesso crea l'utente solo se abilitato dal proprietario (RF-01.04).
-- **Entra ID, limite da conoscere**: un tenant Entra "workforce" ospita bene utenti interni e guest invitati; per utenti esterni self-service serve Entra External ID o un altro IdP. Finché gli utenti sono pochi e invitati, Entra ID basta. L'app non cambia in entrambi i casi.
-- **Segreti degli utenti** (chiavi API wallet, API key fonti): cifrati a riposo con AES-GCM, chiave radice in variabile d'ambiente (`SECRETS_KEY`), ruotabile; mai restituiti dall'API, mai nei log, mai nel contesto LLM (RNF-04). Evoluzione: KMS del cloud o Vault, dietro la stessa interfaccia.
-- **LiteLLM**: una chiave virtuale per tenant con budget mensile; le API key dei fornitori stanno solo nella configurazione di LiteLLM, non nel database dell'app. Opzione futura: chiavi dei fornitori per tenant ("bring your own key").
-- **Rete**: solo `api` (e `dashboard`) esposti; `postgres`, `litellm`, `forecaster` su rete interna del compose.
+Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-esecuzione-verificata`.
+
+### 8.1 Accesso degli utenti
+
+- **Solo Entra ID.** Gli utenti si creano esclusivamente in Entra; la piattaforma non registra né invita nessuno. Accede solo chi ha il ruolo applicativo **Utente** nel token (R0.1.1). Il **tenant** nasce al primo accesso di chi ha il ruolo, legato all'identificativo stabile della directory (`oid`), non al nome (R0.1.2). Tenant e utente sono distinti: il tenant ha un identificativo proprio, l'utente (`oid`) ne è membro; in E0 il database impone un tenant per utente.
+- **Ruoli applicativi** sull'app registration: `Utente` (accesso alla piattaforma) e `Gestore chiavi` (amministrazione di OpenBao: revoca ed eliminazione, mai lettura delle credenziali dei conti).
+- **Superficie in E0-E1**: sola API REST con pagina OpenAPI interattiva e login Entra (Authorization Code + PKCE). Nessuna CLI. Validazione del token con le chiavi pubblicate dall'issuer (JWKS), controllo di audience, tenant e ruolo.
+- **Isolamento** (R0.1.3): le porte che il caso d'uso riceve sono già legate al tenant della richiesta; le entità possedute da un tenant estendono `TenantOwned`. Come seconda barriera PostgreSQL applica row level security, configurata e attivata solo dall'adapter SQLAlchemy. Un elemento di un altro tenant risponde "non trovato". Regole in `.claude/rules/context-tenancy.md`.
+- **Entra ID, limite da conoscere**: per utenti esterni self-service servirebbe Entra External ID o un altro IdP OIDC; l'app non cambia.
+
+### 8.2 Segreti
+
+**Modello di minaccia.** La gestione dei segreti protegge da: bug nell'API esposta, accesso alla macchina senza privilegi di root, copie di disco, snapshot e backup. Contro un attaccante root sulla macchina in esecuzione nessuno schema su nodo singolo protegge ciò che è in uso; lì contano il valore basso delle chiavi, la rilevazione e la revoca rapida (sotto).
+
+- **Archivio: OpenBao** in container, storage integrato (raft) su volume, mai esposto su Internet.
+- **Credenziali dei conti**: nel KV di OpenBao, un percorso per tenant e conto (`tenants/<tenant>/accounts/<conto>`); nel database solo il riferimento (R0.2.3). Leggibili **solo dal worker** ("robot"): policy OpenBao distinte per servizio.
+
+  | Identità | Permessi sulle credenziali dei conti |
+  |----------|--------------------------------------|
+  | `worker` | lettura |
+  | `api` | creazione, sostituzione, eliminazione; **mai lettura** |
+  | persone con `Gestore chiavi` | revoca ed eliminazione; **mai lettura** |
+
+  La verifica delle credenziali alla registrazione (R0.2.1) usa le credenziali presenti nella richiesta prima di salvarle, quindi l'API non ha bisogno di rileggerle.
+- **Accesso dei servizi a OpenBao**: metodo AppRole, un ruolo per servizio con token a vita breve e rinnovabile; il `secret_id` di ciascun servizio è un file montato in sola lettura, leggibile solo dall'utente del container.
+- **Accesso delle persone a OpenBao**: metodo OIDC con Entra, legato al ruolo `Gestore chiavi`.
+- **Sblocco**: seal `static` con chiave di 32 byte in un file **leggibile solo da root** sul server; OpenBao riparte da solo dopo un riavvio. Il TPM virtuale non risulta disponibile su Hetzner Cloud; se lo diventasse, il file si cifra con `systemd-creds` legato al TPM senza altri cambi.
+- **Materiale di emergenza fuori dalla macchina**: chiavi di recupero e token root generati all'inizializzazione vanno nel password manager del proprietario; il token root si revoca dopo la configurazione.
+- **Mai variabili d'ambiente per i segreti** (visibili con `docker inspect` e da `/proc`): solo file montati.
+- **Audit** di OpenBao attivo su file, ruotato.
+- **LiteLLM**: chiavi dei fornitori in OpenBao, consegnate a LiteLLM come file; una chiave virtuale per tenant con budget mensile.
+
+**Limitare il danno se la macchina è compromessa.**
+
+- Credenziali di sola operatività: su Hyperliquid l'API wallet non può prelevare; il wallet principale con i fondi non tocca mai la piattaforma.
+- Rilevazione: audit di OpenBao, riconciliazione con allarme, notifica di ogni apertura.
+- Revoca: playbook scritto per revocare l'API wallet dal wallet principale e ruotare le chiavi dei servizi.
+- Esposizione: solo Caddy (443) e SSH con chiave; `postgres`, `litellm`, `forecaster`, `openbao` su rete interna. Container non root, filesystem in sola lettura dove possibile, nessun accesso al socket Docker.
 
 ---
 
@@ -254,10 +287,12 @@ Alternative scartate e perché:
 Configurazione del nodo (F0):
 
 1. Ubuntu LTS, utente non root, accesso solo con chiave SSH, firewall `ufw` con sole porte 22 e 443; aggiornamenti automatici di sicurezza.
-2. Docker Engine + plugin compose; repository clonato o immagini da GHCR.
-3. Reverse proxy (Caddy) davanti ad `api`, con TLS automatico su un nome DNS; `postgres`, `litellm`, `forecaster` su rete interna del compose, mai esposti.
-4. Segreti in file `.env` con permessi 600, mai nel repository.
+2. Docker Engine + plugin compose; immagini da GHCR.
+3. Reverse proxy (Caddy) davanti ad `api`, con TLS automatico su un nome DNS; `postgres`, `litellm`, `forecaster`, `openbao` su rete interna del compose, mai esposti.
+4. Segreti secondo la sezione 8.2: in OpenBao, consegnati ai servizi come file; chiave di sblocco in un file leggibile solo da root.
 5. Entra ID: redirect URI sul nome DNS pubblico (e `http://localhost` per lo sviluppo).
+
+**Ambienti e deploy.** Due installazioni identiche, `dev` (reti di test degli exchange) e `prod`, ciascuna sulla propria VPS con il proprio OpenBao. Il deploy passa **sempre** dalla pipeline GitHub Actions, con runner ospitati da GitHub: build e pubblicazione delle immagini su GHCR, poi aggiornamento via SSH (chiave privata nei segreti dell'environment GitHub, sulla VPS solo la chiave pubblica). Environment GitHub `dev` e `prod` con segreti separati; `prod` richiede approvazione. Action di terzi fissate per hash di commit; ramo `main` protetto.
 
 **Backup**: in F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su Hetzner Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot Hetzner del server (+20% del canone). Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
 

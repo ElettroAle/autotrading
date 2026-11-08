@@ -1,6 +1,12 @@
-# AutoTrading: documento dei requisiti funzionali
+# AutoTrading: documento dei requisiti funzionali (RAW DI PARTENZA)
 
-**Stato:** bozza 0.3, con le decisioni dell'intervista e della revisione del 7-8 novembre 2026 (sezione 11)
+> **Documento raw di partenza, non più mantenuto.** È la base da cui è stato ricavato il backlog. La fonte di verità dei requisiti è ora:
+> - **gli scenari di accettazione** in [`specs/`](../specs), un file `.feature` per User Story, in cartelle per Epic e Feature (`specs/E<n>-…/F<n>.<m>-…/R<n>.<m>.<k>-….feature`);
+> - **le descrizioni** di Epic, Feature e User Story sulla board Azure DevOps (progetto AutoTrading).
+>
+> Le fasi F0-F6 di questo documento corrispondono alle Epic E0-E6. Dove questo documento e gli scenari divergono, valgono gli scenari: le decisioni prese durante la scrittura del backlog (per esempio ambienti `dev`/`prod`, accesso solo tramite ruolo Entra, credenziali leggibili solo dal servizio) non sono riportate qui.
+
+**Stato:** raw di partenza (ex bozza 0.3), con le decisioni dell'intervista e della revisione del 7-8 novembre 2026 (sezione 11)
 **Data:** 8 novembre 2026
 **Ambito:** solo requisiti funzionali e di comportamento. Le scelte di architettura e tecnologia sono escluse; gli spunti tecnologici emersi dalle fonti sono raccolti in [`tech-notes.md`](tech-notes.md).
 
