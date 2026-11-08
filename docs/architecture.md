@@ -237,9 +237,25 @@ Implementazioni: `hyperliquid` (SDK ufficiale) e `simulated` (replay, RF-25.04).
 
 ## 12. Deployment e costi
 
-- **Sviluppo e produzione piccola**: `docker compose up` con i sei servizi; volumi per PostgreSQL. Lo stesso `compose.yaml` gira su una VM qualsiasi.
-- **Cloud**: immagini pubblicate su GHCR dalla CI; qualunque servizio container (Azure Container Apps, Railway, Fly, una VM con Docker). Nessun servizio gestito obbligatorio: PostgreSQL può essere gestito (comodo per backup) o in container.
-- **Stima minima** (testnet, 1-3 flussi a 15 minuti): una VM da 2 vCPU / 4 GB o equivalente in container app, circa 15-30 € al mese; PostgreSQL gestito piccolo, 10-20 € se non in container; LLM: 96 cicli/giorno × asset × costo per chiamata, misurato in F1 prima di scegliere il modello di lungo periodo.
+### 12.1 Decisione per F0-F1 (8 novembre 2026)
+
+**Hosting: la macchina del proprietario** (VM Windows 11 Pro su Hyper-V, 4 vCPU, 16 GB RAM, circa 27 GB liberi su disco al momento della decisione), con Docker Compose. Nessun credito Azure disponibile; nessun vincolo di regione. Costo cloud: zero. PostgreSQL in container.
+
+Prerequisiti da sistemare sulla macchina (oggi assenti):
+
+1. **WSL2** non installato (`wsl --install`). La macchina è essa stessa una VM: serve la **virtualizzazione annidata** abilitata sull'host Hyper-V (`Set-VMProcessor -ExposeVirtualizationExtensions $true` sulla VM, da host, a VM spenta). Da verificare per primo: senza, Docker non parte.
+2. **Docker Desktop** (gratuito per uso personale) o, in alternativa, Docker Engine dentro una distribuzione WSL2 senza Docker Desktop.
+3. **Spazio disco**: immagini (Prophet con cmdstan pesa), volumi PostgreSQL e distribuzione WSL2 occupano decine di GB; liberare o aggiungere disco.
+4. **Esposizione**: in F0-F1 API e dashboard restano su `localhost`; Entra ID accetta redirect URI su `http://localhost`. Accesso da fuori, se servirà, tramite tunnel (Cloudflare Tunnel, Tailscale) senza aprire porte.
+5. **Uptime**: i flussi girano solo se la VM è accesa. Accettato per la fase testnet; un ciclo saltato è registrato come tale (RF-04.07).
+
+**Backup**: nessun backup gestito. In F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale, con copia opzionale su uno storage qualsiasi: costo zero, un servizio in più nel compose. Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
+
+### 12.2 Dopo F1
+
+- Lo stesso `compose.yaml` gira su una VPS (Hetzner CX22/CX32, 5-10 € al mese), su una VM Azure nel tenant del proprietario (10-20 €), o, con le stesse immagini, su Azure Container Apps con PostgreSQL gestito (30-45 €). Nessun cambio di codice.
+- Immagini pubblicate su GHCR dalla CI.
+- LLM: 96 cicli/giorno × asset × costo per chiamata, misurato in F1 prima di scegliere il modello di lungo periodo.
 - **CI**: GitHub Actions: ruff, mypy, pytest (unit sul rischio e sulla contabilità, integrazione con PostgreSQL in servizio), build immagini. Boards su ADO con `AB#id` nei commit.
 
 ---
@@ -256,6 +272,7 @@ Implementazioni: `hyperliquid` (SDK ufficiale) e `simulated` (replay, RF-25.04).
 | T6 | Scadenza API wallet (180 giorni). | Campo `expires_at` sul conto, notifica 14 giorni prima. |
 | T7 | Nonce con più worker. | Un API wallet per replica; in F1 una sola replica. |
 | T8 | Fonti esterne instabili (feed RSS, endpoint non ufficiali). | Isolamento per nodo, timeout, campione mancante registrato; chiusura della fonte se non praticabile (principio dei requisiti). |
+| T9 | Hosting su VM Hyper-V: virtualizzazione annidata, spazio disco, uptime legato alla macchina. | Verifica WSL2/Docker prima dello scheletro (12.1); `pg_dump` notturno da F1; spostamento su VPS con lo stesso compose quando serve continuità. |
 
 ---
 
