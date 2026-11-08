@@ -17,7 +17,7 @@ Funzionalità: R0.1.1 Accesso riservato agli utenti con il ruolo Utente
     Dato che la persona "bruno" esiste nella directory senza il ruolo "Utente"
     Quando "bruno" accede alla piattaforma
     Allora l'accesso di "bruno" è negato con il motivo "ruolo Utente assente"
-    E la piattaforma non crea alcuno spazio per "bruno"
+    E la piattaforma non crea alcun tenant per "bruno"
 
   Scenario: Una persona con il solo ruolo Gestore chiavi non entra nella piattaforma
     Dato che la persona "carla" esiste nella directory con il solo ruolo "Gestore chiavi"

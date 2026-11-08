@@ -205,10 +205,10 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 
 ### 8.1 Accesso degli utenti
 
-- **Solo Entra ID.** Gli utenti si creano esclusivamente in Entra; la piattaforma non registra né invita nessuno. Accede solo chi ha il ruolo applicativo **Utente** nel token (R0.1.1). Lo spazio applicativo nasce al primo accesso di chi ha il ruolo, legato all'identificativo stabile della directory (`oid`), non al nome (R0.1.2).
+- **Solo Entra ID.** Gli utenti si creano esclusivamente in Entra; la piattaforma non registra né invita nessuno. Accede solo chi ha il ruolo applicativo **Utente** nel token (R0.1.1). Il **tenant** nasce al primo accesso di chi ha il ruolo, legato all'identificativo stabile della directory (`oid`), non al nome (R0.1.2). Tenant e utente sono distinti: il tenant ha un identificativo proprio, l'utente (`oid`) ne è membro; in E0 il database impone un tenant per utente.
 - **Ruoli applicativi** sull'app registration: `Utente` (accesso alla piattaforma) e `Gestore chiavi` (amministrazione di OpenBao: revoca ed eliminazione, mai lettura delle credenziali dei conti).
 - **Superficie in E0-E1**: sola API REST con pagina OpenAPI interattiva e login Entra (Authorization Code + PKCE). Nessuna CLI. Validazione del token con le chiavi pubblicate dall'issuer (JWKS), controllo di audience, tenant e ruolo.
-- **Isolamento** (R0.1.3): ogni query filtra per spazio; PostgreSQL applica in più row level security. Un elemento di un altro spazio risponde "non trovato".
+- **Isolamento** (R0.1.3): le porte che il caso d'uso riceve sono già legate al tenant della richiesta; le entità possedute da un tenant estendono `TenantOwned`. Come seconda barriera PostgreSQL applica row level security, configurata e attivata solo dall'adapter SQLAlchemy. Un elemento di un altro tenant risponde "non trovato". Regole in `.claude/rules/context-tenancy.md`.
 - **Entra ID, limite da conoscere**: per utenti esterni self-service servirebbe Entra External ID o un altro IdP OIDC; l'app non cambia.
 
 ### 8.2 Segreti
@@ -216,7 +216,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 **Modello di minaccia.** La gestione dei segreti protegge da: bug nell'API esposta, accesso alla macchina senza privilegi di root, copie di disco, snapshot e backup. Contro un attaccante root sulla macchina in esecuzione nessuno schema su nodo singolo protegge ciò che è in uso; lì contano il valore basso delle chiavi, la rilevazione e la revoca rapida (sotto).
 
 - **Archivio: OpenBao** in container, storage integrato (raft) su volume, mai esposto su Internet.
-- **Credenziali dei conti**: nel KV di OpenBao, un percorso per spazio e conto (`spaces/<spazio>/accounts/<conto>`); nel database solo il riferimento (R0.2.3). Leggibili **solo dal worker** ("robot"): policy OpenBao distinte per servizio.
+- **Credenziali dei conti**: nel KV di OpenBao, un percorso per tenant e conto (`tenants/<tenant>/accounts/<conto>`); nel database solo il riferimento (R0.2.3). Leggibili **solo dal worker** ("robot"): policy OpenBao distinte per servizio.
 
   | Identità | Permessi sulle credenziali dei conti |
   |----------|--------------------------------------|
@@ -231,7 +231,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 - **Materiale di emergenza fuori dalla macchina**: chiavi di recupero e token root generati all'inizializzazione vanno nel password manager del proprietario; il token root si revoca dopo la configurazione.
 - **Mai variabili d'ambiente per i segreti** (visibili con `docker inspect` e da `/proc`): solo file montati.
 - **Audit** di OpenBao attivo su file, ruotato.
-- **LiteLLM**: chiavi dei fornitori in OpenBao, consegnate a LiteLLM come file; una chiave virtuale per spazio con budget mensile.
+- **LiteLLM**: chiavi dei fornitori in OpenBao, consegnate a LiteLLM come file; una chiave virtuale per tenant con budget mensile.
 
 **Limitare il danno se la macchina è compromessa.**
 

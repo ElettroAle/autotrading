@@ -2,7 +2,7 @@
 @R0.2.1
 Funzionalità: R0.2.1 Registrazione di un conto di trading
   Come utente
-  Voglio registrare nel mio spazio un conto di trading con le sue credenziali
+  Voglio registrare nel mio tenant un conto di trading con le sue credenziali
   Perché la piattaforma possa leggerne lo stato e operare per mio conto
 
   Le credenziali sono quelle che l'exchange richiede (per Hyperliquid: indirizzo del conto e chiave dell'API wallet).
@@ -17,7 +17,7 @@ Funzionalità: R0.2.1 Registrazione di un conto di trading
 
   Scenario: Registrazione riuscita con credenziali accettate dall'exchange
     Quando "anna" registra il conto "test-1" sull'exchange "Hyperliquid" con credenziali che l'exchange accetta
-    Allora il conto "test-1" è salvato nello spazio di "anna"
+    Allora il conto "test-1" è salvato nel tenant di "anna"
     E il conto "test-1" riporta l'exchange "Hyperliquid"
     E il conto "test-1" riporta il saldo letto dall'exchange al momento della registrazione
 
@@ -38,15 +38,15 @@ Funzionalità: R0.2.1 Registrazione di un conto di trading
     Allora la registrazione del conto "test-4" fallisce con il motivo "exchange non supportato"
     E l'esito elenca gli exchange supportati "Hyperliquid"
 
-  Scenario: Nome del conto già usato nello stesso spazio
+  Scenario: Nome del conto già usato nello stesso tenant
     Dato che "anna" ha già il conto "test-1"
     Quando "anna" registra un altro conto con il nome "test-1"
     Allora la registrazione fallisce con il motivo "nome del conto già in uso"
 
-  Scenario: Lo stesso nome è ammesso in spazi diversi
+  Scenario: Lo stesso nome è ammesso in tenant diversi
     Dato che "bruno" ha il ruolo "Utente" e il conto "test-1"
     Quando "anna" registra il conto "test-1" con credenziali che l'exchange accetta
-    Allora il conto "test-1" è salvato nello spazio di "anna"
+    Allora il conto "test-1" è salvato nel tenant di "anna"
 
   Schema dello scenario: Dati obbligatori mancanti
     Quando "anna" registra un conto senza "<dato>"
