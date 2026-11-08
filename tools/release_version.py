@@ -21,6 +21,10 @@ class NonConformingCommitsError(PipelineError):
         self.messages = messages
 
 
+# The title check builds a throwaway commit; CI runners have no git identity configured.
+DETACHED_IDENTITY = ("-c", "user.name=title-check", "-c", "user.email=title-check@localhost")
+
+
 @dataclass(frozen=True, slots=True)
 class Repository:
     path: Path
@@ -40,7 +44,7 @@ class Repository:
 
 
 def is_conventional_title(repository: Repository, title: str) -> bool:
-    detached = repository.run("git", "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", title)
+    detached = repository.run("git", *DETACHED_IDENTITY, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", title)
     return not _unconventional_messages(repository, f"{detached}^..{detached}")
 
 

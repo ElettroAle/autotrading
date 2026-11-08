@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.git_repository import commit, new_repository, tag
+from tests.support.git_repository import IDENTITY, commit, new_repository, tag
 from tools.release_version import (
     GitCommandError,
     NonConformingCommitsError,
@@ -26,6 +26,19 @@ def released(tmp_path: Path) -> Repository:
 @pytest.mark.parametrize("title", ["feat: add health", "fix(api): typo", "feat(api)!: drop v1", "ci: pin actions"])
 def test_accepts_conventional_titles(released: Repository, title: str) -> None:
     assert is_conventional_title(released, title)
+
+
+def test_checks_title_without_a_configured_git_identity(
+    released: Repository, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in IDENTITY:
+        monkeypatch.delenv(name, raising=False)
+    global_config = tmp_path_factory.mktemp("home") / "gitconfig"
+    global_config.write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+    assert is_conventional_title(released, "feat: add health")
 
 
 @pytest.mark.parametrize("title", ["aggiornato tutto", "Feature: health", "wip"])
