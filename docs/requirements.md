@@ -24,7 +24,7 @@ Convenzioni usate nel testo:
 - **RF-xx.yy**: requisito funzionale. **RNF-xx**: requisito non funzionale.
 - **Priorità**: **M** (Must, necessario per la fase indicata), **S** (Should, atteso a breve), **C** (Could, evoluzione futura).
 - **Fase**: fase di rilascio in cui il requisito è previsto (sezione 8).
-- **[Vn] / [D]**: provenienza del requisito.
+- **[Vn] / [D] / [R]**: provenienza del requisito (video, decisione, ricerca su framework esterni in [`research/frameworks-evaluation.md`](research/frameworks-evaluation.md)).
 - **[PROPOSTA]**: requisito non presente nei video, aggiunto perché necessario a rendere il sistema sicuro o completo.
 - **[ASSUNZIONE]**: interpretazione di un punto non esplicito, da confermare.
 
@@ -469,6 +469,25 @@ La dashboard è **privata**: ogni utente, previa autenticazione, vede e gestisce
 |----|-----------|------|------|-------|
 | RF-27.01 | Un flusso può essere guidato da due agenti: uno **strategico** a bassa frequenza, che analizza il mercato su finestre lunghe (es. settimanali) e produce una "narrativa" o un indirizzo di fondo, e uno **esecutivo** a frequenza più alta che opera tenendone conto. | C | F5 | V4, V5 |
 
+### 6.28 Feature avanzata: flusso multi-analista ("comitato")
+
+Idee riprese dai framework di ricerca DeepFund (HKUST) e TradingAgents, valutati in [`research/frameworks-evaluation.md`](research/frameworks-evaluation.md). Nessun codice di terzi viene adottato: il comitato è un modo alternativo di produrre la decisione per asset, tutto il resto del ciclo resta invariato [D].
+
+| ID | Requisito | Pri. | Fase | Fonte |
+|----|-----------|------|------|-------|
+| RF-28.01 | Un flusso ha una **modalità di decisione**: "agente unico" (quella standard, sezione 6.17) oppure "comitato". La modalità fa parte della configurazione versionata del flusso. | C | F5 | D, R |
+| RF-28.02 | In modalità comitato il flusso ha un elenco configurabile di **analisti**; ciascuno ha: nome, fonti dati assegnate (sottoinsieme delle fonti attive del flusso), fornitore e modello IA, istruzioni, peso. | C | F5 | R |
+| RF-28.03 | Ogni analista produce, per ogni asset, un **segnale in schema unificato**: orientamento (rialzista, ribassista, neutrale), confidenza, motivazione. Lo schema è lo stesso per tutti gli analisti. | C | F5 | R |
+| RF-28.04 | **Dibattito** opzionale: due ruoli, uno rialzista e uno ribassista, discutono i segnali raccolti per un numero di round configurabile; ogni round è registrato. | C | F5 | R |
+| RF-28.05 | **Planner** opzionale: prima degli analisti, un agente sceglie, dato il contesto, quali analisti eseguire nel ciclo; la scelta e il motivo sono registrati. | C | F5 | R |
+| RF-28.06 | Un **gestore** riceve i segnali, i pesi degli analisti e l'eventuale esito del dibattito, e produce la decisione per asset nel formato standard (sezione 6.17). Da qui il ciclo prosegue come in modalità agente unico: rischio, esecuzione, contabilità, registrazione. | C | F5 | R |
+| RF-28.07 | Tutti i segnali, i round di dibattito, le scelte del planner e i costi per analista sono registrati con il ciclo e consultabili. | C | F5 | R |
+| RF-28.08 | Il costo stimato per ciclo della modalità comitato (numero di chiamate ai modelli) viene mostrato all'utente al salvataggio della configurazione. | C | F5 | [PROPOSTA] |
+| RF-28.09 | **Memoria delle decisioni**: l'agente (unico o gestore) riceve nel contesto le proprie decisioni precedenti sullo stesso asset e l'esito ottenuto, in numero configurabile. Applicabile anche alla modalità agente unico. | C | F5 | R |
+| RF-28.10 | Per ogni modello IA è registrata la **data di cutoff** dell'addestramento, se nota; nei replay e nei confronti tra modelli i periodi precedenti al cutoff sono segnalati come potenzialmente viziati. | C | F4 | R |
+
+Nelle tabelle, **R** indica una fonte di ricerca citata in `research/frameworks-evaluation.md`.
+
 ---
 
 ## 7. Requisiti non funzionali (comportamentali)
@@ -501,7 +520,7 @@ Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima 
 | **F2. Dashboard e confronto** | Dashboard privata con monitoraggio e configurazione (6.23); duplicazione dei flussi e classifica (RF-03.05, 03.06); interrogazione dello storico (RF-20.04); esportazione e importazione delle configurazioni. |
 | **F3. Rischio, capitale e qualità** | Exit plan, confidenza, stop loss e take profit sull'exchange, esposizione complessiva, perdita massima, chiusura di emergenza (6.18); allarmi di riconciliazione (RF-13.07, 13.08); riduzione del capitale, incasso dei profitti, capitale libero, prelievo (6.22); notifiche complete e scelta dei canali, email (6.24); valutazione del forecast (RF-26.01). |
 | **F4. Replay e analisi** | Replay storico (6.25); analisi delle prestazioni e valutazione dei segnali (6.26). |
-| **F5. Evoluzioni** | Fonti whale e volumi globali; agente multi-livello; chiusure parziali; registrazione autonoma degli utenti; riuso dei dati di mercato tra flussi; riepiloghi periodici. |
+| **F5. Evoluzioni** | Fonti whale e volumi globali; agente multi-livello; flusso multi-analista (6.28); chiusure parziali; registrazione autonoma degli utenti; riuso dei dati di mercato tra flussi; riepiloghi periodici. |
 | **F6. Reale (opzionale)** | Dopo alcuni mesi di sperimentazione e per scelta esplicita: uno o più conti sull'ambiente reale con capitale limitato. |
 | **Backlog** | BL-01 spot, BL-02 copy-trading, BL-03 netting tra flussi. |
 
@@ -561,3 +580,4 @@ Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima 
 | Filtro di rischio | Un'operazione oltre i limiti viene ridotta ai limiti ed eseguita. |
 | Replay storico | Sì: si possono rigiocare i flussi su dati storici. |
 | Spot e copy-trading | Fuori dalla prima versione; nel backlog come proposte a bassa priorità. |
+| Framework esterni | DeepFund e simili non vengono adottati come base; le loro idee (analisti con segnale unificato, dibattito, planner, gestore, memoria delle decisioni, cutoff dei modelli) diventano la feature avanzata 6.28. |
