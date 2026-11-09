@@ -1,4 +1,4 @@
-name: openstack-setup
+name: ovh-setup
 description: Installa la CLI OpenStack da versioni e hash fissati e configura l'accesso al progetto OVH Public Cloud.
 inputs:
   project-id:

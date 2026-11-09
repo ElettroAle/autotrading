@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/python-setup
       - id: provision
-        uses: ./.github/actions/openstack-provision
+        uses: ./.github/actions/ovh-provision
         with:
           environment: ${{ inputs.environment }}
           client-id: ${{ secrets.OVH_CLIENT_ID }}
