@@ -27,7 +27,7 @@ paths:
 - **`TenantOwned`**: classe base astratta in `domain/tenancy`. Ogni entità che appartiene a un tenant
   la estende e porta `tenant_id: TenantId`. Le uniche entità che non la estendono sono `Tenant`,
   `User` e `Membership`.
-- **Porte legate al tenant.** I repository e il vault dei dati posseduti si costruiscono con il
+- **Porte legate al tenant.** I repository dei dati posseduti si costruiscono con il
   tenant della richiesta (`bootstrap.for_tenant`). I loro metodi non ricevono mai `tenant_id`.
 - Un adapter legato al tenant che riceve un'entità di un altro tenant solleva `CrossTenantAccessError`.
 - Un elemento di un altro tenant è **non trovato**: stesso errore e stessa risposta di un elemento

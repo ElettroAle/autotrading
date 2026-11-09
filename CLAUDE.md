@@ -24,7 +24,7 @@ dal proprietario, copia isolata, rosso e verde, PR. Non esistono scorciatoie fuo
 ## Stack
 
 Python 3.15, uv, ruff, mypy (strict), pytest + pytest-bdd, import-linter. FastAPI, SQLAlchemy 2 +
-Alembic, PostgreSQL 16, OpenBao, SDK ufficiale Hyperliquid, Entra ID. Dettagli e motivazioni in
+Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, Entra ID. Dettagli e motivazioni in
 `docs/architecture.md`.
 
 ## Architettura target
@@ -32,11 +32,11 @@ Alembic, PostgreSQL 16, OpenBao, SDK ufficiale Hyperliquid, Entra ID. Dettagli e
 ### Container (installazioni `dev` e `prod`, VPS Hetzner, Docker Compose)
 
 ```text
-Utente ──HTTPS──> Caddy ──> api (FastAPI) ──┬──> PostgreSQL
-                                            ├──> OpenBao (segreti)
+Utente ──HTTPS──> Caddy ──> api (FastAPI) ──┬──> PostgreSQL (credenziali cifrate, chiave pubblica)
                                             ├──> Hyperliquid (internet)
                                             └──> Entra ID (validazione token)
-fasi successive: worker, forecaster (Prophet), litellm, dashboard
+worker (chiave privata) ──> PostgreSQL, Hyperliquid
+fasi successive: forecaster (Prophet), litellm, dashboard
 ```
 
 ### Esagono dentro un servizio
@@ -46,7 +46,8 @@ fasi successive: worker, forecaster (Prophet), litellm, dashboard
  FastAPI router ──> UseCase (application) ──> dominio
                          │ dipende solo da porte (*Port)
                          ├── ExchangePort          ◄── HyperliquidExchangeAdapter
-                         ├── SecretVaultPort       ◄── OpenBaoSecretVaultAdapter
+                         ├── CredentialSealerPort  ◄── SodiumCredentialSealerAdapter
+                         ├── CredentialOpenerPort  ◄── SodiumCredentialOpenerAdapter
                          └── AccountRepositoryPort ◄── SqlAlchemyAccountRepositoryAdapter
  bootstrap.py: unico punto che sceglie quale adapter sta dietro ogni porta
 ```
@@ -79,7 +80,7 @@ src/autotrading/
       <verbo>_<oggetto>.py      un caso d'uso per modulo
   adapters/                     livello 3: tecnologie, ognuna incapsulata
     inbound/api/                FastAPI
-    outbound/<tecnologia>/      hyperliquid/, openbao/, sqlalchemy/
+    outbound/<tecnologia>/      hyperliquid/, libsodium/, sqlalchemy/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -156,7 +157,8 @@ vede rossa prima di diventare verde. Dettagli in `.claude/rules/tests.md`.
 ## Sicurezza (vincoli del proprietario)
 
 - Mai segreti in variabili d'ambiente: solo file montati in sola lettura.
-- Le credenziali dei conti le leggono solo identità di servizio, mai persone.
+- Le credenziali dei conti le leggono solo identità di servizio, mai persone: cifrate nel database,
+  decifrabili solo dal `worker` (ADR 0007).
 - Mai token personali (PAT) per Azure DevOps: solo `az` con l'identità dell'utente, profilo isolato
   (`docs/architecture.md`).
 - Il deploy passa sempre dalla pipeline GitHub Actions.
@@ -171,7 +173,7 @@ Una ADR accettata non si riscrive: la si sostituisce con una nuova che la dichia
 
 Flusso TrunkFlow su `main` protetto: solo pull request integrate per squash, con tutti i controlli
 superati. Ogni integrazione pubblica un'immagine e la rilascia in dev; lo stesso digest va in prod
-con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0006`.
+con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0007`.
 
 ## Board
 
@@ -191,7 +193,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `context-verification.md` | contesto `verification` (F0.4) |
 | `tech-fastapi.md` | `adapters/inbound/api/**` |
 | `tech-hyperliquid.md` | `adapters/outbound/hyperliquid/**` |
-| `tech-openbao.md` | `adapters/outbound/openbao/**` |
+| `tech-libsodium.md` | `adapters/outbound/libsodium/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |

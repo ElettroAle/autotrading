@@ -17,7 +17,7 @@ Funzionalità: R0.2.5 Rimozione di un conto
     Dato che il conto "test-1" non ha posizioni aperte sull'exchange
     Quando "anna" rimuove il conto "test-1"
     Allora il conto "test-1" non compare più tra i conti di "anna"
-    E le credenziali "K1" sono eliminate dall'archivio dei segreti
+    E le credenziali "K1" non sono più conservate dalla piattaforma
     E lo storico delle operazioni del conto "test-1" resta consultabile
 
   Scenario: Rimozione di un conto con posizioni aperte chiede conferma

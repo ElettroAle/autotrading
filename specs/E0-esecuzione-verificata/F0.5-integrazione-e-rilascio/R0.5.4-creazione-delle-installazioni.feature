@@ -7,7 +7,7 @@ Funzionalità: R0.5.4 Creazione delle installazioni dev e prod dalla pipeline
 
   Ogni installazione ha la propria macchina. Il nome pubblico è derivato dall'indirizzo della macchina e ha un certificato HTTPS valido.
 
-  Fuori ambito: backup (non serve in E0), dominio personalizzato, configurazione dei segreti applicativi in OpenBao.
+  Fuori ambito: backup (non serve in E0), dominio personalizzato, configurazione dei segreti applicativi e delle chiavi delle credenziali.
 
   Schema dello scenario: Creazione di un'installazione
     Dato che l'installazione "<ambiente>" non esiste

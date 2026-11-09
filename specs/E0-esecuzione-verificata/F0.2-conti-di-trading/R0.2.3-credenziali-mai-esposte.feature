@@ -5,10 +5,9 @@ Funzionalità: R0.2.3 Credenziali dei conti mai esposte
   Voglio che le credenziali che inserisco non siano mai più leggibili dopo il salvataggio
   Perché chi accede ai miei dati, ai registri o alle risposte non possa operare al posto mio
 
-  Le credenziali sono custodite in un archivio di segreti separato dai dati della piattaforma.
-  Solo il servizio della piattaforma le usa per parlare con l'exchange; le persone con il ruolo Gestore chiavi possono amministrarle nell'archivio.
+  Le credenziali sono salvate cifrate. Le decifra solo il servizio della piattaforma che opera sull'exchange; nessuna persona le legge, né dalla piattaforma né dai dati salvati né dai backup.
 
-  Fuori ambito: rotazione automatica delle credenziali, scadenza delle chiavi sull'exchange.
+  Fuori ambito: rotazione della chiave di cifratura (R0.2.6), scadenza delle chiavi sull'exchange.
 
   Contesto:
     Dato che "anna" ha registrato il conto "test-1" con le credenziali "K1"

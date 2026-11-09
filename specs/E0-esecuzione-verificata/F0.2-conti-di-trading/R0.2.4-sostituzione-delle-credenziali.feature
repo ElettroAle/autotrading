@@ -13,7 +13,7 @@ Funzionalità: R0.2.4 Sostituzione delle credenziali di un conto
   Scenario: Sostituzione con credenziali accettate
     Quando "anna" sostituisce le credenziali del conto "test-1" con "K2" che l'exchange accetta
     Allora il conto "test-1" usa le credenziali "K2"
-    E le credenziali "K1" sono eliminate dall'archivio dei segreti
+    E le credenziali "K1" non sono più conservate dalla piattaforma
 
   Scenario: Sostituzione con credenziali rifiutate
     Quando "anna" sostituisce le credenziali del conto "test-1" con "K3" che l'exchange rifiuta
