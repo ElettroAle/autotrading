@@ -15,7 +15,7 @@ Stessa struttura a livelli di V3, tradotta in GitHub Actions:
 
 | Livello V3 | Qui |
 |---|---|
-| Entry point | `.github/workflows/{quality,release,provision}.yml`: solo trigger e parametri |
+| Entry point | `.github/workflows/{quality,release,provision,inspect}.yml`: solo trigger e parametri |
 | Orchestratore (`Modules/`) | `.github/workflows/reusable-*.yml`: job e ordine, nessun comando |
 | Step template (`Common/Steps/`) | `.github/actions/<tecnologia>-<azione>/action.yml`: l'unico posto con i comandi |
 
@@ -23,6 +23,8 @@ Stessa struttura a livelli di V3, tradotta in GitHub Actions:
   ruleset.
 - `release.yml` sul push in `main`: versione, artefatto, rilascio dev, promozione prod.
 - `provision.yml` ad avvio manuale per ambiente.
+- `inspect.yml` ad avvio manuale per ambiente: legge quote, rete e risorse del progetto OVH senza
+  modificare nulla.
 - Action di terzi fissate per hash di commit; strumenti scaricati dalle release con verifica del
   checksum.
 

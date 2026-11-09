@@ -1,0 +1,58 @@
+name: ovh-inspect
+description: Stampa quote, rete, firewall e risorse del progetto OVH Public Cloud senza creare, modificare o cancellare nulla.
+inputs:
+  client-id:
+    description: Identificativo del service account OVH
+    required: true
+  client-secret:
+    description: Segreto del service account OVH
+    required: true
+  project-id:
+    description: Identificativo del progetto Public Cloud
+    required: true
+  region:
+    description: Regione Public Cloud
+    required: true
+  zone:
+    description: Zona dell'account OVH (eu o ca)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/ovh-setup
+      with:
+        project-id: ${{ inputs.project-id }}
+        region: ${{ inputs.region }}
+        zone: ${{ inputs.zone }}
+    - name: Ispezione in sola lettura
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+      # Only list and show commands: a failing one is reported and the next one still runs.
+      run: |
+        failures=0
+        section() {
+          echo "::group::$1"
+          shift
+          if ! "$@"; then
+            echo "::warning::non riuscito: $*"
+            failures=$((failures + 1))
+          fi
+          echo "::endgroup::"
+        }
+        section "Quote compute" openstack quota show --compute --usage
+        section "Quote rete" openstack quota show --network --usage
+        section "Quote volumi" openstack quota show --volume --usage
+        section "Estensioni di rete" openstack extension list --network -c Alias -c Name
+        section "Reti" openstack network list --long
+        section "Rete pubblica Ext-Net" openstack network show Ext-Net
+        section "Security group" openstack security group list
+        section "Regole del gruppo default" openstack security group rule list default --long
+        section "Porte" openstack port list --long
+        section "Macchine" openstack server list
+        section "Keypair" openstack keypair list
+        section "Floating IP" openstack floating ip list
+        section "Flavor" openstack flavor list
+        section "Immagini Ubuntu" openstack image list --name "Ubuntu 24.04"
+        echo "comandi non riusciti: ${failures}"
