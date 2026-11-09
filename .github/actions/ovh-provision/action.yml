@@ -16,6 +16,9 @@ inputs:
   region:
     description: Regione Public Cloud
     required: true
+  zone:
+    description: Zona dell'account OVH (eu o ca)
+    required: true
   flavor:
     description: Tipo di istanza Public Cloud
     required: true
@@ -39,6 +42,7 @@ runs:
       with:
         project-id: ${{ inputs.project-id }}
         region: ${{ inputs.region }}
+        zone: ${{ inputs.zone }}
     - id: exists
       name: Installazione già esistente?
       shell: bash

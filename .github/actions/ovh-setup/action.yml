@@ -7,6 +7,9 @@ inputs:
   region:
     description: Regione Public Cloud
     required: true
+  zone:
+    description: Zona dell'account OVH (eu o ca)
+    required: true
 runs:
   using: composite
   steps:
@@ -26,16 +29,23 @@ runs:
       env:
         PROJECT_ID: ${{ inputs.project-id }}
         REGION: ${{ inputs.region }}
+        ZONE: ${{ inputs.zone }}
       # Only non-secret settings go to the job environment; client id and secret stay in each step.
+      # Accounts created from the international site live in the Canadian zone (ADR 0009).
       run: |
+        case "$ZONE" in
+          eu) provider=ovhcloud-emea; iam=https://iam.ovh.net/role-adapter/urn:v1:eu:resource:publicCloudProject:pci ;;
+          ca) provider=ovhcloud-world; iam=https://iam.ovh.ca/role-adapter/urn:v1:ca:resource:publicCloudProject:pci ;;
+          *) echo "::error::zona OVH sconosciuta: ${ZONE} (attese eu o ca)"; exit 1 ;;
+        esac
         {
           echo "OS_AUTH_TYPE=v3oidcclientcredentials"
           echo "OS_PROTOCOL=openid"
           echo "OS_ACCESS_TOKEN_TYPE=id_token"
           echo "OS_OPENID_SCOPE=openid profile email publicCloudProject/all"
           echo "OS_AUTH_URL=https://auth.cloud.ovh.net/v3"
-          echo "OS_IDENTITY_PROVIDER=ovhcloud-emea"
-          echo "OS_DISCOVERY_ENDPOINT=https://iam.ovh.net/role-adapter/urn:v1:eu:resource:publicCloudProject:pci/.well-known/openid-configuration"
+          echo "OS_IDENTITY_PROVIDER=${provider}"
+          echo "OS_DISCOVERY_ENDPOINT=${iam}/.well-known/openid-configuration"
           echo "OS_PROJECT_ID=${PROJECT_ID}"
           echo "OS_REGION_NAME=${REGION}"
         } >> "$GITHUB_ENV"

@@ -27,6 +27,7 @@ jobs:
           client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
           project-id: ${{ vars.OVH_PROJECT_ID }}
           region: ${{ vars.OVH_REGION || 'GRA11' }}
+          zone: ${{ vars.OVH_ZONE || 'eu' }}
           deploy-public-key: ${{ vars.DEPLOY_SSH_PUBLIC_KEY }}
           host-private-key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
           host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
@@ -40,6 +41,7 @@ jobs:
           client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
           project-id: ${{ vars.OVH_PROJECT_ID }}
           region: ${{ vars.OVH_REGION || 'GRA11' }}
+          zone: ${{ vars.OVH_ZONE || 'eu' }}
       - if: ${{ steps.provision.outputs.created == 'true' }}
         uses: ./.github/actions/installation-start
         with:
