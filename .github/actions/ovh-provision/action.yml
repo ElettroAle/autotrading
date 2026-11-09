@@ -1,4 +1,4 @@
-name: openstack-provision
+name: ovh-provision
 description: Crea la macchina dell'installazione su OVH Public Cloud da cloud-init versionato; non duplica un'installazione esistente.
 inputs:
   environment:
@@ -35,7 +35,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/openstack-setup
+    - uses: ./.github/actions/ovh-setup
       with:
         project-id: ${{ inputs.project-id }}
         region: ${{ inputs.region }}
