@@ -16,6 +16,9 @@ inputs:
   region:
     description: Regione Public Cloud
     required: true
+  zone:
+    description: Zona dell'account OVH (eu o ca)
+    required: true
 outputs:
   address:
     description: Indirizzo IPv4 della macchina
@@ -30,6 +33,7 @@ runs:
       with:
         project-id: ${{ inputs.project-id }}
         region: ${{ inputs.region }}
+        zone: ${{ inputs.zone }}
     - id: lookup
       name: Indirizzo dell'installazione
       shell: bash

@@ -70,6 +70,7 @@ jobs:
           client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
           project-id: ${{ vars.OVH_PROJECT_ID }}
           region: ${{ vars.OVH_REGION || 'GRA11' }}
+          zone: ${{ vars.OVH_ZONE || 'eu' }}
       - uses: ./.github/actions/ssh-deploy
         with:
           address: ${{ steps.host.outputs.address }}
@@ -119,6 +120,7 @@ jobs:
           client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
           project-id: ${{ vars.OVH_PROJECT_ID }}
           region: ${{ vars.OVH_REGION || 'GRA11' }}
+          zone: ${{ vars.OVH_ZONE || 'eu' }}
       - uses: ./.github/actions/ssh-deploy
         with:
           address: ${{ steps.host.outputs.address }}
