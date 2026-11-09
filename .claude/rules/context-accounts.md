@@ -11,8 +11,8 @@ paths:
 
 - **Account** (conto di trading): collegamento a un conto su un exchange, posseduto da un tenant
   (`TenantOwned`). Nome univoco nel tenant.
-- **Credentials**: chiavi generate dall'utente sull'exchange. Il database conserva solo il
-  riferimento; il contenuto sta nel vault (R0.2.3).
+- **Credentials**: chiavi generate dall'utente sull'exchange. Il database le conserva cifrate con la
+  chiave pubblica dell'installazione; solo il `worker` le decifra (R0.2.3, ADR 0007).
 - **Account state**: saldo, margine disponibile, posizioni aperte, letti dall'exchange.
 
 ## Regole
@@ -27,4 +27,4 @@ paths:
 
 ## Porte del contesto
 
-`ExchangePort` (lettura di saldo e stato), `SecretVaultPort` (credenziali), `AccountRepositoryPort`.
+`ExchangePort` (lettura di saldo e stato), `CredentialSealerPort` e `CredentialOpenerPort` (cifratura e decifratura delle credenziali), `AccountRepositoryPort`.

@@ -32,7 +32,7 @@ tests/
   run reale della pipeline) diventano marker pytest e sono esclusi dalla suite di default e dalla
   copertura degli scenari; gli altri tag (`@R0.5.1`) sono tracciabilità e non diventano marker
   (`tests/scenarios/conftest.py`). Consegnare una User Story significa togliere `@wip`.
-- **Integrazione**: marker `integration`. PostgreSQL e OpenBao in container. Hyperliquid solo con il
+- **Integrazione**: marker `integration`. PostgreSQL in container. Hyperliquid solo con il
   marker `testnet`, fuori dalla suite di default.
 - **Test architetturale**: fa parte della suite di default; un contratto rotto è un test rosso.
 - **Adapter finti**: implementano la porta per intero, sono deterministici e vivono solo in

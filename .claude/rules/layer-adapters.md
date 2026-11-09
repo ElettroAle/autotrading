@@ -13,7 +13,7 @@ Qui vivono le tecnologie. Ogni tecnologia è incapsulata in una sola cartella.
 ## Adapter in uscita
 
 - `adapters/outbound/<tecnologia>/`: implementano le porte di application.
-- Nome `<Tecnologia><Ruolo>Adapter` (es. `OpenBaoSecretVaultAdapter`); rispetta la porta
+- Nome `<Tecnologia><Ruolo>Adapter` (es. `SodiumCredentialSealerAdapter`); rispetta la porta
   strutturalmente, verificato da mypy.
 - Le eccezioni della libreria si catturano qui e si traducono subito nell'errore tipizzato del
   contratto della porta. Nessuna eccezione di libreria esce dall'adapter.
