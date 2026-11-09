@@ -1,0 +1,41 @@
+name: openstack-setup
+description: Installa la CLI OpenStack da versioni e hash fissati e configura l'accesso al progetto OVH Public Cloud.
+inputs:
+  project-id:
+    description: Identificativo del progetto Public Cloud
+    required: true
+  region:
+    description: Regione Public Cloud
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+    - name: Installa la CLI OpenStack
+      shell: bash
+      # PyYAML ships no wheels for Python 3.15 yet: the CLI lives in its own 3.14 environment (ADR 0008).
+      run: |
+        if [ ! -x "${RUNNER_TEMP}/openstack/bin/openstack" ]; then
+          uv venv --python 3.14 "${RUNNER_TEMP}/openstack"
+          uv pip install --python "${RUNNER_TEMP}/openstack/bin/python" --require-hashes \
+            --requirement "${GITHUB_WORKSPACE}/deploy/provision/requirements.txt"
+        fi
+        echo "${RUNNER_TEMP}/openstack/bin" >> "$GITHUB_PATH"
+    - name: Accesso con il service account OVH
+      shell: bash
+      env:
+        PROJECT_ID: ${{ inputs.project-id }}
+        REGION: ${{ inputs.region }}
+      # Only non-secret settings go to the job environment; client id and secret stay in each step.
+      run: |
+        {
+          echo "OS_AUTH_TYPE=v3oidcclientcredentials"
+          echo "OS_PROTOCOL=openid"
+          echo "OS_ACCESS_TOKEN_TYPE=id_token"
+          echo "OS_OPENID_SCOPE=openid profile email publicCloudProject/all"
+          echo "OS_AUTH_URL=https://auth.cloud.ovh.net/v3"
+          echo "OS_IDENTITY_PROVIDER=ovhcloud-emea"
+          echo "OS_DISCOVERY_ENDPOINT=https://iam.ovh.net/role-adapter/urn:v1:eu:resource:publicCloudProject:pci/.well-known/openid-configuration"
+          echo "OS_PROJECT_ID=${PROJECT_ID}"
+          echo "OS_REGION_NAME=${REGION}"
+        } >> "$GITHUB_ENV"

@@ -1,6 +1,6 @@
 # ADR 0005 — Installazioni Hetzner create dalla pipeline
 
-- Stato: accettata (8 novembre 2026)
+- Stato: superata da ADR 0008 (9 novembre 2026)
 - Requisiti: R0.5.4
 
 ## Decisione

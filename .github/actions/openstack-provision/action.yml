@@ -1,0 +1,103 @@
+name: openstack-provision
+description: Crea la macchina dell'installazione su OVH Public Cloud da cloud-init versionato; non duplica un'installazione esistente.
+inputs:
+  environment:
+    description: dev o prod
+    required: true
+  client-id:
+    description: Identificativo del service account OVH
+    required: true
+  client-secret:
+    description: Segreto del service account OVH
+    required: true
+  project-id:
+    description: Identificativo del progetto Public Cloud
+    required: true
+  region:
+    description: Regione Public Cloud
+    required: true
+  flavor:
+    description: Tipo di istanza Public Cloud
+    required: true
+  deploy-public-key:
+    description: Chiave pubblica dell'utente deploy
+    required: true
+  host-private-key:
+    description: Chiave privata host della macchina
+    required: true
+  host-public-key:
+    description: Chiave pubblica host della macchina
+    required: true
+outputs:
+  created:
+    description: true se la macchina è stata creata in questa esecuzione
+    value: ${{ steps.exists.outputs.created }}
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/openstack-setup
+      with:
+        project-id: ${{ inputs.project-id }}
+        region: ${{ inputs.region }}
+    - id: exists
+      name: Installazione già esistente?
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      # A listing fails loudly on authentication errors, unlike a lookup by name.
+      run: |
+        servers="$(openstack server list --name "^autotrading-${ENVIRONMENT}\$" -f value -c ID)"
+        if [ -n "$servers" ]; then
+          echo "::notice::installazione ${ENVIRONMENT} già esistente"
+          echo "created=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "created=true" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Security group e chiave
+      if: ${{ steps.exists.outputs.created == 'true' }}
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
+      run: |
+        group="autotrading-${ENVIRONMENT}"
+        if ! openstack security group show "$group" > /dev/null 2>&1; then
+          openstack security group create "$group" --description "AutoTrading ${ENVIRONMENT}: solo 22 e 443"
+          for port in 22 443; do
+            for ethertype in IPv4 IPv6; do
+              openstack security group rule create "$group" --ingress --protocol tcp --dst-port "$port" \
+                --ethertype "$ethertype"
+            done
+          done
+        fi
+        key="autotrading-${ENVIRONMENT}-deploy"
+        if ! openstack keypair show "$key" > /dev/null 2>&1; then
+          printf '%s\n' "$DEPLOY_PUBLIC_KEY" > "${RUNNER_TEMP}/deploy.pub"
+          openstack keypair create "$key" --public-key "${RUNNER_TEMP}/deploy.pub"
+          rm -f "${RUNNER_TEMP}/deploy.pub"
+        fi
+    - name: Crea la macchina
+      if: ${{ steps.exists.outputs.created == 'true' }}
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        FLAVOR: ${{ inputs.flavor }}
+        DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
+        HOST_PRIVATE_KEY: ${{ inputs.host-private-key }}
+        HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
+      # Ext-Net is the public network; the explicit security group replaces the permissive default one.
+      run: |
+        user_data="${RUNNER_TEMP}/cloud-init.yaml"
+        umask 077
+        uv run python -m tools.render_cloud_init deploy/cloud-init.yaml > "$user_data"
+        openstack server create "autotrading-${ENVIRONMENT}" --flavor "$FLAVOR" --image "Ubuntu 24.04" \
+          --network Ext-Net --key-name "autotrading-${ENVIRONMENT}-deploy" \
+          --security-group "autotrading-${ENVIRONMENT}" --user-data "$user_data" \
+          --property app=autotrading --property "environment=${ENVIRONMENT}" --wait > /dev/null
+        rm -f "$user_data"
