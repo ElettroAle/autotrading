@@ -67,22 +67,26 @@ runs:
         OS_CLIENT_SECRET: ${{ inputs.client-secret }}
         ENVIRONMENT: ${{ inputs.environment }}
         DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
-      # New projects have no quota for extra security groups: the project's default group, which accepts
-      # every connection out of the box, is narrowed to ports 22 and 443 instead (ADR 0010).
+      # New projects have no quota for extra security groups and only a few rules: the project's default
+      # group, which accepts every connection out of the box, keeps just IPv4 TCP 22 and 443 inbound
+      # (ADR 0010, ADR 0011). The public name resolves to the IPv4 address, so IPv6 stays closed.
       run: |
         group=default
         openstack security group rule list "$group" --ingress -f json \
-          | jq -r '.[] | select(.["IP Protocol"] != "tcp" or (.["Port Range"] != "22:22" and .["Port Range"] != "443:443")) | .ID' \
+          | jq -r '.[] | select(.Ethertype != "IPv4" or .["IP Protocol"] != "tcp" or (.["Port Range"] != "22:22" and .["Port Range"] != "443:443")) | .ID' \
           | xargs -r -n 1 openstack security group rule delete
         for port in 22 443; do
-          for ethertype in IPv4 IPv6; do
-            present="$(openstack security group rule list "$group" --ingress --protocol tcp --ethertype "$ethertype" -f json \
-              | jq --arg range "${port}:${port}" '[.[] | select(.["Port Range"] == $range)] | length')"
-            if [ "$present" = "0" ]; then
-              openstack security group rule create "$group" --ingress --protocol tcp --dst-port "$port" \
-                --ethertype "$ethertype"
+          present="$(openstack security group rule list "$group" --ingress --protocol tcp --ethertype IPv4 -f json \
+            | jq --arg range "${port}:${port}" '[.[] | select(.["Port Range"] == $range)] | length')"
+          if [ "$present" = "0" ]; then
+            if ! openstack security group rule create "$group" --ingress --protocol tcp --dst-port "$port" \
+              --ethertype IPv4 > /dev/null; then
+              echo "::error::regola ${port}/tcp non creata; regole attuali del gruppo ${group}:"
+              openstack security group rule list "$group" -f value -c Direction -c Ethertype -c "IP Protocol" -c "Port Range"
+              openstack quota show --network --usage || true
+              exit 1
             fi
-          done
+          fi
         done
         key="autotrading-${ENVIRONMENT}-deploy"
         if ! openstack keypair show "$key" > /dev/null 2>&1; then
