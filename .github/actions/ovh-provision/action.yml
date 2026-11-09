@@ -59,7 +59,7 @@ runs:
         else
           echo "created=true" >> "$GITHUB_OUTPUT"
         fi
-    - name: Security group e chiave
+    - name: Firewall e chiave
       if: ${{ steps.exists.outputs.created == 'true' }}
       shell: bash
       env:
@@ -67,17 +67,23 @@ runs:
         OS_CLIENT_SECRET: ${{ inputs.client-secret }}
         ENVIRONMENT: ${{ inputs.environment }}
         DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
+      # New projects have no quota for extra security groups: the project's default group, which accepts
+      # every connection out of the box, is narrowed to ports 22 and 443 instead (ADR 0010).
       run: |
-        group="autotrading-${ENVIRONMENT}"
-        if ! openstack security group show "$group" > /dev/null 2>&1; then
-          openstack security group create "$group" --description "AutoTrading ${ENVIRONMENT}: solo 22 e 443"
-          for port in 22 443; do
-            for ethertype in IPv4 IPv6; do
+        group=default
+        openstack security group rule list "$group" --ingress -f json \
+          | jq -r '.[] | select(.["IP Protocol"] != "tcp" or (.["Port Range"] != "22:22" and .["Port Range"] != "443:443")) | .ID' \
+          | xargs -r -n 1 openstack security group rule delete
+        for port in 22 443; do
+          for ethertype in IPv4 IPv6; do
+            present="$(openstack security group rule list "$group" --ingress --protocol tcp --ethertype "$ethertype" -f json \
+              | jq --arg range "${port}:${port}" '[.[] | select(.["Port Range"] == $range)] | length')"
+            if [ "$present" = "0" ]; then
               openstack security group rule create "$group" --ingress --protocol tcp --dst-port "$port" \
                 --ethertype "$ethertype"
-            done
+            fi
           done
-        fi
+        done
         key="autotrading-${ENVIRONMENT}-deploy"
         if ! openstack keypair show "$key" > /dev/null 2>&1; then
           printf '%s\n' "$DEPLOY_PUBLIC_KEY" > "${RUNNER_TEMP}/deploy.pub"
@@ -95,13 +101,13 @@ runs:
         DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
         HOST_PRIVATE_KEY: ${{ inputs.host-private-key }}
         HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
-      # Ext-Net is the public network; the explicit security group replaces the permissive default one.
+      # Ext-Net is the public network; the default security group now admits only ports 22 and 443.
       run: |
         user_data="${RUNNER_TEMP}/cloud-init.yaml"
         umask 077
         uv run python -m tools.render_cloud_init deploy/cloud-init.yaml > "$user_data"
         openstack server create "autotrading-${ENVIRONMENT}" --flavor "$FLAVOR" --image "Ubuntu 24.04" \
           --network Ext-Net --key-name "autotrading-${ENVIRONMENT}-deploy" \
-          --security-group "autotrading-${ENVIRONMENT}" --user-data "$user_data" \
+          --security-group default --user-data "$user_data" \
           --property app=autotrading --property "environment=${ENVIRONMENT}" --wait > /dev/null
         rm -f "$user_data"
