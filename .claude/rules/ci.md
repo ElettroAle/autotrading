@@ -10,7 +10,7 @@ paths:
 
 # Pipeline, rilascio e installazioni
 
-Decisioni in `docs/adr/0001`-`0009`. Requisiti in `specs/E0-esecuzione-verificata/F0.5-*`.
+Decisioni in `docs/adr/0001`-`0010`. Requisiti in `specs/E0-esecuzione-verificata/F0.5-*`.
 
 ## Struttura a livelli (come Pipelines V3)
 
