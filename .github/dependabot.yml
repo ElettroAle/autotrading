@@ -6,6 +6,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
+  - package-ecosystem: pip
+    directory: /deploy/provision
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
   - package-ecosystem: github-actions
     directories: ["/", "/.github/actions/*"]
     schedule:

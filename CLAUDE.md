@@ -29,7 +29,7 @@ Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, Entra ID.
 
 ## Architettura target
 
-### Container (installazioni `dev` e `prod`, VPS Hetzner, Docker Compose)
+### Container (installazioni `dev` e `prod`, OVH Public Cloud, Docker Compose)
 
 ```text
 Utente ──HTTPS──> Caddy ──> api (FastAPI) ──┬──> PostgreSQL (credenziali cifrate, chiave pubblica)
@@ -173,7 +173,7 @@ Una ADR accettata non si riscrive: la si sostituisce con una nuova che la dichia
 
 Flusso TrunkFlow su `main` protetto: solo pull request integrate per squash, con tutti i controlli
 superati. Ogni integrazione pubblica un'immagine e la rilascia in dev; lo stesso digest va in prod
-con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0007`.
+con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0008`.
 
 ## Board
 

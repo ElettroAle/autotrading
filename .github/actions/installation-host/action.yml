@@ -4,8 +4,17 @@ inputs:
   environment:
     description: dev o prod
     required: true
-  hcloud-token:
-    description: Token API Hetzner dell'ambiente
+  client-id:
+    description: Identificativo del service account OVH
+    required: true
+  client-secret:
+    description: Segreto del service account OVH
+    required: true
+  project-id:
+    description: Identificativo del progetto Public Cloud
+    required: true
+  region:
+    description: Regione Public Cloud
     required: true
 outputs:
   address:
@@ -17,14 +26,23 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/hcloud-setup
+    - uses: ./.github/actions/openstack-setup
+      with:
+        project-id: ${{ inputs.project-id }}
+        region: ${{ inputs.region }}
     - id: lookup
       name: Indirizzo dell'installazione
       shell: bash
       env:
-        HCLOUD_TOKEN: ${{ inputs.hcloud-token }}
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
         ENVIRONMENT: ${{ inputs.environment }}
       run: |
-        address="$(hcloud server ip "autotrading-${ENVIRONMENT}")"
+        address="$(openstack server show "autotrading-${ENVIRONMENT}" -f json -c addresses \
+          | jq -r '.addresses["Ext-Net"][] | select(test("^[0-9.]+$"))' | head -n 1)"
+        if [ -z "$address" ]; then
+          echo "::error::nessun indirizzo IPv4 pubblico per l'installazione ${ENVIRONMENT}"
+          exit 1
+        fi
         echo "address=${address}" >> "$GITHUB_OUTPUT"
         echo "hostname=${address//./-}.sslip.io" >> "$GITHUB_OUTPUT"

@@ -66,7 +66,10 @@ jobs:
         uses: ./.github/actions/installation-host
         with:
           environment: dev
-          hcloud-token: ${{ secrets.HCLOUD_TOKEN }}
+          client-id: ${{ secrets.OVH_CLIENT_ID }}
+          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
+          project-id: ${{ vars.OVH_PROJECT_ID }}
+          region: ${{ vars.OVH_REGION || 'GRA11' }}
       - uses: ./.github/actions/ssh-deploy
         with:
           address: ${{ steps.host.outputs.address }}
@@ -112,7 +115,10 @@ jobs:
         uses: ./.github/actions/installation-host
         with:
           environment: prod
-          hcloud-token: ${{ secrets.HCLOUD_TOKEN }}
+          client-id: ${{ secrets.OVH_CLIENT_ID }}
+          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
+          project-id: ${{ vars.OVH_PROJECT_ID }}
+          region: ${{ vars.OVH_REGION || 'GRA11' }}
       - uses: ./.github/actions/ssh-deploy
         with:
           address: ${{ steps.host.outputs.address }}

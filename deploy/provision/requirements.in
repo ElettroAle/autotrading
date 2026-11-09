@@ -1,0 +1,2 @@
+# OpenStack CLI for provisioning only. It runs on Python 3.14 because PyYAML ships no wheels for 3.15 yet (ADR 0008).
+python-openstackclient==10.5.0

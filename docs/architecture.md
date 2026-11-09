@@ -269,7 +269,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 
 ### 12.1 Decisione per F0-F1 (8 novembre 2026)
 
-**Hosting: VPS Hetzner** (CX22: 2 vCPU, 4 GB, 40 GB, circa €4,49/mese; oppure CX32: 4 vCPU, 8 GB, 80 GB, circa €8,49/mese, prezzi di ottobre 2026 da verificare al momento dell'ordine), Ubuntu LTS, Docker Engine, `docker compose`. Nessun credito Azure disponibile; nessun vincolo di regione. PostgreSQL in container. Si parte da CX22 e si passa a CX32 (ridimensionamento in pochi minuti) se Prophet o il numero di flussi lo richiedono.
+**Hosting: OVH Public Cloud** (decisione del 9 novembre 2026, ADR 0008; sostituisce la VPS Hetzner, i cui piani condivisi non sono più disponibili). Per ora solo l'installazione `dev`, istanza `d2-2` (1 vCPU, 2 GB, circa €5,71/mese, prezzi di novembre 2026 da verificare all'ordine) in regione `GRA11`, Ubuntu 24.04, Docker Engine, `docker compose`, PostgreSQL in container. Si passa a `d2-4` (2 vCPU, 4 GB, circa €11,44/mese) cambiando una variabile quando arrivano worker e forecaster. Creazione della macchina dalla pipeline con la CLI OpenStack e un service account IAM.
 
 Motivi: canone fisso minimo, sempre acceso, nessun compromesso sull'architettura (cinque container sempre attivi), nessun prerequisito sulla macchina del proprietario.
 
@@ -291,7 +291,7 @@ Configurazione del nodo (F0):
 
 **Ambienti e deploy.** Due installazioni identiche, `dev` (reti di test degli exchange) e `prod`, ciascuna sulla propria VPS con la propria coppia di chiavi delle credenziali. Il deploy passa **sempre** dalla pipeline GitHub Actions, con runner ospitati da GitHub: build e pubblicazione delle immagini su GHCR, poi aggiornamento via SSH (chiave privata nei segreti dell'environment GitHub, sulla VPS solo la chiave pubblica). Environment GitHub `dev` e `prod` con segreti separati; `prod` richiede approvazione. Action di terzi fissate per hash di commit; ramo `main` protetto.
 
-**Backup**: in F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su Hetzner Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot Hetzner del server (+20% del canone). Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
+**Backup**: in F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su OVH Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot dell'istanza. Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
 
 ### 12.2 Dopo F1
 
@@ -314,8 +314,8 @@ Configurazione del nodo (F0):
 | T6 | Scadenza API wallet (180 giorni). | Campo `expires_at` sul conto, notifica 14 giorni prima. |
 | T7 | Nonce con più worker. | Un API wallet per replica; in F1 una sola replica. |
 | T8 | Fonti esterne instabili (feed RSS, endpoint non ufficiali). | Isolamento per nodo, timeout, campione mancante registrato; chiusura della fonte se non praticabile (principio dei requisiti). |
-| T9 | Nodo singolo Hetzner: nessuna ridondanza, disco locale. | Accettato in testnet; `pg_dump` notturno su storage esterno da F1; lo stesso compose gira altrove in caso di guasto. |
-| T10 | Sviluppo locale sulla VM del proprietario senza Docker. | Sviluppare con Python locale contro PostgreSQL e LiteLLM sul nodo Hetzner (porte via tunnel SSH), oppure installare WSL2/Docker se la virtualizzazione annidata è disponibile. |
+| T9 | Nodo singolo OVH: nessuna ridondanza, disco locale. | Accettato in testnet; `pg_dump` notturno su storage esterno da F1; lo stesso compose gira altrove in caso di guasto. |
+| T10 | Sviluppo locale sulla VM del proprietario senza Docker. | Sviluppare con Python locale contro PostgreSQL e LiteLLM sul nodo OVH (porte via tunnel SSH), oppure installare WSL2/Docker se la virtualizzazione annidata è disponibile. |
 
 ---
 

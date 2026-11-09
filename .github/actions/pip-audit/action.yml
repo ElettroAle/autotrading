@@ -9,3 +9,4 @@ runs:
       run: |
         uv export --frozen --no-emit-project --all-groups --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
         uv run pip-audit --strict --disable-pip --requirement "$RUNNER_TEMP/requirements.txt" --progress-spinner off
+        uv run pip-audit --strict --disable-pip --requirement deploy/provision/requirements.txt --progress-spinner off
