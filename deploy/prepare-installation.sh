@@ -6,6 +6,8 @@ cd /opt/autotrading
 install -d -m 700 secrets
 # The postgres user of the container (70) must traverse the init directory.
 install -d -m 755 postgres-init
+# The previous release left the script read-only: replace it instead of writing through it.
+rm -f postgres-init/10-application-role.sh
 cat > postgres-init/10-application-role.sh
 chmod 0555 postgres-init/10-application-role.sh
 postgres_image="$(docker compose config --images | grep '^postgres:')"
