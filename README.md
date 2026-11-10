@@ -29,8 +29,8 @@ senza mostrarli. Nei comandi sostituisci `<env>` con `dev` o `prod`.
    account**, nome `autotrading-<env>`. La finestra mostra il nome (`clientId`) e la password
    (`clientSecret`): la password si vede una volta sola e non si recupera.
 2. **Identity and Access Management > Policy**: una policy con identità il service account, risorsa
-   **solo** il progetto Public Cloud e i permessi OpenStack per gestire istanze, rete, security group
-   e keypair.
+   **solo** il progetto Public Cloud e i permessi OpenStack per gestire istanze, porte di rete e
+   keypair.
 
 ### 3. Segreti e variabili dell'environment GitHub
 
@@ -61,8 +61,8 @@ gh variable set DEPLOY_SSH_PUBLIC_KEY --env <env> -R ElettroAle/autotrading < de
 
 ### 5. Creazione e primo rilascio
 
-1. GitHub, **Actions > provision > Run workflow**, ambiente `<env>`. Crea la macchina, il firewall
-   (solo 22 e 443) e il certificato HTTPS su `<ip-con-trattini>.sslip.io`. Ripeterlo non duplica
+1. GitHub, **Actions > provision > Run workflow**, ambiente `<env>`. Crea la macchina su una porta
+   pubblica senza security group, con firewall `ufw` (solo 22 e 443, ADR 0012) e il certificato HTTPS su `<ip-con-trattini>.sslip.io`. Ripeterlo non duplica
    nulla.
 2. Il rilascio parte da solo a ogni merge su `main` (dev) e con l'approvazione del proprietario
    (prod). Per il primo rilascio di un ambiente appena creato: **Actions > release**, rilancia
@@ -79,5 +79,5 @@ gh variable set DEPLOY_SSH_PUBLIC_KEY --env <env> -R ElettroAle/autotrading < de
    di spegnere la vecchia macchina si esegue un `pg_dump` e lo si ripristina sulla nuova. La coppia di
    chiavi che cifra le credenziali dei conti nasce sulla macchina (ADR 0007) e non si sposta: dopo la
    migrazione le credenziali dei conti vanno reinserite.
-5. Verificato `/health` sul nuovo nome pubblico, sul vecchio account elimina istanza, security group,
-   keypair e progetto, così smette di fatturare.
+5. Verificato `/health` sul nuovo nome pubblico, sul vecchio account elimina istanza, porta
+   `autotrading-<env>-public`, keypair e progetto, così smette di fatturare.

@@ -59,7 +59,7 @@ runs:
         else
           echo "created=true" >> "$GITHUB_OUTPUT"
         fi
-    - name: Firewall e chiave
+    - name: Chiave di accesso
       if: ${{ steps.exists.outputs.created == 'true' }}
       shell: bash
       env:
@@ -67,33 +67,35 @@ runs:
         OS_CLIENT_SECRET: ${{ inputs.client-secret }}
         ENVIRONMENT: ${{ inputs.environment }}
         DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
-      # New projects have no quota for extra security groups and only a few rules: the project's default
-      # group, which accepts every connection out of the box, keeps just IPv4 TCP 22 and 443 inbound
-      # (ADR 0010, ADR 0011). The public name resolves to the IPv4 address, so IPv6 stays closed.
       run: |
-        group=default
-        openstack security group rule list "$group" --ingress -f json \
-          | jq -r '.[] | select(.Ethertype != "IPv4" or .["IP Protocol"] != "tcp" or (.["Port Range"] != "22:22" and .["Port Range"] != "443:443")) | .ID' \
-          | xargs -r -n 1 openstack security group rule delete
-        for port in 22 443; do
-          present="$(openstack security group rule list "$group" --ingress --protocol tcp --ethertype IPv4 -f json \
-            | jq --arg range "${port}:${port}" '[.[] | select(.["Port Range"] == $range)] | length')"
-          if [ "$present" = "0" ]; then
-            if ! openstack security group rule create "$group" --ingress --protocol tcp --dst-port "$port" \
-              --ethertype IPv4 > /dev/null; then
-              echo "::error::regola ${port}/tcp non creata; regole attuali del gruppo ${group}:"
-              openstack security group rule list "$group" -f value -c Direction -c Ethertype -c "IP Protocol" -c "Port Range"
-              openstack quota show --network --usage || true
-              exit 1
-            fi
-          fi
-        done
         key="autotrading-${ENVIRONMENT}-deploy"
         if ! openstack keypair show "$key" > /dev/null 2>&1; then
           printf '%s\n' "$DEPLOY_PUBLIC_KEY" > "${RUNNER_TEMP}/deploy.pub"
           openstack keypair create "$key" --public-key "${RUNNER_TEMP}/deploy.pub"
           rm -f "${RUNNER_TEMP}/deploy.pub"
         fi
+    - id: port
+      name: Porta pubblica senza security group
+      if: ${{ steps.exists.outputs.created == 'true' }}
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      # The project has no quota for security groups or rules: the public port carries none and has port
+      # security disabled, so ufw on the machine is the only firewall (ADR 0012). A port left behind by a
+      # failed run is reused.
+      run: |
+        name="autotrading-${ENVIRONMENT}-public"
+        port="$(openstack port list --name "$name" -f value -c ID | head -n 1)"
+        if [ -z "$port" ]; then
+          if ! port="$(openstack port create "$name" --network Ext-Net --no-security-group \
+            --disable-port-security -f value -c id)"; then
+            echo "::error::OVH non consente una porta pubblica senza security group; nessuna macchina creata"
+            exit 1
+          fi
+        fi
+        echo "id=${port}" >> "$GITHUB_OUTPUT"
     - name: Crea la macchina
       if: ${{ steps.exists.outputs.created == 'true' }}
       shell: bash
@@ -105,13 +107,14 @@ runs:
         DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
         HOST_PRIVATE_KEY: ${{ inputs.host-private-key }}
         HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
-      # Ext-Net is the public network; the default security group now admits only ports 22 and 443.
+        PORT_ID: ${{ steps.port.outputs.id }}
+      # The machine sits on the public port created above; cloud-init enables ufw before any service starts.
       run: |
         user_data="${RUNNER_TEMP}/cloud-init.yaml"
         umask 077
         uv run python -m tools.render_cloud_init deploy/cloud-init.yaml > "$user_data"
         openstack server create "autotrading-${ENVIRONMENT}" --flavor "$FLAVOR" --image "Ubuntu 24.04" \
-          --network Ext-Net --key-name "autotrading-${ENVIRONMENT}-deploy" \
-          --security-group default --user-data "$user_data" \
+          --port "$PORT_ID" --key-name "autotrading-${ENVIRONMENT}-deploy" \
+          --user-data "$user_data" \
           --property app=autotrading --property "environment=${ENVIRONMENT}" --wait > /dev/null
         rm -f "$user_data"

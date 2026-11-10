@@ -1,6 +1,6 @@
 # ADR 0011 — Firewall OVH: ingresso solo IPv4
 
-- Stato: accettata (9 novembre 2026)
+- Stato: sostituita dall'ADR 0012 (10 novembre 2026)
 - Requisiti: R0.5.4
 - Sostituisce: le regole IPv6 in ingresso dell'ADR 0010
 

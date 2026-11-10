@@ -1,6 +1,6 @@
 # ADR 0010 — Firewall OVH sul security group default del progetto
 
-- Stato: accettata (9 novembre 2026)
+- Stato: sostituita dall'ADR 0012 (10 novembre 2026)
 - Requisiti: R0.5.4
 - Sostituisce: la sola parte "Firewall" dell'ADR 0008
 
