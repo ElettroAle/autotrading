@@ -1,11 +1,14 @@
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.execution import Execution
+from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
 from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.domain.tenancy.user_id import UserId
 
 
 class TradingAccessPort(Protocol):
@@ -22,6 +25,9 @@ class ExchangePort(Protocol):
 
     def market(self, access: TradingAccess, coin: str) -> Market: ...
 
+    def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
+        """The position open on the asset, or None when there is none."""
+
     def set_leverage(self, access: TradingAccess, coin: str, leverage: int) -> None:
         """Raises ExchangeRejectedOrderError when the exchange refuses the leverage."""
 
@@ -34,6 +40,16 @@ class ExchangePort(Protocol):
 
     def find_order(self, access: TradingAccess, order: MarketOrder) -> Execution | None:
         """The execution of an order looked up by its client order id, or None if the exchange has none."""
+
+
+class PositionClosingPort(Protocol):
+    """Asks the worker, the only service holding the private key, to close a position of the tenant (ADR 0023).
+
+    Raises OrderAccountNotFoundError, NoOpenPositionError, OrderExchangeUnavailableError, and
+    OrderWorkerUnavailableError when the worker cannot be reached or answers in an unexpected shape.
+    """
+
+    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome: ...
 
 
 class OrderRepositoryPort(Protocol):

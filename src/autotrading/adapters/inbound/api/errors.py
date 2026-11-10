@@ -14,6 +14,13 @@ from autotrading.application.accounts.errors import (
     UnsupportedExchangeError,
     WorkerUnavailableError,
 )
+from autotrading.application.orders.errors import (
+    NoOpenPositionError,
+    OrderAccountNotFoundError,
+    OrderExchangeUnavailableError,
+    OrderWorkerUnavailableError,
+    UnsupportedOrderExchangeError,
+)
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.errors import (
     AccountNameRequiredError,
@@ -22,6 +29,7 @@ from autotrading.domain.accounts.errors import (
     ExchangeRequiredError,
 )
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.orders.errors import ManualOpeningNotAllowedError
 
 
 class NotAuthenticatedError(AutotradingError):
@@ -50,6 +58,10 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     UserRoleMissingError: 403,
     CrossTenantAccessError: 404,
     AccountNotFoundError: 404,
+    OrderAccountNotFoundError: 404,
+    ManualOpeningNotAllowedError: 403,
+    NoOpenPositionError: 409,
+    UnsupportedOrderExchangeError: 422,
     AccountNameInUseError: 409,
     AccountNameRequiredError: 422,
     ExchangeRequiredError: 422,
@@ -61,6 +73,8 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     IdentityProviderUnavailableError: 503,
     ExchangeUnavailableError: 503,
     WorkerUnavailableError: 503,
+    OrderExchangeUnavailableError: 503,
+    OrderWorkerUnavailableError: 503,
     # Sealed credentials that do not open are a fault of the installation, never of the request.
     CredentialsNotOpenedError: 500,
 }
@@ -77,6 +91,7 @@ def _exchange_message(error: Any) -> dict[str, Any]:
 # What an answer adds to the reason, for the errors whose outcome the requirement asks to show.
 ERROR_DETAILS: dict[type[AutotradingError], Callable[[Any], dict[str, Any]]] = {
     UnsupportedExchangeError: _supported,
+    UnsupportedOrderExchangeError: _supported,
     ExchangeRejectedCredentialsError: _exchange_message,
 }
 

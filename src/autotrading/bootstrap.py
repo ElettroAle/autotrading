@@ -3,7 +3,9 @@ import binascii
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from uuid import UUID
 
 import httpx
 from fastapi import FastAPI
@@ -11,11 +13,13 @@ from sqlalchemy import Engine
 
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings, OidcSigningKeys
-from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
-from autotrading.adapters.inbound.api.worker import create_worker_api
+from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
+from autotrading.adapters.inbound.api.worker import WorkerUseCases, create_worker_api
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
+from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
@@ -23,22 +27,38 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
-from autotrading.application.accounts.ports import ExchangePort
+from autotrading.application.accounts.errors import AccountNotFoundError
+from autotrading.application.accounts.get_account import find_account
+from autotrading.application.accounts.ports import AccountRepositoryPort, CredentialOpenerPort, ExchangePort
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
+from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
+from autotrading.application.orders.errors import OrderAccountNotFoundError
+from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.orders.slippage import Slippage
+from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 SUPPORTED_ENVIRONMENTS = ("dev", "prod")
 DEFAULT_DATABASE_PORT = "5432"
 DEFAULT_CREDENTIALS_KEY_VERSION = "1"
 HYPERLIQUID = "Hyperliquid"
+SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
 
 
 class MissingConfigurationError(AutotradingError):
     def __init__(self, name: str) -> None:
         super().__init__(f"configurazione mancante: {name}")
+        self.name = name
+
+
+class InvalidConfigurationError(AutotradingError):
+    def __init__(self, name: str) -> None:
+        super().__init__(f"configurazione non valida: {name}")
         self.name = name
 
 
@@ -67,6 +87,34 @@ class WorkerConnection:
     token: str = field(repr=False)
 
 
+@dataclass(frozen=True, slots=True)
+class WorkerExchanges:
+    """The exchanges the worker reads accounts from and sends orders to, on the network of the installation."""
+
+    accounts: Mapping[str, ExchangePort]
+    orders: Mapping[str, OrderExchangePort]
+
+
+class TradingAccessFromAccounts:
+    """Bridges the accounts context to the orders context in the worker (ADR 0023).
+
+    The account is looked up for the tenant under row level security, then opened with the private key only the
+    worker holds; an account the tenant does not have is not found before anything is opened (R0.1.3).
+    """
+
+    def __init__(self, accounts: AccountRepositoryPort, opener: CredentialOpenerPort) -> None:
+        self._accounts = accounts
+        self._opener = opener
+
+    def access(self, account_id: UUID) -> TradingAccess:
+        try:
+            account = find_account(self._accounts, AccountId(account_id))
+        except AccountNotFoundError as error:
+            raise OrderAccountNotFoundError from error
+        credentials = self._opener.open(account)
+        return TradingAccess(account.exchange.value, credentials.account_address, credentials.secret_key)
+
+
 class TenantUseCaseFactory:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
 
@@ -85,23 +133,37 @@ class TenantUseCaseFactory:
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
         sealer = SodiumCredentialSealerAdapter(self._public_key.key, self._public_key.version, tenant_id)
-        account_state = HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id)
-        return TenantUseCases.on(tenant_id, accounts, sealer, self._exchanges, account_state)
+        ports = TenantPorts(
+            accounts=accounts,
+            sealer=sealer,
+            exchanges=self._exchanges,
+            account_state=HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id),
+            position_closing=HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id),
+        )
+        return TenantUseCases.on(tenant_id, ports)
 
 
 class WorkerUseCaseFactory:
-    """Builds, for each request of the API, the worker use case on adapters bound to the tenant it names."""
+    """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
 
     def __init__(
-        self, engine: Engine, opener: SodiumCredentialOpenerAdapter, exchanges: Mapping[str, ExchangePort]
+        self, engine: Engine, opener: SodiumCredentialOpenerAdapter, exchanges: WorkerExchanges, slippage: Slippage
     ) -> None:
         self._engine = engine
         self._opener = opener
         self._exchanges = exchanges
+        self._slippage = slippage
 
-    def for_tenant(self, tenant_id: TenantId) -> ReadExchangeStateUseCase:
+    def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
-        return ReadExchangeStateUseCase(accounts, self._opener, self._exchanges)
+        orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
+        access = TradingAccessFromAccounts(accounts, self._opener)
+        return WorkerUseCases(
+            read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
+            close_exchange_position=CloseExchangePositionUseCase(
+                access, self._exchanges.orders, orders, self._slippage
+            ),
+        )
 
 
 def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
@@ -126,13 +188,32 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     opener = SodiumCredentialOpenerAdapter(
         {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     )
-    worker = WorkerUseCaseFactory(_database(configuration), opener, exchanges_for(environment))
+    exchanges = WorkerExchanges(exchanges_for(environment), order_exchanges_for(environment))
+    worker = WorkerUseCaseFactory(_database(configuration), opener, exchanges, slippage_from(configuration))
     return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant)
 
 
 def exchanges_for(environment: str) -> dict[str, HyperliquidExchangeAdapter]:
     # The exchange network follows the installation: test networks in dev, real ones in prod (R0.2.1).
     return {HYPERLIQUID: HyperliquidExchangeAdapter.for_network(testnet=environment == "dev")}
+
+
+def order_exchanges_for(environment: str) -> dict[str, HyperliquidOrderExchangeAdapter]:
+    return {HYPERLIQUID: HyperliquidOrderExchangeAdapter.for_network(testnet=environment == "dev")}
+
+
+def slippage_from(configuration: Mapping[str, str]) -> Slippage:
+    """The largest distance from the current price an order accepts: 5% unless the installation says otherwise."""
+    text = configuration.get(SLIPPAGE_SETTING, "").strip()
+    if not text:
+        return Slippage.default()
+    try:
+        percent = Decimal(text)
+    except InvalidOperation as error:
+        raise InvalidConfigurationError(SLIPPAGE_SETTING) from error
+    if not percent.is_finite():
+        raise InvalidConfigurationError(SLIPPAGE_SETTING)
+    return Slippage.percent(percent)
 
 
 def _credentials_public_key(configuration: Mapping[str, str]) -> bytes:

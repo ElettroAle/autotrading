@@ -12,7 +12,20 @@ from autotrading.application.accounts.ports import (
 from autotrading.application.accounts.read_account_state import ReadAccountStateUseCase
 from autotrading.application.accounts.register_account import RegisterAccountUseCase
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
+from autotrading.application.orders.close_position import ClosePositionUseCase
+from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.domain.tenancy.tenant_id import TenantId
+
+
+@dataclass(frozen=True, slots=True)
+class TenantPorts:
+    """The adapters of one request, bound to its tenant, that the use cases of the API run on."""
+
+    accounts: AccountRepositoryPort
+    sealer: CredentialSealerPort
+    exchanges: Mapping[str, ExchangePort]
+    account_state: AccountStatePort
+    position_closing: PositionClosingPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,20 +37,16 @@ class TenantUseCases:
     get_account: GetAccountUseCase
     replace_credentials: ReplaceCredentialsUseCase
     read_account_state: ReadAccountStateUseCase
+    close_position: ClosePositionUseCase
 
     @classmethod
-    def on(
-        cls,
-        tenant_id: TenantId,
-        accounts: AccountRepositoryPort,
-        sealer: CredentialSealerPort,
-        exchanges: Mapping[str, ExchangePort],
-        account_state: AccountStatePort,
-    ) -> TenantUseCases:
+    def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
+        accounts, sealer, exchanges = ports.accounts, ports.sealer, ports.exchanges
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
             list_accounts=ListAccountsUseCase(accounts),
             get_account=GetAccountUseCase(accounts),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
-            read_account_state=ReadAccountStateUseCase(accounts, account_state),
+            read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
+            close_position=ClosePositionUseCase(ports.position_closing),
         )

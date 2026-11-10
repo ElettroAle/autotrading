@@ -15,45 +15,15 @@ from autotrading.application.accounts.errors import (
     ExchangeUnavailableError,
     WorkerUnavailableError,
 )
-from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
-from autotrading.domain.accounts.account import Account
+from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
-from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
-from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
-from tests.fakes.exchange import REDACTED_REJECTION, FakeExchangeAdapter
-from tests.support.accounts import an_account
-from tests.support.platform import HYPERLIQUID, new_credentials
+from tests.fakes.exchange import REDACTED_REJECTION
+from tests.support.worker import TENANT, TOKEN, Worker
 
-TOKEN = token_hex(16)
 REFUSED = "connection refused"
-TENANT = TenantId.new()
 SHORT_ETH = Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("-4.2"), None)
-
-
-class Worker:
-    """The worker of an installation: its store, its exchange and the vault only its opener reads."""
-
-    def __init__(self) -> None:
-        self.store = AccountStore()
-        self.vault: SealedVault = {}
-        self.exchange = FakeExchangeAdapter()
-
-    def for_tenant(self, tenant_id: TenantId) -> ReadExchangeStateUseCase:
-        accounts = InMemoryAccountRepositoryAdapter(self.store, tenant_id)
-        return ReadExchangeStateUseCase(accounts, FakeCredentialOpenerAdapter(self.vault), {HYPERLIQUID: self.exchange})
-
-    def saved_account(self, tenant_id: TenantId = TENANT) -> Account:
-        credentials = new_credentials()
-        self.exchange.accept(credentials, Decimal("250.5"))
-        account = an_account(tenant_id, credentials=credentials)
-        sealed = account.with_credentials(
-            FakeCredentialSealerAdapter(tenant_id, self.vault).seal(account.id, credentials)
-        )
-        self.store.accounts.append(sealed)
-        return sealed
 
 
 @pytest.fixture
@@ -77,7 +47,7 @@ def test_the_state_read_by_the_worker_arrives_unchanged(worker: Worker) -> None:
 
     state = adapter_on(worker).read_state(account.id)
 
-    assert state == worker.for_tenant(TENANT).execute(ReadExchangeStateCommand(account.id))
+    assert state == worker.for_tenant(TENANT).read_exchange_state.execute(ReadExchangeStateCommand(account.id))
     assert state.positions == (SHORT_ETH,)
 
 

@@ -9,8 +9,10 @@ class FakeCredentialOpenerAdapter:
 
     def __init__(self, vault: SealedVault) -> None:
         self._vault = vault
+        self.opened: list[Account] = []
 
     def open(self, account: Account) -> Credentials:
+        self.opened.append(account)
         sealed = self._vault.get(account.credentials.ciphertext)
         if sealed is None:
             raise CredentialsNotOpenedError

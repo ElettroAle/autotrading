@@ -1,19 +1,41 @@
 import hmac
 from collections.abc import Callable
+from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
+from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.errors import NotAuthenticatedError, install_error_responses
+from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
+from autotrading.application.orders.close_exchange_position import (
+    CloseExchangePositionCommand,
+    CloseExchangePositionUseCase,
+)
+from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 
 BEARER_PREFIX = "bearer "
 
 
-def create_worker_api(token: str, for_tenant: Callable[[TenantId], ReadExchangeStateUseCase]) -> FastAPI:
+@dataclass(frozen=True, slots=True)
+class WorkerUseCases:
+    """The use cases of the worker for one request, on adapters bound to the tenant the API names."""
+
+    read_exchange_state: ReadExchangeStateUseCase
+    close_exchange_position: CloseExchangePositionUseCase
+
+
+class ClosingRequest(BaseModel):
+    # The API has authenticated the user and sends who asked, so the close is recorded with them (R0.3.2).
+    user_id: str
+
+
+def create_worker_api(token: str, for_tenant: Callable[[TenantId], WorkerUseCases]) -> FastAPI:
     """The internal service of the worker: reachable only by the API on the network of the installation (ADR 0021).
 
     The tenant travels in the path because the API has already resolved it from the identity of the user; the
@@ -32,7 +54,13 @@ def create_worker_api(token: str, for_tenant: Callable[[TenantId], ReadExchangeS
     @api.get("/tenants/{tenant_id}/accounts/{account_id}/state", dependencies=[Depends(require_api)])
     def read_state(tenant_id: UUID, account_id: UUID) -> AccountStateResponse:
         command = ReadExchangeStateCommand(AccountId(account_id))
-        return AccountStateResponse.of(for_tenant(TenantId(tenant_id)).execute(command))
+        return AccountStateResponse.of(for_tenant(TenantId(tenant_id)).read_exchange_state.execute(command))
+
+    @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])
+    def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: ClosingRequest) -> OrderOutcomeResponse:
+        command = CloseExchangePositionCommand(account_id, coin, UserId(request.user_id))
+        order = for_tenant(TenantId(tenant_id)).close_exchange_position.execute(command)
+        return OrderOutcomeResponse.of(OrderOutcome.of(order))
 
     @api.get("/health")
     def read_health() -> dict[str, str]:

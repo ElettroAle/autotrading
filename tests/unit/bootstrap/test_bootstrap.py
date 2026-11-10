@@ -1,4 +1,5 @@
 import base64
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,26 +10,44 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from sqlalchemy import create_engine
 
 from autotrading import bootstrap
-from autotrading.adapters.outbound.libsodium.opener import InvalidPrivateCredentialsKeyError
+from autotrading.adapters.outbound.libsodium.opener import (
+    InvalidPrivateCredentialsKeyError,
+    SodiumCredentialOpenerAdapter,
+)
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
+from autotrading.application.orders.close_position import ClosePositionCommand
+from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
 from autotrading.bootstrap import (
+    SLIPPAGE_SETTING,
+    InvalidConfigurationError,
     MissingConfigurationError,
     PublicCredentialsKey,
     TenantUseCaseFactory,
+    TradingAccessFromAccounts,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
     WorkerConnection,
+    WorkerExchanges,
+    WorkerUseCaseFactory,
     create_application,
     create_worker_application,
     exchanges_for,
+    order_exchanges_for,
+    slippage_from,
 )
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.orders.errors import InvalidSlippageError
+from autotrading.domain.orders.slippage import Slippage
+from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
+from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
+from tests.support.worker import Worker
 
 AUTHENTICATION = {
     "AUTH_ISSUER": "https://login.example.test/tenant/v2.0",
@@ -227,3 +246,102 @@ def test_the_worker_refuses_to_start_with_a_malformed_private_key(tmp_path: Path
 @pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
 def test_the_exchange_network_follows_the_installation(environment: str, url: str) -> None:
     assert {name: exchange.base_url for name, exchange in exchanges_for(environment).items()} == {"Hyperliquid": url}
+
+
+@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
+def test_the_orders_go_to_the_network_of_the_installation(environment: str, url: str) -> None:
+    assert {name: exchange.base_url for name, exchange in order_exchanges_for(environment).items()} == {
+        "Hyperliquid": url
+    }
+
+
+@pytest.mark.parametrize(
+    ("configured", "percent"),
+    [({}, Decimal(5)), ({SLIPPAGE_SETTING: "  "}, Decimal(5)), ({SLIPPAGE_SETTING: " 1.5 "}, Decimal("1.5"))],
+    ids=["absent", "blank", "declared"],
+)
+def test_the_slippage_is_five_percent_unless_the_installation_declares_it(
+    configured: dict[str, str], percent: Decimal
+) -> None:
+    assert slippage_from(configured) == Slippage.percent(percent)
+
+
+@pytest.mark.parametrize("text", ["five", "NaN", "Infinity"])
+def test_a_slippage_that_is_not_a_number_is_an_invalid_configuration(text: str) -> None:
+    with pytest.raises(InvalidConfigurationError) as raised:
+        slippage_from({SLIPPAGE_SETTING: text})
+
+    assert SLIPPAGE_SETTING in str(raised.value)
+
+
+@pytest.mark.parametrize("text", ["0", "-1", "100", "250"])
+def test_a_slippage_outside_its_range_is_refused(text: str) -> None:
+    with pytest.raises(InvalidSlippageError):
+        slippage_from({SLIPPAGE_SETTING: text})
+
+
+def test_the_worker_refuses_to_start_with_an_invalid_slippage(tmp_path: Path) -> None:
+    with pytest.raises(AutotradingError):
+        create_worker_application(worker_configuration(tmp_path, **{SLIPPAGE_SETTING: "five"}))
+
+
+def test_the_access_to_trade_is_opened_from_the_account_of_the_tenant() -> None:
+    worker = Worker()
+    account = worker.saved_account()
+    credentials = worker.vault[account.credentials.ciphertext][2]
+    accesses = TradingAccessFromAccounts(
+        InMemoryAccountRepositoryAdapter(worker.store, account.tenant_id), FakeCredentialOpenerAdapter(worker.vault)
+    )
+
+    assert accesses.access(account.id.value) == TradingAccess(
+        "Hyperliquid", credentials.account_address, credentials.secret_key
+    )
+
+
+def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
+    worker = Worker()
+    theirs = worker.saved_account(TenantId.new())
+    opener = FakeCredentialOpenerAdapter(worker.vault)
+    accesses = TradingAccessFromAccounts(InMemoryAccountRepositoryAdapter(worker.store, TenantId.new()), opener)
+
+    with pytest.raises(OrderAccountNotFoundError):
+        accesses.access(theirs.id.value)
+
+    assert opener.opened == []
+
+
+def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
+    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"))
+    opener = SodiumCredentialOpenerAdapter({})
+    factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, Slippage.default())
+
+    first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
+
+    assert first.close_exchange_position is not second.close_exchange_position
+    assert first.read_exchange_state is not second.read_exchange_state
+
+
+def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: Path) -> None:
+    asked: list[httpx.Request] = []
+
+    def worker_answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(503, json={"detail": "exchange non raggiungibile"})
+
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    factory = TenantUseCaseFactory(
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, WorkerConnection(client, WORKER_TOKEN)
+    )
+    tenant_id, account_id = TenantId.new(), uuid4()
+
+    with pytest.raises(OrderExchangeUnavailableError):
+        factory.for_tenant(tenant_id).close_position.execute(
+            ClosePositionCommand(account_id, "BTC", UserId("oid-anna"))
+        )
+
+    assert [request.url.path for request in asked] == [
+        f"/tenants/{tenant_id.value}/accounts/{account_id}/positions/BTC/close"
+    ]
+    assert asked[0].headers["Authorization"] == f"Bearer {WORKER_TOKEN}"

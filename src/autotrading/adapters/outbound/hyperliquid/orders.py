@@ -22,7 +22,9 @@ from autotrading.application.orders.errors import (
     OrderExchangeUnavailableError,
     OrderNotAcknowledgedError,
 )
+from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
+from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -47,11 +49,20 @@ class HyperliquidOrderExchangeAdapter:
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidOrderExchangeAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
     def market(self, access: TradingAccess, coin: str) -> Market:
         with _translated(access):
             info = self._sdk.info(self._base_url, self._timeout)
             universe, mids = info.meta()["universe"], info.all_mids()
         return _market_of(coin, universe, mids)
+
+    def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
+        with _translated(access):
+            state = self._sdk.info(self._base_url, self._timeout).user_state(access.account_address)
+        return _held_position_of(state, coin)
 
     def set_leverage(self, access: TradingAccess, coin: str, leverage: int) -> None:
         with _translated(access):
@@ -123,6 +134,18 @@ def _market_of(coin: str, universe: Sequence[Mapping[str, Any]], mids: Mapping[s
         raise ExchangeRejectedOrderError(message)
     try:
         return Market(coin, int(asset["maxLeverage"]), int(asset["szDecimals"]), _decimal(mids[coin]))
+    except SHAPE_ERRORS as error:
+        raise OrderExchangeUnavailableError from error
+
+
+def _held_position_of(state: Any, coin: str) -> HeldPosition | None:
+    try:
+        held = [entry["position"] for entry in state["assetPositions"] if entry["position"]["coin"] == coin]
+        if not held or _decimal(held[0]["szi"]) == 0:
+            return None
+        size = _decimal(held[0]["szi"])
+        direction = Direction.LONG if size > 0 else Direction.SHORT
+        return HeldPosition(coin, direction, abs(size), int(held[0]["leverage"]["value"]))
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error
 
