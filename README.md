@@ -40,7 +40,7 @@ gh variable set OVH_PROJECT_ID --env <env> -R ElettroAle/autotrading --body <id-
 gh variable set OVH_ZONE --env <env> -R ElettroAle/autotrading --body <eu|ca>
 ```
 
-Facoltative: `OVH_REGION` (predefinita `GRA11`) e `OVH_FLAVOR` (predefinito `d2-2`).
+Facoltative: `OVH_REGION` (predefinita `SBG5`) e `OVH_FLAVOR` (predefinito `d2-2`).
 
 ### 4. Tailscale (rete privata delle installazioni, ADR 0013)
 
@@ -59,7 +59,9 @@ Per ogni ambiente:
 
 1. https://console.tailscale.com/admin/settings/trust-credentials, **Credential > OpenID Connect**:
    - Issuer **GitHub** (`https://token.actions.githubusercontent.com`);
-   - Subject `repo:ElettroAle/autotrading:environment:<env>`;
+   - Subject `repo:ElettroAle@13102057/autotrading@1448691814:environment:<env>`. Il repository usa il
+     subject immutabile di GitHub, con gli ID numerici di account e repository; il prefisso esatto si legge
+     con `gh api repos/ElettroAle/autotrading/actions/oidc/customization/sub` (`sub_claim_prefix`);
    - scope **Auth Keys > Write**, tag `tag:ci` e `tag:autotrading-<env>`.
 2. Client ID e Audience non sono segreti:
 
