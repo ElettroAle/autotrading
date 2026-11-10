@@ -5,7 +5,7 @@ from sqlalchemy import Connection, Engine, RowMapping, func, insert, select, upd
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
-from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
@@ -16,6 +16,8 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 NAME_UNIQUE_IN_TENANT = "accounts_name_unique_in_tenant"
+# A removed account keeps its row for the history and is invisible to every other query (ADR 0025).
+IN_USE = accounts.c.removed_at.is_(None)
 
 
 class SqlAlchemyAccountRepositoryAdapter:
@@ -26,17 +28,17 @@ class SqlAlchemyAccountRepositoryAdapter:
         self._tenant_id = tenant_id
 
     def name_in_use(self, name: AccountName) -> bool:
-        query = select(func.count()).select_from(accounts).where(accounts.c.name == name.value)
+        query = select(func.count()).select_from(accounts).where(IN_USE, accounts.c.name == name.value)
         with self._transaction() as connection:
             return bool(connection.execute(query).scalar_one())
 
     def list(self) -> list[Account]:
-        query = select(accounts).order_by(accounts.c.name)
+        query = select(accounts).where(IN_USE).order_by(accounts.c.name)
         with self._transaction() as connection:
             return [_account_of(row) for row in connection.execute(query).mappings()]
 
     def get(self, account_id: AccountId) -> Account | None:
-        query = select(accounts).where(accounts.c.id == account_id.value)
+        query = select(accounts).where(IN_USE, accounts.c.id == account_id.value)
         with self._transaction() as connection:
             row = connection.execute(query).mappings().one_or_none()
         return None if row is None else _account_of(row)
@@ -53,11 +55,22 @@ class SqlAlchemyAccountRepositoryAdapter:
 
     def replace(self, account: Account) -> None:
         self._require_own(account)
-        statement = update(accounts).where(accounts.c.id == account.id.value).values(_row_of(account))
+        statement = update(accounts).where(IN_USE, accounts.c.id == account.id.value).values(_row_of(account))
         with self._transaction() as connection:
             # Row level security hides the rows of other tenants: an account of theirs updates nothing.
             if connection.execute(statement).rowcount != 1:
                 raise CrossTenantAccessError
+
+    def remove(self, account_id: AccountId) -> None:
+        statement = (
+            update(accounts)
+            .where(IN_USE, accounts.c.id == account_id.value)
+            .values(removed_at=func.now(), credentials_key_version=None, credentials_ciphertext=None)
+        )
+        with self._transaction() as connection:
+            # Row level security hides the rows of other tenants: an account of theirs is not found.
+            if connection.execute(statement).rowcount != 1:
+                raise AccountNotFoundError
 
     def _require_own(self, account: Account) -> None:
         if account.tenant_id != self._tenant_id:

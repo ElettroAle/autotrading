@@ -57,3 +57,10 @@ class AccountRepositoryPort(Protocol):
     def add(self, account: Account) -> None:
         """Raises AccountNameInUseError when the tenant already has an account with that name."""
         ...
+
+    def remove(self, account_id: AccountId) -> None:
+        """Deletes the credentials and hides the account, keeping its history (ADR 0025).
+
+        Raises AccountNotFoundError when the tenant has no such account, also when it was already removed.
+        """
+        ...

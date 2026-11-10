@@ -19,3 +19,8 @@ class CredentialsRequiredError(DomainError):
 class CredentialsOfAnotherAccountError(DomainError):
     def __init__(self) -> None:
         super().__init__("le credenziali appartengono a un altro conto dell'exchange")
+
+
+class OpenPositionsNeedConfirmationError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("il conto ha posizioni aperte che resteranno sull'exchange senza gestione")

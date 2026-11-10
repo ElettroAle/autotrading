@@ -11,6 +11,7 @@ from autotrading.application.accounts.account_details import AccountDetails
 from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.account_id import AccountId
 
@@ -104,6 +105,15 @@ def accounts_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIR
     ) -> AccountDetailsResponse:
         command = ReplaceCredentialsCommand(AccountId(account_id), request.account_address, request.secret_key)
         return AccountDetailsResponse.of(use_cases.replace_credentials.execute(command))
+
+    @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def remove_account(
+        account_id: UUID,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        confirmed: bool = False,
+    ) -> None:
+        # Without confirmation an account with open positions is kept (R0.2.5, ADR 0025).
+        use_cases.remove_account.execute(RemoveAccountCommand(AccountId(account_id), confirmed=confirmed))
 
     @router.get("/{account_id}/state")
     def read_account_state(

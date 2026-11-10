@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     LargeBinary,
     MetaData,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 
 metadata = MetaData()
@@ -42,10 +44,18 @@ accounts = Table(
     Column("name", Text, nullable=False),
     Column("exchange", Text, nullable=False),
     Column("exchange_account_fingerprint", Text, nullable=False),
-    Column("credentials_key_version", Integer, nullable=False),
-    Column("credentials_ciphertext", LargeBinary, nullable=False),
+    # Empty once the account is removed: the row stays for its history, the credentials do not (ADR 0025).
+    Column("credentials_key_version", Integer),
+    Column("credentials_ciphertext", LargeBinary),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    UniqueConstraint("tenant_id", "name", name="accounts_name_unique_in_tenant"),
+    Column("removed_at", DateTime(timezone=True)),
+    Index(
+        "accounts_name_unique_in_tenant",
+        "tenant_id",
+        "name",
+        unique=True,
+        postgresql_where=text("removed_at IS NULL"),
+    ),
     UniqueConstraint("id", "tenant_id", name="accounts_id_tenant_unique"),
 )
 
