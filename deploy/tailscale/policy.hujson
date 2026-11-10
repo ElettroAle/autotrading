@@ -1,0 +1,44 @@
+// Policy del tailnet del proprietario (ADR 0013). Fonte di verità: si incolla a mano nel pannello
+// Tailscale, Access controls > JSON editor, a ogni modifica di questo file.
+{
+  // Ogni tag è anche proprietario di sé stesso: la credenziale OIDC di un ambiente, che ha due tag, può
+  // così dare un solo tag per chiave (tag:ci al job, tag:autotrading-<ambiente> alla macchina).
+  "tagOwners": {
+    "tag:ci": ["autogroup:admin", "tag:ci"],
+    "tag:autotrading-dev": ["autogroup:admin", "tag:autotrading-dev"],
+    "tag:autotrading-prod": ["autogroup:admin", "tag:autotrading-prod"]
+  },
+  "grants": [
+    // La pipeline raggiunge le installazioni per il deploy (22) e il controllo di salute (443).
+    {
+      "src": ["tag:ci"],
+      "dst": ["tag:autotrading-dev", "tag:autotrading-prod"],
+      "ip": ["tcp:22", "tcp:443"]
+    },
+    // I dispositivi del proprietario raggiungono la dashboard (443) e, con nuovo login, l'SSH (22).
+    {
+      "src": ["autogroup:member"],
+      "dst": ["tag:autotrading-dev", "tag:autotrading-prod"],
+      "ip": ["tcp:22", "tcp:443"]
+    },
+    {
+      "src": ["autogroup:member"],
+      "dst": ["autogroup:self"],
+      "ip": ["*"]
+    }
+  ],
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["tag:ci"],
+      "dst": ["tag:autotrading-dev", "tag:autotrading-prod"],
+      "users": ["deploy"]
+    },
+    {
+      "action": "check",
+      "src": ["autogroup:member"],
+      "dst": ["tag:autotrading-dev", "tag:autotrading-prod"],
+      "users": ["deploy"]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ Funzionalità: R0.5.4 Creazione delle installazioni dev e prod dalla pipeline
   Voglio creare le macchine delle installazioni dev e prod con un'esecuzione manuale della pipeline e una configurazione versionata
   Perché le due installazioni siano identiche, ricreabili e mai configurate a mano
 
-  Ogni installazione ha la propria macchina. Il nome pubblico è derivato dall'indirizzo della macchina e ha un certificato HTTPS valido.
+  Ogni installazione ha la propria macchina. La macchina non accetta connessioni da Internet: si raggiunge solo dalla rete privata dell'installazione, dove ha un nome con un certificato HTTPS valido.
 
   Fuori ambito: backup (non serve in E0), dominio personalizzato, configurazione dei segreti applicativi e delle chiavi delle credenziali.
 
@@ -13,9 +13,10 @@ Funzionalità: R0.5.4 Creazione delle installazioni dev e prod dalla pipeline
     Dato che l'installazione "<ambiente>" non esiste
     Quando il proprietario avvia la creazione dell'installazione "<ambiente>"
     Allora esiste una macchina dedicata all'installazione "<ambiente>"
-    E la macchina accetta connessioni solo sulle porte 22 e 443
+    E la macchina non accetta connessioni da Internet
+    E dalla rete privata dell'installazione la macchina accetta connessioni solo sulle porte 22 e 443
     E l'accesso amministrativo è possibile solo con chiave, mai con password
-    E il nome pubblico dell'installazione risponde in HTTPS con un certificato valido
+    E il nome dell'installazione nella rete privata risponde in HTTPS con un certificato valido
 
     Esempi:
       | ambiente |

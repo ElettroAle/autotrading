@@ -32,7 +32,7 @@ Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, Entra ID.
 ### Container (installazioni `dev` e `prod`, OVH Public Cloud, Docker Compose)
 
 ```text
-Utente ──HTTPS──> Caddy ──> api (FastAPI) ──┬──> PostgreSQL (credenziali cifrate, chiave pubblica)
+Utente (tailnet) ──HTTPS──> Tailscale Serve ──> api (FastAPI) ──┬──> PostgreSQL (credenziali cifrate, chiave pubblica)
                                             ├──> Hyperliquid (internet)
                                             └──> Entra ID (validazione token)
 worker (chiave privata) ──> PostgreSQL, Hyperliquid
@@ -85,7 +85,7 @@ src/autotrading/
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
 tools/                          script Python della pipeline, fuori dall'esagono (.claude/rules/ci.md)
-deploy/                         cloud-init, compose e Caddyfile delle installazioni
+deploy/                         cloud-init, compose e policy Tailscale delle installazioni
 .github/                        workflow e action della pipeline TrunkFlow
 docs/adr/                       decisioni tecniche, una per file
 ```
@@ -173,7 +173,7 @@ Una ADR accettata non si riscrive: la si sostituisce con una nuova che la dichia
 
 Flusso TrunkFlow su `main` protetto: solo pull request integrate per squash, con tutti i controlli
 superati. Ogni integrazione pubblica un'immagine e la rilascia in dev; lo stesso digest va in prod
-con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0012`.
+con l'approvazione del proprietario. Dettagli in `.claude/rules/ci.md` e `docs/adr/0001`-`0013`.
 
 ## Board
 

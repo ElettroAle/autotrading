@@ -1,55 +1,37 @@
 name: installation-start
-description: Attende la fine di cloud-init, avvia il reverse proxy e verifica il certificato HTTPS.
+description: Attende che la macchina entri nel tailnet e finisca cloud-init, copia il compose e verifica il certificato HTTPS.
 inputs:
-  address:
-    description: Indirizzo della macchina
-    required: true
   hostname:
-    description: Nome pubblico dell'installazione
-    required: true
-  ssh-private-key:
-    description: Chiave privata dell'utente deploy
-    required: true
-  host-public-key:
-    description: Chiave pubblica host attesa
+    description: Nome dell'installazione nel tailnet
     required: true
 runs:
   using: composite
   steps:
-    - name: Avvia il reverse proxy
+    - name: Attendi la macchina e copia il compose
       shell: bash
       env:
-        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
-        HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
-        ADDRESS: ${{ inputs.address }}
-        PUBLIC_HOSTNAME: ${{ inputs.hostname }}
+        HOSTNAME_TS: ${{ inputs.hostname }}
+      # Tailscale SSH authenticates both ends with their tailnet identity, so no SSH key exists and a host
+      # key seen for the first time over the tailnet can be accepted (ADR 0013).
       run: |
-        install -d -m 700 ~/.ssh
-        printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy
-        chmod 600 ~/.ssh/deploy
-        printf '%s %s\n' "$ADDRESS" "$HOST_PUBLIC_KEY" > ~/.ssh/known_hosts
-        target="deploy@${ADDRESS}"
-        ssh_options=(-i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5)
-        for attempt in $(seq 1 60); do
+        target="deploy@${HOSTNAME_TS}"
+        ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
+          -o BatchMode=yes -o ConnectTimeout=5)
+        for attempt in $(seq 1 120); do
           ssh "${ssh_options[@]}" "$target" true && break
           sleep 5
         done
         ssh "${ssh_options[@]}" "$target" 'cloud-init status --wait'
-        scp "${ssh_options[@]}" deploy/compose.yaml deploy/Caddyfile "${target}:/opt/autotrading/"
-        printf 'PUBLIC_HOSTNAME=%s\n' "$PUBLIC_HOSTNAME" | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
-        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d caddy'
+        ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
     - name: Certificato HTTPS valido
       shell: bash
       env:
-        PUBLIC_HOSTNAME: ${{ inputs.hostname }}
+        HOSTNAME_TS: ${{ inputs.hostname }}
+      # Until the first release the API is not running: any HTTP answer over a valid certificate is enough.
       run: |
         for attempt in $(seq 1 36); do
-          curl -sS --max-time 4 -o /dev/null "https://${PUBLIC_HOSTNAME}/" && exit 0
+          curl -sS --max-time 10 -o /dev/null "https://${HOSTNAME_TS}/" && exit 0
           sleep 5
         done
-        echo "::error::il nome pubblico ${PUBLIC_HOSTNAME} non risponde in HTTPS con un certificato valido"
+        echo "::error::${HOSTNAME_TS} non risponde in HTTPS con un certificato valido"
         exit 1
-    - name: Rimuovi la chiave
-      if: ${{ always() }}
-      shell: bash
-      run: rm -f ~/.ssh/deploy

@@ -1,6 +1,6 @@
 # Orchestratore TrunkFlow (R0.5.2, R0.5.3): un artefatto per integrazione, rilascio
 # automatico in dev, promozione dello stesso digest in prod dopo l'approvazione.
-# I segreti sono degli environment GitHub dev e prod, letti dai job che li dichiarano.
+# Le installazioni si raggiungono solo dal tailnet, con l'identità OIDC dei job (ADR 0013).
 name: reusable-release
 
 on:
@@ -60,26 +60,21 @@ jobs:
     permissions:
       contents: read
       packages: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: host
-        uses: ./.github/actions/installation-host
+        uses: ./.github/actions/tailscale-connect
         with:
+          client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
           environment: dev
-          client-id: ${{ secrets.OVH_CLIENT_ID }}
-          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
-          project-id: ${{ vars.OVH_PROJECT_ID }}
-          region: ${{ vars.OVH_REGION || 'GRA11' }}
-          zone: ${{ vars.OVH_ZONE || 'eu' }}
       - uses: ./.github/actions/ssh-deploy
         with:
-          address: ${{ steps.host.outputs.address }}
           hostname: ${{ steps.host.outputs.hostname }}
           environment: dev
           version: ${{ needs.versione.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: ./.github/actions/health-check
         with:
@@ -98,6 +93,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,23 +109,17 @@ jobs:
           version: ${{ steps.release.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - id: host
-        uses: ./.github/actions/installation-host
+        uses: ./.github/actions/tailscale-connect
         with:
+          client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
           environment: prod
-          client-id: ${{ secrets.OVH_CLIENT_ID }}
-          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
-          project-id: ${{ vars.OVH_PROJECT_ID }}
-          region: ${{ vars.OVH_REGION || 'GRA11' }}
-          zone: ${{ vars.OVH_ZONE || 'eu' }}
       - uses: ./.github/actions/ssh-deploy
         with:
-          address: ${{ steps.host.outputs.address }}
           hostname: ${{ steps.host.outputs.hostname }}
           environment: prod
           version: ${{ steps.release.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: ./.github/actions/health-check
         with:

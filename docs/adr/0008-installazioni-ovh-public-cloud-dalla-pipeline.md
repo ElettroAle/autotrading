@@ -1,6 +1,6 @@
 # ADR 0008 — Installazioni OVH Public Cloud create dalla pipeline
 
-- Stato: accettata (9 novembre 2026)
+- Stato: accettata (9 novembre 2026); accesso, firewall e nome dell'installazione sostituiti dall'ADR 0013
 - Requisiti: R0.5.2, R0.5.3, R0.5.4
 - Sostituisce: ADR 0005
 

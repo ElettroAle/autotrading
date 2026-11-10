@@ -1,0 +1,36 @@
+name: tailscale-connect
+description: Porta il job nel tailnet come nodo temporaneo tag:ci e restituisce il nome dell'installazione nella rete privata.
+inputs:
+  client-id:
+    description: Client ID della credenziale OIDC Tailscale dell'environment
+    required: true
+  audience:
+    description: Audience della credenziale OIDC Tailscale dell'environment
+    required: true
+  environment:
+    description: dev o prod
+    required: true
+outputs:
+  hostname:
+    description: Nome completo dell'installazione nel tailnet (autotrading-<env>.<tailnet>.ts.net)
+    value: ${{ steps.name.outputs.hostname }}
+runs:
+  using: composite
+  steps:
+    - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+      with:
+        oauth-client-id: ${{ inputs.client-id }}
+        audience: ${{ inputs.audience }}
+        tags: tag:ci
+    - id: name
+      name: Nome dell'installazione nel tailnet
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        suffix="$(sudo tailscale status --json | jq -r '.MagicDNSSuffix // empty')"
+        if [ -z "$suffix" ]; then
+          echo "::error::MagicDNS non attivo nel tailnet"
+          exit 1
+        fi
+        echo "hostname=autotrading-${ENVIRONMENT}.${suffix}" >> "$GITHUB_OUTPUT"

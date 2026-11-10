@@ -1,6 +1,6 @@
 # ADR 0012 — Porta pubblica senza security group, firewall solo ufw
 
-- Stato: accettata (10 novembre 2026)
+- Stato: sostituita dall'ADR 0013 (10 novembre 2026)
 - Requisiti: R0.5.4
 - Sostituisce: ADR 0010 e ADR 0011
 
