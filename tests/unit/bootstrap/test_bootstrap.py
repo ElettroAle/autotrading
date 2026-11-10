@@ -1,14 +1,21 @@
+import base64
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
+from sqlalchemy import create_engine
 
+from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
 from autotrading.bootstrap import (
     MissingConfigurationError,
+    TenantUseCaseFactory,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
     create_application,
+    exchanges_for,
 )
+from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.installation import installation_configuration
 
 AUTHENTICATION = {
@@ -106,3 +113,34 @@ def test_an_issuer_without_the_rest_of_the_login_refuses_to_start(tmp_path: Path
         create_application(installation_configuration(tmp_path, **{**AUTHENTICATION, name: " "}))
 
     assert raised.value.name == name
+
+
+def test_application_refuses_to_start_without_the_credentials_key(tmp_path: Path) -> None:
+    with pytest.raises(MissingConfigurationError) as raised:
+        create_application(installation_configuration(tmp_path, CREDENTIALS_PUBLIC_KEY_FILE=""))
+
+    assert raised.value.name == "CREDENTIALS_PUBLIC_KEY_FILE"
+
+
+@pytest.mark.parametrize("content", ["not base64 at all!", "c2hvcnQ="], ids=["not-base64", "short-key"])
+def test_application_refuses_to_start_with_a_malformed_credentials_key(tmp_path: Path, content: str) -> None:
+    configuration = installation_configuration(tmp_path)
+    Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).write_text(content, encoding="utf-8")
+
+    with pytest.raises(InvalidCredentialsKeyError):
+        create_application(configuration)
+
+
+def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    factory = TenantUseCaseFactory(create_engine("sqlite://"), public_key, 1, {})
+
+    first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
+
+    assert first.register_account is not second.register_account
+
+
+@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
+def test_the_exchange_network_follows_the_installation(environment: str, url: str) -> None:
+    assert {name: exchange.base_url for name, exchange in exchanges_for(environment).items()} == {"Hyperliquid": url}

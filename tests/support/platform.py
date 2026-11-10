@@ -2,6 +2,7 @@
 
 from secrets import token_hex
 
+from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.accounts.register_account import (
     AccountRegistration,
     RegisterAccountCommand,
@@ -52,13 +53,17 @@ class Platform:
         return self.register_account_use_case(user).execute(command)
 
     def register_account_use_case(self, user: str) -> RegisterAccountUseCase:
-        tenant_id = self.tenant_of(user)
-        return RegisterAccountUseCase(
+        return self.for_tenant(self.tenant_of(user)).register_account
+
+    def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
+        """What bootstrap.for_tenant does, on the fake adapters."""
+        register_account = RegisterAccountUseCase(
             tenant_id,
             InMemoryAccountRepositoryAdapter(self.accounts, tenant_id),
             FakeCredentialSealerAdapter(tenant_id),
             self.exchanges,
         )
+        return TenantUseCases(register_account=register_account)
 
 
 def registration(name: str, exchange: str, credentials: Credentials) -> RegisterAccountCommand:

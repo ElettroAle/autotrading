@@ -52,12 +52,16 @@ services:
       DATABASE_NAME: autotrading
       DATABASE_USER: autotrading_app
       DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+      # The API seals account credentials with the public key only; the private key never enters it (ADR 0007).
+      CREDENTIALS_PUBLIC_KEY_FILE: /run/secrets/credentials_public_key
+      CREDENTIALS_KEY_VERSION: "1"
       AUTH_ISSUER: ${AUTH_ISSUER:-}
       AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
       AUTH_SCOPE: ${AUTH_SCOPE:-}
     secrets:
       - postgres_app_password
+      - credentials_public_key
     read_only: true
     restart: unless-stopped
     depends_on:
@@ -71,6 +75,8 @@ secrets:
     file: ./secrets/postgres_owner_password
   postgres_app_password:
     file: ./secrets/postgres_app_password
+  credentials_public_key:
+    file: ./secrets/credentials_public_key
 
 volumes:
   postgres-data:
