@@ -16,7 +16,7 @@ from autotrading.application.accounts.errors import (
 )
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.errors import AccountNameRequiredError, CredentialsRequiredError, ExchangeRequiredError
-from tests.fakes.exchange import REJECTION_MESSAGE
+from tests.fakes.exchange import REDACTED_REJECTION
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform
 
@@ -87,7 +87,7 @@ def test_rejected_credentials_report_the_reason_and_the_exchange_message(
     response = register(client, **body)
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "credenziali rifiutate dall'exchange", "exchange_message": REJECTION_MESSAGE}
+    assert response.json() == {"detail": "credenziali rifiutate dall'exchange", "exchange_message": REDACTED_REJECTION}
 
 
 def test_an_unsupported_exchange_lists_the_supported_ones(client: TestClient, platform: Platform) -> None:

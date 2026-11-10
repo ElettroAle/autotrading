@@ -27,3 +27,10 @@ class ExchangeRejectedCredentialsError(ApplicationError):
 class ExchangeUnavailableError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("exchange non raggiungibile, riprovare")
+
+
+class AccountNotFoundError(ApplicationError):
+    """The same answer for an account that does not exist and for one of another tenant (R0.1.3)."""
+
+    def __init__(self) -> None:
+        super().__init__("non trovato")

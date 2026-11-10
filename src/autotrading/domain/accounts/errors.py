@@ -14,3 +14,8 @@ class ExchangeRequiredError(DomainError):
 class CredentialsRequiredError(DomainError):
     def __init__(self) -> None:
         super().__init__("credenziali obbligatorio")
+
+
+class CredentialsOfAnotherAccountError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("le credenziali appartengono a un altro conto dell'exchange")

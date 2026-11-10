@@ -7,12 +7,18 @@ from fastapi.responses import JSONResponse
 
 from autotrading.application.accounts.errors import (
     AccountNameInUseError,
+    AccountNotFoundError,
     ExchangeRejectedCredentialsError,
     ExchangeUnavailableError,
     UnsupportedExchangeError,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
-from autotrading.domain.accounts.errors import AccountNameRequiredError, CredentialsRequiredError, ExchangeRequiredError
+from autotrading.domain.accounts.errors import (
+    AccountNameRequiredError,
+    CredentialsOfAnotherAccountError,
+    CredentialsRequiredError,
+    ExchangeRequiredError,
+)
 from autotrading.domain.errors import AutotradingError
 
 
@@ -41,10 +47,12 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     NotAuthenticatedError: 401,
     UserRoleMissingError: 403,
     CrossTenantAccessError: 404,
+    AccountNotFoundError: 404,
     AccountNameInUseError: 409,
     AccountNameRequiredError: 422,
     ExchangeRequiredError: 422,
     CredentialsRequiredError: 422,
+    CredentialsOfAnotherAccountError: 422,
     UnsupportedExchangeError: 422,
     ExchangeRejectedCredentialsError: 422,
     AuthenticationNotConfiguredError: 503,

@@ -7,7 +7,7 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, UnsupportedExchangeError
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.domain.errors import AutotradingError
-from tests.fakes.exchange import REJECTION_MESSAGE
+from tests.fakes.exchange import REDACTED_REJECTION
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 from tests.support.steps import quoted
 
@@ -143,7 +143,7 @@ def registration_fails(outcomes: Outcomes, reason: str) -> None:
 def reports_exchange_message(outcomes: Outcomes) -> None:
     error = outcomes.error_of()
     assert isinstance(error, ExchangeRejectedCredentialsError)
-    assert error.exchange_message == REJECTION_MESSAGE
+    assert error.exchange_message == REDACTED_REJECTION
 
 
 @then(quoted('il conto "{account}" non è salvato'))

@@ -37,6 +37,7 @@ accounts = Table(
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
     Column("name", Text, nullable=False),
     Column("exchange", Text, nullable=False),
+    Column("exchange_account_fingerprint", Text, nullable=False),
     Column("credentials_key_version", Integer, nullable=False),
     Column("credentials_ciphertext", LargeBinary, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
