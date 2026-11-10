@@ -17,4 +17,7 @@ def test_rejects_an_empty_identifier(value: str) -> None:
 
 
 def test_two_identifiers_with_the_same_value_are_equal() -> None:
-    assert UserId("oid-1") == UserId("oid-1")
+    first, second = UserId("oid-1"), UserId(" oid-1 ")
+
+    assert first == second
+    assert first is not second
