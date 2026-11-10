@@ -1,4 +1,6 @@
-from autotrading.application.accounts.errors import AccountNameInUseError
+from dataclasses import dataclass
+
+from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
@@ -6,11 +8,22 @@ from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
+@dataclass(frozen=True, slots=True)
+class RemovedAccount:
+    """What the database keeps of a removed account: the row the history points to, without credentials."""
+
+    id: AccountId
+    tenant_id: TenantId
+    name: str
+    credentials: None = None
+
+
 class AccountStore:
     """The accounts of every tenant, as the database holds them."""
 
     def __init__(self) -> None:
         self.accounts: list[Account] = []
+        self.removed: list[RemovedAccount] = []
 
     def of(self, tenant_id: TenantId) -> list[Account]:
         return [account for account in self.accounts if account.tenant_id == tenant_id]
@@ -46,6 +59,13 @@ class InMemoryAccountRepositoryAdapter:
         if self.name_in_use(account.name):
             raise AccountNameInUseError(account.name)
         self._store.accounts.append(account)
+
+    def remove(self, account_id: AccountId) -> None:
+        account = self.get(account_id)
+        if account is None:
+            raise AccountNotFoundError
+        self._store.accounts.remove(account)
+        self._store.removed.append(RemovedAccount(account.id, account.tenant_id, account.name.value))
 
     def take_name_before_next_add(self, account: Account) -> None:
         """Simulates another request that saves an account with the same name between the check and the insert."""

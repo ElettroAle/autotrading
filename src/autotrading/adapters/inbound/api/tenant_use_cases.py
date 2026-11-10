@@ -11,6 +11,7 @@ from autotrading.application.accounts.ports import (
 )
 from autotrading.application.accounts.read_account_state import ReadAccountStateUseCase
 from autotrading.application.accounts.register_account import RegisterAccountUseCase
+from autotrading.application.accounts.remove_account import RemoveAccountUseCase
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import PositionClosingPort
@@ -40,6 +41,7 @@ class TenantUseCases:
     get_account: GetAccountUseCase
     replace_credentials: ReplaceCredentialsUseCase
     read_account_state: ReadAccountStateUseCase
+    remove_account: RemoveAccountUseCase
     close_position: ClosePositionUseCase
     run_verification: RunVerificationUseCase
 
@@ -52,6 +54,7 @@ class TenantUseCases:
             get_account=GetAccountUseCase(accounts),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
+            remove_account=RemoveAccountUseCase(accounts, ports.account_state),
             close_position=ClosePositionUseCase(ports.position_closing),
             run_verification=RunVerificationUseCase(ports.verification),
         )

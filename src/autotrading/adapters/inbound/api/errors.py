@@ -32,6 +32,7 @@ from autotrading.domain.accounts.errors import (
     CredentialsOfAnotherAccountError,
     CredentialsRequiredError,
     ExchangeRequiredError,
+    OpenPositionsNeedConfirmationError,
 )
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.errors import ManualOpeningNotAllowedError
@@ -71,6 +72,7 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     VerificationNotStartedError: 409,
     UnsupportedOrderExchangeError: 422,
     AccountNameInUseError: 409,
+    OpenPositionsNeedConfirmationError: 409,
     AccountNameRequiredError: 422,
     ExchangeRequiredError: 422,
     CredentialsRequiredError: 422,

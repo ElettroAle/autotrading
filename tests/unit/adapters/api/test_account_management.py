@@ -213,3 +213,65 @@ def test_credentials_that_do_not_open_are_a_fault_of_the_installation(
     response = client_of("anna").get(f"/accounts/{account_id}/state")
 
     assert (response.status_code, response.json()) == (500, {"detail": "credenziali del conto non leggibili"})
+
+
+def test_an_account_without_positions_is_removed_and_no_longer_listed(
+    client_of: Client, platform: Platform, account_id: str
+) -> None:
+    response = client_of("anna").delete(f"/accounts/{account_id}")
+
+    assert (response.status_code, response.content) == (204, b"")
+    assert client_of("anna").get("/accounts").json() == []
+    assert client_of("anna").get(f"/accounts/{account_id}").status_code == 404
+    assert [str(removed.id.value) for removed in platform.accounts.removed] == [account_id]
+
+
+def test_an_account_with_open_positions_is_kept_without_confirmation(
+    client_of: Client, platform: Platform, account_id: str, credentials: Credentials
+) -> None:
+    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal("5.5"), None)
+    platform.hyperliquid.open_position(credentials, btc)
+
+    response = client_of("anna").delete(f"/accounts/{account_id}", params={"confirmed": "false"})
+
+    assert (response.status_code, response.json()) == (
+        409,
+        {"detail": "il conto ha posizioni aperte che resteranno sull'exchange senza gestione"},
+    )
+    assert platform.accounts.removed == []
+
+
+def test_a_confirmed_removal_keeps_the_positions_and_removes_the_account(
+    client_of: Client, platform: Platform, account_id: str, credentials: Credentials
+) -> None:
+    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal("5.5"), None)
+    platform.hyperliquid.open_position(credentials, btc)
+    platform.worker_reachable = False
+
+    response = client_of("anna").delete(f"/accounts/{account_id}", params={"confirmed": "true"})
+
+    assert response.status_code == 204
+    assert platform.hyperliquid.read_state(credentials).positions == (btc,)
+
+
+def test_another_user_cannot_remove_the_account(client_of: Client, platform: Platform, account_id: str) -> None:
+    response = client_of("bruno").delete(f"/accounts/{account_id}", params={"confirmed": "true"})
+
+    assert (response.status_code, response.json()) == (404, {"detail": "non trovato"})
+    assert platform.accounts.removed == []
+
+
+def test_a_removed_name_can_be_registered_again(client_of: Client, account_id: str, credentials: Credentials) -> None:
+    client_of("anna").delete(f"/accounts/{account_id}")
+
+    response = client_of("anna").post(
+        "/accounts",
+        json={
+            "name": "test-1",
+            "exchange": HYPERLIQUID,
+            "account_address": credentials.account_address,
+            "secret_key": credentials.secret_key,
+        },
+    )
+
+    assert response.status_code == 201
