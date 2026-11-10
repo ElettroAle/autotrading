@@ -1,5 +1,7 @@
 from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -24,6 +26,18 @@ class InMemoryAccountRepositoryAdapter:
 
     def name_in_use(self, name: AccountName) -> bool:
         return any(account.name == name for account in self._store.of(self._tenant_id))
+
+    def list(self) -> list[Account]:
+        return self._store.of(self._tenant_id)
+
+    def get(self, account_id: AccountId) -> Account | None:
+        return next((account for account in self.list() if account.id == account_id), None)
+
+    def replace(self, account: Account) -> None:
+        current = self.get(account.id)
+        if current is None or account.tenant_id != self._tenant_id:
+            raise CrossTenantAccessError
+        self._store.accounts[self._store.accounts.index(current)] = account
 
     def add(self, account: Account) -> None:
         if self._taken_before_next_add is not None:

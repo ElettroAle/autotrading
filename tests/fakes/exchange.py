@@ -4,7 +4,13 @@ from autotrading.application.accounts.errors import ExchangeRejectedCredentialsE
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 
-REJECTION_MESSAGE = "User or API Wallet 0x0000000000000000000000000000000000000000 does not exist."
+# What the user reads of a refusal: the text of the exchange with the address masked (R0.2.3).
+REDACTED_REJECTION = "User or API Wallet *** does not exist."
+
+
+def rejection_message(credentials: Credentials) -> str:
+    """Hyperliquid names the wallet it does not know: the text of a refusal carries the address sent."""
+    return f"User or API Wallet {credentials.account_address.upper()} does not exist."
 
 
 class FakeExchangeAdapter:
@@ -18,11 +24,15 @@ class FakeExchangeAdapter:
     def accept(self, credentials: Credentials, amount: Decimal = Decimal("1000.00")) -> None:
         self._balances[credentials] = Balance(amount, "USDC")
 
+    def revoke(self, credentials: Credentials) -> None:
+        """The key is deleted or expired on the exchange: from now on it is refused."""
+        self._balances.pop(credentials, None)
+
     def read_balance(self, credentials: Credentials) -> Balance:
         self.requests.append(credentials)
         if not self.reachable:
             raise ExchangeUnavailableError
         balance = self._balances.get(credentials)
         if balance is None:
-            raise ExchangeRejectedCredentialsError(REJECTION_MESSAGE)
+            raise ExchangeRejectedCredentialsError(rejection_message(credentials))
         return balance

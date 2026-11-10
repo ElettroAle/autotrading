@@ -3,11 +3,13 @@ from dataclasses import dataclass, field
 
 from autotrading.application.accounts.errors import AccountNameInUseError, UnsupportedExchangeError
 from autotrading.application.accounts.ports import AccountRepositoryPort, CredentialSealerPort, ExchangePort
+from autotrading.application.accounts.verification import operations, read_balance_proving
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -47,9 +49,10 @@ class RegisterAccountUseCase:
         credentials = Credentials(command.account_address, command.secret_key)
         exchange = self._supported(exchange_name)
         self._require_free(name)
-        balance = exchange.read_balance(credentials)
+        balance = read_balance_proving(exchange, credentials)
         account = self._sealed_account(name, exchange_name, credentials)
         self._accounts.add(account)
+        operations.info("conto registrato", extra={"account_id": str(account.id.value)})
         return AccountRegistration(account, balance)
 
     def _supported(self, exchange_name: ExchangeName) -> ExchangePort:
@@ -65,4 +68,4 @@ class RegisterAccountUseCase:
     def _sealed_account(self, name: AccountName, exchange: ExchangeName, credentials: Credentials) -> Account:
         account_id = AccountId.new()
         sealed = self._sealer.seal(account_id, credentials)
-        return Account(account_id, self._tenant_id, name, exchange, sealed)
+        return Account(account_id, self._tenant_id, name, exchange, ExchangeAccount.of(credentials), sealed)

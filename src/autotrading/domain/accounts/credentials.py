@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 
 from autotrading.domain.accounts.errors import CredentialsRequiredError
@@ -21,6 +22,12 @@ class Credentials:
             raise CredentialsRequiredError
         object.__setattr__(self, "account_address", address)
         object.__setattr__(self, "secret_key", secret)
+
+    def redact(self, text: str) -> str:
+        """The text without address and secret, whatever their case: what may reach a user, a log or an error."""
+        for secret in (self.secret_key, self.account_address):
+            text = re.sub(re.escape(secret), MASK, text, flags=re.IGNORECASE)
+        return text
 
     def __repr__(self) -> str:
         return f"Credentials({MASK})"

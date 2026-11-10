@@ -3,11 +3,7 @@
 from secrets import token_hex
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
-from autotrading.application.accounts.register_account import (
-    AccountRegistration,
-    RegisterAccountCommand,
-    RegisterAccountUseCase,
-)
+from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
@@ -50,20 +46,26 @@ class Platform:
         return credentials
 
     def register_account(self, user: str, command: RegisterAccountCommand) -> AccountRegistration:
-        return self.register_account_use_case(user).execute(command)
-
-    def register_account_use_case(self, user: str) -> RegisterAccountUseCase:
-        return self.for_tenant(self.tenant_of(user)).register_account
+        return self.use_cases_of(user).register_account.execute(command)
 
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         """What bootstrap.for_tenant does, on the fake adapters."""
-        register_account = RegisterAccountUseCase(
-            tenant_id,
-            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id),
-            FakeCredentialSealerAdapter(tenant_id),
-            self.exchanges,
-        )
-        return TenantUseCases(register_account=register_account)
+        accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
+        return TenantUseCases.on(tenant_id, accounts, self.sealer_of(tenant_id), self.exchanges)
+
+    def use_cases_of(self, user: str) -> TenantUseCases:
+        return self.for_tenant(self.tenant_of(user))
+
+    @staticmethod
+    def sealer_of(tenant_id: TenantId) -> FakeCredentialSealerAdapter:
+        return FakeCredentialSealerAdapter(tenant_id)
+
+    def uses_credentials(self, account: Account, credentials: Credentials) -> bool:
+        """The fake seal is deterministic: sealing the same credentials again gives the saved text."""
+        return account.credentials == self.sealer_of(account.tenant_id).seal(account.id, credentials)
+
+    def account_named(self, user: str, name: str) -> Account:
+        return next(account for account in self.accounts_of(user) if account.name.value == name)
 
 
 def registration(name: str, exchange: str, credentials: Credentials) -> RegisterAccountCommand:

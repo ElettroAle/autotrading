@@ -1,14 +1,18 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import Connection, Engine, func, insert, select
+from sqlalchemy import Connection, Engine, RowMapping, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.application.accounts.errors import AccountNameInUseError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
+from autotrading.domain.accounts.exchange_account import ExchangeAccount
+from autotrading.domain.accounts.exchange_name import ExchangeName
+from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 NAME_UNIQUE_IN_TENANT = "accounts_name_unique_in_tenant"
@@ -26,6 +30,17 @@ class SqlAlchemyAccountRepositoryAdapter:
         with self._transaction() as connection:
             return bool(connection.execute(query).scalar_one())
 
+    def list(self) -> list[Account]:
+        query = select(accounts).order_by(accounts.c.name)
+        with self._transaction() as connection:
+            return [_account_of(row) for row in connection.execute(query).mappings()]
+
+    def get(self, account_id: AccountId) -> Account | None:
+        query = select(accounts).where(accounts.c.id == account_id.value)
+        with self._transaction() as connection:
+            row = connection.execute(query).mappings().one_or_none()
+        return None if row is None else _account_of(row)
+
     def add(self, account: Account) -> None:
         self._require_own(account)
         try:
@@ -35,6 +50,14 @@ class SqlAlchemyAccountRepositoryAdapter:
             if NAME_UNIQUE_IN_TENANT in str(error.orig):
                 raise AccountNameInUseError(account.name) from error
             raise
+
+    def replace(self, account: Account) -> None:
+        self._require_own(account)
+        statement = update(accounts).where(accounts.c.id == account.id.value).values(_row_of(account))
+        with self._transaction() as connection:
+            # Row level security hides the rows of other tenants: an account of theirs updates nothing.
+            if connection.execute(statement).rowcount != 1:
+                raise CrossTenantAccessError
 
     def _require_own(self, account: Account) -> None:
         if account.tenant_id != self._tenant_id:
@@ -54,6 +77,18 @@ def _row_of(account: Account) -> dict[str, object]:
         "tenant_id": account.tenant_id.value,
         "name": account.name.value,
         "exchange": account.exchange.value,
+        "exchange_account_fingerprint": account.exchange_account.fingerprint,
         "credentials_key_version": account.credentials.key_version,
         "credentials_ciphertext": account.credentials.ciphertext,
     }
+
+
+def _account_of(row: RowMapping) -> Account:
+    return Account(
+        AccountId(row["id"]),
+        TenantId(row["tenant_id"]),
+        AccountName(row["name"]),
+        ExchangeName(row["exchange"]),
+        ExchangeAccount(row["exchange_account_fingerprint"]),
+        SealedCredentials(row["credentials_key_version"], row["credentials_ciphertext"]),
+    )
