@@ -44,10 +44,17 @@ runs:
         OS_CLIENT_ID: ${{ inputs.client-id }}
         OS_CLIENT_SECRET: ${{ inputs.client-secret }}
         ENVIRONMENT: ${{ inputs.environment }}
-      # A listing fails loudly on authentication errors, unlike a lookup by name.
+      # A listing fails loudly on authentication errors, unlike a lookup by name. A machine that OVH failed to
+      # build is reported and removed, so this run builds it again instead of treating it as existing.
       run: |
-        servers="$(openstack server list --name "^autotrading-${ENVIRONMENT}\$" -f value -c ID)"
-        if [ -n "$servers" ]; then
+        servers="$(openstack server list --name "^autotrading-${ENVIRONMENT}\$" -f value -c ID -c Status)"
+        while read -r id status; do
+          [ "$status" = "ERROR" ] || continue
+          fault="$(openstack server show "$id" -f json -c fault | jq -r '.fault.message // .fault // "nessun dettaglio"')"
+          echo "::warning::macchina ${id} in errore da un'esecuzione precedente: ${fault}; la rimuovo"
+          openstack server delete --wait "$id"
+        done <<< "$servers"
+        if grep -v " ERROR$" <<< "$servers" | grep -q .; then
           echo "::notice::installazione ${ENVIRONMENT} già esistente"
           echo "created=false" >> "$GITHUB_OUTPUT"
         else
@@ -63,12 +70,24 @@ runs:
         FLAVOR: ${{ inputs.flavor }}
         TAILSCALE_AUTH_KEY: ${{ inputs.tailscale-auth-key }}
       # The project's default security group is used untouched: it lets the machine out and nothing in, which
-      # is all Tailscale needs (ADR 0013). No security group or rule is created, changed or deleted.
+      # is all Tailscale needs (ADR 0013). No security group or rule is created, changed or deleted. If OVH
+      # fails to build the machine, its reason is reported and only that broken machine is removed.
       run: |
         user_data="${RUNNER_TEMP}/cloud-init.yaml"
         umask 077
         uv run python -m tools.render_cloud_init deploy/cloud-init.yaml > "$user_data"
-        openstack server create "autotrading-${ENVIRONMENT}" --flavor "$FLAVOR" --image "Ubuntu 24.04" \
+        id="$(openstack server create "autotrading-${ENVIRONMENT}" --flavor "$FLAVOR" --image "Ubuntu 24.04" \
           --network Ext-Net --security-group default --user-data "$user_data" \
-          --property app=autotrading --property "environment=${ENVIRONMENT}" --wait > /dev/null
+          --property app=autotrading --property "environment=${ENVIRONMENT}" -f value -c id)"
         rm -f "$user_data"
+        for _ in $(seq 1 60); do
+          status="$(openstack server show "$id" -f value -c status)"
+          [ "$status" = "BUILD" ] || break
+          sleep 10
+        done
+        if [ "$status" != "ACTIVE" ]; then
+          fault="$(openstack server show "$id" -f json -c fault | jq -r '.fault.message // .fault // "nessun dettaglio"')"
+          echo "::error::OVH non ha creato la macchina (stato ${status}): ${fault}"
+          [ "$status" = "ERROR" ] && openstack server delete --wait "$id"
+          exit 1
+        fi
