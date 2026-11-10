@@ -1,8 +1,9 @@
 import base64
 import binascii
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import UUID
@@ -18,6 +19,7 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases, create_worke
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
 from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
+from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.adapters.outbound.libsodium.opener import (
@@ -29,19 +31,34 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
+    SqlAlchemyVerificationRunRepositoryAdapter,
+)
 from autotrading.application.accounts.errors import AccountNotFoundError
 from autotrading.application.accounts.get_account import find_account
 from autotrading.application.accounts.ports import AccountRepositoryPort, CredentialOpenerPort, ExchangePort
-from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
-from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
+from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
+from autotrading.application.orders.close_exchange_position import (
+    CloseExchangePositionCommand,
+    CloseExchangePositionUseCase,
+)
 from autotrading.application.orders.errors import OrderAccountNotFoundError
+from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
+from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
+from autotrading.domain.verification.order_result import OrderResult
+from autotrading.domain.verification.procedure import Opening
+from autotrading.domain.verification.reading import AccountReading, PositionReading
 
 SUPPORTED_ENVIRONMENTS = ("dev", "prod")
 DEFAULT_DATABASE_PORT = "5432"
@@ -115,6 +132,86 @@ class TradingAccessFromAccounts:
         return TradingAccess(account.exchange.value, credentials.account_address, credentials.secret_key)
 
 
+class AccountReadingFromAccounts:
+    """Bridges the accounts context to the verification context in the worker (ADR 0024).
+
+    The state is read as the worker reads it for the API; a failure becomes a failed step with its message.
+    """
+
+    def __init__(self, read_exchange_state: ReadExchangeStateUseCase) -> None:
+        self._read_exchange_state = read_exchange_state
+
+    def read(self, account_id: UUID) -> AccountReading:
+        try:
+            state = self._read_exchange_state.execute(ReadExchangeStateCommand(AccountId(account_id)))
+        except AccountNotFoundError as error:
+            raise VerificationAccountNotFoundError from error
+        except AutotradingError as error:
+            raise VerificationStepError(str(error)) from error
+        return AccountReading(
+            balance=state.balance.amount,
+            available_margin=state.available_margin.amount,
+            currency=state.balance.currency,
+            positions=tuple(
+                PositionReading(position.coin, position.side.value, position.size, position.leverage)
+                for position in state.positions
+            ),
+        )
+
+
+class OrderExecutionFromOrders:
+    """Bridges the orders context to the verification context in the worker (ADR 0024).
+
+    Both orders carry the origin "procedura di verifica" and the user who launched it; a failure becomes a failed
+    step with its message, and an order the exchange did not execute is a failed step with the reason.
+    """
+
+    def __init__(self, opening: OpenPositionUseCase, closing: CloseExchangePositionUseCase) -> None:
+        self._opening = opening
+        self._closing = closing
+
+    def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult:
+        command = OpenPositionCommand(
+            account_id=account_id,
+            coin=opening.coin,
+            direction=Direction(opening.side),
+            leverage=opening.leverage,
+            value=opening.value,
+            source=_verification_source(user_id),
+        )
+        return _result_of(lambda: self._opening.execute(command))
+
+    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderResult:
+        command = CloseExchangePositionCommand(account_id, coin, _verification_source(user_id))
+        return _result_of(lambda: self._closing.execute(command))
+
+
+def _verification_source(user_id: UserId) -> OrderSource:
+    return OrderSource(OrderOrigin.VERIFICATION, user_id.value)
+
+
+def _result_of(send: Callable[[], Order]) -> OrderResult:
+    try:
+        order = send()
+    except OrderAccountNotFoundError as error:
+        raise VerificationAccountNotFoundError from error
+    except AutotradingError as error:
+        raise VerificationStepError(str(error)) from error
+    execution, rejection = order.execution, order.rejection
+    if execution is None:
+        message = order.status.value if rejection is None else rejection.exchange_message
+        return OrderResult(succeeded=False, message=message)
+    return OrderResult(succeeded=True, fee=execution.fee, realized_pnl=execution.realized_pnl)
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerSettings:
+    """What the installation declares to the worker beyond its secrets."""
+
+    environment: str
+    slippage: Slippage
+
+
 class TenantUseCaseFactory:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
 
@@ -139,6 +236,7 @@ class TenantUseCaseFactory:
             exchanges=self._exchanges,
             account_state=HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id),
             position_closing=HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id),
+            verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -147,23 +245,40 @@ class WorkerUseCaseFactory:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
 
     def __init__(
-        self, engine: Engine, opener: SodiumCredentialOpenerAdapter, exchanges: WorkerExchanges, slippage: Slippage
+        self,
+        engine: Engine,
+        opener: SodiumCredentialOpenerAdapter,
+        exchanges: WorkerExchanges,
+        settings: WorkerSettings,
     ) -> None:
         self._engine = engine
         self._opener = opener
         self._exchanges = exchanges
-        self._slippage = slippage
+        self._settings = settings
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
         access = TradingAccessFromAccounts(accounts, self._opener)
+        slippage = self._settings.slippage
+        read_exchange_state = ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts)
+        close_exchange_position = CloseExchangePositionUseCase(access, self._exchanges.orders, orders, slippage)
+        open_position = OpenPositionUseCase(access, self._exchanges.orders, orders, slippage)
         return WorkerUseCases(
-            read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
-            close_exchange_position=CloseExchangePositionUseCase(
-                access, self._exchanges.orders, orders, self._slippage
+            read_exchange_state=read_exchange_state,
+            close_exchange_position=close_exchange_position,
+            run_exchange_verification=RunExchangeVerificationUseCase(
+                AccountReadingFromAccounts(read_exchange_state),
+                OrderExecutionFromOrders(open_position, close_exchange_position),
+                SqlAlchemyVerificationRunRepositoryAdapter(self._engine, tenant_id),
+                self._settings.environment,
+                now,
             ),
         )
+
+
+def now() -> datetime:
+    return datetime.now(UTC)
 
 
 def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
@@ -189,7 +304,8 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
         {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     )
     exchanges = WorkerExchanges(exchanges_for(environment), order_exchanges_for(environment))
-    worker = WorkerUseCaseFactory(_database(configuration), opener, exchanges, slippage_from(configuration))
+    settings = WorkerSettings(environment, slippage_from(configuration))
+    worker = WorkerUseCaseFactory(_database(configuration), opener, exchanges, settings)
     return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant)
 
 

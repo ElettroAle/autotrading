@@ -1,4 +1,5 @@
 import base64
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -19,6 +20,8 @@ from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
+from autotrading.application.verification.errors import VerificationAccountNotFoundError
+from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.bootstrap import (
     SLIPPAGE_SETTING,
     InvalidConfigurationError,
@@ -30,10 +33,12 @@ from autotrading.bootstrap import (
     UnsupportedEnvironmentError,
     WorkerConnection,
     WorkerExchanges,
+    WorkerSettings,
     WorkerUseCaseFactory,
     create_application,
     create_worker_application,
     exchanges_for,
+    now,
     order_exchanges_for,
     slippage_from,
 )
@@ -313,12 +318,14 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"))
     opener = SodiumCredentialOpenerAdapter({})
-    factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, Slippage.default())
+    settings = WorkerSettings("dev", Slippage.default())
+    factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, settings)
 
     first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
 
     assert first.close_exchange_position is not second.close_exchange_position
     assert first.read_exchange_state is not second.read_exchange_state
+    assert first.run_exchange_verification is not second.run_exchange_verification
 
 
 def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: Path) -> None:
@@ -345,3 +352,35 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
         f"/tenants/{tenant_id.value}/accounts/{account_id}/positions/BTC/close"
     ]
     assert asked[0].headers["Authorization"] == f"Bearer {WORKER_TOKEN}"
+
+
+def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: Path) -> None:
+    asked: list[httpx.Request] = []
+
+    def worker_answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(404, json={"detail": "non trovato"})
+
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    factory = TenantUseCaseFactory(
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, WorkerConnection(client, WORKER_TOKEN)
+    )
+    tenant_id, account_id = TenantId.new(), uuid4()
+
+    with pytest.raises(VerificationAccountNotFoundError):
+        factory.for_tenant(tenant_id).run_verification.execute(RunVerificationCommand(account_id, UserId("oid-anna")))
+
+    assert [request.url.path for request in asked] == [
+        f"/tenants/{tenant_id.value}/accounts/{account_id}/verifications"
+    ]
+
+
+def test_the_instant_of_a_run_is_the_current_one_with_its_zone() -> None:
+    before = datetime.now(UTC)
+
+    instant = now()
+
+    assert before <= instant <= datetime.now(UTC)
+    assert instant.tzinfo is UTC

@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -74,5 +75,24 @@ orders = Table(
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="orders_account_of_tenant"
+    ),
+)
+
+verification_runs = Table(
+    "verification_runs",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("user_id", Text, nullable=False),
+    Column("environment", Text, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("outcome", Text, nullable=False),
+    Column("total_fee", Numeric, nullable=False),
+    Column("realized_pnl", Numeric, nullable=False),
+    Column("warning", Text),
+    Column("steps", JSON, nullable=False),
+    ForeignKeyConstraint(
+        ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="verification_runs_account_of_tenant"
     ),
 )

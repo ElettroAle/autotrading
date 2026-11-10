@@ -14,6 +14,8 @@ from autotrading.application.accounts.register_account import RegisterAccountUse
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.application.verification.ports import VerificationPort
+from autotrading.application.verification.run_verification import RunVerificationUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -26,6 +28,7 @@ class TenantPorts:
     exchanges: Mapping[str, ExchangePort]
     account_state: AccountStatePort
     position_closing: PositionClosingPort
+    verification: VerificationPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +41,7 @@ class TenantUseCases:
     replace_credentials: ReplaceCredentialsUseCase
     read_account_state: ReadAccountStateUseCase
     close_position: ClosePositionUseCase
+    run_verification: RunVerificationUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -49,4 +53,5 @@ class TenantUseCases:
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
             close_position=ClosePositionUseCase(ports.position_closing),
+            run_verification=RunVerificationUseCase(ports.verification),
         )

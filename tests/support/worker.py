@@ -1,12 +1,15 @@
 """The worker of an installation, in memory, for the tests of the internal HTTP contract (ADR 0021, ADR 0023)."""
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from secrets import token_hex
 
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
-from autotrading.bootstrap import TradingAccessFromAccounts
+from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
+from autotrading.bootstrap import AccountReadingFromAccounts, OrderExecutionFromOrders, TradingAccessFromAccounts
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -16,10 +19,12 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.platform import HYPERLIQUID, new_credentials
 
 TOKEN = token_hex(16)
+STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
 TENANT = TenantId.new()
 
 
@@ -32,17 +37,25 @@ class Worker:
         self.exchange = FakeExchangeAdapter()
         self.order_exchange = FakeOrderExchangeAdapter()
         self.orders = InMemoryOrderRepositoryAdapter()
+        self.runs = InMemoryVerificationRunRepositoryAdapter()
+        self.exchange.trades_on(self.order_exchange)
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = InMemoryAccountRepositoryAdapter(self.store, tenant_id)
         opener = FakeCredentialOpenerAdapter(self.vault)
+        access, order_exchanges = TradingAccessFromAccounts(accounts, opener), {HYPERLIQUID: self.order_exchange}
+        read_exchange_state = ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: self.exchange})
+        closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default())
+        opening = OpenPositionUseCase(access, order_exchanges, self.orders, Slippage.default())
         return WorkerUseCases(
-            read_exchange_state=ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: self.exchange}),
-            close_exchange_position=CloseExchangePositionUseCase(
-                TradingAccessFromAccounts(accounts, opener),
-                {HYPERLIQUID: self.order_exchange},
-                self.orders,
-                Slippage.default(),
+            read_exchange_state=read_exchange_state,
+            close_exchange_position=closing,
+            run_exchange_verification=RunExchangeVerificationUseCase(
+                AccountReadingFromAccounts(read_exchange_state),
+                OrderExecutionFromOrders(opening, closing),
+                self.runs,
+                "dev",
+                lambda: STARTED_AT,
             ),
         )
 

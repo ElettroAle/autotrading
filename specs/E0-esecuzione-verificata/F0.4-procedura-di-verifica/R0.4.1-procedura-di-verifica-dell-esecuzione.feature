@@ -1,5 +1,5 @@
 # language: it
-@R0.4.1 @wip
+@R0.4.1
 Funzionalità: R0.4.1 Procedura di verifica dell'esecuzione
   Come utente
   Voglio lanciare su un mio conto una procedura che apre, legge e chiude una posizione
