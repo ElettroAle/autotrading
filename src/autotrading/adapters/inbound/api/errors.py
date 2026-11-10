@@ -22,6 +22,11 @@ from autotrading.application.orders.errors import (
     UnsupportedOrderExchangeError,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.application.verification.errors import (
+    VerificationAccountNotFoundError,
+    VerificationStepError,
+    VerificationWorkerUnavailableError,
+)
 from autotrading.domain.accounts.errors import (
     AccountNameRequiredError,
     CredentialsOfAnotherAccountError,
@@ -30,6 +35,7 @@ from autotrading.domain.accounts.errors import (
 )
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.errors import ManualOpeningNotAllowedError
+from autotrading.domain.verification.errors import VerificationNotStartedError
 
 
 class NotAuthenticatedError(AutotradingError):
@@ -61,6 +67,8 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     OrderAccountNotFoundError: 404,
     ManualOpeningNotAllowedError: 403,
     NoOpenPositionError: 409,
+    VerificationAccountNotFoundError: 404,
+    VerificationNotStartedError: 409,
     UnsupportedOrderExchangeError: 422,
     AccountNameInUseError: 409,
     AccountNameRequiredError: 422,
@@ -75,6 +83,9 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     WorkerUnavailableError: 503,
     OrderExchangeUnavailableError: 503,
     OrderWorkerUnavailableError: 503,
+    # The account could not be read before the procedure started: the exchange or the credentials failed.
+    VerificationStepError: 503,
+    VerificationWorkerUnavailableError: 503,
     # Sealed credentials that do not open are a fault of the installation, never of the request.
     CredentialsNotOpenedError: 500,
 }

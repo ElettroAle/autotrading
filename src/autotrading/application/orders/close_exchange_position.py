@@ -6,24 +6,25 @@ from autotrading.application.orders.errors import NoOpenPositionError
 from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort, TradingAccessPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.held_position import HeldPosition
-from autotrading.domain.orders.order import Order, OrderOrigin, OrderRequest, OrderSource
+from autotrading.domain.orders.order import Order, OrderRequest, OrderSource
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
-from autotrading.domain.tenancy.user_id import UserId
 
 
 @dataclass(frozen=True, slots=True)
 class CloseExchangePositionCommand:
     account_id: UUID
     coin: str
-    user_id: UserId
+    # Who asks and why: a user with a manual command, or the procedure of verification it launched.
+    source: OrderSource
 
 
 class CloseExchangePositionUseCase:
-    """Closes in the worker the whole position on an asset, at a manual command of a user (R0.3.2, ADR 0023).
+    """Closes in the worker the whole position on an asset, at a manual command of a user or for the
+    procedure of verification (R0.3.2, R0.4.1, ADR 0023, ADR 0024).
 
     Without a position on the asset nothing is sent; otherwise the reduce-only order is sent once and recorded with
-    the manual origin and the user who asked.
+    the source of the command.
     """
 
     def __init__(
@@ -42,8 +43,8 @@ class CloseExchangePositionUseCase:
         access = self._access.access(command.account_id)
         exchange = supported_exchange(self._exchanges, access.exchange)
         position = _open_position(exchange, access, command.coin)
-        source = OrderSource(OrderOrigin.MANUAL, command.user_id.value)
-        request = OrderRequest(command.account_id, source, position.leverage, position.closing_order(self._slippage))
+        closing = position.closing_order(self._slippage)
+        request = OrderRequest(command.account_id, command.source, position.leverage, closing)
         order = send_order(exchange, access, request)
         self._orders.add(order)
         return order

@@ -9,13 +9,19 @@ from pydantic import BaseModel
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.errors import NotAuthenticatedError, install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
+from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
 from autotrading.application.orders.outcome import OrderOutcome
+from autotrading.application.verification.run_exchange_verification import (
+    RunExchangeVerificationCommand,
+    RunExchangeVerificationUseCase,
+)
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -28,10 +34,11 @@ class WorkerUseCases:
 
     read_exchange_state: ReadExchangeStateUseCase
     close_exchange_position: CloseExchangePositionUseCase
+    run_exchange_verification: RunExchangeVerificationUseCase
 
 
-class ClosingRequest(BaseModel):
-    # The API has authenticated the user and sends who asked, so the close is recorded with them (R0.3.2).
+class UserRequest(BaseModel):
+    # The API has authenticated the user and sends who asked, so what follows is recorded with them.
     user_id: str
 
 
@@ -57,10 +64,16 @@ def create_worker_api(token: str, for_tenant: Callable[[TenantId], WorkerUseCase
         return AccountStateResponse.of(for_tenant(TenantId(tenant_id)).read_exchange_state.execute(command))
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])
-    def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: ClosingRequest) -> OrderOutcomeResponse:
-        command = CloseExchangePositionCommand(account_id, coin, UserId(request.user_id))
+    def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: UserRequest) -> OrderOutcomeResponse:
+        command = CloseExchangePositionCommand(account_id, coin, OrderSource(OrderOrigin.MANUAL, request.user_id))
         order = for_tenant(TenantId(tenant_id)).close_exchange_position.execute(command)
         return OrderOutcomeResponse.of(OrderOutcome.of(order))
+
+    @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])
+    def run_verification(tenant_id: UUID, account_id: UUID, request: UserRequest) -> VerificationRunResponse:
+        command = RunExchangeVerificationCommand(account_id, UserId(request.user_id))
+        run = for_tenant(TenantId(tenant_id)).run_exchange_verification.execute(command)
+        return VerificationRunResponse.of(run)
 
     @api.get("/health")
     def read_health() -> dict[str, str]:

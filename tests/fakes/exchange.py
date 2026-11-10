@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -5,7 +6,8 @@ from autotrading.application.accounts.errors import ExchangeRejectedCredentialsE
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
-from autotrading.domain.accounts.position import Position
+from autotrading.domain.accounts.position import Position, PositionSide
+from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 
 # What the user reads of a refusal: the text of the exchange with the address masked (R0.2.3).
 REDACTED_REJECTION = "User or API Wallet *** does not exist."
@@ -24,6 +26,12 @@ class FakeExchangeAdapter:
         self._states: dict[Credentials, AccountState] = {}
         self.reachable = True
         self.requests: list[Credentials] = []
+        self.shown: dict[Credentials, list[AccountState]] = {}
+        self._orders: FakeOrderExchangeAdapter | None = None
+
+    def trades_on(self, orders: FakeOrderExchangeAdapter) -> None:
+        """The same exchange for orders: the positions it holds for an account are part of its state."""
+        self._orders = orders
 
     def accept(self, credentials: Credentials, amount: Decimal = Decimal("1000.00")) -> None:
         balance = Balance(amount, "USDC")
@@ -34,6 +42,10 @@ class FakeExchangeAdapter:
         self._states[credentials] = AccountState(
             state.balance, state.available_margin, (*state.positions, position), state.read_at
         )
+
+    def set_available_margin(self, credentials: Credentials, amount: Decimal) -> None:
+        state = self._states[credentials]
+        self._states[credentials] = replace(state, available_margin=Balance(amount, state.balance.currency))
 
     def revoke(self, credentials: Credentials) -> None:
         """The key is deleted or expired on the exchange: from now on it is refused."""
@@ -46,4 +58,23 @@ class FakeExchangeAdapter:
         state = self._states.get(credentials)
         if state is None:
             raise ExchangeRejectedCredentialsError(rejection_message(credentials))
-        return state
+        shown = replace(state, positions=(*state.positions, *self._traded_positions(credentials)))
+        self.shown.setdefault(credentials, []).append(shown)
+        return shown
+
+    def _traded_positions(self, credentials: Credentials) -> tuple[Position, ...]:
+        if self._orders is None:
+            return ()
+        held = [p for (address, _), p in self._orders.positions.items() if address == credentials.account_address]
+        return tuple(
+            Position(
+                p.coin,
+                PositionSide(p.direction.value),
+                p.size,
+                p.leverage,
+                self._orders.markets[p.coin].mid_price,
+                Decimal(0),
+                None,
+            )
+            for p in held
+        )

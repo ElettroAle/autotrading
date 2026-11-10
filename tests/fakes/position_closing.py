@@ -7,6 +7,7 @@ from autotrading.application.orders.close_exchange_position import (
 )
 from autotrading.application.orders.errors import OrderWorkerUnavailableError
 from autotrading.application.orders.outcome import OrderOutcome
+from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -20,4 +21,8 @@ class FakePositionClosingAdapter:
     def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
         if not self.reachable:
             raise OrderWorkerUnavailableError
-        return OrderOutcome.of(self._worker().execute(CloseExchangePositionCommand(account_id, coin, user_id)))
+        return OrderOutcome.of(
+            self._worker().execute(
+                CloseExchangePositionCommand(account_id, coin, OrderSource(OrderOrigin.MANUAL, user_id.value))
+            )
+        )
