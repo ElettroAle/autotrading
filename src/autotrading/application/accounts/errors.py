@@ -34,3 +34,15 @@ class AccountNotFoundError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("non trovato")
+
+
+class CredentialsNotOpenedError(ApplicationError):
+    """The sealed credentials do not belong to the account asked for, or no key of the installation opens them."""
+
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto non leggibili")
+
+
+class WorkerUnavailableError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("servizio di esecuzione non raggiungibile, riprovare")

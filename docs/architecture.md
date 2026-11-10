@@ -223,8 +223,8 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
   | `api` | pubblica | creazione, sostituzione, eliminazione; **mai lettura** |
   | persone | nessuna | **mai lettura** |
 
-  La verifica delle credenziali alla registrazione e alla sostituzione (R0.2.1, R0.2.4) usa le credenziali presenti nella richiesta prima di cifrarle, quindi l'API non ha bisogno di decifrarle. Le funzioni che usano credenziali salvate (stato del conto R0.2.2, ordini R0.3) arrivano con il `worker`.
-- **Chiavi**: generate dalla pipeline direttamente sul server al primo deploy, se assenti; la privata è un file leggibile solo da root, montato in sola lettura nel solo container `worker`. Non passano mai da GitHub né da una persona. Rotazione periodica e su richiesta dalla pipeline: requisito futuro R0.2.6; la versione della chiave nel formato salvato la rende possibile senza migrazioni.
+  La verifica delle credenziali alla registrazione e alla sostituzione (R0.2.1, R0.2.4) usa le credenziali presenti nella richiesta prima di cifrarle, quindi l'API non ha bisogno di decifrarle. Le funzioni che usano credenziali salvate (stato del conto R0.2.2, ordini R0.3) le esegue il `worker`, che l'API chiama via HTTP sulla rete interna dell'installazione con un token generato sulla macchina (ADR 0021).
+- **Chiavi**: generate dalla pipeline direttamente sul server al primo deploy, se assenti; la privata è un file leggibile solo dall'utente dell'immagine (65532), montato in sola lettura nel solo container `worker` (ADR 0021). Non passano mai da GitHub né da una persona. Rotazione periodica e su richiesta dalla pipeline: requisito futuro R0.2.6; la versione della chiave nel formato salvato la rende possibile senza migrazioni.
 - **Segreti dei servizi** (password del database, chiavi dei fornitori dei modelli): segreti degli environment GitHub, consegnati dalla pipeline come file montati in sola lettura, leggibili solo dall'utente del container.
 - **Mai variabili d'ambiente per i segreti** (visibili con `docker inspect` e da `/proc`): solo file montati.
 - **Registro delle decifrature**: ogni decifratura registra conto e momento, mai il contenuto.

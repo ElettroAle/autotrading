@@ -19,8 +19,15 @@ for secret in postgres_owner_password postgres_app_password; do
         && chown 65532:70 /secrets/${secret} && chmod 0440 /secrets/${secret}"
 done
 
+# The token the API presents to the worker (ADR 0021): readable only by the image user both services run as.
+if [ ! -s secrets/worker_token ]; then
+  docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets --entrypoint sh "$postgres_image" \
+    -c "umask 077 && tr -dc A-Za-z0-9 </dev/urandom | head -c 48 > /secrets/worker_token \
+        && chown 65532:65532 /secrets/worker_token && chmod 0400 /secrets/worker_token"
+fi
+
 # The key pair of the account credentials (ADR 0007, ADR 0018): generated once, never replaced by a release.
-# The private key is readable only by root; the API receives only the public one.
+# The API receives only the public key; the private one is mounted in the worker alone.
 private_key=secrets/credentials_private_key_v1
 public_key=secrets/credentials_public_key
 if [ ! -e "$private_key" ] && [ ! -e "$public_key" ]; then
@@ -41,3 +48,8 @@ if [ ! -s "$public_key" ] || [ ! -e "$private_key" ]; then
   echo "coppia di chiavi delle credenziali incompleta: nessuna chiave viene rigenerata sopra quella esistente" >&2
   exit 1
 fi
+# Only the worker mounts the private key, and it runs as the image user (65532): the key belongs to that user and
+# nobody else can read it (ADR 0021). Applied at every release, so an installation created before the worker
+# gets the same ownership.
+docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets --entrypoint sh "$postgres_image" \
+  -c "chown 65532:65532 /secrets/credentials_private_key_v1 && chmod 0400 /secrets/credentials_private_key_v1"

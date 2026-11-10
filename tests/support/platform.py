@@ -3,6 +3,7 @@
 from secrets import token_hex
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
+from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.domain.accounts.account import Account
@@ -10,7 +11,9 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
-from tests.fakes.credential_sealer import FakeCredentialSealerAdapter
+from tests.fakes.account_state import FakeAccountStateAdapter
+from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Directory
@@ -28,6 +31,8 @@ class Platform:
         self.tenants = InMemoryTenantRepositoryAdapter()
         self.accounts = AccountStore()
         self.exchanges = {HYPERLIQUID: FakeExchangeAdapter()}
+        self.vault: SealedVault = {}
+        self.worker_reachable = True
 
     @property
     def hyperliquid(self) -> FakeExchangeAdapter:
@@ -51,14 +56,20 @@ class Platform:
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         """What bootstrap.for_tenant does, on the fake adapters."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
-        return TenantUseCases.on(tenant_id, accounts, self.sealer_of(tenant_id), self.exchanges)
+        account_state = FakeAccountStateAdapter(lambda: self.worker_for(tenant_id))
+        account_state.reachable = self.worker_reachable
+        return TenantUseCases.on(tenant_id, accounts, self.sealer_of(tenant_id), self.exchanges, account_state)
+
+    def worker_for(self, tenant_id: TenantId) -> ReadExchangeStateUseCase:
+        """What the worker builds for a request of the API, with the opener only it holds."""
+        accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
+        return ReadExchangeStateUseCase(accounts, FakeCredentialOpenerAdapter(self.vault), self.exchanges)
 
     def use_cases_of(self, user: str) -> TenantUseCases:
         return self.for_tenant(self.tenant_of(user))
 
-    @staticmethod
-    def sealer_of(tenant_id: TenantId) -> FakeCredentialSealerAdapter:
-        return FakeCredentialSealerAdapter(tenant_id)
+    def sealer_of(self, tenant_id: TenantId) -> FakeCredentialSealerAdapter:
+        return FakeCredentialSealerAdapter(tenant_id, self.vault)
 
     def uses_credentials(self, account: Account, credentials: Credentials) -> bool:
         """The fake seal is deterministic: sealing the same credentials again gives the saved text."""

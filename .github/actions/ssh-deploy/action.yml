@@ -71,4 +71,4 @@ runs:
           < deploy/postgres/10-application-role.sh
         # On failure the container state and logs explain why; lines naming a password are dropped.
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans \
-          || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate | grep -vi password; exit 1; }'
+          || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate worker | grep -vi password; exit 1; }'

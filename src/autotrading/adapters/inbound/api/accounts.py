@@ -5,9 +5,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.accounts.account_details import AccountDetails
 from autotrading.application.accounts.get_account import GetAccountCommand
+from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.account_id import AccountId
@@ -102,5 +104,12 @@ def accounts_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIR
     ) -> AccountDetailsResponse:
         command = ReplaceCredentialsCommand(AccountId(account_id), request.account_address, request.secret_key)
         return AccountDetailsResponse.of(use_cases.replace_credentials.execute(command))
+
+    @router.get("/{account_id}/state")
+    def read_account_state(
+        account_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> AccountStateResponse:
+        command = ReadAccountStateCommand(AccountId(account_id))
+        return AccountStateResponse.of(use_cases.read_account_state.execute(command))
 
     return router

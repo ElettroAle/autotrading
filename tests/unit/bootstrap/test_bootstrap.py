@@ -1,22 +1,34 @@
 import base64
 from pathlib import Path
+from uuid import uuid4
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from sqlalchemy import create_engine
 
+from autotrading import bootstrap
+from autotrading.adapters.outbound.libsodium.opener import InvalidPrivateCredentialsKeyError
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
+from autotrading.application.accounts.errors import ExchangeUnavailableError
+from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.bootstrap import (
     MissingConfigurationError,
+    PublicCredentialsKey,
     TenantUseCaseFactory,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
+    WorkerConnection,
     create_application,
+    create_worker_application,
     exchanges_for,
 )
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.installation import installation_configuration
+from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
+from tests.support.accounts import an_account
+from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
 
 AUTHENTICATION = {
     "AUTH_ISSUER": "https://login.example.test/tenant/v2.0",
@@ -134,11 +146,82 @@ def test_application_refuses_to_start_with_a_malformed_credentials_key(tmp_path:
 def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    factory = TenantUseCaseFactory(create_engine("sqlite://"), public_key, 1, {})
+    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    factory = TenantUseCaseFactory(create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker)
 
     first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
 
     assert first.register_account is not second.register_account
+    assert first.read_account_state is not second.read_account_state
+
+
+def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store, tenant_id = AccountStore(), TenantId.new()
+    account = an_account(tenant_id)
+    store.accounts.append(account)
+    monkeypatch.setattr(
+        bootstrap,
+        "SqlAlchemyAccountRepositoryAdapter",
+        lambda _, tenant: InMemoryAccountRepositoryAdapter(store, tenant),
+    )
+    asked: list[httpx.Request] = []
+
+    def worker_answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(503, json={"detail": "exchange non raggiungibile"})
+
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    worker = WorkerConnection(client, WORKER_TOKEN)
+    factory = TenantUseCaseFactory(create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker)
+
+    with pytest.raises(ExchangeUnavailableError):
+        factory.for_tenant(tenant_id).read_account_state.execute(ReadAccountStateCommand(account.id))
+
+    assert [request.url.path for request in asked] == [f"/tenants/{tenant_id.value}/accounts/{account.id.value}/state"]
+    assert asked[0].headers["Authorization"] == f"Bearer {WORKER_TOKEN}"
+
+
+@pytest.mark.parametrize("name", ["WORKER_URL", "WORKER_TOKEN_FILE"])
+def test_application_refuses_to_start_without_the_worker(tmp_path: Path, name: str) -> None:
+    with pytest.raises(MissingConfigurationError) as raised:
+        create_application(installation_configuration(tmp_path, **{name: ""}))
+
+    assert raised.value.name == name
+
+
+def test_the_worker_answers_only_with_the_token_generated_on_the_machine(tmp_path: Path) -> None:
+    client = TestClient(create_worker_application(worker_configuration(tmp_path)))
+    path = f"/tenants/{uuid4()}/accounts/{uuid4()}/state"
+
+    response = client.get(path, headers={"Authorization": "Bearer another-token"})
+
+    assert (response.status_code, response.json()) == (401, {"detail": "non autenticato"})
+    assert client.get("/health").json() == {"status": "ok"}
+
+
+def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
+    client = TestClient(create_worker_application(worker_configuration(tmp_path)))
+
+    assert (client.get("/openapi.json").status_code, client.get("/docs").status_code) == (404, 404)
+
+
+@pytest.mark.parametrize(
+    "name", ["APP_ENVIRONMENT", "CREDENTIALS_PRIVATE_KEY_FILE", "WORKER_TOKEN_FILE", "DATABASE_PASSWORD_FILE"]
+)
+def test_the_worker_refuses_to_start_without_its_configuration(tmp_path: Path, name: str) -> None:
+    with pytest.raises(AutotradingError):
+        create_worker_application(worker_configuration(tmp_path, **{name: ""}))
+
+
+@pytest.mark.parametrize("content", ["not base64 at all!", "c2hvcnQ="], ids=["not-base64", "short-key"])
+def test_the_worker_refuses_to_start_with_a_malformed_private_key(tmp_path: Path, content: str) -> None:
+    configuration = worker_configuration(tmp_path)
+    Path(configuration["CREDENTIALS_PRIVATE_KEY_FILE"]).write_text(content, encoding="utf-8")
+
+    with pytest.raises(InvalidPrivateCredentialsKeyError):
+        create_worker_application(configuration)
 
 
 @pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])

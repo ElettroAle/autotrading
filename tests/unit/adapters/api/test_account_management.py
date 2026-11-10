@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -9,7 +10,8 @@ from autotrading.adapters.inbound.api.app import Authentication, HealthReport, c
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
-from tests.fakes.exchange import REDACTED_REJECTION
+from autotrading.domain.accounts.position import Position, PositionSide
+from tests.fakes.exchange import READ_AT, REDACTED_REJECTION
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
 
@@ -145,3 +147,69 @@ def test_the_replacement_request_never_shows_the_credentials() -> None:
 
     assert "0xaddr" not in shown
     assert "0xsk" not in shown
+
+
+def test_the_state_of_an_account_is_read_from_the_exchange(
+    client_of: Client, platform: Platform, account_id: str, credentials: Credentials
+) -> None:
+    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal("5.5"), None)
+    platform.hyperliquid.open_position(credentials, btc)
+
+    response = client_of("anna").get(f"/accounts/{account_id}/state")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "balance": {"amount": "1000.00", "currency": "USDC"},
+        "available_margin": {"amount": "1000.00", "currency": "USDC"},
+        "positions": [
+            {
+                "coin": "BTC",
+                "side": "long",
+                "size": "0.01",
+                "leverage": 2,
+                "entry_price": "60000",
+                "unrealized_pnl": "5.5",
+                "liquidation_price": None,
+            }
+        ],
+        "read_at": READ_AT.isoformat(),
+    }
+
+
+def test_another_user_cannot_read_the_state(client_of: Client, account_id: str) -> None:
+    response = client_of("bruno").get(f"/accounts/{account_id}/state")
+
+    assert (response.status_code, response.json()) == (404, {"detail": "non trovato"})
+
+
+def test_an_unreachable_exchange_asks_to_retry_the_reading(
+    client_of: Client, platform: Platform, account_id: str
+) -> None:
+    platform.hyperliquid.reachable = False
+
+    response = client_of("anna").get(f"/accounts/{account_id}/state")
+
+    assert (response.status_code, response.json()) == (503, {"detail": "exchange non raggiungibile, riprovare"})
+
+
+def test_an_unreachable_worker_asks_to_retry_the_reading(
+    client_of: Client, platform: Platform, account_id: str
+) -> None:
+    platform.worker_reachable = False
+
+    response = client_of("anna").get(f"/accounts/{account_id}/state")
+
+    assert (response.status_code, response.json()) == (
+        503,
+        {"detail": "servizio di esecuzione non raggiungibile, riprovare"},
+    )
+
+
+def test_credentials_that_do_not_open_are_a_fault_of_the_installation(
+    client_of: Client, platform: Platform, account_id: str
+) -> None:
+    platform.vault.clear()
+
+    response = client_of("anna").get(f"/accounts/{account_id}/state")
+
+    assert (response.status_code, response.json()) == (500, {"detail": "credenziali del conto non leggibili"})
