@@ -1,5 +1,5 @@
 # language: it
-@R0.1.4 @wip
+@R0.1.4
 Funzionalità: R0.1.4 Ambiente di installazione sempre riconoscibile
   Come utente
   Voglio sapere sempre se sto usando l'installazione "dev" o "prod"
