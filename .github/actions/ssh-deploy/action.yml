@@ -39,5 +39,10 @@ runs:
         printf '%s' "$REGISTRY_TOKEN" | ssh "${ssh_options[@]}" "$target" \
           "docker login ghcr.io -u '${GITHUB_ACTOR}' --password-stdin"
         ssh "${ssh_options[@]}" "$target" \
-          'cd /opt/autotrading && docker compose pull api; status=$?; docker logout ghcr.io; exit $status'
+          'cd /opt/autotrading && docker compose pull; status=$?; docker logout ghcr.io; exit $status'
+        # Service secrets are generated on the machine and never leave it (ADR 0015).
+        ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/prepare-installation.sh' \
+          < deploy/prepare-installation.sh
+        ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/prepare-installation.sh' \
+          < deploy/postgres/10-application-role.sh
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans'

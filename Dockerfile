@@ -15,6 +15,8 @@ ARG REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading" \
       org.opencontainers.image.revision="${REVISION}"
 COPY --from=build /app/.venv /app/.venv
+# The migrate service of the compose runs Alembic from the same image (ADR 0015).
+COPY migrations /app/migrations
 ENV PATH="/app/.venv/bin:${PATH}" PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
