@@ -43,6 +43,30 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Il worker è l'unico servizio che riceve la chiave privata delle credenziali (ADR 0007, ADR 0021).
+  # Nessuna porta pubblicata: lo raggiunge solo l'API sulla rete dell'installazione, con il token generato sulla macchina.
+  worker:
+    image: ${API_IMAGE:-}
+    command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
+      DATABASE_HOST: postgres
+      DATABASE_NAME: autotrading
+      DATABASE_USER: autotrading_app
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+      CREDENTIALS_PRIVATE_KEY_FILE: /run/secrets/credentials_private_key_v1
+      CREDENTIALS_KEY_VERSION: "1"
+      WORKER_TOKEN_FILE: /run/secrets/worker_token
+    secrets:
+      - postgres_app_password
+      - credentials_private_key_v1
+      - worker_token
+    read_only: true
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   api:
     image: ${API_IMAGE:-}
     environment:
@@ -59,14 +83,19 @@ services:
       AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
       AUTH_SCOPE: ${AUTH_SCOPE:-}
+      WORKER_URL: http://worker:8000
+      WORKER_TOKEN_FILE: /run/secrets/worker_token
     secrets:
       - postgres_app_password
       - credentials_public_key
+      - worker_token
     read_only: true
     restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
+      worker:
+        condition: service_started
     ports:
       - "127.0.0.1:8000:8000"
 
@@ -77,6 +106,10 @@ secrets:
     file: ./secrets/postgres_app_password
   credentials_public_key:
     file: ./secrets/credentials_public_key
+  credentials_private_key_v1:
+    file: ./secrets/credentials_private_key_v1
+  worker_token:
+    file: ./secrets/worker_token
 
 volumes:
   postgres-data:

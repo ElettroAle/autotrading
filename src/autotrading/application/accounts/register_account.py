@@ -1,9 +1,9 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from autotrading.application.accounts.errors import AccountNameInUseError, UnsupportedExchangeError
+from autotrading.application.accounts.errors import AccountNameInUseError
 from autotrading.application.accounts.ports import AccountRepositoryPort, CredentialSealerPort, ExchangePort
-from autotrading.application.accounts.verification import operations, read_balance_proving
+from autotrading.application.accounts.verification import operations, read_state_proving, supported_exchange
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
@@ -47,19 +47,13 @@ class RegisterAccountUseCase:
         name = AccountName(command.name)
         exchange_name = ExchangeName(command.exchange)
         credentials = Credentials(command.account_address, command.secret_key)
-        exchange = self._supported(exchange_name)
+        exchange = supported_exchange(self._exchanges, exchange_name)
         self._require_free(name)
-        balance = read_balance_proving(exchange, credentials)
+        balance = read_state_proving(exchange, credentials).balance
         account = self._sealed_account(name, exchange_name, credentials)
         self._accounts.add(account)
         operations.info("conto registrato", extra={"account_id": str(account.id.value)})
         return AccountRegistration(account, balance)
-
-    def _supported(self, exchange_name: ExchangeName) -> ExchangePort:
-        exchange = self._exchanges.get(exchange_name.value)
-        if exchange is None:
-            raise UnsupportedExchangeError(exchange_name, self._exchanges)
-        return exchange
 
     def _require_free(self, name: AccountName) -> None:
         if self._accounts.name_in_use(name):

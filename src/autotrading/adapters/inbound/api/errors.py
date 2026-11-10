@@ -8,9 +8,11 @@ from fastapi.responses import JSONResponse
 from autotrading.application.accounts.errors import (
     AccountNameInUseError,
     AccountNotFoundError,
+    CredentialsNotOpenedError,
     ExchangeRejectedCredentialsError,
     ExchangeUnavailableError,
     UnsupportedExchangeError,
+    WorkerUnavailableError,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.errors import (
@@ -58,6 +60,9 @@ ERROR_STATUS: dict[type[AutotradingError], int] = {
     AuthenticationNotConfiguredError: 503,
     IdentityProviderUnavailableError: 503,
     ExchangeUnavailableError: 503,
+    WorkerUnavailableError: 503,
+    # Sealed credentials that do not open are a fault of the installation, never of the request.
+    CredentialsNotOpenedError: 500,
 }
 
 

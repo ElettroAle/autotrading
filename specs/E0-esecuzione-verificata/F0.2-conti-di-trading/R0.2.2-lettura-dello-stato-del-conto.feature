@@ -1,5 +1,5 @@
 # language: it
-@R0.2.2 @wip
+@R0.2.2
 Funzionalità: R0.2.2 Lettura dello stato del conto
   Come utente
   Voglio vedere lo stato aggiornato di un mio conto

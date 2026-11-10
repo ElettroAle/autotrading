@@ -99,6 +99,7 @@ dependencies = [
     { name = "alembic" },
     { name = "eth-account" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "hyperliquid-python-sdk" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyjwt", extra = ["crypto"] },
@@ -111,7 +112,6 @@ dependencies = [
 dev = [
     { name = "gherkin-official" },
     { name = "git-cliff" },
-    { name = "httpx" },
     { name = "import-linter" },
     { name = "mypy" },
     { name = "pip-audit" },
@@ -126,6 +126,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.16" },
     { name = "eth-account", specifier = ">=0.10,<0.11" },
     { name = "fastapi", specifier = ">=0.120" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "hyperliquid-python-sdk", specifier = ">=0.24.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
@@ -138,7 +139,6 @@ requires-dist = [
 dev = [
     { name = "gherkin-official", specifier = ">=36" },
     { name = "git-cliff", specifier = ">=2.10" },
-    { name = "httpx", specifier = ">=0.28" },
     { name = "import-linter", specifier = ">=2.5" },
     { name = "mypy", specifier = ">=1.18" },
     { name = "pip-audit", specifier = ">=2.9" },

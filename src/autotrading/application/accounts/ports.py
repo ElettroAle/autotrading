@@ -3,14 +3,14 @@ from typing import Protocol
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
-from autotrading.domain.accounts.balance import Balance
+from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 
 
 class ExchangePort(Protocol):
-    def read_balance(self, credentials: Credentials) -> Balance:
-        """Reads the balance proving the credentials work on the exchange.
+    def read_state(self, credentials: Credentials) -> AccountState:
+        """Reads balance, margin and positions, proving the credentials work on the exchange.
 
         Raises ExchangeRejectedCredentialsError with the message of the exchange, or ExchangeUnavailableError.
         """
@@ -21,6 +21,22 @@ class CredentialSealerPort(Protocol):
     """Bound to the tenant of the request: the sealed text names tenant and account (ADR 0007)."""
 
     def seal(self, account_id: AccountId, credentials: Credentials) -> SealedCredentials: ...
+
+
+class CredentialOpenerPort(Protocol):
+    """Only in the worker, the one service holding the private key (ADR 0007)."""
+
+    def open(self, account: Account) -> Credentials:
+        """Raises CredentialsNotOpenedError when the sealed text names another tenant or account, or no key opens it."""
+        ...
+
+
+class AccountStatePort(Protocol):
+    """Bound to the tenant of the request: the live state of one of its accounts, read where the private key is."""
+
+    def read_state(self, account_id: AccountId) -> AccountState:
+        """Raises the errors of ExchangePort, AccountNotFoundError, or WorkerUnavailableError."""
+        ...
 
 
 class AccountRepositoryPort(Protocol):

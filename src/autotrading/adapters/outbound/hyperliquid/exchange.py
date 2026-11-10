@@ -1,6 +1,7 @@
 import re
 import secrets
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
 
@@ -14,8 +15,10 @@ from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.accounts.position import Position, PositionSide
 
 TIMEOUT_SECONDS = 10.0
 PROBE_COIN = "BTC"
@@ -41,7 +44,7 @@ class OfficialSdk:
 
 
 class HyperliquidExchangeAdapter:
-    """Proves the credentials with a signed cancel of an order that cannot exist, then reads the account value.
+    """Proves the credentials with a signed cancel of an order that cannot exist, then reads the account state.
 
     The cancel changes nothing on the exchange, but only a signer approved for the account gets an answer other than
     the rejection of the exchange, whose message is kept (R0.2.1, ADR 0018). No retries, 10 seconds of timeout.
@@ -61,7 +64,7 @@ class HyperliquidExchangeAdapter:
         # The network is chosen by the installation, never deduced from the credentials.
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
-    def read_balance(self, credentials: Credentials) -> Balance:
+    def read_state(self, credentials: Credentials) -> AccountState:
         wallet = _wallet_of(credentials)
         try:
             exchange = self._sdk.exchange(wallet, self._base_url, credentials.account_address, self._timeout)
@@ -71,7 +74,7 @@ class HyperliquidExchangeAdapter:
             raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
-        return _balance_of(state)
+        return _account_state_of(state)
 
 
 def _wallet_of(credentials: Credentials) -> LocalAccount:
@@ -94,12 +97,35 @@ def _require_accepted(response: Any, credentials: Credentials) -> None:
     raise ExchangeRejectedCredentialsError(_masked(str(message), credentials))
 
 
-def _balance_of(state: Any) -> Balance:
+def _account_state_of(state: Any) -> AccountState:
+    # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
-        amount = Decimal(str(state["marginSummary"]["accountValue"]))
-    except (KeyError, TypeError, InvalidOperation) as error:
+        return AccountState(
+            balance=Balance(_decimal(state["marginSummary"]["accountValue"]), MARGIN_CURRENCY),
+            available_margin=Balance(_decimal(state["withdrawable"]), MARGIN_CURRENCY),
+            positions=tuple(_position_of(entry["position"]) for entry in state["assetPositions"]),
+            read_at=datetime.fromtimestamp(int(state["time"]) / 1000, UTC),
+        )
+    except (KeyError, TypeError, ValueError, InvalidOperation) as error:
         raise ExchangeUnavailableError from error
-    return Balance(amount, MARGIN_CURRENCY)
+
+
+def _position_of(position: Mapping[str, Any]) -> Position:
+    size = _decimal(position["szi"])
+    liquidation = position.get("liquidationPx")
+    return Position(
+        coin=str(position["coin"]),
+        side=PositionSide.LONG if size > 0 else PositionSide.SHORT,
+        size=abs(size),
+        leverage=int(position["leverage"]["value"]),
+        entry_price=_decimal(position["entryPx"]),
+        unrealized_pnl=_decimal(position["unrealizedPnl"]),
+        liquidation_price=None if liquidation is None else _decimal(liquidation),
+    )
+
+
+def _decimal(value: Any) -> Decimal:
+    return Decimal(str(value))
 
 
 def _masked(message: str, credentials: Credentials) -> str:
