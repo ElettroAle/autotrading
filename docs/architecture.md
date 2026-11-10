@@ -269,7 +269,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 
 ### 12.1 Decisione per F0-F1 (8 novembre 2026)
 
-**Hosting: OVH Public Cloud** (decisione del 9 novembre 2026, ADR 0008; sostituisce la VPS Hetzner, i cui piani condivisi non sono più disponibili). Per ora solo l'installazione `dev`, istanza `d2-2` (1 vCPU, 2 GB, circa €5,71/mese, prezzi di novembre 2026 da verificare all'ordine) in regione `GRA11`, Ubuntu 24.04, Docker Engine, `docker compose`, PostgreSQL in container. Si passa a `d2-4` (2 vCPU, 4 GB, circa €11,44/mese) cambiando una variabile quando arrivano worker e forecaster. Creazione della macchina dalla pipeline con la CLI OpenStack e un service account IAM.
+**Hosting: OVH Public Cloud** (decisione del 9 novembre 2026, ADR 0008; sostituisce la VPS Hetzner, i cui piani condivisi non sono più disponibili). Per ora solo l'installazione `dev`, istanza `d2-2` (1 vCPU, 2 GB, circa €5,71/mese, prezzi di novembre 2026 da verificare all'ordine) in regione `SBG5` (ADR 0013; `GRA11` era senza capacità per `d2-2`), Ubuntu 24.04, Docker Engine, `docker compose`, PostgreSQL in container. Si passa a `d2-4` (2 vCPU, 4 GB, circa €11,44/mese) cambiando una variabile quando arrivano worker e forecaster. Creazione della macchina dalla pipeline con la CLI OpenStack e un service account IAM.
 
 Motivi: canone fisso minimo, sempre acceso, nessun compromesso sull'architettura (cinque container sempre attivi), nessun prerequisito sulla macchina del proprietario.
 

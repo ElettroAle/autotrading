@@ -22,7 +22,8 @@ progetto o una rete privata con IP pubblico costano, e il proprietario lo esclud
   Tailscale, verso l'API che ascolta solo su `127.0.0.1:8000`. Caddy esce dal compose.
 - **Firewall sulla macchina**: `ufw` rifiuta tutto in ingresso tranne l'interfaccia `tailscale0`.
 - **Pipeline senza segreti Tailscale**: una credenziale OIDC (workload identity federation) per
-  environment GitHub, subject `repo:ElettroAle/autotrading:environment:<ambiente>`, scope `auth_keys`, tag
+  environment GitHub, subject immutabile
+  `repo:ElettroAle@13102057/autotrading@1448691814:environment:<ambiente>`, scope `auth_keys`, tag
   `tag:ci` e `tag:autotrading-<ambiente>`. Client ID e Audience sono variabili dell'environment
   (`TS_CLIENT_ID`, `TS_AUDIENCE`).
 - **`provision`**: con l'identità del job crea una chiave monouso, preautorizzata, valida un'ora, con il
@@ -51,4 +52,6 @@ progetto o una rete privata con IP pubblico costano, e il proprietario lo esclud
 - I segreti e le variabili delle chiavi SSH (`DEPLOY_SSH_*`, `HOST_SSH_*`) non servono più.
 - Il piano gratuito Tailscale (Personal) è per uso non commerciale: va rivisto se AutoTrading diventa un
   servizio venduto.
+- La regione predefinita è `SBG5`: il 10 novembre 2026 `GRA11` non aveva capacità per `d2-2` (`No valid host
+  was found`). Il listino OVH ha un solo prezzo per `d2-2`, valido per ogni regione.
 - Il nome `.ts.net` della macchina compare nei registri pubblici dei certificati; non dà accesso.

@@ -35,7 +35,7 @@ jobs:
           client-id: ${{ secrets.OVH_CLIENT_ID }}
           client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
           project-id: ${{ vars.OVH_PROJECT_ID }}
-          region: ${{ vars.OVH_REGION || 'GRA11' }}
+          region: ${{ vars.OVH_REGION || 'SBG5' }}
           zone: ${{ vars.OVH_ZONE || 'eu' }}
           flavor: ${{ vars.OVH_FLAVOR || 'd2-2' }}
           tailscale-auth-key: ${{ steps.key.outputs.key }}
