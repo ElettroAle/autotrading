@@ -1,11 +1,8 @@
 name: ssh-deploy
-description: Aggiorna l'installazione via SSH all'artefatto indicato per digest.
+description: Aggiorna l'installazione via Tailscale SSH all'artefatto indicato per digest.
 inputs:
-  address:
-    description: Indirizzo della macchina
-    required: true
   hostname:
-    description: Nome pubblico dell'installazione
+    description: Nome dell'installazione nel tailnet
     required: true
   environment:
     description: dev o prod
@@ -16,44 +13,27 @@ inputs:
   image:
     description: Riferimento repository@sha256
     required: true
-  ssh-private-key:
-    description: Chiave privata dell'utente deploy
-    required: true
-  host-public-key:
-    description: Chiave pubblica host attesa
-    required: true
   registry-token:
     description: Token di sola lettura del registro, valido solo per questa esecuzione
     required: true
 runs:
   using: composite
   steps:
-    - name: Chiavi SSH
-      shell: bash
-      env:
-        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
-        HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
-        ADDRESS: ${{ inputs.address }}
-      run: |
-        install -d -m 700 ~/.ssh
-        printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy
-        chmod 600 ~/.ssh/deploy
-        printf '%s %s\n' "$ADDRESS" "$HOST_PUBLIC_KEY" > ~/.ssh/known_hosts
     - name: Aggiorna l'installazione
       shell: bash
       env:
-        ADDRESS: ${{ inputs.address }}
-        PUBLIC_HOSTNAME: ${{ inputs.hostname }}
+        HOSTNAME_TS: ${{ inputs.hostname }}
         APP_ENVIRONMENT: ${{ inputs.environment }}
         APP_VERSION: ${{ inputs.version }}
         API_IMAGE: ${{ inputs.image }}
         REGISTRY_TOKEN: ${{ inputs.registry-token }}
+      # Tailscale SSH: identity from the tailnet, no SSH key (ADR 0013).
       run: |
-        target="deploy@${ADDRESS}"
-        ssh_options=(-i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes)
-        scp "${ssh_options[@]}" deploy/compose.yaml deploy/Caddyfile "${target}:/opt/autotrading/"
-        printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\nPUBLIC_HOSTNAME=%s\n' \
-          "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION" "$PUBLIC_HOSTNAME" \
+        target="deploy@${HOSTNAME_TS}"
+        ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
+          -o BatchMode=yes)
+        ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
+        printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION" \
           | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
         # Il token di registro vale solo per questa esecuzione e viene rimosso subito dopo il pull.
         printf '%s' "$REGISTRY_TOKEN" | ssh "${ssh_options[@]}" "$target" \
@@ -61,7 +41,3 @@ runs:
         ssh "${ssh_options[@]}" "$target" \
           'cd /opt/autotrading && docker compose pull api; status=$?; docker logout ghcr.io; exit $status'
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans'
-    - name: Rimuovi la chiave
-      if: ${{ always() }}
-      shell: bash
-      run: rm -f ~/.ssh/deploy

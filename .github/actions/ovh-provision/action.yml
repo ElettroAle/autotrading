@@ -22,14 +22,8 @@ inputs:
   flavor:
     description: Tipo di istanza Public Cloud
     required: true
-  deploy-public-key:
-    description: Chiave pubblica dell'utente deploy
-    required: true
-  host-private-key:
-    description: Chiave privata host della macchina
-    required: true
-  host-public-key:
-    description: Chiave pubblica host della macchina
+  tailscale-auth-key:
+    description: Chiave Tailscale monouso con cui la macchina entra nel tailnet
     required: true
 outputs:
   created:
@@ -59,43 +53,6 @@ runs:
         else
           echo "created=true" >> "$GITHUB_OUTPUT"
         fi
-    - name: Chiave di accesso
-      if: ${{ steps.exists.outputs.created == 'true' }}
-      shell: bash
-      env:
-        OS_CLIENT_ID: ${{ inputs.client-id }}
-        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
-        ENVIRONMENT: ${{ inputs.environment }}
-        DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
-      run: |
-        key="autotrading-${ENVIRONMENT}-deploy"
-        if ! openstack keypair show "$key" > /dev/null 2>&1; then
-          printf '%s\n' "$DEPLOY_PUBLIC_KEY" > "${RUNNER_TEMP}/deploy.pub"
-          openstack keypair create "$key" --public-key "${RUNNER_TEMP}/deploy.pub"
-          rm -f "${RUNNER_TEMP}/deploy.pub"
-        fi
-    - id: port
-      name: Porta pubblica senza security group
-      if: ${{ steps.exists.outputs.created == 'true' }}
-      shell: bash
-      env:
-        OS_CLIENT_ID: ${{ inputs.client-id }}
-        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
-        ENVIRONMENT: ${{ inputs.environment }}
-      # The project has no quota for security groups or rules: the public port carries none and has port
-      # security disabled, so ufw on the machine is the only firewall (ADR 0012). A port left behind by a
-      # failed run is reused.
-      run: |
-        name="autotrading-${ENVIRONMENT}-public"
-        port="$(openstack port list --name "$name" -f value -c ID | head -n 1)"
-        if [ -z "$port" ]; then
-          if ! port="$(openstack port create "$name" --network Ext-Net --no-security-group \
-            --disable-port-security -f value -c id)"; then
-            echo "::error::OVH non consente una porta pubblica senza security group; nessuna macchina creata"
-            exit 1
-          fi
-        fi
-        echo "id=${port}" >> "$GITHUB_OUTPUT"
     - name: Crea la macchina
       if: ${{ steps.exists.outputs.created == 'true' }}
       shell: bash
@@ -104,17 +61,14 @@ runs:
         OS_CLIENT_SECRET: ${{ inputs.client-secret }}
         ENVIRONMENT: ${{ inputs.environment }}
         FLAVOR: ${{ inputs.flavor }}
-        DEPLOY_PUBLIC_KEY: ${{ inputs.deploy-public-key }}
-        HOST_PRIVATE_KEY: ${{ inputs.host-private-key }}
-        HOST_PUBLIC_KEY: ${{ inputs.host-public-key }}
-        PORT_ID: ${{ steps.port.outputs.id }}
-      # The machine sits on the public port created above; cloud-init enables ufw before any service starts.
+        TAILSCALE_AUTH_KEY: ${{ inputs.tailscale-auth-key }}
+      # The project's default security group is used untouched: it lets the machine out and nothing in, which
+      # is all Tailscale needs (ADR 0013). No security group or rule is created, changed or deleted.
       run: |
         user_data="${RUNNER_TEMP}/cloud-init.yaml"
         umask 077
         uv run python -m tools.render_cloud_init deploy/cloud-init.yaml > "$user_data"
         openstack server create "autotrading-${ENVIRONMENT}" --flavor "$FLAVOR" --image "Ubuntu 24.04" \
-          --port "$PORT_ID" --key-name "autotrading-${ENVIRONMENT}-deploy" \
-          --user-data "$user_data" \
+          --network Ext-Net --security-group default --user-data "$user_data" \
           --property app=autotrading --property "environment=${ENVIRONMENT}" --wait > /dev/null
         rm -f "$user_data"

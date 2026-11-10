@@ -1,5 +1,6 @@
-# Installazione dev o prod sulla VPS. I valori arrivano dal file .env scritto dalla pipeline
-# (nessun segreto): immagine per digest, ambiente, versione, nome pubblico.
+# Installazione dev o prod. I valori arrivano dal file .env scritto dalla pipeline
+# (nessun segreto): immagine per digest, ambiente, versione.
+# L'API ascolta solo sull'interfaccia locale: la espone Tailscale Serve, in HTTPS e solo nel tailnet (ADR 0013).
 name: autotrading
 
 services:
@@ -10,24 +11,5 @@ services:
       APP_VERSION: ${APP_VERSION:-}
     read_only: true
     restart: unless-stopped
-    networks: [internal]
-
-  caddy:
-    image: caddy:2.11.9-alpine
-    restart: unless-stopped
     ports:
-      - "443:443"
-    environment:
-      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME mancante}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks: [internal]
-
-networks:
-  internal: {}
-
-volumes:
-  caddy_data: {}
-  caddy_config: {}
+      - "127.0.0.1:8000:8000"

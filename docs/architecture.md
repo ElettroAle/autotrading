@@ -235,7 +235,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 - Credenziali di sola operatività: su Hyperliquid l'API wallet non può prelevare; il wallet principale con i fondi non tocca mai la piattaforma.
 - Rilevazione: registro delle decifrature, riconciliazione con allarme, notifica di ogni apertura.
 - Revoca: playbook scritto per revocare l'API wallet dal wallet principale e ruotare le chiavi dei servizi.
-- Esposizione: solo Caddy (443) e SSH con chiave; `postgres`, `litellm`, `forecaster` su rete interna. Container non root, filesystem in sola lettura dove possibile, nessun accesso al socket Docker.
+- Esposizione: nessuna porta verso Internet; HTTPS (Tailscale Serve) e Tailscale SSH solo dal tailnet del proprietario (ADR 0013); `postgres`, `litellm`, `forecaster` su rete interna. Container non root, filesystem in sola lettura dove possibile, nessun accesso al socket Docker.
 
 ---
 
@@ -283,13 +283,13 @@ Alternative scartate e perché:
 
 Configurazione del nodo (F0):
 
-1. Ubuntu LTS, utente non root, accesso solo con chiave SSH, firewall `ufw` con sole porte 22 e 443; aggiornamenti automatici di sicurezza.
+1. Ubuntu LTS, utente non root, nessuna connessione accettata da Internet: accesso solo dal tailnet Tailscale del proprietario con Tailscale SSH (nessuna chiave SSH, `sshd` spento), `ufw` aperto solo sull'interfaccia `tailscale0`; aggiornamenti automatici di sicurezza (ADR 0013).
 2. Docker Engine + plugin compose; immagini da GHCR.
-3. Reverse proxy (Caddy) davanti ad `api`, con TLS automatico su un nome DNS; `postgres`, `litellm`, `forecaster` su rete interna del compose, mai esposti.
+3. Tailscale Serve davanti ad `api` (in ascolto solo su `127.0.0.1`), con TLS automatico sul nome `autotrading-<ambiente>.<tailnet>.ts.net`; `postgres`, `litellm`, `forecaster` su rete interna del compose, mai esposti.
 4. Segreti secondo la sezione 8.2: segreti dei servizi come file montati dalla pipeline; coppia di chiavi delle credenziali generata sul server, privata leggibile solo da root.
-5. Entra ID: redirect URI sul nome DNS pubblico (e `http://localhost` per lo sviluppo).
+5. Entra ID: redirect URI sul nome `.ts.net` dell'installazione (e `http://localhost` per lo sviluppo).
 
-**Ambienti e deploy.** Due installazioni identiche, `dev` (reti di test degli exchange) e `prod`, ciascuna sulla propria VPS con la propria coppia di chiavi delle credenziali. Il deploy passa **sempre** dalla pipeline GitHub Actions, con runner ospitati da GitHub: build e pubblicazione delle immagini su GHCR, poi aggiornamento via SSH (chiave privata nei segreti dell'environment GitHub, sulla VPS solo la chiave pubblica). Environment GitHub `dev` e `prod` con segreti separati; `prod` richiede approvazione. Action di terzi fissate per hash di commit; ramo `main` protetto.
+**Ambienti e deploy.** Due installazioni identiche, `dev` (reti di test degli exchange) e `prod`, ciascuna sulla propria VPS con la propria coppia di chiavi delle credenziali. Il deploy passa **sempre** dalla pipeline GitHub Actions, con runner ospitati da GitHub: build e pubblicazione delle immagini su GHCR, poi aggiornamento via Tailscale SSH: il job entra nel tailnet con la propria identità OIDC, senza chiavi né segreti. Environment GitHub `dev` e `prod` con segreti separati; `prod` richiede approvazione. Action di terzi fissate per hash di commit; ramo `main` protetto.
 
 **Backup**: in F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su OVH Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot dell'istanza. Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
 

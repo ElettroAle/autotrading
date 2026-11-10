@@ -5,8 +5,7 @@ from string import Template
 from tools.errors import PipelineError
 from tools.workspace import workspace_path
 
-PRIVATE_KEY_INDENT = "    "
-REQUIRED_VALUES = ("DEPLOY_PUBLIC_KEY", "HOST_PRIVATE_KEY", "HOST_PUBLIC_KEY")
+REQUIRED_VALUES = ("ENVIRONMENT", "TAILSCALE_AUTH_KEY")
 
 
 class MissingProvisioningValueError(PipelineError):
@@ -17,21 +16,13 @@ class MissingProvisioningValueError(PipelineError):
 
 def render(template: str, values: dict[str, str]) -> str:
     _require_values(values)
-    return Template(template).substitute(
-        DEPLOY_PUBLIC_KEY=values["DEPLOY_PUBLIC_KEY"].strip(),
-        HOST_PUBLIC_KEY=values["HOST_PUBLIC_KEY"].strip(),
-        HOST_PRIVATE_KEY=_indented(values["HOST_PRIVATE_KEY"]),
-    )
+    return Template(template).substitute({name: values[name].strip() for name in REQUIRED_VALUES})
 
 
 def _require_values(values: dict[str, str]) -> None:
     for name in REQUIRED_VALUES:
         if not values.get(name, "").strip():
             raise MissingProvisioningValueError(name)
-
-
-def _indented(block: str) -> str:
-    return "\n".join(PRIVATE_KEY_INDENT + line for line in block.strip().splitlines())
 
 
 def main(arguments: list[str]) -> int:

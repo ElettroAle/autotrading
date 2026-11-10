@@ -1,4 +1,4 @@
-# Orchestratore della creazione di un'installazione (R0.5.4).
+# Orchestratore della creazione di un'installazione (R0.5.4, ADR 0013).
 name: reusable-provision
 
 on:
@@ -16,9 +16,18 @@ jobs:
     name: installazione ${{ inputs.environment }}
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/python-setup
+      - id: key
+        uses: ./.github/actions/tailscale-auth-key
+        with:
+          client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tag: tag:autotrading-${{ inputs.environment }}
       - id: provision
         uses: ./.github/actions/ovh-provision
         with:
@@ -28,24 +37,16 @@ jobs:
           project-id: ${{ vars.OVH_PROJECT_ID }}
           region: ${{ vars.OVH_REGION || 'GRA11' }}
           zone: ${{ vars.OVH_ZONE || 'eu' }}
-          deploy-public-key: ${{ vars.DEPLOY_SSH_PUBLIC_KEY }}
-          host-private-key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
-          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
           flavor: ${{ vars.OVH_FLAVOR || 'd2-2' }}
-      - id: host
-        if: ${{ steps.provision.outputs.created == 'true' }}
-        uses: ./.github/actions/installation-host
+          tailscale-auth-key: ${{ steps.key.outputs.key }}
+      # Joining the tailnet and starting the installation are repeatable, so a rerun completes a machine that a
+      # failed run left half configured.
+      - id: tailnet
+        uses: ./.github/actions/tailscale-connect
         with:
+          client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
           environment: ${{ inputs.environment }}
-          client-id: ${{ secrets.OVH_CLIENT_ID }}
-          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
-          project-id: ${{ vars.OVH_PROJECT_ID }}
-          region: ${{ vars.OVH_REGION || 'GRA11' }}
-          zone: ${{ vars.OVH_ZONE || 'eu' }}
-      - if: ${{ steps.provision.outputs.created == 'true' }}
-        uses: ./.github/actions/installation-start
+      - uses: ./.github/actions/installation-start
         with:
-          address: ${{ steps.host.outputs.address }}
-          hostname: ${{ steps.host.outputs.hostname }}
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          host-public-key: ${{ vars.HOST_SSH_PUBLIC_KEY }}
+          hostname: ${{ steps.tailnet.outputs.hostname }}

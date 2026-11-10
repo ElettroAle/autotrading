@@ -1,9 +1,12 @@
 #cloud-config
-# Configurazione versionata di una macchina dell'installazione (R0.5.4).
+# Configurazione versionata di una macchina dell'installazione (R0.5.4, ADR 0013).
 # I segnaposto con il dollaro sono riempiti da tools/render_cloud_init.py nella pipeline.
+# La macchina non accetta connessioni da Internet: si raggiunge solo dal tailnet, con Tailscale SSH e
+# Tailscale Serve (HTTPS sul nome autotrading-<ambiente>.<tailnet>.ts.net).
 package_update: true
 package_upgrade: true
 packages:
+  - curl
   - docker.io
   - docker-compose-v2
   - ufw
@@ -17,34 +20,21 @@ users:
     groups: [docker]
     shell: /bin/bash
     lock_passwd: true
-    ssh_authorized_keys:
-      - ${DEPLOY_PUBLIC_KEY}
 
 ssh_pwauth: false
 disable_root: true
-ssh_deletekeys: true
-ssh_genkeytypes: []
-# Chiave host nota in anticipo: la pipeline verifica l'identità della macchina invece di
-# fidarsi della prima chiave che riceve.
-ssh_keys:
-  ed25519_private: |
-${HOST_PRIVATE_KEY}
-  ed25519_public: ${HOST_PUBLIC_KEY}
-
-write_files:
-  - path: /etc/ssh/sshd_config.d/10-hardening.conf
-    permissions: "0644"
-    content: |
-      PasswordAuthentication no
-      KbdInteractiveAuthentication no
-      PermitRootLogin no
 
 runcmd:
   - ufw default deny incoming
   - ufw default allow outgoing
-  - ufw allow 22/tcp
-  - ufw allow 443/tcp
+  - ufw allow in on tailscale0
   - ufw --force enable
   - install -d -o deploy -g deploy -m 750 /opt/autotrading
   - systemctl enable --now docker
-  - systemctl restart ssh
+  - curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+  - curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list
+  - apt-get update
+  - apt-get install -y tailscale
+  - tailscale up --auth-key=${TAILSCALE_AUTH_KEY} --hostname=autotrading-${ENVIRONMENT} --advertise-tags=tag:autotrading-${ENVIRONMENT} --ssh
+  - tailscale serve --bg --https=443 http://127.0.0.1:8000
+  - systemctl disable --now ssh.socket ssh.service

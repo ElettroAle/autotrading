@@ -1,0 +1,62 @@
+name: tailscale-auth-key
+description: Crea con l'identità OIDC del job una chiave Tailscale monouso, preautorizzata e valida un'ora, per un solo tag.
+inputs:
+  client-id:
+    description: Client ID della credenziale OIDC Tailscale dell'environment
+    required: true
+  audience:
+    description: Audience della credenziale OIDC Tailscale dell'environment
+    required: true
+  tag:
+    description: Unico tag assegnato al dispositivo che userà la chiave
+    required: true
+outputs:
+  key:
+    description: Chiave monouso, mascherata nei log
+    value: ${{ steps.key.outputs.key }}
+runs:
+  using: composite
+  steps:
+    - id: key
+      name: Chiave Tailscale monouso
+      shell: bash
+      env:
+        CLIENT_ID: ${{ inputs.client-id }}
+        AUDIENCE: ${{ inputs.audience }}
+        TAG: ${{ inputs.tag }}
+      # GitHub signs an identity token for this job; Tailscale trades it for a short-lived API token that can only
+      # create auth keys for the credential's tags (ADR 0013). No secret is stored anywhere.
+      run: |
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+          echo "::error::il job non ha il permesso id-token: write"
+          exit 1
+        fi
+        jwt="$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" | jq -r '.value // empty')"
+        if [ -z "$jwt" ]; then
+          echo "::error::GitHub non ha rilasciato il token di identità del job"
+          exit 1
+        fi
+        echo "::add-mask::${jwt}"
+        exchange="$(curl -sS -X POST https://api.tailscale.com/api/v2/oauth/token-exchange \
+          --data-urlencode "client_id=${CLIENT_ID}" --data-urlencode "jwt=${jwt}")"
+        token="$(jq -r '.access_token // empty' <<< "$exchange")"
+        if [ -z "$token" ]; then
+          echo "::error::Tailscale ha rifiutato l'identità del job: $(jq -r '.message // "risposta inattesa"' <<< "$exchange")"
+          exit 1
+        fi
+        echo "::add-mask::${token}"
+        request="$(jq -n --arg tag "$TAG" '{
+          capabilities: {devices: {create: {reusable: false, ephemeral: false, preauthorized: true, tags: [$tag]}}},
+          expirySeconds: 3600,
+          description: "autotrading provision"
+        }')"
+        created="$(curl -sS -X POST https://api.tailscale.com/api/v2/tailnet/-/keys \
+          -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d "$request")"
+        key="$(jq -r '.key // empty' <<< "$created")"
+        if [ -z "$key" ]; then
+          echo "::error::chiave Tailscale non creata per ${TAG}: $(jq -r '.message // "risposta inattesa"' <<< "$created")"
+          exit 1
+        fi
+        echo "::add-mask::${key}"
+        echo "key=${key}" >> "$GITHUB_OUTPUT"
