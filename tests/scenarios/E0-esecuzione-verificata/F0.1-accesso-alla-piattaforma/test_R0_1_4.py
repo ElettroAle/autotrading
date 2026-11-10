@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -5,13 +7,16 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from autotrading.adapters.inbound.api.app import ENVIRONMENT_HEADER
 from autotrading.bootstrap import create_application
 from autotrading.domain.errors import AutotradingError
+from tests.support.installation import installation_configuration
 
 scenarios("E0-esecuzione-verificata/F0.1-accesso-alla-piattaforma/R0.1.4-ambiente-di-installazione-visibile.feature")
 
 
 @pytest.fixture
-def configuration() -> dict[str, str]:
-    return {"APP_VERSION": "1.0.0"}
+def configuration(tmp_path: Path) -> dict[str, str]:
+    configuration = installation_configuration(tmp_path)
+    del configuration["APP_ENVIRONMENT"]
+    return configuration
 
 
 @given(parsers.parse("che l'installazione è configurata con l'ambiente \"{environment}\""))

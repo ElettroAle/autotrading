@@ -1,5 +1,5 @@
 # language: it
-@R0.1.1 @wip
+@R0.1.1
 Funzionalità: R0.1.1 Accesso riservato agli utenti con il ruolo Utente
   Come persona censita nella directory aziendale
   Voglio entrare nella piattaforma solo se mi è stato assegnato il ruolo Utente

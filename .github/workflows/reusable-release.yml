@@ -76,6 +76,10 @@ jobs:
           version: ${{ needs.versione.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          auth-issuer: ${{ vars.AUTH_ISSUER }}
+          auth-audience: ${{ vars.AUTH_AUDIENCE }}
+          auth-client-id: ${{ vars.AUTH_CLIENT_ID }}
+          auth-scope: ${{ vars.AUTH_SCOPE }}
       - uses: ./.github/actions/health-check
         with:
           hostname: ${{ steps.host.outputs.hostname }}
@@ -121,6 +125,10 @@ jobs:
           version: ${{ steps.release.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
+          auth-issuer: ${{ vars.AUTH_ISSUER }}
+          auth-audience: ${{ vars.AUTH_AUDIENCE }}
+          auth-client-id: ${{ vars.AUTH_CLIENT_ID }}
+          auth-scope: ${{ vars.AUTH_SCOPE }}
       - uses: ./.github/actions/health-check
         with:
           hostname: ${{ steps.host.outputs.hostname }}
