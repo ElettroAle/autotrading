@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.errors import (
     NotAuthenticatedError,
     install_error_responses,
 )
+from autotrading.adapters.inbound.api.orders import orders_router
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -76,6 +77,7 @@ def create_api(
         return Identity(user_id=user_id.value, tenant_id=str(tenant_id.value))
 
     protected.include_router(accounts_router(use_cases_of_request))
+    protected.include_router(orders_router(use_cases_of_request, current_user))
     api.include_router(protected)
     return api
 

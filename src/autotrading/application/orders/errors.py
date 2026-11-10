@@ -35,3 +35,14 @@ class OrderNotAcknowledgedError(ApplicationError):
 class OrderExchangeUnavailableError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("exchange non raggiungibile, riprovare")
+
+
+class NoOpenPositionError(ApplicationError):
+    def __init__(self, coin: str) -> None:
+        super().__init__(f"nessuna posizione aperta su {coin}")
+        self.coin = coin
+
+
+class OrderWorkerUnavailableError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("servizio di esecuzione non raggiungibile, riprovare")

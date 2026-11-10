@@ -19,6 +19,7 @@ from autotrading.application.orders.errors import (
 )
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
+from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.slippage import Slippage
@@ -66,6 +67,14 @@ FILLS = [
     {"coin": "ETH", "px": "4000.0", "sz": "1.0", "oid": 1, "fee": "1.8", "closedPnl": "0.0", "time": 1_794_307_100_000},
 ]
 
+STATE = {
+    "assetPositions": [
+        {"position": {"coin": "BTC", "szi": "-0.0003", "leverage": {"type": "cross", "value": 3}}},
+        {"position": {"coin": "ETH", "szi": "1.25", "leverage": {"type": "cross", "value": 5}}},
+        {"position": {"coin": "SOL", "szi": "0.0", "leverage": {"type": "cross", "value": 2}}},
+    ]
+}
+
 
 def answer(statuses: list[Any]) -> Any:
     return {"status": "ok", "response": {"type": "order", "data": {"statuses": statuses}}}
@@ -82,6 +91,7 @@ class FakeSdk:
         default_factory=lambda: {"status": "order", "order": {"order": {"oid": OID}, "status": "filled"}}
     )
     meta_answer: Any = field(default_factory=lambda: META)
+    state: Any = field(default_factory=lambda: STATE)
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -118,6 +128,9 @@ class FakeSdk:
     def user_fills(self, address: str) -> Any:
         self.calls.append(("user_fills", address))
         return self.fills
+
+    def user_state(self, address: str) -> Any:
+        return self._answer("user_state", address, self.state)
 
     def query_order_by_cloid(self, address: str, cloid: object) -> Any:
         return self._answer("query_order_by_cloid", (address, str(cloid)), self.order_status)
@@ -306,3 +319,32 @@ def test_the_network_is_chosen_by_the_installation(testnet: bool, url: str) -> N
     HyperliquidOrderExchangeAdapter.for_network(testnet=testnet, sdk=sdk).market(ACCESS, "BTC")
 
     assert calls_named(sdk, "info") == [(url, TIMEOUT_SECONDS)]
+
+
+@pytest.mark.parametrize(
+    ("coin", "expected"),
+    [
+        ("BTC", HeldPosition("BTC", Direction.SHORT, Decimal("0.0003"), 3)),
+        ("ETH", HeldPosition("ETH", Direction.LONG, Decimal("1.25"), 5)),
+    ],
+)
+def test_the_position_is_read_from_the_state_of_the_account(coin: str, expected: HeldPosition) -> None:
+    sdk = FakeSdk()
+
+    assert adapter(sdk).position(ACCESS, coin) == expected
+    assert calls_named(sdk, "user_state") == [ADDRESS]
+
+
+@pytest.mark.parametrize("coin", ["SOL", "DOGE"])
+def test_an_asset_without_size_or_not_held_has_no_position(coin: str) -> None:
+    assert adapter(FakeSdk()).position(ACCESS, coin) is None
+
+
+def test_a_state_of_unexpected_shape_is_unavailable() -> None:
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(FakeSdk(state={"assetPositions": [{"position": {"coin": "BTC"}}]})).position(ACCESS, "BTC")
+
+
+def test_a_fault_reading_the_position_is_unavailable() -> None:
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(FakeSdk(failure=ServerError(500, "down"))).position(ACCESS, "BTC")

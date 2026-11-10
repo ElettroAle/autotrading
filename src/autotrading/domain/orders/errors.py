@@ -43,3 +43,10 @@ class EmptyExecutionError(DomainError):
 class TradingAccessRequiredError(DomainError):
     def __init__(self) -> None:
         super().__init__("accesso al conto obbligatorio")
+
+
+class ManualOpeningNotAllowedError(DomainError):
+    """Only the procedure of verification and the flows open positions; a user can only close them (R0.3.2)."""
+
+    def __init__(self) -> None:
+        super().__init__("apertura manuale non consentita")

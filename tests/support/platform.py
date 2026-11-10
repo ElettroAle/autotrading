@@ -2,12 +2,16 @@
 
 from secrets import token_hex
 
-from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
+from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
+from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
+from autotrading.bootstrap import TradingAccessFromAccounts
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
@@ -15,6 +19,9 @@ from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.order_exchange import FakeOrderExchangeAdapter
+from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Directory
 
@@ -33,6 +40,9 @@ class Platform:
         self.exchanges = {HYPERLIQUID: FakeExchangeAdapter()}
         self.vault: SealedVault = {}
         self.worker_reachable = True
+        self.order_exchange = FakeOrderExchangeAdapter()
+        self.orders: dict[TenantId, InMemoryOrderRepositoryAdapter] = {}
+        self.slippage = Slippage.default()
 
     @property
     def hyperliquid(self) -> FakeExchangeAdapter:
@@ -55,15 +65,32 @@ class Platform:
 
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         """What bootstrap.for_tenant does, on the fake adapters."""
-        accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
-        account_state = FakeAccountStateAdapter(lambda: self.worker_for(tenant_id))
-        account_state.reachable = self.worker_reachable
-        return TenantUseCases.on(tenant_id, accounts, self.sealer_of(tenant_id), self.exchanges, account_state)
+        account_state = FakeAccountStateAdapter(lambda: self.worker_for(tenant_id).read_exchange_state)
+        position_closing = FakePositionClosingAdapter(lambda: self.worker_for(tenant_id).close_exchange_position)
+        account_state.reachable = position_closing.reachable = self.worker_reachable
+        ports = TenantPorts(
+            accounts=InMemoryAccountRepositoryAdapter(self.accounts, tenant_id),
+            sealer=self.sealer_of(tenant_id),
+            exchanges=self.exchanges,
+            account_state=account_state,
+            position_closing=position_closing,
+        )
+        return TenantUseCases.on(tenant_id, ports)
 
-    def worker_for(self, tenant_id: TenantId) -> ReadExchangeStateUseCase:
+    def worker_for(self, tenant_id: TenantId) -> WorkerUseCases:
         """What the worker builds for a request of the API, with the opener only it holds."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
-        return ReadExchangeStateUseCase(accounts, FakeCredentialOpenerAdapter(self.vault), self.exchanges)
+        opener = FakeCredentialOpenerAdapter(self.vault)
+        access = TradingAccessFromAccounts(accounts, opener)
+        return WorkerUseCases(
+            read_exchange_state=ReadExchangeStateUseCase(accounts, opener, self.exchanges),
+            close_exchange_position=CloseExchangePositionUseCase(
+                access, {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id), self.slippage
+            ),
+        )
+
+    def orders_of(self, tenant_id: TenantId) -> InMemoryOrderRepositoryAdapter:
+        return self.orders.setdefault(tenant_id, InMemoryOrderRepositoryAdapter())
 
     def use_cases_of(self, user: str) -> TenantUseCases:
         return self.for_tenant(self.tenant_of(user))
