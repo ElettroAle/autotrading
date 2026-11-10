@@ -1,9 +1,22 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Annotated, Any
 
-from fastapi import FastAPI, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response, Security
+from fastapi.security import HTTPBearer, OpenIdConnect
+from pydantic import BaseModel
+
+from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings
+from autotrading.adapters.inbound.api.errors import (
+    AuthenticationNotConfiguredError,
+    NotAuthenticatedError,
+    install_error_responses,
+)
+from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
+from autotrading.domain.tenancy.user_id import UserId
 
 ENVIRONMENT_HEADER = "X-Autotrading-Environment"
+BEARER_PREFIX = "bearer "
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,9 +25,48 @@ class HealthReport:
     environment: str
 
 
-def create_api(health: HealthReport) -> FastAPI:
-    api = FastAPI(title="AutoTrading")
+@dataclass(frozen=True, slots=True)
+class Authentication:
+    settings: AuthenticationSettings
+    verifier: AccessTokenVerifier
 
+
+class Identity(BaseModel):
+    user_id: str
+    tenant_id: str
+
+
+def create_api(
+    health: HealthReport, resolve_tenant: ResolveTenantUseCase, authentication: Authentication | None = None
+) -> FastAPI:
+    api = FastAPI(title="AutoTrading", swagger_ui_init_oauth=_swagger_login(authentication))
+    install_error_responses(api)
+    _declare_environment_on_every_response(api, health)
+
+    @api.get("/health")
+    def read_health() -> dict[str, str]:
+        return {"version": health.version, "environment": health.environment}
+
+    def current_user(request: Request) -> UserId:
+        token = _bearer_token(request)
+        # Without an identity provider nobody gets in: the platform fails closed.
+        if authentication is None:
+            raise AuthenticationNotConfiguredError
+        return authentication.verifier.verify(token)
+
+    # Every function of the platform lives on this router, so none is reachable without an identity (R0.1.1).
+    protected = APIRouter(dependencies=[Security(_security_scheme(authentication)), Depends(current_user)])
+
+    @protected.get("/me")
+    def read_identity(user_id: Annotated[UserId, Depends(current_user)]) -> Identity:
+        tenant_id = resolve_tenant.execute(ResolveTenantCommand(user_id))
+        return Identity(user_id=user_id.value, tenant_id=str(tenant_id.value))
+
+    api.include_router(protected)
+    return api
+
+
+def _declare_environment_on_every_response(api: FastAPI, health: HealthReport) -> None:
     # A middleware covers every answer, errors included, so no response can leave without the environment (R0.1.4).
     @api.middleware("http")
     async def declare_environment(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -22,8 +74,29 @@ def create_api(health: HealthReport) -> FastAPI:
         response.headers[ENVIRONMENT_HEADER] = health.environment
         return response
 
-    @api.get("/health")
-    def read_health() -> dict[str, str]:
-        return {"version": health.version, "environment": health.environment}
 
-    return api
+def _bearer_token(request: Request) -> str:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.lower().startswith(BEARER_PREFIX):
+        raise NotAuthenticatedError
+    token = authorization[len(BEARER_PREFIX) :].strip()
+    if not token:
+        raise NotAuthenticatedError
+    return token
+
+
+def _security_scheme(authentication: Authentication | None) -> HTTPBearer | OpenIdConnect:
+    # The scheme only describes the login on the OpenAPI page; the token is read and verified by current_user.
+    if authentication is None:
+        return HTTPBearer(auto_error=False)
+    return OpenIdConnect(openIdConnectUrl=authentication.settings.discovery_url, auto_error=False)
+
+
+def _swagger_login(authentication: Authentication | None) -> dict[str, Any] | None:
+    if authentication is None:
+        return None
+    return {
+        "clientId": authentication.settings.client_id,
+        "usePkceWithAuthorizationCodeGrant": True,
+        "scopes": authentication.settings.scope,
+    }

@@ -16,6 +16,22 @@ inputs:
   registry-token:
     description: Token di sola lettura del registro, valido solo per questa esecuzione
     required: true
+  auth-issuer:
+    description: Issuer OIDC dell'installazione; vuoto finché la directory non è registrata (ADR 0016)
+    required: false
+    default: ""
+  auth-audience:
+    description: Audience dei token accettati
+    required: false
+    default: ""
+  auth-client-id:
+    description: Client id della pagina OpenAPI (Authorization Code + PKCE)
+    required: false
+    default: ""
+  auth-scope:
+    description: Scope chiesto dalla pagina OpenAPI
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -27,14 +43,22 @@ runs:
         APP_VERSION: ${{ inputs.version }}
         API_IMAGE: ${{ inputs.image }}
         REGISTRY_TOKEN: ${{ inputs.registry-token }}
+        AUTH_ISSUER: ${{ inputs.auth-issuer }}
+        AUTH_AUDIENCE: ${{ inputs.auth-audience }}
+        AUTH_CLIENT_ID: ${{ inputs.auth-client-id }}
+        AUTH_SCOPE: ${{ inputs.auth-scope }}
       # Tailscale SSH: identity from the tailnet, no SSH key (ADR 0013).
       run: |
         target="deploy@${HOSTNAME_TS}"
         ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
           -o BatchMode=yes)
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
-        printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION" \
-          | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
+        # Public configuration only: issuer, audience, client id and scope are not secrets (ADR 0016).
+        {
+          printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION"
+          printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
+          printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
+        } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
         # Il token di registro vale solo per questa esecuzione e viene rimosso subito dopo il pull.
         printf '%s' "$REGISTRY_TOKEN" | ssh "${ssh_options[@]}" "$target" \
           "docker login ghcr.io -u '${GITHUB_ACTOR}' --password-stdin"
