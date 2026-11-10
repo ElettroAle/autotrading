@@ -3,7 +3,9 @@
 # machine itself, so no person and no GitHub log ever sees them (ADR 0015), and installs the database bootstrap.
 set -euo pipefail
 cd /opt/autotrading
-install -d -m 700 secrets postgres-init
+install -d -m 700 secrets
+# The postgres user of the container (70) must traverse the init directory.
+install -d -m 755 postgres-init
 cat > postgres-init/10-application-role.sh
 chmod 0555 postgres-init/10-application-role.sh
 postgres_image="$(docker compose config --images | grep '^postgres:')"

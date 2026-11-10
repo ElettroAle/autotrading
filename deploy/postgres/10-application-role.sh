@@ -4,6 +4,8 @@
 set -eu
 password="$(cat /run/secrets/postgres_app_password)"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL
+-- A failing statement must never reach the server log with the password in it.
+SET log_min_error_statement TO panic;
 CREATE ROLE autotrading_app LOGIN PASSWORD '${password}';
 GRANT CONNECT ON DATABASE ${POSTGRES_DB} TO autotrading_app;
 GRANT USAGE ON SCHEMA public TO autotrading_app;

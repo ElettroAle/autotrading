@@ -45,4 +45,6 @@ runs:
           < deploy/prepare-installation.sh
         ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/prepare-installation.sh' \
           < deploy/postgres/10-application-role.sh
-        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans'
+        # On failure the container state and logs explain why; lines naming a password are dropped.
+        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans \
+          || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate | grep -vi password; exit 1; }'
