@@ -15,7 +15,6 @@ Funzionalità: R0.1.2 Tenant dell'utente creato al primo accesso
     E il tenant di "anna" non contiene conti
     E il tenant di "anna" non contiene flussi
 
-  @wip
   Scenario: Agli accessi successivi il tenant è lo stesso
     Dato che "anna" ha un tenant con il conto "test-1"
     Quando "anna" accede di nuovo alla piattaforma
