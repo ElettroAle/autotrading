@@ -4,7 +4,9 @@ from autotrading.domain.accounts.account_id import AccountId
 
 
 def test_new_identifiers_are_distinct() -> None:
-    assert AccountId.new() != AccountId.new()
+    first, second = AccountId.new(), AccountId.new()
+
+    assert first != second
 
 
 def test_parses_the_text_of_an_identifier() -> None:
