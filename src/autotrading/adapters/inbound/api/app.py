@@ -6,13 +6,16 @@ from fastapi import APIRouter, Depends, FastAPI, Request, Response, Security
 from fastapi.security import HTTPBearer, OpenIdConnect
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.accounts import accounts_router
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings
 from autotrading.adapters.inbound.api.errors import (
     AuthenticationNotConfiguredError,
     NotAuthenticatedError,
     install_error_responses,
 )
+from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
+from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
 ENVIRONMENT_HEADER = "X-Autotrading-Environment"
@@ -37,7 +40,10 @@ class Identity(BaseModel):
 
 
 def create_api(
-    health: HealthReport, resolve_tenant: ResolveTenantUseCase, authentication: Authentication | None = None
+    health: HealthReport,
+    resolve_tenant: ResolveTenantUseCase,
+    for_tenant: Callable[[TenantId], TenantUseCases],
+    authentication: Authentication | None = None,
 ) -> FastAPI:
     api = FastAPI(title="AutoTrading", swagger_ui_init_oauth=_swagger_login(authentication))
     install_error_responses(api)
@@ -57,11 +63,19 @@ def create_api(
     # Every function of the platform lives on this router, so none is reachable without an identity (R0.1.1).
     protected = APIRouter(dependencies=[Security(_security_scheme(authentication)), Depends(current_user)])
 
+    def tenant_of_request(user_id: Annotated[UserId, Depends(current_user)]) -> TenantId:
+        return resolve_tenant.execute(ResolveTenantCommand(user_id))
+
+    def use_cases_of_request(tenant_id: Annotated[TenantId, Depends(tenant_of_request)]) -> TenantUseCases:
+        return for_tenant(tenant_id)
+
     @protected.get("/me")
-    def read_identity(user_id: Annotated[UserId, Depends(current_user)]) -> Identity:
-        tenant_id = resolve_tenant.execute(ResolveTenantCommand(user_id))
+    def read_identity(
+        user_id: Annotated[UserId, Depends(current_user)], tenant_id: Annotated[TenantId, Depends(tenant_of_request)]
+    ) -> Identity:
         return Identity(user_id=user_id.value, tenant_id=str(tenant_id.value))
 
+    protected.include_router(accounts_router(use_cases_of_request))
     api.include_router(protected)
     return api
 

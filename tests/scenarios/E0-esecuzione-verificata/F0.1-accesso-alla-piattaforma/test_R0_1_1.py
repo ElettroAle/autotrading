@@ -13,6 +13,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Directory
 from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.platform import Platform
 
 scenarios("E0-esecuzione-verificata/F0.1-accesso-alla-piattaforma/R0.1.1-accesso-riservato-al-ruolo-utente.feature")
 
@@ -41,6 +42,7 @@ def api(identity_provider: IdentityProvider, tenants: InMemoryTenantRepositoryAd
     return create_api(
         HealthReport(version="1.0.0", environment="dev"),
         ResolveTenantUseCase(tenants),
+        Platform().for_tenant,
         Authentication(SETTINGS, verifier),
     )
 

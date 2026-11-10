@@ -8,6 +8,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Person
 from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.platform import Platform
 
 
 @pytest.fixture
@@ -30,7 +31,8 @@ def client_for(
         verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
         authentication = Authentication(SETTINGS, verifier)
     resolve_tenant = ResolveTenantUseCase(tenants or InMemoryTenantRepositoryAdapter())
-    return TestClient(create_api(HealthReport("1.2.1-dev.57", environment), resolve_tenant, authentication))
+    health = HealthReport("1.2.1-dev.57", environment)
+    return TestClient(create_api(health, resolve_tenant, Platform().for_tenant, authentication))
 
 
 def test_health_reports_version_and_environment_without_an_identity() -> None:
