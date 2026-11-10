@@ -73,6 +73,21 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-24.04
+    # Integration tests of the SQLAlchemy adapters run against a real PostgreSQL (rule tests.md).
+    services:
+      postgres:
+        image: postgres:16.15-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username postgres" --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_HOST: localhost
+      TEST_DATABASE_PORT: "5432"
+      TEST_DATABASE_ADMIN: postgres
+      TEST_DATABASE_ADMIN_PASSWORD: postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/python-setup

@@ -1,9 +1,48 @@
 # Installazione dev o prod. I valori arrivano dal file .env scritto dalla pipeline
 # (nessun segreto): immagine per digest, ambiente, versione.
 # L'API ascolta solo sull'interfaccia locale: la espone Tailscale Serve, in HTTPS e solo nel tailnet (ADR 0013).
+# I segreti dei servizi sono file generati sulla macchina da prepare-installation.sh e montati in sola
+# lettura; mai variabili d'ambiente (ADR 0015).
 name: autotrading
 
 services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
+    environment:
+      POSTGRES_DB: autotrading
+      POSTGRES_USER: autotrading_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_owner_password
+    secrets:
+      - postgres_owner_password
+      - postgres_app_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username", "autotrading_owner", "--dbname", "autotrading"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  # Applica le migrazioni come proprietario del database, poi termina; l'API parte solo se sono riuscite.
+  migrate:
+    image: ${API_IMAGE:-}
+    entrypoint: ["/app/.venv/bin/python", "-m", "alembic", "-c", "/app/migrations/alembic.ini"]
+    command: ["upgrade", "head"]
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: autotrading
+      DATABASE_OWNER: autotrading_owner
+      DATABASE_OWNER_PASSWORD_FILE: /run/secrets/postgres_owner_password
+    secrets:
+      - postgres_owner_password
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     image: ${API_IMAGE:-}
     environment:
@@ -11,5 +50,17 @@ services:
       APP_VERSION: ${APP_VERSION:-}
     read_only: true
     restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:8000:8000"
+
+secrets:
+  postgres_owner_password:
+    file: ./secrets/postgres_owner_password
+  postgres_app_password:
+    file: ./secrets/postgres_app_password
+
+volumes:
+  postgres-data:

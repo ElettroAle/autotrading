@@ -1,5 +1,5 @@
 # language: it
-@R0.1.2 @wip
+@R0.1.2
 Funzionalità: R0.1.2 Tenant dell'utente creato al primo accesso
   Come utente con il ruolo Utente
   Voglio trovare il mio tenant pronto al primo accesso
@@ -7,6 +7,7 @@ Funzionalità: R0.1.2 Tenant dell'utente creato al primo accesso
 
   Fuori ambito: eliminazione del tenant, trasferimento di un tenant ad altro utente, condivisione di tenant.
 
+  @wip
   Scenario: Al primo accesso nasce un tenant vuoto
     Dato che la persona "anna" ha il ruolo "Utente" e non è mai entrata
     Quando "anna" accede alla piattaforma
@@ -14,6 +15,7 @@ Funzionalità: R0.1.2 Tenant dell'utente creato al primo accesso
     E il tenant di "anna" non contiene conti
     E il tenant di "anna" non contiene flussi
 
+  @wip
   Scenario: Agli accessi successivi il tenant è lo stesso
     Dato che "anna" ha un tenant con il conto "test-1"
     Quando "anna" accede di nuovo alla piattaforma

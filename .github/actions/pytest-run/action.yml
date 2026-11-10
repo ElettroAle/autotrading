@@ -1,5 +1,5 @@
 name: pytest-run
-description: Esegue unit test, scenari e test architetturale; pubblica i report di copertura e degli scenari.
+description: Esegue unit test, scenari, test di integrazione e test architetturale; pubblica i report di copertura e degli scenari.
 runs:
   using: composite
   steps:
@@ -7,7 +7,7 @@ runs:
       shell: bash
       run: >-
         uv run pytest --cov --cov-report=term --cov-report=json --cov-report=xml
-        --cucumberjson=cucumber.json
+        --cucumberjson=cucumber.json -m "not wip and not pipeline and not testnet"
     - name: Pubblica i report
       if: ${{ !cancelled() }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
