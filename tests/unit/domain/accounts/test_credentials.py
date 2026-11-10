@@ -28,3 +28,14 @@ def test_representation_never_shows_address_or_secret() -> None:
 
     assert all(ADDRESS not in text and SECRET not in text for text in shown)
     assert repr(credentials) == "Credentials(***)"
+
+
+def test_redaction_masks_address_and_secret_whatever_their_case() -> None:
+    credentials = Credentials(ADDRESS, SECRET)
+    text = f"wallet {ADDRESS.upper()} signed with {SECRET} refused"
+
+    assert credentials.redact(text) == "wallet *** signed with *** refused"
+
+
+def test_redaction_leaves_other_text_untouched() -> None:
+    assert Credentials(ADDRESS, SECRET).redact("exchange busy") == "exchange busy"

@@ -16,7 +16,6 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.application.accounts.ports import ExchangePort
-from autotrading.application.accounts.register_account import RegisterAccountUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -58,7 +57,7 @@ class TenantUseCaseFactory:
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
         sealer = SodiumCredentialSealerAdapter(self._public_key, self._key_version, tenant_id)
-        return TenantUseCases(register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, self._exchanges))
+        return TenantUseCases.on(tenant_id, accounts, sealer, self._exchanges)
 
 
 def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:

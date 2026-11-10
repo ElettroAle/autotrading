@@ -12,11 +12,11 @@ from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
-from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
+from tests.support.accounts import an_account
 
 pytestmark = pytest.mark.integration
 
@@ -28,8 +28,7 @@ def new_tenant(database: Engine) -> TenantId:
 
 
 def account_of(tenant_id: TenantId, name: str = "test-1") -> Account:
-    sealed = SealedCredentials(key_version=1, ciphertext=b"\x00sealed\xff")
-    return Account(AccountId.new(), tenant_id, AccountName(name), ExchangeName("Hyperliquid"), sealed)
+    return an_account(tenant_id, name, SealedCredentials(key_version=1, ciphertext=b"\x00sealed\xff"))
 
 
 def rows_seen(database: Engine, tenant_id: TenantId | None) -> int:
@@ -93,8 +92,9 @@ def test_a_transaction_without_a_tenant_sees_no_row(database: Engine) -> None:
 def test_a_row_for_another_tenant_cannot_be_written(database: Engine) -> None:
     anna, bruno = new_tenant(database), new_tenant(database)
     statement = text(
-        "INSERT INTO accounts (id, tenant_id, name, exchange, credentials_key_version, credentials_ciphertext) "
-        "VALUES (:id, :tenant, 'intruso', 'Hyperliquid', 1, '\\x00')"
+        "INSERT INTO accounts (id, tenant_id, name, exchange, exchange_account_fingerprint, "
+        "credentials_key_version, credentials_ciphertext) "
+        "VALUES (:id, :tenant, 'intruso', 'Hyperliquid', 'f', 1, '\\x00')"
     )
 
     with database.begin() as connection:
@@ -111,3 +111,66 @@ def test_the_tenant_does_not_survive_the_transaction_on_a_pooled_connection(data
         setting = connection.execute(text("SELECT current_setting('app.tenant_id', true)")).scalar_one()
 
     assert setting in (None, "")
+
+
+def test_the_tenant_lists_its_accounts_by_name_and_only_those(database: Engine) -> None:
+    anna, bruno = new_tenant(database), new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    second, first = account_of(anna, "test-2"), account_of(anna, "test-1")
+    repository.add(second)
+    repository.add(first)
+    SqlAlchemyAccountRepositoryAdapter(database, bruno).add(account_of(bruno, "conto-bruno"))
+
+    assert repository.list() == [first, second]
+
+
+def test_an_account_read_back_is_the_one_saved(database: Engine) -> None:
+    anna = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    assert repository.get(account.id) == account
+
+
+def test_an_account_of_another_tenant_reads_as_missing(database: Engine) -> None:
+    anna, bruno = new_tenant(database), new_tenant(database)
+    account = account_of(anna)
+    SqlAlchemyAccountRepositoryAdapter(database, anna).add(account)
+
+    bruno_accounts = SqlAlchemyAccountRepositoryAdapter(database, bruno)
+
+    assert (bruno_accounts.get(account.id), bruno_accounts.get(AccountId.new())) == (None, None)
+
+
+def test_replaced_credentials_leave_no_trace_of_the_previous_ones(database: Engine) -> None:
+    anna = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+    replaced = account.with_credentials(SealedCredentials(key_version=1, ciphertext=b"new"))
+
+    repository.replace(replaced)
+
+    assert repository.get(account.id) == replaced
+    assert ciphertexts(database, anna) == [b"new"]
+
+
+def test_an_account_hidden_by_row_level_security_is_not_replaced(database: Engine) -> None:
+    anna = new_tenant(database)
+    account = account_of(anna)
+    SqlAlchemyAccountRepositoryAdapter(database, anna).add(account)
+    other = new_tenant(database)
+    # The same account presented as one of the other tenant: the guard passes, row level security does not.
+    disguised = Account(
+        account.id, other, account.name, account.exchange, account.exchange_account, account.credentials
+    )
+
+    with pytest.raises(CrossTenantAccessError):
+        SqlAlchemyAccountRepositoryAdapter(database, other).replace(disguised)
+
+
+def ciphertexts(database: Engine, tenant_id: TenantId) -> list[bytes]:
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
+        return list(connection.execute(select(accounts.c.credentials_ciphertext)).scalars())
