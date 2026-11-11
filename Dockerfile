@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Chainguard images carry no distribution packages, so the image scan has nothing to report but Python itself (ADR 0006).
-FROM cgr.dev/chainguard/python:latest-dev@sha256:6b7c43c25f9446e8b1cf850797826a3d40b7cccdc6370c6e1b31cb28adae0a18 AS build
+FROM cgr.dev/chainguard/python:latest-dev@sha256:9f76d277ca81d3079eb3be24c742de3b6598f032fc9943fed6951ff99e581d02 AS build
 USER root
 COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /usr/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PYTHON=/usr/bin/python
@@ -10,7 +10,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
-FROM cgr.dev/chainguard/python:latest@sha256:a57ac9d33d8ca6eb2946d1d7e93a5600153d02e0c7c1fa3a322fc343f89451f5
+FROM cgr.dev/chainguard/python:latest@sha256:e5322b9d32064a645225b8b2419f11127bcf2d8b9927f9514f0acee1e1d25751
 ARG REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading" \
       org.opencontainers.image.revision="${REVISION}"
