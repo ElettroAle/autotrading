@@ -28,14 +28,14 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
     E il contesto inviato all'agente non contiene notizie
 
   Scenario: Pesi predefiniti
-    Dato che il flusso "alfa" ha attive le fonti "indicatori, sentiment" senza pesi
+    Dato che il flusso "alfa" ha attive le fonti "indicatori, sentiment-alternative-me" senza pesi
     Quando il flusso "alfa" esegue un ciclo
-    Allora il contesto comunica all'agente il peso 5 per "indicatori" e per "sentiment"
+    Allora il contesto comunica all'agente il peso 5 per "indicatori" e per "sentiment-alternative-me"
 
   Scenario: Pesi indicati
-    Dato che il flusso "alfa" ha attive le fonti "indicatori" con peso 8 e "sentiment" con peso 2
+    Dato che il flusso "alfa" ha attive le fonti "indicatori" con peso 8 e "sentiment-alternative-me" con peso 2
     Quando il flusso "alfa" esegue un ciclo
-    Allora il contesto comunica all'agente il peso 8 per "indicatori" e 2 per "sentiment"
+    Allora il contesto comunica all'agente il peso 8 per "indicatori" e 2 per "sentiment-alternative-me"
 
   Scenario: Parametro predefinito
     Dato che il flusso "alfa" ha attiva la fonte "notizie" senza parametri

@@ -58,7 +58,7 @@ from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
-from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -72,7 +72,7 @@ DEFAULT_CREDENTIALS_KEY_VERSION = "1"
 HYPERLIQUID = "Hyperliquid"
 SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
 # The sources of the platform (R1.3.1): one added here becomes selectable in every flow.
-SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS))
+SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP, NEWS))
 
 
 class MissingConfigurationError(AutotradingError):

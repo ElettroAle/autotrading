@@ -12,7 +12,7 @@ Le fonti dati che l'agente riceve nel contesto.
 ## Glossario
 
 - **Source**: fornitore di dati per il ciclo, con nome, descrizione e parametri. In E1: indicatori, pivot,
-  forecast, sentiment, notizie (R1.3.1).
+  forecast, due sentiment (`sentiment-alternative-me`, `sentiment-coinmarketcap`), notizie (R1.3.1).
 - **Per-asset source**: si interroga per ogni asset del flusso (indicatori, pivot, forecast). **Market
   source**: riguarda l'intero mercato e compare una sola volta nel contesto (sentiment, notizie).
 - **Source parameter**: parametro con valore predefinito e valori ammessi, dichiarato dal catalogo.
@@ -26,7 +26,9 @@ Le fonti dati che l'agente riceve nel contesto.
 - Ogni fonte implementa la stessa porta e si dichiara al catalogo: una fonte nuova si aggiunge con un
   adapter registrato in `bootstrap.py`, senza toccare chi compone il contesto.
 - I calcoli (indicatori, pivot) sono regole del domain, sui prezzi dell'exchange del conto del flusso.
-- Sentiment: indice Fear & Greed di alternative.me, senza chiave (decisione del proprietario).
+- Sentiment: due fonti distinte (decisione del proprietario), perché sono due indici diversi con lo stesso
+  nome: Crypto Fear & Greed Index di alternative.me, senza chiave, e CMC Crypto Fear and Greed Index di
+  CoinMarketCap, con una chiave API della piattaforma letta da un file montato in sola lettura.
 - Una fonte esterna che non risponde produce un errore tipizzato della porta; il ciclo la tratta come
   assente, mai come errore del ciclo.
 - I parametri non indicati assumono il predefinito del catalogo; un valore fuori dai valori ammessi rende

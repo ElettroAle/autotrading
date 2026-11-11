@@ -2,7 +2,7 @@ from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
-from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_parameter import SourceParameter
 
 
@@ -30,8 +30,14 @@ def test_the_forecast_is_per_asset_with_the_depth_of_its_history() -> None:
     )
 
 
-def test_the_sentiment_concerns_the_whole_market_without_parameters() -> None:
-    assert (SENTIMENT.name, SENTIMENT.per_asset, SENTIMENT.parameters) == ("sentiment", False, ())
+def test_the_alternative_me_sentiment_concerns_the_whole_market_without_parameters() -> None:
+    source = SENTIMENT_ALTERNATIVE_ME
+    assert (source.name, source.per_asset, source.parameters) == ("sentiment-alternative-me", False, ())
+
+
+def test_the_coinmarketcap_sentiment_concerns_the_whole_market_without_parameters() -> None:
+    source = SENTIMENT_COINMARKETCAP
+    assert (source.name, source.per_asset, source.parameters) == ("sentiment-coinmarketcap", False, ())
 
 
 def test_the_news_concern_the_whole_market_with_count_and_age() -> None:
@@ -43,4 +49,7 @@ def test_the_news_concern_the_whole_market_with_count_and_age() -> None:
 
 
 def test_every_source_describes_itself() -> None:
-    assert all(source.description for source in (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS))
+    assert all(
+        source.description
+        for source in (INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP, NEWS)
+    )

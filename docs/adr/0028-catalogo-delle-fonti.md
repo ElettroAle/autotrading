@@ -8,16 +8,17 @@
 R1.3.1 chiede un catalogo delle fonti consultabile, con nome, descrizione e parametri (valore
 predefinito e valori ammessi). Una fonte aggiunta alla piattaforma deve comparire nel catalogo e diventare
 selezionabile nei flussi senza altre modifiche; una fonte ritirata deve sparire. Le fonti di E1 sono
-indicatori, pivot, forecast, sentiment e notizie. Il loro calcolo e la loro raccolta arrivano con
+indicatori, pivot, forecast, due fonti sentiment (alternative.me e CoinMarketCap, due indici
+diversi con lo stesso nome, entrambi voluti dal proprietario) e notizie. Il loro calcolo e la loro raccolta arrivano con
 R1.3.3-R1.3.7.
 
 ## Decisione
 
 - **Definizione nel domain di `sources`.** `SourceDefinition` (nome, descrizione, per asset o di mercato,
   parametri) e `SourceParameter` (chiave, etichetta, predefinito, minimo, massimo; un predefinito fuori
-  intervallo è un difetto e solleva `InvalidSourceParameterError`). Ogni fonte ha un modulo proprio con la
-  sua definizione (`indicators.py`, `pivots.py`, `forecast.py`, `sentiment.py`, `news.py`): lì arriveranno
-  anche i suoi calcoli.
+  intervallo è un difetto e solleva `InvalidSourceParameterError`). Ogni famiglia di fonti ha un modulo
+  proprio con le sue definizioni (`indicators.py`, `pivots.py`, `forecast.py`, `news.py`, e `sentiment.py`
+  con le due fonti Fear & Greed): lì arriveranno anche i loro calcoli.
 - **`SourceCatalog`** compone le definizioni nell'ordine dato e trova una fonte per nome; una fonte assente
   solleva `SourceNotAvailableError` "fonte non disponibile: <nome>" (404).
 - **Composizione in `bootstrap.py`** (`SOURCE_CATALOG`). Aggiungere o ritirare una fonte significa cambiare

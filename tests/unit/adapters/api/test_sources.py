@@ -37,7 +37,14 @@ def test_the_catalog_lists_the_sources_with_their_parameters(client_of: Client) 
     response = client_of("anna").get("/sources")
 
     assert response.status_code == 200
-    assert [source["name"] for source in response.json()] == ["indicatori", "pivot", "forecast", "sentiment", "notizie"]
+    assert [source["name"] for source in response.json()] == [
+        "indicatori",
+        "pivot",
+        "forecast",
+        "sentiment-alternative-me",
+        "sentiment-coinmarketcap",
+        "notizie",
+    ]
 
 
 def test_one_source_shows_description_scope_and_parameters(client_of: Client) -> None:
