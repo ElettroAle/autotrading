@@ -48,5 +48,7 @@ class TradingAccessRequiredError(DomainError):
 class ManualOpeningNotAllowedError(DomainError):
     """Only the procedure of verification and the flows open positions; a user can only close them (R0.3.2)."""
 
+    status_code = 403
+
     def __init__(self) -> None:
         super().__init__("apertura manuale non consentita")

@@ -7,18 +7,11 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.accounts import AccountRegistrationRequest
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
-from autotrading.adapters.inbound.api.errors import ERROR_STATUS
-from autotrading.application.accounts.errors import (
-    AccountNameInUseError,
-    ExchangeRejectedCredentialsError,
-    ExchangeUnavailableError,
-    UnsupportedExchangeError,
-)
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
-from autotrading.domain.accounts.errors import AccountNameRequiredError, CredentialsRequiredError, ExchangeRequiredError
 from tests.fakes.exchange import REDACTED_REJECTION
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform
+from tests.support.problems import reason_of
 
 
 @pytest.fixture
@@ -87,13 +80,16 @@ def test_rejected_credentials_report_the_reason_and_the_exchange_message(
     response = register(client, **body)
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "credenziali rifiutate dall'exchange", "exchange_message": REDACTED_REJECTION}
+    assert reason_of(response) == {
+        "detail": "credenziali rifiutate dall'exchange",
+        "exchange_message": REDACTED_REJECTION,
+    }
 
 
 def test_an_unsupported_exchange_lists_the_supported_ones(client: TestClient, platform: Platform) -> None:
     response = register(client, **accepted_body(platform) | {"exchange": "Binance"})
 
-    assert (response.status_code, response.json()) == (
+    assert (response.status_code, reason_of(response)) == (
         422,
         {"detail": "exchange non supportato", "supported": [HYPERLIQUID]},
     )
@@ -104,7 +100,7 @@ def test_a_name_in_use_is_a_conflict(client: TestClient, platform: Platform) -> 
 
     response = register(client, **accepted_body(platform))
 
-    assert (response.status_code, response.json()) == (409, {"detail": "nome del conto già in uso"})
+    assert (response.status_code, reason_of(response)) == (409, {"detail": "nome del conto già in uso"})
 
 
 def test_an_unreachable_exchange_asks_to_retry(client: TestClient, platform: Platform) -> None:
@@ -113,7 +109,7 @@ def test_an_unreachable_exchange_asks_to_retry(client: TestClient, platform: Pla
 
     response = register(client, **body)
 
-    assert (response.status_code, response.json()) == (503, {"detail": "exchange non raggiungibile, riprovare"})
+    assert (response.status_code, reason_of(response)) == (503, {"detail": "exchange non raggiungibile, riprovare"})
 
 
 @pytest.mark.parametrize(
@@ -126,7 +122,7 @@ def test_missing_data_is_named(client: TestClient, platform: Platform, missing: 
 
     response = register(client, **body)
 
-    assert (response.status_code, response.json()) == (422, {"detail": reason})
+    assert (response.status_code, reason_of(response)) == (422, {"detail": reason})
 
 
 def test_a_malformed_request_never_echoes_what_was_sent(client: TestClient) -> None:
@@ -136,21 +132,7 @@ def test_a_malformed_request_never_echoes_what_was_sent(client: TestClient) -> N
 
     assert response.status_code == 422
     assert secret not in response.text
-    assert response.json()["detail"][0]["loc"] == ["body", "secret_key"]
-
-
-def test_every_error_of_the_registration_has_a_status() -> None:
-    errors = [
-        AccountNameRequiredError,
-        ExchangeRequiredError,
-        CredentialsRequiredError,
-        UnsupportedExchangeError,
-        AccountNameInUseError,
-        ExchangeRejectedCredentialsError,
-        ExchangeUnavailableError,
-    ]
-
-    assert all(error in ERROR_STATUS for error in errors)
+    assert response.json()["errors"][0]["loc"] == ["body", "secret_key"]
 
 
 def test_the_request_representation_never_shows_the_credentials() -> None:
