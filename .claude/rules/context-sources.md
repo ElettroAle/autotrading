@@ -27,8 +27,8 @@ Le fonti dati che l'agente riceve nel contesto.
   adapter registrato in `bootstrap.py`, senza toccare chi compone il contesto.
 - I calcoli (indicatori, pivot) sono regole del domain, sui prezzi dell'exchange del conto del flusso.
 - Sentiment: due fonti distinte (decisione del proprietario), perché sono due indici diversi con lo stesso
-  nome: Crypto Fear & Greed Index di alternative.me, senza chiave, e CMC Crypto Fear and Greed Index di
-  CoinMarketCap, con una chiave API della piattaforma letta da un file montato in sola lettura.
+  nome: Crypto Fear & Greed Index di alternative.me e CMC Crypto Fear and Greed Index di CoinMarketCap, entrambi
+  dagli endpoint pubblici senza chiave (ADR 0033).
 - Una fonte esterna che non risponde produce un errore tipizzato della porta; il ciclo la tratta come
   assente, mai come errore del ciclo.
 - I parametri non indicati assumono il predefinito del catalogo; un valore fuori dai valori ammessi rende
