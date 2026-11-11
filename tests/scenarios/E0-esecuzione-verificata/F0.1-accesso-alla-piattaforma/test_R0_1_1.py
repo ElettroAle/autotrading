@@ -14,6 +14,7 @@ from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Directory
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import Platform
+from tests.support.problems import reason_of
 
 scenarios("E0-esecuzione-verificata/F0.1-accesso-alla-piattaforma/R0.1.1-accesso-riservato-al-ruolo-utente.feature")
 
@@ -125,7 +126,7 @@ def identified_by_directory(name: str, directory: Directory, accesses: dict[str,
 
 @then(parsers.parse('l\'accesso di "{name}" è negato con il motivo "{reason}"'))
 def access_denied(name: str, reason: str, accesses: dict[str, httpx.Response]) -> None:
-    assert (accesses[name].status_code, accesses[name].json()) == (403, {"detail": reason})
+    assert (accesses[name].status_code, reason_of(accesses[name])) == (403, {"detail": reason})
 
 
 @then(parsers.parse('la piattaforma non crea alcun tenant per "{name}"'))

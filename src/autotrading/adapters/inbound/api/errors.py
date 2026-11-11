@@ -1,134 +1,124 @@
-from collections.abc import Callable
-from typing import Any
+import logging
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from http import HTTPStatus
+from typing import cast
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from autotrading.application.accounts.errors import (
-    AccountNameInUseError,
-    AccountNotFoundError,
-    CredentialsNotOpenedError,
-    ExchangeRejectedCredentialsError,
-    ExchangeUnavailableError,
-    UnsupportedExchangeError,
-    WorkerUnavailableError,
-)
-from autotrading.application.orders.errors import (
-    NoOpenPositionError,
-    OrderAccountNotFoundError,
-    OrderExchangeUnavailableError,
-    OrderWorkerUnavailableError,
-    UnsupportedOrderExchangeError,
-)
-from autotrading.application.tenancy.errors import CrossTenantAccessError
-from autotrading.application.verification.errors import (
-    VerificationAccountNotFoundError,
-    VerificationStepError,
-    VerificationWorkerUnavailableError,
-)
-from autotrading.domain.accounts.errors import (
-    AccountNameRequiredError,
-    CredentialsOfAnotherAccountError,
-    CredentialsRequiredError,
-    ExchangeRequiredError,
-    OpenPositionsNeedConfirmationError,
-)
 from autotrading.domain.errors import AutotradingError
-from autotrading.domain.orders.errors import ManualOpeningNotAllowedError
-from autotrading.domain.verification.errors import VerificationNotStartedError
+
+PROBLEM_MEDIA_TYPE = "application/problem+json"
+INTERNAL_ERROR_DETAIL = "errore interno"
+NOT_IMPLEMENTED_DETAIL = "non implementato"
+INVALID_REQUEST_DETAIL = "richiesta non valida"
+TRACE_PARENT = re.compile(r"^[0-9a-f]{2}-(?P<trace_id>[0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$")
+INVALID_TRACE_ID = "0" * 32
+
+_CHALLENGE = {"WWW-Authenticate": "Bearer"}
+
+errors_log = logging.getLogger("autotrading.api.errors")
 
 
 class NotAuthenticatedError(AutotradingError):
+    status_code = 401
+
     def __init__(self) -> None:
         super().__init__("non autenticato")
 
 
 class UserRoleMissingError(AutotradingError):
+    status_code = 403
+
     def __init__(self) -> None:
         super().__init__("ruolo Utente assente")
 
 
 class AuthenticationNotConfiguredError(AutotradingError):
+    status_code = 503
+
     def __init__(self) -> None:
         super().__init__("autenticazione non configurata")
 
 
 class IdentityProviderUnavailableError(AutotradingError):
+    status_code = 503
+
     def __init__(self) -> None:
         super().__init__("directory non raggiungibile")
 
 
-# The single map from typed error to HTTP status (rule tech-fastapi). An error missing here is a defect.
-ERROR_STATUS: dict[type[AutotradingError], int] = {
-    NotAuthenticatedError: 401,
-    UserRoleMissingError: 403,
-    CrossTenantAccessError: 404,
-    AccountNotFoundError: 404,
-    OrderAccountNotFoundError: 404,
-    ManualOpeningNotAllowedError: 403,
-    NoOpenPositionError: 409,
-    VerificationAccountNotFoundError: 404,
-    VerificationNotStartedError: 409,
-    UnsupportedOrderExchangeError: 422,
-    AccountNameInUseError: 409,
-    OpenPositionsNeedConfirmationError: 409,
-    AccountNameRequiredError: 422,
-    ExchangeRequiredError: 422,
-    CredentialsRequiredError: 422,
-    CredentialsOfAnotherAccountError: 422,
-    UnsupportedExchangeError: 422,
-    ExchangeRejectedCredentialsError: 422,
-    AuthenticationNotConfiguredError: 503,
-    IdentityProviderUnavailableError: 503,
-    ExchangeUnavailableError: 503,
-    WorkerUnavailableError: 503,
-    OrderExchangeUnavailableError: 503,
-    OrderWorkerUnavailableError: 503,
-    # The account could not be read before the procedure started: the exchange or the credentials failed.
-    VerificationStepError: 503,
-    VerificationWorkerUnavailableError: 503,
-    # Sealed credentials that do not open are a fault of the installation, never of the request.
-    CredentialsNotOpenedError: 500,
-}
-
-
-def _supported(error: Any) -> dict[str, Any]:
-    return {"supported": list(error.supported)}
-
-
-def _exchange_message(error: Any) -> dict[str, Any]:
-    return {"exchange_message": error.exchange_message}
-
-
-# What an answer adds to the reason, for the errors whose outcome the requirement asks to show.
-ERROR_DETAILS: dict[type[AutotradingError], Callable[[Any], dict[str, Any]]] = {
-    UnsupportedExchangeError: _supported,
-    UnsupportedOrderExchangeError: _supported,
-    ExchangeRejectedCredentialsError: _exchange_message,
-}
-
-_CHALLENGE = {"WWW-Authenticate": "Bearer"}
-
-
 def install_error_responses(api: FastAPI) -> None:
-    for error_type in ERROR_STATUS:
-        api.add_exception_handler(error_type, _respond)
+    """One handler per kind of failure, every answer in Problem Details (RFC 9457, ADR 0027)."""
+    api.add_exception_handler(AutotradingError, _respond_to_typed_error)
     api.add_exception_handler(RequestValidationError, _respond_to_invalid_request)
+    api.add_exception_handler(NotImplementedError, _respond_to_not_implemented)
+    api.add_exception_handler(Exception, _respond_to_unexpected_error)
 
 
-async def _respond(_: Request, error: Exception) -> JSONResponse:
-    status = next(status for error_type, status in ERROR_STATUS.items() if isinstance(error, error_type))
-    headers = _CHALLENGE if status == 401 else None
-    body: dict[str, Any] = {"detail": str(error)}
-    for error_type, details in ERROR_DETAILS.items():
-        if isinstance(error, error_type):
-            body.update(details(error))
-    return JSONResponse(body, status_code=status, headers=headers)
+@dataclass(frozen=True, slots=True)
+class Correlation:
+    request_id: str
+    trace_id: str
+
+    @classmethod
+    def of(cls, request: Request) -> Correlation:
+        return cls(uuid4().hex, _trace_id(request.headers.get("traceparent", "")))
 
 
-async def _respond_to_invalid_request(_: Request, error: Exception) -> JSONResponse:
+async def _respond_to_typed_error(request: Request, error: Exception) -> JSONResponse:
+    typed = cast(AutotradingError, error)
+    headers = _CHALLENGE if typed.status_code == HTTPStatus.UNAUTHORIZED else None
+    return _problem(Correlation.of(request), typed.status_code, str(typed), typed.details, headers)
+
+
+async def _respond_to_invalid_request(request: Request, error: Exception) -> JSONResponse:
     # The framework would echo the input; a request may carry credentials, so only where and why are kept (R0.2.3).
-    errors = error.errors() if isinstance(error, RequestValidationError) else []
-    detail = [{"loc": list(item["loc"]), "msg": item["msg"], "type": item["type"]} for item in errors]
-    return JSONResponse({"detail": detail}, status_code=422)
+    found = [
+        {"loc": list(item["loc"]), "msg": item["msg"], "type": item["type"]}
+        for item in cast(RequestValidationError, error).errors()
+    ]
+    return _problem(Correlation.of(request), HTTPStatus.UNPROCESSABLE_ENTITY, INVALID_REQUEST_DETAIL, {"errors": found})
+
+
+async def _respond_to_not_implemented(request: Request, _: Exception) -> JSONResponse:
+    return _problem(Correlation.of(request), HTTPStatus.NOT_IMPLEMENTED, NOT_IMPLEMENTED_DETAIL)
+
+
+async def _respond_to_unexpected_error(request: Request, error: Exception) -> JSONResponse:
+    correlation = Correlation.of(request)
+    errors_log.error(
+        "unexpected error, request %s, trace %s", correlation.request_id, correlation.trace_id, exc_info=error
+    )
+    return _problem(correlation, HTTPStatus.INTERNAL_SERVER_ERROR, INTERNAL_ERROR_DETAIL)
+
+
+def _problem(
+    correlation: Correlation,
+    status: int,
+    detail: str,
+    details: Mapping[str, object] | None = None,
+    headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
+    body = {
+        "type": "about:blank",
+        "title": HTTPStatus(status).phrase,
+        "status": status,
+        "detail": detail,
+        **(details or {}),
+        "requestId": correlation.request_id,
+        "traceId": correlation.trace_id,
+    }
+    return JSONResponse(body, status_code=status, headers=headers, media_type=PROBLEM_MEDIA_TYPE)
+
+
+def _trace_id(traceparent: str) -> str:
+    """The trace of the caller when it sends a valid W3C trace context, otherwise a new one."""
+    match = TRACE_PARENT.match(traceparent)
+    if match and match["trace_id"] != INVALID_TRACE_ID:
+        return match["trace_id"]
+    return uuid4().hex

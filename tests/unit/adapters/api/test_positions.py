@@ -6,18 +6,9 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
-from autotrading.adapters.inbound.api.errors import ERROR_STATUS
-from autotrading.application.orders.errors import (
-    NoOpenPositionError,
-    OrderAccountNotFoundError,
-    OrderExchangeUnavailableError,
-    OrderWorkerUnavailableError,
-    UnsupportedOrderExchangeError,
-)
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.orders.direction import Direction
-from autotrading.domain.orders.errors import ManualOpeningNotAllowedError
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.order_exchange import EXECUTED_AT, REALIZED_ON_CLOSE
@@ -144,16 +135,3 @@ def test_a_user_can_never_open_a_position(platform: Platform, client_of: Client,
 
     assert (response.status_code, response.json()["detail"]) == (403, "apertura manuale non consentita")
     assert platform.order_exchange.sent == []
-
-
-def test_every_error_of_the_positions_has_a_status() -> None:
-    errors = [
-        ManualOpeningNotAllowedError,
-        NoOpenPositionError,
-        OrderAccountNotFoundError,
-        UnsupportedOrderExchangeError,
-        OrderExchangeUnavailableError,
-        OrderWorkerUnavailableError,
-    ]
-
-    assert all(error in ERROR_STATUS for error in errors)

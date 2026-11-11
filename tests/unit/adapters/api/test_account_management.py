@@ -14,6 +14,7 @@ from autotrading.domain.accounts.position import Position, PositionSide
 from tests.fakes.exchange import READ_AT, REDACTED_REJECTION
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
+from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
 
@@ -92,7 +93,7 @@ def test_an_account_of_another_tenant_answers_as_one_that_does_not_exist(
 
     response = client_of("bruno").get(f"/accounts/{target}")
 
-    assert (response.status_code, response.json()) == (404, {"detail": "non trovato"})
+    assert (response.status_code, reason_of(response)) == (404, {"detail": "non trovato"})
 
 
 def test_accepted_credentials_replace_the_old_ones(
@@ -113,7 +114,10 @@ def test_rejected_credentials_answer_with_the_redacted_message_of_the_exchange(
     response = client_of("anna").put(f"/accounts/{account_id}/credentials", json=body)
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "credenziali rifiutate dall'exchange", "exchange_message": REDACTED_REJECTION}
+    assert reason_of(response) == {
+        "detail": "credenziali rifiutate dall'exchange",
+        "exchange_message": REDACTED_REJECTION,
+    }
     assert body["account_address"] not in response.text.lower()
 
 
@@ -125,7 +129,7 @@ def test_credentials_of_another_exchange_account_are_refused(
 
     response = client_of("anna").put(f"/accounts/{account_id}/credentials", json=body)
 
-    assert (response.status_code, response.json()) == (
+    assert (response.status_code, reason_of(response)) == (
         422,
         {"detail": "le credenziali appartengono a un altro conto dell'exchange"},
     )
@@ -136,7 +140,7 @@ def test_another_user_cannot_replace_the_credentials(
 ) -> None:
     response = client_of("bruno").put(f"/accounts/{account_id}/credentials", json=rotated(platform, credentials))
 
-    assert (response.status_code, response.json()) == (404, {"detail": "non trovato"})
+    assert (response.status_code, reason_of(response)) == (404, {"detail": "non trovato"})
     assert platform.uses_credentials(platform.account_named("anna", "test-1"), credentials)
 
 
@@ -179,7 +183,7 @@ def test_the_state_of_an_account_is_read_from_the_exchange(
 def test_another_user_cannot_read_the_state(client_of: Client, account_id: str) -> None:
     response = client_of("bruno").get(f"/accounts/{account_id}/state")
 
-    assert (response.status_code, response.json()) == (404, {"detail": "non trovato"})
+    assert (response.status_code, reason_of(response)) == (404, {"detail": "non trovato"})
 
 
 def test_an_unreachable_exchange_asks_to_retry_the_reading(
@@ -189,7 +193,7 @@ def test_an_unreachable_exchange_asks_to_retry_the_reading(
 
     response = client_of("anna").get(f"/accounts/{account_id}/state")
 
-    assert (response.status_code, response.json()) == (503, {"detail": "exchange non raggiungibile, riprovare"})
+    assert (response.status_code, reason_of(response)) == (503, {"detail": "exchange non raggiungibile, riprovare"})
 
 
 def test_an_unreachable_worker_asks_to_retry_the_reading(
@@ -199,7 +203,7 @@ def test_an_unreachable_worker_asks_to_retry_the_reading(
 
     response = client_of("anna").get(f"/accounts/{account_id}/state")
 
-    assert (response.status_code, response.json()) == (
+    assert (response.status_code, reason_of(response)) == (
         503,
         {"detail": "servizio di esecuzione non raggiungibile, riprovare"},
     )
@@ -212,7 +216,7 @@ def test_credentials_that_do_not_open_are_a_fault_of_the_installation(
 
     response = client_of("anna").get(f"/accounts/{account_id}/state")
 
-    assert (response.status_code, response.json()) == (500, {"detail": "credenziali del conto non leggibili"})
+    assert (response.status_code, reason_of(response)) == (500, {"detail": "credenziali del conto non leggibili"})
 
 
 def test_an_account_without_positions_is_removed_and_no_longer_listed(
@@ -234,7 +238,7 @@ def test_an_account_with_open_positions_is_kept_without_confirmation(
 
     response = client_of("anna").delete(f"/accounts/{account_id}", params={"confirmed": "false"})
 
-    assert (response.status_code, response.json()) == (
+    assert (response.status_code, reason_of(response)) == (
         409,
         {"detail": "il conto ha posizioni aperte che resteranno sull'exchange senza gestione"},
     )
@@ -257,7 +261,7 @@ def test_a_confirmed_removal_keeps_the_positions_and_removes_the_account(
 def test_another_user_cannot_remove_the_account(client_of: Client, platform: Platform, account_id: str) -> None:
     response = client_of("bruno").delete(f"/accounts/{account_id}", params={"confirmed": "true"})
 
-    assert (response.status_code, response.json()) == (404, {"detail": "non trovato"})
+    assert (response.status_code, reason_of(response)) == (404, {"detail": "non trovato"})
     assert platform.accounts.removed == []
 
 

@@ -11,5 +11,7 @@ class TenantAlreadyExistsError(ApplicationError):
 class CrossTenantAccessError(ApplicationError):
     """A tenant-bound adapter received an entity of another tenant (rule context-tenancy)."""
 
+    status_code = 404
+
     def __init__(self) -> None:
         super().__init__("non trovato")

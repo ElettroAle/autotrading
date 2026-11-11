@@ -15,7 +15,8 @@ Contiene le regole di business: entità, value object, invarianti, calcoli. È i
 - Le regole che valgono a prescindere da come si arriva al sistema e da dove si salvano i dati
   (es. leva entro il massimo dell'asset, arrotondamento della dimensione al passo ammesso).
 - Gli errori di dominio del contesto in `domain/<contesto>/errors.py`, sottoclassi di `DomainError`.
-- `domain/errors.py`: la radice `AutotradingError` e `DomainError`. Nient'altro.
+- `domain/errors.py`: la radice `AutotradingError` (con `status_code`, `permanent`, `details`, ADR 0027) e
+  `DomainError`. Nient'altro.
 
 ## Cosa non ci sta
 
