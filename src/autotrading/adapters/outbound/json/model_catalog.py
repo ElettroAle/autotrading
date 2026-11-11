@@ -6,6 +6,7 @@ from typing import Any
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParameter, RangeParameter
+from autotrading.domain.agent.model_usage import ModelPrices
 from autotrading.domain.errors import AutotradingError
 
 PACKAGED_CATALOG = "models.json"
@@ -48,7 +49,13 @@ def _document(text: str) -> dict[str, Any]:
 
 def _model_of(entry: dict[str, Any]) -> ModelDefinition:
     parameters = tuple(_parameter_of(key, declaration) for key, declaration in entry["parameters"].items())
-    return ModelDefinition(entry["name"], parameters)
+    return ModelDefinition(entry["name"], parameters, _prices_of(entry.get("prices")))
+
+
+def _prices_of(declaration: dict[str, Any] | None) -> ModelPrices | None:
+    if declaration is None:
+        return None
+    return ModelPrices(declaration["input_per_million"], declaration["output_per_million"])
 
 
 def _parameter_of(key: str, declaration: dict[str, Any]) -> ModelParameter:
