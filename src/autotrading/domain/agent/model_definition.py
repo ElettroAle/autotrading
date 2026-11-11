@@ -7,6 +7,7 @@ from autotrading.domain.agent.errors import (
     UnknownParameterError,
 )
 from autotrading.domain.agent.model_parameter import PARAMETER_LABELS, ModelParameter, ParameterValue, label_of
+from autotrading.domain.agent.model_usage import ModelPrices
 from autotrading.domain.agent.provider_name import ProviderName
 
 PROVIDER_SEPARATOR = "/"
@@ -18,6 +19,8 @@ class ModelDefinition:
 
     name: str
     parameters: tuple[ModelParameter, ...]
+    # Needed only for providers that do not report the cost of a call (R1.4.6).
+    prices: ModelPrices | None = None
 
     def __post_init__(self) -> None:
         provider, separator, model = self.name.partition(PROVIDER_SEPARATOR)
