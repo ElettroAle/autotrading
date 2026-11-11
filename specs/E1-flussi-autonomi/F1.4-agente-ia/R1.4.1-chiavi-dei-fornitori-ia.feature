@@ -36,7 +36,6 @@ Funzionalità: R1.4.1 Chiavi dei fornitori IA dell'utente
     Quando "anna" sostituisce la chiave del fornitore "openrouter" con "K-OR2"
     Allora i cicli successivi dei flussi di "anna" usano la chiave "K-OR2" presso "openrouter"
 
-  @wip
   Scenario: Flusso con modello di un fornitore senza chiave
     Quando "anna" crea il flusso "alfa" con modello "anthropic/claude-sonnet"
     Allora la creazione è rifiutata con il motivo "nessuna chiave registrata per il fornitore: anthropic"
