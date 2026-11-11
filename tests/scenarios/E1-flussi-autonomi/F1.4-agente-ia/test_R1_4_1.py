@@ -3,6 +3,8 @@ from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.domain.errors import AutotradingError
+from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
+from tests.support.flows import scenario_catalog
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
@@ -11,7 +13,9 @@ scenarios("E1-flussi-autonomi/F1.4-agente-ia/R1.4.1-chiavi-dei-fornitori-ia.feat
 
 @pytest.fixture
 def platform() -> Platform:
-    return Platform()
+    platform = Platform()
+    platform.model_catalog = scenario_catalog()
+    return platform
 
 
 @pytest.fixture

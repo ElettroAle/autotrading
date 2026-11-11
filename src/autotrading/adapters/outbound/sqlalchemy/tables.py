@@ -118,3 +118,38 @@ provider_keys = Table(
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
+
+# A flow keeps its name unique among the flows of the tenant not archived (R1.1.1, ADR 0031).
+flows = Table(
+    "flows",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    ForeignKeyConstraint(
+        ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="flows_account_of_tenant"
+    ),
+    UniqueConstraint("id", "tenant_id", name="flows_id_tenant_unique"),
+    Index(
+        "flows_name_unique_in_tenant",
+        "tenant_id",
+        "name",
+        unique=True,
+        postgresql_where=text("status <> 'archived'"),
+    ),
+)
+
+# Configuration versions are only ever added: a cycle can always be rebuilt with the one it used (R1.1.3).
+flow_versions = Table(
+    "flow_versions",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("version", Integer, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("configuration", JSON, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)

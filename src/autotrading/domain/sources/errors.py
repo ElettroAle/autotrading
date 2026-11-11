@@ -15,3 +15,20 @@ class SourceNotAvailableError(DomainError):
     def __init__(self, name: str) -> None:
         super().__init__(f"fonte non disponibile: {name}")
         self.name = name
+
+
+class SourceParameterOutOfRangeError(DomainError):
+    status_code = 422
+
+    def __init__(self, label: str) -> None:
+        super().__init__(f"parametro fuori dai valori ammessi: {label}")
+        self.label = label
+
+
+class UnknownSourceParameterError(DomainError):
+    status_code = 422
+
+    def __init__(self, source: str, key: str) -> None:
+        super().__init__(f"parametro sconosciuto della fonte {source}: {key}")
+        self.source = source
+        self.key = key

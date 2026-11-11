@@ -1,5 +1,5 @@
 # language: it
-@R1.1.1 @wip
+@R1.1.1
 Funzionalità: R1.1.1 Creazione di un flusso
   Come utente
   Voglio creare un flusso di trading con la sua configurazione completa
@@ -22,6 +22,7 @@ Funzionalità: R1.1.1 Creazione di un flusso
     Dato che "anna" ha il conto "test-1" con saldo 1000 USDC e nessun flusso
     E che il catalogo dei modelli contiene "openrouter/deepseek-chat"
     E che il catalogo delle fonti contiene "indicatori" e "notizie"
+    E che "anna" ha registrato la chiave del fornitore "openrouter"
 
   Scenario: Creazione di un flusso valido
     Quando "anna" crea il flusso "alfa" sul conto "test-1" con asset "BTC, ETH", modello "openrouter/deepseek-chat", fonti "indicatori, notizie", leva massima 5, esposizione massima del margine 10% e capitale allocato 400 USDC
