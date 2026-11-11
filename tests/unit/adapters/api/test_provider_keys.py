@@ -13,7 +13,7 @@ from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
-KEY = "sk-or-v1-0123456789"
+KEY = "K-OPENROUTER-TEST"
 
 
 @pytest.fixture
@@ -52,11 +52,11 @@ def test_a_registered_key_answers_with_the_provider_only(client_of: Client) -> N
 
 
 def test_a_refused_key_answers_with_the_reason_and_never_the_key(client_of: Client) -> None:
-    response = client_of("anna").post("/provider-keys", json={"provider": "openrouter", "key": "sk-bad-key"})
+    response = client_of("anna").post("/provider-keys", json={"provider": "openrouter", "key": "K-BAD"})
 
     assert response.status_code == 422
     assert reason_of(response) == {"detail": "chiave rifiutata dal fornitore: openrouter"}
-    assert "sk-bad-key" not in response.text
+    assert "K-BAD" not in response.text
 
 
 def test_a_missing_key_answers_with_the_reason(client_of: Client) -> None:

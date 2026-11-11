@@ -9,7 +9,7 @@ from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.tenancy.tenant_id import TenantId
 
-KEY = ProviderKey("sk-or-v1-0123456789")
+KEY = ProviderKey("K-OPENROUTER-TEST")
 OPENROUTER = ProviderName("openrouter")
 
 

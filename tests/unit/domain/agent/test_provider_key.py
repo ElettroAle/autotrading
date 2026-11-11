@@ -4,7 +4,7 @@ from autotrading.domain.agent.errors import ProviderKeyRequiredError, ProviderRe
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 
-KEY_TEXT = "sk-or-v1-secret"
+KEY_TEXT = "K-SECRET-TEST"
 
 
 def test_a_provider_is_named_in_lower_case_without_spaces() -> None:

@@ -12,7 +12,7 @@ from autotrading.application.agent.errors import (
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 
-KEY = ProviderKey("sk-secret-0123456789")
+KEY = ProviderKey("K-SECRET-TEST")
 
 
 def verifier_answering(status: int, asked: list[httpx.Request] | None = None) -> HttpxProviderKeyVerifierAdapter:

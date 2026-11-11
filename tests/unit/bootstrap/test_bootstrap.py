@@ -439,7 +439,7 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
 
     with pytest.raises(ProviderRejectedKeyError):
         factory.for_tenant(TenantId.new()).register_provider_key.execute(
-            RegisterProviderKeyCommand("openrouter", "sk-or-v1-made-up")
+            RegisterProviderKeyCommand("openrouter", "K-MADE-UP")
         )
 
     assert [str(request.url) for request in asked] == ["https://openrouter.ai/api/v1/key"]
