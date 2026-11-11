@@ -115,6 +115,34 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "I contesti di domain non si importano a vicenda (tenancy esclusa)"
+type = "independence"
+modules = [
+    "autotrading.domain.accounts",
+    "autotrading.domain.orders",
+    "autotrading.domain.verification",
+    "autotrading.domain.flows",
+    "autotrading.domain.cycles",
+    "autotrading.domain.sources",
+    "autotrading.domain.agent",
+    "autotrading.domain.notifications",
+]
+
+[[tool.importlinter.contracts]]
+name = "I contesti di application non si importano a vicenda (tenancy esclusa)"
+type = "independence"
+modules = [
+    "autotrading.application.accounts",
+    "autotrading.application.orders",
+    "autotrading.application.verification",
+    "autotrading.application.flows",
+    "autotrading.application.cycles",
+    "autotrading.application.sources",
+    "autotrading.application.agent",
+    "autotrading.application.notifications",
+]
+
+[[tool.importlinter.contracts]]
 name = "Una cartella di tecnologia non importa un'altra"
 type = "independence"
 modules = [
