@@ -31,3 +31,10 @@ class InsufficientHistoryError(DomainError):
         super().__init__(f"storico dei prezzi insufficiente: servono {needed} valori, disponibili {available}")
         self.needed = needed
         self.available = available
+
+
+class InvalidNewsItemError(DomainError):
+    """A news story without a title or with a publication time without its time zone."""
+
+    def __init__(self) -> None:
+        super().__init__("notizia non valida")
