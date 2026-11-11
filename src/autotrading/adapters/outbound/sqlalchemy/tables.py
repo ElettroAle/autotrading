@@ -106,3 +106,15 @@ verification_runs = Table(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="verification_runs_account_of_tenant"
     ),
 )
+
+# At most one key per provider and tenant; replaced in place, deleted on removal (ADR 0029).
+provider_keys = Table(
+    "provider_keys",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("provider", Text, primary_key=True),
+    Column("key_version", Integer, nullable=False),
+    Column("ciphertext", LargeBinary, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)

@@ -11,6 +11,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from sqlalchemy import create_engine
 
 from autotrading import bootstrap
+from autotrading.adapters.outbound.httpx.provider_key_verifier import KEY_CHECKS
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
@@ -18,14 +19,18 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
+from autotrading.application.agent.errors import ProviderRejectedKeyError
+from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
 from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.bootstrap import (
+    MODEL_CATALOG,
     SLIPPAGE_SETTING,
     InvalidConfigurationError,
     MissingConfigurationError,
+    ProviderKeyUsageBeforeFlows,
     PublicCredentialsKey,
     TenantUseCaseFactory,
     TradingAccessFromAccounts,
@@ -42,6 +47,7 @@ from autotrading.bootstrap import (
     order_exchanges_for,
     slippage_from,
 )
+from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.errors import InvalidSlippageError
 from autotrading.domain.orders.slippage import Slippage
@@ -50,6 +56,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter, ProviderKeyStore
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
 from tests.support.problems import reason_of
@@ -172,7 +179,9 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
-    factory = TenantUseCaseFactory(create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker)
+    factory = TenantUseCaseFactory(
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker, httpx.Client()
+    )
 
     first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
 
@@ -199,7 +208,9 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
     worker = WorkerConnection(client, WORKER_TOKEN)
-    factory = TenantUseCaseFactory(create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker)
+    factory = TenantUseCaseFactory(
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker, httpx.Client()
+    )
 
     with pytest.raises(ExchangeUnavailableError):
         factory.for_tenant(tenant_id).read_account_state.execute(ReadAccountStateCommand(account.id))
@@ -340,7 +351,11 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
     factory = TenantUseCaseFactory(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, WorkerConnection(client, WORKER_TOKEN)
+        create_engine("sqlite://"),
+        PublicCredentialsKey(public_key, 1),
+        {},
+        WorkerConnection(client, WORKER_TOKEN),
+        httpx.Client(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
 
@@ -366,7 +381,11 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
     factory = TenantUseCaseFactory(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, WorkerConnection(client, WORKER_TOKEN)
+        create_engine("sqlite://"),
+        PublicCredentialsKey(public_key, 1),
+        {},
+        WorkerConnection(client, WORKER_TOKEN),
+        httpx.Client(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
 
@@ -385,3 +404,43 @@ def test_the_instant_of_a_run_is_the_current_one_with_its_zone() -> None:
 
     assert before <= instant <= datetime.now(UTC)
     assert instant.tzinfo is UTC
+
+
+def test_every_provider_of_the_catalog_has_a_way_to_verify_its_keys() -> None:
+    assert {provider.value for provider in MODEL_CATALOG.providers} <= set(KEY_CHECKS)
+
+
+def test_no_flow_uses_a_provider_before_the_flows_exist() -> None:
+    assert ProviderKeyUsageBeforeFlows().flows_using(ProviderName("openrouter")) == []
+
+
+def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ProviderKeyStore()
+    monkeypatch.setattr(
+        bootstrap,
+        "SqlAlchemyProviderKeyRepositoryAdapter",
+        lambda _, tenant: InMemoryProviderKeyRepositoryAdapter(store, tenant),
+    )
+    asked: list[httpx.Request] = []
+
+    def provider_answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(401, json={"error": {"message": "invalid key"}})
+
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
+    factory = TenantUseCaseFactory(
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker, providers
+    )
+
+    with pytest.raises(ProviderRejectedKeyError):
+        factory.for_tenant(TenantId.new()).register_provider_key.execute(
+            RegisterProviderKeyCommand("openrouter", "K-MADE-UP")
+        )
+
+    assert [str(request.url) for request in asked] == ["https://openrouter.ai/api/v1/key"]
+    assert store.keys == []

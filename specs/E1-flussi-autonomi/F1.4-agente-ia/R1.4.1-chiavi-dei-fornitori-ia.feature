@@ -1,5 +1,5 @@
 # language: it
-@R1.4.1 @wip
+@R1.4.1
 Funzionalità: R1.4.1 Chiavi dei fornitori IA dell'utente
   Come utente
   Voglio registrare le mie chiavi dei fornitori di modelli IA
@@ -29,22 +29,26 @@ Funzionalità: R1.4.1 Chiavi dei fornitori IA dell'utente
     Allora la registrazione è rifiutata con il motivo "chiave rifiutata dal fornitore: openrouter"
     E "anna" non ha chiavi registrate per il fornitore "openrouter"
 
+  @wip
   Scenario: Sostituzione della chiave
     Dato che "anna" ha registrato la chiave "K-OR" per il fornitore "openrouter"
     E che il fornitore "openrouter" accetta la chiave "K-OR2"
     Quando "anna" sostituisce la chiave del fornitore "openrouter" con "K-OR2"
     Allora i cicli successivi dei flussi di "anna" usano la chiave "K-OR2" presso "openrouter"
 
+  @wip
   Scenario: Flusso con modello di un fornitore senza chiave
     Quando "anna" crea il flusso "alfa" con modello "anthropic/claude-sonnet"
     Allora la creazione è rifiutata con il motivo "nessuna chiave registrata per il fornitore: anthropic"
 
+  @wip
   Scenario: Rimozione rifiutata se un flusso non fermo usa la chiave
     Dato che "anna" ha registrato la chiave "K-OR" per il fornitore "openrouter"
     E che "anna" ha il flusso "alfa" attivo con modello "openrouter/deepseek-chat"
     Quando "anna" rimuove la chiave del fornitore "openrouter"
     Allora la rimozione è rifiutata con il motivo "chiave usata da flussi attivi o in pausa: alfa"
 
+  @wip
   Scenario: La chiave non è mai esposta
     Dato che "anna" ha registrato la chiave "K-OR" per il fornitore "openrouter"
     Quando il flusso "alfa" di "anna" esegue un ciclo

@@ -24,7 +24,7 @@ class SodiumCredentialSealerAdapter:
     """
 
     def __init__(self, public_key: bytes, key_version: int, tenant_id: TenantId) -> None:
-        self._box = SealedBox(_public_key(public_key))
+        self._box = SealedBox(public_key_of(public_key))
         self._key_version = key_version
         self._tenant_id = tenant_id
 
@@ -36,7 +36,7 @@ class SodiumCredentialSealerAdapter:
         return SealedCredentials(self._key_version, self._box.encrypt(plaintext))
 
 
-def _public_key(raw: bytes) -> PublicKey:
+def public_key_of(raw: bytes) -> PublicKey:
     if len(raw) != PUBLIC_KEY_BYTES:
         raise InvalidCredentialsKeyError
     try:
