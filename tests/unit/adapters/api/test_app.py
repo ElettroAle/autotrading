@@ -9,6 +9,7 @@ from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Person
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import Platform
+from tests.support.problems import reason_of
 
 
 @pytest.fixture
@@ -75,7 +76,7 @@ def test_rejects_a_request_without_a_usable_bearer_token(provider: IdentityProvi
 
     response = client_for(provider=provider).get("/me", headers=headers)
 
-    assert (response.status_code, response.json()) == (401, {"detail": "non autenticato"})
+    assert (response.status_code, reason_of(response)) == (401, {"detail": "non autenticato"})
 
 
 def test_accepts_the_scheme_name_in_any_case(provider: IdentityProvider) -> None:
@@ -91,7 +92,7 @@ def test_without_an_identity_provider_a_token_is_refused_as_not_configured(provi
 
     response = client_for().get("/me", headers={"Authorization": f"Bearer {token}"})
 
-    assert (response.status_code, response.json()) == (503, {"detail": "autenticazione non configurata"})
+    assert (response.status_code, reason_of(response)) == (503, {"detail": "autenticazione non configurata"})
 
 
 def test_openapi_page_logs_in_with_the_issuer_through_pkce(provider: IdentityProvider) -> None:

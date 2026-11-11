@@ -52,6 +52,7 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
+from tests.support.problems import reason_of
 from tests.support.worker import Worker
 
 AUTHENTICATION = {
@@ -130,7 +131,7 @@ def test_without_an_issuer_every_protected_function_is_refused_as_not_configured
 
     response = client.get("/me", headers={"Authorization": "Bearer any-token"})
 
-    assert (response.status_code, response.json()) == (503, {"detail": "autenticazione non configurata"})
+    assert (response.status_code, reason_of(response)) == (503, {"detail": "autenticazione non configurata"})
 
 
 def test_with_an_issuer_the_openapi_page_logs_in_with_it(tmp_path: Path) -> None:
@@ -221,7 +222,7 @@ def test_the_worker_answers_only_with_the_token_generated_on_the_machine(tmp_pat
 
     response = client.get(path, headers={"Authorization": "Bearer another-token"})
 
-    assert (response.status_code, response.json()) == (401, {"detail": "non autenticato"})
+    assert (response.status_code, reason_of(response)) == (401, {"detail": "non autenticato"})
     assert client.get("/health").json() == {"status": "ok"}
 
 
