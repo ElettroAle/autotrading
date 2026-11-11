@@ -54,6 +54,12 @@ from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.domain.sources.forecast import FORECAST
+from autotrading.domain.sources.indicators import INDICATORS
+from autotrading.domain.sources.news import NEWS
+from autotrading.domain.sources.pivots import PIVOTS
+from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
@@ -65,6 +71,8 @@ DEFAULT_DATABASE_PORT = "5432"
 DEFAULT_CREDENTIALS_KEY_VERSION = "1"
 HYPERLIQUID = "Hyperliquid"
 SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
+# The sources of the platform (R1.3.1): one added here becomes selectable in every flow.
+SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS))
 
 
 class MissingConfigurationError(AutotradingError):
@@ -237,6 +245,7 @@ class TenantUseCaseFactory:
             account_state=HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id),
             position_closing=HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id),
             verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
+            source_catalog=SOURCE_CATALOG,
         )
         return TenantUseCases.on(tenant_id, ports)
 
