@@ -18,4 +18,6 @@ paths:
 - I permessi di ciascuna identità sono in `docs/architecture.md` §8.2: `api` riceve solo il sealer,
   il `worker` l'opener.
 - Le eccezioni di PyNaCl si traducono negli errori del contratto della porta.
+- `SodiumProviderKeySealerAdapter` sigilla le chiavi dei fornitori IA con la stessa chiave pubblica; il testo
+  in chiaro contiene tenant, fornitore e chiave (ADR 0029).
 - Le credenziali in chiaro e le chiavi non compaiono in log, errori o repr.

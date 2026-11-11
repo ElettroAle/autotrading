@@ -19,17 +19,21 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases, create_worke
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
 from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
+from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
+from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
 )
+from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
@@ -49,6 +53,7 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
@@ -73,6 +78,9 @@ HYPERLIQUID = "Hyperliquid"
 SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
 # The sources of the platform (R1.3.1): one added here becomes selectable in every flow.
 SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP, NEWS))
+# The models of the platform (R1.4.2): one added to the configuration file becomes selectable in every flow.
+MODEL_CATALOG = load_model_catalog()
+PROVIDER_TIMEOUT_SECONDS = 10.0
 
 
 class MissingConfigurationError(AutotradingError):
@@ -110,6 +118,13 @@ class WorkerConnection:
 
     client: httpx.Client
     token: str = field(repr=False)
+
+
+class ProviderKeyUsageBeforeFlows:
+    """No flow uses a provider yet: flows arrive with R1.1.1, which bridges the flows context here (ADR 0029)."""
+
+    def flows_using(self, provider: ProviderName) -> list[str]:  # noqa: ARG002 - the signature of the port
+        return []
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,11 +244,13 @@ class TenantUseCaseFactory:
         public_key: PublicCredentialsKey,
         exchanges: Mapping[str, ExchangePort],
         worker: WorkerConnection,
+        providers: httpx.Client,
     ) -> None:
         self._engine = engine
         self._public_key = public_key
         self._exchanges = exchanges
         self._worker = worker
+        self._provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
 
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
@@ -246,6 +263,13 @@ class TenantUseCaseFactory:
             position_closing=HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id),
             verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
+            provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
+            provider_key_sealer=SodiumProviderKeySealerAdapter(
+                self._public_key.key, self._public_key.version, tenant_id
+            ),
+            provider_key_verifier=self._provider_key_verifier,
+            provider_key_usage=ProviderKeyUsageBeforeFlows(),
+            model_catalog=MODEL_CATALOG,
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -302,6 +326,7 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
         PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
         exchanges_for(health.environment),
         _worker_connection(configuration),
+        httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
     return create_api(health, resolve_tenant, tenants.for_tenant, _authentication(configuration))
 

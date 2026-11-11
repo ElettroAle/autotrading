@@ -12,6 +12,7 @@ from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.bootstrap import (
+    MODEL_CATALOG,
     SOURCE_CATALOG,
     AccountReadingFromAccounts,
     OrderExecutionFromOrders,
@@ -19,6 +20,7 @@ from autotrading.bootstrap import (
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -30,6 +32,14 @@ from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
+from tests.fakes.provider_keys import (
+    FakeProviderKeySealerAdapter,
+    FakeProviderKeyUsageAdapter,
+    FakeProviderKeyVerifierAdapter,
+    InMemoryProviderKeyRepositoryAdapter,
+    ProviderKeyStore,
+    ProviderKeyVault,
+)
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
@@ -55,6 +65,11 @@ class Platform:
         self.orders: dict[TenantId, InMemoryOrderRepositoryAdapter] = {}
         self.slippage = Slippage.default()
         self.runs: dict[TenantId, InMemoryVerificationRunRepositoryAdapter] = {}
+        self.provider_keys = ProviderKeyStore()
+        self.key_vault: ProviderKeyVault = {}
+        self.providers = FakeProviderKeyVerifierAdapter()
+        self.flows_using_keys: dict[TenantId, FakeProviderKeyUsageAdapter] = {}
+        self.model_catalog: ModelCatalog = MODEL_CATALOG
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -91,6 +106,11 @@ class Platform:
             position_closing=position_closing,
             verification=verification,
             source_catalog=SOURCE_CATALOG,
+            provider_keys=InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id),
+            provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
+            provider_key_verifier=self.providers,
+            provider_key_usage=self.flows_using_keys.setdefault(tenant_id, FakeProviderKeyUsageAdapter()),
+            model_catalog=self.model_catalog,
         )
         return TenantUseCases.on(tenant_id, ports)
 

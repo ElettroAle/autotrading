@@ -34,6 +34,9 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   credito esaurito o la chiave non valida (errore permanente, contesto `cycles`).
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
 
+- Una chiave si verifica presso il fornitore con un endpoint gratuito che la richiede (ADR 0029); il
+  catalogo dei modelli è `adapters/outbound/json/models.json` (ADR 0030).
+
 ## Porte del contesto
 
 Repository delle chiavi, cifratura e decifratura delle chiavi, verifica presso il fornitore, catalogo dei
