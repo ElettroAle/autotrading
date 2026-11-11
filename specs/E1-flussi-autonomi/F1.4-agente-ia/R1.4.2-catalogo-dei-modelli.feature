@@ -1,5 +1,5 @@
 # language: it
-@R1.4.2 @wip
+@R1.4.2
 Funzionalità: R1.4.2 Catalogo dei modelli IA
   Come utente
   Voglio consultare i fornitori e i modelli IA disponibili con i parametri ammessi
@@ -22,15 +22,18 @@ Funzionalità: R1.4.2 Catalogo dei modelli IA
     Allora il catalogo contiene il modello "openrouter/deepseek-chat" con il parametro temperatura da 0 a 2, predefinita 1
     E il fornitore "openrouter" risulta con chiave registrata
 
+  @wip
   Scenario: Parametro fuori dai valori ammessi
     Quando "anna" crea il flusso "alfa" con modello "openrouter/deepseek-chat" e temperatura 3
     Allora la creazione è rifiutata con il motivo "parametro fuori dai valori ammessi: temperatura"
 
+  @wip
   Scenario: Parametro non supportato dal modello
     Dato che il modello "openrouter/deepseek-chat" non supporta il livello di ragionamento
     Quando "anna" crea il flusso "alfa" con modello "openrouter/deepseek-chat" e livello di ragionamento "alto"
     Allora la creazione è rifiutata con il motivo "parametro non supportato dal modello: livello di ragionamento"
 
+  @wip
   Scenario: Parametri predefiniti
     Quando "anna" crea il flusso "alfa" con modello "openrouter/deepseek-chat" senza parametri
     Allora il flusso "alfa" usa la temperatura 1
