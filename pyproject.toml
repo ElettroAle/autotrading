@@ -34,7 +34,7 @@ requires = ["uv_build>=0.9,<0.14"]
 build-backend = "uv_build"
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib", "--strict-markers", "-m", "not wip and not pipeline and not integration and not testnet and not providers"]
+addopts = ["--import-mode=importlib", "--strict-markers", "-m", "not wip and not pipeline and not integration and not testnet and not providers and not sources"]
 testpaths = ["tests"]
 pythonpath = ["."]
 bdd_features_base_dir = "specs"
@@ -44,6 +44,7 @@ markers = [
     "integration: adapter contro la tecnologia vera",
     "testnet: adapter Hyperliquid contro la testnet",
     "providers: verifica delle chiavi contro i fornitori IA veri, con una chiave inventata",
+    "sources: adapter delle fonti contro i servizi pubblici veri",
 ]
 
 [tool.coverage.run]
