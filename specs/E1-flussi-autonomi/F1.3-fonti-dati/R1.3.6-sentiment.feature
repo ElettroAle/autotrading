@@ -8,8 +8,8 @@ Funzionalità: R1.3.6 Fonti sentiment di mercato
   Due fonti distinte, selezionabili una indipendentemente dall'altra, perché sono due indici diversi con lo
   stesso nome e metodologie proprie:
   - "sentiment-alternative-me": il Crypto Fear & Greed Index di alternative.me, senza chiave;
-  - "sentiment-coinmarketcap": il CMC Crypto Fear and Greed Index di CoinMarketCap, con una chiave API della piattaforma
-    (non dell'utente).
+  - "sentiment-coinmarketcap": il CMC Crypto Fear and Greed Index di CoinMarketCap, dall'endpoint pubblico senza
+    chiave.
   A ogni ciclo ogni fonte attiva rileva il proprio indice corrente: valore da 0 a 100, classificazione testuale
   e istante di aggiornamento dell'indice. L'indice riguarda l'intero mercato cripto: compare una sola volta nel
   contesto, non per asset.

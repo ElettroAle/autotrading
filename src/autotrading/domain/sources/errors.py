@@ -15,3 +15,10 @@ class SourceNotAvailableError(DomainError):
     def __init__(self, name: str) -> None:
         super().__init__(f"fonte non disponibile: {name}")
         self.name = name
+
+
+class InvalidSentimentIndexError(DomainError):
+    """A Fear & Greed reading outside 0-100, without classification or without its time zone."""
+
+    def __init__(self) -> None:
+        super().__init__("indice Fear & Greed non valido")
