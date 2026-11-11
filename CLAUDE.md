@@ -75,7 +75,7 @@ src/autotrading/
       <verbo>_<oggetto>.py      un caso d'uso per modulo
   adapters/                     livello 3: tecnologie, ognuna incapsulata
     inbound/api/                FastAPI
-    outbound/<tecnologia>/      hyperliquid/, libsodium/, sqlalchemy/
+    outbound/<tecnologia>/      hyperliquid/, libsodium/, sqlalchemy/, httpx/, json/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -200,6 +200,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-fastapi.md` | `adapters/inbound/api/**` |
 | `tech-hyperliquid.md` | `adapters/outbound/hyperliquid/**` |
 | `tech-libsodium.md` | `adapters/outbound/libsodium/**` |
+| `tech-json.md` | `adapters/outbound/json/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |
