@@ -17,6 +17,13 @@ class SourceNotAvailableError(DomainError):
         self.name = name
 
 
+class InvalidSentimentIndexError(DomainError):
+    """A Fear & Greed reading outside 0-100, without classification or without its time zone."""
+
+    def __init__(self) -> None:
+        super().__init__("indice Fear & Greed non valido")
+
+
 class InsufficientHistoryError(DomainError):
     """The exchange returned fewer prices than an indicator needs: the source is absent from that cycle."""
 
