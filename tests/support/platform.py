@@ -11,7 +11,12 @@ from autotrading.application.orders.close_exchange_position import CloseExchange
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
-from autotrading.bootstrap import AccountReadingFromAccounts, OrderExecutionFromOrders, TradingAccessFromAccounts
+from autotrading.bootstrap import (
+    SOURCE_CATALOG,
+    AccountReadingFromAccounts,
+    OrderExecutionFromOrders,
+    TradingAccessFromAccounts,
+)
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.orders.slippage import Slippage
@@ -85,6 +90,7 @@ class Platform:
             account_state=account_state,
             position_closing=position_closing,
             verification=verification,
+            source_catalog=SOURCE_CATALOG,
         )
         return TenantUseCases.on(tenant_id, ports)
 

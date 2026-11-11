@@ -15,8 +15,11 @@ from autotrading.application.accounts.remove_account import RemoveAccountUseCase
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.application.sources.get_source import GetSourceUseCase
+from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.verification.ports import VerificationPort
 from autotrading.application.verification.run_verification import RunVerificationUseCase
+from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -30,6 +33,7 @@ class TenantPorts:
     account_state: AccountStatePort
     position_closing: PositionClosingPort
     verification: VerificationPort
+    source_catalog: SourceCatalog
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +48,8 @@ class TenantUseCases:
     remove_account: RemoveAccountUseCase
     close_position: ClosePositionUseCase
     run_verification: RunVerificationUseCase
+    list_sources: ListSourcesUseCase
+    get_source: GetSourceUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -57,4 +63,6 @@ class TenantUseCases:
             remove_account=RemoveAccountUseCase(accounts, ports.account_state),
             close_position=ClosePositionUseCase(ports.position_closing),
             run_verification=RunVerificationUseCase(ports.verification),
+            list_sources=ListSourcesUseCase(ports.source_catalog),
+            get_source=GetSourceUseCase(ports.source_catalog),
         )
