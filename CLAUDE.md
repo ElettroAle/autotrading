@@ -66,6 +66,7 @@ src/autotrading/
   domain/                       livello 1: regole di business, solo libreria standard
     errors.py                   AutotradingError, DomainError
     tenancy/  accounts/  orders/  verification/
+    flows/  cycles/  sources/  agent/  notifications/
   application/                  livello 2: casi d'uso e porte
     errors.py                   ApplicationError
     <contesto>/
@@ -85,7 +86,7 @@ docs/adr/                       decisioni tecniche, una per file
 ```
 
 **Contesti** = aree di logica di business, non tecnologie. In E0: `tenancy`, `accounts`, `orders`,
-`verification`. Un contesto nuovo nasce solo con decisione del proprietario e porta con sé la propria
+`verification`. In E1: `flows`, `cycles`, `sources`, `agent`, `notifications` (ADR 0026). Un contesto nuovo nasce solo con decisione del proprietario e porta con sé la propria
 rule `context-<nome>.md`.
 
 **Comunicazione tra contesti**: chiamata in-process attraverso porte o casi d'uso esposti. Eventi solo
@@ -191,6 +192,11 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `context-accounts.md` | contesto `accounts` (F0.2) |
 | `context-orders.md` | contesto `orders` (F0.3) |
 | `context-verification.md` | contesto `verification` (F0.4) |
+| `context-flows.md` | contesto `flows` (F1.1, F1.5, F1.6, R1.7.2) |
+| `context-cycles.md` | contesto `cycles` (F1.2, R1.7.1, R1.7.3) |
+| `context-sources.md` | contesto `sources` (F1.3) |
+| `context-agent.md` | contesto `agent` (F1.4) |
+| `context-notifications.md` | contesto `notifications` (F1.8) |
 | `tech-fastapi.md` | `adapters/inbound/api/**` |
 | `tech-hyperliquid.md` | `adapters/outbound/hyperliquid/**` |
 | `tech-libsodium.md` | `adapters/outbound/libsodium/**` |
