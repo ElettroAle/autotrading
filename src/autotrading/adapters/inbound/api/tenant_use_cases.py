@@ -45,9 +45,9 @@ from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
     ClosedPositionRepositoryPort,
+    FlowLedgerPort,
     FlowPositionsPort,
     FlowRepositoryPort,
-    PlatformOrdersPort,
 )
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -88,7 +88,7 @@ class TenantPorts:
     stop_ports: StopPorts
     account_flows: AccountFlowsPort
     account_activity: AccountActivityPort
-    platform_orders: PlatformOrdersPort
+    flow_ledger: FlowLedgerPort
     link_codes: LinkCodeRepositoryPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
@@ -163,7 +163,7 @@ class TenantUseCases:
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
-            read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.platform_orders),
+            read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
@@ -176,7 +176,7 @@ class TenantUseCases:
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
                 ports.flows,
                 ports.flow_checks.accounts,
-                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.platform_orders),
+                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
                 ports.clock,
             ),
             list_capital_changes=ListCapitalChangesUseCase(ports.flows),

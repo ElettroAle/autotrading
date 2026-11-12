@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from uuid import UUID
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.ledger import FlowTotals
 
 HUNDRED = Decimal(100)
 
@@ -13,7 +13,8 @@ HUNDRED = Decimal(100)
 class FlowState:
     """The share of the account that belongs to a flow, attributed from what the exchange shows (R1.6.1).
 
-    Positions belong to the flow by asset, executions by the client order id of its orders. The return is measured
+    Positions belong to the flow by asset; realized PnL, fees and funding come from the running totals of the ledger
+    the platform keeps (ADR 0063), never from the executions the exchange still holds. The return is measured
     against the capital allocated now: a change of the capital moves the reference from that moment (R1.1.7).
     """
 
@@ -23,18 +24,19 @@ class FlowState:
     positions: tuple[AccountPosition, ...]
     realized_pnl: Decimal
     fees: Decimal
+    funding: Decimal
 
     @classmethod
-    def attributed(cls, flow: Flow, activity: AccountActivity, orders_of_flow: frozenset[UUID]) -> FlowState:
+    def attributed(cls, flow: Flow, activity: AccountActivity, totals: FlowTotals) -> FlowState:
         assets = frozenset(flow.configuration.assets)
-        fills = [fill for fill in activity.fills if fill.order_id in orders_of_flow]
         return cls(
             flow_id=flow.id,
             currency=activity.currency,
             allocated_capital=flow.configuration.allocated_capital,
             positions=tuple(position for position in activity.positions if position.asset in assets),
-            realized_pnl=sum((fill.realized_pnl for fill in fills), Decimal(0)),
-            fees=sum((fill.fee for fill in fills), Decimal(0)),
+            realized_pnl=totals.realized_pnl,
+            fees=totals.fees,
+            funding=totals.funding,
         )
 
     @property
@@ -47,7 +49,7 @@ class FlowState:
 
     @property
     def available_liquidity(self) -> Decimal:
-        return self.allocated_capital + self.realized_pnl - self.fees - self.margin
+        return self.allocated_capital + self.realized_pnl - self.fees + self.funding - self.margin
 
     @property
     def total_value(self) -> Decimal:

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from autotrading.application.errors import ApplicationError
 
 
@@ -80,3 +82,16 @@ class AssetWithOpenPositionError(ApplicationError):
     def __init__(self, assets: tuple[str, ...]) -> None:
         super().__init__("posizione aperta sull'asset da togliere: " + ", ".join(assets))
         self.assets = assets
+
+
+class FlowLedgerIncompleteError(ApplicationError):
+    """Part of the executions of the account is gone from the exchange before the platform recorded it: the totals of
+    its flows can no longer be trusted, so every active flow of the account pauses (ADR 0063).
+    """
+
+    status_code = 409
+    permanent = True
+
+    def __init__(self, account_id: UUID) -> None:
+        super().__init__("registro delle esecuzioni incompleto")
+        self.account_id = account_id

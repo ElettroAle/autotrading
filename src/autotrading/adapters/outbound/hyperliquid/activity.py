@@ -3,7 +3,6 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from uuid import UUID
 
 import requests
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
@@ -16,20 +15,18 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     OfficialSdk,
 )
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
-from autotrading.domain.flows.account_activity import AccountActivity, AccountFill, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
 
-# The exchange answers at most 2000 fills per request and keeps the 10000 most recent of an account.
-FILLS_PAGE = 2000
 FROM_THE_START = 0
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, InvalidOperation)
 
 
 class HyperliquidAccountActivityAdapter:
-    """What Hyperliquid shows of an account: positions with their margin, fills, movements of the balance (R1.6.1).
+    """What Hyperliquid shows of an account: positions with their margin, movements of the balance (R1.6.1).
 
-    Everything is public information of the address: no signature, so no secret leaves the opener. Funding payments
-    and liquidations are not movements: a liquidation shows in the fills, without a client order id.
+    Everything is public information of the address: no signature, so no secret leaves the opener. The executions
+    are read apart, only the new ones, for the ledger (ADR 0063). Funding payments are not movements.
     """
 
     def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
@@ -46,40 +43,27 @@ class HyperliquidAccountActivityAdapter:
         return self._base_url
 
     def activity(self, address: str) -> AccountActivity:
-        with _translated():
+        with translated():
             info = self._sdk.info(self._base_url, self._timeout)
             state = info.user_state(address)
-            fills = _all_fills(info, address)
             ledger = info.user_non_funding_ledger_updates(address, FROM_THE_START)
             return AccountActivity(
                 currency=MARGIN_CURRENCY,
                 balance=_decimal(state["marginSummary"]["accountValue"]),
                 available_margin=_decimal(state["withdrawable"]),
                 positions=tuple(_position_of(entry["position"]) for entry in state["assetPositions"]),
-                fills=tuple(_fill_of(fill) for fill in fills),
                 movements=tuple(movement for update in ledger if (movement := _movement_of(update, address))),
                 read_at=_instant(state["time"]),
             )
 
 
 @contextmanager
-def _translated() -> Iterator[None]:
+def translated() -> Iterator[None]:
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
         yield
     except (ClientError, ServerError, requests.RequestException, *SHAPE_ERRORS) as error:
         raise FlowExchangeUnavailableError from error
-
-
-def _all_fills(info: Any, address: str) -> list[Mapping[str, Any]]:
-    fills: list[Mapping[str, Any]] = []
-    start = FROM_THE_START
-    while True:
-        page = info.user_fills_by_time(address, start)
-        fills.extend(page)
-        if len(page) < FILLS_PAGE:
-            return fills
-        start = int(page[-1]["time"]) + 1
 
 
 def _position_of(position: Mapping[str, Any]) -> AccountPosition:
@@ -90,20 +74,6 @@ def _position_of(position: Mapping[str, Any]) -> AccountPosition:
         size=abs(size),
         margin=_decimal(position["marginUsed"]),
         unrealized_pnl=_decimal(position["unrealizedPnl"]),
-    )
-
-
-def _fill_of(fill: Mapping[str, Any]) -> AccountFill:
-    cloid = fill.get("cloid")
-    return AccountFill(
-        fill_id=str(fill["tid"]),
-        order_id=None if cloid is None else UUID(hex=str(cloid).removeprefix("0x")),
-        asset=str(fill["coin"]),
-        size=_decimal(fill["sz"]),
-        price=_decimal(fill["px"]),
-        fee=_decimal(fill["fee"]),
-        realized_pnl=_decimal(fill["closedPnl"]),
-        executed_at=_instant(fill["time"]),
     )
 
 

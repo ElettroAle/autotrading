@@ -52,6 +52,7 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.link_code_repository import (
@@ -112,6 +113,7 @@ class Platform:
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
         self.platform_orders = InMemoryPlatformOrdersAdapter()
+        self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))
         self.closed_positions = ClosedPositionStore()
@@ -182,7 +184,7 @@ class Platform:
             stop_ports=stop_ports,
             account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
             account_activity=self.account_activity,
-            platform_orders=self.platform_orders,
+            flow_ledger=self.ledger,
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             clock=lambda: self.now,

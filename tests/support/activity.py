@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.domain.flows.account_activity import AccountActivity, AccountFill, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.ledger import Execution, FundingPayment
 from autotrading.domain.flows.trade_intent import TradeSide
 
 CURRENCY = "USDC"
@@ -25,8 +26,28 @@ def a_fill(
     fee: Decimal = Decimal(0),
     executed_at: datetime = READ_AT,
     fill_id: str = "1",
-) -> AccountFill:
-    return AccountFill(fill_id, order_id, asset, Decimal(1), Decimal(100), fee, realized_pnl, executed_at)
+    size: Decimal = Decimal(1),
+    start_position: Decimal = Decimal(0),
+    liquidation: bool = False,
+) -> Execution:
+    """An execution of the account; its exchange order is its fill, so two fills are two executions."""
+    return Execution(
+        fill_id=fill_id,
+        exchange_order_id=f"o-{fill_id}",
+        order_id=order_id,
+        asset=asset,
+        size=size,
+        price=Decimal(100),
+        fee=fee,
+        realized_pnl=realized_pnl,
+        start_position=start_position,
+        liquidation=liquidation,
+        executed_at=executed_at,
+    )
+
+
+def a_payment(asset: str, amount: Decimal, *, paid_at: datetime = READ_AT) -> FundingPayment:
+    return FundingPayment(asset, amount, paid_at)
 
 
 def a_movement(amount: Decimal, *, moved_at: datetime = READ_AT, movement_id: str = "0xabc") -> BalanceMovement:
@@ -38,8 +59,7 @@ def an_activity(
     balance: Decimal = Decimal(1000),
     available_margin: Decimal = Decimal(1000),
     positions: tuple[AccountPosition, ...] = (),
-    fills: tuple[AccountFill, ...] = (),
     movements: tuple[BalanceMovement, ...] = (),
     read_at: datetime = READ_AT,
 ) -> AccountActivity:
-    return AccountActivity(CURRENCY, balance, available_margin, positions, fills, movements, read_at)
+    return AccountActivity(CURRENCY, balance, available_margin, positions, movements, read_at)

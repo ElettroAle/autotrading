@@ -12,7 +12,7 @@ from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.activity import a_fill, a_movement, a_position, an_activity
+from tests.support.activity import a_movement, a_position, an_activity
 from tests.support.worker import TENANT, TOKEN, Worker
 
 REFUSED = "connection refused"
@@ -38,7 +38,6 @@ def test_the_activity_read_by_the_worker_arrives_unchanged(worker: Worker) -> No
     activity = an_activity(
         balance=Decimal("1012.5"),
         positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal("-1.5")),),
-        fills=(a_fill("BTC", uuid4(), realized_pnl=Decimal(4), fee=Decimal("0.04")), a_fill("ETH", None, fill_id="9")),
         movements=(a_movement(Decimal(-20)),),
     )
     worker.activity_reader.activities[address] = activity
@@ -106,7 +105,6 @@ def test_a_refusal_of_the_worker_is_never_read_as_an_activity() -> None:
         "balance": "1",
         "available_margin": "1",
         "positions": [],
-        "fills": [],
         "movements": [],
         "read_at": "2026-11-12T10:00:00+00:00",
     }

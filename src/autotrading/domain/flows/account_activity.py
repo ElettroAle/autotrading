@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID
 
 from autotrading.domain.flows.trade_intent import TradeSide
 
@@ -18,20 +17,6 @@ class AccountPosition:
 
 
 @dataclass(frozen=True, slots=True)
-class AccountFill:
-    """One execution of the account read from the exchange, with the client order id the platform gave, if any."""
-
-    fill_id: str
-    order_id: UUID | None
-    asset: str
-    size: Decimal
-    price: Decimal
-    fee: Decimal
-    realized_pnl: Decimal
-    executed_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
 class BalanceMovement:
     """A change of the balance the exchange records outside the executions: a deposit, a withdrawal, a transfer."""
 
@@ -42,15 +27,14 @@ class BalanceMovement:
 
 @dataclass(frozen=True, slots=True)
 class AccountActivity:
-    """What the exchange shows of an account now: the totals, the open positions, the executions, the movements.
+    """What the exchange shows of an account now: the totals, the open positions, the movements of the balance.
 
-    The platform keeps no liquidity of its own: the state of every flow is shared out of this reading (R1.6.1).
+    The executions are not part of it: the platform records them in its ledger as they happen (ADR 0063).
     """
 
     currency: str
     balance: Decimal
     available_margin: Decimal
     positions: tuple[AccountPosition, ...]
-    fills: tuple[AccountFill, ...]
     movements: tuple[BalanceMovement, ...]
     read_at: datetime

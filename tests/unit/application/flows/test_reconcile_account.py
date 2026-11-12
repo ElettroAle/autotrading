@@ -6,6 +6,7 @@ import pytest
 
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.domain.flows.account_reconciliation import OUTSIDE_PLATFORM, AccountReading
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
@@ -14,6 +15,7 @@ from autotrading.domain.flows.unattributable import UnattributableKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
@@ -32,9 +34,10 @@ class Bench:
         self.orders = InMemoryPlatformOrdersAdapter()
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.closed = InMemoryClosedPositionsAdapter()
-        self.use_case = ReconcileAccountUseCase(
-            InMemoryFlowRepositoryAdapter(self.store, TENANT), self.activity, self.orders, self.readings, self.closed
-        )
+        self.ledger = InMemoryFlowLedgerAdapter()
+        flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
+        record = RecordAccountExecutionsUseCase(flows, self.activity, self.orders, self.ledger)
+        self.use_case = ReconcileAccountUseCase(flows, self.activity, self.readings, self.closed, record)
 
     def flow(self, *assets: str, account_id: UUID = ACCOUNT) -> Flow:
         flow = a_flow(
@@ -120,11 +123,35 @@ def test_the_fills_of_the_orders_of_the_platform_are_explained(bench: Bench) -> 
     flow, order = bench.flow("BTC"), uuid4()
     bench.orders.add(order, ACCOUNT, flow.id)
     bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {}))
-    bench.activity.activities[ACCOUNT] = an_activity(fills=(a_fill("BTC", order), a_fill("BTC", None, fill_id="9")))
+    bench.activity.activities[ACCOUNT] = an_activity()
+    bench.activity.executions[ACCOUNT] = [a_fill("BTC", order), a_fill("BTC", None, fill_id="9")]
 
     outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
 
     assert [item.reference for item in outcome.new_items] == ["9"]
+
+
+def test_the_executions_are_recorded_in_the_ledger_before_the_reconciliation(bench: Bench) -> None:
+    flow, order = bench.flow("BTC"), uuid4()
+    bench.orders.add(order, ACCOUNT, flow.id)
+    bench.activity.activities[ACCOUNT] = an_activity()
+    bench.activity.executions[ACCOUNT] = [a_fill("BTC", order, realized_pnl=Decimal(4))]
+
+    bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert bench.ledger.realized(flow.id) == Decimal(4)
+
+
+def test_executions_already_recorded_are_not_reported_again(bench: Bench) -> None:
+    flow = bench.flow("BTC")
+    bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {}))
+    bench.activity.activities[ACCOUNT] = an_activity()
+    bench.activity.executions[ACCOUNT] = [a_fill("BTC", None, fill_id="9")]
+    bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert outcome.new_items == ()
 
 
 def test_a_position_closed_outside_enters_the_history_of_the_flow(bench: Bench) -> None:
