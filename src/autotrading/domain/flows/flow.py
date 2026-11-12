@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.flows.errors import (
@@ -38,8 +39,8 @@ class Flow(TenantOwned):
         return self.configuration.model.name.partition("/")[0]
 
     def after(self, command: FlowCommand) -> Flow:
-        """The flow in the status the command leads to, when the command starts from its status (R1.1.4)."""
-        if self.status != command.starts_from:
+        """The flow in the status the command leads to, when the command starts from its status (R1.1.4, R1.1.5)."""
+        if self.status not in command.starts_from:
             raise FlowCommandNotAllowedError(command.value, self.status.value)
         return replace(self, status=command.leads_to)
 
@@ -57,3 +58,7 @@ class Flow(TenantOwned):
         """The flow with the configuration as its next version; the previous ones stay as they are (R1.1.3)."""
         self.require_modifiable()
         return replace(self, configuration=replace(configuration, version=self.configuration.version + 1))
+
+    def with_capital(self, capital: Decimal) -> Flow:
+        """The flow with another allocated capital as its next version: a cycle under way keeps its own (R1.1.7)."""
+        return self.reconfigured(replace(self.configuration, allocated_capital=capital))

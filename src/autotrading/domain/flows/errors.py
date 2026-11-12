@@ -82,6 +82,22 @@ class CapitalAboveFreeCapitalError(DomainError):
         self.free_capital = free_capital
 
 
+class CapitalAboveAvailableCapitalError(DomainError):
+    status_code = 422
+
+    def __init__(self, available: str) -> None:
+        super().__init__(f"capitale allocato oltre il capitale disponibile: {available}")
+        self.available = available
+
+
+class CapitalBelowCommittedMarginError(DomainError):
+    status_code = 422
+
+    def __init__(self, committed_margin: str) -> None:
+        super().__init__(f"capitale allocato sotto il margine impegnato: {committed_margin}")
+        self.committed_margin = committed_margin
+
+
 class FlowCommandNotAllowedError(DomainError):
     status_code = 409
 

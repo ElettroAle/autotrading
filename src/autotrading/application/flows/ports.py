@@ -4,12 +4,14 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.tenancy.user_id import UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,12 +57,41 @@ class FlowRepositoryPort(Protocol):
         """Saves the configuration of the flow as a new version, the others untouched. Raises FlowNotFoundError."""
         ...
 
+    def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
+        """Saves, together, the version with the new capital and the change in its history. Raises FlowNotFoundError."""
+        ...
+
+    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
+        """The changes of the capital allocated to the flow, oldest first. Raises FlowNotFoundError."""
+        ...
+
 
 class FlowAccountPort(Protocol):
     """Bound to the tenant of the request."""
 
     def account(self, account_id: UUID) -> FlowAccount:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the balance cannot be read."""
+        ...
+
+
+class FlowPositionsPort(Protocol):
+    """Bound to the tenant of the request: the positions of a flow are those of its account on its assets (R1.1.2)."""
+
+    def close(self, account_id: UUID, asset: str, user_id: UserId) -> str | None:
+        """Closes the whole position on the asset, through the worker that holds the key (ADR 0023).
+
+        None when the position is closed or there was none; otherwise the reason the exchange or the worker gave.
+        """
+        ...
+
+    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
+        """The margin the open positions on the assets hold now. Raises FlowExchangeUnavailableError."""
+        ...
+
+
+class RunningCyclePort(Protocol):
+    def wait_until_finished(self, flow_id: FlowId) -> None:
+        """Returns once no cycle of the flow is running, across processes; at once when none is (R1.1.5)."""
         ...
 
 

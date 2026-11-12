@@ -5,6 +5,7 @@ from datetime import datetime
 from autotrading.application.accounts.get_account import GetAccountUseCase
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
 from autotrading.application.accounts.ports import (
+    AccountFlowsPort,
     AccountRepositoryPort,
     AccountStatePort,
     CredentialSealerPort,
@@ -26,14 +27,17 @@ from autotrading.application.agent.register_provider_key import ProviderKeyServi
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
+from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
-from autotrading.application.flows.ports import FlowRepositoryPort
+from autotrading.application.flows.ports import FlowPositionsPort, FlowRepositoryPort, RunningCyclePort
+from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
@@ -67,6 +71,9 @@ class TenantPorts:
     model_catalog: ModelCatalog
     flows: FlowRepositoryPort
     flow_checks: FlowChecks
+    flow_positions: FlowPositionsPort
+    running_cycles: RunningCyclePort
+    account_flows: AccountFlowsPort
     link_codes: LinkCodeRepositoryPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
@@ -102,6 +109,9 @@ class TenantUseCases:
     compare_flow_versions: CompareFlowVersionsUseCase
     change_flow_status: ChangeFlowStatusUseCase
     archive_flow: ArchiveFlowUseCase
+    stop_flow: StopFlowUseCase
+    change_allocated_capital: ChangeAllocatedCapitalUseCase
+    list_capital_changes: ListCapitalChangesUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -114,7 +124,7 @@ class TenantUseCases:
             get_account=GetAccountUseCase(accounts),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
-            remove_account=RemoveAccountUseCase(accounts, ports.account_state),
+            remove_account=RemoveAccountUseCase(accounts, ports.account_state, ports.account_flows),
             close_position=ClosePositionUseCase(ports.position_closing),
             run_verification=RunVerificationUseCase(ports.verification),
             list_sources=ListSourcesUseCase(ports.source_catalog),
@@ -135,4 +145,9 @@ class TenantUseCases:
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
             change_flow_status=ChangeFlowStatusUseCase(ports.flows),
             archive_flow=ArchiveFlowUseCase(ports.flows),
+            stop_flow=StopFlowUseCase(ports.flows, ports.running_cycles, ports.flow_positions),
+            change_allocated_capital=ChangeAllocatedCapitalUseCase(
+                ports.flows, ports.flow_checks.accounts, ports.flow_positions, ports.clock
+            ),
+            list_capital_changes=ListCapitalChangesUseCase(ports.flows),
         )

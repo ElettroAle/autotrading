@@ -82,14 +82,14 @@ def create_api(
     ) -> Identity:
         return Identity(user_id=user_id.value, tenant_id=str(tenant_id.value))
 
-    protected.include_router(accounts_router(use_cases_of_request))
+    protected.include_router(accounts_router(use_cases_of_request, current_user))
     protected.include_router(orders_router(use_cases_of_request, current_user))
     protected.include_router(verifications_router(use_cases_of_request, current_user))
     protected.include_router(sources_router(use_cases_of_request))
     protected.include_router(provider_keys_router(use_cases_of_request))
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
-    protected.include_router(flows_router(use_cases_of_request))
+    protected.include_router(flows_router(use_cases_of_request, current_user))
     api.include_router(protected)
     return api
 

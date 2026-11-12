@@ -45,6 +45,8 @@ class FakeOrderExchangeAdapter:
         self.rejection: str | None = None
         # Refuses only the orders that close: the opening executes, the closing does not.
         self.closing_rejection: str | None = None
+        # Refuses the closing of the position on one asset only, with its message.
+        self.closing_rejections: dict[str, str] = {}
         self.fill_ratio = Decimal(1)
         self.silent = False
         self.executes_when_silent = False
@@ -84,6 +86,8 @@ class FakeOrderExchangeAdapter:
             raise ExchangeRejectedOrderError(self.rejection)
         if order.reduce_only and self.closing_rejection is not None:
             raise ExchangeRejectedOrderError(self.closing_rejection)
+        if order.reduce_only and order.coin in self.closing_rejections:
+            raise ExchangeRejectedOrderError(self.closing_rejections[order.coin])
         if self.price_moves.get(order.coin, Decimal(0)) > order.slippage.fraction:
             raise ExchangeRejectedOrderError(NO_MATCH)
         if self.silent:

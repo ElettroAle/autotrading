@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
@@ -18,6 +19,7 @@ class FlowStore:
     def __init__(self) -> None:
         self.flows: list[Flow] = []
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
+        self.capital_changes: dict[FlowId, list[CapitalChange]] = {}
 
     def of(self, tenant_id: TenantId) -> list[Flow]:
         return [flow for flow in self.flows if flow.tenant_id == tenant_id]
@@ -63,6 +65,14 @@ class InMemoryFlowRepositoryAdapter:
     def add_version(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), configuration=flow.configuration))
         self._store.versions[flow.id].append(flow.configuration)
+
+    def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
+        self.add_version(flow)
+        self._store.capital_changes.setdefault(flow.id, []).append(change)
+
+    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
+        self.get(flow_id)
+        return tuple(self._store.capital_changes.get(flow_id, []))
 
     def _replace(self, flow: Flow) -> None:
         self._store.flows = [flow if each.id == flow.id else each for each in self._store.flows]

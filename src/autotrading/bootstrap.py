@@ -47,6 +47,7 @@ from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.running_cycle import SqlAlchemyRunningCycleAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
@@ -66,6 +67,7 @@ from autotrading.application.accounts.ports import (
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.errors import ProviderKeyNotFoundError
 from autotrading.application.agent.ports import ProviderKeyRepositoryPort
+from autotrading.application.flows.archive_flow import ArchiveFlowCommand, ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
@@ -73,6 +75,7 @@ from autotrading.application.flows.errors import (
     InvalidFlowSettingError,
 )
 from autotrading.application.flows.ports import FlowAccount, FlowRepositoryPort, MarketsPort
+from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -82,14 +85,21 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
-from autotrading.application.orders.errors import OrderAccountNotFoundError
+from autotrading.application.orders.errors import (
+    NoOpenPositionError,
+    OrderAccountNotFoundError,
+    OrderExchangeUnavailableError,
+    OrderWorkerUnavailableError,
+)
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
+from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.application.sources.collect_source import CollectedSource
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.accounts.removal import FlowPositionLeftOpen
 from autotrading.domain.agent.agent_context import SourceData
 from autotrading.domain.agent.errors import (
     ModelNotAvailableError,
@@ -101,10 +111,12 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.errors import ModelRequiredError
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.direction import Direction
-from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
+from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource, OrderStatus
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.sources.errors import (
@@ -216,6 +228,73 @@ class FlowAccountsFromAccounts:
         except (ExchangeUnavailableError, WorkerUnavailableError) as error:
             raise FlowExchangeUnavailableError from error
         return FlowAccount(account.exchange.value, balance.amount, balance.currency)
+
+
+class FlowPositionsFromAccountsAndOrders:
+    """Bridges the accounts and orders contexts to the flows context in the API (ADR 0052, ADR 0053).
+
+    The positions are read and closed by the worker, the only service holding the key (ADR 0023). The margin of a
+    position is what its opening committed: its size at the entry price over its leverage.
+    """
+
+    def __init__(self, account_state: AccountStatePort, closing: PositionClosingPort) -> None:
+        self._account_state = account_state
+        self._closing = closing
+
+    def close(self, account_id: UUID, asset: str, user_id: UserId) -> str | None:
+        try:
+            outcome = self._closing.close(account_id, asset, user_id)
+        except NoOpenPositionError:
+            return None
+        except (OrderAccountNotFoundError, OrderExchangeUnavailableError, OrderWorkerUnavailableError) as error:
+            return str(error)
+        if outcome.status != OrderStatus.REJECTED:
+            return None
+        return outcome.exchange_message or str(outcome.reason)
+
+    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
+        try:
+            positions = self._account_state.read_state(AccountId(account_id)).positions
+        except AccountNotFoundError as error:
+            raise FlowAccountNotFoundError from error
+        except (ExchangeUnavailableError, WorkerUnavailableError) as error:
+            raise FlowExchangeUnavailableError from error
+        return sum(
+            (
+                position.size * position.entry_price / position.leverage
+                for position in positions
+                if position.coin in assets
+            ),
+            Decimal(0),
+        )
+
+
+class AccountFlowsFromFlows:
+    """Bridges the flows context to the accounts context in the API (ADR 0054): the flows that run on an account."""
+
+    def __init__(self, flows: FlowRepositoryPort, stop: StopFlowUseCase, archive: ArchiveFlowUseCase) -> None:
+        self._flows = flows
+        self._stop = stop
+        self._archive = archive
+
+    def operating(self, account_id: AccountId) -> tuple[str, ...]:
+        return tuple(flow.name.value for flow in self._operating_on(account_id))
+
+    def stop(self, account_id: AccountId, user_id: UserId) -> tuple[FlowPositionLeftOpen, ...]:
+        outcomes = [self._stop.execute(StopFlowCommand(flow.id, user_id)) for flow in self._operating_on(account_id)]
+        return tuple(
+            FlowPositionLeftOpen(position.asset, position.reason)
+            for outcome in outcomes
+            for position in outcome.left_open
+        )
+
+    def archive(self, account_id: AccountId) -> None:
+        for flow in self._flows.list():
+            if flow.account_id == account_id.value and flow.status == FlowStatus.STOPPED:
+                self._archive.execute(ArchiveFlowCommand(flow.id))
+
+    def _operating_on(self, account_id: AccountId) -> list[Flow]:
+        return [flow for flow in self._flows.list() if flow.account_id == account_id.value and flow.status.not_stopped]
 
 
 class ModelSettingsFromAgent:
@@ -404,12 +483,15 @@ class TenantUseCaseFactory:
         account_state = HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
+        position_closing = HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id)
+        flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
+        running_cycles = SqlAlchemyRunningCycleAdapter(self._engine)
         ports = TenantPorts(
             accounts=accounts,
             sealer=sealer,
             exchanges=self._exchanges.accounts,
             account_state=account_state,
-            position_closing=HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id),
+            position_closing=position_closing,
             verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
@@ -425,6 +507,11 @@ class TenantUseCaseFactory:
                 markets=self._exchanges.markets,
                 models=ModelSettingsFromAgent(MODEL_CATALOG, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
+            ),
+            flow_positions=flow_positions,
+            running_cycles=running_cycles,
+            account_flows=AccountFlowsFromFlows(
+                flows, StopFlowUseCase(flows, running_cycles, flow_positions), ArchiveFlowUseCase(flows)
             ),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),

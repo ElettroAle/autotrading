@@ -14,10 +14,17 @@ from pytest_bdd import given, then, when
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
+from autotrading.application.flows.stop_flow import StopFlowCommand
+from autotrading.bootstrap import TradingAccessFromAccounts
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_command import FlowCommand
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.stop_outcome import StopOutcome
+from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.held_position import HeldPosition
+from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
+from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.support.flow_steps import names, provider_key_registered, valid_command
 from tests.support.flows import account_id_of
 from tests.support.platform import Platform
@@ -32,11 +39,12 @@ COMMANDS_TO = {
 
 
 class Lifecycle:
-    """The user of the scenario and the refusal of what they asked, if any."""
+    """The user of the scenario, the refusal of what they asked if any, and the outcome of a stop."""
 
     def __init__(self) -> None:
         self.user = ""
         self.error: AutotradingError | None = None
+        self.stop: StopOutcome | None = None
 
 
 @pytest.fixture
@@ -87,6 +95,32 @@ def put_in_status(platform: Platform, user: str, name: str, status: FlowStatus) 
         use_cases.change_flow_status.execute(ChangeFlowStatusCommand(flow_id, command))
 
 
+def hold_position(platform: Platform, user: str, account: str, asset: str, margin: Decimal = Decimal(100)) -> None:
+    """A long position on the asset at leverage 1, worth the margin at the price of the exchange."""
+    account_id = account_id_of(platform, user, account)
+    tenant_id = platform.tenant_of(user)
+    accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
+    access = TradingAccessFromAccounts(accounts, FakeCredentialOpenerAdapter(platform.vault)).access(account_id)
+    size = margin / platform.order_exchange.markets[asset].mid_price
+    platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, size, 1))
+
+
+def open_assets(platform: Platform) -> set[str]:
+    """The assets with a position open on the exchange: the scenarios of a flow have one account only, which may be
+    removed by now, so the exchange is read directly."""
+    return {coin for _, coin in platform.order_exchange.positions}
+
+
+def stop(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
+    lifecycle.user = user
+    command = StopFlowCommand(flow_named(platform, user, name).id, platform.user_id_of(user))
+
+    def stop_flow() -> None:
+        lifecycle.stop = platform.use_cases_of(user).stop_flow.execute(command)
+
+    attempt(lifecycle, stop_flow)
+
+
 def attempt(lifecycle: Lifecycle, action: Callable[[], object]) -> None:
     try:
         action()
@@ -135,6 +169,16 @@ def modification_refused(lifecycle: Lifecycle, reason: str) -> None:
 @then(quoted('"{user}" ha il flusso "{name}"'))
 def flow_present(platform: Platform, user: str, name: str) -> None:
     assert [flow.name.value for flow in platform.use_cases_of(user).list_flows.execute()].count(name) == 1
+
+
+@given(quoted('che l\'exchange rifiuta la chiusura della posizione su "{asset}" con il messaggio "{message}"'))
+def closing_refused(platform: Platform, asset: str, message: str) -> None:
+    platform.order_exchange.closing_rejections[asset] = message
+
+
+@then(quoted('sull\'exchange la posizione su "{asset}" è chiusa'))
+def position_closed(platform: Platform, asset: str) -> None:
+    assert asset not in open_assets(platform)
 
 
 @then(quoted('il flusso "{name}" è nello stato "{status}"'))

@@ -160,6 +160,21 @@ flow_versions = Table(
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 
+flow_capital_changes = Table(
+    "flow_capital_changes",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("flow_id", Uuid, nullable=False),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("changed_at", DateTime(timezone=True), nullable=False),
+    Column("previous_capital", Numeric, nullable=False),
+    Column("new_capital", Numeric, nullable=False),
+    Column("user_id", Text, nullable=False),
+    Column("version", Integer, nullable=False),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+    ForeignKeyConstraint(["flow_id", "version"], ["flow_versions.flow_id", "flow_versions.version"]),
+)
+
 telegram_link_codes = Table(
     "telegram_link_codes",
     metadata,
