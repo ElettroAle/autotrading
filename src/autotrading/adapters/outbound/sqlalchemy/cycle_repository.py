@@ -39,9 +39,11 @@ class SqlAlchemyCycleRepositoryAdapter:
             insert(cycles)
             .values(flow_id=flow_id, planned_at=planned_at, tenant_id=self._tenant_id.value)
             .on_conflict_do_nothing(index_elements=KEY)
+            # The row comes back only when this insert took it: the row count is not reliable with every driver.
+            .returning(cycles.c.flow_id)
         )
         with self._transaction() as connection:
-            return connection.execute(statement).rowcount == 1
+            return connection.execute(statement).first() is not None
 
     def record(self, record: CycleRecord) -> None:
         row = row_of(record, self._tenant_id)
