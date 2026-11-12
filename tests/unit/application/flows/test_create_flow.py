@@ -96,6 +96,13 @@ def test_a_valid_flow_is_saved_stopped_with_its_whole_configuration(flows: Flows
     ]
     assert configuration.instructions == "prudente"
     assert (configuration.risk_limits.max_leverage, configuration.allocated_capital) == (5, Decimal(400))
+    assert configuration.bring_to_minimum is False
+
+
+def test_the_option_to_bring_an_opening_to_the_exchange_minimum_is_saved(flows: Flows) -> None:
+    flow = flows.create.execute(flows.command(bring_to_minimum=True))
+
+    assert flow.configuration.bring_to_minimum is True
 
 
 def test_the_creation_is_logged_with_the_flow_and_nothing_of_its_configuration(

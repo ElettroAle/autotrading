@@ -83,8 +83,18 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "instructions": "prudente",
         "risk_limits": {"max_leverage": 5, "max_margin_exposure_percent": "10", "max_value_exposure_percent": None},
         "allocated_capital": "400",
+        "bring_to_minimum": False,
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
+
+
+def test_a_flow_can_be_created_bringing_its_openings_to_the_exchange_minimum(
+    client_of: Client, platform: Platform
+) -> None:
+    response = client_of("anna").post("/flows", json=a_request(platform, "anna", bring_to_minimum=True))
+
+    assert response.status_code == 201
+    assert response.json()["bring_to_minimum"] is True
 
 
 def test_the_flows_of_the_tenant_are_listed_and_the_free_capital_shrinks(client_of: Client, platform: Platform) -> None:

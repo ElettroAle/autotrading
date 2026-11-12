@@ -45,6 +45,7 @@ class FlowCreationRequest(BaseModel):
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
     allocated_capital: Decimal
+    bring_to_minimum: bool = False
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -60,6 +61,7 @@ class FlowCreationRequest(BaseModel):
             sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in self.sources),
             instructions=self.instructions,
             cycle_minutes=self.cycle_minutes,
+            bring_to_minimum=self.bring_to_minimum,
         )
 
 
@@ -179,6 +181,7 @@ class FlowResponse(BaseModel):
     instructions: str
     risk_limits: RiskLimitsResponse
     allocated_capital: str
+    bring_to_minimum: bool
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -199,6 +202,7 @@ class FlowResponse(BaseModel):
             instructions=configuration.instructions,
             risk_limits=RiskLimitsResponse.of(configuration.risk_limits),
             allocated_capital=amount_text(configuration.allocated_capital),
+            bring_to_minimum=configuration.bring_to_minimum,
         )
 
 

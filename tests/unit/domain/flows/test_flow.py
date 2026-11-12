@@ -15,6 +15,7 @@ from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital, amount_text
+from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
@@ -94,3 +95,12 @@ def test_a_capital_above_the_free_one_is_refused_with_the_free_capital() -> None
 )
 def test_an_amount_reads_without_trailing_zeros_nor_exponent(amount: Decimal, text: str) -> None:
     assert amount_text(amount) == text
+
+
+def test_bringing_an_opening_to_the_exchange_minimum_is_off_unless_chosen() -> None:
+    configuration = a_configuration()
+
+    assert configuration.risk_policy == RiskPolicy(configuration.risk_limits, bring_to_minimum=False)
+    assert replace(configuration, bring_to_minimum=True).risk_policy == RiskPolicy(
+        configuration.risk_limits, bring_to_minimum=True
+    )

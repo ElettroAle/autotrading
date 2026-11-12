@@ -4,6 +4,7 @@ from uuid import UUID
 
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.execution import Execution
+from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.rejection import Rejection
 
@@ -11,6 +12,7 @@ from autotrading.domain.orders.rejection import Rejection
 class OrderOrigin(StrEnum):
     VERIFICATION = "procedura di verifica"
     MANUAL = "comando manuale"
+    FLOW = "flusso"
 
 
 class OrderStatus(StrEnum):
@@ -22,10 +24,11 @@ class OrderStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class OrderSource:
-    """Who generated the order: the procedure, a flow, or a user with a manual command."""
+    """Who generated the order: the procedure, a flow with its cycle and decision, or a user with a manual command."""
 
     origin: OrderOrigin
     user_id: str | None = None
+    flow: FlowLink | None = None
 
 
 @dataclass(frozen=True, slots=True)
