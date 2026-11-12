@@ -1,5 +1,5 @@
 # language: it
-@R1.2.2 @wip
+@R1.2.2
 Funzionalità: R1.2.2 Nessuna sovrapposizione tra cicli dello stesso flusso
   Come utente
   Voglio che due cicli dello stesso flusso non siano mai in corso insieme

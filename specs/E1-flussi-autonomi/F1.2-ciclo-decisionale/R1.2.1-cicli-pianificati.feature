@@ -1,5 +1,5 @@
 # language: it
-@R1.2.1 @wip
+@R1.2.1
 Funzionalità: R1.2.1 Cicli pianificati
   Come utente
   Voglio che ogni flusso attivo esegua il proprio ciclo decisionale al proprio intervallo, giorno e notte

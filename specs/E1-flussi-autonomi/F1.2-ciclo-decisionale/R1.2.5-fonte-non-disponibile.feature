@@ -1,5 +1,5 @@
 # language: it
-@R1.2.5 @wip
+@R1.2.5
 Funzionalità: R1.2.5 Fonte dati non disponibile
   Come utente
   Voglio che il ciclo prosegua anche se una fonte dati non risponde
