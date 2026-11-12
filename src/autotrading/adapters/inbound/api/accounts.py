@@ -14,6 +14,7 @@ from autotrading.application.accounts.register_account import AccountRegistratio
 from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.tenancy.user_id import UserId
 
 
 class AccountRegistrationRequest(BaseModel):
@@ -75,7 +76,9 @@ class AccountRegistrationResponse(BaseModel):
         )
 
 
-def accounts_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
+def accounts_router(
+    use_cases_of_request: Callable[..., TenantUseCases], user_of_request: Callable[..., UserId]
+) -> APIRouter:
     router = APIRouter(prefix="/accounts", tags=["conti"])
 
     @router.post("", status_code=status.HTTP_201_CREATED)
@@ -110,10 +113,12 @@ def accounts_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIR
     def remove_account(
         account_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        user_id: Annotated[UserId, Depends(user_of_request)],
         confirmed: bool = False,
     ) -> None:
-        # Without confirmation an account with open positions is kept (R0.2.5, ADR 0025).
-        use_cases.remove_account.execute(RemoveAccountCommand(AccountId(account_id), confirmed=confirmed))
+        # Without confirmation an account with flows operating or open positions is kept (R0.2.5, R1.1.8).
+        command = RemoveAccountCommand(AccountId(account_id), user_id, confirmed=confirmed)
+        use_cases.remove_account.execute(command)
 
     @router.get("/{account_id}/state")
     def read_account_state(

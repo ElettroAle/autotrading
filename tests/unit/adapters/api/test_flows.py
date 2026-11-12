@@ -8,8 +8,9 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
-from tests.support.flows import OPENROUTER_MODEL, account_id_of, scenario_catalog
+from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.lifecycle_steps import hold_position
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
@@ -243,3 +244,74 @@ def test_a_flow_of_another_tenant_or_a_missing_version_is_not_found(client_of: C
         409,
         {"detail": "comando pausa non ammesso per un flusso fermo"},
     )
+
+
+def test_a_stop_answers_the_flow_stopped_and_the_positions_left_open(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    anna.post(f"/flows/{flow_id}/start")
+    hold_position(platform, "anna", ACCOUNT, "BTC")
+    hold_position(platform, "anna", ACCOUNT, "ETH")
+    platform.order_exchange.closing_rejections["ETH"] = "Order rejected"
+
+    response = anna.post(f"/flows/{flow_id}/stop")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["flow"]["id"], body["flow"]["status"]) == (flow_id, "fermo")
+    assert body["left_open"] == [{"asset": "ETH", "reason": "Order rejected"}]
+    refused = anna.post(f"/flows/{flow_id}/stop")
+    assert (refused.status_code, reason_of(refused)) == (
+        409,
+        {"detail": "comando ferma non ammesso per un flusso fermo"},
+    )
+
+
+def test_the_capital_of_a_flow_changes_with_its_history(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    changed = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "700.50"})
+
+    assert (changed.status_code, changed.json()["allocated_capital"], changed.json()["version"]) == (200, "700.5", 2)
+    (change,) = anna.get(f"/flows/{flow_id}/capital-changes").json()
+    assert change == {
+        "changed_at": platform.now.isoformat().replace("+00:00", "Z"),
+        "previous": "400",
+        "new": "700.5",
+        "user_id": platform.directory.person("anna").object_id,
+    }
+    refused = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "1000.51"})
+    assert (refused.status_code, reason_of(refused)) == (
+        422,
+        {"detail": "capitale allocato oltre il capitale disponibile: 1000 USDC"},
+    )
+
+
+def test_stop_and_capital_of_a_flow_of_another_tenant_are_not_found(client_of: Client, platform: Platform) -> None:
+    flow_id = client_of("anna").post("/flows", json=a_request(platform, "anna")).json()["id"]
+    bruno = client_of("bruno")
+
+    for response in (
+        bruno.post(f"/flows/{flow_id}/stop"),
+        bruno.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "10"}),
+        bruno.get(f"/flows/{flow_id}/capital-changes"),
+    ):
+        assert (response.status_code, reason_of(response)) == (404, {"detail": "flusso non trovato"})
+
+
+def test_an_account_with_an_active_flow_is_removed_only_confirming(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    request = a_request(platform, "anna")
+    flow_id = anna.post("/flows", json=request).json()["id"]
+    anna.post(f"/flows/{flow_id}/start")
+
+    suspended = anna.delete(f"/accounts/{request['account_id']}")
+    removed = anna.delete(f"/accounts/{request['account_id']}", params={"confirmed": True})
+
+    assert (suspended.status_code, reason_of(suspended)) == (
+        409,
+        {"detail": "il conto ha flussi attivi o in pausa che verranno fermati: alfa"},
+    )
+    assert removed.status_code == 204
+    assert [flow["status"] for flow in anna.get("/flows", params={"archived": True}).json()] == ["archiviato"]

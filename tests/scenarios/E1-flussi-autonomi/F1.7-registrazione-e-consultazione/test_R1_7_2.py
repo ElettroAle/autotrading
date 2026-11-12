@@ -1,15 +1,22 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
+from autotrading.application.flows.stop_flow import StopFlowCommand
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.trade_intent import TradeSide
-from tests.support.flows import a_flow
+from tests.support.flows import ACCOUNT, a_flow, account_id_of
+from tests.support.lifecycle_steps import hold_position
+from tests.support.orders import a_flow_order
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
@@ -18,8 +25,6 @@ scenarios("E1-flussi-autonomi/F1.7-registrazione-e-consultazione/R1.7.2-storico-
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 EVENTS = {
     "chiusura manuale dell'utente": CloseReason.MANUAL,
-    "stop del flusso": CloseReason.FLOW_STOP,
-    "rimozione del conto": CloseReason.ACCOUNT_REMOVAL,
     "liquidazione sull'exchange": CloseReason.OUTSIDE_PLATFORM,
 }
 
@@ -47,6 +52,7 @@ class Opening:
 class History:
     platform: Platform = field(default_factory=Platform)
     flows: dict[str, Flow] = field(default_factory=dict)
+    owners: dict[str, str] = field(default_factory=dict)
     opening: Opening = field(default_factory=Opening)
     consulted: list[ClosedPosition] = field(default_factory=list)
 
@@ -67,6 +73,29 @@ class History:
             )
         )
 
+    def operating_with_open_position(self, flow: str) -> UUID:
+        """The flow active on an account of its owner, holding the position its own executed order opened."""
+        owner = self.owners[flow]
+        account_id = account_id_of(self.platform, owner)
+        operating = replace(self.flows[flow], account_id=account_id, status=FlowStatus.ACTIVE)
+        self.platform.flows.flows[self.platform.flows.flows.index(self.flows[flow])] = operating
+        self.flows[flow] = operating
+        self.platform.orders_of(operating.tenant_id).add(a_flow_order(account_id, operating.id.value))
+        hold_position(self.platform, owner, ACCOUNT, "BTC")
+        return account_id
+
+    def stop(self, flow: str) -> None:
+        owner = self.owners[flow]
+        self.operating_with_open_position(flow)
+        command = StopFlowCommand(self.flows[flow].id, self.platform.user_id_of(owner))
+        self.platform.use_cases_of(owner).stop_flow.execute(command)
+
+    def remove_account(self, flow: str) -> None:
+        owner = self.owners[flow]
+        account_id = self.operating_with_open_position(flow)
+        command = RemoveAccountCommand(AccountId(account_id), self.platform.user_id_of(owner), confirmed=True)
+        self.platform.use_cases_of(owner).remove_account.execute(command)
+
     def position(self) -> ClosedPosition:
         assert len(self.consulted) == 1, self.consulted
         return self.consulted[0]
@@ -82,6 +111,7 @@ def flow_of_user(history: History, user: str, flow: str) -> None:
     created = a_flow(history.platform.tenant_of(user), name=flow)
     history.platform.flows.flows.append(created)
     history.flows[flow] = created
+    history.owners[flow] = user
 
 
 @given(
@@ -110,6 +140,13 @@ def agent_closed(history: History, closed: str, price: str, fees: str) -> None:
 
 @given(parsers.re(r'^che una posizione del flusso "(?P<flow>[^"]+)" è stata chiusa per (?P<event>.+)$'))
 def closed_for_event(history: History, flow: str, event: str) -> None:
+    # The stop and the removal of the account close the position through the platform itself (R1.1.5, R1.1.8).
+    if event == "stop del flusso":
+        history.stop(flow)
+        return
+    if event == "rimozione del conto":
+        history.remove_account(flow)
+        return
     history.close(flow, EVENTS[event], PositionEnd(Decimal(100), at("10:00")))
 
 

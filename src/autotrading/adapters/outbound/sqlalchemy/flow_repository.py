@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
-from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
+from autotrading.adapters.outbound.sqlalchemy.tables import flow_capital_changes, flow_versions, flows
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowNameInUseError,
@@ -14,6 +14,7 @@ from autotrading.application.flows.errors import (
     FlowVersionNotFoundError,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -23,6 +24,7 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelParameterValue, ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 
 NAME_UNIQUE_IN_TENANT = "flows_name_unique_in_tenant"
 ACCOUNT_OF_TENANT = "flows_account_of_tenant"
@@ -71,6 +73,44 @@ class SqlAlchemyFlowRepositoryAdapter:
         self.get(flow.id)
         with self._transaction() as connection:
             connection.execute(insert(flow_versions).values(_version_row_of(flow)))
+
+    def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
+        if flow.tenant_id != self._tenant_id:
+            raise CrossTenantAccessError
+        self.get(flow.id)
+        with self._transaction() as connection:
+            connection.execute(insert(flow_versions).values(_version_row_of(flow)))
+            connection.execute(
+                insert(flow_capital_changes).values(
+                    flow_id=flow.id.value,
+                    tenant_id=flow.tenant_id.value,
+                    changed_at=change.changed_at,
+                    previous_capital=change.previous,
+                    new_capital=change.new,
+                    user_id=change.user_id.value,
+                    version=flow.configuration.version,
+                )
+            )
+
+    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
+        query = (
+            select(flow_capital_changes)
+            .where(flow_capital_changes.c.flow_id == flow_id.value)
+            .order_by(flow_capital_changes.c.changed_at, flow_capital_changes.c.id)
+        )
+        self.get(flow_id)
+        with self._transaction() as connection:
+            rows = connection.execute(query).mappings().all()
+        return tuple(
+            CapitalChange(
+                flow_id,
+                row["changed_at"],
+                Decimal(row["previous_capital"]),
+                Decimal(row["new_capital"]),
+                UserId(row["user_id"]),
+            )
+            for row in rows
+        )
 
     def name_in_use(self, name: FlowName) -> bool:
         query = select(func.count()).select_from(flows).where(NOT_ARCHIVED, flows.c.name == name.value)
