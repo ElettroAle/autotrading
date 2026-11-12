@@ -6,15 +6,22 @@ from secrets import token_hex
 
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
-from autotrading.bootstrap import AccountReadingFromAccounts, OrderExecutionFromOrders, TradingAccessFromAccounts
+from autotrading.bootstrap import (
+    AccountActivityFromAccounts,
+    AccountReadingFromAccounts,
+    OrderExecutionFromOrders,
+    TradingAccessFromAccounts,
+)
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
+from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
@@ -43,6 +50,7 @@ class Worker:
         self.runs = InMemoryVerificationRunRepositoryAdapter()
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.activity_reader = FakeActivityReaderAdapter()
         self.exchange.trades_on(self.order_exchange)
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
@@ -63,6 +71,9 @@ class Worker:
                 lambda: STARTED_AT,
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+            read_account_activity=ReadAccountActivityUseCase(
+                AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: self.activity_reader})
+            ),
         )
 
     def saved_account(self, tenant_id: TenantId = TENANT) -> Account:

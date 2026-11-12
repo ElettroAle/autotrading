@@ -33,7 +33,8 @@ from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
-from autotrading.application.flows.ports import FlowRepositoryPort
+from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort, PlatformOrdersPort
+from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
@@ -67,6 +68,8 @@ class TenantPorts:
     model_catalog: ModelCatalog
     flows: FlowRepositoryPort
     flow_checks: FlowChecks
+    account_activity: AccountActivityPort
+    platform_orders: PlatformOrdersPort
     link_codes: LinkCodeRepositoryPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
@@ -94,6 +97,7 @@ class TenantUseCases:
     create_flow: CreateFlowUseCase
     list_flows: ListFlowsUseCase
     read_free_capital: ReadFreeCapitalUseCase
+    read_flow_state: ReadFlowStateUseCase
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
@@ -127,6 +131,7 @@ class TenantUseCases:
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
+            read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.platform_orders),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),

@@ -230,3 +230,37 @@ source_samples = Table(
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     Index("source_samples_of_cycle", "flow_id", "cycle_planned_at"),
 )
+
+# The last reading of each account, replaced at every reconciliation (R1.6.2, ADR 0045).
+account_readings = Table(
+    "account_readings",
+    metadata,
+    Column("account_id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("read_at", DateTime(timezone=True), nullable=False),
+    Column("open_assets", JSON, nullable=False),
+)
+
+# Recorded once while the case lasts: unique among the cases not resolved (R1.6.2, ADR 0045).
+unattributable_items = Table(
+    "unattributable_items",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("reference", Text, nullable=False),
+    Column("asset", Text),
+    Column("amount", Numeric, nullable=False),
+    Column("detected_at", DateTime(timezone=True), nullable=False),
+    Column("resolved_at", DateTime(timezone=True)),
+    Index(
+        "unattributable_items_open_case_unique",
+        "tenant_id",
+        "account_id",
+        "kind",
+        "reference",
+        unique=True,
+        postgresql_where=text("resolved_at IS NULL"),
+    ),
+)

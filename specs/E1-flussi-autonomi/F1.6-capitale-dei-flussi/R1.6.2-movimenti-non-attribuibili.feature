@@ -1,5 +1,5 @@
 # language: it
-@R1.6.2 @wip
+@R1.6.2
 Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
   Come utente
   Voglio sapere quando sul conto c'è qualcosa che nessun flusso spiega

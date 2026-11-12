@@ -10,11 +10,16 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.account_activity import AccountActivityResponse
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.errors import NotAuthenticatedError, install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
+from autotrading.application.flows.read_account_activity import (
+    ReadAccountActivityCommand,
+    ReadAccountActivityUseCase,
+)
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
@@ -48,6 +53,7 @@ class WorkerUseCases:
     close_exchange_position: CloseExchangePositionUseCase
     run_exchange_verification: RunExchangeVerificationUseCase
     notify: NotifyUseCase
+    read_account_activity: ReadAccountActivityUseCase
 
 
 class UserRequest(BaseModel):
@@ -149,6 +155,11 @@ def create_worker_api(
     def read_state(tenant_id: UUID, account_id: UUID) -> AccountStateResponse:
         command = ReadExchangeStateCommand(AccountId(account_id))
         return AccountStateResponse.of(for_tenant(TenantId(tenant_id)).read_exchange_state.execute(command))
+
+    @api.get("/tenants/{tenant_id}/accounts/{account_id}/activity", dependencies=[Depends(require_api)])
+    def read_activity(tenant_id: UUID, account_id: UUID) -> AccountActivityResponse:
+        command = ReadAccountActivityCommand(account_id)
+        return AccountActivityResponse.of(for_tenant(TenantId(tenant_id)).read_account_activity.execute(command))
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])
     def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: UserRequest) -> OrderOutcomeResponse:
