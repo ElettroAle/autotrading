@@ -151,6 +151,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         model=ModelSelection("anthropic/claude-sonnet", {"temperature": Decimal("0.5"), "max_tokens": Decimal(900)}),
         instructions="aggressivo",
         risk_limits=RiskLimits(3, None, Decimal("12.50")),
+        bring_to_minimum=True,
     )
 
     assert differences(before, after) == (
@@ -164,6 +165,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("esposizione massima del margine", "10%", "nessuno"),
         ConfigurationDifference("esposizione massima del valore", "nessuno", "12.5%"),
         ConfigurationDifference("capitale allocato", "100", "250.5"),
+        ConfigurationDifference("porta al minimo", "no", "sì"),
     )
 
 

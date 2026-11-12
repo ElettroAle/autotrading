@@ -152,19 +152,29 @@ def test_a_flow_is_modified_compared_commanded_and_archived(client_of: Client, p
     anna = client_of("anna")
     flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
 
-    modified = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30, "instructions": "audace"})
+    modified = anna.patch(
+        f"/flows/{flow_id}", json={"cycle_minutes": 30, "instructions": "audace", "bring_to_minimum": True}
+    )
 
     assert (modified.status_code, modified.json()["version"], modified.json()["cycle_minutes"]) == (200, 2, 30)
     first = anna.get(f"/flows/{flow_id}/versions/1").json()
-    assert (first["version"], first["cycle_minutes"], first["instructions"], first["allocated_capital"]) == (
+    assert (
+        first["version"],
+        first["cycle_minutes"],
+        first["instructions"],
+        first["allocated_capital"],
+        first["bring_to_minimum"],
+    ) == (
         1,
         15,
         "prudente",
         "400",
+        False,
     )
     assert anna.get(f"/flows/{flow_id}/versions/1/differences/2").json() == [
         {"part": "intervallo di ciclo", "before": "15 minuti", "after": "30 minuti"},
         {"part": "istruzioni", "before": "prudente", "after": "audace"},
+        {"part": "porta al minimo", "before": "no", "after": "sì"},
     ]
     assert [anna.post(f"/flows/{flow_id}/{action}").json()["status"] for action in ("start", "pause", "resume")] == [
         "attivo",

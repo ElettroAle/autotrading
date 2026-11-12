@@ -78,6 +78,7 @@ class FlowModificationRequest(BaseModel):
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    bring_to_minimum: bool | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -94,6 +95,7 @@ class FlowModificationRequest(BaseModel):
             max_leverage=self.max_leverage,
             max_margin_exposure_percent=self.max_margin_exposure_percent,
             max_value_exposure_percent=self.max_value_exposure_percent,
+            bring_to_minimum=self.bring_to_minimum,
         )
 
 
@@ -138,6 +140,7 @@ class ConfigurationResponse(BaseModel):
     instructions: str
     risk_limits: RiskLimitsResponse
     allocated_capital: str
+    bring_to_minimum: bool
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -153,6 +156,7 @@ class ConfigurationResponse(BaseModel):
             instructions=configuration.instructions,
             risk_limits=RiskLimitsResponse.of(configuration.risk_limits),
             allocated_capital=amount_text(configuration.allocated_capital),
+            bring_to_minimum=configuration.bring_to_minimum,
         )
 
 

@@ -52,4 +52,5 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (MARGIN_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_margin_exposure_percent)),
     (VALUE_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_value_exposure_percent)),
     ("capitale allocato", lambda configuration: amount_text(configuration.allocated_capital)),
+    ("porta al minimo", lambda configuration: "sì" if configuration.bring_to_minimum else "no"),
 )

@@ -37,6 +37,7 @@ class ModifyFlowCommand:
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    bring_to_minimum: bool | None = None
 
 
 class ModifyFlowUseCase:
@@ -74,6 +75,9 @@ class ModifyFlowUseCase:
             sources=current.sources if command.sources is None else self._sources(command.sources),
             instructions=current.instructions if command.instructions is None else command.instructions.strip(),
             risk_limits=_risk_limits(current.risk_limits, command),
+            bring_to_minimum=(
+                current.bring_to_minimum if command.bring_to_minimum is None else command.bring_to_minimum
+            ),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

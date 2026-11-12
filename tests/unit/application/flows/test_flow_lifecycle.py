@@ -121,6 +121,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         max_leverage=2,
         max_margin_exposure_percent=Decimal(20),
         max_value_exposure_percent=Decimal(30),
+        bring_to_minimum=True,
     )
 
     configuration = flows.modify.execute(command).configuration
@@ -133,6 +134,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         instructions="prudente",
         cycle_interval=CycleInterval(60),
         risk_limits=RiskLimits(2, Decimal(20), Decimal(30)),
+        bring_to_minimum=True,
     )
 
 
