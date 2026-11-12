@@ -28,7 +28,6 @@ Funzionalità: R1.1.3 Modifica versionata della configurazione
     Quando "anna" confronta le versioni 1 e 2 del flusso "alfa"
     Allora il confronto riporta solo la differenza sul modello, da "openrouter/deepseek-chat" a "anthropic/claude-sonnet"
 
-  @wip
   Scenario: La modifica non tocca il ciclo in corso
     Dato che un ciclo del flusso "alfa" è in corso con la versione 1
     Quando "anna" modifica il modello del flusso "alfa" in "anthropic/claude-sonnet"

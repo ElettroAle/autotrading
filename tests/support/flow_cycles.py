@@ -1,6 +1,7 @@
 """The cycles of real flows as the worker runs them: the bridges of bootstrap on the fake adapters (ADR 0042)."""
 
 import json
+import threading
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -105,6 +106,7 @@ class FlowCycles:
         self.anchors: dict[UUID, datetime] = {}
         self.credentials: dict[tuple[TenantId, str], Credentials] = {}
         self.users: dict[str, str] = {}
+        self.running: threading.Thread | None = None
 
     # The platform
 
@@ -240,7 +242,7 @@ class FlowCycles:
                 return [
                     TenantScheduledFlow(
                         flow.tenant_id,
-                        ScheduledFlow(flow.id.value, CycleSchedule(self.anchors[flow.id.value], timedelta(minutes=15))),
+                        ScheduledFlow(flow.id.value, CycleSchedule(self.anchor_of(flow), timedelta(minutes=15))),
                     )
                     for flow in flows
                     if flow.status is FlowStatus.ACTIVE
@@ -252,6 +254,10 @@ class FlowCycles:
         runtime = CycleRuntime(Scheduled(), guards, self.launcher)
         run_due_cycles(self.directory, self.ports_of, self.services(), runtime).execute()
         record_actual_prices(self.directory, self.ports_of, self.services())
+
+    def anchor_of(self, flow: Flow) -> datetime:
+        """As the trigger of the database: a flow is anchored at the instant it is first seen active (ADR 0042)."""
+        return self.anchors.setdefault(flow.id.value, self.clock.now())
 
     def last_record(self, name: str) -> CycleRecord:
         flow_id = self.flow(name).id.value
