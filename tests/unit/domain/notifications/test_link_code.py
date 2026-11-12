@@ -28,13 +28,16 @@ def test_the_digest_is_the_sha256_of_the_code() -> None:
         ("  abcd2345 \n", "ABCD2345"),
         ("/start ABCD2345", "ABCD2345"),
         ("/START abcd2345", "ABCD2345"),
-        ("/start", ""),
-        ("", ""),
         ("hello there", "HELLO THERE"),
     ],
 )
 def test_the_code_of_a_message_is_read_alone_or_after_the_start_command(message: str, code: str) -> None:
     assert LinkCode.in_message(message) == LinkCode(code)
+
+
+@pytest.mark.parametrize("message", ["", "   ", "/start", "/START  ", "/help", "/help ABCD2345", "/stop now"])
+def test_a_message_without_a_code_or_with_another_command_has_no_code(message: str) -> None:
+    assert LinkCode.in_message(message) is None
 
 
 def test_the_code_never_shows_in_its_representation() -> None:
@@ -44,3 +47,7 @@ def test_the_code_never_shows_in_its_representation() -> None:
 def test_the_alphabet_leaves_out_the_characters_a_reader_confuses() -> None:
     assert not set(ALPHABET) & set("01IO")
     assert len(set(ALPHABET)) == len(ALPHABET) == 32
+
+
+def test_the_start_link_opens_the_bot_with_the_code() -> None:
+    assert LinkCode("ABCD2345").start_link("autotrading_bot") == "https://t.me/autotrading_bot?start=ABCD2345"

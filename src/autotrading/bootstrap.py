@@ -23,6 +23,7 @@ from autotrading.adapters.inbound.api.worker import BotPolling, CyclePolling, Wo
 from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
+from autotrading.adapters.outbound.httpx.bot_identity import HttpxWorkerBotIdentityAdapter
 from autotrading.adapters.outbound.httpx.model_call import HttpxModelCallAdapter
 from autotrading.adapters.outbound.httpx.news import HttpxRssNewsAdapter
 from autotrading.adapters.outbound.httpx.notifications import HttpxNotificationAdapter
@@ -33,6 +34,7 @@ from autotrading.adapters.outbound.httpx.sentiment import (
     HttpxCoinMarketCapSentimentAdapter,
 )
 from autotrading.adapters.outbound.httpx.telegram import (
+    HttpxTelegramBotIdentityAdapter,
     HttpxTelegramInboxAdapter,
     HttpxTelegramMessengerAdapter,
     telegram_client,
@@ -698,6 +700,8 @@ class TenantUseCaseFactory:
         self._exchanges = exchanges
         self._worker = worker
         self._provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
+        # One per installation: the username, once known, is kept across requests.
+        self._bot_identity = HttpxWorkerBotIdentityAdapter(worker.client, worker.token)
 
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
@@ -745,6 +749,7 @@ class TenantUseCaseFactory:
             account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
             platform_orders=SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
+            bot_identity=self._bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
             clock=now,
             closed_positions=closed_positions,
@@ -891,7 +896,8 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     if bot is None:
         operations.warning("bot Telegram non configurato: notifiche disattivate")
     cycles = worker_cycles(engine, worker.cycle_ports_for, cycle_services(environment, private_keys))
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles)
+    bot_identity = None if client is None else HttpxTelegramBotIdentityAdapter(client)
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles, bot_identity)
 
 
 def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:

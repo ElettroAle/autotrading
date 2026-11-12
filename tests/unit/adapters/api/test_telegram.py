@@ -52,6 +52,20 @@ def test_a_requested_code_answers_with_the_code_and_its_expiry(platform: Platfor
     assert body["expires_at"] == (platform.now + timedelta(minutes=15)).isoformat().replace("+00:00", "Z")
 
 
+def test_a_requested_code_comes_with_the_link_of_the_active_bot(platform: Platform, client_of: Client) -> None:
+    platform.bot_username = "autotrading_bot"
+
+    body = client_of("anna").post("/telegram/link-code").json()
+
+    assert body["link"] == f"https://t.me/autotrading_bot?start={body['code']}"
+
+
+def test_without_an_active_bot_the_link_is_null(client_of: Client) -> None:
+    body = client_of("anna").post("/telegram/link-code").json()
+
+    assert body["link"] is None
+
+
 def test_the_chat_reads_as_linked_once_the_bot_received_the_code(platform: Platform, client_of: Client) -> None:
     anna = client_of("anna")
     assert anna.get("/telegram/chat").json() == {"linked": False}

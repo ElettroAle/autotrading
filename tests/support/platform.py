@@ -47,6 +47,7 @@ from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
+from tests.fakes.bot_identity import FakeBotIdentityAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
@@ -108,6 +109,7 @@ class Platform:
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.bot_username: str | None = None
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
@@ -184,6 +186,7 @@ class Platform:
             account_activity=self.account_activity,
             platform_orders=self.platform_orders,
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
+            bot_identity=FakeBotIdentityAdapter(self.bot_username),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             clock=lambda: self.now,
             closed_positions=closed_positions,

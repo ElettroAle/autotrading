@@ -12,6 +12,10 @@ Funzionalità: R1.8.1 Collegamento di Telegram
   normalmente.
   Un messaggio al bot con un codice scaduto, già usato o inesistente non collega nulla e riceve una risposta
   che non rivela se il codice è esistito.
+  Il codice si può inviare da solo o dopo il comando di avvio del bot, come fa il link t.me/<bot>?start=<codice>
+  che la piattaforma restituisce insieme al codice quando il bot è attivo: un tocco apre la chat e collega.
+  Un messaggio senza codice, come il solo comando di avvio o un altro comando, riceve le istruzioni per il
+  collegamento.
 
   Fuori ambito: email, scelta dei canali per evento, più chat per tenant.
 
@@ -35,6 +39,32 @@ Funzionalità: R1.8.1 Collegamento di Telegram
       | condizione                                       |
       | sono le 10:16                                    |
       | il codice è già stato usato dalla chat "chat-anna" |
+
+  Scenario: Il codice arriva con il link del bot
+    Dato che il bot della piattaforma si chiama "autotrading_bot"
+    Quando "anna" chiede un codice di collegamento
+    Allora insieme al codice arriva il link "https://t.me/autotrading_bot?start=" seguito dal codice
+
+  Scenario: Senza bot attivo il codice arriva senza link
+    Dato che il bot della piattaforma non è attivo
+    Quando "anna" chiede un codice di collegamento
+    Allora insieme al codice non arriva alcun link
+
+  Scenario: Collegamento dal link del bot
+    Dato che "anna" ha chiesto un codice di collegamento alle 10:00
+    Quando la chat "chat-anna" invia il comando di avvio seguito dal codice alle 10:05
+    Allora la chat "chat-anna" è collegata al tenant di "anna"
+    E il bot risponde alla chat "chat-anna" che il collegamento è riuscito
+
+  Schema dello scenario: Messaggio senza codice
+    Quando la chat "chat-x" invia "<messaggio>" al bot
+    Allora la chat "chat-x" non è collegata ad alcun tenant
+    E il bot risponde alla chat "chat-x" con le istruzioni per il collegamento
+
+    Esempi:
+      | messaggio |
+      | /start    |
+      | /help     |
 
   Scenario: Nuovo collegamento sostituisce il precedente
     Dato che la chat "chat-anna" è collegata al tenant di "anna"

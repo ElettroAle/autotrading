@@ -52,7 +52,11 @@ from autotrading.application.flows.ports import (
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
-from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
+from autotrading.application.notifications.ports import (
+    BotIdentityPort,
+    LinkCodeRepositoryPort,
+    LinkedChatRepositoryPort,
+)
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
@@ -90,6 +94,7 @@ class TenantPorts:
     account_activity: AccountActivityPort
     platform_orders: PlatformOrdersPort
     link_codes: LinkCodeRepositoryPort
+    bot_identity: BotIdentityPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
@@ -164,7 +169,7 @@ class TenantUseCases:
             list_flows=ListFlowsUseCase(ports.flows),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
             read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.platform_orders),
-            request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
+            request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.bot_identity, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
