@@ -130,6 +130,9 @@ flows = Table(
     Column("name", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Stamped by the database on every change into "active": the first cycle falls there (R1.2.1, ADR 0042).
+    Column("cycle_anchor", DateTime(timezone=True)),
+    Column("pause_reason", Text),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="flows_account_of_tenant"
     ),
@@ -170,4 +173,38 @@ telegram_chats = Table(
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
     Column("chat_id", BigInteger, nullable=False),
     Column("linked_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+# One row per planned instant of a flow, taken before the cycle runs and completed when it is recorded (ADR 0042).
+cycles = Table(
+    "cycles",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("planned_at", DateTime(timezone=True), primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("claimed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("outcome", Text),
+    Column("started_at", DateTime(timezone=True)),
+    Column("delay_seconds", Integer),
+    Column("steps", JSON, nullable=False),
+    Column("absent_sources", JSON, nullable=False),
+    Column("failure", JSON),
+    Column("recorded_at", DateTime(timezone=True)),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+forecasts = Table(
+    "forecasts",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("asset", Text, primary_key=True),
+    Column("horizon_minutes", Integer, primary_key=True),
+    Column("made_at", DateTime(timezone=True), primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("last_price", Numeric, nullable=False),
+    Column("predicted_price", Numeric, nullable=False),
+    Column("history_days", Integer, nullable=False),
+    Column("shortened", Boolean, nullable=False),
+    Column("actual_price", Numeric),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )

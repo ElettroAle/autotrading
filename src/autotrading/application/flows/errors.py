@@ -40,3 +40,16 @@ class InvalidFlowSettingError(ApplicationError):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class FlowCredentialsRejectedError(ApplicationError):
+    """The exchange refuses the credentials of the account of the flow: it repeats until the user replaces them, and
+    pauses every active flow of the account (R1.2.4).
+    """
+
+    status_code = 422
+    permanent = True
+
+    def __init__(self, account: str) -> None:
+        super().__init__(f"credenziali del conto non valide: {account}")
+        self.account = account

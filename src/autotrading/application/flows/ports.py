@@ -1,10 +1,11 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -71,4 +72,12 @@ class ExchangeLimitsPort(Protocol):
 
     def limits(self, asset: str) -> AssetLimits | None:
         """None when the exchange does not trade the asset. Raises FlowExchangeUnavailableError."""
+        ...
+
+
+class AutomaticPausePort(Protocol):
+    """Bound to the tenant of the flows it pauses."""
+
+    def pause(self, flow_ids: Sequence[FlowId], reason: str) -> None:
+        """Pauses the flows still active, with the reason of the automatic pause; the others stay as they are."""
         ...

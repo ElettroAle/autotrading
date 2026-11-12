@@ -11,6 +11,7 @@ from autotrading.domain.orders.rejection import Rejection
 class OrderOrigin(StrEnum):
     VERIFICATION = "procedura di verifica"
     MANUAL = "comando manuale"
+    FLOW = "flusso"
 
 
 class OrderStatus(StrEnum):
