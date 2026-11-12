@@ -1,5 +1,5 @@
 # language: it
-@R1.4.5 @wip
+@R1.4.5
 Funzionalità: R1.4.5 Risposta dell'agente non conforme
   Come utente
   Voglio che una risposta dell'agente non conforme non produca mai ordini
