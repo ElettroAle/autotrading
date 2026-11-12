@@ -137,6 +137,7 @@ flows = Table(
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     # Stamped by the database on every change into "active": the first cycle falls there (R1.2.1, ADR 0042).
     Column("cycle_anchor", DateTime(timezone=True)),
+    Column("first_started_at", DateTime(timezone=True)),
     Column("pause_reason", Text),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="flows_account_of_tenant"
@@ -249,6 +250,8 @@ closed_positions = Table(
     Column("closing_cycle", DateTime(timezone=True)),
     Column("fees", Numeric, nullable=False),
     Column("reason", Text, nullable=False),
+    # The PnL the exchange reported for the closing, when it reported one (ADR 0070).
+    Column("realized_pnl", Numeric),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 

@@ -63,6 +63,17 @@ def test_the_closed_positions_read_back_from_the_most_recent_close(database: Eng
     assert repository.of_flow(flow.id) == [later, earlier]
 
 
+def test_a_closed_position_keeps_the_pnl_the_exchange_reported(database: Engine) -> None:
+    flow = new_flow(database)
+    repository = SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id)
+    reported = replace(a_position(flow, timedelta(hours=1)), realized_pnl=Decimal("-4.2"))
+
+    repository.add(reported)
+
+    [read] = repository.of_flow(flow.id)
+    assert (read, read.pnl) == (reported, Decimal("-4.2"))
+
+
 def test_the_closed_positions_of_another_tenant_stay_invisible(database: Engine) -> None:
     flow, other = new_flow(database), new_flow(database)
     SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id).add(a_position(flow, timedelta(hours=1)))

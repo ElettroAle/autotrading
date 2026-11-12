@@ -58,6 +58,7 @@ def row_of(position: ClosedPosition) -> dict[str, object]:
         "closing_cycle": position.closing.cycle,
         "fees": position.fees,
         "reason": position.reason.name.lower(),
+        "realized_pnl": position.realized_pnl,
     }
 
 
@@ -73,4 +74,5 @@ def position_of(row: RowMapping | Mapping[str, Any]) -> ClosedPosition:
         closing=PositionEnd(row["close_price"], row["closed_at"], row["closing_cycle"]),
         fees=row["fees"],
         reason=CloseReason[row["reason"].upper()],
+        realized_pnl=row["realized_pnl"],
     )
