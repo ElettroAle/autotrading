@@ -35,6 +35,8 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
 - Formato della risposta, lettura delle decisioni, contesto e costo sono regole del domain (`AgentResponse`,
   `AgentContext`, `ModelUsage`, ADR 0038): le chiavi della risposta sono i nomi dei campi dei motivi di scarto.
+- La chiamata al modello è un adapter httpx con una voce per fornitore (ADR 0039): 401/403 chiave non
+  valida e 402 credito esaurito sono permanenti, ogni altro errore è transitorio con il messaggio originale.
 
 - Una chiave si verifica presso il fornitore con un endpoint gratuito che la richiede (ADR 0029); il
   catalogo dei modelli è `adapters/outbound/json/models.json` (ADR 0030).
