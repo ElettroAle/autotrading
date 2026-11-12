@@ -16,6 +16,7 @@ from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.cycle_record import CycleOutcome
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.risk_limits import RiskLimits
+from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
@@ -156,6 +157,8 @@ def show_activity(flow_cycles: FlowCycles, flow: str, held: AccountPosition) -> 
     """The same position as the activity of the account shows it: the state of the flow is attributed from it."""
     address = flow_cycles.credentials_of(flow).account_address
     flow_cycles.platform.activity_reader.activities[address] = an_activity(positions=(held,))
+    signed = held.size if held.side is TradeSide.LONG else -held.size
+    flow_cycles.platform.ledger.expect(flow_cycles.flow(flow).id, held.asset, signed)
 
 
 @given(parsers.re(r'^che il flusso "(?P<flow>[^"]+)" ha un rendimento dall\'avvio del (?P<percent>[\d,]+)%$'))

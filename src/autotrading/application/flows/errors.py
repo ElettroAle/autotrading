@@ -1,6 +1,8 @@
 from uuid import UUID
 
 from autotrading.application.errors import ApplicationError
+from autotrading.domain.flows.flow_state import PositionMismatch
+from autotrading.domain.flows.risk_check import number
 
 
 class FlowNameInUseError(ApplicationError):
@@ -91,6 +93,22 @@ class OperationsCursorInvalidError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("pagina delle operazioni non valida")
+
+
+class FlowPositionMismatchError(ApplicationError):
+    """The position of the account on an asset of the flow is not the one the ledger of the flow expects: someone
+    else traded it, so the flow sends no order and pauses until the user looks at it (Bug 155, ADR 0064).
+    """
+
+    status_code = 409
+    permanent = True
+
+    def __init__(self, mismatch: PositionMismatch) -> None:
+        super().__init__(
+            f"posizione {mismatch.asset} diversa da quella del flusso: "
+            f"attesa {number(mismatch.expected)}, sul conto {number(mismatch.held)}"
+        )
+        self.mismatch = mismatch
 
 
 class FlowLedgerIncompleteError(ApplicationError):

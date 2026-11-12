@@ -1,12 +1,31 @@
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from decimal import Decimal
+from types import MappingProxyType
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.trade_intent import TradeSide
 
 HUNDRED = Decimal(100)
+ZERO = Decimal(0)
+
+
+@dataclass(frozen=True, slots=True)
+class PositionMismatch:
+    """A position of the account on an asset of the flow that differs from the one the flow expects; sizes are signed,
+    positive for a long position.
+    """
+
+    asset: str
+    expected: Decimal
+    held: Decimal
+
+
+def _signed(position: AccountPosition) -> Decimal:
+    return position.size if position.side is TradeSide.LONG else -position.size
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +44,7 @@ class FlowState:
     realized_pnl: Decimal
     fees: Decimal
     funding: Decimal
+    expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: MappingProxyType({}))
 
     @classmethod
     def attributed(cls, flow: Flow, activity: AccountActivity, totals: FlowTotals) -> FlowState:
@@ -37,7 +57,17 @@ class FlowState:
             realized_pnl=totals.realized_pnl,
             fees=totals.fees,
             funding=totals.funding,
+            expected_positions=totals.positions,
         )
+
+    def position_mismatch(self) -> PositionMismatch | None:
+        """The first asset of the flow whose position on the account is not the one its ledger expects (ADR 0064)."""
+        held = {position.asset: _signed(position) for position in self.positions}
+        expected = {asset: size for asset, size in self.expected_positions.items() if size != ZERO}
+        for asset in sorted(held.keys() | expected.keys()):
+            if held.get(asset, ZERO) != expected.get(asset, ZERO):
+                return PositionMismatch(asset, expected.get(asset, ZERO), held.get(asset, ZERO))
+        return None
 
     @property
     def margin(self) -> Decimal:

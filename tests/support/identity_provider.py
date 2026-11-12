@@ -8,13 +8,15 @@ from typing import Any
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from autotrading.adapters.inbound.api.authentication import AuthenticationSettings
+from autotrading.adapters.inbound.api.authentication import AuthenticationSettings, OidcLoginEndpoints
 from tests.support.directory import Person
 
 ISSUER = "https://login.example.test/tenant-id/v2.0"
 AUDIENCE = "api://autotrading-test"
 SETTINGS = AuthenticationSettings(issuer=ISSUER, audience=AUDIENCE, client_id="swagger-client", scope="api://x/access")
 JWKS_URI = f"{ISSUER}/keys"
+AUTHORIZATION_URL = f"{ISSUER}/authorize"
+TOKEN_URL = f"{ISSUER}/token"
 LIFETIME_SECONDS = 3600
 
 
@@ -31,10 +33,19 @@ class IdentityProvider:
         if not self.reachable:
             raise ConnectionRefusedError
         if url == SETTINGS.discovery_url:
-            return {"issuer": ISSUER, "jwks_uri": JWKS_URI}
+            return {
+                "issuer": ISSUER,
+                "jwks_uri": JWKS_URI,
+                "authorization_endpoint": AUTHORIZATION_URL,
+                "token_endpoint": TOKEN_URL,
+            }
         if url == JWKS_URI:
             return {"keys": [self._public_jwk()]}
         raise FileNotFoundError(url)
+
+    def login(self) -> OidcLoginEndpoints:
+        """Where the OpenAPI page of a test sends the user to log in at this provider."""
+        return OidcLoginEndpoints(SETTINGS.discovery_url, self.fetch)
 
     def token_for(self, person: Person, **overrides: object) -> str:
         now = int(time.time())
