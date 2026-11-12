@@ -35,16 +35,6 @@ Funzionalità: R1.7.2 Storico delle posizioni chiuse
       | evento                                | motivo                         |
       | stop del flusso                       | stop del flusso                |
       | rimozione del conto                   | rimozione del conto            |
-
-  # @wip: la registrazione della chiusura manuale e dell'attribuzione dall'exchange arriva con R1.6.1.
-  @wip
-  Schema dello scenario: Motivi di chiusura di una posizione chiusa a mano o fuori dalla piattaforma
-    Dato che una posizione del flusso "alfa" è stata chiusa per <evento>
-    Quando "anna" consulta lo storico delle posizioni chiuse del flusso "alfa"
-    Allora la posizione ha motivo di chiusura "<motivo>"
-
-    Esempi:
-      | evento                                | motivo                         |
       | chiusura manuale dell'utente          | comando manuale                |
       | liquidazione sull'exchange            | chiusa fuori dalla piattaforma |
 

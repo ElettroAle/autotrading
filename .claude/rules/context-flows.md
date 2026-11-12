@@ -44,6 +44,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - Lo stop chiude sempre le posizioni del flusso (decisione del proprietario: senza stop loss sull'exchange
   una posizione lasciata aperta non è protetta), dopo il ciclo in corso; ogni posizione chiusa entra nello
   storico col motivo dello stop o della rimozione del conto (ADR 0055).
+- Una posizione chiusa a mano (R0.3.2) entra nello storico del flusso che ha l'asset sul conto, col motivo
+  "comando manuale", quando l'exchange conferma l'esecuzione (ADR 0061).
 - Il capitale allocato cambia in ogni stato tranne archiviato: versione nuova della configurazione più una riga
   di cronologia; un aumento entro il capitale disponibile, una riduzione non sotto il margine impegnato (ADR 0053).
 - Ordine del controllo del rischio: leva, poi esposizione, poi coerenza con lo stato, poi importo minimo.
