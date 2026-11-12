@@ -1,4 +1,4 @@
-# ADR 0052 — Stop di un flusso
+# ADR 0055 — Stop di un flusso
 
 - Stato: accettata (12 novembre 2026)
 - Requisiti: R1.1.5 (Task T1.1.5.1), R1.7.2 per i motivi "stop del flusso" e "rimozione del conto"

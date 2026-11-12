@@ -9,6 +9,7 @@ from sqlalchemy import Engine, RowMapping, func, select, update
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.scheduling import (
     SqlAlchemyFlowLockAdapter,
@@ -19,6 +20,7 @@ from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchem
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -202,3 +204,18 @@ def test_the_forecasts_of_a_tenant_are_invisible_to_the_others(database: Engine)
         )
         == []
     )
+
+
+def test_the_timing_of_a_flow_tells_its_anchor_and_its_pause_reason(database: Engine) -> None:
+    flow = new_flow(database)
+    set_status(database, flow, "active")
+    SqlAlchemyAutomaticPauseAdapter(database, flow.tenant_id).pause([flow.id], "credito esaurito presso openrouter")
+    other = new_flow(database)
+
+    timings = SqlAlchemyFlowTimingAdapter(database, flow.tenant_id).timings()
+
+    assert set(timings) == {flow.id}
+    assert timings[flow.id] == FlowTiming(
+        flow_row(database, flow)["cycle_anchor"], "credito esaurito presso openrouter"
+    )
+    assert other.id not in timings

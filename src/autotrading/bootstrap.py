@@ -5,7 +5,7 @@ import os
 import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from pathlib import Path
@@ -59,6 +59,7 @@ from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
     SqlAlchemyLinkCodeLookupAdapter,
@@ -109,6 +110,7 @@ from autotrading.application.cycles.ports import (
     ClockPort,
     CycleLauncherPort,
     FlowSnapshot,
+    FlowSummary,
     RiskReview,
     ScheduledFlow,
     SourceReading,
@@ -126,12 +128,14 @@ from autotrading.application.flows.errors import (
     FlowExchangeUnavailableError,
     InvalidFlowSettingError,
 )
+from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ExchangeLimitsPort,
     FlowAccount,
     FlowRepositoryPort,
+    FlowTimingPort,
     MarketsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
@@ -189,6 +193,7 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
@@ -197,6 +202,7 @@ from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
@@ -313,6 +319,43 @@ class FlowDirectoryFromFlows:
         return any(flow.id.value == flow_id for flow in self._flows.list())
 
 
+class FlowSummariesFromFlows:
+    """Bridges the flows and accounts contexts to the consultation of the cycles (R1.7.3, ADR 0042).
+
+    The schedule of a flow starts at its last start or resume, the anchor the database stamps on the flow.
+    """
+
+    def __init__(self, flows: FlowRepositoryPort, accounts: AccountRepositoryPort, timing: FlowTimingPort) -> None:
+        self._flows = flows
+        self._accounts = accounts
+        self._timing = timing
+
+    def in_use(self) -> list[FlowSummary]:
+        timings = self._timing.timings()
+        names = {account.id.value: account.name.value for account in self._accounts.list()}
+        return [
+            _summary_of(flow, names.get(flow.account_id, ""), timings.get(flow.id))
+            for flow in ListFlowsUseCase(self._flows).execute()
+        ]
+
+
+def _summary_of(flow: Flow, account: str, timing: FlowTiming | None) -> FlowSummary:
+    configuration = flow.configuration
+    anchor = None if timing is None else timing.anchor
+    schedule = None
+    if flow.status is FlowStatus.ACTIVE and anchor is not None:
+        schedule = CycleSchedule(anchor, timedelta(minutes=configuration.cycle_interval.minutes))
+    return FlowSummary(
+        flow_id=flow.id.value,
+        name=flow.name.value,
+        account=account,
+        status=flow.status.value,
+        pause_reason=None if timing is None else timing.pause_reason,
+        model=configuration.model.name,
+        schedule=schedule,
+    )
+
+
 class FlowAccountsFromAccounts:
     """Bridges the accounts context to the flows context in the API (ADR 0031).
 
@@ -335,7 +378,7 @@ class FlowAccountsFromAccounts:
 
 
 class FlowPositionsFromAccountsAndOrders:
-    """Bridges the accounts and orders contexts to the flows context in the API (ADR 0052, ADR 0053).
+    """Bridges the accounts and orders contexts to the flows context in the API (ADR 0055, ADR 0053).
 
     The positions are read and closed by the worker, the only service holding the key (ADR 0023). The margin of a
     position is what its opening committed: its size at the entry price over its leverage.
@@ -460,6 +503,7 @@ class ApiExchanges:
 
     accounts: Mapping[str, ExchangePort]
     markets: Mapping[str, MarketsPort]
+    environment: str = "dev"
 
 
 @dataclass(frozen=True, slots=True)
@@ -667,6 +711,10 @@ class TenantUseCaseFactory:
             closed_positions=closed_positions,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(self._engine, tenant_id),
             flow_directory=FlowDirectoryFromFlows(flows),
+            flow_summaries=FlowSummariesFromFlows(
+                flows, accounts, SqlAlchemyFlowTimingAdapter(self._engine, tenant_id)
+            ),
+            environment=self._exchanges.environment,
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -758,7 +806,7 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
     tenants = TenantUseCaseFactory(
         engine,
         PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
-        ApiExchanges(exchanges_for(health.environment), markets_for(health.environment)),
+        ApiExchanges(exchanges_for(health.environment), markets_for(health.environment), health.environment),
         _worker_connection(configuration),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )

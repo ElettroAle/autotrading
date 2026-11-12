@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import replace
+from datetime import datetime
 
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
@@ -11,6 +12,7 @@ from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -20,6 +22,7 @@ class FlowStore:
     def __init__(self) -> None:
         self.flows: list[Flow] = []
         self.pause_reasons: dict[FlowId, str] = {}
+        self.anchors: dict[FlowId, datetime] = {}
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
         self.capital_changes: dict[FlowId, list[CapitalChange]] = {}
 
@@ -92,3 +95,17 @@ class InMemoryAutomaticPauseAdapter:
             if flow.tenant_id == self._tenant_id and flow.id in flow_ids and flow.status is FlowStatus.ACTIVE:
                 self._store.flows[index] = replace(flow, status=FlowStatus.PAUSED)
                 self._store.pause_reasons[flow.id] = reason
+
+
+class InMemoryFlowTimingAdapter:
+    """Bound to one tenant: the anchor and the pause reason the store keeps beside its flows."""
+
+    def __init__(self, store: FlowStore, tenant_id: TenantId) -> None:
+        self._store = store
+        self._tenant_id = tenant_id
+
+    def timings(self) -> dict[FlowId, FlowTiming]:
+        return {
+            flow.id: FlowTiming(self._store.anchors.get(flow.id), self._store.pause_reasons.get(flow.id))
+            for flow in self._store.of(self._tenant_id)
+        }

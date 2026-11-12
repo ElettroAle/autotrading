@@ -27,6 +27,7 @@ from autotrading.bootstrap import (
     FlowAccountsFromAccounts,
     FlowDirectoryFromFlows,
     FlowPositionsFromAccountsAndOrders,
+    FlowSummariesFromFlows,
     ModelSettingsFromAgent,
     OrderExecutionFromOrders,
     ProviderKeyUsageFromFlows,
@@ -49,7 +50,7 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
     InMemoryLinkCodeRepositoryAdapter,
@@ -185,6 +186,8 @@ class Platform:
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=FlowDirectoryFromFlows(flows),
+            flow_summaries=FlowSummariesFromFlows(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
+            environment="dev",
         )
         return TenantUseCases.on(tenant_id, ports)
 

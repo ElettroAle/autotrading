@@ -43,7 +43,7 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.
 - Lo stop chiude sempre le posizioni del flusso (decisione del proprietario: senza stop loss sull'exchange
   una posizione lasciata aperta non è protetta), dopo il ciclo in corso; ogni posizione chiusa entra nello
-  storico col motivo dello stop o della rimozione del conto (ADR 0052).
+  storico col motivo dello stop o della rimozione del conto (ADR 0055).
 - Il capitale allocato cambia in ogni stato tranne archiviato: versione nuova della configurazione più una riga
   di cronologia; un aumento entro il capitale disponibile, una riduzione non sotto il margine impegnato (ADR 0053).
 - Ordine del controllo del rischio: leva, poi esposizione, poi coerenza con lo stato, poi importo minimo.
@@ -65,10 +65,11 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).
 - `ClosedPositionsPort`: storico delle posizioni chiuse dei flussi (R1.7.2).
 - `FlowPositionsPort`: chiusura di una posizione del flusso attraverso il `worker` (fill o rifiuto) e margine
-  impegnato sugli asset (ADR 0052, ADR 0053).
-- `FlowOpeningsPort`: ultima apertura eseguita del flusso su un asset, dagli ordini registrati (ADR 0052).
+  impegnato sugli asset (ADR 0055, ADR 0053).
+- `FlowOpeningsPort`: ultima apertura eseguita del flusso su un asset, dagli ordini registrati (ADR 0055).
 - `RunningCyclePort`: attesa della fine del ciclo in corso; advisory lock PostgreSQL con la chiave `lock_key`
-  che l'esecutore dei cicli tiene per tutto il ciclo (ADR 0042, ADR 0052).
+  che l'esecutore dei cicli tiene per tutto il ciclo (ADR 0042, ADR 0055).
+- `FlowTimingPort`: ancora dei cicli (ultimo avvio o ripresa) e motivo della pausa automatica di ogni flusso (ADR 0052).
 - I bridge verso gli altri contesti vivono solo in `bootstrap.py`; `flows` fornisce ad `agent` i flussi che
   usano una chiave (`ProviderKeyUsageFromFlows`).
 

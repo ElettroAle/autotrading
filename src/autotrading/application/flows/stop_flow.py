@@ -36,7 +36,7 @@ class StopPorts:
 
 
 class StopFlowUseCase:
-    """Stops an active or paused flow and closes its open positions (R1.1.5, ADR 0052).
+    """Stops an active or paused flow and closes its open positions (R1.1.5, ADR 0055).
 
     The flow is stopped first, so no cycle starts any more; the cycle under way ends before the positions close, so
     it never opens one after them. Each position closed enters the history with the reason (R1.7.2); a closing that

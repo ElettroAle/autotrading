@@ -1,4 +1,4 @@
-"""The bridges bootstrap builds to stop flows and change their capital (ADR 0052, ADR 0053, ADR 0054)."""
+"""The bridges bootstrap builds to stop flows and change their capital (ADR 0055, ADR 0053, ADR 0054)."""
 
 from dataclasses import replace
 from datetime import UTC, datetime

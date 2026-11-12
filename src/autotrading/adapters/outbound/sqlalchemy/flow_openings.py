@@ -11,7 +11,7 @@ EXECUTED = ("FILLED", "PARTIALLY_FILLED")
 
 
 class SqlAlchemyFlowOpeningsAdapter:
-    """The openings of the flows of one tenant, read from the orders the platform recorded (ADR 0052, ADR 0050).
+    """The openings of the flows of one tenant, read from the orders the platform recorded (ADR 0055, ADR 0050).
 
     A flow opens and closes a position whole (R1.4.4): its last executed opening on an asset is the one still open.
     """

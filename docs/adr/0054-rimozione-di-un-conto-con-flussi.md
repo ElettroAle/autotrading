@@ -13,7 +13,7 @@ lascia il conto, perché senza di esso nessuno potrebbe più chiuderla dalla pia
 ## Decisione
 
 - **Porta** `AccountFlowsPort` in `application/accounts` (`operating`, `stop`, `archive`), ponte
-  `AccountFlowsFromFlows` in `bootstrap.py` sopra `StopFlowUseCase` (motivo `ACCOUNT_REMOVAL`, ADR 0052) e
+  `AccountFlowsFromFlows` in `bootstrap.py` sopra `StopFlowUseCase` (motivo `ACCOUNT_REMOVAL`, ADR 0055) e
   `ArchiveFlowUseCase`.
 - **`RemoveAccountUseCase`**: senza conferma controlla prima i flussi (`OperatingFlowsNeedConfirmationError`, 409,
   coi nomi) e poi le posizioni (R0.2.5); con conferma ferma i flussi, e se resta una posizione aperta solleva

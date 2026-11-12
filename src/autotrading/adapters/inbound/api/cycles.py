@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.cycles.list_cycles import ListCyclesCommand
+from autotrading.application.cycles.list_flow_overviews import FlowOverview
 from autotrading.application.cycles.read_cycle import ReadCycleCommand
 from autotrading.application.cycles.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.cycles.call_cost import CallCost
@@ -138,8 +139,54 @@ class FlowCostResponse(BaseModel):
         )
 
 
+class LastCycleResponse(BaseModel):
+    planned_at: datetime
+    outcome: str
+
+    @classmethod
+    def of(cls, record: CycleRecord | None) -> LastCycleResponse | None:
+        if record is None:
+            return None
+        return cls(planned_at=record.planned_at, outcome=record.outcome.value)
+
+
+class FlowOverviewResponse(BaseModel):
+    """A flow in use with its last cycle and the next planned one (R1.7.3)."""
+
+    id: UUID
+    name: str
+    account: str
+    environment: str
+    status: str
+    pause_reason: str | None
+    model: str
+    last_cycle: LastCycleResponse | None
+    next_cycle_at: datetime | None
+
+    @classmethod
+    def of(cls, overview: FlowOverview) -> FlowOverviewResponse:
+        summary = overview.summary
+        return cls(
+            id=summary.flow_id,
+            name=summary.name,
+            account=summary.account,
+            environment=overview.environment,
+            status=summary.status,
+            pause_reason=summary.pause_reason,
+            model=summary.model,
+            last_cycle=LastCycleResponse.of(overview.last_cycle),
+            next_cycle_at=overview.next_cycle_at,
+        )
+
+
 def cycles_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
     router = APIRouter(tags=["cicli"])
+
+    @router.get("/flows/overview")
+    def list_flow_overviews(
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> list[FlowOverviewResponse]:
+        return [FlowOverviewResponse.of(overview) for overview in use_cases.list_flow_overviews.execute()]
 
     @router.get("/flows/{flow_id}/cycles")
     def list_cycles(

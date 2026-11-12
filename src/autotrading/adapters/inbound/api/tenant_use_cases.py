@@ -27,7 +27,8 @@ from autotrading.application.agent.register_provider_key import ProviderKeyServi
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
 from autotrading.application.cycles.list_cycles import ListCyclesUseCase
-from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort
+from autotrading.application.cycles.list_flow_overviews import ListFlowOverviewsUseCase
+from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort, FlowSummaryPort
 from autotrading.application.cycles.read_cycle import ReadCycleUseCase
 from autotrading.application.cycles.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
@@ -94,6 +95,8 @@ class TenantPorts:
     closed_positions: ClosedPositionRepositoryPort
     cycle_history: CycleHistoryPort
     flow_directory: FlowDirectoryPort
+    flow_summaries: FlowSummaryPort
+    environment: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +137,7 @@ class TenantUseCases:
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
+    list_flow_overviews: ListFlowOverviewsUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -177,4 +181,7 @@ class TenantUseCases:
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
+            list_flow_overviews=ListFlowOverviewsUseCase(
+                ports.flow_summaries, ports.cycle_history, ports.environment, ports.clock
+            ),
         )
