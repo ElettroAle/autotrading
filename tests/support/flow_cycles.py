@@ -22,6 +22,7 @@ from autotrading.bootstrap import (
     CycleServices,
     FlowDirectory,
     FlowPauseFromFlows,
+    NotifiedClosedPositions,
     NotifiedCycles,
     TenantCyclePorts,
     TradingAccessFromAccounts,
@@ -52,7 +53,11 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.cycles import FakeClockAdapter, InMemoryCycleRepositoryAdapter, InMemoryFlowLockAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
-from tests.fakes.flow_repository import InMemoryAutomaticPauseAdapter, InMemoryFlowRepositoryAdapter
+from tests.fakes.flow_repository import (
+    InMemoryAutomaticPauseAdapter,
+    InMemoryFlowRepositoryAdapter,
+    InMemoryFlowTimingAdapter,
+)
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
@@ -127,13 +132,16 @@ class FlowCycles:
         access = TradingAccessFromAccounts(accounts, opener)
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
-        closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
+        notify = platform.worker_for(tenant_id).notify
+        closed_positions = NotifiedClosedPositions(
+            InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id), flows, notify
+        )
         reconcile_account = ReconcileAccountUseCase(
             flows,
             AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
             platform.platform_orders,
             self.readings,
-            ClosedPositionsFromOpenings(flows, openings, closed_positions),
+            ClosedPositionsFromOpenings(flows, openings, closed_positions, notify),
         )
         return TenantCyclePorts(
             flows=flows,
@@ -149,7 +157,8 @@ class FlowCycles:
             reconcile_account=reconcile_account,
             openings=openings,
             closed_positions=closed_positions,
-            notify=platform.worker_for(tenant_id).notify,
+            notify=notify,
+            timing=InMemoryFlowTimingAdapter(platform.flows, tenant_id),
         )
 
     def services(self) -> CycleServices:
@@ -225,6 +234,7 @@ class FlowCycles:
         self.platform.flows.flows.append(flow)
         self.register_key(tenant_id, model.partition("/")[0])
         self.platform.flows.anchors[flow.id] = at(started)
+        self.platform.flows.first_starts[flow.id] = at(started)
         return flow
 
     def flow(self, name: str) -> Flow:
@@ -285,7 +295,9 @@ class FlowCycles:
 
     def anchor_of(self, flow: Flow) -> datetime:
         """As the trigger of the database: a flow is anchored at the instant it is first seen active (ADR 0042)."""
-        return self.platform.flows.anchors.setdefault(flow.id, self.clock.now())
+        anchor = self.platform.flows.anchors.setdefault(flow.id, self.clock.now())
+        self.platform.flows.first_starts.setdefault(flow.id, anchor)
+        return anchor
 
     def last_record(self, name: str) -> CycleRecord:
         flow_id = self.flow(name).id.value

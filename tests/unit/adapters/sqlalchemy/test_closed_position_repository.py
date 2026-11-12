@@ -49,7 +49,15 @@ def test_a_closed_position_is_saved_with_side_and_reason_by_name() -> None:
         "closing_cycle": None,
         "fees": Decimal("0.08"),
         "reason": "outside_platform",
+        "realized_pnl": None,
     }
+
+
+def test_the_pnl_the_exchange_reported_is_saved_and_read_back() -> None:
+    position = replace(POSITION, realized_pnl=Decimal("-4.2"))
+
+    assert row_of(position)["realized_pnl"] == Decimal("-4.2")
+    assert position_of(row_of(position)) == position
 
 
 @pytest.mark.parametrize("reason", list(CloseReason))

@@ -126,3 +126,28 @@ def test_a_position_closed_by_a_cycle_keeps_the_cycle_that_closed_it() -> None:
     closed = opening(TradeSide.LONG).closed(flow, "BTC", fill, CloseReason.AGENT, cycle=CLOSED_AT)
 
     assert closed.closing == PositionEnd(Decimal(101000), CLOSED_AT, CLOSED_AT)
+
+
+def test_a_position_closed_keeps_the_result_the_exchange_reported() -> None:
+    flow = a_flow(TENANT)
+    fill = ClosingFill(Decimal(101000), CLOSED_AT, Decimal("0.02"), realized_pnl=Decimal("4.20"))
+
+    closed = opening(TradeSide.LONG).closed(flow, "BTC", fill, CloseReason.FLOW_STOP)
+
+    assert (closed.realized_pnl, closed.pnl) == (Decimal("4.20"), Decimal("4.20"))
+
+
+def test_a_position_closed_without_a_reported_result_measures_the_price_move() -> None:
+    flow = a_flow(TENANT)
+    fill = ClosingFill(Decimal(101000), CLOSED_AT, Decimal("0.02"))
+
+    closed = opening(TradeSide.LONG).closed(flow, "BTC", fill, CloseReason.AGENT)
+
+    assert (closed.realized_pnl, closed.pnl) == (None, Decimal(1))
+
+
+def test_a_position_closed_outside_keeps_the_result_the_exchange_reported() -> None:
+    flow = a_flow(TENANT)
+    closing = OutsideClosing(flow.id, "BTC", "chiusa fuori dalla piattaforma", Decimal(-7), Decimal("0.05"), CLOSED_AT)
+
+    assert opening(TradeSide.LONG).closed_outside(flow, closing).realized_pnl == Decimal(-7)

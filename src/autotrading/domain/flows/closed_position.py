@@ -34,7 +34,11 @@ class PositionEnd:
 
 @dataclass(frozen=True, slots=True)
 class ClosedPosition(TenantOwned):
-    """A position of a flow, closed, with its result (R1.7.2)."""
+    """A position of a flow, closed, with its result (R1.7.2).
+
+    The result is the one the exchange reported for the closing, when it reported one, so the history and the
+    notification of the closing show the same PnL (ADR 0070).
+    """
 
     tenant_id: TenantId
     flow_id: FlowId
@@ -46,6 +50,7 @@ class ClosedPosition(TenantOwned):
     closing: PositionEnd
     fees: Decimal
     reason: CloseReason
+    realized_pnl: Decimal | None = None
 
     def __post_init__(self) -> None:
         ends = (self.opening, self.closing)
@@ -62,7 +67,12 @@ class ClosedPosition(TenantOwned):
 
     @property
     def pnl(self) -> Decimal:
-        """The result of the price move on the value the margin held with the leverage, before the fees."""
+        """The result the exchange reported, or else the price move on the value the margin held with the leverage.
+
+        Both before the fees.
+        """
+        if self.realized_pnl is not None:
+            return self.realized_pnl
         move = (self.closing.price - self.opening.price) / self.opening.price
         sign = 1 if self.side is TradeSide.LONG else -1
         return self.margin * self.leverage * move * sign

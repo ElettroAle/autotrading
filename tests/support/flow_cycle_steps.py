@@ -105,6 +105,12 @@ def started_flow(  # noqa: PLR0917 - one argument per value of the step
     )
 
 
+@given(quoted('che il flusso "{flow}" è stato messo in pausa e ripreso alle {clock}'))
+def paused_and_resumed(flow_cycles: FlowCycles, flow: str, clock: str) -> None:
+    # As the trigger of the database: a resume moves the anchor of the cycles, never the first start.
+    flow_cycles.platform.flows.anchors[flow_cycles.flow(flow).id] = at(clock)
+
+
 @given(quoted('che "{user}" ha anche il flusso "{flow}" sullo stesso conto con asset "{assets}"'))
 def other_flow_same_account(flow_cycles: FlowCycles, user: str, flow: str, assets: str) -> None:
     flow_cycles.add_flow(user, flow, assets=names_of(assets))

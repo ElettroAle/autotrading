@@ -31,6 +31,7 @@ from autotrading.bootstrap import (
     FlowSummariesFromFlows,
     ManualClosingsRecordedInFlows,
     ModelSettingsFromAgent,
+    NotifiedClosedPositions,
     OrderExecutionFromOrders,
     ProviderKeyUsageFromFlows,
     SourceSettingsFromSources,
@@ -152,14 +153,16 @@ class Platform:
         flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
-        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions)
+        # The API hands its notifications to the worker, which holds the bot (ADR 0070).
+        notified_closings = NotifiedClosedPositions(closed_positions, flows, self.worker_for(tenant_id).notify)
+        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, notified_closings)
         ports = TenantPorts(
             accounts=accounts,
             sealer=self.sealer_of(tenant_id),
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=ManualClosingsRecordedInFlows(
-                position_closing, RecordManualClosingUseCase(flows, flow_openings, closed_positions)
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings)
             ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
