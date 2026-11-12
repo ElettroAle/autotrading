@@ -3,9 +3,10 @@
 from collections.abc import Sequence
 from dataclasses import replace
 
-from autotrading.application.flows.errors import FlowNameInUseError
+from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -13,11 +14,12 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 
 class FlowStore:
-    """The flows of every tenant, as the database holds them."""
+    """The flows of every tenant with the version in force, and every version, as the database holds them."""
 
     def __init__(self) -> None:
         self.flows: list[Flow] = []
         self.pause_reasons: dict[FlowId, str] = {}
+        self.versions: dict[FlowId, list[FlowConfiguration]] = {}
 
     def of(self, tenant_id: TenantId) -> list[Flow]:
         return [flow for flow in self.flows if flow.tenant_id == tenant_id]
@@ -42,6 +44,30 @@ class InMemoryFlowRepositoryAdapter:
         if self.name_in_use(flow.name):
             raise FlowNameInUseError
         self._store.flows.append(flow)
+        self._store.versions[flow.id] = [flow.configuration]
+
+    def get(self, flow_id: FlowId) -> Flow:
+        flow = next((flow for flow in self.list() if flow.id == flow_id), None)
+        if flow is None:
+            raise FlowNotFoundError
+        return flow
+
+    def version(self, flow_id: FlowId, number: int) -> FlowConfiguration:
+        self.get(flow_id)
+        configuration = next((each for each in self._store.versions[flow_id] if each.version == number), None)
+        if configuration is None:
+            raise FlowVersionNotFoundError(number)
+        return configuration
+
+    def change_status(self, flow: Flow) -> None:
+        self._replace(replace(self.get(flow.id), status=flow.status))
+
+    def add_version(self, flow: Flow) -> None:
+        self._replace(replace(self.get(flow.id), configuration=flow.configuration))
+        self._store.versions[flow.id].append(flow.configuration)
+
+    def _replace(self, flow: Flow) -> None:
+        self._store.flows = [flow if each.id == flow.id else each for each in self._store.flows]
 
 
 class InMemoryAutomaticPauseAdapter:

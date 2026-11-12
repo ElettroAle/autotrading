@@ -3,11 +3,16 @@ from contextlib import contextmanager
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Connection, Engine, RowMapping, func, insert, select
+from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
-from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowNameInUseError
+from autotrading.application.flows.errors import (
+    FlowAccountNotFoundError,
+    FlowNameInUseError,
+    FlowNotFoundError,
+    FlowVersionNotFoundError,
+)
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
@@ -32,22 +37,40 @@ class SqlAlchemyFlowRepositoryAdapter:
         self._tenant_id = tenant_id
 
     def list(self) -> list[Flow]:
-        current = (
-            select(flow_versions.c.flow_id, func.max(flow_versions.c.version).label("version"))
-            .group_by(flow_versions.c.flow_id)
-            .subquery()
-        )
-        query = (
-            select(flows, flow_versions.c.version, flow_versions.c.configuration)
-            .join(current, current.c.flow_id == flows.c.id)
-            .join(
-                flow_versions,
-                (flow_versions.c.flow_id == current.c.flow_id) & (flow_versions.c.version == current.c.version),
-            )
-            .order_by(flows.c.name)
-        )
         with self._transaction() as connection:
-            return [_flow_of(row) for row in connection.execute(query).mappings()]
+            return [_flow_of(row) for row in connection.execute(_in_force().order_by(flows.c.name)).mappings()]
+
+    def get(self, flow_id: FlowId) -> Flow:
+        with self._transaction() as connection:
+            row = connection.execute(_in_force().where(flows.c.id == flow_id.value)).mappings().one_or_none()
+        if row is None:
+            raise FlowNotFoundError
+        return _flow_of(row)
+
+    def version(self, flow_id: FlowId, number: int) -> FlowConfiguration:
+        query = select(flow_versions.c.configuration).where(
+            flow_versions.c.flow_id == flow_id.value, flow_versions.c.version == number
+        )
+        self.get(flow_id)
+        with self._transaction() as connection:
+            document = connection.execute(query).scalar_one_or_none()
+        if document is None:
+            raise FlowVersionNotFoundError(number)
+        return configuration_of(number, document)
+
+    def change_status(self, flow: Flow) -> None:
+        statement = update(flows).where(flows.c.id == flow.id.value).values(status=flow.status.name.lower())
+        with self._transaction() as connection:
+            changed = connection.execute(statement).rowcount
+        if not changed:
+            raise FlowNotFoundError
+
+    def add_version(self, flow: Flow) -> None:
+        if flow.tenant_id != self._tenant_id:
+            raise CrossTenantAccessError
+        self.get(flow.id)
+        with self._transaction() as connection:
+            connection.execute(insert(flow_versions).values(_version_row_of(flow)))
 
     def name_in_use(self, name: FlowName) -> bool:
         query = select(func.count()).select_from(flows).where(NOT_ARCHIVED, flows.c.name == name.value)
@@ -75,6 +98,23 @@ class SqlAlchemyFlowRepositoryAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             yield connection
+
+
+def _in_force() -> Select[Any]:
+    """Every flow with its configuration version in force: the highest number it has."""
+    current = (
+        select(flow_versions.c.flow_id, func.max(flow_versions.c.version).label("version"))
+        .group_by(flow_versions.c.flow_id)
+        .subquery()
+    )
+    return (
+        select(flows, flow_versions.c.version, flow_versions.c.configuration)
+        .join(current, current.c.flow_id == flows.c.id)
+        .join(
+            flow_versions,
+            (flow_versions.c.flow_id == current.c.flow_id) & (flow_versions.c.version == current.c.version),
+        )
+    )
 
 
 def _row_of(flow: Flow) -> dict[str, object]:

@@ -53,3 +53,20 @@ class FlowCredentialsRejectedError(ApplicationError):
     def __init__(self, account: str) -> None:
         super().__init__(f"credenziali del conto non valide: {account}")
         self.account = account
+
+
+class FlowNotFoundError(ApplicationError):
+    """The same answer for a flow that does not exist and for one of another tenant (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("flusso non trovato")
+
+
+class FlowVersionNotFoundError(ApplicationError):
+    status_code = 404
+
+    def __init__(self, version: int) -> None:
+        super().__init__(f"versione di configurazione non trovata: {version}")
+        self.version = version
