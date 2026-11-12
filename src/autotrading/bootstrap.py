@@ -131,6 +131,7 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionUseCase,
 )
 from autotrading.application.orders.errors import OrderAccountNotFoundError
+from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.sources.errors import SourceUnavailableError
@@ -159,12 +160,13 @@ from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
-from autotrading.domain.flows.risk_check import RiskPolicy, RiskState
+from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -540,8 +542,7 @@ class WorkerUseCaseFactory:
             read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
-            open_position=OpenPositionUseCase(access, self._exchanges.orders, orders, slippage),
-            close_position=CloseExchangePositionUseCase(access, self._exchanges.orders, orders, slippage),
+            execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
         )
 
     def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
@@ -804,8 +805,7 @@ class TenantCyclePorts:
     read_exchange_state: ReadExchangeStateUseCase
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
-    open_position: OpenPositionUseCase
-    close_position: CloseExchangePositionUseCase
+    execute_flow_orders: ExecuteFlowOrdersUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -1107,9 +1107,7 @@ class CycleOrder:
 
 
 class RiskFromFlows:
-    """Bridges the decisions of the agent to the risk check of the flows context; the approved orders go out closes
-    first, so an opening never waits for margin a close would free (R1.5.1-R1.5.4, ADR 0042).
-    """
+    """Bridges the decisions of the agent to the risk check of the flows context (R1.5.1-R1.5.4, ADR 0042)."""
 
     def __init__(self, exchange_limits: Mapping[str, ExchangeLimitsPort]) -> None:
         self._exchange_limits = exchange_limits
@@ -1127,13 +1125,15 @@ class RiskFromFlows:
         )
         command = CheckRiskCommand(
             tuple(_intent_of(decision) for decision in decisions.answer.response.decisions),
-            RiskPolicy(configuration.risk_limits),
+            configuration.risk_policy,
             state,
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
-        closes = [CycleOrder(cycle_flow, outcome) for outcome in outcomes if isinstance(outcome, ApprovedClose)]
-        openings = [CycleOrder(cycle_flow, outcome) for outcome in outcomes if isinstance(outcome, ApprovedOpening)]
-        return [*closes, *openings]
+        return [
+            CycleOrder(cycle_flow, outcome)
+            for outcome in outcomes
+            if isinstance(outcome, (ApprovedOpening, ApprovedClose))
+        ]
 
 
 def _intent_of(decision: Decision) -> TradeIntent:
@@ -1146,24 +1146,26 @@ def _intent_of(decision: Decision) -> TradeIntent:
 
 
 class OrdersFromOrders:
-    """Bridges the approved orders of a cycle to the orders context, on the account of the flow (ADR 0042)."""
+    """Bridges the approved decisions of a cycle to the orders context, on the account of the flow (R1.5.5)."""
 
     def __init__(self, ports_of: CyclePortsOf) -> None:
         self._ports_of = ports_of
 
-    def execute(self, flow_id: UUID, planned_at: datetime, order: object) -> object:  # noqa: ARG002 - the signature of the port
-        if not isinstance(order, CycleOrder):
-            raise FlowOfCycleNotFoundError
-        ports = self._ports_of(order.flow.tenant_id)
-        account_id = order.flow.flow.account_id
-        source = OrderSource(OrderOrigin.FLOW)
-        outcome = order.outcome
-        if isinstance(outcome, ApprovedClose):
-            return ports.close_position.execute(CloseExchangePositionCommand(account_id, outcome.asset, source))
-        command = OpenPositionCommand(
-            account_id, outcome.asset, Direction(outcome.side.value), outcome.leverage, outcome.value, source
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
+        approved = [order for order in orders if isinstance(order, CycleOrder)]
+        if not approved:
+            return ()
+        cycle_flow = approved[0].flow
+        command = ExecuteFlowOrdersCommand(
+            cycle_flow.flow.account_id, flow_id, planned_at, tuple(_flow_order_of(order.outcome) for order in approved)
         )
-        return ports.open_position.execute(command)
+        return self._ports_of(cycle_flow.tenant_id).execute_flow_orders.execute(command)
+
+
+def _flow_order_of(outcome: ApprovedOpening | ApprovedClose) -> FlowOrder:
+    if isinstance(outcome, ApprovedClose):
+        return FlowClosing(outcome.asset)
+    return FlowOpening(outcome.asset, Direction(outcome.side.value), outcome.value, outcome.leverage)
 
 
 @dataclass(frozen=True, slots=True)
