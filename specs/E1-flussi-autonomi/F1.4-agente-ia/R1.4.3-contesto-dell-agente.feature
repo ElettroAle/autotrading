@@ -1,5 +1,5 @@
 # language: it
-@R1.4.3 @wip
+@R1.4.3
 Funzionalità: R1.4.3 Contesto inviato all'agente
   Come utente
   Voglio che l'agente riceva a ogni ciclo un contesto completo del flusso

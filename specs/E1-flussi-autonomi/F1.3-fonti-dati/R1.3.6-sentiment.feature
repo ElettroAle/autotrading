@@ -1,5 +1,5 @@
 # language: it
-@R1.3.6 @wip
+@R1.3.6
 Funzionalità: R1.3.6 Fonti sentiment di mercato
   Come utente
   Voglio che l'agente riceva l'indice Fear & Greed del mercato cripto

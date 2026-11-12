@@ -5,6 +5,7 @@ import pytest
 
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.application.sources.read_latest_news import ReadLatestNewsCommand, ReadLatestNewsUseCase
+from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.news_item import NewsItem
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -17,7 +18,7 @@ class FakeNews:
 
     def read_latest(self) -> Sequence[NewsItem]:
         if self._unavailable:
-            raise SourceUnavailableError("notizie")
+            raise SourceUnavailableError(NEWS.name)
         return self._items
 
 
