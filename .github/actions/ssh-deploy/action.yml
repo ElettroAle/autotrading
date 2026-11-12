@@ -32,6 +32,10 @@ inputs:
     description: Scope chiesto dalla pagina OpenAPI
     required: false
     default: ""
+  telegram-bot-token:
+    description: Token del bot Telegram dal segreto dell'environment; vuoto lascia il bot com'è (ADR 0071)
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -47,6 +51,7 @@ runs:
         AUTH_AUDIENCE: ${{ inputs.auth-audience }}
         AUTH_CLIENT_ID: ${{ inputs.auth-client-id }}
         AUTH_SCOPE: ${{ inputs.auth-scope }}
+        TELEGRAM_BOT_TOKEN: ${{ inputs.telegram-bot-token }}
       # Tailscale SSH: identity from the tailnet, no SSH key (ADR 0013).
       run: |
         target="deploy@${HOSTNAME_TS}"
@@ -69,6 +74,16 @@ runs:
           < deploy/prepare-installation.sh
         ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/prepare-installation.sh' \
           < deploy/postgres/10-application-role.sh
+        # The token of the bot is created outside the machine: it travels only inside SSH, on stdin (ADR 0071).
+        if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+          ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/install-telegram-token.sh' \
+            < deploy/install-telegram-token.sh
+          printf '%s' "$TELEGRAM_BOT_TOKEN" | ssh "${ssh_options[@]}" "$target" \
+            'bash /opt/autotrading/install-telegram-token.sh'
+        fi
         # On failure the container state and logs explain why; lines naming a password are dropped.
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans \
           || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate worker | grep -vi password; exit 1; }'
+        # The worker reads the token only when it starts: a changed token recreates the worker alone.
+        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && if [ -e .telegram_bot_token_changed ]; then
+          docker compose up -d --no-deps --force-recreate worker && rm -f .telegram_bot_token_changed; fi'

@@ -26,8 +26,8 @@ if [ ! -s secrets/worker_token ]; then
         && chown 65532:65532 /secrets/worker_token && chmod 0400 /secrets/worker_token"
 fi
 
-# The token of the Telegram bot (ADR 0035): created by the owner with BotFather and written here by hand, never
-# by a release. Until then the file stays empty and the worker runs with the notifications off.
+# The token of the Telegram bot (ADR 0035, ADR 0071): created by the owner with BotFather, it arrives from the
+# secret of the GitHub environment. Until then the file stays empty and the worker runs with the notifications off.
 if [ ! -e secrets/telegram_bot_token ]; then
   docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets --entrypoint sh "$postgres_image" \
     -c "umask 077 && : > /secrets/telegram_bot_token \
