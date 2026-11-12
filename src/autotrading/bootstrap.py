@@ -148,6 +148,7 @@ from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
     ReconciliationOutcome,
 )
+from autotrading.application.flows.record_manual_closing import RecordManualClosingCommand, RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
@@ -166,6 +167,7 @@ from autotrading.application.orders.errors import (
 )
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
+from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
@@ -436,6 +438,30 @@ class FlowPositionsFromAccountsAndOrders:
         )
 
 
+class ManualClosingRecorder(Protocol):
+    def execute(self, command: RecordManualClosingCommand) -> None: ...
+
+
+class ManualClosingsRecordedInFlows:
+    """Bridges the manual closing of the orders context to the history of the flows context in the API (ADR 0061).
+
+    A position closed by hand on an asset of a flow enters its history once the exchange confirms the fill; a
+    closing refused or not confirmed in time leaves the position as the exchange shows it, so nothing is recorded.
+    """
+
+    def __init__(self, closing: PositionClosingPort, history: ManualClosingRecorder) -> None:
+        self._closing = closing
+        self._history = history
+
+    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
+        outcome = self._closing.close(account_id, coin, user_id)
+        if outcome.average_price is None or outcome.executed_at is None or outcome.fee is None:
+            return outcome
+        fill = ClosingFill(outcome.average_price, outcome.executed_at, outcome.fee)
+        self._history.execute(RecordManualClosingCommand(account_id, coin, fill))
+        return outcome
+
+
 class AccountFlowsFromFlows:
     """Bridges the flows context to the accounts context in the API (ADR 0054): the flows that run on an account."""
 
@@ -689,18 +715,18 @@ class TenantUseCaseFactory:
         position_closing = HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id)
         flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
+        flow_openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
         stop_ports = StopPorts(
-            SqlAlchemyRunningCycleAdapter(self._engine),
-            flow_positions,
-            SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id),
-            closed_positions,
+            SqlAlchemyRunningCycleAdapter(self._engine), flow_positions, flow_openings, closed_positions
         )
         ports = TenantPorts(
             accounts=accounts,
             sealer=sealer,
             exchanges=self._exchanges.accounts,
             account_state=account_state,
-            position_closing=position_closing,
+            position_closing=ManualClosingsRecordedInFlows(
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, closed_positions)
+            ),
             verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,

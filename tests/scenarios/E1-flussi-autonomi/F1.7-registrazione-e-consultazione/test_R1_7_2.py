@@ -8,12 +8,21 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
+from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand
+from autotrading.application.orders.close_position import ClosePositionCommand
+from autotrading.bootstrap import ClosedPositionsFromOpenings
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.trade_intent import TradeSide
+from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
+from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.support.activity import READ_AT, a_fill, an_activity
 from tests.support.flows import ACCOUNT, a_flow, account_id_of
 from tests.support.lifecycle_steps import hold_position
 from tests.support.orders import a_flow_order
@@ -23,10 +32,8 @@ from tests.support.steps import quoted
 scenarios("E1-flussi-autonomi/F1.7-registrazione-e-consultazione/R1.7.2-storico-delle-posizioni-chiuse.feature")
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
-EVENTS = {
-    "chiusura manuale dell'utente": CloseReason.MANUAL,
-    "liquidazione sull'exchange": CloseReason.OUTSIDE_PLATFORM,
-}
+# The flow order opens about 20 USDC of BTC at leverage 2: a liquidation loses about its margin of 10 USDC.
+LIQUIDATION_LOSS = Decimal(-9)
 
 
 def amount(text: str) -> Decimal:
@@ -96,6 +103,34 @@ class History:
         command = RemoveAccountCommand(AccountId(account_id), self.platform.user_id_of(owner), confirmed=True)
         self.platform.use_cases_of(owner).remove_account.execute(command)
 
+    def close_by_hand(self, flow: str) -> None:
+        owner = self.owners[flow]
+        account_id = self.operating_with_open_position(flow)
+        command = ClosePositionCommand(account_id, "BTC", self.platform.user_id_of(owner))
+        self.platform.use_cases_of(owner).close_position.execute(command)
+
+    def liquidate(self, flow: str) -> None:
+        """The exchange liquidates the position: the reconciliation of the next cycle finds it gone (R1.6.2)."""
+        account_id = self.operating_with_open_position(flow)
+        operating = self.flows[flow]
+        self.platform.account_activity.activities[account_id] = an_activity(
+            fills=(a_fill("BTC", None, realized_pnl=LIQUIDATION_LOSS),)
+        )
+        readings = InMemoryReconciliationRepositoryAdapter()
+        readings.save_reading(
+            AccountReading(account_id, READ_AT - timedelta(minutes=5), {operating.id: frozenset({"BTC"})})
+        )
+        flows = InMemoryFlowRepositoryAdapter(self.platform.flows, operating.tenant_id)
+        history = ClosedPositionsFromOpenings(
+            flows,
+            InMemoryFlowOpeningsAdapter(self.platform.orders_of(operating.tenant_id)),
+            InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
+        )
+        reconciliation = ReconcileAccountUseCase(
+            flows, self.platform.account_activity, self.platform.platform_orders, readings, history
+        )
+        reconciliation.execute(ReconcileAccountCommand(operating.id))
+
     def position(self) -> ClosedPosition:
         assert len(self.consulted) == 1, self.consulted
         return self.consulted[0]
@@ -147,7 +182,11 @@ def closed_for_event(history: History, flow: str, event: str) -> None:
     if event == "rimozione del conto":
         history.remove_account(flow)
         return
-    history.close(flow, EVENTS[event], PositionEnd(Decimal(100), at("10:00")))
+    if event == "chiusura manuale dell'utente":
+        history.close_by_hand(flow)
+        return
+    assert event == "liquidazione sull'exchange", event
+    history.liquidate(flow)
 
 
 @given(parsers.re(r'^che il flusso "(?P<flow>[^"]+)" ha chiuso posizioni alle (?P<instants>.+)$'))
