@@ -167,8 +167,8 @@ from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
-    NewsPort,
     MarketDataPort,
+    NewsPort,
     PriceHistoryPort,
     SampleRepositoryPort,
     SentimentPort,

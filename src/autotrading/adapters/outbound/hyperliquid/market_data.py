@@ -110,7 +110,7 @@ class HyperliquidMarketDataAdapter:
         try:
             page = self._info().candles_snapshot(asset, timeframe.label, start, end)
             closed = [_candle_of(candle) for candle in page if int(candle["T"]) < end]
-        except UNAVAILABLE as error:
+        except (*UNAVAILABLE, ValueError) as error:
             raise SourceUnavailableError(MARKET_DATA) from error
         return closed[-count:]
 
@@ -134,7 +134,7 @@ class HyperliquidMarketDataAdapter:
         try:
             page = self._info().candles_snapshot(asset, DAY, yesterday, _milliseconds(today) - 1)
             days = [_range_of(candle) for candle in page if int(candle["t"]) == yesterday]
-        except UNAVAILABLE as error:
+        except (*UNAVAILABLE, ValueError) as error:
             raise SourceUnavailableError(MARKET_DATA) from error
         if not days:
             raise SourceUnavailableError(MARKET_DATA)

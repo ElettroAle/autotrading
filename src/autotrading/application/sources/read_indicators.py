@@ -3,8 +3,8 @@ from decimal import Context, Decimal
 from autotrading.application.sources.errors import AssetRequiredError
 from autotrading.application.sources.ports import MarketDataPort, ReadSourceCommand
 from autotrading.domain.sources.indicator_series import WARM_UP, indicator_series
-from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe, short_timeframe_of
 from autotrading.domain.sources.source_sample import SourceValue
+from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe, short_timeframe_of
 
 SERIES_LENGTH = "lunghezza_serie"
 # Enough digits for any price, few enough not to spend the tokens of the agent on noise.

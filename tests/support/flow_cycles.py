@@ -48,8 +48,8 @@ from tests.fakes.cycles import FakeClockAdapter, InMemoryCycleRepositoryAdapter,
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.flow_repository import InMemoryAutomaticPauseAdapter, InMemoryFlowRepositoryAdapter
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
-from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
+from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,

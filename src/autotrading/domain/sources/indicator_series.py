@@ -19,9 +19,7 @@ FAST_RSI, SLOW_RSI = 7, 14
 WARM_UP = 100
 
 
-def indicator_series(
-    candles: Sequence[Candle], length: int, *, with_long_averages: bool
-) -> dict[str, list[Decimal]]:
+def indicator_series(candles: Sequence[Candle], length: int, *, with_long_averages: bool) -> dict[str, list[Decimal]]:
     closes = [candle.close for candle in candles]
     points = macd(closes)
     series = {
