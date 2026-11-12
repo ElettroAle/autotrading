@@ -8,6 +8,7 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import LinkStores
@@ -18,6 +19,7 @@ from autotrading.application.verification.run_exchange_verification import RunEx
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
+    AccountActivityFromAccounts,
     AccountReadingFromAccounts,
     FlowAccountsFromAccounts,
     ModelSettingsFromAgent,
@@ -32,8 +34,10 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
+from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
+from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
@@ -48,6 +52,7 @@ from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
@@ -90,6 +95,10 @@ class Platform:
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.activity_reader = FakeActivityReaderAdapter()
+        # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
+        self.account_activity = FakeAccountActivityAdapter()
+        self.platform_orders = InMemoryPlatformOrdersAdapter()
         self.now = STARTED_AT
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
@@ -142,6 +151,8 @@ class Platform:
                 models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
             ),
+            account_activity=self.account_activity,
+            platform_orders=self.platform_orders,
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             clock=lambda: self.now,
@@ -168,6 +179,9 @@ class Platform:
                 lambda: STARTED_AT,
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+            read_account_activity=ReadAccountActivityUseCase(
+                AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: self.activity_reader})
+            ),
         )
 
     def link_chat(self) -> LinkChatUseCase:

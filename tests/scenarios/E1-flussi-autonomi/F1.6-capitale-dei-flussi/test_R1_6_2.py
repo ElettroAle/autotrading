@@ -1,0 +1,92 @@
+import pytest
+from pytest_bdd import given, scenarios, then, when
+
+from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
+from tests.support.activity import a_movement, a_position
+from tests.support.attribution import AttributionBench, amount, step
+
+scenarios("E1-flussi-autonomi/F1.6-capitale-dei-flussi/R1.6.2-movimenti-non-attribuibili.feature")
+
+
+@pytest.fixture
+def bench() -> AttributionBench:
+    return AttributionBench()
+
+
+def recorded(bench: AttributionBench, account: str, kind: UnattributableKind) -> list[UnattributableItem]:
+    account_id = bench.account(account)
+    return [item for item in bench.readings.items if item.account_id == account_id and item.kind is kind]
+
+
+@given(step(r'che "anna" ha il conto "{account}" con il solo flusso "{flow}" con asset "{asset}"'))
+def single_flow(bench: AttributionBench, account: str, flow: str, asset: str) -> None:
+    bench.add_flow(account, flow, (asset,))
+
+
+@given(step(r'che sull\'exchange il conto "{account}" ha una posizione aperta su "{asset}"'))
+def position_of_no_flow(bench: AttributionBench, account: str, asset: str) -> None:
+    bench.extend(bench.account(account), positions=(a_position(asset),))
+
+
+@given(step(r'che il flusso "{flow}" aveva una posizione aperta su "{asset}"'))
+def position_seen_open(bench: AttributionBench, flow: str, asset: str) -> None:
+    bench.previous_reading(bench.flow(flow).account_id, {flow: frozenset({asset})})
+
+
+@given(step(r'che sull\'exchange la posizione su "{asset}" non c\'è più'))
+def position_gone(bench: AttributionBench, asset: str) -> None:
+    assert all(asset not in {p.asset for p in activity.positions} for activity in bench.exchange.activities.values())
+
+
+@given(step(r'che il saldo del conto "{account}" è aumentato di {a} USDC senza esecuzioni dei flussi'))
+def balance_increased(bench: AttributionBench, account: str, a: str) -> None:
+    account_id = bench.account(account)
+    bench.previous_reading(account_id)
+    bench.extend(account_id, movements=(a_movement(amount(a)),))
+
+
+@given(step(r'che per il conto "{account}" è già registrata una posizione non attribuibile su "{asset}"'))
+def already_recorded(bench: AttributionBench, account: str, asset: str) -> None:
+    bench.extend(bench.account(account), positions=(a_position(asset),))
+    (flow,) = bench.store.flows
+    bench.run_cycle(flow.name.value)
+    assert len(recorded(bench, account, UnattributableKind.POSITION)) == 1
+
+
+@when(step(r'il flusso "{flow}" esegue un ciclo'))
+@when(step(r'il flusso "{flow}" esegue un altro ciclo'))
+def run_cycle(bench: AttributionBench, flow: str) -> None:
+    bench.run_cycle(flow)
+
+
+@then(step(r'è registrata per il conto "{account}" una posizione non attribuibile su "{asset}"'))
+def position_recorded(bench: AttributionBench, account: str, asset: str) -> None:
+    assert [item.asset for item in recorded(bench, account, UnattributableKind.POSITION)] == [asset]
+
+
+@then(step(r'la posizione su "{asset}" resta aperta sull\'exchange'))
+def position_still_open(bench: AttributionBench, asset: str) -> None:
+    assert any(asset in {p.asset for p in activity.positions} for activity in bench.exchange.activities.values())
+
+
+@then(step(r'il flusso "{flow}" è nello stato "{status}"'))
+def flow_status(bench: AttributionBench, flow: str, status: str) -> None:
+    assert bench.flow(flow).status.value == status
+
+
+@then(step(r'la posizione su "{asset}" compare nello storico del flusso "{flow}" come chiusa con il motivo "{reason}"'))
+def closed_in_history(bench: AttributionBench, asset: str, flow: str, reason: str) -> None:
+    flow_id = bench.flow(flow).id
+    assert [(c.asset, c.reason) for c in bench.closed.closed if c.flow_id == flow_id] == [(asset, reason)]
+
+
+@then(step(r'è registrata per il conto "{account}" una variazione del saldo non attribuibile di {a} USDC'))
+def balance_change_recorded(bench: AttributionBench, account: str, a: str) -> None:
+    assert [item.amount for item in recorded(bench, account, UnattributableKind.BALANCE_CHANGE)] == [amount(a)]
+
+
+@then(step(r'per il conto "{account}" c\'è una sola registrazione della posizione non attribuibile su "{asset}"'))
+def recorded_once(bench: AttributionBench, account: str, asset: str) -> None:
+    items = recorded(bench, account, UnattributableKind.POSITION)
+    assert [item.asset for item in items] == [asset]
+    assert len(items) == 1
