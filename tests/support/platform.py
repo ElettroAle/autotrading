@@ -9,8 +9,8 @@ from autotrading.application.accounts.read_exchange_state import ReadExchangeSta
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
-from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import LinkStores
@@ -21,12 +21,12 @@ from autotrading.application.verification.run_exchange_verification import RunEx
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
+    AccountActivityFromAccounts,
     AccountFlowsFromFlows,
     AccountReadingFromAccounts,
     FlowAccountsFromAccounts,
-    FlowPositionsFromAccountsAndOrders,
-    AccountActivityFromAccounts,
     FlowDirectoryFromFlows,
+    FlowPositionsFromAccountsAndOrders,
     ModelSettingsFromAgent,
     OrderExecutionFromOrders,
     ProviderKeyUsageFromFlows,
@@ -48,6 +48,7 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
@@ -146,6 +147,13 @@ class Platform:
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
         flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
+        closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
+        stop_ports = StopPorts(
+            self.running_cycles,
+            flow_positions,
+            InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id)),
+            closed_positions,
+        )
         ports = TenantPorts(
             accounts=accounts,
             sealer=self.sealer_of(tenant_id),
@@ -167,16 +175,14 @@ class Platform:
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
-            running_cycles=self.running_cycles,
-            account_flows=AccountFlowsFromFlows(
-                flows, StopFlowUseCase(flows, self.running_cycles, flow_positions), ArchiveFlowUseCase(flows)
-            ),
+            stop_ports=stop_ports,
+            account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
             account_activity=self.account_activity,
             platform_orders=self.platform_orders,
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             clock=lambda: self.now,
-            closed_positions=InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id),
+            closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=FlowDirectoryFromFlows(flows),
         )

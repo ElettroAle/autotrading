@@ -137,3 +137,12 @@ class AssetsAssignedToOtherFlowError(DomainError):
         super().__init__(f"asset già assegnati al flusso {flow} sullo stesso conto: " + ", ".join(assets))
         self.flow = flow
         self.assets = assets
+
+
+class InvalidClosedPositionError(DomainError):
+    """A closed position the exchange cannot have shown: a defect of whoever reads it."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("posizione chiusa non valida")

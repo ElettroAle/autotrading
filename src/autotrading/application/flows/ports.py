@@ -4,9 +4,9 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, PlatformOrders
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -14,8 +14,9 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
-from autotrading.domain.tenancy.user_id import UserId
+from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
+from autotrading.domain.tenancy.user_id import UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,15 +82,23 @@ class FlowAccountPort(Protocol):
 class FlowPositionsPort(Protocol):
     """Bound to the tenant of the request: the positions of a flow are those of its account on its assets (R1.1.2)."""
 
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> str | None:
+    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
         """Closes the whole position on the asset, through the worker that holds the key (ADR 0023).
 
-        None when the position is closed or there was none; otherwise the reason the exchange or the worker gave.
+        None when there was no position; otherwise the fill, or the reason the exchange or the worker gave.
         """
         ...
 
     def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
         """The margin the open positions on the assets hold now. Raises FlowExchangeUnavailableError."""
+        ...
+
+
+class FlowOpeningsPort(Protocol):
+    """Bound to the tenant of the request: the openings the flows sent, from the orders the platform recorded."""
+
+    def last_opening(self, flow_id: FlowId, asset: str) -> PositionOpening | None:
+        """The last executed order of the flow that opened a position on the asset, or None if it never did."""
         ...
 
 

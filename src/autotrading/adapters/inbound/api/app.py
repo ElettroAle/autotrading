@@ -93,7 +93,6 @@ def create_api(
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request, current_user))
-    protected.include_router(flows_router(use_cases_of_request))
     protected.include_router(flow_state_router(use_cases_of_request))
     protected.include_router(closed_positions_router(use_cases_of_request))
     protected.include_router(cycles_router(use_cases_of_request))

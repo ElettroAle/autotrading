@@ -14,7 +14,7 @@ from autotrading.application.accounts.errors import (
 )
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.application.flows.stop_flow import StopFlowUseCase
+from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.orders.errors import (
     NoOpenPositionError,
     OrderAccountNotFoundError,
@@ -28,12 +28,16 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.accounts.removal import FlowPositionLeftOpen
+from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing, PositionOpening
+from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.orders.order import OrderStatus
 from autotrading.domain.orders.rejection import RejectionReason
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
+from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.flows import a_configuration, a_flow
 
@@ -92,14 +96,29 @@ def positions(state: ScriptedAccountState, closing: ScriptedClosing) -> FlowPosi
     return FlowPositionsFromAccountsAndOrders(state, closing)
 
 
-@pytest.mark.parametrize("status", [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED, OrderStatus.UNKNOWN])
-def test_a_closing_not_refused_leaves_no_reason(
+EXECUTED = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
+FILLED = {"average_price": Decimal(102000), "executed_at": EXECUTED, "fee": Decimal("0.05")}
+
+
+@pytest.mark.parametrize("status", [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED])
+def test_a_closing_executed_gives_its_fill(
     positions: FlowPositionsFromAccountsAndOrders, closing: ScriptedClosing, status: OrderStatus
 ) -> None:
-    closing.outcome = an_outcome(status)
+    closing.outcome = an_outcome(status, **FILLED)
 
-    assert positions.close(ACCOUNT, "BTC", USER) is None
+    assert positions.close(ACCOUNT, "BTC", USER) == PositionClosing(
+        "BTC", ClosingFill(Decimal(102000), EXECUTED, Decimal("0.05"))
+    )
     assert closing.asked == [(ACCOUNT, "BTC", USER)]
+
+
+@pytest.mark.parametrize("missing", ["average_price", "executed_at", "fee"])
+def test_a_closing_not_confirmed_in_time_is_a_position_maybe_still_open(
+    positions: FlowPositionsFromAccountsAndOrders, closing: ScriptedClosing, missing: str
+) -> None:
+    closing.outcome = an_outcome(OrderStatus.UNKNOWN, **{**FILLED, missing: None})
+
+    assert positions.close(ACCOUNT, "BTC", USER) == PositionClosing("BTC", refusal=OrderStatus.UNKNOWN.value)
 
 
 def test_a_closing_refused_gives_the_message_of_the_exchange(
@@ -107,7 +126,7 @@ def test_a_closing_refused_gives_the_message_of_the_exchange(
 ) -> None:
     closing.outcome = an_outcome(OrderStatus.REJECTED, reason=RejectionReason.OTHER, exchange_message="Order rejected")
 
-    assert positions.close(ACCOUNT, "BTC", USER) == "Order rejected"
+    assert positions.close(ACCOUNT, "BTC", USER) == PositionClosing("BTC", refusal="Order rejected")
 
 
 def test_a_closing_refused_without_a_message_gives_its_reason(
@@ -115,7 +134,7 @@ def test_a_closing_refused_without_a_message_gives_its_reason(
 ) -> None:
     closing.outcome = an_outcome(OrderStatus.REJECTED, reason=RejectionReason.INSUFFICIENT_MARGIN)
 
-    assert positions.close(ACCOUNT, "BTC", USER) == "margine insufficiente"
+    assert positions.close(ACCOUNT, "BTC", USER) == PositionClosing("BTC", refusal="margine insufficiente")
 
 
 def test_no_position_on_the_asset_is_nothing_to_close(
@@ -134,7 +153,7 @@ def test_a_closing_that_cannot_be_done_gives_the_reason(
 ) -> None:
     closing.failure = failure
 
-    assert positions.close(ACCOUNT, "BTC", USER) == str(failure)
+    assert positions.close(ACCOUNT, "BTC", USER) == PositionClosing("BTC", refusal=str(failure))
 
 
 def test_the_committed_margin_sums_the_positions_on_the_assets_at_entry_over_leverage(
@@ -182,9 +201,11 @@ class ScriptedPositions:
         self.refusals: dict[str, str] = {}
         self.closed: list[tuple[UUID, str, UserId]] = []
 
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> str | None:
+    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
         self.closed.append((account_id, asset, user_id))
-        return self.refusals.get(asset)
+        if asset in self.refusals:
+            return PositionClosing(asset, refusal=self.refusals[asset])
+        return PositionClosing(asset, ClosingFill(Decimal(102000), EXECUTED, Decimal("0.05")))
 
     def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
         raise AssertionError((account_id, assets))
@@ -198,6 +219,16 @@ class RecordingCycles:
         self.waited.append(flow_id)
 
 
+class OpeningOfEveryAsset:
+    def __init__(self) -> None:
+        self.asked: list[tuple[FlowId, str]] = []
+
+    def last_opening(self, flow_id: FlowId, asset: str) -> PositionOpening | None:
+        self.asked.append((flow_id, asset))
+        end = PositionEnd(Decimal(100000), EXECUTED, EXECUTED)
+        return PositionOpening(TradeSide.LONG, 2, Decimal(50), end, Decimal("0.03"))
+
+
 class AccountFlows:
     def __init__(self) -> None:
         self.tenant_id = TenantId.new()
@@ -205,7 +236,11 @@ class AccountFlows:
         repository = InMemoryFlowRepositoryAdapter(self.store, self.tenant_id)
         self.positions = ScriptedPositions()
         self.cycles = RecordingCycles()
-        stop = StopFlowUseCase(repository, self.cycles, self.positions)
+        self.closed = ClosedPositionStore()
+        closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id)
+        stop = StopFlowUseCase(
+            repository, StopPorts(self.cycles, self.positions, OpeningOfEveryAsset(), closed_positions)
+        )
         self.bridge = AccountFlowsFromFlows(repository, stop, ArchiveFlowUseCase(repository))
 
     def add(self, name: str, status: FlowStatus, asset: str, account_id: UUID = ACCOUNT) -> FlowId:
@@ -246,6 +281,9 @@ def test_stopping_the_flows_of_an_account_closes_their_positions_and_reports_tho
     assert left_open == (FlowPositionLeftOpen("ETH", "Order rejected"),)
     assert account_flows.positions.closed == [(ACCOUNT, "BTC", USER), (ACCOUNT, "ETH", USER)]
     assert len(account_flows.cycles.waited) == 2
+    assert [(position.asset, position.reason) for position in account_flows.closed.positions] == [
+        ("BTC", CloseReason.ACCOUNT_REMOVAL)
+    ]
     statuses = account_flows.statuses()
     assert (statuses["attivo"], statuses["pausa"], statuses["altro conto"]) == (
         FlowStatus.STOPPED,

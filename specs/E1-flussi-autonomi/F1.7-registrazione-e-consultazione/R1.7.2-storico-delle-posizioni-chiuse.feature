@@ -26,9 +26,6 @@ Funzionalità: R1.7.2 Storico delle posizioni chiuse
     E la posizione ha PnL 2 USDC pari al 4% del margine e commissioni 0,08 USDC
     E la posizione ha motivo di chiusura "decisione dell'agente"
 
-  # @wip: la registrazione a ogni evento arriva con l'esecuzione (R1.5.5), lo stop (R1.1.5), la rimozione del
-  # conto (R1.1.8) e l'attribuzione dall'exchange (R1.6.1).
-  @wip
   Schema dello scenario: Motivi di chiusura
     Dato che una posizione del flusso "alfa" è stata chiusa per <evento>
     Quando "anna" consulta lo storico delle posizioni chiuse del flusso "alfa"
@@ -36,9 +33,19 @@ Funzionalità: R1.7.2 Storico delle posizioni chiuse
 
     Esempi:
       | evento                                | motivo                         |
-      | chiusura manuale dell'utente          | comando manuale                |
       | stop del flusso                       | stop del flusso                |
       | rimozione del conto                   | rimozione del conto            |
+
+  # @wip: la registrazione della chiusura manuale e dell'attribuzione dall'exchange arriva con R1.6.1.
+  @wip
+  Schema dello scenario: Motivi di chiusura di una posizione chiusa a mano o fuori dalla piattaforma
+    Dato che una posizione del flusso "alfa" è stata chiusa per <evento>
+    Quando "anna" consulta lo storico delle posizioni chiuse del flusso "alfa"
+    Allora la posizione ha motivo di chiusura "<motivo>"
+
+    Esempi:
+      | evento                                | motivo                         |
+      | chiusura manuale dell'utente          | comando manuale                |
       | liquidazione sull'exchange            | chiusa fuori dalla piattaforma |
 
   Scenario: Ordine dalla chiusura più recente
