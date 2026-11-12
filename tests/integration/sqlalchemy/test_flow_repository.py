@@ -10,9 +10,15 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter, document_of
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
-from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowNameInUseError
+from autotrading.application.flows.errors import (
+    FlowAccountNotFoundError,
+    FlowNameInUseError,
+    FlowNotFoundError,
+    FlowVersionNotFoundError,
+)
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -149,3 +155,54 @@ def test_a_configuration_version_is_never_changed_nor_deleted(database: Engine) 
             connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
             with pytest.raises(ProgrammingError, match="permission denied"):
                 connection.execute(text(statement))
+
+
+def test_a_flow_is_read_by_its_id_with_the_version_in_force(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    flow = a_flow(tenant_id, account_id=account_id)
+    repository.add(flow)
+    repository.add(a_flow(tenant_id, name="beta", account_id=account_id))
+    second = flow.reconfigured(a_configuration(assets=("ETH",)))
+
+    repository.add_version(second)
+
+    assert repository.get(flow.id) == second
+    assert repository.version(flow.id, 1) == flow.configuration
+    assert repository.version(flow.id, 2) == second.configuration
+    assert len(rows_of(database, flow_versions, tenant_id)) == 3
+
+
+def test_a_status_change_is_saved(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    flow = a_flow(tenant_id, account_id=account_id)
+    repository.add(flow)
+
+    repository.change_status(replace(flow, status=FlowStatus.ARCHIVED))
+
+    assert repository.get(flow.id).status == FlowStatus.ARCHIVED
+    assert not repository.name_in_use(flow.name)
+
+
+def test_a_flow_or_version_missing_or_of_another_tenant_is_not_found(database: Engine) -> None:
+    anna, anna_account = new_account(database)
+    bruno, _ = new_account(database)
+    flow = a_flow(anna, account_id=anna_account)
+    SqlAlchemyFlowRepositoryAdapter(database, anna).add(flow)
+    bruno_flows = SqlAlchemyFlowRepositoryAdapter(database, bruno)
+
+    for action in (
+        lambda: bruno_flows.get(flow.id),
+        lambda: bruno_flows.version(flow.id, 1),
+        lambda: bruno_flows.change_status(replace(flow, tenant_id=bruno, status=FlowStatus.ACTIVE)),
+        lambda: bruno_flows.add_version(replace(flow, tenant_id=bruno)),
+        lambda: bruno_flows.get(FlowId.new()),
+    ):
+        with pytest.raises(FlowNotFoundError):
+            action()
+    with pytest.raises(CrossTenantAccessError):
+        bruno_flows.add_version(flow)
+    with pytest.raises(FlowVersionNotFoundError):
+        SqlAlchemyFlowRepositoryAdapter(database, anna).version(flow.id, 2)
+    assert SqlAlchemyFlowRepositoryAdapter(database, anna).get(flow.id) == flow

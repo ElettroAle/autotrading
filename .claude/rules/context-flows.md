@@ -38,6 +38,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - **Nessuna liquidità propria**: lo stato del flusso si ricava da ciò che l'exchange mostra. Le posizioni
   si attribuiscono per asset, le esecuzioni per identificativo dell'ordine (`ClientOrderId`, contesto
   `orders`). La piattaforma non tocca ciò che non attribuisce.
+- Stati e transizioni sono regole del domain: avvia da fermo, pausa da attivo, riprendi da in pausa,
+  archivia solo da fermo; un flusso archiviato non si avvia e non si modifica (ADR 0036).
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.
 - Lo stop chiude sempre le posizioni del flusso (decisione del proprietario: senza stop loss sull'exchange
   una posizione lasciata aperta non è protetta), dopo il ciclo in corso.
@@ -48,7 +50,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 ## Porte del contesto
 
 - `FlowRepositoryPort`: flussi del tenant con la versione di configurazione in vigore; nome unico tra i non
-  archiviati (ADR 0031).
+  archiviati (ADR 0031); legge un flusso per id e ogni sua versione, salva lo stato e le versioni nuove
+  senza toccare le precedenti (ADR 0036).
 - `FlowAccountPort`: exchange e saldo del conto letti ora, dal contesto `accounts` attraverso il `worker`.
 - `ModelSettingsPort`, `SourceSettingsPort`: modello e fonti con i parametri risolti, dai contesti `agent` e
   `sources`; un rifiuto arriva come `InvalidFlowSettingError` con il motivo del contesto che lo dà.

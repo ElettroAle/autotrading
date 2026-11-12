@@ -82,6 +82,47 @@ class CapitalAboveFreeCapitalError(DomainError):
         self.free_capital = free_capital
 
 
+class FlowCommandNotAllowedError(DomainError):
+    status_code = 409
+
+    def __init__(self, command: str, status: str) -> None:
+        super().__init__(f"comando {command} non ammesso per un flusso {status}")
+        self.command = command
+        self.status = status
+
+
+class ArchiveOnlyStoppedError(DomainError):
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("si archivia solo un flusso fermo")
+
+
+class ArchivedFlowNotModifiableError(DomainError):
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("un flusso archiviato non si modifica")
+
+
+class AccountNotChangeableError(DomainError):
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("il conto di un flusso non si cambia")
+
+
+class AssetsAssignedToOtherFlowError(DomainError):
+    """Two flows of one account never share an asset: each position stays attributable to one flow (R1.1.2)."""
+
+    status_code = 409
+
+    def __init__(self, flow: str, assets: tuple[str, ...]) -> None:
+        super().__init__(f"asset già assegnati al flusso {flow} sullo stesso conto: " + ", ".join(assets))
+        self.flow = flow
+        self.assets = assets
+
+
 class InvalidClosedPositionError(DomainError):
     """A closed position the exchange cannot have shown: a defect of whoever reads it."""
 

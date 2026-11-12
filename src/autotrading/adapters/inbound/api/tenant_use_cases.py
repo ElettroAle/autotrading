@@ -29,10 +29,15 @@ from autotrading.application.cycles.list_cycles import ListCyclesUseCase
 from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort
 from autotrading.application.cycles.read_cycle import ReadCycleUseCase
 from autotrading.application.cycles.read_flow_cost import ReadFlowCostUseCase
+from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
+from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import ClosedPositionRepositoryPort, FlowRepositoryPort
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
@@ -100,6 +105,11 @@ class TenantUseCases:
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
+    modify_flow: ModifyFlowUseCase
+    get_flow_version: GetFlowVersionUseCase
+    compare_flow_versions: CompareFlowVersionsUseCase
+    change_flow_status: ChangeFlowStatusUseCase
+    archive_flow: ArchiveFlowUseCase
     list_closed_positions: ListClosedPositionsUseCase
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
@@ -132,6 +142,11 @@ class TenantUseCases:
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
+            modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks),
+            get_flow_version=GetFlowVersionUseCase(ports.flows),
+            compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
+            change_flow_status=ChangeFlowStatusUseCase(ports.flows),
+            archive_flow=ArchiveFlowUseCase(ports.flows),
             list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),

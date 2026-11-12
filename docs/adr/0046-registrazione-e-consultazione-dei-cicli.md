@@ -62,6 +62,6 @@ le porte sanno che cosa contengono. ADR 0041 prevede già la tabella dei cicli c
 - Lo scenario "Ciclo concluso registrato per intero" (R1.7.1) e i tre scenari sul costo della singola chiamata
   (R1.4.6) restano `@wip` fino al ponte: con le porte finte proverebbero solo l'adapter finto.
 - Lo scenario "Elenco dei flussi" (R1.7.3) resta `@wip`: ultimo e prossimo ciclo nell'elenco richiedono l'istante
-  di avvio del flusso (R1.1.4) e il ponte.
+  di avvio o ripresa e il motivo della pausa automatica sul flusso, che ancora non li registra, e il ponte.
 - Il worker che registra un ciclo usa l'adapter legato al tenant del flusso: il ponte che pianifica i flussi di
   tutti i tenant deve conoscere il tenant di ciascuno.
