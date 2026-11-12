@@ -1,11 +1,14 @@
 from decimal import Decimal
+from types import MappingProxyType
 from uuid import uuid4
 
 import pytest
 
+from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.flow_state import FlowState, PositionMismatch
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -91,3 +94,56 @@ def test_a_flow_without_operations_keeps_its_capital_in_the_currency_of_the_acco
 
     assert (state.flow_id, state.currency, state.allocated_capital) == (flow.id, "USDC", Decimal(1000))
     assert state.available_liquidity == state.total_value == Decimal(1000)
+
+
+def expecting(flow: Flow, **positions: Decimal) -> FlowTotals:
+    return FlowTotals(flow.id, positions=MappingProxyType(positions))
+
+
+def test_the_positions_the_flow_expects_match_those_on_the_account() -> None:
+    flow = flow_on("BTC", "SOL")
+    activity = an_activity(positions=(a_position("BTC", size=Decimal(2)), a_position("ETH", size=Decimal(9))))
+
+    state = FlowState.attributed(flow, activity, expecting(flow, BTC=Decimal(2), SOL=Decimal(0)))
+
+    assert state.position_mismatch() is None
+
+
+def test_a_bigger_position_on_the_account_than_the_flow_expects_is_a_mismatch() -> None:
+    flow = flow_on("BTC")
+    activity = an_activity(positions=(a_position("BTC", size=Decimal("0.2")),))
+
+    state = FlowState.attributed(flow, activity, expecting(flow, BTC=Decimal("0.1")))
+
+    assert state.position_mismatch() == PositionMismatch("BTC", Decimal("0.1"), Decimal("0.2"))
+
+
+def test_a_short_position_is_compared_with_its_sign() -> None:
+    flow = flow_on("BTC")
+    short = AccountPosition("BTC", TradeSide.SHORT, Decimal(1), Decimal(0), Decimal(0))
+
+    assert (
+        FlowState.attributed(
+            flow, an_activity(positions=(short,)), expecting(flow, BTC=Decimal(-1))
+        ).position_mismatch()
+        is None
+    )
+    assert FlowState.attributed(
+        flow, an_activity(positions=(short,)), expecting(flow, BTC=Decimal(1))
+    ).position_mismatch() == (PositionMismatch("BTC", Decimal(1), Decimal(-1)))
+
+
+def test_a_position_the_flow_expects_and_the_account_no_longer_has_is_a_mismatch() -> None:
+    flow = flow_on("BTC")
+
+    state = FlowState.attributed(flow, an_activity(), expecting(flow, BTC=Decimal(1)))
+
+    assert state.position_mismatch() == PositionMismatch("BTC", Decimal(1), Decimal(0))
+
+
+def test_a_position_on_an_asset_of_the_flow_it_never_opened_is_a_mismatch() -> None:
+    flow = flow_on("BTC")
+
+    state = FlowState.attributed(flow, an_activity(positions=(a_position("BTC"),)), FlowTotals(flow.id))
+
+    assert state.position_mismatch() == PositionMismatch("BTC", Decimal(0), Decimal(1))

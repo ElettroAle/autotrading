@@ -54,6 +54,7 @@ from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleReposit
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
+from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
@@ -185,6 +186,9 @@ class Platform:
             account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
+            flow_operations=InMemoryFlowOperationsAdapter(
+                self.ledger, lambda: [account.id.value for account in accounts.list()]
+            ),
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             clock=lambda: self.now,

@@ -1,9 +1,10 @@
 """In-memory ledger of the executions with the running totals of the flows, as the SQL adapter keeps them."""
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
+from types import MappingProxyType
 from uuid import UUID
 
 from autotrading.domain.flows.flow_id import FlowId
@@ -64,6 +65,11 @@ class InMemoryFlowLedgerAdapter:
         """An execution of an order of the flow, as a cycle of the worker records it."""
         entry = LedgerEntry(execution, flow_id, ExecutionKind.FLOW_ORDER, platform_order=True)
         self.record(account_id, AccountLedger((entry,), ()), execution.executed_at)
+
+    def expect(self, flow_id: FlowId, asset: str, size: Decimal) -> None:
+        """The position of the flow on the asset as its past executions left it in the totals."""
+        totals = self._of(flow_id)
+        self.totals[flow_id] = replace(totals, positions=MappingProxyType({**totals.positions, asset: size}))
 
     def entries_of(self, flow_id: FlowId) -> list[LedgerEntry]:
         return [entry for entries in self.entries.values() for entry in entries if entry.flow_id == flow_id]
