@@ -1,11 +1,12 @@
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 
 from autotrading.application.flows.free_capital import free_capital_of
-from autotrading.application.flows.ports import FlowAccountPort, FlowPositionsPort, FlowRepositoryPort
+from autotrading.application.flows.ports import FlowAccountPort, FlowRepositoryPort
+from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, require_increase_within, require_reduction_within
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
@@ -24,20 +25,21 @@ class ChangeAllocatedCapitalCommand:
 class ChangeAllocatedCapitalUseCase:
     """Raises or lowers the capital allocated to a flow in any status but archived (R1.1.7, ADR 0053).
 
-    A raise is checked against the balance of the account read now, a reduction against the margin the positions of
-    the flow hold now. The new capital is the next configuration version, so the cycle under way keeps its own.
+    A raise is checked against the balance of the account read now; a reduction against the state of the flow read
+    now (R1.6.1), so that its liquidity does not go below zero (ADR 0068). The new capital is the next configuration
+    version, so the cycle under way keeps its own.
     """
 
     def __init__(
         self,
         flows: FlowRepositoryPort,
         accounts: FlowAccountPort,
-        positions: FlowPositionsPort,
+        flow_state: ReadFlowStateUseCase,
         clock: Callable[[], datetime],
     ) -> None:
         self._flows = flows
         self._accounts = accounts
-        self._positions = positions
+        self._flow_state = flow_state
         self._clock = clock
 
     def execute(self, command: ChangeAllocatedCapitalCommand) -> Flow:
@@ -57,9 +59,9 @@ class ChangeAllocatedCapitalUseCase:
 
     def _require_admitted(self, flow: Flow, capital: Decimal) -> None:
         current = flow.configuration.allocated_capital
-        account = self._accounts.account(flow.account_id)
         if capital > current:
+            account = self._accounts.account(flow.account_id)
             require_increase_within(current, capital, free_capital_of(account, flow.account_id, self._flows.list()))
             return
-        margin = self._positions.committed_margin(flow.account_id, flow.configuration.assets)
-        require_reduction_within(capital, margin, account.currency)
+        state = self._flow_state.execute(ReadFlowStateCommand(flow.id))
+        require_reduction_within(replace(state, allocated_capital=capital))

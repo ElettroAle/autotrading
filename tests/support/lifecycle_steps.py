@@ -25,6 +25,7 @@ from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.support.activity import a_position, an_activity
 from tests.support.flow_steps import names, provider_key_registered, valid_command
 from tests.support.flows import account_id_of
 from tests.support.platform import Platform
@@ -98,13 +99,19 @@ def put_in_status(platform: Platform, user: str, name: str, status: FlowStatus) 
 
 
 def hold_position(platform: Platform, user: str, account: str, asset: str, margin: Decimal = Decimal(100)) -> None:
-    """A long position on the asset at leverage 1, worth the margin at the price of the exchange."""
+    """A long position on the asset at leverage 1, worth the margin at the price of the exchange.
+
+    The reading of the account shows it too, with the margin the exchange declares for it (R1.6.1).
+    """
     account_id = account_id_of(platform, user, account)
     tenant_id = platform.tenant_of(user)
     accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
     access = TradingAccessFromAccounts(accounts, FakeCredentialOpenerAdapter(platform.vault)).access(account_id)
     size = margin / platform.order_exchange.markets[asset].mid_price
     platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, size, 1))
+    reading = platform.account_activity.activities.get(account_id, an_activity())
+    held = (*reading.positions, a_position(asset, margin=margin, size=size))
+    platform.account_activity.activities[account_id] = replace(reading, positions=held)
 
 
 def open_assets(platform: Platform) -> set[str]:

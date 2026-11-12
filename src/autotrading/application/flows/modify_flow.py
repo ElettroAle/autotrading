@@ -6,7 +6,7 @@ from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
 from autotrading.application.flows.errors import AssetWithOpenPositionError
-from autotrading.application.flows.ports import FlowPositionsPort, FlowRepositoryPort
+from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -48,10 +48,10 @@ class ModifyFlowUseCase:
     an open position is not removed: the flow would leave on the account a position nobody follows.
     """
 
-    def __init__(self, flows: FlowRepositoryPort, checks: FlowChecks, positions: FlowPositionsPort) -> None:
+    def __init__(self, flows: FlowRepositoryPort, checks: FlowChecks, activity: AccountActivityPort) -> None:
         self._flows = flows
         self._checks = checks
-        self._positions = positions
+        self._activity = activity
 
     def execute(self, command: ModifyFlowCommand) -> Flow:
         flow = self._flows.get(command.flow_id)
@@ -104,7 +104,11 @@ class ModifyFlowUseCase:
 
     def _require_removed_without_position(self, flow: Flow, assets: tuple[str, ...]) -> None:
         removed = tuple(asset for asset in flow.configuration.assets if asset not in assets)
-        held = tuple(asset for asset in removed if self._positions.committed_margin(flow.account_id, (asset,)) > 0)
+        if not removed:
+            return
+        # What the exchange shows of the account decides, as for the state of the flow (R1.6.1, ADR 0067).
+        open_assets = {position.asset for position in self._activity.activity(flow.account_id).positions}
+        held = tuple(asset for asset in removed if asset in open_assets)
         if held:
             raise AssetWithOpenPositionError(held)
 

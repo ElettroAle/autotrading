@@ -403,15 +403,14 @@ class FlowAccountsFromAccounts:
         return FlowAccount(account.exchange.value, balance.amount, balance.currency)
 
 
-class FlowPositionsFromAccountsAndOrders:
-    """Bridges the accounts and orders contexts to the flows context in the API (ADR 0055, ADR 0053).
+class FlowPositionsFromOrders:
+    """Bridges the orders context to the flows context in the API (ADR 0055).
 
-    The positions are read and closed by the worker, the only service holding the key (ADR 0023). The margin of a
-    position is what its opening committed: its size at the entry price over its leverage.
+    The positions are closed by the worker, the only service holding the key (ADR 0023). Their margin is the one the
+    exchange declares, read with the state of the flow (R1.6.1, ADR 0067).
     """
 
-    def __init__(self, account_state: AccountStatePort, closing: PositionClosingPort) -> None:
-        self._account_state = account_state
+    def __init__(self, closing: PositionClosingPort) -> None:
         self._closing = closing
 
     def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
@@ -427,22 +426,6 @@ class FlowPositionsFromAccountsAndOrders:
             # Not confirmed in time: the position may still be open, so it is reported as such.
             return PositionClosing(asset, refusal=outcome.status.value)
         return PositionClosing(asset, ClosingFill(outcome.average_price, outcome.executed_at, outcome.fee))
-
-    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
-        try:
-            positions = self._account_state.read_state(AccountId(account_id)).positions
-        except AccountNotFoundError as error:
-            raise FlowAccountNotFoundError from error
-        except (ExchangeUnavailableError, WorkerUnavailableError) as error:
-            raise FlowExchangeUnavailableError from error
-        return sum(
-            (
-                position.size * position.entry_price / position.leverage
-                for position in positions
-                if position.coin in assets
-            ),
-            Decimal(0),
-        )
 
 
 class ManualClosingRecorder(Protocol):
@@ -720,7 +703,7 @@ class TenantUseCaseFactory:
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         position_closing = HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id)
-        flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
+        flow_positions = FlowPositionsFromOrders(position_closing)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
         flow_openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
         stop_ports = StopPorts(

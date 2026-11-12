@@ -27,7 +27,7 @@ from autotrading.bootstrap import (
     AccountReadingFromAccounts,
     FlowAccountsFromAccounts,
     FlowDirectoryFromFlows,
-    FlowPositionsFromAccountsAndOrders,
+    FlowPositionsFromOrders,
     FlowSummariesFromFlows,
     ManualClosingsRecordedInFlows,
     ModelSettingsFromAgent,
@@ -149,7 +149,7 @@ class Platform:
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
-        flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
+        flow_positions = FlowPositionsFromOrders(position_closing)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions)
