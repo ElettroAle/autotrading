@@ -19,6 +19,7 @@ from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
     FlowLedgerIncompleteError,
+    FlowPositionMismatchError,
 )
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -360,6 +361,39 @@ def test_the_history_reads_back_what_it_told(world: World) -> None:
 
     assert world.ports.closed_positions.of_flow(world.flow.id) == world.closed.positions
     assert len(world.closed.positions) == 1
+
+
+# FlowStateFromFlows.read: the position the flow expects (Bug 155)
+
+
+def test_a_position_the_flow_does_not_expect_stops_the_cycle_at_its_start(world: World) -> None:
+    world.cycles.platform.activity_reader.activities[world.address] = an_activity(
+        positions=(a_position("BTC", size=Decimal("0.2")),)
+    )
+    world.cycles.platform.ledger.expect(world.flow.id, "BTC", Decimal("0.1"))
+
+    with pytest.raises(FlowPositionMismatchError) as raised:
+        FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+
+    assert str(raised.value) == "posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
+    assert raised.value.permanent
+
+
+def test_the_state_at_the_end_of_the_cycle_is_read_whatever_the_position(world: World) -> None:
+    world.cycles.platform.activity_reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
+
+    state = FlowStateFromFlows(world.cycles.directory, world.ports_of).update(world.flow.id.value, ())
+
+    assert isinstance(state, CycleFlow)
+
+
+def test_without_the_new_executions_the_positions_are_compared_at_the_next_cycle(world: World) -> None:
+    world.cycles.platform.activity_reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
+    world.cycles.platform.activity_reader.executions_reachable = False
+
+    snapshot = FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+
+    assert isinstance(snapshot.state, CycleFlow)
 
 
 # FlowStateFromFlows.update: the reconciliation of the account
