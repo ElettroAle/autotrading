@@ -56,6 +56,8 @@ class FakeOrderExchangeAdapter:
         self.fill_at: tuple[Decimal, Decimal] | None = None
         # The exchange stops answering once this many orders are executed.
         self.unreachable_after_orders: int | None = None
+        # The PnL every closing realizes, when a scenario fixes it.
+        self.realized_on_close = REALIZED_ON_CLOSE
 
     def hold(self, access: TradingAccess, position: HeldPosition) -> None:
         self.positions[access.account_address, position.coin] = position
@@ -107,7 +109,9 @@ class FakeOrderExchangeAdapter:
         fee = (size * price * FEE_RATE).quantize(Decimal("0.000001"))
         if self.fill_at is not None:
             price, fee = self.fill_at
-        execution = Execution(size, price, fee, REALIZED_ON_CLOSE if order.reduce_only else Decimal(0), EXECUTED_AT)
+        execution = Execution(
+            size, price, fee, self.realized_on_close if order.reduce_only else Decimal(0), EXECUTED_AT
+        )
         self.executions[order.id] = execution
         self._move_position(access, order, size)
         return execution
