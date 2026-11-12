@@ -1,9 +1,10 @@
 import hmac
 import logging
 import threading
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
@@ -37,8 +38,11 @@ from autotrading.domain.tenancy.user_id import UserId
 
 BEARER_PREFIX = "bearer "
 BOT_PAUSE_SECONDS = 5.0
+# Well under the punctuality of a cycle (R1.2.1): a cycle starts within seconds of its planned instant.
+CYCLE_PAUSE_SECONDS = 5.0
 
 bot_log = logging.getLogger("autotrading.notifications.bot")
+cycles_log = logging.getLogger("autotrading.cycles")
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +67,8 @@ class BotPolling:
     A round that fails waits a pause and tries again: Telegram or the database being away never stops the worker.
     """
 
+    thread_name = "telegram-bot"
+
     def __init__(self, answer_round: Callable[[], None], pause_seconds: float = BOT_PAUSE_SECONDS) -> None:
         self._answer_round = answer_round
         self._pause_seconds = pause_seconds
@@ -75,16 +81,54 @@ class BotPolling:
                 bot_log.warning("giro del bot Telegram fallito", exc_info=True)
                 stopping.wait(self._pause_seconds)
 
+
+class CyclePolling:
+    """Plans the cycles of every active flow, round after round, while the worker is up (ADR 0042).
+
+    Each round launches the cycles due and returns at once; a failing round is logged and the next one comes after
+    the same pause, so the database being away never stops the worker.
+    """
+
+    thread_name = "cycles"
+
+    def __init__(self, plan_round: Callable[[], None], pause_seconds: float = CYCLE_PAUSE_SECONDS) -> None:
+        self._plan_round = plan_round
+        self._pause_seconds = pause_seconds
+
+    def run(self, stopping: threading.Event) -> None:
+        while not stopping.is_set():
+            try:
+                self._plan_round()
+            except AutotradingError:
+                cycles_log.warning("giro di pianificazione dei cicli fallito", exc_info=True)
+            stopping.wait(self._pause_seconds)
+
+
+class BackgroundLoop(Protocol):
+    thread_name: str
+
+    def run(self, stopping: threading.Event) -> None: ...
+
+
+def background(loops: Sequence[BackgroundLoop]) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
+    """Each loop in a thread of its own for the life of the worker, told to stop when the worker stops."""
+
     @asynccontextmanager
-    async def lifespan(self, _: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         stopping = threading.Event()
-        threading.Thread(target=self.run, args=(stopping,), name="telegram-bot", daemon=True).start()
+        for loop in loops:
+            threading.Thread(target=loop.run, args=(stopping,), name=loop.thread_name, daemon=True).start()
         yield
         stopping.set()
 
+    return lifespan
+
 
 def create_worker_api(
-    token: str, for_tenant: Callable[[TenantId], WorkerUseCases], bot: BotPolling | None = None
+    token: str,
+    for_tenant: Callable[[TenantId], WorkerUseCases],
+    bot: BotPolling | None = None,
+    cycles: CyclePolling | None = None,
 ) -> FastAPI:
     """The internal service of the worker: reachable only by the API on the network of the installation (ADR 0021).
 
@@ -96,7 +140,7 @@ def create_worker_api(
         openapi_url=None,
         docs_url=None,
         redoc_url=None,
-        lifespan=None if bot is None else bot.lifespan,
+        lifespan=background([loop for loop in (bot, cycles) if loop is not None]),
     )
     install_error_responses(api)
 

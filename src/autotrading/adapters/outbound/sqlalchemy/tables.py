@@ -135,6 +135,9 @@ flows = Table(
     Column("name", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Stamped by the database on every change into "active": the first cycle falls there (R1.2.1, ADR 0042).
+    Column("cycle_anchor", DateTime(timezone=True)),
+    Column("pause_reason", Text),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="flows_account_of_tenant"
     ),
@@ -196,6 +199,21 @@ cycles = Table(
     Column("output_tokens", Integer),
     Column("cost_usd", Numeric),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+forecasts = Table(
+    "forecasts",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("asset", Text, primary_key=True),
+    Column("horizon_minutes", Integer, primary_key=True),
+    Column("made_at", DateTime(timezone=True), primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("last_price", Numeric, nullable=False),
+    Column("predicted_price", Numeric, nullable=False),
+    Column("history_days", Integer, nullable=False),
+    Column("shortened", Boolean, nullable=False),
+    Column("actual_price", Numeric),
 )
 
 closed_positions = Table(

@@ -5,6 +5,7 @@ import hashlib
 from autotrading.application.agent.errors import (
     ProviderKeyAlreadyRegisteredError,
     ProviderKeyNotFoundError,
+    ProviderKeyNotOpenedError,
     ProviderRejectedKeyError,
     ProviderUnavailableError,
 )
@@ -112,3 +113,16 @@ class FakeProviderKeyUsageAdapter:
 
     def flows_using(self, provider: ProviderName) -> list[str]:
         return list(self.flows.get(provider, []))
+
+
+class FakeProviderKeyOpenerAdapter:
+    """Recovers from the vault what the private key would: only a key sealed for its own tenant and provider."""
+
+    def __init__(self, vault: ProviderKeyVault) -> None:
+        self._vault = vault
+
+    def open(self, key: RegisteredProviderKey) -> ProviderKey:
+        tenant_id, provider, secret = self._vault.get(key.sealed.ciphertext, (None, None, None))
+        if (tenant_id, provider) != (key.tenant_id, key.provider) or secret is None:
+            raise ProviderKeyNotOpenedError(key.provider)
+        return secret

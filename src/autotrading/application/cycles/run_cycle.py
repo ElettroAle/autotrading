@@ -132,7 +132,7 @@ class RunCycleUseCase:
         )
         readings, absent = progress.run(
             CycleStep.COLLECT_SOURCES,
-            lambda: steps.sources.collect(flow_id, snapshot.sources, progress.command.schedule.source_wait),
+            lambda: steps.sources.collect(flow_id, planned_at, snapshot.sources, progress.command.schedule.source_wait),
             lambda collected: collected[0],
         )
         progress.absent = tuple(absent)

@@ -1,5 +1,6 @@
 """Fake of the repository of the flows: the database of every tenant, bound to one per request."""
 
+from collections.abc import Sequence
 from dataclasses import replace
 
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
@@ -17,6 +18,7 @@ class FlowStore:
 
     def __init__(self) -> None:
         self.flows: list[Flow] = []
+        self.pause_reasons: dict[FlowId, str] = {}
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
 
     def of(self, tenant_id: TenantId) -> list[Flow]:
@@ -66,3 +68,17 @@ class InMemoryFlowRepositoryAdapter:
 
     def _replace(self, flow: Flow) -> None:
         self._store.flows = [flow if each.id == flow.id else each for each in self._store.flows]
+
+
+class InMemoryAutomaticPauseAdapter:
+    """Bound to one tenant: pauses only its active flows, keeping the reason beside them."""
+
+    def __init__(self, store: FlowStore, tenant_id: TenantId) -> None:
+        self._store = store
+        self._tenant_id = tenant_id
+
+    def pause(self, flow_ids: Sequence[FlowId], reason: str) -> None:
+        for index, flow in enumerate(self._store.flows):
+            if flow.tenant_id == self._tenant_id and flow.id in flow_ids and flow.status is FlowStatus.ACTIVE:
+                self._store.flows[index] = replace(flow, status=FlowStatus.PAUSED)
+                self._store.pause_reasons[flow.id] = reason

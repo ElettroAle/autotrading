@@ -153,4 +153,5 @@ modules = [
     "autotrading.adapters.outbound.libsodium",
     "autotrading.adapters.outbound.hyperliquid",
     "autotrading.adapters.outbound.httpx",
+    "autotrading.adapters.outbound.threads",
 ]

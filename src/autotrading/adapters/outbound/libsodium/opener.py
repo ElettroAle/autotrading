@@ -26,7 +26,7 @@ class SodiumCredentialOpenerAdapter:
     """
 
     def __init__(self, private_keys: Mapping[int, bytes]) -> None:
-        self._boxes = {version: SealedBox(_private_key(raw)) for version, raw in private_keys.items()}
+        self._boxes = {version: SealedBox(private_key_of(raw)) for version, raw in private_keys.items()}
 
     def __repr__(self) -> str:
         return f"SodiumCredentialOpenerAdapter(key_versions={sorted(self._boxes)})"
@@ -53,7 +53,7 @@ class SodiumCredentialOpenerAdapter:
         return document
 
 
-def _private_key(raw: bytes) -> PrivateKey:
+def private_key_of(raw: bytes) -> PrivateKey:
     if len(raw) != PRIVATE_KEY_BYTES:
         raise InvalidPrivateCredentialsKeyError
     return PrivateKey(raw)

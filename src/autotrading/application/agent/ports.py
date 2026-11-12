@@ -26,6 +26,14 @@ class ProviderKeySealerPort(Protocol):
     def seal(self, provider: ProviderName, key: ProviderKey) -> SealedProviderKey: ...
 
 
+class ProviderKeyOpenerPort(Protocol):
+    """In the worker only: the private key of the installation never reaches the API (ADR 0007, ADR 0029)."""
+
+    def open(self, key: RegisteredProviderKey) -> ProviderKey:
+        """Raises ProviderKeyNotOpenedError when the sealed text is not of the tenant and provider of the key."""
+        ...
+
+
 class ProviderKeyRepositoryPort(Protocol):
     """Bound to the tenant of the request: it never sees the keys of another tenant."""
 

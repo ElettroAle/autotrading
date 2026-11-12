@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
@@ -93,6 +93,14 @@ class ExchangeLimitsPort(Protocol):
 
     def limits(self, asset: str) -> AssetLimits | None:
         """None when the exchange does not trade the asset. Raises FlowExchangeUnavailableError."""
+        ...
+
+
+class AutomaticPausePort(Protocol):
+    """Bound to the tenant of the flows it pauses."""
+
+    def pause(self, flow_ids: Sequence[FlowId], reason: str) -> None:
+        """Pauses the flows still active, with the reason of the automatic pause; the others stay as they are."""
         ...
 
 
