@@ -1,5 +1,5 @@
 # language: it
-@R1.4.4 @wip
+@R1.4.4
 Funzionalità: R1.4.4 Decisione dell'agente per ogni asset
   Come utente
   Voglio che l'agente restituisca a ogni ciclo una decisione strutturata per ciascun asset del flusso
