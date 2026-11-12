@@ -66,6 +66,7 @@ from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
@@ -784,6 +785,7 @@ class TenantUseCaseFactory:
             account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
             account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
             flow_ledger=SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id),
+            flow_operations=SqlAlchemyFlowOperationsAdapter(self._engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
             bot_identity=self._bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),

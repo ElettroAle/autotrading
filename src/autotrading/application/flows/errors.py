@@ -84,6 +84,15 @@ class AssetWithOpenPositionError(ApplicationError):
         self.assets = assets
 
 
+class OperationsCursorInvalidError(ApplicationError):
+    """The `after` of a page of operations is not one the platform gave (ADR 0074)."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("pagina delle operazioni non valida")
+
+
 class FlowLedgerIncompleteError(ApplicationError):
     """Part of the executions of the account is gone from the exchange before the platform recorded it: the totals of
     its flows can no longer be trusted, so every active flow of the account pauses (ADR 0063).

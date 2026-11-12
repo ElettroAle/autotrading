@@ -1,17 +1,26 @@
 import json
+import re
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.application.flows.list_account_operations import (
+    ListAccountOperationsCommand,
+    ListAccountOperationsUseCase,
+)
+from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand, ListFlowOperationsUseCase
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.ledger import ExecutionKind, FlowTotals
+from autotrading.domain.flows.operations import FUNDING, OperationsPage, OperationsQuery
 from autotrading.domain.flows.risk_limits import RiskLimits
+from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
+from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.support.activity import READ_AT, a_fill, a_payment, a_position
-from tests.support.attribution import AttributionBench, amount, step
+from tests.support.attribution import TENANT, AttributionBench, amount, step
 from tests.support.flow_cycles import FlowCycles
 
 scenarios("E1-flussi-autonomi/F1.6-capitale-dei-flussi/R1.6.1-stato-del-flusso-dall-exchange.feature")
@@ -293,3 +302,138 @@ def flow_state_in_context(flow_cycles: FlowCycles) -> dict[str, str]:
     state = flow_cycles.context()["stato_del_flusso"]
     assert isinstance(state, dict)
     return state
+
+
+CLOCK = r"(?P<{}>[0-9]{{2}}:[0-9]{{2}})"
+CLOCKS = re.compile(r"[0-9]{2}:[0-9]{2}")
+PURCHASES = re.compile(r'su "([^"]+)" alle ([0-9]{2}:[0-9]{2})')
+TODAY = READ_AT.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def at(clock: str) -> datetime:
+    hours, minutes = clock.split(":")
+    return TODAY + timedelta(hours=int(hours), minutes=int(minutes))
+
+
+def clock(name: str) -> str:
+    return CLOCK.format(name)
+
+
+def operations_of(bench: AttributionBench) -> InMemoryFlowOperationsAdapter:
+    return InMemoryFlowOperationsAdapter(bench.ledger, bench.accounts.values)
+
+
+def record_flow_fills(bench: AttributionBench, flow: str, asset: str, instants: list[datetime]) -> None:
+    owner = bench.flow(flow)
+    fills = []
+    for number, instant in enumerate(instants):
+        order = uuid4()
+        bench.orders.add(order, owner.account_id, owner.id)
+        fills.append(a_fill(asset, order, executed_at=instant, fill_id=f"{flow}-{number}"))
+    bench.extend(owner.account_id, fills=tuple(fills))
+    bench.record_executions(owner.account_id)
+
+
+def flow_operations(bench: AttributionBench) -> ListFlowOperationsUseCase:
+    return ListFlowOperationsUseCase(InMemoryFlowRepositoryAdapter(bench.store, TENANT), operations_of(bench))
+
+
+@pytest.fixture
+def pages() -> list[OperationsPage]:
+    return []
+
+
+@given(step(r'che il flusso "{flow}" ha {a} esecuzioni registrate su "{asset}", una al minuto'))
+def many_fills(bench: AttributionBench, flow: str, a: str, asset: str) -> None:
+    record_flow_fills(bench, flow, asset, [at("09:00") + timedelta(minutes=minute) for minute in range(int(a))])
+
+
+@given(step(r'che il flusso "{flow}" ha esecuzioni registrate su "{asset}" (?P<clocks>alle .+)'))
+def fills_at(bench: AttributionBench, flow: str, asset: str, clocks: str) -> None:
+    record_flow_fills(bench, flow, asset, [at(found) for found in CLOCKS.findall(clocks)])
+
+
+@given(step(r'che il flusso "{flow}" ha ricevuto un funding di {a} USDC su "{asset}" alle ' + clock("paid")))
+def funding_at(bench: AttributionBench, flow: str, a: str, asset: str, paid: str) -> None:
+    account_id = bench.flow(flow).account_id
+    bench.exchange.funding.setdefault(account_id, []).append(a_payment(asset, amount(a), paid_at=at(paid)))
+    bench.record_executions(account_id)
+
+
+@given(step(r'che sul conto "{account}" ci sono acquisti fuori dalla piattaforma (?P<purchases>su .+)'))
+def outside_purchases(bench: AttributionBench, account: str, purchases: str) -> None:
+    account_id = bench.account(account)
+    fills = tuple(
+        a_fill(asset, None, executed_at=at(instant), fill_id=f"fuori-{number}")
+        for number, (asset, instant) in enumerate(PURCHASES.findall(purchases))
+    )
+    bench.extend(account_id, fills=fills)
+    bench.record_executions(account_id)
+
+
+@when(step(r'"anna" consulta le operazioni del flusso "{flow}"'))
+def consult_operations(bench: AttributionBench, pages: list[OperationsPage], flow: str) -> None:
+    flow_id = bench.flow(flow).id.value
+    first = flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, OperationsQuery()))
+    pages.append(first)
+    if first.next is not None:
+        following = OperationsQuery(after=first.next)
+        pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, following)))
+
+
+@when(step(r'"anna" consulta le operazioni del flusso "{flow}" dalle ' + clock("since") + " alle " + clock("until")))
+def consult_period(bench: AttributionBench, pages: list[OperationsPage], flow: str, since: str, until: str) -> None:
+    query = OperationsQuery(since=at(since), until=at(until))
+    pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow(flow).id.value, query)))
+
+
+@when(step(r'"anna" consulta le operazioni del conto "{account}" senza flusso sull\'asset "{asset}"'))
+def consult_account(bench: AttributionBench, pages: list[OperationsPage], account: str, asset: str) -> None:
+    use_case = ListAccountOperationsUseCase(operations_of(bench))
+    pages.append(use_case.execute(ListAccountOperationsCommand(bench.account(account), OperationsQuery(asset=asset))))
+
+
+@then(step(r"vede {a} operazioni, dalla più recente"))
+def first_page(pages: list[OperationsPage], a: str) -> None:
+    instants = [operation.occurred_at for operation in pages[0].operations]
+    assert len(instants) == int(a)
+    assert instants == sorted(instants, reverse=True)
+    assert instants[0] == at("09:59")
+
+
+@then(step(r"la pagina successiva contiene le {a} operazioni più vecchie e nessun'altra pagina"))
+def second_page(pages: list[OperationsPage], a: str) -> None:
+    second = pages[1]
+    expected = [at("09:00") + timedelta(minutes=minute) for minute in reversed(range(int(a)))]
+    assert [operation.occurred_at for operation in second.operations] == expected
+    assert second.next is None
+
+
+@then(step(r"vede le esecuzioni delle " + clock("later") + " e delle " + clock("earlier") + ", in quest'ordine"))
+def executions_newest_first(pages: list[OperationsPage], later: str, earlier: str) -> None:
+    rows = [(operation.kind, operation.occurred_at) for operation in pages[0].operations]
+    assert rows == [(ExecutionKind.FLOW_ORDER.value, at(later)), (ExecutionKind.FLOW_ORDER.value, at(earlier))]
+
+
+@then(
+    step(
+        r"consultando dalle "
+        + clock("since")
+        + " alle "
+        + clock("until")
+        + " vede per primo il funding delle "
+        + clock("paid")
+    )
+)
+def funding_first(bench: AttributionBench, since: str, until: str, paid: str) -> None:
+    query = OperationsQuery(since=at(since), until=at(until))
+    page = flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow("alfa").id.value, query))
+    first = page.operations[0]
+    assert (first.kind, first.occurred_at, first.funding, first.size) == (FUNDING, at(paid), Decimal(2), None)
+    assert len(page.operations) == 3
+
+
+@then(step(r'vede solo l\'acquisto su "{asset}" delle ' + clock("bought")))
+def only_purchase(pages: list[OperationsPage], asset: str, bought: str) -> None:
+    rows = [(operation.asset, operation.occurred_at, operation.size) for operation in pages[0].operations]
+    assert rows == [(asset, at(bought), Decimal(1))]

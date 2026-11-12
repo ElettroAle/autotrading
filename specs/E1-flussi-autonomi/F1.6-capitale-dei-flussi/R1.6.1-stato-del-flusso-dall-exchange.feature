@@ -31,6 +31,11 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
   un'apertura il cui margine supera la liquidità disponibile (R1.5.3). Nel ciclo la liquidità disponibile non
   supera mai il margine libero del conto e non scende sotto zero.
 
+  Il registro delle operazioni si consulta: per un flusso, le sue esecuzioni e i suoi pagamenti di funding; per un
+  conto, le operazioni che non sono di nessun flusso. Le operazioni vanno dalla più recente, 50 per pagina; la
+  pagina successiva parte dall'ultima operazione vista. Si filtrano per asset e per periodo (inizio compreso, fine
+  esclusa).
+
   Fuori ambito: incasso dei profitti, rendimento corretto per incassi e prelievi.
 
   Contesto:
@@ -123,3 +128,22 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     Quando parte un ciclo del flusso "alfa" in cui l'agente apre "BTC" con quota 0,1 e leva 1
     Allora nessun ordine è inviato
     E i flussi "alfa" e "beta" sono in pausa con il motivo "registro delle esecuzioni incompleto"
+
+  Scenario: Le operazioni del flusso si consultano a pagine dalla più recente
+    Dato che il flusso "alfa" ha 60 esecuzioni registrate su "BTC", una al minuto
+    Quando "anna" consulta le operazioni del flusso "alfa"
+    Allora vede 50 operazioni, dalla più recente
+    E la pagina successiva contiene le 10 operazioni più vecchie e nessun'altra pagina
+
+  Scenario: Le operazioni del flusso si filtrano per periodo e comprendono il funding
+    Dato che il flusso "alfa" ha esecuzioni registrate su "BTC" alle 10:00, alle 11:00 e alle 12:00
+    E che il flusso "alfa" ha ricevuto un funding di 2 USDC su "BTC" alle 12:30
+    Quando "anna" consulta le operazioni del flusso "alfa" dalle 11:00 alle 12:30
+    Allora vede le esecuzioni delle 12:00 e delle 11:00, in quest'ordine
+    E consultando dalle 11:00 alle 13:00 vede per primo il funding delle 12:30
+
+  Scenario: Le operazioni del conto che non sono di nessun flusso si filtrano per asset
+    Dato che il flusso "alfa" ha esecuzioni registrate su "BTC" alle 10:00, alle 11:00 e alle 12:00
+    E che sul conto "test-1" ci sono acquisti fuori dalla piattaforma su "SOL" alle 12:10 e su "DOGE" alle 12:20
+    Quando "anna" consulta le operazioni del conto "test-1" senza flusso sull'asset "SOL"
+    Allora vede solo l'acquisto su "SOL" delle 12:10
