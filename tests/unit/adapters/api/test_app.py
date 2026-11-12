@@ -7,7 +7,7 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Person
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import AUTHORIZATION_URL, SETTINGS, TOKEN_URL, IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
@@ -30,7 +30,7 @@ def client_for(
     authentication = None
     if provider is not None:
         verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
-        authentication = Authentication(SETTINGS, verifier)
+        authentication = Authentication(SETTINGS, verifier, provider.login())
     resolve_tenant = ResolveTenantUseCase(tenants or InMemoryTenantRepositoryAdapter())
     health = HealthReport("1.2.1-dev.57", environment)
     return TestClient(create_api(health, resolve_tenant, Platform().for_tenant, authentication))
@@ -101,9 +101,38 @@ def test_openapi_page_logs_in_with_the_issuer_through_pkce(provider: IdentityPro
     schemes = client.get("/openapi.json").json()["components"]["securitySchemes"]
     page = client.get("/docs").text
 
-    assert schemes == {"OpenIdConnect": {"type": "openIdConnect", "openIdConnectUrl": SETTINGS.discovery_url}}
+    assert schemes == {
+        "OAuth2": {
+            "type": "oauth2",
+            "flows": {
+                "authorizationCode": {
+                    "authorizationUrl": AUTHORIZATION_URL,
+                    "tokenUrl": TOKEN_URL,
+                    "scopes": {SETTINGS.scope: "accesso ad AutoTrading"},
+                }
+            },
+        }
+    }
     assert '"usePkceWithAuthorizationCodeGrant": true' in page
     assert f'"clientId": "{SETTINGS.client_id}"' in page
+
+
+def test_every_function_of_the_openapi_page_asks_for_the_login_of_the_issuer(provider: IdentityProvider) -> None:
+    paths = client_for(provider=provider).get("/openapi.json").json()["paths"]
+
+    assert paths["/me"]["get"]["security"] == [{"OAuth2": []}]
+
+
+def test_openapi_page_waits_for_the_issuer_and_logs_in_once_it_answers(provider: IdentityProvider) -> None:
+    client = client_for(provider=provider)
+    provider.reachable = False
+
+    unavailable = client.get("/openapi.json")
+    provider.reachable = True
+    schemes = client.get("/openapi.json").json()["components"]["securitySchemes"]
+
+    assert (unavailable.status_code, reason_of(unavailable)) == (503, {"detail": "directory non raggiungibile"})
+    assert schemes["OAuth2"]["flows"]["authorizationCode"]["tokenUrl"] == TOKEN_URL
 
 
 def test_openapi_page_without_an_identity_provider_offers_a_plain_bearer_token() -> None:

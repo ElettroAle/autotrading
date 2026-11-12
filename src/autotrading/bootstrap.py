@@ -17,7 +17,12 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings, OidcSigningKeys
+from autotrading.adapters.inbound.api.authentication import (
+    AccessTokenVerifier,
+    AuthenticationSettings,
+    OidcLoginEndpoints,
+    OidcSigningKeys,
+)
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import BotPolling, CyclePolling, WorkerUseCases, create_worker_api
 from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
@@ -1058,7 +1063,11 @@ def _authentication(configuration: Mapping[str, str]) -> Authentication | None:
         client_id=_required(configuration, "AUTH_CLIENT_ID"),
         scope=_required(configuration, "AUTH_SCOPE"),
     )
-    return Authentication(settings, AccessTokenVerifier(settings, OidcSigningKeys(settings.discovery_url)))
+    return Authentication(
+        settings,
+        AccessTokenVerifier(settings, OidcSigningKeys(settings.discovery_url)),
+        OidcLoginEndpoints(settings.discovery_url),
+    )
 
 
 def _required(configuration: Mapping[str, str], name: str) -> str:

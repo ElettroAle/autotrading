@@ -44,7 +44,7 @@ def api(identity_provider: IdentityProvider, tenants: InMemoryTenantRepositoryAd
         HealthReport(version="1.0.0", environment="dev"),
         ResolveTenantUseCase(tenants),
         Platform().for_tenant,
-        Authentication(SETTINGS, verifier),
+        Authentication(SETTINGS, verifier, identity_provider.login()),
     )
 
 
