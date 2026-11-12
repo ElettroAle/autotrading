@@ -1,5 +1,5 @@
 # language: it
-@R1.5.3 @wip
+@R1.5.3
 Funzionalità: R1.5.3 Decisioni incoerenti con lo stato del flusso
   Come utente
   Voglio che le decisioni incoerenti con lo stato del flusso siano bloccate

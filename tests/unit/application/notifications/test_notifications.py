@@ -1,0 +1,257 @@
+import logging
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.errors import BotUnreachableError, ChatNotLinkedError
+from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
+from autotrading.application.notifications.link_chat import INVALID_CODE, LINKED, LinkChatCommand, LinkChatUseCase
+from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.ports import BotMessage, LinkStores
+from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
+from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
+from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.link_code import LinkCode
+from autotrading.domain.notifications.linked_chat import LinkedChat
+from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.bot_inbox import FakeBotInboxAdapter
+from tests.fakes.link_code_repository import (
+    InMemoryLinkCodeLookupAdapter,
+    InMemoryLinkCodeRepositoryAdapter,
+    LinkCodeStore,
+    RacedLinkCodeRepositoryAdapter,
+)
+from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.messenger import FakeMessengerAdapter
+
+NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
+ANNA, BRUNO = TenantId.new(), TenantId.new()
+CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
+FAILED = Notification.cycle_failed("alfa", "timeout")
+
+
+class Telegram:
+    """The stores and the bot of one test, with a clock the test moves."""
+
+    def __init__(self) -> None:
+        self.codes: LinkCodeStore = {}
+        self.chats: LinkedChatStore = {}
+        self.messenger = FakeMessengerAdapter()
+        self.now = NOW
+
+    def request_code(self, tenant_id: TenantId) -> str:
+        codes = InMemoryLinkCodeRepositoryAdapter(self.codes, tenant_id)
+        return RequestLinkCodeUseCase(tenant_id, codes, lambda: self.now).execute().code
+
+    def link_chat(self) -> LinkChatUseCase:
+        return LinkChatUseCase(
+            InMemoryLinkCodeLookupAdapter(self.codes), self.stores_for, self.messenger, lambda: self.now
+        )
+
+    def stores_for(self, tenant_id: TenantId) -> LinkStores:
+        return LinkStores(
+            InMemoryLinkCodeRepositoryAdapter(self.codes, tenant_id),
+            InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+        )
+
+    def send(self, chat_id: ChatId, message: str) -> None:
+        self.link_chat().execute(LinkChatCommand(chat_id, message))
+
+    def linked(self, tenant_id: TenantId) -> LinkedChat | None:
+        return GetLinkedChatUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)).execute()
+
+    def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:
+        NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger).execute(notification)
+
+
+@pytest.fixture
+def telegram() -> Telegram:
+    return Telegram()
+
+
+def test_a_requested_code_is_stored_as_a_digest_valid_fifteen_minutes(telegram: Telegram) -> None:
+    codes = InMemoryLinkCodeRepositoryAdapter(telegram.codes, ANNA)
+    issued = RequestLinkCodeUseCase(ANNA, codes, lambda: NOW).execute()
+
+    stored = codes.get(LinkCode(issued.code).digest)
+    assert stored is not None
+    assert (stored.issued_at, stored.used) == (NOW, False)
+    assert issued.expires_at == NOW + timedelta(minutes=15)
+    assert issued.code.encode() not in b"".join(telegram.codes)
+    assert issued.code not in repr(issued)
+
+
+def test_a_valid_code_links_the_chat_that_sent_it_and_answers_it(telegram: Telegram) -> None:
+    code = telegram.request_code(ANNA)
+    telegram.now = NOW + timedelta(minutes=15)
+
+    telegram.send(CHAT, f"/start {code.lower()}")
+
+    assert telegram.linked(ANNA) == LinkedChat(ANNA, CHAT)
+    assert telegram.messenger.sent == [(CHAT, LINKED)]
+
+
+def test_a_code_links_only_the_tenant_that_asked_for_it(telegram: Telegram) -> None:
+    code = telegram.request_code(ANNA)
+    telegram.request_code(BRUNO)
+
+    telegram.send(CHAT, code)
+
+    assert telegram.linked(BRUNO) is None
+
+
+def test_an_expired_code_links_nothing(telegram: Telegram) -> None:
+    code = telegram.request_code(ANNA)
+    telegram.now = NOW + timedelta(minutes=16)
+
+    telegram.send(CHAT, code)
+
+    assert telegram.linked(ANNA) is None
+    assert telegram.messenger.sent == [(CHAT, INVALID_CODE)]
+
+
+def test_a_code_links_one_chat_only(telegram: Telegram) -> None:
+    code = telegram.request_code(ANNA)
+    telegram.send(CHAT, code)
+
+    telegram.send(OTHER_CHAT, code)
+
+    assert telegram.linked(ANNA) == LinkedChat(ANNA, CHAT)
+    assert telegram.messenger.sent == [(CHAT, LINKED), (OTHER_CHAT, INVALID_CODE)]
+
+
+@pytest.mark.parametrize("message", ["ZZZZ9999", "", "/start"])
+def test_an_unknown_code_gets_the_same_answer_as_an_expired_one(telegram: Telegram, message: str) -> None:
+    telegram.send(CHAT, message)
+
+    assert telegram.chats == {}
+    assert telegram.messenger.sent == [(CHAT, INVALID_CODE)]
+
+
+def test_an_unknown_code_opens_the_stores_of_no_tenant(telegram: Telegram) -> None:
+    opened: list[TenantId] = []
+
+    def stores_for(tenant_id: TenantId) -> LinkStores:
+        opened.append(tenant_id)
+        return telegram.stores_for(tenant_id)
+
+    lookup = InMemoryLinkCodeLookupAdapter(telegram.codes)
+    LinkChatUseCase(lookup, stores_for, telegram.messenger, lambda: NOW).execute(LinkChatCommand(CHAT, "ZZZZ9999"))
+
+    assert opened == []
+
+
+def test_a_code_redeemed_meanwhile_by_another_chat_links_nothing(telegram: Telegram) -> None:
+    code = telegram.request_code(ANNA)
+    raced = LinkStores(
+        RacedLinkCodeRepositoryAdapter(telegram.codes, ANNA), InMemoryLinkedChatRepositoryAdapter(telegram.chats, ANNA)
+    )
+    link_chat = LinkChatUseCase(
+        InMemoryLinkCodeLookupAdapter(telegram.codes), lambda _: raced, telegram.messenger, lambda: NOW
+    )
+
+    link_chat.execute(LinkChatCommand(CHAT, code))
+
+    assert telegram.linked(ANNA) is None
+    assert telegram.messenger.sent == [(CHAT, INVALID_CODE)]
+
+
+def test_a_code_of_a_lookup_without_its_link_is_refused(telegram: Telegram) -> None:
+    code = telegram.request_code(ANNA)
+    lookup = InMemoryLinkCodeLookupAdapter(telegram.codes)
+    empty_stores = LinkStores(
+        InMemoryLinkCodeRepositoryAdapter({}, ANNA), InMemoryLinkedChatRepositoryAdapter(telegram.chats, ANNA)
+    )
+
+    LinkChatUseCase(lookup, lambda _: empty_stores, telegram.messenger, lambda: NOW).execute(
+        LinkChatCommand(CHAT, code)
+    )
+
+    assert telegram.messenger.sent == [(CHAT, INVALID_CODE)]
+    assert telegram.chats == {}
+
+
+def test_a_new_link_replaces_the_previous_chat(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+
+    telegram.send(OTHER_CHAT, telegram.request_code(ANNA))
+
+    assert telegram.linked(ANNA) == LinkedChat(ANNA, OTHER_CHAT)
+
+
+def test_an_answer_telegram_does_not_take_is_recorded_and_the_link_holds(
+    telegram: Telegram, caplog: pytest.LogCaptureFixture
+) -> None:
+    code = telegram.request_code(ANNA)
+    telegram.messenger.reachable = False
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
+        telegram.send(CHAT, code)
+
+    assert telegram.linked(ANNA) == LinkedChat(ANNA, CHAT)
+    assert [record.getMessage() for record in caplog.records] == ["risposta del bot non consegnata"]
+
+
+def test_unlinking_removes_the_chat(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+
+    UnlinkChatUseCase(InMemoryLinkedChatRepositoryAdapter(telegram.chats, ANNA)).execute()
+
+    assert telegram.linked(ANNA) is None
+
+
+def test_unlinking_without_a_linked_chat_is_not_found(telegram: Telegram) -> None:
+    with pytest.raises(ChatNotLinkedError, match=r"^nessuna chat Telegram collegata$") as raised:
+        UnlinkChatUseCase(InMemoryLinkedChatRepositoryAdapter(telegram.chats, ANNA)).execute()
+
+    assert raised.value.status_code == 404
+
+
+def test_a_notification_goes_to_the_chat_of_its_tenant_only(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+    telegram.send(OTHER_CHAT, telegram.request_code(BRUNO))
+    telegram.messenger.sent.clear()
+
+    telegram.notify(ANNA)
+
+    assert telegram.messenger.sent == [(CHAT, "alfa: ciclo fallito, timeout")]
+
+
+def test_without_a_linked_chat_nothing_is_sent(telegram: Telegram) -> None:
+    telegram.notify(ANNA)
+
+    assert telegram.messenger.sent == []
+
+
+def test_a_notification_telegram_does_not_take_is_recorded_without_failing(
+    telegram: Telegram, caplog: pytest.LogCaptureFixture
+) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+    telegram.messenger.reachable = False
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
+        telegram.notify(ANNA)
+
+    [record] = caplog.records
+    assert record.getMessage() == "invio della notifica fallito"
+    assert (record.__dict__["tenant_id"], record.__dict__["subject"]) == (str(ANNA.value), "alfa")
+
+
+def test_every_message_the_bot_receives_is_a_link_attempt(telegram: Telegram) -> None:
+    inbox = FakeBotInboxAdapter()
+    inbox.waiting = [BotMessage(CHAT, telegram.request_code(ANNA)), BotMessage(OTHER_CHAT, "hello")]
+
+    AnswerBotMessagesUseCase(inbox, telegram.link_chat()).execute()
+
+    assert telegram.messenger.sent == [(CHAT, LINKED), (OTHER_CHAT, INVALID_CODE)]
+    assert inbox.waiting == []
+
+
+def test_a_bot_round_without_telegram_fails_for_the_next_round_to_retry(telegram: Telegram) -> None:
+    inbox = FakeBotInboxAdapter()
+    inbox.reachable = False
+
+    with pytest.raises(BotUnreachableError, match=r"^bot Telegram non raggiungibile$"):
+        AnswerBotMessagesUseCase(inbox, telegram.link_chat()).execute()

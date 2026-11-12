@@ -1,5 +1,5 @@
 # language: it
-@R1.8.1 @wip
+@R1.8.1
 Funzionalità: R1.8.1 Collegamento di Telegram
   Come utente
   Voglio collegare la mia chat Telegram al mio tenant

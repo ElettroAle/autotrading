@@ -1,5 +1,6 @@
 import base64
 import binascii
+import logging
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -15,13 +16,19 @@ from sqlalchemy import Engine
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings, OidcSigningKeys
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
-from autotrading.adapters.inbound.api.worker import WorkerUseCases, create_worker_api
+from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases, create_worker_api
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
 from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
+from autotrading.adapters.outbound.httpx.telegram import (
+    HttpxTelegramInboxAdapter,
+    HttpxTelegramMessengerAdapter,
+    telegram_client,
+)
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
@@ -32,16 +39,45 @@ from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumPr
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
+    SqlAlchemyLinkCodeLookupAdapter,
+    SqlAlchemyLinkCodeRepositoryAdapter,
+)
+from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
-from autotrading.application.accounts.errors import AccountNotFoundError
+from autotrading.application.accounts.errors import (
+    AccountNotFoundError,
+    ExchangeUnavailableError,
+    WorkerUnavailableError,
+)
 from autotrading.application.accounts.get_account import find_account
-from autotrading.application.accounts.ports import AccountRepositoryPort, CredentialOpenerPort, ExchangePort
+from autotrading.application.accounts.ports import (
+    AccountRepositoryPort,
+    AccountStatePort,
+    CredentialOpenerPort,
+    ExchangePort,
+)
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
+from autotrading.application.agent.errors import ProviderKeyNotFoundError
+from autotrading.application.agent.ports import ProviderKeyRepositoryPort
+from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.errors import (
+    FlowAccountNotFoundError,
+    FlowExchangeUnavailableError,
+    InvalidFlowSettingError,
+)
+from autotrading.application.flows.ports import FlowAccount, FlowRepositoryPort, MarketsPort
+from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.errors import MessageNotDeliveredError
+from autotrading.application.notifications.link_chat import LinkChatUseCase
+from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.ports import LinkStores, MessengerPort
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -53,12 +89,27 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.agent.errors import (
+    ModelNotAvailableError,
+    ParameterNotSupportedError,
+    ParameterOutOfRangeError,
+    UnknownParameterError,
+)
+from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.errors import ModelRequiredError
+from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
+from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.domain.sources.errors import (
+    SourceNotAvailableError,
+    SourceParameterOutOfRangeError,
+    UnknownSourceParameterError,
+)
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
@@ -81,6 +132,9 @@ SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNAT
 # The models of the platform (R1.4.2): one added to the configuration file becomes selectable in every flow.
 MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
+TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
+
+operations = logging.getLogger("autotrading.bootstrap")
 
 
 class MissingConfigurationError(AutotradingError):
@@ -120,11 +174,92 @@ class WorkerConnection:
     token: str = field(repr=False)
 
 
-class ProviderKeyUsageBeforeFlows:
-    """No flow uses a provider yet: flows arrive with R1.1.1, which bridges the flows context here (ADR 0029)."""
+MODEL_REFUSALS = (ModelNotAvailableError, ParameterOutOfRangeError, ParameterNotSupportedError, UnknownParameterError)
+SOURCE_REFUSALS = (SourceNotAvailableError, SourceParameterOutOfRangeError, UnknownSourceParameterError)
 
-    def flows_using(self, provider: ProviderName) -> list[str]:  # noqa: ARG002 - the signature of the port
-        return []
+
+class ProviderKeyUsageFromFlows:
+    """Bridges the flows context to the agent context in the API (ADR 0031).
+
+    A key is in use while a flow active or paused runs on a model of its provider; a stopped flow runs no cycle.
+    """
+
+    def __init__(self, flows: FlowRepositoryPort) -> None:
+        self._flows = flows
+
+    def flows_using(self, provider: ProviderName) -> list[str]:
+        return [
+            flow.name.value
+            for flow in self._flows.list()
+            if flow.status.not_stopped and flow.model_provider == provider.value
+        ]
+
+
+class FlowAccountsFromAccounts:
+    """Bridges the accounts context to the flows context in the API (ADR 0031).
+
+    The account is looked up for the tenant first, then its balance is read now by the worker (R0.2.2).
+    """
+
+    def __init__(self, accounts: AccountRepositoryPort, account_state: AccountStatePort) -> None:
+        self._accounts = accounts
+        self._account_state = account_state
+
+    def account(self, account_id: UUID) -> FlowAccount:
+        try:
+            account = find_account(self._accounts, AccountId(account_id))
+            balance = self._account_state.read_state(account.id).balance
+        except AccountNotFoundError as error:
+            raise FlowAccountNotFoundError from error
+        except (ExchangeUnavailableError, WorkerUnavailableError) as error:
+            raise FlowExchangeUnavailableError from error
+        return FlowAccount(account.exchange.value, balance.amount, balance.currency)
+
+
+class ModelSettingsFromAgent:
+    """Bridges the agent context to the flows context in the API (ADR 0031).
+
+    A model of the catalog is usable only with a registered key of its provider (R1.4.1), and only with the
+    parameters it admits (R1.4.2); a refusal reaches the flow with the reason the agent context gives.
+    """
+
+    def __init__(self, catalog: ModelCatalog, keys: ProviderKeyRepositoryPort) -> None:
+        self._catalog = catalog
+        self._keys = keys
+
+    def selection(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
+        if not model.strip():
+            raise ModelRequiredError
+        try:
+            definition = self._catalog.find(model)
+            parameters = definition.settings(requested)
+        except MODEL_REFUSALS as error:
+            raise InvalidFlowSettingError(str(error)) from error
+        if self._keys.get(definition.provider) is None:
+            raise InvalidFlowSettingError(str(ProviderKeyNotFoundError(definition.provider)))
+        return ModelSelection(definition.name, parameters)
+
+
+class SourceSettingsFromSources:
+    """Bridges the sources context to the flows context (ADR 0031): a source of the catalog, its parameters checked."""
+
+    def __init__(self, catalog: SourceCatalog) -> None:
+        self._catalog = catalog
+
+    def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
+        try:
+            parameters = self._catalog.find(source).settings(requested)
+        except SOURCE_REFUSALS as error:
+            raise InvalidFlowSettingError(str(error)) from error
+        return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, parameters)
+
+
+@dataclass(frozen=True, slots=True)
+class ApiExchanges:
+    """The exchanges the API checks credentials and tradable assets on, on the network of the installation."""
+
+    accounts: Mapping[str, ExchangePort]
+    markets: Mapping[str, MarketsPort]
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,7 +377,7 @@ class TenantUseCaseFactory:
         self,
         engine: Engine,
         public_key: PublicCredentialsKey,
-        exchanges: Mapping[str, ExchangePort],
+        exchanges: ApiExchanges,
         worker: WorkerConnection,
         providers: httpx.Client,
     ) -> None:
@@ -255,21 +390,34 @@ class TenantUseCaseFactory:
     def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
         sealer = SodiumCredentialSealerAdapter(self._public_key.key, self._public_key.version, tenant_id)
+        account_state = HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id)
+        provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id)
+        flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         ports = TenantPorts(
             accounts=accounts,
             sealer=sealer,
-            exchanges=self._exchanges,
-            account_state=HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id),
+            exchanges=self._exchanges.accounts,
+            account_state=account_state,
             position_closing=HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id),
             verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
-            provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
+            provider_keys=provider_keys,
             provider_key_sealer=SodiumProviderKeySealerAdapter(
                 self._public_key.key, self._public_key.version, tenant_id
             ),
             provider_key_verifier=self._provider_key_verifier,
-            provider_key_usage=ProviderKeyUsageBeforeFlows(),
+            provider_key_usage=ProviderKeyUsageFromFlows(flows),
             model_catalog=MODEL_CATALOG,
+            flows=flows,
+            flow_checks=FlowChecks(
+                accounts=FlowAccountsFromAccounts(accounts, account_state),
+                markets=self._exchanges.markets,
+                models=ModelSettingsFromAgent(MODEL_CATALOG, provider_keys),
+                sources=SourceSettingsFromSources(SOURCE_CATALOG),
+            ),
+            link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
+            linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
+            clock=now,
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -283,11 +431,13 @@ class WorkerUseCaseFactory:
         opener: SodiumCredentialOpenerAdapter,
         exchanges: WorkerExchanges,
         settings: WorkerSettings,
+        messenger: MessengerPort,
     ) -> None:
         self._engine = engine
         self._opener = opener
         self._exchanges = exchanges
         self._settings = settings
+        self._messenger = messenger
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
@@ -307,7 +457,23 @@ class WorkerUseCaseFactory:
                 self._settings.environment,
                 now,
             ),
+            notify=NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger),
         )
+
+    def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
+        return LinkStores(
+            SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
+            SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
+        )
+
+
+class UnconfiguredMessenger:
+    """Stands for Telegram until the installation has the token of the bot: every notification is a recorded
+    failure, and the flows go on (ADR 0035).
+    """
+
+    def send(self, chat_id: ChatId, text: str) -> None:  # noqa: ARG002 - the signature of the port
+        raise MessageNotDeliveredError
 
 
 def now() -> datetime:
@@ -324,7 +490,7 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
     tenants = TenantUseCaseFactory(
         engine,
         PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
-        exchanges_for(health.environment),
+        ApiExchanges(exchanges_for(health.environment), markets_for(health.environment)),
         _worker_connection(configuration),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
@@ -339,13 +505,32 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     )
     exchanges = WorkerExchanges(exchanges_for(environment), order_exchanges_for(environment))
     settings = WorkerSettings(environment, slippage_from(configuration))
-    worker = WorkerUseCaseFactory(_database(configuration), opener, exchanges, settings)
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant)
+    engine = _database(configuration)
+    token = _optional_secret(configuration, TELEGRAM_BOT_SETTING)
+    client = None if token is None else telegram_client(token)
+    messenger: MessengerPort = UnconfiguredMessenger() if client is None else HttpxTelegramMessengerAdapter(client)
+    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, messenger)
+    bot = None if client is None else telegram_bot(engine, worker, client, messenger)
+    if bot is None:
+        operations.warning("bot Telegram non configurato: notifiche disattivate")
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot)
+
+
+def telegram_bot(
+    engine: Engine, worker: WorkerUseCaseFactory, client: httpx.Client, messenger: MessengerPort
+) -> BotPolling:
+    """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
+    link_chat = LinkChatUseCase(SqlAlchemyLinkCodeLookupAdapter(engine), worker.link_stores_for, messenger, now)
+    return BotPolling(AnswerBotMessagesUseCase(HttpxTelegramInboxAdapter(client), link_chat).execute)
 
 
 def exchanges_for(environment: str) -> dict[str, HyperliquidExchangeAdapter]:
     # The exchange network follows the installation: test networks in dev, real ones in prod (R0.2.1).
     return {HYPERLIQUID: HyperliquidExchangeAdapter.for_network(testnet=environment == "dev")}
+
+
+def markets_for(environment: str) -> dict[str, HyperliquidMarketsAdapter]:
+    return {HYPERLIQUID: HyperliquidMarketsAdapter.for_network(testnet=environment == "dev")}
 
 
 def order_exchanges_for(environment: str) -> dict[str, HyperliquidOrderExchangeAdapter]:
@@ -429,6 +614,14 @@ def _secret(configuration: Mapping[str, str], name: str) -> str:
     if not secret:
         raise MissingConfigurationError(name)
     return secret
+
+
+def _optional_secret(configuration: Mapping[str, str], name: str) -> str | None:
+    """A secret the installation may not have yet: unset, missing or empty means absent, never an error."""
+    location = configuration.get(name, "").strip()
+    if not location or not Path(location).is_file():
+        return None
+    return Path(location).read_text(encoding="utf-8").strip() or None
 
 
 def _environment(configuration: Mapping[str, str]) -> str:

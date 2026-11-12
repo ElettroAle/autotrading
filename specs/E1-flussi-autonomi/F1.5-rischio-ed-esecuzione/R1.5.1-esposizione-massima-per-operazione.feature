@@ -1,5 +1,5 @@
 # language: it
-@R1.5.1 @wip
+@R1.5.1
 Funzionalità: R1.5.1 Esposizione massima per operazione
   Come utente
   Voglio limitare quanto un'apertura può impegnare del capitale del flusso

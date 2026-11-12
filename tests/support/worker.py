@@ -6,6 +6,7 @@ from secrets import token_hex
 
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
+from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
@@ -17,6 +18,8 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
@@ -38,6 +41,8 @@ class Worker:
         self.order_exchange = FakeOrderExchangeAdapter()
         self.orders = InMemoryOrderRepositoryAdapter()
         self.runs = InMemoryVerificationRunRepositoryAdapter()
+        self.chats: LinkedChatStore = {}
+        self.messenger = FakeMessengerAdapter()
         self.exchange.trades_on(self.order_exchange)
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
@@ -57,6 +62,7 @@ class Worker:
                 "dev",
                 lambda: STARTED_AT,
             ),
+            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
         )
 
     def saved_account(self, tenant_id: TenantId = TENANT) -> Account:
