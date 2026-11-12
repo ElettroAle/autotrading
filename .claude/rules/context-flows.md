@@ -47,7 +47,11 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - Una posizione chiusa a mano (R0.3.2) entra nello storico del flusso che ha l'asset sul conto, col motivo
   "comando manuale", quando l'exchange conferma l'esecuzione (ADR 0061).
 - Il capitale allocato cambia in ogni stato tranne archiviato: versione nuova della configurazione più una riga
-  di cronologia; un aumento entro il capitale disponibile, una riduzione non sotto il margine impegnato (ADR 0053).
+  di cronologia; un aumento entro il capitale disponibile, una riduzione che non porta sotto zero la liquidità del
+  flusso letta dallo stato di R1.6.1 (ADR 0053, ADR 0068).
+- Il margine di una posizione è uno solo: quello che l'exchange dichiara (`marginUsed`, `AccountPosition.margin`),
+  in ogni controllo e vista; solo lo storico delle posizioni chiuse tiene il margine dell'esecuzione di apertura,
+  che l'exchange non dà più dopo la chiusura (ADR 0067).
 - Ordine del controllo del rischio: leva, poi esposizione, poi coerenza con lo stato, poi importo minimo.
 - Gli ordini passano dal contesto `orders` (apertura, chiusura, esito reale); `flows` non parla con
   l'exchange per inviare ordini.
@@ -66,8 +70,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `PlatformOrdersPort`: i `cloid` degli ordini registrati sul conto, con il flusso che li ha inviati (contesto `orders`).
 - `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).
 - `ClosedPositionsPort`: storico delle posizioni chiuse dei flussi (R1.7.2).
-- `FlowPositionsPort`: chiusura di una posizione del flusso attraverso il `worker` (fill o rifiuto) e margine
-  impegnato sugli asset (ADR 0055, ADR 0053); la modifica non toglie un asset con posizione aperta (R1.1.3).
+- `FlowPositionsPort`: chiusura di una posizione del flusso attraverso il `worker` (fill o rifiuto) (ADR 0055); la
+  modifica non toglie un asset con posizione aperta, letta da `AccountActivityPort` (R1.1.3, ADR 0067).
 - `FlowOpeningsPort`: ultima apertura eseguita del flusso su un asset, dagli ordini registrati (ADR 0055).
 - `RunningCyclePort`: attesa della fine del ciclo in corso; advisory lock PostgreSQL con la chiave `lock_key`
   che l'esecutore dei cicli tiene per tutto il ciclo (ADR 0042, ADR 0055).
