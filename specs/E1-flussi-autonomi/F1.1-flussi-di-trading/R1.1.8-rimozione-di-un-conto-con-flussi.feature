@@ -1,5 +1,5 @@
 # language: it
-@R1.1.8 @wip
+@R1.1.8
 Funzionalità: R1.1.8 Rimozione di un conto con flussi assegnati
   Come utente
   Voglio che la rimozione di un conto fermi prima i flussi che vi operano

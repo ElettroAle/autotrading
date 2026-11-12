@@ -5,7 +5,9 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.accounts.removal import FlowPositionLeftOpen
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.tenancy.user_id import UserId
 
 
 class ExchangePort(Protocol):
@@ -63,4 +65,20 @@ class AccountRepositoryPort(Protocol):
 
         Raises AccountNotFoundError when the tenant has no such account, also when it was already removed.
         """
+        ...
+
+
+class AccountFlowsPort(Protocol):
+    """Bound to the tenant of the request: the flows that run on an account (R1.1.8)."""
+
+    def operating(self, account_id: AccountId) -> tuple[str, ...]:
+        """The names of the flows of the account that are active or paused."""
+        ...
+
+    def stop(self, account_id: AccountId, user_id: UserId) -> tuple[FlowPositionLeftOpen, ...]:
+        """Stops every active or paused flow of the account closing its positions (R1.1.5); those left open."""
+        ...
+
+    def archive(self, account_id: AccountId) -> None:
+        """Archives every flow of the account not archived yet: all of them are stopped by now."""
         ...

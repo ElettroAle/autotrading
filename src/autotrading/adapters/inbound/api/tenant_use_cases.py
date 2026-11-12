@@ -5,6 +5,7 @@ from datetime import datetime
 from autotrading.application.accounts.get_account import GetAccountUseCase
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
 from autotrading.application.accounts.ports import (
+    AccountFlowsPort,
     AccountRepositoryPort,
     AccountStatePort,
     CredentialSealerPort,
@@ -31,21 +32,25 @@ from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectory
 from autotrading.application.cycles.read_cycle import ReadCycleUseCase
 from autotrading.application.cycles.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
+from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
     ClosedPositionRepositoryPort,
+    FlowPositionsPort,
     FlowRepositoryPort,
     PlatformOrdersPort,
 )
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
@@ -79,6 +84,9 @@ class TenantPorts:
     model_catalog: ModelCatalog
     flows: FlowRepositoryPort
     flow_checks: FlowChecks
+    flow_positions: FlowPositionsPort
+    stop_ports: StopPorts
+    account_flows: AccountFlowsPort
     account_activity: AccountActivityPort
     platform_orders: PlatformOrdersPort
     link_codes: LinkCodeRepositoryPort
@@ -122,6 +130,9 @@ class TenantUseCases:
     compare_flow_versions: CompareFlowVersionsUseCase
     change_flow_status: ChangeFlowStatusUseCase
     archive_flow: ArchiveFlowUseCase
+    stop_flow: StopFlowUseCase
+    change_allocated_capital: ChangeAllocatedCapitalUseCase
+    list_capital_changes: ListCapitalChangesUseCase
     list_closed_positions: ListClosedPositionsUseCase
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
@@ -139,7 +150,7 @@ class TenantUseCases:
             get_account=GetAccountUseCase(accounts),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
-            remove_account=RemoveAccountUseCase(accounts, ports.account_state),
+            remove_account=RemoveAccountUseCase(accounts, ports.account_state, ports.account_flows),
             close_position=ClosePositionUseCase(ports.position_closing),
             run_verification=RunVerificationUseCase(ports.verification),
             list_sources=ListSourcesUseCase(ports.source_catalog),
@@ -161,6 +172,11 @@ class TenantUseCases:
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
             change_flow_status=ChangeFlowStatusUseCase(ports.flows),
             archive_flow=ArchiveFlowUseCase(ports.flows),
+            stop_flow=StopFlowUseCase(ports.flows, ports.stop_ports),
+            change_allocated_capital=ChangeAllocatedCapitalUseCase(
+                ports.flows, ports.flow_checks.accounts, ports.flow_positions, ports.clock
+            ),
+            list_capital_changes=ListCapitalChangesUseCase(ports.flows),
             list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),

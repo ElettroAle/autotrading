@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
@@ -8,12 +9,16 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
+from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
 from autotrading.application.flows.free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
+from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
+from autotrading.application.flows.stop_flow import StopFlowCommand
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_command import FlowCommand
@@ -22,6 +27,8 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital, amount_text
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
+from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
+from autotrading.domain.tenancy.user_id import UserId
 
 
 class SourceSelectionRequest(BaseModel):
@@ -219,7 +226,52 @@ class FreeCapitalResponse(BaseModel):
         return cls(amount=amount_text(capital.amount), currency=capital.currency)
 
 
-def flows_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
+class PositionLeftOpenResponse(BaseModel):
+    asset: str
+    reason: str
+
+    @classmethod
+    def of(cls, position: PositionLeftOpen) -> PositionLeftOpenResponse:
+        return cls(asset=position.asset, reason=position.reason)
+
+
+class StopOutcomeResponse(BaseModel):
+    """The flow stopped and the positions the exchange did not close, each with its reason (R1.1.5)."""
+
+    flow: FlowResponse
+    left_open: list[PositionLeftOpenResponse]
+
+    @classmethod
+    def of(cls, outcome: StopOutcome) -> StopOutcomeResponse:
+        return cls(
+            flow=FlowResponse.of(outcome.flow),
+            left_open=[PositionLeftOpenResponse.of(position) for position in outcome.left_open],
+        )
+
+
+class CapitalChangeRequest(BaseModel):
+    allocated_capital: Decimal
+
+
+class CapitalChangeResponse(BaseModel):
+    changed_at: datetime
+    previous: str
+    new: str
+    user_id: str
+
+    @classmethod
+    def of(cls, change: CapitalChange) -> CapitalChangeResponse:
+        return cls(
+            changed_at=change.changed_at,
+            previous=amount_text(change.previous),
+            new=amount_text(change.new),
+            user_id=change.user_id.value,
+        )
+
+
+def flows_router(
+    use_cases_of_request: Callable[..., TenantUseCases], user_of_request: Callable[..., UserId]
+) -> APIRouter:
     router = APIRouter(tags=["flussi"])
 
     @router.post("/flows", status_code=status.HTTP_201_CREATED)
@@ -261,6 +313,31 @@ def flows_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRout
         flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.archive_flow.execute(ArchiveFlowCommand(FlowId(flow_id))))
+
+    @router.post("/flows/{flow_id}/stop")
+    def stop_flow(
+        flow_id: UUID,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        user_id: Annotated[UserId, Depends(user_of_request)],
+    ) -> StopOutcomeResponse:
+        return StopOutcomeResponse.of(use_cases.stop_flow.execute(StopFlowCommand(FlowId(flow_id), user_id)))
+
+    @router.put("/flows/{flow_id}/allocated-capital")
+    def change_allocated_capital(
+        flow_id: UUID,
+        request: CapitalChangeRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        user_id: Annotated[UserId, Depends(user_of_request)],
+    ) -> FlowResponse:
+        command = ChangeAllocatedCapitalCommand(FlowId(flow_id), request.allocated_capital, user_id)
+        return FlowResponse.of(use_cases.change_allocated_capital.execute(command))
+
+    @router.get("/flows/{flow_id}/capital-changes")
+    def list_capital_changes(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> list[CapitalChangeResponse]:
+        changes = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(FlowId(flow_id)))
+        return [CapitalChangeResponse.of(change) for change in changes]
 
     @router.post("/flows/{flow_id}/{action}")
     def change_flow_status(

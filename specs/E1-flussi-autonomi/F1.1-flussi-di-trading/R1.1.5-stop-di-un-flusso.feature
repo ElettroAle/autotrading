@@ -1,5 +1,5 @@
 # language: it
-@R1.1.5 @wip
+@R1.1.5
 Funzionalità: R1.1.5 Stop di un flusso
   Come utente
   Voglio fermare un flusso chiudendone le posizioni

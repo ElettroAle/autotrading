@@ -6,6 +6,7 @@ from uuid import UUID
 
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, PlatformOrders
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -14,7 +15,9 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
+from autotrading.domain.tenancy.user_id import UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,12 +63,49 @@ class FlowRepositoryPort(Protocol):
         """Saves the configuration of the flow as a new version, the others untouched. Raises FlowNotFoundError."""
         ...
 
+    def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
+        """Saves, together, the version with the new capital and the change in its history. Raises FlowNotFoundError."""
+        ...
+
+    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
+        """The changes of the capital allocated to the flow, oldest first. Raises FlowNotFoundError."""
+        ...
+
 
 class FlowAccountPort(Protocol):
     """Bound to the tenant of the request."""
 
     def account(self, account_id: UUID) -> FlowAccount:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the balance cannot be read."""
+        ...
+
+
+class FlowPositionsPort(Protocol):
+    """Bound to the tenant of the request: the positions of a flow are those of its account on its assets (R1.1.2)."""
+
+    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
+        """Closes the whole position on the asset, through the worker that holds the key (ADR 0023).
+
+        None when there was no position; otherwise the fill, or the reason the exchange or the worker gave.
+        """
+        ...
+
+    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
+        """The margin the open positions on the assets hold now. Raises FlowExchangeUnavailableError."""
+        ...
+
+
+class FlowOpeningsPort(Protocol):
+    """Bound to the tenant of the request: the openings the flows sent, from the orders the platform recorded."""
+
+    def last_opening(self, flow_id: FlowId, asset: str) -> PositionOpening | None:
+        """The last executed order of the flow that opened a position on the asset, or None if it never did."""
+        ...
+
+
+class RunningCyclePort(Protocol):
+    def wait_until_finished(self, flow_id: FlowId) -> None:
+        """Returns once no cycle of the flow is running, across processes; at once when none is (R1.1.5)."""
         ...
 
 

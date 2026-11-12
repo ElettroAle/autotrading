@@ -26,7 +26,8 @@ class Removal:
     failures: list[AutotradingError] = field(default_factory=list)
 
     def attempt(self, user: str, account: str, *, confirmed: bool) -> None:
-        command = RemoveAccountCommand(self.platform.account_named(user, account).id, confirmed=confirmed)
+        account_id = self.platform.account_named(user, account).id
+        command = RemoveAccountCommand(account_id, self.platform.user_id_of(user), confirmed=confirmed)
         try:
             self.platform.use_cases_of(user).remove_account.execute(command)
         except AutotradingError as error:
