@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     HyperliquidSdk,
     OfficialSdk,
 )
+from autotrading.adapters.outbound.hyperliquid.user_state import UserPosition, user_state_of
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -45,15 +46,15 @@ class HyperliquidAccountActivityAdapter:
     def activity(self, address: str) -> AccountActivity:
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)
-            state = info.user_state(address)
+            state = user_state_of(info.user_state(address))
             ledger = info.user_non_funding_ledger_updates(address, FROM_THE_START)
             return AccountActivity(
                 currency=MARGIN_CURRENCY,
-                balance=_decimal(state["marginSummary"]["accountValue"]),
-                available_margin=_decimal(state["withdrawable"]),
-                positions=tuple(_position_of(entry["position"]) for entry in state["assetPositions"]),
+                balance=state.account_value,
+                available_margin=state.withdrawable,
+                positions=tuple(_position_of(position) for position in state.positions),
                 movements=tuple(movement for update in ledger if (movement := _movement_of(update, address))),
-                read_at=_instant(state["time"]),
+                read_at=state.read_at,
             )
 
 
@@ -66,14 +67,13 @@ def translated() -> Iterator[None]:
         raise FlowExchangeUnavailableError from error
 
 
-def _position_of(position: Mapping[str, Any]) -> AccountPosition:
-    size = _decimal(position["szi"])
+def _position_of(position: UserPosition) -> AccountPosition:
     return AccountPosition(
-        asset=str(position["coin"]),
-        side=TradeSide.LONG if size > 0 else TradeSide.SHORT,
-        size=abs(size),
-        margin=_decimal(position["marginUsed"]),
-        unrealized_pnl=_decimal(position["unrealizedPnl"]),
+        asset=position.coin,
+        side=TradeSide.LONG if position.signed_size > 0 else TradeSide.SHORT,
+        size=abs(position.signed_size),
+        margin=position.margin,
+        unrealized_pnl=position.unrealized_pnl,
     )
 
 

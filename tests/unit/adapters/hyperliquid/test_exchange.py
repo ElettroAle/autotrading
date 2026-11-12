@@ -41,6 +41,7 @@ LONG_BTC = {
     "entryPx": "60000.0",
     "unrealizedPnl": "12.5",
     "liquidationPx": "31000.0",
+    "marginUsed": "600.0",
 }
 
 

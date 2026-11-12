@@ -198,7 +198,7 @@ def test_a_closing_without_an_opening_of_the_flow_is_notified_but_has_no_history
 
 
 def outside(world: World, pnl: str) -> OutsideClosing:
-    return OutsideClosing(world.flow.id, "BTC", "liquidazione", Decimal(pnl), Decimal("0.5"), CLOSED_AT)
+    return OutsideClosing(world.flow.id, "BTC", Decimal(pnl), Decimal("0.5"), CLOSED_AT)
 
 
 def closed_positions(world: World) -> ClosedPositionsFromOpenings:
@@ -459,7 +459,7 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: W
         [
             "test-1: posizione non attribuibile su SOL",
             "test-1: esecuzione non attribuibile su ETH",
-            "test-1: movimento non attribuibile di -25,5 USDC",
+            "test-1: movimento non attribuibile di -25,50 USDC",
         ]
     )
 

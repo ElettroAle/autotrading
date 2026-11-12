@@ -38,3 +38,8 @@ class AccountActivity:
     positions: tuple[AccountPosition, ...]
     movements: tuple[BalanceMovement, ...]
     read_at: datetime
+
+    @property
+    def open_assets(self) -> frozenset[str]:
+        """The assets with a position open on the account: the one place that decides it for the flows context."""
+        return frozenset(position.asset for position in self.positions)

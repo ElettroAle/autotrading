@@ -78,7 +78,7 @@ def test_risk_limits_need_the_leverage_and_one_exposure() -> None:
 
 def test_the_maximum_leverage_is_required_before_anything_else() -> None:
     with pytest.raises(MaxLeverageRequiredError, match=r"^la leva massima è obbligatoria$"):
-        RiskLimits(None)
+        RiskLimits.of(None)
 
 
 def test_at_least_one_exposure_is_required() -> None:

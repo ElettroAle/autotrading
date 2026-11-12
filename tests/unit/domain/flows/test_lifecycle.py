@@ -163,8 +163,8 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("istruzioni", "prudente", "aggressivo"),
         ConfigurationDifference("leva massima", "5", "3"),
         ConfigurationDifference("esposizione massima del margine", "10%", "nessuno"),
-        ConfigurationDifference("esposizione massima del valore", "nessuno", "12.5%"),
-        ConfigurationDifference("capitale allocato", "100", "250.5"),
+        ConfigurationDifference("esposizione massima del valore", "nessuno", "12,5%"),
+        ConfigurationDifference("capitale allocato", "100", "250,50"),
         ConfigurationDifference("porta al minimo", "no", "sì"),
     )
 

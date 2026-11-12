@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState, number
+from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import (
     Adjustment,
@@ -186,14 +186,6 @@ def test_a_close_without_an_open_position_is_blocked() -> None:
 
 def test_a_hold_stays_a_hold() -> None:
     assert check().outcome(HoldIntent("SOL"), None) == HeldPosition("SOL")
-
-
-@pytest.mark.parametrize(
-    ("amount", "text"),
-    [(Decimal("40.00"), "40"), (Decimal("0.5"), "0,5"), (Decimal(100), "100"), (Decimal("4.20"), "4,2")],
-)
-def test_numbers_are_written_as_the_user_reads_them(amount: Decimal, text: str) -> None:
-    assert number(amount) == text
 
 
 def test_an_approved_opening_commits_the_liquidity_for_the_next_decisions() -> None:

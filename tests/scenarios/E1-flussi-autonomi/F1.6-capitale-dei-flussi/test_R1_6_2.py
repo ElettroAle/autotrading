@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.notifications.chat_id import ChatId
@@ -188,7 +189,9 @@ def flow_status(bench: AttributionBench, flow: str, status: str) -> None:
 @then(step(r'la posizione su "{asset}" compare nello storico del flusso "{flow}" come chiusa con il motivo "{reason}"'))
 def closed_in_history(bench: AttributionBench, asset: str, flow: str, reason: str) -> None:
     flow_id = bench.flow(flow).id
-    assert [(c.asset, c.reason) for c in bench.closed.closed if c.flow_id == flow_id] == [(asset, reason)]
+    # Every closing reported outside the platform enters the history with this one reason (ADR 0045).
+    assert [c.asset for c in bench.closed.closed if c.flow_id == flow_id] == [asset]
+    assert reason == CloseReason.OUTSIDE_PLATFORM
 
 
 @then(step(r'è registrata per il conto "{account}" una variazione del saldo non attribuibile di {a} USDC'))

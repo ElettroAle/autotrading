@@ -107,7 +107,7 @@ class ModifyFlowUseCase:
         if not removed:
             return
         # What the exchange shows of the account decides, as for the state of the flow (R1.6.1, ADR 0067).
-        open_assets = {position.asset for position in self._activity.activity(flow.account_id).positions}
+        open_assets = self._activity.activity(flow.account_id).open_assets
         held = tuple(asset for asset in removed if asset in open_assets)
         if held:
             raise AssetWithOpenPositionError(held)

@@ -8,11 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.errors import OperationsCursorInvalidError
 from autotrading.application.flows.list_account_operations import ListAccountOperationsCommand
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand
-from autotrading.domain.flows.free_capital import amount_text
 from autotrading.domain.flows.operations import (
     Operation,
     OperationCursor,

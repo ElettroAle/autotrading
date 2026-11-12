@@ -23,7 +23,7 @@ from autotrading.domain.tenancy.tenant_owned import TenantOwned
         ),
         (
             Notification.position_closed("alfa", "ETH", Amount(Decimal("-0.5"), "USDC")),
-            "alfa: chiusa ETH, PnL -0,5 USDC",
+            "alfa: chiusa ETH, PnL -0,50 USDC",
         ),
         (Notification.cycle_failed("alfa", "timeout"), "alfa: ciclo fallito, timeout"),
         (Notification.order_rejected("alfa", "Order rejected"), "alfa: ordine rifiutato, Order rejected"),
@@ -35,7 +35,7 @@ from autotrading.domain.tenancy.tenant_owned import TenantOwned
         (Notification.unattributable_fill("conto-1", "ETH"), "conto-1: esecuzione non attribuibile su ETH"),
         (
             Notification.unattributable_movement("conto-1", Amount(Decimal("12.5"), "USDC")),
-            "conto-1: movimento non attribuibile di 12,5 USDC",
+            "conto-1: movimento non attribuibile di 12,50 USDC",
         ),
     ],
 )

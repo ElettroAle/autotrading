@@ -130,7 +130,7 @@ def test_a_position_closed_outside_closes_at_the_price_its_pnl_implies(
     side: TradeSide, pnl: Decimal, price: Decimal
 ) -> None:
     flow = a_flow(TENANT)
-    closing = OutsideClosing(flow.id, "BTC", "chiusa fuori dalla piattaforma", pnl, Decimal("0.05"), CLOSED_AT)
+    closing = OutsideClosing(flow.id, "BTC", pnl, Decimal("0.05"), CLOSED_AT)
 
     closed = opening(side).closed_outside(flow, closing)
 
@@ -171,6 +171,6 @@ def test_a_position_closed_without_a_reported_result_measures_the_price_move() -
 
 def test_a_position_closed_outside_keeps_the_result_the_exchange_reported() -> None:
     flow = a_flow(TENANT)
-    closing = OutsideClosing(flow.id, "BTC", "chiusa fuori dalla piattaforma", Decimal(-7), Decimal("0.05"), CLOSED_AT)
+    closing = OutsideClosing(flow.id, "BTC", Decimal(-7), Decimal("0.05"), CLOSED_AT)
 
     assert opening(TradeSide.LONG).closed_outside(flow, closing).realized_pnl == Decimal(-7)

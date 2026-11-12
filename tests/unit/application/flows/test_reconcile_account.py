@@ -7,7 +7,7 @@ import pytest
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
-from autotrading.domain.flows.account_reconciliation import OUTSIDE_PLATFORM, AccountReading
+from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -161,7 +161,7 @@ def test_a_position_closed_outside_enters_the_history_of_the_flow(bench: Bench) 
 
     outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
 
-    assert [(closing.asset, closing.reason) for closing in bench.closed.closed] == [("BTC", OUTSIDE_PLATFORM)]
+    assert [closing.asset for closing in bench.closed.closed] == ["BTC"]
     assert outcome.closed_outside == tuple(bench.closed.closed)
 
 

@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 
+from autotrading.domain.agent.agent_response import LOWEST_LEVERAGE
 from autotrading.domain.agent.decision import TradeAction, TradeDirection
 from autotrading.domain.agent.errors import InvalidAgentContextError
 
-LOWEST_LEVERAGE = 1
 MINUTE = timedelta(minutes=1)
 
 
