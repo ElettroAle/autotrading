@@ -32,6 +32,7 @@ from autotrading.domain.tenancy.tenant_owned import TenantOwned
             "alfa: in pausa, credito esaurito presso openrouter",
         ),
         (Notification.unattributable_position("conto-1", "SOL"), "conto-1: posizione non attribuibile su SOL"),
+        (Notification.unattributable_fill("conto-1", "ETH"), "conto-1: esecuzione non attribuibile su ETH"),
         (
             Notification.unattributable_movement("conto-1", Amount(Decimal("12.5"), "USDC")),
             "conto-1: movimento non attribuibile di 12,5 USDC",

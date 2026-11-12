@@ -1,5 +1,5 @@
 # language: it
-@R1.8.2 @wip
+@R1.8.2
 Funzionalità: R1.8.2 Notifiche essenziali su Telegram
   Come utente
   Voglio ricevere su Telegram gli eventi importanti dei miei flussi
