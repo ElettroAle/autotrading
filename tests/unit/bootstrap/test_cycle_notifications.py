@@ -4,7 +4,7 @@ import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine
@@ -15,7 +15,11 @@ from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowT
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.cycles.ports import ScheduledFlow
-from autotrading.application.flows.errors import FlowCredentialsRejectedError, FlowExchangeUnavailableError
+from autotrading.application.flows.errors import (
+    FlowCredentialsRejectedError,
+    FlowExchangeUnavailableError,
+    FlowLedgerIncompleteError,
+)
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.bootstrap import (
@@ -32,6 +36,7 @@ from autotrading.bootstrap import (
     _follow_order,
     activity_readers_for,
     exchanges_for,
+    executions_readers_for,
     order_exchanges_for,
 )
 from autotrading.domain.agent.provider_name import ProviderName
@@ -311,6 +316,21 @@ def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: Wor
     assert world.received == [f"alfa: in pausa, {error}"]
 
 
+def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(world: World) -> None:
+    beta = world.cycles.add_flow(USER, "beta")
+    error = FlowLedgerIncompleteError(world.flow.account_id)
+    elsewhere = replace(beta, account_id=uuid4())
+    world.cycles.platform.flows.flows[world.cycles.platform.flows.flows.index(beta)] = elsewhere
+
+    FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
+
+    assert {flow.name.value: flow.status for flow in world.cycles.platform.flows.flows} == {
+        "alfa": FlowStatus.PAUSED,
+        "beta": FlowStatus.ACTIVE,
+    }
+    assert world.received == ["alfa: in pausa, registro delle esecuzioni incompleto"]
+
+
 # FlowStateFromFlows.read: the beginning of the flow
 
 
@@ -352,9 +372,9 @@ def update(world: World) -> object:
 def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: World) -> None:
     reader = world.cycles.platform.activity_reader
     update(world)
+    reader.executions[world.address] = [a_fill("ETH", None, executed_at=CLOSED_AT)]
     reader.activities[world.address] = an_activity(
         positions=(a_position("SOL"),),
-        fills=(a_fill("ETH", None, executed_at=CLOSED_AT),),
         movements=(a_movement(Decimal("-25.5"), moved_at=CLOSED_AT),),
         read_at=CLOSED_AT + timedelta(minutes=1),
     )
@@ -375,10 +395,8 @@ def test_a_position_of_the_flow_closed_outside_is_notified_with_its_pnl(world: W
     reader = world.cycles.platform.activity_reader
     reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
     update(world)
-    reader.activities[world.address] = an_activity(
-        fills=(a_fill("BTC", None, realized_pnl=Decimal("-10"), executed_at=CLOSED_AT),),
-        read_at=CLOSED_AT + timedelta(minutes=1),
-    )
+    reader.executions[world.address] = [a_fill("BTC", None, realized_pnl=Decimal("-10"), executed_at=CLOSED_AT)]
+    reader.activities[world.address] = an_activity(read_at=CLOSED_AT + timedelta(minutes=1))
 
     update(world)
 
@@ -408,7 +426,9 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
 
 
 def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
-    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"))
+    exchanges = WorkerExchanges(
+        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+    )
     messenger = FakeMessengerAdapter()
     worker = WorkerUseCaseFactory(
         create_engine("sqlite://"),

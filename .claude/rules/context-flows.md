@@ -22,8 +22,11 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   `archived` (archiviato, definitivo) (R1.1.4-R1.1.6).
 - **Allocated capital**: quota del saldo del conto assegnata al flusso. **Free capital** del conto: saldo
   letto dall'exchange meno i capitali allocati ai flussi non archiviati (R1.1.7).
-- **Available liquidity** del flusso: capitale allocato, più PnL realizzato delle sue esecuzioni, meno le
-  sue commissioni, meno il margine delle sue posizioni aperte (R1.6.1).
+- **Available liquidity** del flusso: capitale allocato, più PnL realizzato e funding, meno le commissioni, meno il
+  margine delle sue posizioni aperte (R1.6.1). PnL, commissioni e funding vengono dai totali del registro.
+- **Ledger** (registro delle operazioni): storico di ogni esecuzione e pagamento di funding di un conto, scritto una
+  volta sola, con il flusso a cui appartiene o nessuno; **flow totals**: PnL realizzato, commissioni, funding e
+  posizione attesa per asset di un flusso, aggiornati con le sole righe nuove (ADR 0063).
 - **Risk limits**: leva massima (obbligatoria) ed esposizione per operazione sul margine e sul valore
   (almeno una); opzione "porta al minimo" (R1.5.1-R1.5.4).
 - **Risk outcome** di una decisione: approvata, ridotta, bloccata (R1.5.x); scartata è di `agent` (R1.4.5).
@@ -35,9 +38,15 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 
 - **Conflitto sugli asset**: due flussi non archiviati dello stesso conto non hanno asset in comune
   (R1.1.2). È ciò che rende una posizione attribuibile al flusso per asset.
-- **Nessuna liquidità propria**: lo stato del flusso si ricava da ciò che l'exchange mostra. Le posizioni
-  si attribuiscono per asset, le esecuzioni per identificativo dell'ordine (`ClientOrderId`, contesto
-  `orders`). La piattaforma non tocca ciò che non attribuisce.
+- **Nessuna liquidità propria**: lo stato del flusso si ricava da ciò che l'exchange mostra e dal registro delle
+  operazioni. Le posizioni si attribuiscono per asset. Un'esecuzione è del flusso del suo ordine; un ordine della
+  piattaforma senza flusso è del flusso che ha l'asset; senza ordine della piattaforma solo liquidazione e chiusura
+  esatta della posizione attesa sono del flusso dell'asset; il funding è del flusso che ha la posizione (ADR 0063).
+  La piattaforma non tocca ciò che non attribuisce.
+- Il registro si scrive solo con `RecordAccountExecutionsUseCase`, dalla riconciliazione del conto all'inizio e alla
+  fine di ogni ciclo, leggendo dall'exchange solo ciò che è nuovo; il ciclo legge i totali, mai lo storico. Se
+  l'exchange non conserva più tutto ciò che è avvenuto dall'ultima lettura, tutti i flussi del conto vanno in pausa
+  con il motivo "registro delle esecuzioni incompleto" (ADR 0063).
 - Stati e transizioni sono regole del domain: avvia da fermo, pausa da attivo, riprendi da in pausa,
   archivia solo da fermo; un flusso archiviato non si avvia e non si modifica (ADR 0036).
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.
@@ -67,9 +76,14 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `ModelSettingsPort`, `SourceSettingsPort`: modello e fonti con i parametri risolti, dai contesti `agent` e
   `sources`; un rifiuto arriva come `InvalidFlowSettingError` con il motivo del contesto che lo dà.
 - `MarketsPort`: asset negoziabili ora sull'exchange, per nome dell'exchange.
-- `AccountActivityPort`: ciò che l'exchange mostra del conto ora (posizioni con margine, esecuzioni con `cloid`,
-  movimenti del saldo), letto dal `worker` e chiesto dall'API via HTTP interno (ADR 0044).
-- `PlatformOrdersPort`: i `cloid` degli ordini registrati sul conto, con il flusso che li ha inviati (contesto `orders`).
+- `AccountActivityPort`: ciò che l'exchange mostra del conto ora (posizioni con margine, movimenti del saldo),
+  letto dal `worker` e chiesto dall'API via HTTP interno (ADR 0044, ADR 0063).
+- `AccountExecutionsPort`: esecuzioni e funding del conto da un istante, con l'indicazione se la finestra è completa,
+  letti dal `worker` (ADR 0063).
+- `FlowLedgerPort`: cursore del conto, chiavi già registrate, scrittura delle righe nuove con i totali nella stessa
+  transazione, totali dei flussi (ADR 0063).
+- `PlatformOrdersPort`: tra i `cloid` dati, quelli degli ordini registrati sul conto, con il flusso che li ha
+  inviati (contesto `orders`).
 - `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).
 - `ClosedPositionsPort`: storico delle posizioni chiuse dei flussi (R1.7.2).
 - `FlowPositionsPort`: chiusura di una posizione del flusso attraverso il `worker` (fill o rifiuto) (ADR 0055); la

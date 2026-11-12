@@ -38,8 +38,8 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
-from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -108,11 +108,11 @@ class Flows:
             ),
         )
         self.activity = FakeAccountActivityAdapter()
-        self.orders = InMemoryPlatformOrdersAdapter()
+        self.ledger = InMemoryFlowLedgerAdapter()
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
             self.accounts,
-            ReadFlowStateUseCase(self.repository, self.activity, self.orders),
+            ReadFlowStateUseCase(self.repository, self.activity, self.ledger),
             lambda: NOW,
         )
         self.list_changes = ListCapitalChangesUseCase(self.repository)
@@ -124,10 +124,8 @@ class Flows:
 
     def realized(self, flow: Flow, pnl: str, fees: str, *, asset: str = "BTC") -> None:
         order_id = uuid4()
-        self.orders.add(order_id, self.account_id, flow.id)
-        reading = self.activity.activities.get(self.account_id, an_activity())
         fill = a_fill(asset, order_id, realized_pnl=Decimal(pnl), fee=Decimal(fees), fill_id=str(order_id))
-        self.activity.activities[self.account_id] = replace(reading, fills=(*reading.fills, fill))
+        self.ledger.add(self.account_id, flow.id, fill)
 
     def saved(
         self,

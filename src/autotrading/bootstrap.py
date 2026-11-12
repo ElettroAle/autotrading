@@ -42,6 +42,7 @@ from autotrading.adapters.outbound.httpx.telegram import (
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.executions import HyperliquidAccountExecutionsAdapter
 from autotrading.adapters.outbound.hyperliquid.market_data import (
     HyperliquidMarketDataAdapter,
     HyperliquidPriceHistoryAdapter,
@@ -63,6 +64,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
 )
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
@@ -134,6 +136,7 @@ from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
+    FlowLedgerIncompleteError,
     InvalidFlowSettingError,
 )
 from autotrading.application.flows.list_flows import ListFlowsUseCase
@@ -155,6 +158,7 @@ from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
     ReconciliationOutcome,
 )
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingCommand, RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
@@ -227,6 +231,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
+from autotrading.domain.flows.ledger import ExecutionsWindow
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
@@ -551,6 +556,7 @@ class WorkerExchanges:
     accounts: Mapping[str, ExchangePort]
     orders: Mapping[str, OrderExchangePort]
     activity: Mapping[str, ActivityReaderPort]
+    executions: Mapping[str, ExecutionsReaderPort]
 
 
 class TradingAccessFromAccounts:
@@ -602,6 +608,36 @@ class AccountActivityFromAccounts:
         if reader is None:
             raise FlowExchangeUnavailableError
         return reader.activity(self._opener.open(account).account_address)
+
+
+class ExecutionsReaderPort(Protocol):
+    """The executions an exchange still holds of an address: the adapter of the exchange behind the ledger."""
+
+    def since(self, address: str, since: datetime | None) -> ExecutionsWindow: ...
+
+
+class AccountExecutionsFromAccounts:
+    """Bridges the accounts context to the ledger of the flows in the worker (ADR 0063).
+
+    The account is opened only to learn its address: the executions of the exchange are public and sign nothing.
+    """
+
+    def __init__(
+        self, accounts: AccountRepositoryPort, opener: CredentialOpenerPort, readers: Mapping[str, ExecutionsReaderPort]
+    ) -> None:
+        self._accounts = accounts
+        self._opener = opener
+        self._readers = readers
+
+    def since(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
+        try:
+            account = find_account(self._accounts, AccountId(account_id))
+        except AccountNotFoundError as error:
+            raise FlowAccountNotFoundError from error
+        reader = self._readers.get(account.exchange.value)
+        if reader is None:
+            raise FlowExchangeUnavailableError
+        return reader.since(self._opener.open(account).account_address, since)
 
 
 class AccountReadingFromAccounts:
@@ -747,7 +783,7 @@ class TenantUseCaseFactory:
             stop_ports=stop_ports,
             account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
             account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
-            platform_orders=SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
+            flow_ledger=SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
             bot_identity=self._bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
@@ -816,20 +852,26 @@ class WorkerUseCaseFactory:
             SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id), flows, notify
         )
         activity = AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
-        platform_orders = SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id)
+        ledger = SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id)
+        record_executions = RecordAccountExecutionsUseCase(
+            flows,
+            AccountExecutionsFromAccounts(accounts, self._opener, self._exchanges.executions),
+            SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
+            ledger,
+        )
         reconcile_account = ReconcileAccountUseCase(
             flows,
             activity,
-            platform_orders,
             SqlAlchemyReconciliationRepositoryAdapter(self._engine, tenant_id),
             ClosedPositionsFromOpenings(flows, openings, closed_positions, notify),
+            record_executions,
         )
         return TenantCyclePorts(
             flows=flows,
             pause=SqlAlchemyAutomaticPauseAdapter(self._engine, tenant_id),
             accounts=accounts,
             read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
-            read_flow_state=ReadFlowStateUseCase(flows, activity, platform_orders),
+            read_flow_state=ReadFlowStateUseCase(flows, activity, ledger),
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
@@ -884,7 +926,10 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     opener = SodiumCredentialOpenerAdapter(private_keys)
     exchanges = WorkerExchanges(
-        exchanges_for(environment), order_exchanges_for(environment), activity_readers_for(environment)
+        exchanges_for(environment),
+        order_exchanges_for(environment),
+        activity_readers_for(environment),
+        executions_readers_for(environment),
     )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)
@@ -944,6 +989,10 @@ def order_exchanges_for(environment: str) -> dict[str, HyperliquidOrderExchangeA
 
 def activity_readers_for(environment: str) -> dict[str, HyperliquidAccountActivityAdapter]:
     return {HYPERLIQUID: HyperliquidAccountActivityAdapter.for_network(testnet=environment == "dev")}
+
+
+def executions_readers_for(environment: str) -> dict[str, HyperliquidAccountExecutionsAdapter]:
+    return {HYPERLIQUID: HyperliquidAccountExecutionsAdapter.for_network(testnet=environment == "dev")}
 
 
 def slippage_from(configuration: Mapping[str, str]) -> Slippage:
@@ -1196,6 +1245,8 @@ class FlowStateFromFlows:
         self._ports_of = ports_of
 
     def read(self, flow_id: UUID) -> FlowSnapshot:
+        """The account of the flow is reconciled first, so the ledger holds every execution the state counts."""
+        self._reconcile(flow_id)
         tenant_id = self._directory.tenant_of(flow_id)
         ports = self._ports_of(tenant_id)
         flow = flow_of_cycle(ports, flow_id)
@@ -1226,14 +1277,11 @@ class FlowStateFromFlows:
         return self._directory.anchor_of(flow.id.value) if first_start is None else first_start
 
     def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
-        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1).
-
-        The account of the flow is reconciled first: what no flow explains is recorded once and notified (R1.6.2).
-        """
-        self._reconcile(flow_id)
+        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
         return self.read(flow_id).state
 
     def _reconcile(self, flow_id: UUID) -> None:
+        """What no flow explains is recorded once and notified (R1.6.2); the new executions enter the ledger."""
         ports = self._ports_of(self._directory.tenant_of(flow_id))
         try:
             outcome = ports.reconcile_account.execute(ReconcileAccountCommand(FlowId(flow_id)))
@@ -1277,6 +1325,8 @@ class FlowPauseFromFlows:
         account_id = None
         if isinstance(error, FlowCredentialsRejectedError):
             account_id = flow_of_cycle(ports, flow_id).account_id
+        if isinstance(error, FlowLedgerIncompleteError):
+            account_id = error.account_id
         provider = error.provider.value if isinstance(error, PROVIDER_ERRORS) else None
         command = PauseAffectedFlowsCommand(flow_id, str(error), account_id=account_id, provider=provider)
         for paused in PauseAffectedFlowsUseCase(ports.flows, ports.pause).execute(command):

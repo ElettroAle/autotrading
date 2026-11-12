@@ -1,6 +1,5 @@
 from collections.abc import Callable
 from decimal import Decimal
-from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,7 +8,8 @@ from autotrading.adapters.inbound.api.app import Authentication, HealthReport, c
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.flow import Flow
-from tests.support.activity import a_fill, a_position, an_activity
+from autotrading.domain.flows.ledger import FlowTotals
+from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import Platform
@@ -52,11 +52,10 @@ def flow_of(platform: Platform, user: str) -> Flow:
 
 def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
-    flow, order = flow_of(platform, "anna"), uuid4()
-    platform.platform_orders.add(order, flow.account_id, flow.id)
+    flow = flow_of(platform, "anna")
+    platform.ledger.totals[flow.id] = FlowTotals(flow.id, Decimal(40), Decimal(2))
     platform.account_activity.activities[flow.account_id] = an_activity(
         positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal(12)), a_position("ETH")),
-        fills=(a_fill("BTC", order, realized_pnl=Decimal(40), fee=Decimal(2)),),
     )
 
     response = anna.get(f"/flows/{flow.id.value}/state")

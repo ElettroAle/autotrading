@@ -134,5 +134,7 @@ def test_the_orders_of_the_platform_are_those_of_the_account_with_their_flow(dat
 
     orders = SqlAlchemyPlatformOrdersAdapter(database, tenant_id)
 
-    assert orders.orders_of_account(account_id) == {manual.id.value: None, of_flow.id.value: flow.id}
-    assert orders.orders_of_account(other_account) == {}
+    asked = (manual.id.value, of_flow.id.value, uuid4())
+    assert orders.orders_among(account_id, asked) == {manual.id.value: None, of_flow.id.value: flow.id}
+    assert orders.orders_among(other_account, asked) == {}
+    assert orders.orders_among(account_id, ()) == {}

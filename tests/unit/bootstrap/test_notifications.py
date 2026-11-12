@@ -25,6 +25,7 @@ from autotrading.bootstrap import (
     activity_readers_for,
     create_worker_application,
     exchanges_for,
+    executions_readers_for,
     order_exchanges_for,
     telegram_bot,
 )
@@ -39,7 +40,9 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
 def factory(messenger: MessengerPort) -> WorkerUseCaseFactory:
-    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"))
+    exchanges = WorkerExchanges(
+        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+    )
     settings = WorkerSettings("dev", Slippage.default())
     return WorkerUseCaseFactory(
         create_engine("sqlite://"), SodiumCredentialOpenerAdapter({}), exchanges, settings, messenger

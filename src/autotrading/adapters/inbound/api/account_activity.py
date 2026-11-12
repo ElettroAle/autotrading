@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from autotrading.domain.flows.account_activity import AccountActivity, AccountFill, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 
 
 class ActivityPositionResponse(BaseModel):
@@ -19,30 +19,6 @@ class ActivityPositionResponse(BaseModel):
             size=str(position.size),
             margin=str(position.margin),
             unrealized_pnl=str(position.unrealized_pnl),
-        )
-
-
-class ActivityFillResponse(BaseModel):
-    fill_id: str
-    order_id: str | None
-    asset: str
-    size: str
-    price: str
-    fee: str
-    realized_pnl: str
-    executed_at: str
-
-    @classmethod
-    def of(cls, fill: AccountFill) -> ActivityFillResponse:
-        return cls(
-            fill_id=fill.fill_id,
-            order_id=None if fill.order_id is None else str(fill.order_id),
-            asset=fill.asset,
-            size=str(fill.size),
-            price=str(fill.price),
-            fee=str(fill.fee),
-            realized_pnl=str(fill.realized_pnl),
-            executed_at=fill.executed_at.isoformat(),
         )
 
 
@@ -65,7 +41,6 @@ class AccountActivityResponse(BaseModel):
     balance: str
     available_margin: str
     positions: list[ActivityPositionResponse]
-    fills: list[ActivityFillResponse]
     movements: list[ActivityMovementResponse]
     read_at: str
 
@@ -76,7 +51,6 @@ class AccountActivityResponse(BaseModel):
             balance=str(activity.balance),
             available_margin=str(activity.available_margin),
             positions=[ActivityPositionResponse.of(position) for position in activity.positions],
-            fills=[ActivityFillResponse.of(fill) for fill in activity.fills],
             movements=[ActivityMovementResponse.of(movement) for movement in activity.movements],
             read_at=activity.read_at.isoformat(),
         )

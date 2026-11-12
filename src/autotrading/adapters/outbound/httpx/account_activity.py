@@ -7,7 +7,7 @@ from uuid import UUID
 import httpx
 
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.domain.flows.account_activity import AccountActivity, AccountFill, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -51,7 +51,6 @@ def _activity_of(body: Mapping[str, Any]) -> AccountActivity:
         balance=Decimal(body["balance"]),
         available_margin=Decimal(body["available_margin"]),
         positions=tuple(_position_of(position) for position in body["positions"]),
-        fills=tuple(_fill_of(fill) for fill in body["fills"]),
         movements=tuple(_movement_of(movement) for movement in body["movements"]),
         read_at=datetime.fromisoformat(body["read_at"]),
     )
@@ -64,20 +63,6 @@ def _position_of(position: Mapping[str, Any]) -> AccountPosition:
         size=Decimal(position["size"]),
         margin=Decimal(position["margin"]),
         unrealized_pnl=Decimal(position["unrealized_pnl"]),
-    )
-
-
-def _fill_of(fill: Mapping[str, Any]) -> AccountFill:
-    order_id = fill["order_id"]
-    return AccountFill(
-        fill_id=str(fill["fill_id"]),
-        order_id=None if order_id is None else UUID(order_id),
-        asset=str(fill["asset"]),
-        size=Decimal(fill["size"]),
-        price=Decimal(fill["price"]),
-        fee=Decimal(fill["fee"]),
-        realized_pnl=Decimal(fill["realized_pnl"]),
-        executed_at=datetime.fromisoformat(fill["executed_at"]),
     )
 
 

@@ -1,6 +1,6 @@
 # ADR 0044 — Stato del flusso attribuito da ciò che l'exchange mostra
 
-- Stato: accettata (12 novembre 2026)
+- Stato: superata da ADR 0063 (12 novembre 2026)
 - Requisiti: R1.6.1 (Task T1.6.1.1)
 
 ## Contesto

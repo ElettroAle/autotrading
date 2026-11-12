@@ -14,4 +14,4 @@ def test_a_fresh_address_has_an_empty_activity_in_usdc() -> None:
     activity = HyperliquidAccountActivityAdapter.for_network(testnet=True).activity(EthereumAccount.create().address)
 
     assert (activity.currency, activity.balance, activity.available_margin) == ("USDC", Decimal(0), Decimal(0))
-    assert (activity.positions, activity.fills, activity.movements) == ((), (), ())
+    assert (activity.positions, activity.movements) == ((), ())

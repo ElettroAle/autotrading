@@ -4,8 +4,11 @@ from autotrading.application.flows.ports import (
     AccountActivityPort,
     ClosedPositionsPort,
     FlowRepositoryPort,
-    PlatformOrdersPort,
     ReconciliationRepositoryPort,
+)
+from autotrading.application.flows.record_account_executions import (
+    RecordAccountExecutionsCommand,
+    RecordAccountExecutionsUseCase,
 )
 from autotrading.domain.flows.account_reconciliation import AccountReconciliation, OutsideClosing
 from autotrading.domain.flows.flow_id import FlowId
@@ -28,7 +31,8 @@ class ReconciliationOutcome:
 class ReconcileAccountUseCase:
     """At every cycle of a flow, what the account of the flow shows that no flow explains (R1.6.2).
 
-    Every case is recorded once; a position of a flow closed outside the platform enters the history of the flow.
+    The new executions of the account enter the ledger first (ADR 0063). Every case is recorded once; a position
+    of a flow closed outside the platform enters the history of the flow.
     Nothing on the exchange is touched, and the flows keep operating.
     """
 
@@ -36,24 +40,25 @@ class ReconcileAccountUseCase:
         self,
         flows: FlowRepositoryPort,
         activity: AccountActivityPort,
-        orders: PlatformOrdersPort,
         readings: ReconciliationRepositoryPort,
         closed_positions: ClosedPositionsPort,
+        record_executions: RecordAccountExecutionsUseCase,
     ) -> None:
         self._flows = flows
         self._activity = activity
-        self._orders = orders
         self._readings = readings
         self._closed_positions = closed_positions
+        self._record_executions = record_executions
 
     def execute(self, command: ReconcileAccountCommand) -> ReconciliationOutcome:
         account_id = self._flows.get(command.flow_id).account_id
+        recorded = self._record_executions.execute(RecordAccountExecutionsCommand(account_id))
         reconciliation = AccountReconciliation.of(
             account_id,
             (flow for flow in self._flows.list() if flow.account_id == account_id),
             self._activity.activity(account_id),
-            self._orders.orders_of_account(account_id),
             self._readings.last_reading(account_id),
+            recorded,
         )
         new_items = tuple(item for item in reconciliation.items if self._readings.record(item))
         self._readings.resolve_positions(account_id, reconciliation.open_assets)

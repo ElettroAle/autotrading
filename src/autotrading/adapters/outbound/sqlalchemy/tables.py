@@ -305,3 +305,71 @@ unattributable_items = Table(
         postgresql_where=text("resolved_at IS NULL"),
     ),
 )
+
+# The ledger of the executions of every account: written once, never changed (ADR 0063).
+account_fills = Table(
+    "account_fills",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("fill_id", Text, nullable=False),
+    Column("exchange_order_id", Text, nullable=False),
+    Column("flow_id", Uuid),
+    Column("order_id", Uuid),
+    Column("kind", Text, nullable=False),
+    Column("platform_order", Boolean, nullable=False),
+    Column("asset", Text, nullable=False),
+    Column("size", Numeric, nullable=False),
+    Column("price", Numeric, nullable=False),
+    Column("fee", Numeric, nullable=False),
+    Column("realized_pnl", Numeric, nullable=False),
+    Column("start_position", Numeric, nullable=False),
+    Column("liquidation", Boolean, nullable=False),
+    Column("executed_at", DateTime(timezone=True), nullable=False),
+    Column("recorded_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "account_id", "fill_id", "exchange_order_id", name="account_fills_once"),
+)
+
+account_funding = Table(
+    "account_funding",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("flow_id", Uuid),
+    Column("asset", Text, nullable=False),
+    Column("amount", Numeric, nullable=False),
+    Column("paid_at", DateTime(timezone=True), nullable=False),
+    Column("recorded_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "account_id", "asset", "paid_at", name="account_funding_once"),
+)
+
+# Where the next reading of the executions of each account starts (ADR 0063).
+account_fill_cursors = Table(
+    "account_fill_cursors",
+    metadata,
+    Column("account_id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("last_executed_at", DateTime(timezone=True), nullable=False),
+)
+
+# The running totals the cycle reads instead of the ledger, changed only with a new row of the ledger (ADR 0063).
+flow_totals = Table(
+    "flow_totals",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("realized_pnl", Numeric, nullable=False),
+    Column("fees", Numeric, nullable=False),
+    Column("funding", Numeric, nullable=False),
+)
+
+flow_position_totals = Table(
+    "flow_position_totals",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("asset", Text, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("size", Numeric, nullable=False),
+)

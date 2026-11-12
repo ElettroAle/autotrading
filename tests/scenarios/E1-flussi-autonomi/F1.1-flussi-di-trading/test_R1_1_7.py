@@ -16,7 +16,7 @@ from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import amount_text
 from tests.fakes.model_call import HELD_SECONDS
-from tests.support.activity import a_fill, an_activity
+from tests.support.activity import a_fill
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.flows import account_id_of
@@ -74,10 +74,9 @@ def flow_realized(platform: Platform, lifecycle: Lifecycle, name: str, pnl: str,
     flow = flow_named(platform, lifecycle.user, name)
     (asset,) = flow.configuration.assets
     order_id = uuid.uuid4()
-    platform.platform_orders.add(order_id, flow.account_id, flow.id)
-    reading = platform.account_activity.activities.get(flow.account_id, an_activity())
     fill = a_fill(asset, order_id, realized_pnl=Decimal(pnl), fee=Decimal(fees), fill_id=str(order_id))
-    platform.account_activity.activities[flow.account_id] = replace(reading, fills=(*reading.fills, fill))
+    # What the cycles of the worker recorded in the ledger of the flow (ADR 0063).
+    platform.ledger.add(flow.account_id, flow.id, fill)
 
 
 @when(quoted('"{user}" porta il capitale allocato del flusso "{name}" a {capital} USDC'))

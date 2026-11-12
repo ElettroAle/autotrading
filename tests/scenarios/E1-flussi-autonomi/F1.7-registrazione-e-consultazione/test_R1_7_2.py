@@ -9,6 +9,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.bootstrap import ClosedPositionsFromOpenings
@@ -113,9 +114,10 @@ class History:
         """The exchange liquidates the position: the reconciliation of the next cycle finds it gone (R1.6.2)."""
         account_id = self.operating_with_open_position(flow)
         operating = self.flows[flow]
-        self.platform.account_activity.activities[account_id] = an_activity(
-            fills=(a_fill("BTC", None, realized_pnl=LIQUIDATION_LOSS),)
-        )
+        self.platform.account_activity.activities[account_id] = an_activity()
+        self.platform.account_activity.executions[account_id] = [
+            a_fill("BTC", None, realized_pnl=LIQUIDATION_LOSS, liquidation=True)
+        ]
         readings = InMemoryReconciliationRepositoryAdapter()
         readings.save_reading(
             AccountReading(account_id, READ_AT - timedelta(minutes=5), {operating.id: frozenset({"BTC"})})
@@ -127,9 +129,10 @@ class History:
             InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
             self.platform.worker_for(operating.tenant_id).notify,
         )
-        reconciliation = ReconcileAccountUseCase(
-            flows, self.platform.account_activity, self.platform.platform_orders, readings, history
+        record = RecordAccountExecutionsUseCase(
+            flows, self.platform.account_activity, self.platform.platform_orders, self.platform.ledger
         )
+        reconciliation = ReconcileAccountUseCase(flows, self.platform.account_activity, readings, history, record)
         reconciliation.execute(ReconcileAccountCommand(operating.id))
 
     def position(self) -> ClosedPosition:
