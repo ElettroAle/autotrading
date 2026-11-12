@@ -40,6 +40,7 @@ from autotrading.bootstrap import (
     WorkerExchanges,
     WorkerSettings,
     WorkerUseCaseFactory,
+    activity_readers_for,
     create_application,
     create_worker_application,
     exchanges_for,
@@ -278,6 +279,11 @@ def test_the_orders_go_to_the_network_of_the_installation(environment: str, url:
     }
 
 
+@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
+def test_the_activity_of_the_accounts_is_read_on_the_network_of_the_installation(environment: str, url: str) -> None:
+    assert {name: reader.base_url for name, reader in activity_readers_for(environment).items()} == {"Hyperliquid": url}
+
+
 @pytest.mark.parametrize(
     ("configured", "percent"),
     [({}, Decimal(5)), ({SLIPPAGE_SETTING: "  "}, Decimal(5)), ({SLIPPAGE_SETTING: " 1.5 "}, Decimal("1.5"))],
@@ -334,7 +340,7 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
-    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"))
+    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"))
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())
     factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, settings, FakeMessengerAdapter())

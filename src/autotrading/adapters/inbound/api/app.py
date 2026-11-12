@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.errors import (
     NotAuthenticatedError,
     install_error_responses,
 )
+from autotrading.adapters.inbound.api.flow_state import flow_state_router
 from autotrading.adapters.inbound.api.flows import flows_router
 from autotrading.adapters.inbound.api.models import models_router
 from autotrading.adapters.inbound.api.orders import orders_router
@@ -90,6 +91,7 @@ def create_api(
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request))
+    protected.include_router(flow_state_router(use_cases_of_request))
     api.include_router(protected)
     return api
 
