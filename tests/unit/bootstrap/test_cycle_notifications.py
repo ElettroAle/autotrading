@@ -17,7 +17,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlo
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.cycles.ports import ScheduledFlow
-from autotrading.application.flows.errors import FlowCredentialsRejectedError
+from autotrading.application.flows.errors import FlowCredentialsRejectedError, FlowExchangeUnavailableError
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.bootstrap import (
@@ -346,15 +346,15 @@ def test_a_position_of_the_flow_closed_outside_is_notified_with_its_pnl(world: W
     assert world.received == ["alfa: chiusa BTC, PnL -10 USDC", "test-1: esecuzione non attribuibile su BTC"]
 
 
-def test_an_exchange_out_of_reach_leaves_the_reconciliation_to_the_next_cycle(
+def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the_next_cycle(
     world: World, caplog: pytest.LogCaptureFixture
 ) -> None:
     world.cycles.platform.activity_reader.reachable = False
 
-    with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
-        state = update(world)
+    # Without the activity no state can be attributed to the flow: the cycle fails and the next one reads again.
+    with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"), pytest.raises(FlowExchangeUnavailableError):
+        update(world)
 
-    assert state is not None
     assert world.received == []
     assert [record.getMessage() for record in caplog.records] == ["riconciliazione del conto non riuscita"]
 
