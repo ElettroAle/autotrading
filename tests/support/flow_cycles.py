@@ -11,6 +11,7 @@ from uuid import UUID
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.cycles.ports import ScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
+from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.bootstrap import (
@@ -136,9 +137,10 @@ class FlowCycles:
         closed_positions = NotifiedClosedPositions(
             InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id), flows, notify
         )
+        activity = AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         reconcile_account = ReconcileAccountUseCase(
             flows,
-            AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            activity,
             platform.platform_orders,
             self.readings,
             ClosedPositionsFromOpenings(flows, openings, closed_positions, notify),
@@ -148,6 +150,7 @@ class FlowCycles:
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
             accounts=accounts,
             read_exchange_state=worker.read_exchange_state,
+            read_flow_state=ReadFlowStateUseCase(flows, activity, platform.platform_orders),
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),

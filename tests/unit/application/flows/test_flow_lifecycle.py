@@ -1,7 +1,7 @@
 import logging
 from dataclasses import replace
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -12,6 +12,7 @@ from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
 from autotrading.application.flows.errors import (
     AssetNotTradableError,
     AssetWithOpenPositionError,
+    FlowExchangeUnavailableError,
     FlowNotFoundError,
     FlowVersionNotFoundError,
     InvalidFlowSettingError,
@@ -36,33 +37,18 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
-from autotrading.domain.flows.stop_outcome import PositionClosing
 from autotrading.domain.tenancy.tenant_id import TenantId
-from autotrading.domain.tenancy.user_id import UserId
+from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.model_settings import FakeModelSettingsAdapter
 from tests.fakes.source_settings import FakeSourceSettingsAdapter
+from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 OPENROUTER = "openrouter/deepseek-chat"
 ANTHROPIC = "anthropic/claude-sonnet"
-
-
-class HeldPositions:
-    """The margin each asset of the account holds on the exchange; an asset absent has no position."""
-
-    def __init__(self) -> None:
-        self.margins: dict[str, Decimal] = {}
-        self.asked: list[tuple[UUID, tuple[str, ...]]] = []
-
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
-        raise AssertionError((account_id, asset, user_id))
-
-    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
-        self.asked.append((account_id, assets))
-        return sum((self.margins.get(asset, Decimal(0)) for asset in assets), Decimal(0))
 
 
 class Flows:
@@ -80,13 +66,17 @@ class Flows:
         checks = FlowChecks(
             self.accounts, {"Hyperliquid": self.markets}, self.models, FakeSourceSettingsAdapter("notizie")
         )
-        self.positions = HeldPositions()
-        self.modify = ModifyFlowUseCase(self.repository, checks, self.positions)
+        self.activity = FakeAccountActivityAdapter()
+        self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)
         self.change_status = ChangeFlowStatusUseCase(self.repository)
         self.archive = ArchiveFlowUseCase(self.repository)
         self.get_version = GetFlowVersionUseCase(self.repository)
         self.compare = CompareFlowVersionsUseCase(self.repository)
         self.list = ListFlowsUseCase(self.repository)
+
+    def hold(self, *assets: str) -> None:
+        """A position open on the account on each asset, with no margin: holding it is enough to keep the asset."""
+        self.activity.activities[self.account_id] = an_activity(positions=tuple(a_position(asset) for asset in assets))
 
     def saved(
         self, name: str = "alfa", status: FlowStatus = FlowStatus.STOPPED, assets: tuple[str, ...] = ("BTC",)
@@ -235,7 +225,7 @@ def test_a_flow_keeps_its_own_assets_while_adding_others(flows: Flows) -> None:
 
 def test_an_asset_with_an_open_position_is_not_removed(flows: Flows) -> None:
     flow = flows.saved(assets=("BTC", "ETH", "SOL"))
-    flows.positions.margins = {"ETH": Decimal(30), "BTC": Decimal(20)}
+    flows.hold("ETH", "BTC")
 
     with pytest.raises(AssetWithOpenPositionError, match=r"^posizione aperta sull'asset da togliere: ETH$"):
         flows.modify.execute(ModifyFlowCommand(flow.id, assets=("BTC",)))
@@ -245,10 +235,10 @@ def test_an_asset_with_an_open_position_is_not_removed(flows: Flows) -> None:
 
 def test_an_asset_without_position_is_removed(flows: Flows) -> None:
     flow = flows.saved(assets=("BTC", "ETH"))
-    flows.positions.margins = {"BTC": Decimal(20)}
+    flows.hold("BTC", "SOL")
 
     assert flows.modify.execute(ModifyFlowCommand(flow.id, assets=("BTC",))).configuration.assets == ("BTC",)
-    assert flows.positions.asked == [(flows.account_id, ("ETH",))]
+    assert flows.activity.read == [flows.account_id]
 
 
 def test_a_change_that_removes_no_asset_reads_no_position(flows: Flows) -> None:
@@ -256,7 +246,7 @@ def test_a_change_that_removes_no_asset_reads_no_position(flows: Flows) -> None:
 
     flows.modify.execute(ModifyFlowCommand(flow.id, assets=("BTC", "ETH")))
 
-    assert flows.positions.asked == []
+    assert flows.activity.read == []
 
 
 def test_unchanged_assets_are_not_checked_against_the_exchange(flows: Flows) -> None:
@@ -373,3 +363,13 @@ def test_flows_are_listed_by_name(flows: Flows) -> None:
 def test_a_flow_id_never_saved_is_not_found(flows: Flows) -> None:
     with pytest.raises(FlowNotFoundError):
         flows.change_status.execute(ChangeFlowStatusCommand(FlowId.new(), FlowCommand.START))
+
+
+def test_an_account_out_of_reach_refuses_the_removal_of_an_asset(flows: Flows) -> None:
+    flow = flows.saved(assets=("BTC", "ETH"))
+    flows.activity.reachable = False
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        flows.modify.execute(ModifyFlowCommand(flow.id, assets=("BTC",)))
+
+    assert flows.current(flow) == flow

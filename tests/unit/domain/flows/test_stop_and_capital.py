@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.capital_change import require_increase_within, require_reduction_within
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
@@ -11,10 +12,11 @@ from autotrading.domain.flows.errors import (
     AllocatedCapitalNotPositiveError,
     ArchivedFlowNotModifiableError,
     CapitalAboveAvailableCapitalError,
-    CapitalBelowCommittedMarginError,
+    CapitalBelowFlowMinimumError,
     FlowCommandNotAllowedError,
 )
 from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionOpening
@@ -77,18 +79,39 @@ def test_a_raise_beyond_the_free_capital_plus_the_own_names_the_capital_availabl
     assert raised.value.status_code == 422
 
 
-@pytest.mark.parametrize("capital", [Decimal(150), Decimal(399)])
-def test_a_reduction_down_to_the_committed_margin_is_admitted(capital: Decimal) -> None:
-    require_reduction_within(capital, Decimal(150), "USDC")
+def state(capital: str, *, margin: str = "150", realized: str = "0", fees: str = "0") -> FlowState:
+    flow = a_flow(TENANT, configuration=a_configuration(allocated_capital=Decimal(capital)))
+    position = AccountPosition("BTC", TradeSide.LONG, Decimal(1), Decimal(margin), Decimal(0))
+    return FlowState(flow.id, "USDC", Decimal(capital), (position,), Decimal(realized), Decimal(fees))
 
 
-def test_a_reduction_below_the_committed_margin_names_it() -> None:
-    with pytest.raises(CapitalBelowCommittedMarginError) as raised:
-        require_reduction_within(Decimal("149.99"), Decimal("150.000"), "USDC")
+@pytest.mark.parametrize("capital", ["150", "399"])
+def test_a_reduction_down_to_the_committed_margin_is_admitted(capital: str) -> None:
+    require_reduction_within(state(capital))
 
-    assert str(raised.value) == "capitale allocato sotto il margine impegnato: 150 USDC"
-    assert raised.value.committed_margin == "150 USDC"
+
+def test_a_reduction_below_the_committed_margin_names_the_minimum_of_the_flow() -> None:
+    with pytest.raises(CapitalBelowFlowMinimumError) as raised:
+        require_reduction_within(state("149.99", margin="150.000"))
+
+    assert str(raised.value) == "capitale allocato sotto il minimo del flusso: 150 USDC"
+    assert raised.value.minimum == "150 USDC"
     assert raised.value.status_code == 422
+
+
+def test_the_minimum_of_the_flow_covers_its_realized_losses_and_fees() -> None:
+    with pytest.raises(CapitalBelowFlowMinimumError) as raised:
+        require_reduction_within(state("359.99", realized="-200", fees="10"))
+
+    assert raised.value.minimum == "360 USDC"
+
+
+def test_a_reduction_down_to_the_minimum_after_the_losses_is_admitted() -> None:
+    require_reduction_within(state("360", realized="-200", fees="10"))
+
+
+def test_the_realized_gains_lower_the_minimum_of_the_flow() -> None:
+    require_reduction_within(state("100", realized="60", fees="10"))
 
 
 def opening(side: TradeSide) -> PositionOpening:

@@ -7,7 +7,9 @@ Funzionalità: R1.5.3 Decisioni incoerenti con lo stato del flusso
 
   Si bloccano: un'apertura su un asset su cui il flusso ha già una posizione aperta, una chiusura di una posizione
   che il flusso non ha, un'apertura il cui margine supera la liquidità disponibile del flusso dopo le riduzioni
-  del rischio. Lo stato del flusso è quello letto all'inizio del ciclo.
+  del rischio. Lo stato del flusso è quello letto all'inizio del ciclo; dentro lo stesso ciclo ogni apertura
+  approvata impegna la liquidità per le decisioni successive, nell'ordine delle decisioni, mentre una chiusura
+  la libera solo dopo l'esecuzione.
   Una decisione bloccata non produce ordini e si registra con il motivo; le altre decisioni del ciclo proseguono.
 
   Fuori ambito: le decisioni non conformi al formato (R1.4.5), l'esposizione complessiva del flusso.
@@ -31,6 +33,13 @@ Funzionalità: R1.5.3 Decisioni incoerenti con lo stato del flusso
     Dato che l'agente decide di aprire long su "ETH" con un margine di 50 USDC dopo le riduzioni del rischio
     Quando il rischio controlla la decisione
     Allora la decisione su "ETH" è bloccata con il motivo "liquidità del flusso insufficiente: 40 USDC"
+
+  Scenario: Le aperture dello stesso ciclo impegnano la liquidità
+    Dato che l'agente decide di aprire long su "ETH" con un margine di 30 USDC dopo le riduzioni del rischio
+    E che l'agente decide di aprire long su "SOL" con un margine di 30 USDC dopo le riduzioni del rischio
+    Quando il rischio controlla le decisioni
+    Allora l'apertura eseguita su "ETH" ha valore 30 USDC
+    E la decisione su "SOL" è bloccata con il motivo "liquidità del flusso insufficiente: 10 USDC"
 
   Scenario: Le altre decisioni proseguono
     Dato che l'agente decide di aprire short su "BTC" e di mantenere su "ETH"

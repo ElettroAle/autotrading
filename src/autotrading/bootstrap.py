@@ -147,6 +147,7 @@ from autotrading.application.flows.ports import (
     MarketsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountCommand,
     ReconcileAccountUseCase,
@@ -221,6 +222,7 @@ from autotrading.domain.flows.errors import InvalidClosedPositionError, ModelReq
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.risk_check import RiskState
@@ -267,7 +269,6 @@ MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
 ZERO = Decimal(0)
-HUNDRED = Decimal(100)
 PERCENT = Decimal("0.01")
 LOWEST_LEVERAGE = 1
 
@@ -403,15 +404,14 @@ class FlowAccountsFromAccounts:
         return FlowAccount(account.exchange.value, balance.amount, balance.currency)
 
 
-class FlowPositionsFromAccountsAndOrders:
-    """Bridges the accounts and orders contexts to the flows context in the API (ADR 0055, ADR 0053).
+class FlowPositionsFromOrders:
+    """Bridges the orders context to the flows context in the API (ADR 0055).
 
-    The positions are read and closed by the worker, the only service holding the key (ADR 0023). The margin of a
-    position is what its opening committed: its size at the entry price over its leverage.
+    The positions are closed by the worker, the only service holding the key (ADR 0023). Their margin is the one the
+    exchange declares, read with the state of the flow (R1.6.1, ADR 0067).
     """
 
-    def __init__(self, account_state: AccountStatePort, closing: PositionClosingPort) -> None:
-        self._account_state = account_state
+    def __init__(self, closing: PositionClosingPort) -> None:
         self._closing = closing
 
     def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
@@ -428,22 +428,6 @@ class FlowPositionsFromAccountsAndOrders:
             return PositionClosing(asset, refusal=outcome.status.value)
         return PositionClosing(
             asset, ClosingFill(outcome.average_price, outcome.executed_at, outcome.fee, outcome.realized_pnl)
-        )
-
-    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
-        try:
-            positions = self._account_state.read_state(AccountId(account_id)).positions
-        except AccountNotFoundError as error:
-            raise FlowAccountNotFoundError from error
-        except (ExchangeUnavailableError, WorkerUnavailableError) as error:
-            raise FlowExchangeUnavailableError from error
-        return sum(
-            (
-                position.size * position.entry_price / position.leverage
-                for position in positions
-                if position.coin in assets
-            ),
-            Decimal(0),
         )
 
 
@@ -722,7 +706,7 @@ class TenantUseCaseFactory:
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         position_closing = HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id)
-        flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
+        flow_positions = FlowPositionsFromOrders(position_closing)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
         notified_closings = NotifiedClosedPositions(
             closed_positions, flows, HttpxNotificationAdapter(self._worker.client, self._worker.token, tenant_id)
@@ -826,10 +810,12 @@ class WorkerUseCaseFactory:
         closed_positions = NotifiedClosedPositions(
             SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id), flows, notify
         )
+        activity = AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
+        platform_orders = SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id)
         reconcile_account = ReconcileAccountUseCase(
             flows,
-            AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity),
-            SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
+            activity,
+            platform_orders,
             SqlAlchemyReconciliationRepositoryAdapter(self._engine, tenant_id),
             ClosedPositionsFromOpenings(flows, openings, closed_positions, notify),
         )
@@ -838,6 +824,7 @@ class WorkerUseCaseFactory:
             pause=SqlAlchemyAutomaticPauseAdapter(self._engine, tenant_id),
             accounts=accounts,
             read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
+            read_flow_state=ReadFlowStateUseCase(flows, activity, platform_orders),
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
@@ -1115,6 +1102,7 @@ class TenantCyclePorts:
     pause: AutomaticPausePort
     accounts: AccountRepositoryPort
     read_exchange_state: ReadExchangeStateUseCase
+    read_flow_state: ReadFlowStateUseCase
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
@@ -1147,10 +1135,10 @@ type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
 
 @dataclass(frozen=True, slots=True)
 class CycleFlow:
-    """The flow of a cycle as read at its start: whose it is, its configuration in force, its account now.
+    """The flow of a cycle as read at its start: whose it is, its configuration in force, its state now.
 
-    Until the state of the flow is kept apart from the account (R1.6.1), the flow owns the positions of the account
-    on its own assets, and its liquidity is its capital less their margin, never more than the account has free.
+    The amounts are the state attributed to the flow, the same the user consults (R1.6.1, ADR 0062); the account
+    gives only the details of the positions and the margin it has free, which no flow may go beyond.
     """
 
     tenant_id: TenantId
@@ -1159,6 +1147,7 @@ class CycleFlow:
     exchange: str
     started_at: datetime
     account: AccountState
+    attributed: FlowState
 
     @property
     def configuration(self) -> FlowConfiguration:
@@ -1170,19 +1159,16 @@ class CycleFlow:
 
     @property
     def available_liquidity(self) -> Decimal:
-        margin = sum((position.size * position.entry_price / position.leverage for position in self.positions), ZERO)
-        free = min(self.configuration.allocated_capital - margin, self.account.available_margin.amount)
+        free = min(self.attributed.available_liquidity, self.account.available_margin.amount)
         return max(free, ZERO)
 
     @property
     def total_value(self) -> Decimal:
-        pnl = sum((position.unrealized_pnl for position in self.positions), ZERO)
-        return self.configuration.allocated_capital + pnl
+        return self.attributed.total_value
 
     @property
     def return_percent(self) -> Decimal:
-        capital = self.configuration.allocated_capital
-        return ((self.total_value - capital) / capital * HUNDRED).quantize(PERCENT)
+        return self.attributed.return_percent.quantize(PERCENT)
 
 
 def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
@@ -1212,8 +1198,15 @@ class FlowStateFromFlows:
             state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
         except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
             raise FlowCredentialsRejectedError(account.name.value) from error
+        attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
         cycle_flow = CycleFlow(
-            tenant_id, flow, account.name.value, account.exchange.value, self._started_at(ports, flow), state
+            tenant_id,
+            flow,
+            account.name.value,
+            account.exchange.value,
+            self._started_at(ports, flow),
+            state,
+            attributed,
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 

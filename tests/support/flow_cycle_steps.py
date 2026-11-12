@@ -14,10 +14,12 @@ from autotrading.application.agent.errors import ModelCreditExhaustedError, Mode
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.cycle_record import CycleOutcome
+from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import BALANCE, FlowCycles, at
 from tests.support.flows import ANTHROPIC_MODEL
 from tests.support.steps import quoted
@@ -147,6 +149,13 @@ def flow_state(  # noqa: PLR0917 - one argument per value of the step
         liquidation_price=Decimal(20000),
     )
     flow_cycles.platform.hyperliquid.open_position(flow_cycles.credentials_of(flow), held)
+    show_activity(flow_cycles, flow, a_position(asset, margin=margin))
+
+
+def show_activity(flow_cycles: FlowCycles, flow: str, held: AccountPosition) -> None:
+    """The same position as the activity of the account shows it: the state of the flow is attributed from it."""
+    address = flow_cycles.credentials_of(flow).account_address
+    flow_cycles.platform.activity_reader.activities[address] = an_activity(positions=(held,))
 
 
 @given(parsers.re(r'^che il flusso "(?P<flow>[^"]+)" ha un rendimento dall\'avvio del (?P<percent>[\d,]+)%$'))
@@ -159,6 +168,8 @@ def flow_return(flow_cycles: FlowCycles, flow: str, percent: str) -> None:
     exchange.revoke(credentials)
     exchange.accept(credentials, amount=BALANCE)
     exchange.open_position(credentials, replace(held, unrealized_pnl=pnl))
+    [shown] = flow_cycles.platform.activity_reader.activities[credentials.account_address].positions
+    show_activity(flow_cycles, flow, replace(shown, unrealized_pnl=pnl))
 
 
 @given(quoted('che l\'exchange rifiuta le credenziali del conto "{account}"'))
