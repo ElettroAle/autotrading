@@ -1,5 +1,6 @@
 import base64
 import binascii
+import logging
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -15,11 +16,16 @@ from sqlalchemy import Engine
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings, OidcSigningKeys
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
-from autotrading.adapters.inbound.api.worker import WorkerUseCases, create_worker_api
+from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases, create_worker_api
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
 from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
+from autotrading.adapters.outbound.httpx.telegram import (
+    HttpxTelegramInboxAdapter,
+    HttpxTelegramMessengerAdapter,
+    telegram_client,
+)
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
@@ -34,6 +40,11 @@ from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKey
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
+    SqlAlchemyLinkCodeLookupAdapter,
+    SqlAlchemyLinkCodeRepositoryAdapter,
+)
+from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
@@ -62,6 +73,11 @@ from autotrading.application.flows.errors import (
     InvalidFlowSettingError,
 )
 from autotrading.application.flows.ports import FlowAccount, FlowRepositoryPort, MarketsPort
+from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.errors import MessageNotDeliveredError
+from autotrading.application.notifications.link_chat import LinkChatUseCase
+from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.ports import LinkStores, MessengerPort
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -84,6 +100,7 @@ from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
+from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
@@ -115,6 +132,9 @@ SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNAT
 # The models of the platform (R1.4.2): one added to the configuration file becomes selectable in every flow.
 MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
+TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
+
+operations = logging.getLogger("autotrading.bootstrap")
 
 
 class MissingConfigurationError(AutotradingError):
@@ -395,6 +415,9 @@ class TenantUseCaseFactory:
                 models=ModelSettingsFromAgent(MODEL_CATALOG, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
             ),
+            link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
+            linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
+            clock=now,
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -408,11 +431,13 @@ class WorkerUseCaseFactory:
         opener: SodiumCredentialOpenerAdapter,
         exchanges: WorkerExchanges,
         settings: WorkerSettings,
+        messenger: MessengerPort,
     ) -> None:
         self._engine = engine
         self._opener = opener
         self._exchanges = exchanges
         self._settings = settings
+        self._messenger = messenger
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
@@ -432,7 +457,23 @@ class WorkerUseCaseFactory:
                 self._settings.environment,
                 now,
             ),
+            notify=NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger),
         )
+
+    def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
+        return LinkStores(
+            SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
+            SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
+        )
+
+
+class UnconfiguredMessenger:
+    """Stands for Telegram until the installation has the token of the bot: every notification is a recorded
+    failure, and the flows go on (ADR 0035).
+    """
+
+    def send(self, chat_id: ChatId, text: str) -> None:  # noqa: ARG002 - the signature of the port
+        raise MessageNotDeliveredError
 
 
 def now() -> datetime:
@@ -464,8 +505,23 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     )
     exchanges = WorkerExchanges(exchanges_for(environment), order_exchanges_for(environment))
     settings = WorkerSettings(environment, slippage_from(configuration))
-    worker = WorkerUseCaseFactory(_database(configuration), opener, exchanges, settings)
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant)
+    engine = _database(configuration)
+    token = _optional_secret(configuration, TELEGRAM_BOT_SETTING)
+    client = None if token is None else telegram_client(token)
+    messenger: MessengerPort = UnconfiguredMessenger() if client is None else HttpxTelegramMessengerAdapter(client)
+    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, messenger)
+    bot = None if client is None else telegram_bot(engine, worker, client, messenger)
+    if bot is None:
+        operations.warning("bot Telegram non configurato: notifiche disattivate")
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot)
+
+
+def telegram_bot(
+    engine: Engine, worker: WorkerUseCaseFactory, client: httpx.Client, messenger: MessengerPort
+) -> BotPolling:
+    """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
+    link_chat = LinkChatUseCase(SqlAlchemyLinkCodeLookupAdapter(engine), worker.link_stores_for, messenger, now)
+    return BotPolling(AnswerBotMessagesUseCase(HttpxTelegramInboxAdapter(client), link_chat).execute)
 
 
 def exchanges_for(environment: str) -> dict[str, HyperliquidExchangeAdapter]:
@@ -558,6 +614,14 @@ def _secret(configuration: Mapping[str, str], name: str) -> str:
     if not secret:
         raise MissingConfigurationError(name)
     return secret
+
+
+def _optional_secret(configuration: Mapping[str, str], name: str) -> str | None:
+    """A secret the installation may not have yet: unset, missing or empty means absent, never an error."""
+    location = configuration.get(name, "").strip()
+    if not location or not Path(location).is_file():
+        return None
+    return Path(location).read_text(encoding="utf-8").strip() or None
 
 
 def _environment(configuration: Mapping[str, str]) -> str:
