@@ -17,7 +17,9 @@ Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
   all'inizio del ciclo, dopo la riconciliazione, la posizione del conto su un asset del flusso è diversa da quella
   attesa (per esempio l'utente ha comprato a mano sullo stesso asset), il ciclo non invia ordini, il flusso va in
   pausa con il motivo "posizione <asset> diversa da quella del flusso: attesa <A>, sul conto <B>" e arriva la
-  notifica.
+  notifica. Prima di mettere in pausa il flusso, il ciclo rilegge le esecuzioni nuove e rifà il confronto: un'esecuzione
+  pubblicata dall'exchange tra la lettura delle esecuzioni e quella delle posizioni non ferma il flusso.
+  Gli ordini della procedura di verifica (R0.4.1) non appartengono a nessun flusso.
   Una posizione di un flusso chiusa fuori dalla piattaforma si registra nello storico del flusso come chiusa,
   con il motivo "chiusa fuori dalla piattaforma" e l'esito letto dall'exchange.
 
@@ -57,3 +59,15 @@ Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
     Allora nessun ordine è inviato
     E il flusso "alfa" è in pausa con il motivo "posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
     E "anna" riceve la notifica "alfa: in pausa, posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
+
+  Scenario: Esecuzione del flusso pubblicata in ritardo
+    Dato che il flusso "alfa" ha aperto 0,1 "BTC" con i propri ordini
+    E che il flusso "alfa" ha aperto altri 0,1 "BTC" con un'esecuzione pubblicata dopo la prima lettura
+    E che sull'exchange il conto "test-1" ha una posizione di 0,2 "BTC"
+    Quando parte un ciclo del flusso "alfa" in cui l'agente apre "BTC"
+    Allora il flusso "alfa" non è in pausa
+
+  Scenario: Gli ordini della procedura di verifica non sono del flusso
+    Dato che sul conto "test-1" la procedura di verifica ha aperto e chiuso 0,1 "BTC"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora le esecuzioni della procedura di verifica non appartengono al flusso "alfa"

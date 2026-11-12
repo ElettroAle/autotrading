@@ -19,6 +19,15 @@ class PositionAlreadyOpenError(VerificationNotStartedError):
         self.coin = coin
 
 
+class AssetOfFlowError(VerificationNotStartedError):
+    """The executions of the procedure would change the position a flow of the account expects, and pause it."""
+
+    def __init__(self, coin: str, flow_name: str) -> None:
+        super().__init__(f"{coin} è un asset del flusso {flow_name}")
+        self.coin = coin
+        self.flow_name = flow_name
+
+
 class InsufficientMarginError(VerificationNotStartedError):
     def __init__(self, required: Decimal) -> None:
         super().__init__(f"margine insufficiente: servono almeno {required} USDC")

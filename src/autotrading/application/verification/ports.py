@@ -9,9 +9,16 @@ from autotrading.domain.verification.verification_run import VerificationRun
 
 
 class AccountReadingPort(Protocol):
-    """Reads the account on the exchange; raises VerificationStepError when it cannot."""
+    """Reads the account: what the exchange shows of it and the flows that trade on it."""
 
-    def read(self, account_id: UUID) -> AccountReading: ...
+    def read(self, account_id: UUID) -> AccountReading:
+        """Raises VerificationStepError when the exchange cannot be read."""
+        ...
+
+    def flow_on(self, account_id: UUID, asset: str) -> str | None:
+        """The name of a flow of the account trading the asset, if any: active or paused, it compares its position
+        at the next cycle (ADR 0075)."""
+        ...
 
 
 class OrderExecutionPort(Protocol):

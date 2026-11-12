@@ -216,7 +216,7 @@ class Platform:
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state),
+                AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
                 OrderExecutionFromOrders(open_position, close_exchange_position),
                 self.runs_of(tenant_id),
                 "dev",

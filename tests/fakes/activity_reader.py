@@ -1,6 +1,7 @@
 """Fake of the adapter that reads what an exchange shows of an address: a reading per address, or out of reach.
 
-It also holds the executions and funding of each address, read since a moment as the exchange does.
+It also holds the executions and funding of each address, read since a moment as the exchange does. A late execution
+is published only after the first reading of its address, as the exchange may do with an execution of a moment ago.
 """
 
 from datetime import datetime
@@ -15,10 +16,12 @@ class FakeActivityReaderAdapter:
     def __init__(self) -> None:
         self.activities: dict[str, AccountActivity] = {}
         self.executions: dict[str, list[Execution]] = {}
+        self.late: dict[str, list[Execution]] = {}
         self.funding: dict[str, list[FundingPayment]] = {}
         self.complete = True
         self.reachable = True
         self.executions_reachable = True
+        self.unreachable_after_first_reading = False
         self.readings: list[tuple[str, datetime | None]] = []
 
     def activity(self, address: str) -> AccountActivity:
@@ -30,8 +33,11 @@ class FakeActivityReaderAdapter:
         if not (self.reachable and self.executions_reachable):
             raise FlowExchangeUnavailableError
         self.readings.append((address, since))
-        return ExecutionsWindow(
+        window = ExecutionsWindow(
             tuple(e for e in self.executions.get(address, []) if since is None or e.executed_at >= since),
             tuple(p for p in self.funding.get(address, []) if since is None or p.paid_at >= since),
             self.complete or since is None,
         )
+        self.executions.setdefault(address, []).extend(self.late.pop(address, []))
+        self.executions_reachable = not self.unreachable_after_first_reading
+        return window

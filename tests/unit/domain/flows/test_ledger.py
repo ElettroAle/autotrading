@@ -15,6 +15,7 @@ from autotrading.domain.flows.ledger import (
     FundingEntry,
     FundingPayment,
     LedgerKeys,
+    PlatformOrder,
     PlatformOrders,
 )
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -50,7 +51,7 @@ def window_of(*executions: Execution, funding: tuple[FundingPayment, ...] = ()) 
 def test_an_execution_of_an_order_of_the_flow_belongs_to_the_flow() -> None:
     flow, order = flow_on("BTC"), uuid4()
 
-    (entry,) = attributed([flow], window_of(a_fill("BTC", order)), {order: flow.id}).entries
+    (entry,) = attributed([flow], window_of(a_fill("BTC", order)), {order: PlatformOrder(flow.id)}).entries
 
     assert (entry.flow_id, entry.kind, entry.platform_order) == (flow.id, ExecutionKind.FLOW_ORDER, True)
 
@@ -58,15 +59,25 @@ def test_an_execution_of_an_order_of_the_flow_belongs_to_the_flow() -> None:
 def test_an_order_of_the_platform_sent_for_no_flow_belongs_to_the_flow_that_owns_the_asset() -> None:
     flow, manual = flow_on("BTC"), uuid4()
 
-    (entry,) = attributed([flow], window_of(a_fill("BTC", manual)), {manual: None}).entries
+    (entry,) = attributed([flow], window_of(a_fill("BTC", manual)), {manual: PlatformOrder(None)}).entries
 
     assert (entry.flow_id, entry.kind, entry.platform_order) == (flow.id, ExecutionKind.FLOW_ORDER, True)
+
+
+def test_an_order_of_the_verification_procedure_belongs_to_no_flow_even_on_an_asset_of_a_flow() -> None:
+    flow, check = flow_on("BTC"), uuid4()
+
+    (entry,) = attributed(
+        [flow], window_of(a_fill("BTC", check)), {check: PlatformOrder(None, verification=True)}
+    ).entries
+
+    assert (entry.flow_id, entry.kind, entry.platform_order) == (None, ExecutionKind.UNATTRIBUTED, True)
 
 
 def test_an_order_of_the_platform_for_no_flow_on_an_asset_of_no_flow_belongs_to_no_flow() -> None:
     manual = uuid4()
 
-    (entry,) = attributed([flow_on("BTC")], window_of(a_fill("SOL", manual)), {manual: None}).entries
+    (entry,) = attributed([flow_on("BTC")], window_of(a_fill("SOL", manual)), {manual: PlatformOrder(None)}).entries
 
     assert (entry.flow_id, entry.kind, entry.platform_order) == (None, ExecutionKind.UNATTRIBUTED, True)
 
@@ -123,7 +134,7 @@ def test_an_execution_on_an_asset_of_no_flow_belongs_to_no_flow() -> None:
 def test_an_archived_flow_owns_no_asset() -> None:
     flow, manual = flow_on("BTC", status=FlowStatus.ARCHIVED), uuid4()
 
-    (entry,) = attributed([flow], window_of(a_fill("BTC", manual)), {manual: None}).entries
+    (entry,) = attributed([flow], window_of(a_fill("BTC", manual)), {manual: PlatformOrder(None)}).entries
 
     assert entry.flow_id is None
 
@@ -133,7 +144,7 @@ def test_the_position_opened_by_the_flow_in_the_same_window_is_the_one_its_closi
     opening = a_fill("BTC", order, fill_id="1", size=Decimal(2), executed_at=EARLIER)
     closing = a_fill("BTC", None, fill_id="2", size=Decimal(-2), start_position=Decimal(2))
 
-    ledger = attributed([flow], window_of(closing, opening), {order: flow.id})
+    ledger = attributed([flow], window_of(closing, opening), {order: PlatformOrder(flow.id)})
 
     assert [(entry.execution.fill_id, entry.kind) for entry in ledger.entries] == [
         ("1", ExecutionKind.FLOW_ORDER),
@@ -165,7 +176,7 @@ def test_funding_paid_after_the_flow_closed_belongs_to_no_flow() -> None:
     ledger = attributed(
         [flow],
         window_of(closing, funding=(a_payment("BTC", Decimal(1)),)),
-        {order: flow.id},
+        {order: PlatformOrder(flow.id)},
         holding(flow, "BTC", Decimal(1)),
     )
 

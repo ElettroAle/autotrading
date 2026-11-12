@@ -11,7 +11,7 @@ from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
 )
 from autotrading.domain.tenancy.user_id import UserId
-from autotrading.domain.verification.errors import InsufficientMarginError, PositionAlreadyOpenError
+from autotrading.domain.verification.errors import AssetOfFlowError, InsufficientMarginError, PositionAlreadyOpenError
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import PROCEDURE_OPENING, Opening, Step
 from autotrading.domain.verification.reading import AccountReading
@@ -30,6 +30,7 @@ class ScriptedReadings:
 
     answers: list[Answer]
     asked: list[UUID] = field(default_factory=list)
+    flows: dict[tuple[UUID, str], str] = field(default_factory=dict)
 
     def read(self, account_id: UUID) -> AccountReading:
         self.asked.append(account_id)
@@ -37,6 +38,9 @@ class ScriptedReadings:
         if isinstance(answer, Exception):
             raise answer
         return answer
+
+    def flow_on(self, account_id: UUID, asset: str) -> str | None:
+        return self.flows.get((account_id, asset))
 
 
 @dataclass
@@ -125,6 +129,27 @@ def test_an_account_not_ready_does_not_start_sends_nothing_and_records_nothing(
         build(ScriptedReadings([first]), orders).execute(RunExchangeVerificationCommand(uuid4(), ANNA))
 
     assert (orders.sent, runs.runs) == ([], [])
+
+
+def test_an_account_whose_flow_trades_the_asset_does_not_start_and_is_not_read(
+    build: Build, runs: InMemoryVerificationRunRepositoryAdapter
+) -> None:
+    account_id, orders, readings = uuid4(), ScriptedOrders(), ScriptedReadings(normal_readings())
+    readings.flows[account_id, PROCEDURE_OPENING.coin] = "alfa"
+
+    with pytest.raises(AssetOfFlowError) as raised:
+        build(readings, orders).execute(RunExchangeVerificationCommand(account_id, ANNA))
+
+    assert (str(raised.value), raised.value.status_code) == ("BTC è un asset del flusso alfa", 409)
+    assert (orders.sent, runs.runs, readings.asked) == ([], [], [])
+
+
+def test_a_flow_of_another_account_on_the_asset_does_not_stop_the_procedure(build: Build) -> None:
+    readings = ScriptedReadings(normal_readings(), flows={(uuid4(), PROCEDURE_OPENING.coin): "alfa"})
+
+    run = build(readings, ScriptedOrders()).execute(RunExchangeVerificationCommand(uuid4(), ANNA))
+
+    assert run.failed_step is None
 
 
 @pytest.mark.parametrize("failure", [VerificationStepError(UNREACHABLE), VerificationAccountNotFoundError()])

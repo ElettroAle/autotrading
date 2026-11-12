@@ -11,6 +11,7 @@ from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.bootstrap import AccountReadingFromAccounts, OrderExecutionFromOrders
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import OrderOrigin, OrderSource, OrderStatus
@@ -21,9 +22,11 @@ from autotrading.domain.verification.procedure import PROCEDURE_OPENING
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.trading_access import FakeTradingAccessAdapter
+from tests.support.flows import a_configuration, a_flow
 from tests.support.trading import HYPERLIQUID, new_access
 from tests.support.worker import Worker
 
@@ -139,7 +142,45 @@ def test_a_closing_on_an_account_the_tenant_does_not_have_is_not_found(orders: O
 def readings_of(worker: Worker, tenant_id: TenantId) -> AccountReadingFromAccounts:
     accounts = InMemoryAccountRepositoryAdapter(worker.store, tenant_id)
     opener = FakeCredentialOpenerAdapter(worker.vault)
-    return AccountReadingFromAccounts(ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: worker.exchange}))
+    return AccountReadingFromAccounts(
+        ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: worker.exchange}),
+        InMemoryFlowRepositoryAdapter(worker.flows, tenant_id),
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "trading"),
+    [(FlowStatus.ACTIVE, "alfa"), (FlowStatus.PAUSED, "alfa"), (FlowStatus.STOPPED, None), (FlowStatus.ARCHIVED, None)],
+    ids=["active", "paused", "stopped", "archived"],
+)
+def test_only_an_active_or_paused_flow_of_the_account_trades_the_asset(status: FlowStatus, trading: str | None) -> None:
+    worker, tenant_id, account_id = Worker(), TenantId.new(), uuid4()
+    worker.flows.flows.append(
+        a_flow(
+            tenant_id, name="alfa", status=status, account_id=account_id, configuration=a_configuration(assets=("BTC",))
+        )
+    )
+
+    assert readings_of(worker, tenant_id).flow_on(account_id, "BTC") == trading
+
+
+def test_a_flow_on_another_asset_or_another_account_does_not_trade_the_asset() -> None:
+    worker, tenant_id, account_id = Worker(), TenantId.new(), uuid4()
+    worker.flows.flows.extend(
+        (
+            a_flow(
+                tenant_id,
+                status=FlowStatus.ACTIVE,
+                account_id=account_id,
+                configuration=a_configuration(assets=("ETH",)),
+            ),
+            a_flow(
+                tenant_id, status=FlowStatus.ACTIVE, account_id=uuid4(), configuration=a_configuration(assets=("BTC",))
+            ),
+        )
+    )
+
+    assert readings_of(worker, tenant_id).flow_on(account_id, "BTC") is None
 
 
 def test_the_reading_carries_balance_margin_and_positions() -> None:
