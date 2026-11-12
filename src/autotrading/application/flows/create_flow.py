@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.flows.errors import AssetNotTradableError, FlowNameInUseError
+from autotrading.application.flows.errors import FlowNameInUseError
 from autotrading.application.flows.free_capital import free_capital_of
 from autotrading.application.flows.ports import (
     FlowAccountPort,
@@ -13,6 +13,8 @@ from autotrading.application.flows.ports import (
     ModelSettingsPort,
     SourceSettingsPort,
 )
+from autotrading.application.flows.tradable_assets import require_tradable
+from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
@@ -70,10 +72,10 @@ class CreateFlowUseCase:
         self._require_free(name)
         configuration = self._configuration(command)
         account = self._checks.accounts.account(command.account_id)
-        self._require_tradable(account.exchange, configuration.assets)
-        free_capital_of(account, command.account_id, self._flows.list()).require_room_for(
-            configuration.allocated_capital
-        )
+        require_tradable(self._checks.markets, account.exchange, configuration.assets)
+        existing = self._flows.list()
+        require_assets_free(command.account_id, configuration.assets, existing)
+        free_capital_of(account, command.account_id, existing).require_room_for(configuration.allocated_capital)
         flow = Flow.created(self._tenant_id, command.account_id, name, configuration)
         self._flows.add(flow)
         operations.info("flusso creato", extra={"flow_id": str(flow.id.value)})
@@ -99,10 +101,3 @@ class CreateFlowUseCase:
 
     def _source(self, request: SourceRequest) -> SourceSelection:
         return self._checks.sources.selection(request.name, request.weight, request.parameters)
-
-    def _require_tradable(self, exchange: str, assets: tuple[str, ...]) -> None:
-        markets = self._checks.markets.get(exchange)
-        tradable = frozenset() if markets is None else markets.tradable_assets()
-        refused = tuple(asset for asset in assets if asset not in tradable)
-        if refused:
-            raise AssetNotTradableError(refused)

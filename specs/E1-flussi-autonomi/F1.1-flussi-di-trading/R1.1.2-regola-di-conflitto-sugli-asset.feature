@@ -1,5 +1,5 @@
 # language: it
-@R1.1.2 @wip
+@R1.1.2
 Funzionalità: R1.1.2 Regola di conflitto sugli asset del conto
   Come utente
   Voglio che due flussi dello stesso conto non operino mai lo stesso asset

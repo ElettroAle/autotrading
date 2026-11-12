@@ -5,6 +5,8 @@ from typing import Protocol
 from uuid import UUID
 
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -35,6 +37,22 @@ class FlowRepositoryPort(Protocol):
 
         Raises FlowNameInUseError, or FlowAccountNotFoundError when the account is not of the tenant any more.
         """
+        ...
+
+    def get(self, flow_id: FlowId) -> Flow:
+        """The flow with the configuration version in force. Raises FlowNotFoundError."""
+        ...
+
+    def version(self, flow_id: FlowId, number: int) -> FlowConfiguration:
+        """One configuration version of the flow. Raises FlowNotFoundError or FlowVersionNotFoundError."""
+        ...
+
+    def change_status(self, flow: Flow) -> None:
+        """Saves the status of the flow. Raises FlowNotFoundError."""
+        ...
+
+    def add_version(self, flow: Flow) -> None:
+        """Saves the configuration of the flow as a new version, the others untouched. Raises FlowNotFoundError."""
         ...
 
 

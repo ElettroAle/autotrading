@@ -175,14 +175,14 @@ def test_an_exchange_out_of_reach_refuses_the_creation(flows: Flows) -> None:
 
 
 def test_the_capital_of_the_other_flows_of_the_account_is_not_free(flows: Flows) -> None:
-    flows.create.execute(flows.command(name="beta", allocated_capital=Decimal(600)))
+    flows.create.execute(flows.command(name="beta", assets=("SOL",), allocated_capital=Decimal(600)))
     other_account = a_flow(flows.tenant_id, name="gamma", configuration=a_configuration(allocated_capital=Decimal(900)))
     flows.store.flows.append(other_account)
 
-    flows.create.execute(flows.command(allocated_capital=Decimal(400)))
+    flows.create.execute(flows.command(assets=("BTC",), allocated_capital=Decimal(400)))
 
     with pytest.raises(CapitalAboveFreeCapitalError, match=r"^capitale allocato oltre il capitale libero: 0 USDC$"):
-        flows.create.execute(flows.command(name="delta", allocated_capital=Decimal("0.01")))
+        flows.create.execute(flows.command(name="delta", assets=("ETH",), allocated_capital=Decimal("0.01")))
 
 
 def test_the_free_capital_of_an_account_is_its_balance_less_its_flows(flows: Flows) -> None:

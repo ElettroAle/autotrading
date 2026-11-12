@@ -136,3 +136,90 @@ def test_the_free_capital_of_an_account_of_another_tenant_is_not_found(client_of
     response = client_of("bruno").get(f"/accounts/{account_id}/free-capital")
 
     assert (response.status_code, reason_of(response)) == (404, {"detail": "conto non trovato"})
+
+
+def test_a_flow_is_modified_compared_commanded_and_archived(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    modified = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30, "instructions": "audace"})
+
+    assert (modified.status_code, modified.json()["version"], modified.json()["cycle_minutes"]) == (200, 2, 30)
+    first = anna.get(f"/flows/{flow_id}/versions/1").json()
+    assert (first["version"], first["cycle_minutes"], first["instructions"], first["allocated_capital"]) == (
+        1,
+        15,
+        "prudente",
+        "400",
+    )
+    assert anna.get(f"/flows/{flow_id}/versions/1/differences/2").json() == [
+        {"part": "intervallo di ciclo", "before": "15 minuti", "after": "30 minuti"},
+        {"part": "istruzioni", "before": "prudente", "after": "audace"},
+    ]
+    assert [anna.post(f"/flows/{flow_id}/{action}").json()["status"] for action in ("start", "pause", "resume")] == [
+        "attivo",
+        "in pausa",
+        "attivo",
+    ]
+    refused = anna.post(f"/flows/{flow_id}/archive")
+    assert (refused.status_code, reason_of(refused)) == (409, {"detail": "si archivia solo un flusso fermo"})
+
+
+def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    archived = anna.post(f"/flows/{flow_id}/archive")
+
+    assert (archived.status_code, archived.json()["status"]) == (200, "archiviato")
+    assert anna.get("/flows").json() == []
+    assert [flow["id"] for flow in anna.get("/flows", params={"archived": True}).json()] == [flow_id]
+
+
+@pytest.mark.parametrize(
+    ("changes", "status", "reason"),
+    [
+        ({"cycle_minutes": 0}, 422, "intervallo di ciclo fuori da 1-1440 minuti"),
+        ({"account_id": str(uuid4())}, 422, "il conto di un flusso non si cambia"),
+        ({"assets": ["XYZ"]}, 422, "asset non negoziabile sull'exchange: XYZ"),
+        ({"model": "openai/inesistente", "model_parameters": {}}, 422, "modello non disponibile: openai/inesistente"),
+        ({"sources": [{"name": "inesistente"}]}, 422, "fonte non disponibile: inesistente"),
+        (
+            {"max_leverage": 0, "max_margin_exposure_percent": "5", "max_value_exposure_percent": "5"},
+            422,
+            "limite di rischio non valido: leva massima",
+        ),
+    ],
+)
+def test_an_invalid_change_answers_with_the_reason(
+    client_of: Client, platform: Platform, changes: dict[str, Any], status: int, reason: str
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json=changes)
+
+    assert (response.status_code, reason_of(response)) == (status, {"detail": reason})
+    assert anna.get("/flows").json()[0]["version"] == 1
+
+
+def test_a_flow_of_another_tenant_or_a_missing_version_is_not_found(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    bruno = client_of("bruno")
+
+    for response in (
+        bruno.patch(f"/flows/{flow_id}", json={"instructions": "x"}),
+        bruno.post(f"/flows/{flow_id}/start"),
+        bruno.post(f"/flows/{flow_id}/archive"),
+        bruno.get(f"/flows/{flow_id}/versions/1"),
+    ):
+        assert (response.status_code, reason_of(response)) == (404, {"detail": "flusso non trovato"})
+    missing = anna.get(f"/flows/{flow_id}/versions/1/differences/5")
+    assert (missing.status_code, reason_of(missing)) == (404, {"detail": "versione di configurazione non trovata: 5"})
+    assert anna.post(f"/flows/{flow_id}/explode").status_code == 422
+    refused = anna.post(f"/flows/{flow_id}/pause")
+    assert (refused.status_code, reason_of(refused)) == (
+        409,
+        {"detail": "comando pausa non ammesso per un flusso fermo"},
+    )
