@@ -1245,6 +1245,8 @@ class FlowStateFromFlows:
         self._ports_of = ports_of
 
     def read(self, flow_id: UUID) -> FlowSnapshot:
+        """The account of the flow is reconciled first, so the ledger holds every execution the state counts."""
+        self._reconcile(flow_id)
         tenant_id = self._directory.tenant_of(flow_id)
         ports = self._ports_of(tenant_id)
         flow = flow_of_cycle(ports, flow_id)
@@ -1266,14 +1268,11 @@ class FlowStateFromFlows:
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 
     def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
-        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1).
-
-        The account of the flow is reconciled first: what no flow explains is recorded once and notified (R1.6.2).
-        """
-        self._reconcile(flow_id)
+        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
         return self.read(flow_id).state
 
     def _reconcile(self, flow_id: UUID) -> None:
+        """What no flow explains is recorded once and notified (R1.6.2); the new executions enter the ledger."""
         ports = self._ports_of(self._directory.tenant_of(flow_id))
         try:
             outcome = ports.reconcile_account.execute(ReconcileAccountCommand(FlowId(flow_id)))

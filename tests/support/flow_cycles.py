@@ -13,11 +13,13 @@ from autotrading.application.cycles.ports import ScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
     AccountActivityFromAccounts,
+    AccountExecutionsFromAccounts,
     ClosedPositionsFromOpenings,
     CycleRuntime,
     CycleServices,
@@ -130,19 +132,25 @@ class FlowCycles:
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
         activity = AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader})
+        record_executions = RecordAccountExecutionsUseCase(
+            flows,
+            AccountExecutionsFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            platform.platform_orders,
+            platform.ledger,
+        )
         reconcile_account = ReconcileAccountUseCase(
             flows,
             activity,
-            platform.platform_orders,
             self.readings,
             ClosedPositionsFromOpenings(flows, openings, closed_positions),
+            record_executions,
         )
         return TenantCyclePorts(
             flows=flows,
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
             accounts=accounts,
             read_exchange_state=worker.read_exchange_state,
-            read_flow_state=ReadFlowStateUseCase(flows, activity, platform.platform_orders),
+            read_flow_state=ReadFlowStateUseCase(flows, activity, platform.ledger),
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),

@@ -13,14 +13,20 @@ from pytest_bdd import parsers
 
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
-from autotrading.domain.flows.account_activity import AccountActivity, AccountFill, AccountPosition, BalanceMovement
+from autotrading.application.flows.record_account_executions import (
+    RecordAccountExecutionsCommand,
+    RecordAccountExecutionsUseCase,
+)
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.ledger import Execution
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
@@ -56,8 +62,10 @@ class AttributionBench:
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.closed = InMemoryClosedPositionsAdapter()
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
-        self.read_state = ReadFlowStateUseCase(flows, self.exchange, self.orders)
-        self.reconcile = ReconcileAccountUseCase(flows, self.exchange, self.orders, self.readings, self.closed)
+        self.ledger = InMemoryFlowLedgerAdapter()
+        self.record = RecordAccountExecutionsUseCase(flows, self.exchange, self.orders, self.ledger)
+        self.read_state = ReadFlowStateUseCase(flows, self.exchange, self.ledger)
+        self.reconcile = ReconcileAccountUseCase(flows, self.exchange, self.readings, self.closed, self.record)
         self.state: FlowState | None = None
 
     def account(self, name: str, balance: Decimal = Decimal(1000)) -> UUID:
@@ -89,10 +97,11 @@ class AttributionBench:
         account_id: UUID,
         *,
         positions: tuple[AccountPosition, ...] = (),
-        fills: tuple[AccountFill, ...] = (),
+        fills: tuple[Execution, ...] = (),
         movements: tuple[BalanceMovement, ...] = (),
     ) -> None:
         activity = self.activity_of(account_id)
+        self.exchange.executions.setdefault(account_id, []).extend(fills)
         moved = sum((movement.amount for movement in movements), Decimal(0))
         self.show(
             account_id,
@@ -100,10 +109,13 @@ class AttributionBench:
                 activity,
                 balance=activity.balance + moved,
                 positions=activity.positions + positions,
-                fills=activity.fills + fills,
                 movements=activity.movements + movements,
             ),
         )
+
+    def record_executions(self, account_id: UUID) -> None:
+        """What a past cycle of the account recorded in the ledger."""
+        self.record.execute(RecordAccountExecutionsCommand(account_id))
 
     def previous_reading(self, account_id: UUID, open_assets: dict[str, frozenset[str]] | None = None) -> None:
         assets = {self.flow(name).id: held for name, held in (open_assets or {}).items()}

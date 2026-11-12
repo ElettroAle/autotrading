@@ -34,6 +34,10 @@ class HyperliquidAccountExecutionsAdapter:
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidAccountExecutionsAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
     def since(self, address: str, since: datetime | None) -> ExecutionsWindow:
         start = FROM_THE_START if since is None else int(since.timestamp() * 1000)
         with translated():

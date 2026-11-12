@@ -32,6 +32,7 @@ from autotrading.bootstrap import (
     _follow_order,
     activity_readers_for,
     exchanges_for,
+    executions_readers_for,
     order_exchanges_for,
 )
 from autotrading.domain.agent.provider_name import ProviderName
@@ -313,9 +314,9 @@ def update(world: World) -> object:
 def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: World) -> None:
     reader = world.cycles.platform.activity_reader
     update(world)
+    reader.executions[world.address] = [a_fill("ETH", None, executed_at=CLOSED_AT)]
     reader.activities[world.address] = an_activity(
         positions=(a_position("SOL"),),
-        fills=(a_fill("ETH", None, executed_at=CLOSED_AT),),
         movements=(a_movement(Decimal("-25.5"), moved_at=CLOSED_AT),),
         read_at=CLOSED_AT + timedelta(minutes=1),
     )
@@ -336,10 +337,8 @@ def test_a_position_of_the_flow_closed_outside_is_notified_with_its_pnl(world: W
     reader = world.cycles.platform.activity_reader
     reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
     update(world)
-    reader.activities[world.address] = an_activity(
-        fills=(a_fill("BTC", None, realized_pnl=Decimal("-10"), executed_at=CLOSED_AT),),
-        read_at=CLOSED_AT + timedelta(minutes=1),
-    )
+    reader.executions[world.address] = [a_fill("BTC", None, realized_pnl=Decimal("-10"), executed_at=CLOSED_AT)]
+    reader.activities[world.address] = an_activity(read_at=CLOSED_AT + timedelta(minutes=1))
 
     update(world)
 
@@ -369,7 +368,9 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
 
 
 def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
-    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"))
+    exchanges = WorkerExchanges(
+        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+    )
     messenger = FakeMessengerAdapter()
     worker = WorkerUseCaseFactory(
         create_engine("sqlite://"),

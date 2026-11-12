@@ -7,7 +7,7 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.domain.flows.risk_limits import RiskLimits
-from tests.support.activity import a_fill, a_position, an_activity
+from tests.support.activity import a_fill, a_position
 from tests.support.attribution import AttributionBench, amount, step
 from tests.support.flow_cycles import FlowCycles
 
@@ -28,7 +28,9 @@ def flow_cycles_of_the_worker() -> FlowCycles:
 def fills_of(bench: AttributionBench, flow: str, realized_pnl: Decimal, fee: Decimal) -> None:
     order, owner = uuid4(), bench.flow(flow)
     bench.orders.add(order, owner.account_id, owner.id)
-    bench.extend(owner.account_id, fills=(a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee),))
+    fill = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee, fill_id=str(order))
+    bench.extend(owner.account_id, fills=(fill,))
+    bench.record_executions(owner.account_id)
 
 
 def cycle_fills_of(flow_cycles: FlowCycles, flow: str, realized_pnl: Decimal, fee: Decimal) -> None:
@@ -36,8 +38,8 @@ def cycle_fills_of(flow_cycles: FlowCycles, flow: str, realized_pnl: Decimal, fe
     platform = flow_cycles.platform
     platform.platform_orders.add(order, owner.account_id, owner.id)
     address = flow_cycles.credentials_of(flow).account_address
-    fill = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee)
-    platform.activity_reader.activities[address] = an_activity(fills=(fill,))
+    fill = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee, fill_id=str(order))
+    platform.activity_reader.executions.setdefault(address, []).append(fill)
 
 
 def add_cycle_flow(flow_cycles: FlowCycles, name: str, asset: str, capital: Decimal) -> None:

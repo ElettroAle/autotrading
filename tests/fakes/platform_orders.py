@@ -2,8 +2,8 @@
 
 from uuid import UUID
 
-from autotrading.domain.flows.account_reconciliation import PlatformOrders
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.ledger import PlatformOrders
 
 
 class InMemoryPlatformOrdersAdapter:

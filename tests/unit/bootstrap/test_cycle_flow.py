@@ -27,7 +27,7 @@ def attributed(
     *, realized_pnl: Decimal = Decimal(0), fees: Decimal = Decimal(0), margin: Decimal = Decimal(0)
 ) -> FlowState:
     positions = (AccountPosition("BTC", TradeSide.LONG, Decimal(1), margin, Decimal(12)),) if margin else ()
-    return FlowState(FLOW.id, "USDC", Decimal(500), positions, realized_pnl, fees)
+    return FlowState(FLOW.id, "USDC", Decimal(500), positions, realized_pnl, fees, Decimal(0))
 
 
 def cycle_flow(state: FlowState, free_margin: Decimal = Decimal(10000)) -> CycleFlow:

@@ -44,6 +44,7 @@ from autotrading.bootstrap import (
     create_application,
     create_worker_application,
     exchanges_for,
+    executions_readers_for,
     markets_for,
     now,
     order_exchanges_for,
@@ -340,7 +341,9 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
-    exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"))
+    exchanges = WorkerExchanges(
+        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+    )
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())
     factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, settings, FakeMessengerAdapter())
