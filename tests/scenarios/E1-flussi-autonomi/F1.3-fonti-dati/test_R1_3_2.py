@@ -3,6 +3,10 @@ import json
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from autotrading.application.flows.create_flow import SourceRequest
+from tests.support.flows import scenario_catalog
+from tests.support.lifecycle_steps import Lifecycle, add_flow, modify
+from tests.support.platform import Platform
 from tests.support.source_collection import SourceCycle
 from tests.support.steps import quoted
 
@@ -12,6 +16,18 @@ scenarios("E1-flussi-autonomi/F1.3-fonti-dati/R1.3.2-selezione-pesi-e-parametri-
 @pytest.fixture
 def cycle() -> SourceCycle:
     return SourceCycle()
+
+
+@pytest.fixture
+def lifecycle() -> Lifecycle:
+    return Lifecycle()
+
+
+@pytest.fixture
+def platform() -> Platform:
+    platform = Platform()
+    platform.model_catalog = scenario_catalog()
+    return platform
 
 
 def names(text: str) -> list[str]:
@@ -53,6 +69,33 @@ def active_sources(cycle: SourceCycle, active: str) -> None:
 def weighted_sources(cycle: SourceCycle, first: str, first_weight: str, second: str, second_weight: str) -> None:
     cycle.activate(first, int(first_weight))
     cycle.activate(second, int(second_weight))
+
+
+@when(
+    parsers.re(
+        r'^"(?P<user>[^"]+)" modifica il flusso "(?P<flow>[^"]+)" con (?P<kind>peso|numero notizie) (?P<value>\d+) '
+        r'per la fonte "(?P<source>[^"]+)"$'
+    )
+)
+def modify_source(
+    platform: Platform,
+    cycle: SourceCycle,
+    lifecycle: Lifecycle,
+    user: str,
+    flow: str,
+    *,
+    kind: str,
+    value: str,
+    source: str,
+) -> None:
+    # The cycle of this feature runs on its own fakes: the flow to modify lives on the platform, with the same assets.
+    add_flow(platform, lifecycle, user, flow, assets=cycle.assets)
+    request = (
+        SourceRequest(source, int(value))
+        if kind == "peso"
+        else SourceRequest(source, None, {"numero_notizie": int(value)})
+    )
+    modify(platform, lifecycle, user, flow, sources=(request,))
 
 
 @when(quoted('il flusso "{flow}" esegue un ciclo'))
@@ -106,3 +149,8 @@ def own_weights(cycle: SourceCycle, first: str, first_weight: str, second: str, 
 def asked_with_defaults(cycle: SourceCycle, source: str, count: str, hours: str) -> None:
     settings = [reading.settings for reading in cycle.readers[source].readings]
     assert settings == [{"numero_notizie": int(count), "eta_massima_ore": int(hours)}]
+
+
+@then(quoted('la modifica è rifiutata con il motivo "{reason}"'))
+def modification_refused(lifecycle: Lifecycle, reason: str) -> None:
+    assert str(lifecycle.error) == reason

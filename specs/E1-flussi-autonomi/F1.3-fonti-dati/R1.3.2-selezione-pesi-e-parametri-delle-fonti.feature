@@ -42,8 +42,6 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
     Quando il flusso "alfa" esegue un ciclo
     Allora la fonte "notizie" è interrogata con numero notizie 10 ed età massima 24 ore
 
-  # La modifica versionata della configurazione arriva con R1.1.3.
-  @wip
   Schema dello scenario: Peso o parametro non valido
     Quando "anna" modifica il flusso "alfa" con <valore>
     Allora la modifica è rifiutata con il motivo "<motivo>"
