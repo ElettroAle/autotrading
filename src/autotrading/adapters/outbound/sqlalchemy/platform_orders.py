@@ -34,7 +34,7 @@ class SqlAlchemyPlatformOrdersAdapter:
             rows = connection.execute(query).all()
         return {
             order_id: PlatformOrder(
-                None if flow_id is None else FlowId(flow_id), verification=origin == OrderOrigin.VERIFICATION.value
+                None if flow_id is None else FlowId(flow_id), verification=origin == OrderOrigin.VERIFICATION.name
             )
             for order_id, flow_id, origin in rows
         }
