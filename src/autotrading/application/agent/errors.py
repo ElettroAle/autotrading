@@ -65,3 +65,36 @@ class ProviderKeyInUseError(ApplicationError):
     def __init__(self, flows: Iterable[str]) -> None:
         self.flows = tuple(sorted(flows))
         super().__init__("chiave usata da flussi attivi o in pausa: " + ", ".join(self.flows))
+
+
+class ModelKeyRejectedError(ApplicationError):
+    """The provider refuses the key during a cycle: it repeats at every cycle until the user acts (R1.2.4)."""
+
+    status_code = 422
+    permanent = True
+
+    def __init__(self, provider: ProviderName) -> None:
+        super().__init__(f"chiave del fornitore non valida: {provider.value}")
+        self.provider = provider
+
+
+class ModelCreditExhaustedError(ApplicationError):
+    """The account of the user at the provider has no credit left: it repeats until the user tops it up (R1.2.4)."""
+
+    status_code = 402
+    permanent = True
+
+    def __init__(self, provider: ProviderName) -> None:
+        super().__init__(f"credito esaurito presso {provider.value}")
+        self.provider = provider
+
+
+class ModelUnavailableError(ApplicationError):
+    """The provider did not answer, or answered with an error that may not repeat: only the cycle fails (R1.2.3)."""
+
+    status_code = 503
+
+    def __init__(self, provider: ProviderName, original: str) -> None:
+        super().__init__(f"fornitore IA non raggiungibile: {provider.value}: {original}")
+        self.provider = provider
+        self.original = original
