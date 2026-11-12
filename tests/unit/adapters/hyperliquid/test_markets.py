@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -9,6 +10,7 @@ from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.domain.flows.risk_check import AssetLimits
 
 META = {
     "universe": [
@@ -70,3 +72,33 @@ def test_an_exchange_that_does_not_answer_is_unavailable(failure: Exception) -> 
 def test_metadata_of_unexpected_shape_are_unavailable(meta: Any) -> None:
     with pytest.raises(FlowExchangeUnavailableError):
         HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk(meta_answer=meta)).tradable_assets()
+
+
+def test_the_limits_of_an_asset_are_its_maximum_leverage_and_the_minimum_order_value() -> None:
+    adapter = HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk())
+
+    assert adapter.limits("ETH") == AssetLimits(25, Decimal(10))
+    assert adapter.limits("BTC") == AssetLimits(40, Decimal(10))
+
+
+@pytest.mark.parametrize("asset", ["DOGE", "MATIC"])
+def test_an_asset_not_traded_has_no_limits(asset: str) -> None:
+    assert HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk()).limits(asset) is None
+
+
+@pytest.mark.parametrize("leverage", [None, "many", ...])
+def test_a_maximum_leverage_of_unexpected_shape_is_unavailable(leverage: object) -> None:
+    entry: dict[str, object] = {"name": "BTC", "szDecimals": 5}
+    if leverage is not ...:
+        entry["maxLeverage"] = leverage
+    adapter = HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk(meta_answer={"universe": [entry]}))
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        adapter.limits("BTC")
+
+
+def test_limits_of_an_exchange_that_does_not_answer_are_unavailable() -> None:
+    adapter = HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk(failure=ServerError(502, "bad gateway")))
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        adapter.limits("BTC")

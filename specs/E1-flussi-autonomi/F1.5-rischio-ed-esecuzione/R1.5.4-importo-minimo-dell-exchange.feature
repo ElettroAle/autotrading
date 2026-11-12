@@ -1,5 +1,5 @@
 # language: it
-@R1.5.4 @wip
+@R1.5.4
 Funzionalità: R1.5.4 Apertura sotto l'importo minimo dell'exchange
   Come utente
   Voglio che un'apertura sotto l'importo minimo dell'exchange sia trattata in modo prevedibile

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any
 
 import requests
@@ -6,12 +7,15 @@ from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdk, OfficialSdk
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.domain.flows.risk_check import AssetLimits
 
 SHAPE_ERRORS = (KeyError, TypeError, AttributeError)
+# The exchange refuses any order below 10 USDC of value ("Order must have minimum value of $10").
+MIN_ORDER_VALUE = Decimal(10)
 
 
 class HyperliquidMarketsAdapter:
-    """The assets Hyperliquid trades now, read from its public metadata: no credentials needed (R1.1.1)."""
+    """The assets Hyperliquid trades now and their limits, from its public metadata: no credentials (R1.1.1, R1.5.2)."""
 
     def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
         self._base_url = base_url
@@ -27,9 +31,23 @@ class HyperliquidMarketsAdapter:
         return self._base_url
 
     def tradable_assets(self) -> frozenset[str]:
+        return frozenset(self._listed())
+
+    def limits(self, asset: str) -> AssetLimits | None:
+        """The maximum leverage of the asset from the metadata, and the minimum order value of the exchange."""
+        entry = self._listed().get(asset)
+        if entry is None:
+            return None
+        try:
+            return AssetLimits(int(entry["maxLeverage"]), MIN_ORDER_VALUE)
+        except (*SHAPE_ERRORS, ValueError) as error:
+            raise FlowExchangeUnavailableError from error
+
+    def _listed(self) -> dict[str, Any]:
+        """The assets not delisted, by name."""
         try:
             universe = self._sdk.info(self._base_url, self._timeout).meta()["universe"]
-            return frozenset(_name(asset) for asset in universe if not asset.get("isDelisted", False))
+            return {_name(asset): asset for asset in universe if not asset.get("isDelisted", False)}
         except (ClientError, ServerError, requests.RequestException, *SHAPE_ERRORS) as error:
             raise FlowExchangeUnavailableError from error
 
