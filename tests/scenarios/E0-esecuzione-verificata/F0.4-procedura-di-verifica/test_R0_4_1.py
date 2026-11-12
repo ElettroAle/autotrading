@@ -42,7 +42,9 @@ class Session:
         verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
         health = HealthReport(version="1.0.0", environment="dev")
         resolve_tenant = ResolveTenantUseCase(self.platform.tenants)
-        return create_api(health, resolve_tenant, self.platform.for_tenant, Authentication(SETTINGS, verifier))
+        return create_api(
+            health, resolve_tenant, self.platform.for_tenant, Authentication(SETTINGS, verifier, provider.login())
+        )
 
     def post_as(self, user: str, path: str) -> None:
         token = self.identity_provider.token_for(self.platform.directory.person(user))

@@ -44,6 +44,41 @@ def fetch_json(url: str) -> Mapping[str, Any]:
     return document
 
 
+@dataclass(frozen=True, slots=True)
+class LoginEndpoints:
+    """Where the OpenAPI page sends the user to log in and to redeem the code (Authorization Code + PKCE)."""
+
+    authorization_url: str
+    token_url: str
+
+
+class OidcLoginEndpoints:
+    """The login endpoints of the issuer, read from its discovery document the first time it answers (ADR 0073)."""
+
+    def __init__(self, discovery_url: str, fetch: FetchJson = fetch_json) -> None:
+        self._discovery_url = discovery_url
+        self._fetch = fetch
+        self._endpoints: LoginEndpoints | None = None
+
+    def endpoints(self) -> LoginEndpoints:
+        if self._endpoints is None:
+            self._endpoints = self._discovered()
+        return self._endpoints
+
+    def _discovered(self) -> LoginEndpoints:
+        try:
+            document = self._fetch(self._discovery_url)
+            endpoints = LoginEndpoints(str(document["authorization_endpoint"]), str(document["token_endpoint"]))
+        except AutotradingError:
+            raise
+        except (OSError, KeyError, ValueError) as error:
+            raise IdentityProviderUnavailableError from error
+        # The browser carries the code and the verifier to these addresses: only HTTPS ones are offered.
+        if not all(url.startswith("https://") for url in (endpoints.authorization_url, endpoints.token_url)):
+            raise IdentityProviderUnavailableError
+        return endpoints
+
+
 class OidcSigningKeys:
     """The public keys of the issuer, found through its discovery document and refreshed when a key is unknown."""
 

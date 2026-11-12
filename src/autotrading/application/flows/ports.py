@@ -22,6 +22,7 @@ from autotrading.domain.flows.ledger import (
     LedgerKeys,
     PlatformOrders,
 )
+from autotrading.domain.flows.operations import OperationsPage, OperationsQuery
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
@@ -194,6 +195,22 @@ class FlowLedgerPort(Protocol):
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         """The running totals of those flows; a flow without any execution yet has none."""
+        ...
+
+
+class FlowOperationsPort(Protocol):
+    """Bound to the tenant of the request: the ledger as its owner reads it, newest first, a page at a time
+    (ADR 0074).
+    """
+
+    def of_flow(self, flow_id: FlowId, query: OperationsQuery) -> OperationsPage:
+        """The executions and funding payments of the flow."""
+        ...
+
+    def unattributed_of_account(self, account_id: UUID, query: OperationsQuery) -> OperationsPage:
+        """The executions and funding payments of the account that belong to no flow; raises FlowAccountNotFoundError
+        for an account the tenant does not have.
+        """
         ...
 
 

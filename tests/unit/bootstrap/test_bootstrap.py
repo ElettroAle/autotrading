@@ -157,11 +157,10 @@ def test_without_an_issuer_every_protected_function_is_refused_as_not_configured
 def test_with_an_issuer_the_openapi_page_logs_in_with_it(tmp_path: Path) -> None:
     client = TestClient(create_application(installation_configuration(tmp_path, **AUTHENTICATION)))
 
-    schemes = client.get("/openapi.json").json()["components"]["securitySchemes"]
+    page = client.get("/docs").text
 
-    assert schemes["OpenIdConnect"]["openIdConnectUrl"] == (
-        "https://login.example.test/tenant/v2.0/.well-known/openid-configuration"
-    )
+    assert '"usePkceWithAuthorizationCodeGrant": true' in page
+    assert '"clientId": "swagger-client"' in page
 
 
 @pytest.mark.parametrize("name", ["AUTH_AUDIENCE", "AUTH_CLIENT_ID", "AUTH_SCOPE"])
