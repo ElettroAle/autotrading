@@ -1,17 +1,8 @@
 from dataclasses import dataclass
 
-from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort, PlatformOrdersPort
-from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
-
-
-def find_flow(flows: FlowRepositoryPort, flow_id: FlowId) -> Flow:
-    flow = next((flow for flow in flows.list() if flow.id == flow_id), None)
-    if flow is None:
-        raise FlowNotFoundError
-    return flow
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,7 +19,7 @@ class ReadFlowStateUseCase:
         self._orders = orders
 
     def execute(self, command: ReadFlowStateCommand) -> FlowState:
-        flow = find_flow(self._flows, command.flow_id)
+        flow = self._flows.get(command.flow_id)
         activity = self._activity.activity(flow.account_id)
         orders = self._orders.orders_of_account(flow.account_id)
         orders_of_flow = frozenset(order for order, owner in orders.items() if owner == flow.id)

@@ -7,7 +7,6 @@ from autotrading.application.flows.ports import (
     PlatformOrdersPort,
     ReconciliationRepositoryPort,
 )
-from autotrading.application.flows.read_flow_state import find_flow
 from autotrading.domain.flows.account_reconciliation import AccountReconciliation, OutsideClosing
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.unattributable import UnattributableItem
@@ -48,7 +47,7 @@ class ReconcileAccountUseCase:
         self._closed_positions = closed_positions
 
     def execute(self, command: ReconcileAccountCommand) -> ReconciliationOutcome:
-        account_id = find_flow(self._flows, command.flow_id).account_id
+        account_id = self._flows.get(command.flow_id).account_id
         reconciliation = AccountReconciliation.of(
             account_id,
             (flow for flow in self._flows.list() if flow.account_id == account_id),
