@@ -121,10 +121,7 @@ class RunCycleUseCase:
         )
         decisions = progress.run(CycleStep.AGENT_DECISION, lambda: steps.agent.decide(flow_id, context))
         orders = progress.run(CycleStep.RISK_CHECK, lambda: steps.risk.check(flow_id, snapshot, decisions))
-        executions = progress.run(
-            CycleStep.ORDER_EXECUTION,
-            lambda: [steps.orders.execute(flow_id, planned_at, order) for order in orders],
-        )
+        executions = progress.run(CycleStep.ORDER_EXECUTION, lambda: steps.orders.execute(flow_id, planned_at, orders))
         progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.flow_state.update(flow_id, executions))
 
     def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:

@@ -114,6 +114,7 @@ def document_of(configuration: FlowConfiguration) -> dict[str, Any]:
             "max_value_exposure_percent": _text(limits.max_value_exposure_percent),
         },
         "allocated_capital": str(configuration.allocated_capital),
+        "bring_to_minimum": configuration.bring_to_minimum,
     }
 
 
@@ -136,6 +137,8 @@ def configuration_of(version: int, document: Mapping[str, Any]) -> FlowConfigura
             _decimal(limits["max_value_exposure_percent"]),
         ),
         allocated_capital=Decimal(document["allocated_capital"]),
+        # Versions saved before the option existed read with it off, its default (ADR 0051).
+        bring_to_minimum=document.get("bring_to_minimum", False),
     )
 
 

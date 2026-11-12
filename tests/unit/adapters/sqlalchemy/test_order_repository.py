@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from autotrading.adapters.outbound.sqlalchemy.order_repository import _row_of
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.orders import EXECUTED_AT, a_rejected_order, an_executed_order
+from tests.support.orders import EXECUTED_AT, a_flow_order, a_rejected_order, an_executed_order
 
 
 def test_a_row_carries_request_source_and_execution_read_from_the_exchange() -> None:
@@ -30,6 +30,9 @@ def test_a_row_carries_request_source_and_execution_read_from_the_exchange() -> 
         "executed_at": EXECUTED_AT,
         "rejection_reason": None,
         "exchange_message": None,
+        "flow_id": None,
+        "cycle_planned_at": None,
+        "decision_asset": None,
     }
 
 
@@ -43,3 +46,18 @@ def test_a_row_of_a_rejected_order_carries_reason_and_original_message_without_e
     )
     assert (row["origin"], row["user_id"]) == ("VERIFICATION", None)
     assert all(row[name] is None for name in ("filled_size", "average_price", "fee", "realized_pnl", "executed_at"))
+
+
+def test_a_row_of_a_flow_order_carries_the_flow_the_cycle_and_the_decision() -> None:
+    order = a_flow_order(uuid4())
+    link = order.request.source.flow
+    assert link is not None
+
+    row = _row_of(order, TenantId.new())
+
+    assert (row["origin"], row["flow_id"], row["cycle_planned_at"], row["decision_asset"]) == (
+        "FLOW",
+        link.flow_id,
+        link.cycle_planned_at,
+        "BTC",
+    )
