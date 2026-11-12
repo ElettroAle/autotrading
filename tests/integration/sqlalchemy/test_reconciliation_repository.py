@@ -7,6 +7,7 @@ from sqlalchemy import Engine, RowMapping, func, select
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.reconciliation_repository import (
@@ -22,7 +23,8 @@ from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.accounts import an_account
-from tests.support.orders import an_executed_order
+from tests.support.flows import a_flow
+from tests.support.orders import a_flow_order, an_executed_order
 
 pytestmark = pytest.mark.integration
 
@@ -121,13 +123,16 @@ def test_a_case_on_an_account_of_another_tenant_cannot_be_written(database: Engi
         SqlAlchemyReconciliationRepositoryAdapter(database, bruno).record(a_position(account_id))
 
 
-def test_the_orders_of_the_platform_are_those_of_the_account(database: Engine) -> None:
+def test_the_orders_of_the_platform_are_those_of_the_account_with_their_flow(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     _, other_account = new_account(database)
-    order = an_executed_order(account_id)
-    SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(order)
+    flow = a_flow(tenant_id, name=f"alfa-{uuid4()}", account_id=account_id)
+    SqlAlchemyFlowRepositoryAdapter(database, tenant_id).add(flow)
+    manual, of_flow = an_executed_order(account_id), a_flow_order(account_id, flow.id.value)
+    SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(manual)
+    SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(of_flow)
 
     orders = SqlAlchemyPlatformOrdersAdapter(database, tenant_id)
 
-    assert orders.orders_of_account(account_id) == {order.id.value: None}
+    assert orders.orders_of_account(account_id) == {manual.id.value: None, of_flow.id.value: flow.id}
     assert orders.orders_of_account(other_account) == {}

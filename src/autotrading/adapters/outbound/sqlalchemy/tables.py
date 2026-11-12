@@ -192,6 +192,7 @@ source_samples = Table(
     Column("sample_values", JSON, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     Index("source_samples_of_cycle", "flow_id", "cycle_planned_at"),
+)
 
 # The last reading of each account, replaced at every reconciliation (R1.6.2, ADR 0045).
 account_readings = Table(

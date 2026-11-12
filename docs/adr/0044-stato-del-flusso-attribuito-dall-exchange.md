@@ -32,9 +32,8 @@ il `worker` (ADR 0007); l'API raggiunge il worker via HTTP interno (ADR 0021).
   il worker trova il conto del tenant sotto RLS e lo apre solo per conoscerne l'indirizzo
   (`AccountActivityFromAccounts` in `bootstrap.py`). L'API espone `GET /flows/{id}/state`; un flusso di un altro
   tenant non si trova (404).
-- **Ordini della piattaforma**: `SqlAlchemyPlatformOrdersAdapter` legge gli identificativi dalla tabella `orders`.
-  Gli ordini di E0 (procedura di verifica, comando manuale) non appartengono a nessun flusso. L'ordine di un
-  flusso porterà il flusso con l'esecuzione delle decisioni (R1.5.5), senza cambiare la porta.
+- **Ordini della piattaforma**: `SqlAlchemyPlatformOrdersAdapter` legge identificativo e flusso dalla tabella `orders`
+  (ADR 0050). Gli ordini della procedura di verifica e dei comandi manuali non hanno flusso.
 
 ## Alternative scartate
 
@@ -51,6 +50,4 @@ il `worker` (ADR 0007); l'API raggiunge il worker via HTTP interno (ADR 0021).
 - Oltre le 10000 esecuzioni più recenti del conto l'exchange non restituisce le più vecchie: il PnL realizzato di
   un flusso molto attivo da molto tempo ne perderebbe una parte. Se servirà, le esecuzioni lette si potranno
   conservare nel database.
-- L'esecuzione delle decisioni (R1.5.5) deve registrare il flusso dell'ordine perché `PlatformOrdersPort` lo
-  restituisca; fino ad allora nessun flusso ha esecuzioni proprie.
 - Il ciclo (F1.2) legge lo stato del flusso con lo stesso caso d'uso per il controllo del rischio (ADR 0040).

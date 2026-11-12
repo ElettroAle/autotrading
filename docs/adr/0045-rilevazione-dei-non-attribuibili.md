@@ -42,7 +42,7 @@ piattaforma". Lo stato si ricava dall'exchange (ADR 0044).
   4. passa le chiusure fuori piattaforma a `ClosedPositionsPort`;
   5. salva la nuova lettura;
   6. restituisce i casi nuovi e le chiusure, perché il ciclo li notifichi (R1.8.2).
-- **Persistenza**: migrazione `0010` con `account_readings` (una riga per conto) e `unattributable_items`, entrambe
+- **Persistenza**: migrazione `0012` con `account_readings` (una riga per conto) e `unattributable_items`, entrambe
   sotto RLS per tenant e con il conto legato al tenant. Le righe dei casi non si cancellano: si risolvono.
 
 ## Alternative scartate
