@@ -21,7 +21,7 @@ class SqlAlchemyOrderRepositoryAdapter:
 
 def _row_of(order: Order, tenant_id: TenantId) -> dict[str, object]:
     request, market_order = order.request, order.request.market_order
-    execution, rejection = order.execution, order.rejection
+    execution, rejection, link = order.execution, order.rejection, order.request.source.flow
     return {
         "id": order.id.value,
         "tenant_id": tenant_id.value,
@@ -42,4 +42,7 @@ def _row_of(order: Order, tenant_id: TenantId) -> dict[str, object]:
         "executed_at": None if execution is None else execution.executed_at,
         "rejection_reason": None if rejection is None else rejection.reason.name,
         "exchange_message": None if rejection is None else rejection.exchange_message,
+        "flow_id": None if link is None else link.flow_id,
+        "cycle_planned_at": None if link is None else link.cycle_planned_at,
+        "decision_asset": None if link is None else link.decision_asset,
     }

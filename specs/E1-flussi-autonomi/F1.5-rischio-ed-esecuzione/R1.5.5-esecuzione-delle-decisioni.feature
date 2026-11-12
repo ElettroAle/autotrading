@@ -1,5 +1,5 @@
 # language: it
-@R1.5.5 @wip
+@R1.5.5
 Funzionalità: R1.5.5 Esecuzione delle decisioni del flusso
   Come utente
   Voglio che le decisioni approvate dal rischio diventino ordini sul conto del flusso, con l'esito reale

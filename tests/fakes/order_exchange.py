@@ -49,6 +49,11 @@ class FakeOrderExchangeAdapter:
         self.silent = False
         self.executes_when_silent = False
         self.reachable = True
+        self.leverage_rejection: str | None = None
+        # The price and the fee of every execution, when a scenario fixes them.
+        self.fill_at: tuple[Decimal, Decimal] | None = None
+        # The exchange stops answering once this many orders are executed.
+        self.unreachable_after_orders: int | None = None
 
     def hold(self, access: TradingAccess, position: HeldPosition) -> None:
         self.positions[access.account_address, position.coin] = position
@@ -68,6 +73,8 @@ class FakeOrderExchangeAdapter:
 
     def set_leverage(self, access: TradingAccess, coin: str, leverage: int) -> None:
         self._require_reachable()
+        if self.leverage_rejection is not None:
+            raise ExchangeRejectedOrderError(self.leverage_rejection)
         self.leverages[access.account_address, coin] = leverage
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
@@ -94,6 +101,8 @@ class FakeOrderExchangeAdapter:
         price = self.markets[order.coin].mid_price * PRICE_IMPACT
         size = order.size * self.fill_ratio
         fee = (size * price * FEE_RATE).quantize(Decimal("0.000001"))
+        if self.fill_at is not None:
+            price, fee = self.fill_at
         execution = Execution(size, price, fee, REALIZED_ON_CLOSE if order.reduce_only else Decimal(0), EXECUTED_AT)
         self.executions[order.id] = execution
         self._move_position(access, order, size)
@@ -113,5 +122,6 @@ class FakeOrderExchangeAdapter:
         self.positions[key] = HeldPosition(order.coin, order.direction, held + size, self.leverages.get(key, 1))
 
     def _require_reachable(self) -> None:
-        if not self.reachable:
+        exhausted = self.unreachable_after_orders is not None and len(self.executions) >= self.unreachable_after_orders
+        if not self.reachable or exhausted:
             raise OrderExchangeUnavailableError

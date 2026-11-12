@@ -28,6 +28,7 @@ CONFIGURATION = replace(
     sources=(SourceSelection("notizie", 7, {"hours": 6}),),
     instructions="prudente",
     risk_limits=RiskLimits(3, None, Decimal("12.5")),
+    bring_to_minimum=True,
 )
 
 
@@ -43,6 +44,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "instructions": "prudente",
         "risk_limits": {"max_leverage": 3, "max_margin_exposure_percent": None, "max_value_exposure_percent": "12.5"},
         "allocated_capital": "400.50",
+        "bring_to_minimum": True,
     }
 
 
@@ -76,3 +78,10 @@ def test_a_flow_of_another_tenant_never_reaches_the_database() -> None:
 
     with pytest.raises(CrossTenantAccessError):
         repository.add(a_flow(TenantId.new()))
+
+
+def test_a_version_saved_before_the_option_reads_without_bringing_to_the_minimum() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    del document["bring_to_minimum"]
+
+    assert configuration_of(1, document).bring_to_minimum is False
