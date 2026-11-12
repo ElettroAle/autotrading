@@ -56,6 +56,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter, ProviderKeyStore
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
@@ -336,7 +337,7 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     exchanges = WorkerExchanges(exchanges_for("dev"), order_exchanges_for("dev"))
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())
-    factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, settings)
+    factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, settings, FakeMessengerAdapter())
 
     first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
 

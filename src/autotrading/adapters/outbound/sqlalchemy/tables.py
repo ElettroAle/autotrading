@@ -1,5 +1,6 @@
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -152,4 +153,21 @@ flow_versions = Table(
     Column("configuration", JSON, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+telegram_link_codes = Table(
+    "telegram_link_codes",
+    metadata,
+    Column("digest", LargeBinary, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("issued_at", DateTime(timezone=True), nullable=False),
+    Column("used_at", DateTime(timezone=True)),
+)
+
+telegram_chats = Table(
+    "telegram_chats",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("chat_id", BigInteger, nullable=False),
+    Column("linked_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )

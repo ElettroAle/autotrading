@@ -22,6 +22,8 @@ paths:
   transazione. Una sessione senza tenant non vede righe.
 - Le sole tabelle senza policy per tenant sono quelle di `tenancy` (tenant, utenti, membership),
   usate da `ResolveTenantUseCase` prima che il tenant sia noto.
+- Unica lettura senza tenant fuori da `tenancy`: `telegram_link_codes` per il digest dichiarato in
+  `app.link_code_digest`, sola lettura di quella riga (ADR 0035).
 - Un'entità di un altro tenant passata all'adapter solleva `CrossTenantAccessError`.
 
 ## Test
