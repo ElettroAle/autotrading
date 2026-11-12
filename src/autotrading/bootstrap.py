@@ -146,6 +146,7 @@ from autotrading.application.flows.ports import (
     MarketsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountCommand,
     ReconcileAccountUseCase,
@@ -220,6 +221,7 @@ from autotrading.domain.flows.errors import InvalidClosedPositionError, ModelReq
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.risk_check import RiskState
@@ -266,7 +268,6 @@ MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
 ZERO = Decimal(0)
-HUNDRED = Decimal(100)
 PERCENT = Decimal("0.01")
 LOWEST_LEVERAGE = 1
 
@@ -817,10 +818,12 @@ class WorkerUseCaseFactory:
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
+        activity = AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
+        platform_orders = SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id)
         reconcile_account = ReconcileAccountUseCase(
             flows,
-            AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity),
-            SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
+            activity,
+            platform_orders,
             SqlAlchemyReconciliationRepositoryAdapter(self._engine, tenant_id),
             ClosedPositionsFromOpenings(flows, openings, closed_positions),
         )
@@ -829,6 +832,7 @@ class WorkerUseCaseFactory:
             pause=SqlAlchemyAutomaticPauseAdapter(self._engine, tenant_id),
             accounts=accounts,
             read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
+            read_flow_state=ReadFlowStateUseCase(flows, activity, platform_orders),
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
@@ -1105,6 +1109,7 @@ class TenantCyclePorts:
     pause: AutomaticPausePort
     accounts: AccountRepositoryPort
     read_exchange_state: ReadExchangeStateUseCase
+    read_flow_state: ReadFlowStateUseCase
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
@@ -1136,10 +1141,10 @@ type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
 
 @dataclass(frozen=True, slots=True)
 class CycleFlow:
-    """The flow of a cycle as read at its start: whose it is, its configuration in force, its account now.
+    """The flow of a cycle as read at its start: whose it is, its configuration in force, its state now.
 
-    Until the state of the flow is kept apart from the account (R1.6.1), the flow owns the positions of the account
-    on its own assets, and its liquidity is its capital less their margin, never more than the account has free.
+    The amounts are the state attributed to the flow, the same the user consults (R1.6.1, ADR 0062); the account
+    gives only the details of the positions and the margin it has free, which no flow may go beyond.
     """
 
     tenant_id: TenantId
@@ -1148,6 +1153,7 @@ class CycleFlow:
     exchange: str
     started_at: datetime
     account: AccountState
+    attributed: FlowState
 
     @property
     def configuration(self) -> FlowConfiguration:
@@ -1159,19 +1165,16 @@ class CycleFlow:
 
     @property
     def available_liquidity(self) -> Decimal:
-        margin = sum((position.size * position.entry_price / position.leverage for position in self.positions), ZERO)
-        free = min(self.configuration.allocated_capital - margin, self.account.available_margin.amount)
+        free = min(self.attributed.available_liquidity, self.account.available_margin.amount)
         return max(free, ZERO)
 
     @property
     def total_value(self) -> Decimal:
-        pnl = sum((position.unrealized_pnl for position in self.positions), ZERO)
-        return self.configuration.allocated_capital + pnl
+        return self.attributed.total_value
 
     @property
     def return_percent(self) -> Decimal:
-        capital = self.configuration.allocated_capital
-        return ((self.total_value - capital) / capital * HUNDRED).quantize(PERCENT)
+        return self.attributed.return_percent.quantize(PERCENT)
 
 
 def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
@@ -1201,8 +1204,15 @@ class FlowStateFromFlows:
             state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
         except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
             raise FlowCredentialsRejectedError(account.name.value) from error
+        attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
         cycle_flow = CycleFlow(
-            tenant_id, flow, account.name.value, account.exchange.value, self._directory.anchor_of(flow_id), state
+            tenant_id,
+            flow,
+            account.name.value,
+            account.exchange.value,
+            self._directory.anchor_of(flow_id),
+            state,
+            attributed,
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 
