@@ -85,6 +85,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   letti dal `worker` (ADR 0063).
 - `FlowLedgerPort`: cursore del conto, chiavi già registrate, scrittura delle righe nuove con i totali nella stessa
   transazione, totali dei flussi (ADR 0063).
+- `FlowOperationsPort`: storico delle operazioni di un flusso, o del conto fuori da ogni flusso, dalla più recente a
+  pagine di 50 per keyset, con filtri per asset e periodo (ADR 0074).
 - `PlatformOrdersPort`: tra i `cloid` dati, quelli degli ordini registrati sul conto, con il flusso che li ha
   inviati (contesto `orders`).
 - `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).

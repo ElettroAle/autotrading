@@ -38,14 +38,17 @@ from autotrading.application.flows.compare_flow_versions import CompareFlowVersi
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
+from autotrading.application.flows.list_account_operations import ListAccountOperationsUseCase
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
+from autotrading.application.flows.list_flow_operations import ListFlowOperationsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
     ClosedPositionRepositoryPort,
     FlowLedgerPort,
+    FlowOperationsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
 )
@@ -93,6 +96,7 @@ class TenantPorts:
     account_flows: AccountFlowsPort
     account_activity: AccountActivityPort
     flow_ledger: FlowLedgerPort
+    flow_operations: FlowOperationsPort
     link_codes: LinkCodeRepositoryPort
     bot_identity: BotIdentityPort
     linked_chats: LinkedChatRepositoryPort
@@ -139,6 +143,8 @@ class TenantUseCases:
     change_allocated_capital: ChangeAllocatedCapitalUseCase
     list_capital_changes: ListCapitalChangesUseCase
     list_closed_positions: ListClosedPositionsUseCase
+    list_flow_operations: ListFlowOperationsUseCase
+    list_account_operations: ListAccountOperationsUseCase
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
@@ -186,6 +192,8 @@ class TenantUseCases:
             ),
             list_capital_changes=ListCapitalChangesUseCase(ports.flows),
             list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
+            list_flow_operations=ListFlowOperationsUseCase(ports.flows, ports.flow_operations),
+            list_account_operations=ListAccountOperationsUseCase(ports.flow_operations),
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
