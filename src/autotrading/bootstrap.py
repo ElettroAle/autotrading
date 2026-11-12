@@ -648,13 +648,15 @@ class AccountExecutionsFromAccounts:
 
 
 class AccountReadingFromAccounts:
-    """Bridges the accounts context to the verification context in the worker (ADR 0024).
+    """Bridges the accounts and flows contexts to the verification context in the worker (ADR 0024, ADR 0075).
 
-    The state is read as the worker reads it for the API; a failure becomes a failed step with its message.
+    The state is read as the worker reads it for the API; a failure becomes a failed step with its message. A stopped
+    flow runs no cycle, so only an active or paused flow keeps the procedure off its assets.
     """
 
-    def __init__(self, read_exchange_state: ReadExchangeStateUseCase) -> None:
+    def __init__(self, read_exchange_state: ReadExchangeStateUseCase, flows: FlowRepositoryPort) -> None:
         self._read_exchange_state = read_exchange_state
+        self._flows = flows
 
     def read(self, account_id: UUID) -> AccountReading:
         try:
@@ -672,6 +674,16 @@ class AccountReadingFromAccounts:
                 for position in state.positions
             ),
         )
+
+    def flow_on(self, account_id: UUID, asset: str) -> str | None:
+        trading = (
+            flow
+            for flow in self._flows.list()
+            if flow.account_id == account_id
+            and flow.status in (FlowStatus.ACTIVE, FlowStatus.PAUSED)
+            and asset in flow.configuration.assets
+        )
+        return next((flow.name.value for flow in trading), None)
 
 
 class OrderExecutionFromOrders:
@@ -836,7 +848,9 @@ class WorkerUseCaseFactory:
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state),
+                AccountReadingFromAccounts(
+                    read_exchange_state, SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
+                ),
                 OrderExecutionFromOrders(open_position, close_exchange_position),
                 SqlAlchemyVerificationRunRepositoryAdapter(self._engine, tenant_id),
                 self._settings.environment,
@@ -1260,7 +1274,8 @@ class FlowStateFromFlows:
         """The account of the flow is reconciled first, so the ledger holds every execution the state counts.
 
         A flow whose position on the exchange is not the one its ledger expects sends no order: the cycle stops and
-        the flow pauses with the reason (Bug 155, ADR 0064). Without a reconciliation the ledger may lag behind the
+        the flow pauses with the reason (Bug 155, ADR 0064), once the executions published meanwhile are recorded too
+        (Bug 165, ADR 0075). Without a reconciliation the ledger may lag behind the
         exchange, so the comparison waits for the next cycle.
         """
         reconciled = self._reconcile(flow_id)
@@ -1276,9 +1291,8 @@ class FlowStateFromFlows:
         except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
             raise FlowCredentialsRejectedError(account.name.value) from error
         attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
-        mismatch = attributed.position_mismatch() if compared else None
-        if mismatch is not None:
-            raise FlowPositionMismatchError(mismatch)
+        if compared and attributed.position_mismatch() is not None:
+            attributed = self._compared_again(ports, flow)
         cycle_flow = CycleFlow(
             tenant_id,
             flow,
@@ -1289,6 +1303,21 @@ class FlowStateFromFlows:
             attributed,
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
+
+    def _compared_again(self, ports: TenantCyclePorts, flow: Flow) -> FlowState:
+        """The flow pauses only for a difference the executions published meanwhile do not explain (Bug 165).
+
+        The exchange may publish an execution after the reading of the executions and before that of the positions:
+        the account is reconciled once more and the positions compared again. If the executions cannot be read again
+        the cycle fails without pausing the flow, and the next cycle compares them.
+        """
+        if not self._reconcile(flow.id.value):
+            raise FlowExchangeUnavailableError
+        attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
+        mismatch = attributed.position_mismatch()
+        if mismatch is not None:
+            raise FlowPositionMismatchError(mismatch)
+        return attributed
 
     def _started_at(self, ports: TenantCyclePorts, flow: Flow) -> datetime:
         """The first start of the flow, the same beginning its return counts from (ADR 0069).

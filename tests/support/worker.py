@@ -25,6 +25,7 @@ from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -48,6 +49,7 @@ class Worker:
         self.order_exchange = FakeOrderExchangeAdapter()
         self.orders = InMemoryOrderRepositoryAdapter()
         self.runs = InMemoryVerificationRunRepositoryAdapter()
+        self.flows = FlowStore()
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
         self.activity_reader = FakeActivityReaderAdapter()
@@ -64,7 +66,7 @@ class Worker:
             read_exchange_state=read_exchange_state,
             close_exchange_position=closing,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state),
+                AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
                 OrderExecutionFromOrders(opening, closing),
                 self.runs,
                 "dev",
