@@ -20,7 +20,7 @@ sparite senza un ordine della piattaforma, comprese le liquidazioni (R1.6.1).
   parte; la percentuale è sul margine. Una posizione che l'exchange non può mostrare (leva sotto 1, margine o
   prezzi non positivi, commissioni negative, istanti senza fuso, chiusura prima dell'apertura) è un difetto.
 - **Porta** `ClosedPositionRepositoryPort` (`add`, `of_flow`) legata al tenant, tabella `closed_positions`
-  (migrazione 0010) con RLS; al ruolo applicativo solo `SELECT` e `INSERT`: lo storico non si modifica.
+  (migrazione 0012) con RLS; al ruolo applicativo solo `SELECT` e `INSERT`: lo storico non si modifica.
 - **Consultazione** `ListClosedPositionsUseCase` ordinata dalla chiusura più recente; un flusso di un altro tenant
   risponde "flusso non trovato". Rotta `GET /flows/{id}/closed-positions`, importi come testo senza zeri finali.
 

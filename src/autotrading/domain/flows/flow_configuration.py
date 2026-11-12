@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import AllocatedCapitalNotPositiveError, AssetsRequiredError, RepeatedSourceError
+from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -28,6 +29,8 @@ class FlowConfiguration:
     instructions: str
     risk_limits: RiskLimits
     allocated_capital: Decimal
+    # Off unless the user chooses it: an opening below the exchange minimum is blocked (R1.5.4).
+    bring_to_minimum: bool = False
 
     def __post_init__(self) -> None:
         if not self.assets:
@@ -38,3 +41,7 @@ class FlowConfiguration:
             raise RepeatedSourceError(repeated)
         if not self.allocated_capital.is_finite() or self.allocated_capital <= 0:
             raise AllocatedCapitalNotPositiveError
+
+    @property
+    def risk_policy(self) -> RiskPolicy:
+        return RiskPolicy(self.risk_limits, self.bring_to_minimum)

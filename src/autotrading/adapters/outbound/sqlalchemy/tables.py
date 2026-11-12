@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Identity,
     Index,
     Integer,
     LargeBinary,
@@ -84,9 +85,13 @@ orders = Table(
     Column("rejection_reason", Text),
     Column("exchange_message", Text),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("flow_id", Uuid),
+    Column("cycle_planned_at", DateTime(timezone=True)),
+    Column("decision_asset", Text),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="orders_account_of_tenant"
     ),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"], name="orders_flow_of_tenant"),
 )
 
 verification_runs = Table(
@@ -212,4 +217,21 @@ closed_positions = Table(
     Column("fees", Numeric, nullable=False),
     Column("reason", Text, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+# A collected value is a fact of a past cycle: it is only ever added (R1.3.8).
+source_samples = Table(
+    "source_samples",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("flow_id", Uuid, nullable=False),
+    Column("cycle_planned_at", DateTime(timezone=True), nullable=False),
+    Column("source", Text, nullable=False),
+    Column("asset", Text),
+    Column("reference_at", DateTime(timezone=True), nullable=False),
+    Column("collected_at", DateTime(timezone=True), nullable=False),
+    Column("sample_values", JSON, nullable=False),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+    Index("source_samples_of_cycle", "flow_id", "cycle_planned_at"),
 )

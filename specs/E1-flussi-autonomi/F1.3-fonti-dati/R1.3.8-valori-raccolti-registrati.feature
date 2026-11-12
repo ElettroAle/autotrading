@@ -1,5 +1,5 @@
 # language: it
-@R1.3.8 @wip
+@R1.3.8
 Funzionalità: R1.3.8 Valori raccolti registrati con il loro istante
   Come utente
   Voglio che ogni valore raccolto dalle fonti sia registrato con il suo istante di riferimento

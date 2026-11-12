@@ -29,7 +29,7 @@ le porte sanno che cosa contengono. ADR 0041 prevede già la tabella dei cicli c
 - **Ritocchi alle porte dei passi**: `RiskPort.check` restituisce un `RiskReview` con gli ordini approvati e gli
   esiti di tutte le decisioni (anche bloccate e scartate, che non diventano ordini); `FlowStatePort.update`
   restituisce lo stato del flusso a fine ciclo.
-- **Tabella `cycles`** (migrazione 0010) con chiave (flusso, istante previsto), RLS per tenant e
+- **Tabella `cycles`** (migrazione 0012) con chiave (flusso, istante previsto), RLS per tenant e
   `SqlAlchemyCycleRepositoryAdapter` legato al tenant: `claim` è un `INSERT ... ON CONFLICT DO NOTHING`, la
   registrazione un `INSERT ... ON CONFLICT DO UPDATE` sulla riga presa; finché l'esito è vuoto il ciclo è in
   corso e non si mostra. I documenti sono JSONB; importi, identificativi e istanti diventano testo, e un valore

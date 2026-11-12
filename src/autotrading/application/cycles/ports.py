@@ -40,7 +40,7 @@ class SourceReading:
 
 @dataclass(frozen=True, slots=True)
 class RiskReview:
-    """The orders the risk check approved, in the order they must be sent, and the outcome of every decision.
+    """The orders the risk check approved, and the outcome of every decision; the execution orders them (R1.5.5).
 
     The outcomes travel only to the record: approved, reduced, blocked or discarded (R1.7.1).
     """
@@ -114,8 +114,8 @@ class RiskPort(Protocol):
 
 
 class OrderPort(Protocol):
-    def execute(self, flow_id: UUID, planned_at: datetime, order: object) -> object:
-        """Sends one order of the cycle and gives back its real outcome."""
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
+        """Sends the approved orders of the cycle, closings first, and gives back their real outcomes (R1.5.5)."""
         ...
 
 
