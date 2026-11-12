@@ -65,7 +65,7 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).
 - `ClosedPositionsPort`: storico delle posizioni chiuse dei flussi (R1.7.2).
 - `FlowPositionsPort`: chiusura di una posizione del flusso attraverso il `worker` (fill o rifiuto) e margine
-  impegnato sugli asset (ADR 0055, ADR 0053).
+  impegnato sugli asset (ADR 0055, ADR 0053); la modifica non toglie un asset con posizione aperta (R1.1.3).
 - `FlowOpeningsPort`: ultima apertura eseguita del flusso su un asset, dagli ordini registrati (ADR 0055).
 - `RunningCyclePort`: attesa della fine del ciclo in corso; advisory lock PostgreSQL con la chiave `lock_key`
   che l'esecutore dei cicli tiene per tutto il ciclo (ADR 0042, ADR 0055).

@@ -1,3 +1,5 @@
+import threading
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -6,23 +8,31 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
+from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import amount_text
+from tests.fakes.model_call import HELD_SECONDS
+from tests.support.flow_cycles import FlowCycles
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
-from tests.support.flows import account_id_of, scenario_catalog
+from tests.support.flows import account_id_of
 from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the life of a flow, shared by the features
-from tests.support.lifecycle_steps import Lifecycle, add_flow, attempt, flow_named, hold_position
+from tests.support.lifecycle_steps import Lifecycle, add_flow, attempt, flow_named, hold_position, put_in_status
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.1-flussi-di-trading/R1.1.7-capitale-allocato.feature")
 
 
+@pytest.fixture(name="flow_cycles")
+def flow_cycles_of_the_worker() -> FlowCycles:
+    return FlowCycles()
+
+
 @pytest.fixture
-def platform() -> Platform:
-    platform = Platform()
-    platform.model_catalog = scenario_catalog()
-    return platform
+def platform(flow_cycles: FlowCycles) -> Platform:
+    return flow_cycles.platform
 
 
 @given(quoted('che "{user}" ha il conto "{account}" con saldo {balance} USDC'))
@@ -75,3 +85,47 @@ def change_recorded(platform: Platform, lifecycle: Lifecycle, previous: str, new
 @then(quoted('la variazione è rifiutata con il motivo "{reason}"'))
 def change_refused(lifecycle: Lifecycle, reason: str) -> None:
     assert str(lifecycle.error) == reason
+
+
+@given(quoted('che un ciclo del flusso "{name}" è in corso con capitale allocato {capital} USDC'))
+def cycle_in_progress(
+    flow_cycles: FlowCycles, platform: Platform, lifecycle: Lifecycle, name: str, capital: str
+) -> None:
+    assert flow_named(platform, lifecycle.user, name).configuration.allocated_capital == Decimal(capital)
+    put_in_status(platform, lifecycle.user, name, FlowStatus.ACTIVE)
+    flow_cycles.model.gate = threading.Event()
+    flow_cycles.running = threading.Thread(target=flow_cycles.plan_round, daemon=True)
+    flow_cycles.running.start()
+    assert flow_cycles.model.entered.wait(HELD_SECONDS)
+
+
+@then(quoted("il ciclo in corso si conclude con capitale allocato {capital} USDC"))
+def cycle_ends_with_capital(flow_cycles: FlowCycles, capital: str) -> None:
+    assert flow_cycles.model.gate is not None
+    flow_cycles.model.gate.set()
+    assert flow_cycles.running is not None
+    flow_cycles.running.join(HELD_SECONDS)
+    [record] = flow_cycles.records.records
+    assert record.outcome is CycleOutcome.COMPLETED
+    assert capital_of(record) == Decimal(capital)
+
+
+@then(quoted('il ciclo successivo del flusso "{name}" usa capitale allocato {capital} USDC'))
+def next_cycle_uses_capital(
+    flow_cycles: FlowCycles, platform: Platform, lifecycle: Lifecycle, name: str, capital: str
+) -> None:
+    flow_cycles.model.gate = None
+    flow_cycles.clock.current = flow_cycles.clock.now() + timedelta(minutes=15)
+    flow_cycles.plan_round()
+    record = flow_cycles.records.records[-1]
+    assert record.flow_id == flow_named(platform, lifecycle.user, name).id.value
+    assert capital_of(record) == Decimal(capital)
+
+
+def capital_of(record: CycleRecord) -> Decimal:
+    """The allocated capital the cycle read at its start, as the agent received it."""
+    document = record.document(CycleStep.READ_FLOW_STATE)
+    assert document is not None
+    state = document["stato"]
+    assert isinstance(state, dict)
+    return Decimal(state["allocated_capital"])

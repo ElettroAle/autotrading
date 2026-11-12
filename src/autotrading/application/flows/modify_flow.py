@@ -5,7 +5,8 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
-from autotrading.application.flows.ports import FlowRepositoryPort
+from autotrading.application.flows.errors import AssetWithOpenPositionError
+from autotrading.application.flows.ports import FlowPositionsPort, FlowRepositoryPort
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -43,12 +44,14 @@ class ModifyFlowCommand:
 class ModifyFlowUseCase:
     """Saves a valid change as the next configuration version, or refuses it leaving the version in force (R1.1.3).
 
-    The rules of the creation hold (R1.1.1), with the conflict on the assets of the account (R1.1.2).
+    The rules of the creation hold (R1.1.1), with the conflict on the assets of the account (R1.1.2). An asset with
+    an open position is not removed: the flow would leave on the account a position nobody follows.
     """
 
-    def __init__(self, flows: FlowRepositoryPort, checks: FlowChecks) -> None:
+    def __init__(self, flows: FlowRepositoryPort, checks: FlowChecks, positions: FlowPositionsPort) -> None:
         self._flows = flows
         self._checks = checks
+        self._positions = positions
 
     def execute(self, command: ModifyFlowCommand) -> Flow:
         flow = self._flows.get(command.flow_id)
@@ -57,6 +60,7 @@ class ModifyFlowUseCase:
         configuration = self._configuration(flow.configuration, command)
         if configuration.assets != flow.configuration.assets:
             self._require_assets_admitted(flow, configuration.assets)
+            self._require_removed_without_position(flow, configuration.assets)
         modified = flow.reconfigured(configuration)
         self._flows.add_version(modified)
         operations.info(
@@ -97,6 +101,12 @@ class ModifyFlowUseCase:
         account = self._checks.accounts.account(flow.account_id)
         require_tradable(self._checks.markets, account.exchange, assets)
         require_assets_free(flow.account_id, assets, self._flows.list(), excluding=flow.id)
+
+    def _require_removed_without_position(self, flow: Flow, assets: tuple[str, ...]) -> None:
+        removed = tuple(asset for asset in flow.configuration.assets if asset not in assets)
+        held = tuple(asset for asset in removed if self._positions.committed_margin(flow.account_id, (asset,)) > 0)
+        if held:
+            raise AssetWithOpenPositionError(held)
 
 
 def _require_same_account(flow: Flow, account_id: UUID | None) -> None:
