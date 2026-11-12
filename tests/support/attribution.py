@@ -22,7 +22,7 @@ from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.ledger import Execution
+from autotrading.domain.flows.ledger import Execution, FlowTotals
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
@@ -67,6 +67,7 @@ class AttributionBench:
         self.read_state = ReadFlowStateUseCase(flows, self.exchange, self.ledger)
         self.reconcile = ReconcileAccountUseCase(flows, self.exchange, self.readings, self.closed, self.record)
         self.state: FlowState | None = None
+        self.recomputed: FlowTotals | None = None
 
     def account(self, name: str, balance: Decimal = Decimal(1000)) -> UUID:
         if name not in self.accounts:

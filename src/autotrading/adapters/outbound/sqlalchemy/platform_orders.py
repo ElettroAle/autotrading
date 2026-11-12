@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from uuid import UUID
 
 from sqlalchemy import Engine, func, select
@@ -18,8 +19,11 @@ class SqlAlchemyPlatformOrdersAdapter:
         self._engine = engine
         self._tenant_id = tenant_id
 
-    def orders_of_account(self, account_id: UUID) -> PlatformOrders:
-        query = select(orders.c.id, orders.c.flow_id).where(orders.c.account_id == account_id)
+    def orders_among(self, account_id: UUID, order_ids: Iterable[UUID]) -> PlatformOrders:
+        wanted = list(order_ids)
+        if not wanted:
+            return {}
+        query = select(orders.c.id, orders.c.flow_id).where(orders.c.account_id == account_id, orders.c.id.in_(wanted))
         with self._engine.begin() as connection:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))

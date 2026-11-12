@@ -66,6 +66,10 @@ class ExecutionsWindow:
     funding: tuple[FundingPayment, ...]
     complete: bool
 
+    @property
+    def order_ids(self) -> frozenset[UUID]:
+        return frozenset(execution.order_id for execution in self.executions if execution.order_id is not None)
+
 
 @dataclass(frozen=True, slots=True)
 class LedgerKeys:

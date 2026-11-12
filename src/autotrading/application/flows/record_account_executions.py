@@ -48,11 +48,12 @@ class RecordAccountExecutionsUseCase:
         if not window.complete:
             raise FlowLedgerIncompleteError(account_id)
         known = LedgerKeys() if since is None else self._ledger.recorded_since(account_id, since)
+        unknown = known.unknown_in(window)
         flows = [flow for flow in self._flows.list() if flow.account_id == account_id]
         ledger = AccountLedger.attributed(
             flows,
-            known.unknown_in(window),
-            self._orders.orders_of_account(account_id),
+            unknown,
+            self._orders.orders_among(account_id, unknown.order_ids),
             self._ledger.totals_of(flow.id for flow in flows),
         )
         latest = ledger.latest

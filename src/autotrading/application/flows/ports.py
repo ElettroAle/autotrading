@@ -204,8 +204,8 @@ class FlowLedgerPort(Protocol):
 class PlatformOrdersPort(Protocol):
     """Bound to the tenant of the request: the orders the platform sent, from the orders context."""
 
-    def orders_of_account(self, account_id: UUID) -> PlatformOrders:
-        """The client order id of every order sent on the account, with the flow that sent it, or None."""
+    def orders_among(self, account_id: UUID, order_ids: Iterable[UUID]) -> PlatformOrders:
+        """Those of the client order ids the platform sent on the account, with the flow that sent it, or None."""
         ...
 
 

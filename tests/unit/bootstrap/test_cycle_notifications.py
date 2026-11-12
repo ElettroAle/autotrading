@@ -4,7 +4,7 @@ import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine
@@ -17,7 +17,11 @@ from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlo
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.cycles.ports import ScheduledFlow
-from autotrading.application.flows.errors import FlowCredentialsRejectedError, FlowExchangeUnavailableError
+from autotrading.application.flows.errors import (
+    FlowCredentialsRejectedError,
+    FlowExchangeUnavailableError,
+    FlowLedgerIncompleteError,
+)
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.bootstrap import (
@@ -302,6 +306,21 @@ def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: Wor
     FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
 
     assert world.received == [f"alfa: in pausa, {error}"]
+
+
+def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(world: World) -> None:
+    beta = world.cycles.add_flow(USER, "beta")
+    error = FlowLedgerIncompleteError(world.flow.account_id)
+    elsewhere = replace(beta, account_id=uuid4())
+    world.cycles.platform.flows.flows[world.cycles.platform.flows.flows.index(beta)] = elsewhere
+
+    FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
+
+    assert {flow.name.value: flow.status for flow in world.cycles.platform.flows.flows} == {
+        "alfa": FlowStatus.PAUSED,
+        "beta": FlowStatus.ACTIVE,
+    }
+    assert world.received == ["alfa: in pausa, registro delle esecuzioni incompleto"]
 
 
 # FlowStateFromFlows.update: the reconciliation of the account
