@@ -4,7 +4,9 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -72,3 +74,13 @@ class ExchangeLimitsPort(Protocol):
     def limits(self, asset: str) -> AssetLimits | None:
         """None when the exchange does not trade the asset. Raises FlowExchangeUnavailableError."""
         ...
+
+
+class ClosedPositionRepositoryPort(Protocol):
+    """Bound to the tenant of the request."""
+
+    def add(self, position: ClosedPosition) -> None:
+        """Raises CrossTenantAccessError for a position of another tenant."""
+        ...
+
+    def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...

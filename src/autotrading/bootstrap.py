@@ -38,6 +38,10 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
+    SqlAlchemyClosedPositionRepositoryAdapter,
+)
+from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
@@ -193,6 +197,16 @@ class ProviderKeyUsageFromFlows:
             for flow in self._flows.list()
             if flow.status.not_stopped and flow.model_provider == provider.value
         ]
+
+
+class FlowDirectoryFromFlows:
+    """Bridges the flows context to the cycles context (ADR 0046): the flows of the tenant are those it can consult."""
+
+    def __init__(self, flows: FlowRepositoryPort) -> None:
+        self._flows = flows
+
+    def exists(self, flow_id: UUID) -> bool:
+        return any(flow.id.value == flow_id for flow in self._flows.list())
 
 
 class FlowAccountsFromAccounts:
@@ -418,6 +432,9 @@ class TenantUseCaseFactory:
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
             clock=now,
+            closed_positions=SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id),
+            cycle_history=SqlAlchemyCycleRepositoryAdapter(self._engine, tenant_id),
+            flow_directory=FlowDirectoryFromFlows(flows),
         )
         return TenantUseCases.on(tenant_id, ports)
 

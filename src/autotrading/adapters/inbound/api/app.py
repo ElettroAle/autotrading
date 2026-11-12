@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.accounts import accounts_router
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings
+from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
+from autotrading.adapters.inbound.api.cycles import cycles_router
 from autotrading.adapters.inbound.api.errors import (
     AuthenticationNotConfiguredError,
     NotAuthenticatedError,
@@ -90,6 +92,8 @@ def create_api(
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request))
+    protected.include_router(closed_positions_router(use_cases_of_request))
+    protected.include_router(cycles_router(use_cases_of_request))
     api.include_router(protected)
     return api
 

@@ -20,6 +20,7 @@ from autotrading.bootstrap import (
     SOURCE_CATALOG,
     AccountReadingFromAccounts,
     FlowAccountsFromAccounts,
+    FlowDirectoryFromFlows,
     ModelSettingsFromAgent,
     OrderExecutionFromOrders,
     ProviderKeyUsageFromFlows,
@@ -34,8 +35,10 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
+from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
+from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.link_code_repository import (
@@ -91,6 +94,8 @@ class Platform:
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
         self.now = STARTED_AT
+        self.closed_positions = ClosedPositionStore()
+        self.cycles = InMemoryCycleRepositoryAdapter()
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -145,6 +150,9 @@ class Platform:
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             clock=lambda: self.now,
+            closed_positions=InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id),
+            cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
+            flow_directory=FlowDirectoryFromFlows(flows),
         )
         return TenantUseCases.on(tenant_id, ports)
 

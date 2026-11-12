@@ -40,3 +40,12 @@ class InvalidFlowSettingError(ApplicationError):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class FlowNotFoundError(ApplicationError):
+    """The same answer for a flow that does not exist and for one of another tenant (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("flusso non trovato")

@@ -80,3 +80,12 @@ class CapitalAboveFreeCapitalError(DomainError):
     def __init__(self, free_capital: str) -> None:
         super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}")
         self.free_capital = free_capital
+
+
+class InvalidClosedPositionError(DomainError):
+    """A closed position the exchange cannot have shown: a defect of whoever reads it."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("posizione chiusa non valida")

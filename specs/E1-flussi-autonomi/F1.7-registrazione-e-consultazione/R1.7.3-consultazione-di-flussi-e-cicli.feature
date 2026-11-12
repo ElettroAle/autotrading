@@ -1,5 +1,5 @@
 # language: it
-@R1.7.3 @wip
+@R1.7.3
 Funzionalità: R1.7.3 Consultazione di flussi e cicli
   Come utente
   Voglio consultare i miei flussi e i loro cicli tramite l'interfaccia programmatica
@@ -19,6 +19,8 @@ Funzionalità: R1.7.3 Consultazione di flussi e cicli
     Dato che "anna" ha il flusso "alfa" attivo con intervallo di 15 minuti e 120 cicli registrati, l'ultimo concluso alle 10:07:00
     E che "bruno" ha il flusso "omega"
 
+  # @wip: ultimo e prossimo ciclo nell'elenco dipendono dall'avvio dei flussi (R1.1.4) e dal ponte dei cicli.
+  @wip
   Scenario: Elenco dei flussi
     Quando "anna" consulta i propri flussi
     Allora l'elenco contiene il flusso "alfa" nello stato "attivo" con ultimo ciclo alle 10:07:00 concluso e prossimo ciclo alle 10:22:00
