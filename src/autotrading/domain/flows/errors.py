@@ -90,12 +90,12 @@ class CapitalAboveAvailableCapitalError(DomainError):
         self.available = available
 
 
-class CapitalBelowCommittedMarginError(DomainError):
+class CapitalBelowFlowMinimumError(DomainError):
     status_code = 422
 
-    def __init__(self, committed_margin: str) -> None:
-        super().__init__(f"capitale allocato sotto il margine impegnato: {committed_margin}")
-        self.committed_margin = committed_margin
+    def __init__(self, minimum: str) -> None:
+        super().__init__(f"capitale allocato sotto il minimo del flusso: {minimum}")
+        self.minimum = minimum
 
 
 class FlowCommandNotAllowedError(DomainError):

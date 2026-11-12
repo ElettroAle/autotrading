@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from autotrading.domain.flows.errors import CapitalAboveAvailableCapitalError, CapitalBelowCommittedMarginError
+from autotrading.domain.flows.errors import CapitalAboveAvailableCapitalError, CapitalBelowFlowMinimumError
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.free_capital import FreeCapital, amount_text
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -27,8 +28,13 @@ def require_increase_within(current: Decimal, capital: Decimal, free_capital: Fr
         raise CapitalAboveAvailableCapitalError(available_text)
 
 
-def require_reduction_within(capital: Decimal, committed_margin: Decimal, currency: str) -> None:
-    """The margin of the open positions of the flow cannot be taken away from it."""
-    if capital < committed_margin:
-        margin_text = f"{amount_text(committed_margin)} {currency}"
-        raise CapitalBelowCommittedMarginError(margin_text)
+def require_reduction_within(reduced: FlowState) -> None:
+    """The liquidity of the flow with the reduced capital stays at zero or above (R1.1.7, ADR 0068).
+
+    What the flow lost, paid in fees or holds as margin cannot be taken away from it: its minimum capital is the one
+    that brings its liquidity to zero.
+    """
+    if reduced.available_liquidity < 0:
+        minimum = reduced.allocated_capital - reduced.available_liquidity
+        minimum_text = f"{amount_text(minimum)} {reduced.currency}"
+        raise CapitalBelowFlowMinimumError(minimum_text)
