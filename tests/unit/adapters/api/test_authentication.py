@@ -8,6 +8,8 @@ import pytest
 from autotrading.adapters.inbound.api.authentication import (
     AccessTokenVerifier,
     AuthenticationSettings,
+    LoginEndpoints,
+    OidcLoginEndpoints,
     OidcSigningKeys,
     fetch_json,
 )
@@ -18,7 +20,7 @@ from autotrading.adapters.inbound.api.errors import (
 )
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.directory import Person
-from tests.support.identity_provider import JWKS_URI, SETTINGS, IdentityProvider
+from tests.support.identity_provider import AUTHORIZATION_URL, JWKS_URI, SETTINGS, TOKEN_URL, IdentityProvider
 
 SHARED_SECRET = "a-shared-secret-of-thirty-two-chars"  # noqa: S105 - signs a forged token in the test
 
@@ -161,3 +163,46 @@ def test_a_malformed_discovery_is_reported_as_unavailable(
 def test_the_directory_is_reached_only_over_https() -> None:
     with pytest.raises(IdentityProviderUnavailableError):
         fetch_json("http://login.example.test/.well-known/openid-configuration")
+
+
+def test_the_login_endpoints_come_from_the_discovery_of_the_issuer(provider: IdentityProvider) -> None:
+    endpoints = provider.login().endpoints()
+
+    assert endpoints == LoginEndpoints(AUTHORIZATION_URL, TOKEN_URL)
+
+
+def test_the_login_endpoints_are_read_once(provider: IdentityProvider) -> None:
+    login = provider.login()
+
+    login.endpoints()
+    login.endpoints()
+
+    assert provider.requests == [SETTINGS.discovery_url]
+
+
+def test_an_unreachable_issuer_gives_no_login_endpoints_until_it_answers(provider: IdentityProvider) -> None:
+    login = provider.login()
+    provider.reachable = False
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        login.endpoints()
+    provider.reachable = True
+
+    assert login.endpoints().token_url == TOKEN_URL
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        {"authorization_endpoint": "https://idp.test/authorize"},
+        {"token_endpoint": "https://idp.test/token"},
+        {"authorization_endpoint": "http://idp.test/authorize", "token_endpoint": "https://idp.test/token"},
+        {"authorization_endpoint": "https://idp.test/authorize", "token_endpoint": "http://idp.test/token"},
+    ],
+    ids=["no-token-endpoint", "no-authorization-endpoint", "plain-authorization", "plain-token"],
+)
+def test_a_login_endpoint_missing_or_not_over_https_is_refused(document: Mapping[str, Any]) -> None:
+    login = OidcLoginEndpoints(SETTINGS.discovery_url, lambda _url: document)
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        login.endpoints()

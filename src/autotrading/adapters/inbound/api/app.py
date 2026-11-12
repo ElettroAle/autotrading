@@ -3,11 +3,15 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, Request, Response, Security
-from fastapi.security import HTTPBearer, OpenIdConnect
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.accounts import accounts_router
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings
+from autotrading.adapters.inbound.api.authentication import (
+    AccessTokenVerifier,
+    AuthenticationSettings,
+    OidcLoginEndpoints,
+)
 from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
 from autotrading.adapters.inbound.api.cycles import cycles_router
 from autotrading.adapters.inbound.api.errors import (
@@ -18,6 +22,7 @@ from autotrading.adapters.inbound.api.errors import (
 from autotrading.adapters.inbound.api.flow_state import flow_state_router
 from autotrading.adapters.inbound.api.flows import flows_router
 from autotrading.adapters.inbound.api.models import models_router
+from autotrading.adapters.inbound.api.operations import operations_router
 from autotrading.adapters.inbound.api.orders import orders_router
 from autotrading.adapters.inbound.api.provider_keys import provider_keys_router
 from autotrading.adapters.inbound.api.sources import sources_router
@@ -30,6 +35,8 @@ from autotrading.domain.tenancy.user_id import UserId
 
 ENVIRONMENT_HEADER = "X-Autotrading-Environment"
 BEARER_PREFIX = "bearer "
+LOGIN_SCHEME = "OAuth2"
+LOGIN_SCOPE_DESCRIPTION = "accesso ad AutoTrading"
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +49,7 @@ class HealthReport:
 class Authentication:
     settings: AuthenticationSettings
     verifier: AccessTokenVerifier
+    login: OidcLoginEndpoints
 
 
 class Identity(BaseModel):
@@ -58,6 +66,7 @@ def create_api(
     api = FastAPI(title="AutoTrading", swagger_ui_init_oauth=_swagger_login(authentication))
     install_error_responses(api)
     _declare_environment_on_every_response(api, health)
+    _publish_login(api, authentication)
 
     @api.get("/health")
     def read_health() -> dict[str, str]:
@@ -95,6 +104,7 @@ def create_api(
     protected.include_router(flows_router(use_cases_of_request, current_user))
     protected.include_router(flow_state_router(use_cases_of_request))
     protected.include_router(closed_positions_router(use_cases_of_request))
+    protected.include_router(operations_router(use_cases_of_request))
     protected.include_router(cycles_router(use_cases_of_request))
     api.include_router(protected)
     return api
@@ -119,11 +129,41 @@ def _bearer_token(request: Request) -> str:
     return token
 
 
-def _security_scheme(authentication: Authentication | None) -> HTTPBearer | OpenIdConnect:
-    # The scheme only describes the login on the OpenAPI page; the token is read and verified by current_user.
+def _security_scheme(authentication: Authentication | None) -> HTTPBearer:
+    # The scheme only names the login on the OpenAPI page; the token is read and verified by current_user.
     if authentication is None:
         return HTTPBearer(auto_error=False)
-    return OpenIdConnect(openIdConnectUrl=authentication.settings.discovery_url, auto_error=False)
+    return HTTPBearer(scheme_name=LOGIN_SCHEME, auto_error=False)
+
+
+def _publish_login(api: FastAPI, authentication: Authentication | None) -> None:
+    """The OpenAPI page offers only Authorization Code + PKCE, at the endpoints the issuer declares (ADR 0073).
+
+    The issuer's discovery also lists the implicit flow, deprecated: its flows are never copied to the page.
+    """
+    if authentication is None:
+        return
+    login = authentication.login
+    scope = authentication.settings.scope
+    generate = api.openapi
+
+    def openapi() -> dict[str, Any]:
+        schema = generate()
+        endpoints = login.endpoints()
+        schema["components"]["securitySchemes"][LOGIN_SCHEME] = {
+            "type": "oauth2",
+            "flows": {
+                "authorizationCode": {
+                    "authorizationUrl": endpoints.authorization_url,
+                    "tokenUrl": endpoints.token_url,
+                    "scopes": {scope: LOGIN_SCOPE_DESCRIPTION},
+                }
+            },
+        }
+        return schema
+
+    # FastAPI documents this override to customise the OpenAPI document; mypy sees it as assigning a method.
+    api.openapi = openapi  # type: ignore[method-assign]
 
 
 def _swagger_login(authentication: Authentication | None) -> dict[str, Any] | None:

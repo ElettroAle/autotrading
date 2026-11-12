@@ -86,6 +86,15 @@ class AssetWithOpenPositionError(ApplicationError):
         self.assets = assets
 
 
+class OperationsCursorInvalidError(ApplicationError):
+    """The `after` of a page of operations is not one the platform gave (ADR 0074)."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("pagina delle operazioni non valida")
+
+
 class FlowPositionMismatchError(ApplicationError):
     """The position of the account on an asset of the flow is not the one the ledger of the flow expects: someone
     else traded it, so the flow sends no order and pauses until the user looks at it (Bug 155, ADR 0064).

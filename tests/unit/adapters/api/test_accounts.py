@@ -27,7 +27,7 @@ def client(platform: Platform) -> TestClient:
         HealthReport("1.0.0", "dev"),
         ResolveTenantUseCase(platform.tenants),
         platform.for_tenant,
-        Authentication(SETTINGS, verifier),
+        Authentication(SETTINGS, verifier, provider.login()),
     )
     anna = platform.directory.person("anna")
     anna.roles.add("Utente")
