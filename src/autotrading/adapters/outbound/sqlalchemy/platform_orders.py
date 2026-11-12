@@ -10,7 +10,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 
 class SqlAlchemyPlatformOrdersAdapter:
-    """The client order ids of the orders the platform recorded on an account, with their flow (ADR 0044).
+    """The client order ids of the orders the platform recorded on an account, with their flow (ADR 0044, ADR 0063).
 
     The orders of the verification procedure and of the manual commands have no flow (ADR 0050).
     """

@@ -177,3 +177,20 @@ def test_the_funding_of_the_position_of_the_flow_adds_to_its_totals(bench: Bench
 
     assert bench.ledger.totals[flow.id].funding == Decimal("-0.25")
     assert bench.ledger.recomputed(flow.id) == bench.ledger.totals[flow.id]
+
+
+def test_what_the_overlap_reads_again_does_not_move_the_position_the_flow_expects(bench: Bench) -> None:
+    flow = bench.flow("BTC")
+    order = bench.order_of(flow)
+    bench.exchange.executions[ACCOUNT] = [
+        a_fill("BTC", order, fill_id="1", size=Decimal(2), executed_at=EARLIER - timedelta(minutes=5)),
+        a_fill(
+            "BTC", None, fill_id="2", size=Decimal(-1), start_position=Decimal(2), liquidation=True, executed_at=EARLIER
+        ),
+    ]
+    bench.record()
+    bench.exchange.executions[ACCOUNT].append(
+        a_fill("BTC", None, fill_id="3", size=Decimal(-1), start_position=Decimal(1))
+    )
+
+    assert bench.record() == [("3", ExecutionKind.OUTSIDE_CLOSING)]

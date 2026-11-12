@@ -201,3 +201,12 @@ def test_the_keys_already_recorded_leave_only_the_unknown_part_of_the_window() -
     unknown = keys.unknown_in(window_of(known, new, funding=(paid, unpaid)))
 
     assert (unknown.executions, unknown.funding) == ((new,), (unpaid,))
+
+
+def test_a_closing_of_the_size_of_the_flow_out_of_a_bigger_position_belongs_to_no_flow() -> None:
+    flow = flow_on("BTC")
+    out_of_more = a_fill("BTC", None, size=Decimal(-2), start_position=Decimal(3))
+
+    (entry,) = attributed([flow], window_of(out_of_more), totals=holding(flow, "BTC", Decimal(2))).entries
+
+    assert entry.flow_id is None
