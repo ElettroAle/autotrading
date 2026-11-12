@@ -244,8 +244,11 @@ class FakeOrderAdapter:
         self.unanswered: set[str] = set()
         self._failures = failures
 
-    def execute(self, flow_id: UUID, planned_at: datetime, order: object) -> object:
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
         self._failures.raise_if_failing(flow_id, CycleStep.ORDER_EXECUTION)
+        return [self._executed(flow_id, planned_at, order) for order in orders]
+
+    def _executed(self, flow_id: UUID, planned_at: datetime, order: object) -> object:
         if order in self.unanswered:
             message = f"l'exchange non risponde all'ordine su {order}"
             raise FakeTransientError(message)

@@ -6,6 +6,7 @@ from sqlalchemy import Engine, RowMapping, func, select, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tables import orders
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
@@ -14,7 +15,8 @@ from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.accounts import an_account
-from tests.support.orders import EXECUTED_AT, a_rejected_order, an_executed_order
+from tests.support.flows import a_flow
+from tests.support.orders import CYCLE_PLANNED_AT, EXECUTED_AT, a_flow_order, a_rejected_order, an_executed_order
 
 pytestmark = pytest.mark.integration
 
@@ -59,6 +61,32 @@ def test_a_rejected_order_is_recorded_with_its_client_order_id(database: Engine)
 
     (row,) = rows_of(database, tenant_id)
     assert (row["id"], row["status"], row["rejection_reason"]) == (order.id.value, "REJECTED", "INSUFFICIENT_MARGIN")
+
+
+def test_an_order_of_a_flow_is_recorded_with_the_flow_the_cycle_and_the_decision(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    flow = a_flow(tenant_id, name=f"alfa-{uuid4()}", account_id=account_id)
+    SqlAlchemyFlowRepositoryAdapter(database, tenant_id).add(flow)
+
+    SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(a_flow_order(account_id, flow.id.value))
+
+    (row,) = rows_of(database, tenant_id)
+    assert (row["origin"], row["flow_id"], row["cycle_planned_at"], row["decision_asset"]) == (
+        "FLOW",
+        flow.id.value,
+        CYCLE_PLANNED_AT,
+        "BTC",
+    )
+
+
+def test_an_order_of_a_flow_of_another_tenant_cannot_be_written(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    other_tenant, other_account = new_account(database)
+    flow = a_flow(other_tenant, name=f"alfa-{uuid4()}", account_id=other_account)
+    SqlAlchemyFlowRepositoryAdapter(database, other_tenant).add(flow)
+
+    with pytest.raises(IntegrityError):
+        SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(a_flow_order(account_id, flow.id.value))
 
 
 def test_the_orders_of_a_tenant_are_invisible_to_another_and_without_a_tenant(database: Engine) -> None:
