@@ -39,6 +39,8 @@ Le fonti dati che l'agente riceve nel contesto.
   assente, mai come errore del ciclo.
 - I parametri non indicati assumono il predefinito del catalogo; un valore fuori dai valori ammessi rende
   la configurazione del flusso non valida.
+- Raccolta: `CollectSourceUseCase` legge una fonte attiva per ogni asset del flusso (o una volta, se di
+  mercato) con il lettore registrato per nome, e registra ogni valore con i suoi istanti (ADR 0048, 0049).
 
 ## Porte del contesto
 

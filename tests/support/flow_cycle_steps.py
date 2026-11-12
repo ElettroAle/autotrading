@@ -287,8 +287,9 @@ def position_still_open(flow_cycles: FlowCycles, asset: str) -> None:
 
 @then(quoted('il contesto contiene per "{asset}" una previsione a 15 minuti e una a 1 ora'))
 def forecasts_in_context(flow_cycles: FlowCycles, asset: str) -> None:
-    horizons = [values["orizzonte"] for values in flow_cycles.sources_in_context("forecast", asset)]
-    assert horizons == ["15 minuti", "1 ora"]
+    [values] = flow_cycles.sources_in_context("forecast", asset)
+    for horizon in ForecastHorizon:
+        assert f"prezzo_previsto_{horizon.label}" in values
 
 
 @then(
@@ -298,22 +299,23 @@ def forecasts_in_context(flow_cycles: FlowCycles, asset: str) -> None:
 )
 def forecast_values(flow_cycles: FlowCycles, price: str) -> None:
     for values in flow_cycles.sources_in_context("forecast"):
-        assert number(values["ultimo_prezzo"]) == number(price)
-        assert Decimal(values["prezzo_previsto"]) > 0
-        Decimal(values["variazione_percentuale_prevista"])
-        assert values["orizzonte"]
+        assert number(values["prezzo_attuale"]) == number(price)
+        for horizon in ForecastHorizon:
+            assert Decimal(values[f"prezzo_previsto_{horizon.label}"]) > 0
+            Decimal(values[f"variazione_percentuale_{horizon.label}"])
 
 
 @then(quoted('la previsione per "{asset}" usa {days} giorni di storico'))
 def forecast_depth_used(flow_cycles: FlowCycles, asset: str, days: str) -> None:
-    for values in flow_cycles.sources_in_context("forecast", asset):
-        assert values["storico_giorni"] == days
+    [values] = flow_cycles.sources_in_context("forecast", asset)
+    assert values["profondita_storico_giorni"] == days
 
 
 @then(quoted('il contesto dichiara per "{asset}" lo storico ridotto a {days} giorni'))
 def shortened_history(flow_cycles: FlowCycles, asset: str, days: str) -> None:
-    for values in flow_cycles.sources_in_context("forecast", asset):
-        assert values["storico_ridotto"] == f"storico ridotto a {days} giorni"
+    [values] = flow_cycles.sources_in_context("forecast", asset)
+    assert values["profondita_storico_giorni"] == days
+    assert "storico_ridotto" in values
 
 
 @given(quoted('che alle {clock} il flusso "{flow}" ha registrato per "{asset}" una previsione a 15 minuti di {price}'))

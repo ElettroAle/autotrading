@@ -113,7 +113,7 @@ class RunCycleUseCase:
         snapshot = progress.run(CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id))
         readings, absent = progress.run(
             CycleStep.COLLECT_SOURCES,
-            lambda: steps.sources.collect(flow_id, snapshot.sources, progress.command.schedule.source_wait),
+            lambda: steps.sources.collect(flow_id, planned_at, snapshot.sources, progress.command.schedule.source_wait),
         )
         progress.absent = tuple(absent)
         context = progress.run(

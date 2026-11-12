@@ -5,7 +5,7 @@ import os
 import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Protocol
@@ -65,6 +65,7 @@ from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchemySampleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
@@ -134,10 +135,20 @@ from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
+from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
 from autotrading.application.sources.errors import SourceUnavailableError
-from autotrading.application.sources.forecast_asset import ForecastAssetCommand, ForecastAssetUseCase
-from autotrading.application.sources.ports import ForecastRepositoryPort, NewsPort, PriceHistoryPort, SentimentPort
-from autotrading.application.sources.read_latest_news import ReadLatestNewsCommand, ReadLatestNewsUseCase
+from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
+from autotrading.application.sources.ports import (
+    ForecastRepositoryPort,
+    NewsPort,
+    PriceHistoryPort,
+    SampleRepositoryPort,
+    SentimentPort,
+    SourceReaderPort,
+)
+from autotrading.application.sources.read_forecast import ReadForecastUseCase
+from autotrading.application.sources.read_news import MAX_AGE_HOURS, ReadNewsUseCase
+from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand, RecordActualPricesUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
@@ -179,9 +190,9 @@ from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
-from autotrading.domain.sources.price_forecast import PriceForecast
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_catalog import SourceCatalog
+from autotrading.domain.sources.source_sample import CycleReference
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
@@ -322,6 +333,15 @@ class SourceSettingsFromSources:
         except SOURCE_REFUSALS as error:
             raise InvalidFlowSettingError(str(error)) from error
         return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, parameters)
+
+
+def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
+    """Bridges the sources context to the agent context: each collected value with the weight of its source (R1.3.2)."""
+    return tuple(
+        SourceData(source.source, source.weight, sample.asset, sample.values)
+        for source in collected
+        for sample in source.samples
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -542,6 +562,7 @@ class WorkerUseCaseFactory:
             read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
+            samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
         )
 
@@ -805,6 +826,7 @@ class TenantCyclePorts:
     read_exchange_state: ReadExchangeStateUseCase
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
+    samples: SampleRepositoryPort
     execute_flow_orders: ExecuteFlowOrdersUseCase
 
 
@@ -924,8 +946,8 @@ class FlowPauseFromFlows:
 
 
 class SourcesFromSources:
-    """Bridges the sources context to the cycles context: each active source read with the parameters of the flow
-    and given to the agent with its weight (R1.3.2-R1.3.7, ADR 0042).
+    """Bridges the sources context to the cycles context: each active source collected with the parameters of the flow,
+    recorded for the cycle and given to the agent with its weight (R1.3.2-R1.3.8, ADR 0042).
     """
 
     def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices) -> None:
@@ -933,75 +955,40 @@ class SourcesFromSources:
         self._ports_of = ports_of
         self._services = services
 
-    def collect(self, flow_id: UUID, source: str) -> object:
+    def collect(self, flow_id: UUID, planned_at: datetime, source: str) -> object:
         ports = self._ports_of(self._directory.tenant_of(flow_id))
-        flow = flow_of_cycle(ports, flow_id)
-        selection = next((selected for selected in flow.configuration.sources if selected.name == source), None)
+        configuration = flow_of_cycle(ports, flow_id).configuration
+        selection = next((selected for selected in configuration.sources if selected.name == source), None)
         if selection is None:
             raise SourceUnavailableError(source)
-        now = self._services.clock.now()
-        if source in self._services.sentiments:
-            return self._sentiment(selection)
-        if source == NEWS.name:
-            return self._news(selection, now)
-        if source == FORECAST.name:
-            return self._forecast(ports, flow, selection, now)
-        # Indicators and pivots need the candles of the exchange, read in a later change (R1.3.3, R1.3.4).
-        raise SourceUnavailableError(source)
+        command = CollectSourceCommand(
+            CycleReference(flow_id, planned_at),
+            selection.name,
+            selection.weight,
+            selection.parameters,
+            configuration.assets,
+            self._services.clock.now(),
+        )
+        collected = CollectSourceUseCase(SOURCE_CATALOG, self._readers_of(ports), ports.samples).execute(command)
+        return agent_sources_of([collected]) or _nothing_collected(selection)
 
-    def _sentiment(self, selection: SourceSelection) -> tuple[SourceData, ...]:
-        index = self._services.sentiments[selection.name].read_index()
-        values = {
-            "valore": str(index.value),
-            "classificazione": index.classification,
-            "aggiornato_alle": index.updated_at.isoformat(),
+    def _readers_of(self, ports: TenantCyclePorts) -> dict[str, SourceReaderPort]:
+        services = self._services
+        readers: dict[str, SourceReaderPort] = {
+            name: ReadSentimentUseCase(sentiment) for name, sentiment in services.sentiments.items()
         }
-        return (SourceData(selection.name, selection.weight, None, values),)
-
-    def _news(self, selection: SourceSelection, now: datetime) -> tuple[SourceData, ...]:
-        hours = selection.parameters["eta_massima_ore"]
-        command = ReadLatestNewsCommand(selection.parameters["numero_notizie"], timedelta(hours=hours), now)
-        stories = ReadLatestNewsUseCase(self._services.news).execute(command)
-        if not stories:
-            window = "nell'ultima ora" if hours == 1 else f"nelle ultime {hours} ore"
-            return (SourceData(selection.name, selection.weight, None, {"nota": f"nessuna notizia {window}"}),)
-        return tuple(
-            SourceData(
-                selection.name,
-                selection.weight,
-                None,
-                {"titolo": story.title, "pubblicata_alle": story.published_at.isoformat(), "sintesi": story.summary},
-            )
-            for story in stories
-        )
-
-    def _forecast(
-        self, ports: TenantCyclePorts, flow: Flow, selection: SourceSelection, now: datetime
-    ) -> tuple[SourceData, ...]:
-        use_case = ForecastAssetUseCase(self._services.prices, ports.forecasts)
-        days = selection.parameters["profondita_storico_giorni"]
-        forecasts = [
-            forecast
-            for asset in flow.configuration.assets
-            for forecast in use_case.execute(ForecastAssetCommand(flow.id.value, asset, days, now))
-        ]
-        return tuple(
-            SourceData(selection.name, selection.weight, forecast.asset, _forecast_values(forecast))
-            for forecast in forecasts
-        )
+        readers[NEWS.name] = ReadNewsUseCase(services.news)
+        readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(services.prices, ports.forecasts))
+        return readers
 
 
-def _forecast_values(forecast: PriceForecast) -> dict[str, str]:
-    values = {
-        "orizzonte": forecast.horizon.label,
-        "ultimo_prezzo": str(forecast.last_price),
-        "prezzo_previsto": str(forecast.predicted_price),
-        "variazione_percentuale_prevista": str(forecast.change_percent),
-        "storico_giorni": str(forecast.history_days),
-    }
-    if forecast.shortened:
-        values["storico_ridotto"] = f"storico ridotto a {forecast.history_days} giorni"
-    return values
+def _nothing_collected(selection: SourceSelection) -> tuple[SourceData, ...]:
+    """An empty source still speaks to the agent: no recent news is itself a datum (R1.3.7)."""
+    if selection.name != NEWS.name:
+        return ()
+    hours = NEWS.settings(selection.parameters)[MAX_AGE_HOURS]
+    window = "nell'ultima ora" if hours == 1 else f"nelle ultime {hours} ore"
+    return (SourceData(selection.name, selection.weight, None, {"nota": f"nessuna notizia {window}"}),)
 
 
 @dataclass(frozen=True, slots=True)

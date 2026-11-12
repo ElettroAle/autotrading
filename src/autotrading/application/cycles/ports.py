@@ -72,7 +72,7 @@ class FlowStatePort(Protocol):
 
 
 class SourcePort(Protocol):
-    def collect(self, flow_id: UUID, source: str) -> object:
+    def collect(self, flow_id: UUID, planned_at: datetime, source: str) -> object:
         """The data of one active source; any typed error makes the source absent for the cycle (R1.2.5)."""
         ...
 

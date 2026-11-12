@@ -54,6 +54,7 @@ from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
 )
+from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
 from tests.support.platform import Platform, new_credentials, registration
@@ -98,6 +99,7 @@ class FlowCycles:
         self.news = FakeNewsAdapter()
         self.prices = FakePriceHistoryAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
+        self.samples: dict[TenantId, InMemorySampleRepositoryAdapter] = {}
         self.limits = FakeExchangeLimitsAdapter()
         self.launcher = ImmediateCycleLauncher()
         self.anchors: dict[UUID, datetime] = {}
@@ -118,6 +120,7 @@ class FlowCycles:
             read_exchange_state=worker.read_exchange_state,
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
+            samples=self.samples_of(tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(
                 access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
             ),
@@ -134,6 +137,9 @@ class FlowCycles:
             prices=self.prices,
             exchange_limits={HYPERLIQUID: self.limits},
         )
+
+    def samples_of(self, tenant_id: TenantId) -> InMemorySampleRepositoryAdapter:
+        return self.samples.setdefault(tenant_id, InMemorySampleRepositoryAdapter())
 
     def forecasts_of(self, tenant_id: TenantId) -> InMemoryForecastRepositoryAdapter:
         return self.forecasts.setdefault(tenant_id, InMemoryForecastRepositoryAdapter())

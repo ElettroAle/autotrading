@@ -170,7 +170,7 @@ class FakeSourcesAdapter:
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
 
-    def collect(self, flow_id: UUID, source: str) -> object:
+    def collect(self, flow_id: UUID, planned_at: datetime, source: str) -> object:  # noqa: ARG002 - the signature of the port
         if source in self.silent:
             self.released.wait(LONGEST_HOLD)
         if source in self.late:
