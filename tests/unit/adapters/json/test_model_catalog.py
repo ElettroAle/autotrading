@@ -6,6 +6,7 @@ import pytest
 from autotrading.adapters.outbound.json.model_catalog import InvalidModelCatalogError, load_model_catalog
 from autotrading.domain.agent.errors import InvalidModelDefinitionError
 from autotrading.domain.agent.model_parameter import ChoiceParameter, RangeParameter
+from autotrading.domain.agent.model_usage import ModelPrices
 
 CATALOG = {
     "models": [
@@ -66,3 +67,24 @@ def test_an_inconsistent_model_stops_the_platform_with_its_reason() -> None:
 
     with pytest.raises(InvalidModelDefinitionError, match="gpt"):
         load_model_catalog(text)
+
+
+def test_the_prices_of_a_model_are_read_when_declared() -> None:
+    priced = {
+        "models": [
+            {"name": "openai/gpt", "parameters": {}, "prices": {"input_per_million": 0.4, "output_per_million": 1.6}},
+            {"name": "openrouter/x", "parameters": {}},
+        ]
+    }
+
+    catalog = load_model_catalog(json.dumps(priced))
+
+    assert catalog.find("openai/gpt").prices == ModelPrices(Decimal("0.4"), Decimal("1.6"))
+    assert catalog.find("openrouter/x").prices is None
+
+
+def test_prices_without_one_of_the_two_stop_the_platform() -> None:
+    priced = {"models": [{"name": "openai/gpt", "parameters": {}, "prices": {"input_per_million": 0.4}}]}
+
+    with pytest.raises(InvalidModelCatalogError):
+        load_model_catalog(json.dumps(priced))
