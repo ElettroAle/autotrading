@@ -83,3 +83,11 @@ def test_a_value_below_the_minimum_is_never_rounded_up() -> None:
 def test_a_negative_minimum_is_refused() -> None:
     with pytest.raises(InvalidMarketError):
         Market("BTC", 40, 5, Decimal(1), Decimal(-1))
+
+
+def test_rounding_down_to_exactly_the_minimum_is_kept() -> None:
+    assert Market("BTC", 40, 5, Decimal(100000), Decimal(10)).size_for(Decimal("10.5")) == Decimal("0.0001")
+
+
+def test_an_exchange_without_a_minimum_is_admitted() -> None:
+    assert Market("BTC", 40, 5, Decimal(100000), Decimal(0)).size_for(Decimal("10.5")) == Decimal("0.0001")

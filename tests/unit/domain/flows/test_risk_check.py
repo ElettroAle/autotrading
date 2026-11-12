@@ -240,3 +240,21 @@ def test_a_close_in_the_same_cycle_frees_no_liquidity() -> None:
     assert risk.outcome(opening("0.05", 1, asset="ETH"), EXCHANGE) == BlockedDecision(
         "ETH", "liquidità del flusso insufficiente: 40 USDC"
     )
+
+
+def test_an_opening_with_leverage_commits_its_margin_not_its_value() -> None:
+    risk = check(liquidity="100")
+
+    risk.outcome(opening("0.03", 2, asset="BTC"), EXCHANGE)
+
+    assert approved(risk.outcome(opening("0.07", 1, asset="ETH"), EXCHANGE)).margin == Decimal(70)
+
+
+def test_an_opening_raised_to_the_minimum_is_compared_with_the_liquidity_left() -> None:
+    risk = check(liquidity="18", bring_to_minimum=True)
+
+    risk.outcome(opening("0.01", 1, asset="BTC"), EXCHANGE)
+
+    assert risk.outcome(opening("0.006", 1, asset="ETH"), EXCHANGE) == BlockedDecision(
+        "ETH", "liquidità del flusso insufficiente: 8 USDC"
+    )
