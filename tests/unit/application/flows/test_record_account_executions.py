@@ -84,6 +84,20 @@ def test_only_what_is_newer_than_the_cursor_less_the_overlap_is_read(bench: Benc
     assert bench.record() == [("late", ExecutionKind.UNATTRIBUTED)]
 
 
+def test_the_overlap_covers_a_whole_funding_hour() -> None:
+    assert timedelta(hours=1) == OVERLAP
+
+
+def test_a_funding_payment_published_late_within_the_hour_is_recorded(bench: Bench) -> None:
+    bench.flow("BTC")
+    bench.ledger.cursors[ACCOUNT] = READ_AT
+    bench.exchange.funding[ACCOUNT] = [a_payment("BTC", Decimal(-1), paid_at=READ_AT - timedelta(minutes=59))]
+
+    bench.record()
+
+    assert len(bench.ledger.funding[ACCOUNT]) == 1
+
+
 def test_what_the_overlap_reads_again_is_not_recorded_twice(bench: Bench) -> None:
     flow = bench.flow("BTC")
     order = bench.order_of(flow)

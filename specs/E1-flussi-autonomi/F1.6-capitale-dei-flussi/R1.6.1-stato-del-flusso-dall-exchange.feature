@@ -10,7 +10,8 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
   - Le posizioni si leggono dall'exchange: una posizione appartiene al flusso del conto che ha quell'asset (R1.1.2).
   - Le esecuzioni (prezzo, quantità, commissione, PnL realizzato) e i pagamenti di funding si leggono
     dall'exchange a ogni ciclo, solo quelli nuovi, e la piattaforma li registra una sola volta nel proprio
-    registro delle operazioni, che conserva l'intero storico anche quando l'exchange non lo mostra più.
+    registro delle operazioni, che conserva l'intero storico anche quando l'exchange non lo mostra più. Un'esecuzione
+    o un funding che l'exchange pubblica in ritardo, fino a un'ora dopo il suo istante, entra comunque nel registro.
   - Un'esecuzione è del flusso il cui ordine l'ha prodotta; un ordine della piattaforma senza flusso (comando
     manuale, stop) è del flusso che ha l'asset. Senza un ordine della piattaforma sono del flusso dell'asset solo
     la liquidazione e la chiusura esatta della posizione che il flusso si aspetta; ogni altra esecuzione non è di
@@ -91,6 +92,13 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     E che il ciclo successivo legge di nuovo le stesse esecuzioni del conto "test-1"
     Quando "anna" consulta lo stato del flusso "alfa"
     Allora il flusso "alfa" ha liquidità disponibile 538 USDC
+
+  Scenario: Un'esecuzione pubblicata in ritardo entra nel registro una volta sola
+    Dato che le esecuzioni del flusso "alfa" hanno PnL realizzato 40 USDC e commissioni 2 USDC
+    E che l'exchange pubblica in ritardo un'esecuzione del flusso "alfa" avvenuta 30 minuti prima con PnL realizzato -10 USDC
+    E che il ciclo successivo legge di nuovo le stesse esecuzioni del conto "test-1"
+    Quando "anna" consulta lo stato del flusso "alfa"
+    Allora il flusso "alfa" ha liquidità disponibile 528 USDC
 
   Scenario: La liquidazione della posizione del flusso è del flusso
     Dato che il flusso "alfa" ha aperto 2 "BTC" con i propri ordini

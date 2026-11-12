@@ -104,6 +104,21 @@ def read_again(bench: AttributionBench, account: str) -> None:
     bench.record_executions(bench.account(account))
 
 
+@given(
+    step(
+        "che l'exchange pubblica in ritardo un'esecuzione del flusso \"{flow}\" avvenuta (?P<minutes>\\d+) minuti "
+        "prima con PnL realizzato {a} USDC"
+    )
+)
+def published_late(bench: AttributionBench, flow: str, minutes: str, a: str) -> None:
+    order, owner = uuid4(), bench.flow(flow)
+    bench.orders.add(order, owner.account_id, owner.id)
+    executed_at = READ_AT - timedelta(minutes=int(minutes))
+    late = a_fill("BTC", order, realized_pnl=amount(a), fill_id="in-ritardo", executed_at=executed_at)
+    bench.extend(owner.account_id, fills=(late,))
+    bench.record_executions(owner.account_id)
+
+
 @given(step(r'che il flusso "{flow}" ha aperto {a} "{asset}" con i propri ordini'))
 def opened_by_flow(bench: AttributionBench, flow: str, a: str, asset: str) -> None:
     order, owner = uuid4(), bench.flow(flow)
