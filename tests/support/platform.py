@@ -10,6 +10,7 @@ from autotrading.application.accounts.register_account import AccountRegistratio
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -28,6 +29,7 @@ from autotrading.bootstrap import (
     FlowDirectoryFromFlows,
     FlowPositionsFromAccountsAndOrders,
     FlowSummariesFromFlows,
+    ManualClosingsRecordedInFlows,
     ModelSettingsFromAgent,
     OrderExecutionFromOrders,
     ProviderKeyUsageFromFlows,
@@ -149,18 +151,16 @@ class Platform:
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
         flow_positions = FlowPositionsFromAccountsAndOrders(account_state, position_closing)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
-        stop_ports = StopPorts(
-            self.running_cycles,
-            flow_positions,
-            InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id)),
-            closed_positions,
-        )
+        flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
+        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions)
         ports = TenantPorts(
             accounts=accounts,
             sealer=self.sealer_of(tenant_id),
             exchanges=self.exchanges,
             account_state=account_state,
-            position_closing=position_closing,
+            position_closing=ManualClosingsRecordedInFlows(
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, closed_positions)
+            ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
