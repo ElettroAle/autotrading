@@ -6,6 +6,7 @@ from uuid import UUID
 
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
 
@@ -62,4 +63,12 @@ class ModelSettingsPort(Protocol):
 class SourceSettingsPort(Protocol):
     def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         """The source with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
+        ...
+
+
+class ExchangeLimitsPort(Protocol):
+    """What the exchange of the account of the flow accepts on an asset, read now (R1.5.2, R1.5.4)."""
+
+    def limits(self, asset: str) -> AssetLimits | None:
+        """None when the exchange does not trade the asset. Raises FlowExchangeUnavailableError."""
         ...

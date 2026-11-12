@@ -1,5 +1,5 @@
 # language: it
-@R1.5.2 @wip
+@R1.5.2
 Funzionalità: R1.5.2 Leva massima del flusso
   Come utente
   Voglio fissare la leva massima di un flusso
