@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.cycles.ports import SourceReading
+from autotrading.application.cycles.ports import FlowSnapshot, SourceReading, SourceRequest
 from autotrading.application.cycles.source_collector import SourceCollector, real_seconds
 from autotrading.domain.cycles.cycle_record import AbsentSource
 from tests.fakes.cycles import FakeSourcesAdapter, FakeTransientError
@@ -15,9 +15,13 @@ MINUTE = timedelta(seconds=60)
 PLANNED_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 
 
+def request(sources: tuple[str, ...], flow_id: UUID | None = None) -> SourceRequest:
+    return SourceRequest(flow_id or uuid4(), PLANNED_AT, FlowSnapshot(sources, None))
+
+
 class BrokenSourceAdapter:
-    def collect(self, flow_id: UUID, planned_at: datetime, source: str) -> object:  # noqa: ARG002 - the signature of the port
-        message = f"{source} {flow_id}"
+    def collect(self, request: SourceRequest, source: str) -> object:
+        message = f"{source} {request.flow_id}"
         raise ZeroDivisionError(message)
 
 
@@ -37,13 +41,13 @@ def test_the_real_wait_lasts_the_seconds_of_the_cycle() -> None:
 
 
 def test_a_flow_without_sources_collects_nothing(sources: FakeSourcesAdapter) -> None:
-    assert compressed(sources).collect(uuid4(), PLANNED_AT, (), MINUTE) == ([], [])
+    assert compressed(sources).collect(request(()), MINUTE) == ([], [])
 
 
 def test_every_source_that_answers_gives_its_reading(sources: FakeSourcesAdapter) -> None:
     flow_id = uuid4()
 
-    readings, absent = compressed(sources).collect(flow_id, PLANNED_AT, ("indicatori", "notizie"), MINUTE)
+    readings, absent = compressed(sources).collect(request(("indicatori", "notizie"), flow_id), MINUTE)
 
     assert readings == [
         SourceReading("indicatori", {"source": "indicatori", "flow_id": str(flow_id)}),
@@ -55,9 +59,7 @@ def test_every_source_that_answers_gives_its_reading(sources: FakeSourcesAdapter
 def test_a_silent_source_is_absent_with_the_wait_in_seconds(sources: FakeSourcesAdapter) -> None:
     sources.silent.add("notizie")
 
-    readings, absent = compressed(sources).collect(
-        uuid4(), PLANNED_AT, ("indicatori", "notizie"), timedelta(seconds=30)
-    )
+    readings, absent = compressed(sources).collect(request(("indicatori", "notizie")), timedelta(seconds=30))
 
     assert [reading.source for reading in readings] == ["indicatori"]
     assert absent == [AbsentSource("notizie", "nessuna risposta entro 30 secondi")]
@@ -66,7 +68,7 @@ def test_a_silent_source_is_absent_with_the_wait_in_seconds(sources: FakeSources
 def test_the_sources_are_asked_together(sources: FakeSourcesAdapter) -> None:
     sources.late.update({"indicatori": 40, "notizie": 40})
 
-    readings, absent = compressed(sources).collect(uuid4(), PLANNED_AT, ("indicatori", "notizie"), MINUTE)
+    readings, absent = compressed(sources).collect(request(("indicatori", "notizie")), MINUTE)
 
     assert ([reading.source for reading in readings], absent) == (["indicatori", "notizie"], [])
 
@@ -76,7 +78,7 @@ def test_a_late_source_is_not_awaited(sources: FakeSourcesAdapter) -> None:
     finished = threading.Event()
 
     def collect() -> None:
-        compressed(sources).collect(uuid4(), PLANNED_AT, ("notizie",), MINUTE)
+        compressed(sources).collect(request(("notizie",)), MINUTE)
         finished.set()
 
     threading.Thread(target=collect, daemon=True).start()
@@ -87,11 +89,11 @@ def test_a_late_source_is_not_awaited(sources: FakeSourcesAdapter) -> None:
 def test_a_source_that_fails_is_absent_with_its_message(sources: FakeSourcesAdapter) -> None:
     sources.failing["notizie"] = FakeTransientError("limite di richieste superato")
 
-    _, absent = compressed(sources).collect(uuid4(), PLANNED_AT, ("notizie",), MINUTE)
+    _, absent = compressed(sources).collect(request(("notizie",)), MINUTE)
 
     assert absent == [AbsentSource("notizie", "limite di richieste superato")]
 
 
 def test_a_defect_of_a_source_is_not_hidden() -> None:
     with pytest.raises(ZeroDivisionError, match="notizie"):
-        compressed(BrokenSourceAdapter()).collect(uuid4(), PLANNED_AT, ("notizie",), MINUTE)
+        compressed(BrokenSourceAdapter()).collect(request(("notizie",)), MINUTE)

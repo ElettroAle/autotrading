@@ -105,6 +105,7 @@ from autotrading.application.cycles.ports import (
     FlowSnapshot,
     ScheduledFlow,
     SourceReading,
+    SourceRequest,
 )
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
@@ -998,19 +999,19 @@ class SourcesFromSources:
     recorded for the cycle and given to the agent with its weight (R1.3.2-R1.3.8, ADR 0042).
     """
 
-    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices) -> None:
-        self._directory = directory
+    def __init__(self, ports_of: CyclePortsOf, services: CycleServices) -> None:
         self._ports_of = ports_of
         self._services = services
 
-    def collect(self, flow_id: UUID, planned_at: datetime, source: str) -> object:
-        ports = self._ports_of(self._directory.tenant_of(flow_id))
-        configuration = flow_of_cycle(ports, flow_id).configuration
+    def collect(self, request: SourceRequest, source: str) -> object:
+        cycle_flow = _cycle_flow_of(request.snapshot.state)
+        ports = self._ports_of(cycle_flow.tenant_id)
+        configuration = cycle_flow.configuration
         selection = next((selected for selected in configuration.sources if selected.name == source), None)
         if selection is None:
             raise SourceUnavailableError(source)
         command = CollectSourceCommand(
-            CycleReference(flow_id, planned_at),
+            CycleReference(request.flow_id, request.planned_at),
             selection.name,
             selection.weight,
             selection.parameters,
@@ -1218,7 +1219,7 @@ def run_due_cycles(
     """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
     steps = CycleSteps(
         flow_state=FlowStateFromFlows(directory, ports_of),
-        sources=SourceCollector(SourcesFromSources(directory, ports_of, services)),
+        sources=SourceCollector(SourcesFromSources(ports_of, services)),
         context=ContextFromAgent(services.clock),
         agent=AgentFromAgent(ports_of, services),
         risk=RiskFromFlows(services.exchange_limits),

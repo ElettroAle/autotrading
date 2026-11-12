@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from autotrading.application.cycles.ports import FlowSnapshot, ScheduledFlow, SourceReading
+from autotrading.application.cycles.ports import FlowSnapshot, ScheduledFlow, SourceReading, SourceRequest
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
@@ -170,7 +170,8 @@ class FakeSourcesAdapter:
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
 
-    def collect(self, flow_id: UUID, planned_at: datetime, source: str) -> object:  # noqa: ARG002 - the signature of the port
+    def collect(self, request: SourceRequest, source: str) -> object:
+        flow_id = request.flow_id
         if source in self.silent:
             self.released.wait(LONGEST_HOLD)
         if source in self.late:
