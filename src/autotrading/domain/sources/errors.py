@@ -38,3 +38,12 @@ class InvalidNewsItemError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("notizia non valida")
+
+
+class InvalidPriceForecastError(DomainError):
+    """A forecast without the time zone of its instant or with a price that is not positive: a defect."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("previsione del prezzo non valida")
