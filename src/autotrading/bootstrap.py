@@ -72,6 +72,7 @@ from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlA
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.reconciliation_repository import SqlAlchemyReconciliationRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.running_cycle import SqlAlchemyRunningCycleAdapter
 from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchemySampleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.scheduling import (
@@ -112,6 +113,7 @@ from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
 from autotrading.application.cycles.ports import (
     ClockPort,
     CycleLauncherPort,
+    CycleRepositoryPort,
     FlowSnapshot,
     FlowSummary,
     RiskReview,
@@ -135,13 +137,20 @@ from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
     AutomaticPausePort,
+    ClosedPositionRepositoryPort,
     ExchangeLimitsPort,
     FlowAccount,
+    FlowOpeningsPort,
     FlowRepositoryPort,
     FlowTimingPort,
     MarketsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.reconcile_account import (
+    ReconcileAccountCommand,
+    ReconcileAccountUseCase,
+    ReconciliationOutcome,
+)
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
@@ -198,15 +207,17 @@ from autotrading.domain.agent.errors import (
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.cycles.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
+from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import CloseReason
-from autotrading.domain.flows.errors import ModelRequiredError
+from autotrading.domain.flows.errors import InvalidClosedPositionError, ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.risk_check import RiskState
@@ -214,10 +225,13 @@ from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
+from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.notification import Amount, Notification
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
-from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource, OrderStatus
+from autotrading.domain.orders.order import Order, OrderOrigin, OrderRequest, OrderSource, OrderStatus
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.sources.errors import (
@@ -255,6 +269,9 @@ PERCENT = Decimal("0.01")
 LOWEST_LEVERAGE = 1
 
 operations = logging.getLogger("autotrading.bootstrap")
+# The notifications show the values of Hyperliquid, settled in USDC, and an opening by its value in whole units.
+USDC = "USDC"
+WHOLE_UNIT = Decimal(1)
 
 
 class MissingConfigurationError(AutotradingError):
@@ -771,8 +788,18 @@ class WorkerUseCaseFactory:
         orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
         access = TradingAccessFromAccounts(accounts, self._opener)
         slippage = self._settings.slippage
+        flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
+        openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
+        closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
+        reconcile_account = ReconcileAccountUseCase(
+            flows,
+            AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity),
+            SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
+            SqlAlchemyReconciliationRepositoryAdapter(self._engine, tenant_id),
+            ClosedPositionsFromOpenings(flows, openings, closed_positions),
+        )
         return TenantCyclePorts(
-            flows=SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id),
+            flows=flows,
             pause=SqlAlchemyAutomaticPauseAdapter(self._engine, tenant_id),
             accounts=accounts,
             read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
@@ -780,6 +807,10 @@ class WorkerUseCaseFactory:
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
+            reconcile_account=reconcile_account,
+            openings=openings,
+            closed_positions=closed_positions,
+            notify=NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger),
         )
 
     def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
@@ -1052,6 +1083,10 @@ class TenantCyclePorts:
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
     execute_flow_orders: ExecuteFlowOrdersUseCase
+    reconcile_account: ReconcileAccountUseCase
+    openings: FlowOpeningsPort
+    closed_positions: ClosedPositionRepositoryPort
+    notify: NotifyUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -1146,8 +1181,43 @@ class FlowStateFromFlows:
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 
     def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
-        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
+        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1).
+
+        The account of the flow is reconciled first: what no flow explains is recorded once and notified (R1.6.2).
+        """
+        self._reconcile(flow_id)
         return self.read(flow_id).state
+
+    def _reconcile(self, flow_id: UUID) -> None:
+        ports = self._ports_of(self._directory.tenant_of(flow_id))
+        try:
+            outcome = ports.reconcile_account.execute(ReconcileAccountCommand(FlowId(flow_id)))
+        except FlowExchangeUnavailableError:
+            # The flows keep operating: the next cycle reads the account again (R1.6.2).
+            operations.warning("riconciliazione del conto non riuscita", extra={"flow_id": str(flow_id)})
+            return
+        for notification in _reconciliation_notifications(ports, outcome):
+            ports.notify.execute(notification)
+
+
+def _reconciliation_notifications(ports: TenantCyclePorts, outcome: ReconciliationOutcome) -> list[Notification]:
+    flows = {flow.id: flow.name.value for flow in ports.flows.list()}
+    closed = [
+        Notification.position_closed(flows[closing.flow_id], closing.asset, Amount(closing.realized_pnl, USDC))
+        for closing in outcome.closed_outside
+        if closing.flow_id in flows
+    ]
+    return closed + [_unattributable_notification(ports, item) for item in outcome.new_items]
+
+
+def _unattributable_notification(ports: TenantCyclePorts, item: UnattributableItem) -> Notification:
+    account = find_account(ports.accounts, AccountId(item.account_id)).name.value
+    asset = item.asset or ""
+    if item.kind is UnattributableKind.POSITION:
+        return Notification.unattributable_position(account, asset)
+    if item.kind is UnattributableKind.FILL:
+        return Notification.unattributable_fill(account, asset)
+    return Notification.unattributable_movement(account, Amount(item.amount, USDC))
 
 
 PROVIDER_ERRORS = (ModelKeyRejectedError, ModelCreditExhaustedError, ModelKeyMissingError, ProviderKeyNotOpenedError)
@@ -1169,7 +1239,8 @@ class FlowPauseFromFlows:
             account_id = flow_of_cycle(ports, flow_id).account_id
         provider = error.provider.value if isinstance(error, PROVIDER_ERRORS) else None
         command = PauseAffectedFlowsCommand(flow_id, str(error), account_id=account_id, provider=provider)
-        PauseAffectedFlowsUseCase(ports.flows, ports.pause).execute(command)
+        for paused in PauseAffectedFlowsUseCase(ports.flows, ports.pause).execute(command):
+            ports.notify.execute(Notification.flow_paused(paused.name.value, str(error)))
 
 
 class SourcesFromSources:
@@ -1377,7 +1448,42 @@ class OrdersFromOrders:
         command = ExecuteFlowOrdersCommand(
             cycle_flow.flow.account_id, flow_id, planned_at, tuple(_flow_order_of(order.outcome) for order in approved)
         )
-        return self._ports_of(cycle_flow.tenant_id).execute_flow_orders.execute(command)
+        ports = self._ports_of(cycle_flow.tenant_id)
+        sent = ports.execute_flow_orders.execute(command)
+        for order in sent:
+            _follow_order(ports, cycle_flow.flow, planned_at, order)
+        return sent
+
+
+def _follow_order(ports: TenantCyclePorts, flow: Flow, planned_at: datetime, order: Order) -> None:
+    """What an order of the cycle leaves behind: its notification (R1.8.2) and, for a closing, the history (R1.7.2)."""
+    if order.rejection is not None:
+        ports.notify.execute(Notification.order_rejected(flow.name.value, order.rejection.exchange_message))
+        return
+    if order.execution is None:
+        return
+    if order.request.market_order.reduce_only:
+        _follow_closing(ports, flow, planned_at, order.request.market_order.coin, order.execution)
+        return
+    ports.notify.execute(_opening_notification(flow, order.request, order.execution))
+
+
+def _opening_notification(flow: Flow, request: OrderRequest, execution: Execution) -> Notification:
+    market_order = request.market_order
+    value = Amount((execution.filled_size * execution.average_price).quantize(WHOLE_UNIT), USDC)
+    return Notification.position_opened(
+        flow.name.value, market_order.coin, market_order.direction.value, request.leverage, value
+    )
+
+
+def _follow_closing(
+    ports: TenantCyclePorts, flow: Flow, planned_at: datetime, asset: str, execution: Execution
+) -> None:
+    opening = ports.openings.last_opening(flow.id, asset)
+    if opening is not None:
+        fill = ClosingFill(execution.average_price, execution.executed_at, execution.fee)
+        ports.closed_positions.add(opening.closed(flow, asset, fill, CloseReason.AGENT, cycle=planned_at))
+    ports.notify.execute(Notification.position_closed(flow.name.value, asset, Amount(execution.realized_pnl, USDC)))
 
 
 def _flow_order_of(outcome: ApprovedOpening | ApprovedClose) -> FlowOrder:
@@ -1474,6 +1580,61 @@ def _scalar_of(value: object) -> object:
     return value
 
 
+class ClosedPositionsFromOpenings:
+    """Bridges a position the reconciliation finds closed outside the platform to the history of the flow (ADR 0056).
+
+    The history shows a position with both its ends: the opening is the last order of the flow on the asset; a
+    position the flow never opened has no history to enter.
+    """
+
+    def __init__(
+        self, flows: FlowRepositoryPort, openings: FlowOpeningsPort, closed_positions: ClosedPositionRepositoryPort
+    ) -> None:
+        self._flows = flows
+        self._openings = openings
+        self._closed_positions = closed_positions
+
+    def add_closed_outside(self, closing: OutsideClosing) -> None:
+        flow = self._flows.get(closing.flow_id)
+        opening = self._openings.last_opening(flow.id, closing.asset)
+        if opening is None:
+            operations.warning(
+                "posizione chiusa fuori senza apertura del flusso",
+                extra={"flow_id": str(flow.id.value), "asset": closing.asset},
+            )
+            return
+        try:
+            closed = opening.closed_outside(flow, closing)
+        except InvalidClosedPositionError:
+            # A loss beyond the value the position held implies no price: the case stays among the unattributable.
+            operations.warning(
+                "esito della chiusura fuori non rappresentabile",
+                extra={"flow_id": str(flow.id.value), "asset": closing.asset},
+            )
+            return
+        self._closed_positions.add(closed)
+
+
+class NotifiedCycles:
+    """Records the cycles where the worker keeps them and notifies a failed one to the chat of its tenant (R1.8.2)."""
+
+    def __init__(self, cycles: CycleRepositoryPort, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+        self._cycles = cycles
+        self._directory = directory
+        self._ports_of = ports_of
+
+    def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
+        return self._cycles.claim(flow_id, planned_at)
+
+    def record(self, record: CycleRecord) -> None:
+        self._cycles.record(record)
+        if record.outcome is not CycleOutcome.FAILED or record.failure is None:
+            return
+        ports = self._ports_of(self._directory.tenant_of(record.flow_id))
+        flow = flow_of_cycle(ports, record.flow_id)
+        ports.notify.execute(Notification.cycle_failed(flow.name.value, record.failure.message))
+
+
 class CyclesOfTenants:
     """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
 
@@ -1527,7 +1688,7 @@ def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, servi
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
     directory = FlowDirectory()
     guards = CycleGuards(
-        cycles=CyclesOfTenants(engine, directory),
+        cycles=NotifiedCycles(CyclesOfTenants(engine, directory), directory, ports_of),
         lock=SqlAlchemyFlowLockAdapter(engine),
         pause=FlowPauseFromFlows(directory, ports_of),
         clock=services.clock,

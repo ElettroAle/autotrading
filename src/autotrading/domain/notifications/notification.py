@@ -54,5 +54,9 @@ class Notification:
         return cls(account, f"posizione non attribuibile su {asset}")
 
     @classmethod
+    def unattributable_fill(cls, account: str, asset: str) -> Notification:
+        return cls(account, f"esecuzione non attribuibile su {asset}")
+
+    @classmethod
     def unattributable_movement(cls, account: str, amount: Amount) -> Notification:
         return cls(account, f"movimento non attribuibile di {amount}")

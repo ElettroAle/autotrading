@@ -124,7 +124,14 @@ def _closed_outside(
         if flow_id in reading.open_assets
         for asset in sorted(assets - reading.open_assets[flow_id])
         if not any(fill.asset == asset and _flow_of(fill, orders) == flow_id for fill in fills)
+        and not _closed_by_manual_command(asset, fills, orders)
     )
+
+
+def _closed_by_manual_command(asset: str, fills: tuple[AccountFill, ...], orders: PlatformOrders) -> bool:
+    """Closed only by orders the platform sent for no flow: the manual command recorded the closing already."""
+    of_asset = [fill for fill in fills if fill.asset == asset]
+    return bool(of_asset) and all(_of_platform(fill, orders) and _flow_of(fill, orders) is None for fill in of_asset)
 
 
 def _outside_closing(
