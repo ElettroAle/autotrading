@@ -64,3 +64,12 @@ class InvalidPriceForecastError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("previsione del prezzo non valida")
+
+
+class InvalidSourceSampleError(DomainError):
+    """A collected value with an instant without its time zone: a defect of the source that read it."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("valore raccolto non valido")

@@ -1,11 +1,14 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
+from uuid import UUID
 
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import PriceForecast, PricePoint
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 
 
 class SentimentPort(Protocol):
@@ -51,3 +54,27 @@ class ForecastRepositoryPort(Protocol):
     def record_actual(self, forecast: PriceForecast) -> None:
         """Saves the actual price of a forecast already added."""
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class ReadSourceCommand:
+    """One reading of a source: for an asset, or for the whole market when asset is None (R1.3.2)."""
+
+    flow_id: UUID
+    asset: str | None
+    settings: Mapping[str, int]
+    now: datetime
+
+
+class SourceReaderPort(Protocol):
+    """Reads one source of the catalog with the parameters of the flow (R1.3.2)."""
+
+    def execute(self, command: ReadSourceCommand) -> Sequence[SourceValue]:
+        """The values read, each with its reference instant. Raises a typed error when the source has no data."""
+        ...
+
+
+class SampleRepositoryPort(Protocol):
+    """Bound to the tenant of the flow: the values its cycles collected (R1.3.8)."""
+
+    def add(self, samples: Sequence[SourceSample]) -> None: ...
