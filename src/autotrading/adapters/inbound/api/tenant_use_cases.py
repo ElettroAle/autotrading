@@ -25,15 +25,25 @@ from autotrading.application.agent.ports import (
 from autotrading.application.agent.register_provider_key import ProviderKeyServices, RegisterProviderKeyUseCase
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
+from autotrading.application.cycles.list_cycles import ListCyclesUseCase
+from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort
+from autotrading.application.cycles.read_cycle import ReadCycleUseCase
+from autotrading.application.cycles.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
+from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
-from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort, PlatformOrdersPort
+from autotrading.application.flows.ports import (
+    AccountActivityPort,
+    ClosedPositionRepositoryPort,
+    FlowRepositoryPort,
+    PlatformOrdersPort,
+)
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
@@ -73,6 +83,9 @@ class TenantPorts:
     link_codes: LinkCodeRepositoryPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
+    closed_positions: ClosedPositionRepositoryPort
+    cycle_history: CycleHistoryPort
+    flow_directory: FlowDirectoryPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +119,10 @@ class TenantUseCases:
     compare_flow_versions: CompareFlowVersionsUseCase
     change_flow_status: ChangeFlowStatusUseCase
     archive_flow: ArchiveFlowUseCase
+    list_closed_positions: ListClosedPositionsUseCase
+    list_cycles: ListCyclesUseCase
+    read_cycle: ReadCycleUseCase
+    read_flow_cost: ReadFlowCostUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -140,4 +157,8 @@ class TenantUseCases:
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
             change_flow_status=ChangeFlowStatusUseCase(ports.flows),
             archive_flow=ArchiveFlowUseCase(ports.flows),
+            list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
+            list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
+            read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
+            read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
         )

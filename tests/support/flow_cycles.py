@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.adapters.outbound.sqlalchemy.cycle_repository import TenantScheduledFlow
+from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.cycles.ports import ScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
@@ -128,6 +128,7 @@ class FlowCycles:
 
     def services(self) -> CycleServices:
         return CycleServices(
+            environment="dev",
             clock=self.clock,
             catalog=self.platform.model_catalog,
             provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),

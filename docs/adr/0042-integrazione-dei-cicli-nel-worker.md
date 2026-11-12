@@ -2,7 +2,7 @@
 
 - Stato: accettata (12 novembre 2026)
 - Requisiti: R1.2.1-R1.2.5, R1.3.5-R1.3.8, R1.4.3, R1.5.5, R1.8.2 (Feature F1.2)
-- Collegate: ADR 0041 (pianificazione ed esecuzione del ciclo), 0043 (previsione), 0048 e 0049 (fonti e valori
+- Collegate: ADR 0041 (pianificazione ed esecuzione del ciclo), 0046 (registrazione dei cicli), 0043 (previsione), 0048 e 0049 (fonti e valori
   raccolti), 0050 (esecuzione delle decisioni del flusso), 0007 (chiave privata solo nel worker)
 
 ## Contesto
@@ -25,10 +25,14 @@ conti e delle chiavi dei fornitori IA (ADR 0007).
   del database (`flows_follow_status`) a ogni passaggio allo stato attivo, e lo stesso trigger cancella
   `pause_reason` quando il flusso non è più in pausa. L'ancora non dipende da chi cambia lo stato (API, pausa
   automatica, ripresa): lo stato e la sua conseguenza restano nella stessa transazione.
-- **Un ciclo si esegue una volta.** La tabella `cycles` ha chiave primaria (flusso, istante pianificato): la
-  rivendicazione è un `INSERT ... ON CONFLICT DO NOTHING`, e solo chi inserisce esegue. La riga riceve poi esito,
-  passi, fonti assenti, ritardo ed errore. Row level security per tenant e chiave esterna composta verso
-  `flows (id, tenant_id)`.
+- **Un ciclo si esegue una volta.** La tabella `cycles` e il suo adapter sono quelli di ADR 0046: la
+  rivendicazione inserisce la riga (flusso, istante pianificato) e solo chi la inserisce esegue. Il worker usa
+  l'adapter legato al tenant del flusso, scelto dal `FlowDirectory` (`CyclesOfTenants`). La migrazione `0014`
+  aggiunge solo ancora, motivo della pausa, policy del pianificatore e tabella `forecasts`.
+- **Registro del ciclo.** `CycleJournalFromContexts` descrive per il registro ciò che ogni passo ha prodotto:
+  utente, flusso, conto, ambiente, versione, fornitore e modello, pesi delle fonti e stato del flusso; dati
+  raccolti; messaggi inviati all'agente; risposta integrale e decisioni; esito del rischio per ogni decisione;
+  ordini con il loro esito; stato del flusso a fine ciclo, riletto dall'exchange; token e costo della chiamata.
 - **Un ciclo per flusso alla volta.** `pg_try_advisory_lock` sulla chiave del flusso (i primi 8 byte del suo
   UUID, con segno), tenuto su una connessione dedicata per tutta la durata del ciclo; se il lock è occupato il
   ciclo si registra come saltato.

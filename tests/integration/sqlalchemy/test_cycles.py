@@ -5,22 +5,18 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import Engine, RowMapping, func, select, update
-from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
-from autotrading.adapters.outbound.sqlalchemy.cycle_repository import (
-    SqlAlchemyCycleRepositoryAdapter,
+from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.scheduling import (
     SqlAlchemyFlowLockAdapter,
     SqlAlchemyScheduledFlowsAdapter,
 )
-from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tables import cycles, flows
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
-from autotrading.domain.cycles.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
-from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
@@ -121,69 +117,6 @@ def test_without_the_scheduler_a_transaction_sees_no_flow(database: Engine) -> N
         seen = connection.execute(select(flows.c.id)).scalars().all()
 
     assert flow.id.value not in seen
-
-
-def test_a_planned_cycle_is_claimed_once(database: Engine) -> None:
-    flow = new_flow(database)
-    repository = SqlAlchemyCycleRepositoryAdapter(database, lambda _: flow.tenant_id)
-
-    first = repository.claim(flow.id.value, PLANNED)
-    second = repository.claim(flow.id.value, PLANNED)
-
-    assert (first, second) == (True, False)
-    assert repository.claim(flow.id.value, PLANNED + timedelta(minutes=15))
-
-
-def test_a_recorded_cycle_keeps_its_steps_absent_sources_and_failure(database: Engine) -> None:
-    flow = new_flow(database)
-    repository = SqlAlchemyCycleRepositoryAdapter(database, lambda _: flow.tenant_id)
-    repository.claim(flow.id.value, PLANNED)
-    record = CycleRecord(
-        flow.id.value,
-        PLANNED,
-        CycleOutcome.FAILED,
-        started_at=PLANNED + timedelta(seconds=90),
-        delay_seconds=90,
-        steps=(CycleStep.READ_FLOW_STATE, CycleStep.COLLECT_SOURCES),
-        absent_sources=(AbsentSource("notizie", "fonte non raggiungibile: notizie"),),
-        failure=CycleFailure(CycleStep.COMPOSE_CONTEXT, "ExampleError", "timeout"),
-    )
-
-    repository.record(record)
-
-    [row] = cycle_rows(database, flow.tenant_id)
-    assert row["outcome"] == "failed"
-    assert row["delay_seconds"] == 90
-    assert row["steps"] == ["read_flow_state", "collect_sources"]
-    assert row["absent_sources"] == [{"source": "notizie", "reason": "fonte non raggiungibile: notizie"}]
-    assert row["failure"] == {"step": "compose_context", "error_type": "ExampleError", "message": "timeout"}
-    assert row["recorded_at"] is not None
-
-
-def test_a_skipped_cycle_is_recorded_without_failure(database: Engine) -> None:
-    flow = new_flow(database)
-    repository = SqlAlchemyCycleRepositoryAdapter(database, lambda _: flow.tenant_id)
-    repository.claim(flow.id.value, PLANNED)
-
-    repository.record(CycleRecord.skipped(flow.id.value, PLANNED))
-
-    [row] = cycle_rows(database, flow.tenant_id)
-    assert (row["outcome"], row["failure"], row["steps"]) == ("skipped", None, [])
-
-
-def test_the_cycles_of_a_tenant_are_invisible_to_the_others(database: Engine) -> None:
-    flow, other = new_flow(database), new_flow(database)
-    SqlAlchemyCycleRepositoryAdapter(database, lambda _: flow.tenant_id).claim(flow.id.value, PLANNED)
-
-    assert cycle_rows(database, other.tenant_id) == []
-    assert cycle_rows(database, None) == []
-
-
-def test_a_cycle_cannot_be_claimed_in_another_tenant(database: Engine) -> None:
-    flow, other = new_flow(database), new_flow(database)
-
-    with pytest.raises(IntegrityError):
-        SqlAlchemyCycleRepositoryAdapter(database, lambda _: other.tenant_id).claim(flow.id.value, PLANNED)
 
 
 def test_a_flow_held_by_a_cycle_is_not_held_again(database: Engine) -> None:

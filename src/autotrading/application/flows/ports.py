@@ -6,6 +6,7 @@ from uuid import UUID
 
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, PlatformOrders
+from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
@@ -141,3 +142,13 @@ class ClosedPositionsPort(Protocol):
     """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
 
     def add_closed_outside(self, closing: OutsideClosing) -> None: ...
+
+
+class ClosedPositionRepositoryPort(Protocol):
+    """Bound to the tenant of the request."""
+
+    def add(self, position: ClosedPosition) -> None:
+        """Raises CrossTenantAccessError for a position of another tenant."""
+        ...
+
+    def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...
