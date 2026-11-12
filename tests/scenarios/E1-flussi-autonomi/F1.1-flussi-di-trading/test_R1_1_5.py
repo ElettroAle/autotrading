@@ -52,7 +52,7 @@ def cycle_running(platform: Platform, lifecycle: Lifecycle, name: str) -> None:
 
 
 @given(quoted('che il flusso "{name}" è fermo'))
-def flow_stopped(platform: Platform, lifecycle: Lifecycle, name: str) -> None:
+def flow_brought_to_stop(platform: Platform, lifecycle: Lifecycle, name: str) -> None:
     stop(platform, lifecycle, lifecycle.user, name)
     assert flow_named(platform, lifecycle.user, name).status == FlowStatus.STOPPED
 

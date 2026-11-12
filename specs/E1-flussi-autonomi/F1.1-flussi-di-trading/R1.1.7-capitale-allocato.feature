@@ -38,7 +38,6 @@ Funzionalità: R1.1.7 Variazione del capitale allocato
     Allora la variazione è rifiutata con il motivo "capitale allocato sotto il margine impegnato: 150 USDC"
     E il flusso "alfa" ha capitale allocato 400 USDC
 
-  @wip
   Scenario: La variazione ha effetto dal ciclo successivo
     Dato che un ciclo del flusso "alfa" è in corso con capitale allocato 400 USDC
     Quando "anna" porta il capitale allocato del flusso "alfa" a 700 USDC

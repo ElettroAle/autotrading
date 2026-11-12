@@ -39,7 +39,6 @@ Funzionalità: R1.1.3 Modifica versionata della configurazione
     Allora la modifica è rifiutata con il motivo "intervallo di ciclo fuori da 1-1440 minuti"
     E il flusso "alfa" resta alla versione di configurazione 1
 
-  @wip
   Scenario: Non si toglie un asset con posizione aperta
     Dato che il flusso "alfa" ha una posizione aperta su "ETH"
     Quando "anna" modifica gli asset del flusso "alfa" in "BTC"

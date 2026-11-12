@@ -167,7 +167,7 @@ class TenantUseCases:
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
-            modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks),
+            modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.flow_positions),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
             change_flow_status=ChangeFlowStatusUseCase(ports.flows),

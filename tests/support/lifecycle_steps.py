@@ -148,6 +148,17 @@ def flow_archived(platform: Platform, lifecycle: Lifecycle, name: str) -> None:
     put_in_status(platform, lifecycle.user, name, FlowStatus.ARCHIVED)
 
 
+@given(quoted('che il flusso "{name}" è fermo'))
+def flow_stopped(platform: Platform, lifecycle: Lifecycle, name: str) -> None:
+    assert flow_named(platform, lifecycle.user, name).status is FlowStatus.STOPPED
+
+
+@given(quoted('che il flusso "{name}" ha una posizione aperta su "{asset}"'))
+def flow_holds_position(platform: Platform, lifecycle: Lifecycle, name: str, asset: str) -> None:
+    assert asset in flow_named(platform, lifecycle.user, name).configuration.assets
+    hold_position(platform, lifecycle.user, "test-1", asset)
+
+
 @given(quoted('che il flusso "{name}" è nello stato "{status}"'))
 def flow_brought_to_status(platform: Platform, lifecycle: Lifecycle, name: str, status: str) -> None:
     put_in_status(platform, lifecycle.user, name, FlowStatus(status))

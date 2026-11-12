@@ -70,3 +70,13 @@ class FlowVersionNotFoundError(ApplicationError):
     def __init__(self, version: int) -> None:
         super().__init__(f"versione di configurazione non trovata: {version}")
         self.version = version
+
+
+class AssetWithOpenPositionError(ApplicationError):
+    """The flow would leave a position it no longer follows: it is closed first, then the asset removed (R1.1.3)."""
+
+    status_code = 409
+
+    def __init__(self, assets: tuple[str, ...]) -> None:
+        super().__init__("posizione aperta sull'asset da togliere: " + ", ".join(assets))
+        self.assets = assets
