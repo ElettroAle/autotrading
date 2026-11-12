@@ -135,6 +135,7 @@ from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
     FlowLedgerIncompleteError,
+    FlowPositionMismatchError,
     InvalidFlowSettingError,
 )
 from autotrading.application.flows.list_flows import ListFlowsUseCase
@@ -1239,8 +1240,16 @@ class FlowStateFromFlows:
         self._ports_of = ports_of
 
     def read(self, flow_id: UUID) -> FlowSnapshot:
-        """The account of the flow is reconciled first, so the ledger holds every execution the state counts."""
-        self._reconcile(flow_id)
+        """The account of the flow is reconciled first, so the ledger holds every execution the state counts.
+
+        A flow whose position on the exchange is not the one its ledger expects sends no order: the cycle stops and
+        the flow pauses with the reason (Bug 155, ADR 0064). Without a reconciliation the ledger may lag behind the
+        exchange, so the comparison waits for the next cycle.
+        """
+        reconciled = self._reconcile(flow_id)
+        return self._snapshot(flow_id, compared=reconciled)
+
+    def _snapshot(self, flow_id: UUID, *, compared: bool) -> FlowSnapshot:
         tenant_id = self._directory.tenant_of(flow_id)
         ports = self._ports_of(tenant_id)
         flow = flow_of_cycle(ports, flow_id)
@@ -1250,6 +1259,9 @@ class FlowStateFromFlows:
         except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
             raise FlowCredentialsRejectedError(account.name.value) from error
         attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
+        mismatch = attributed.position_mismatch() if compared else None
+        if mismatch is not None:
+            raise FlowPositionMismatchError(mismatch)
         cycle_flow = CycleFlow(
             tenant_id,
             flow,
@@ -1272,9 +1284,10 @@ class FlowStateFromFlows:
 
     def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
         """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
-        return self.read(flow_id).state
+        self._reconcile(flow_id)
+        return self._snapshot(flow_id, compared=False).state
 
-    def _reconcile(self, flow_id: UUID) -> None:
+    def _reconcile(self, flow_id: UUID) -> bool:
         """What no flow explains is recorded once and notified (R1.6.2); the new executions enter the ledger."""
         ports = self._ports_of(self._directory.tenant_of(flow_id))
         try:
@@ -1282,9 +1295,10 @@ class FlowStateFromFlows:
         except FlowExchangeUnavailableError:
             # The flows keep operating: the next cycle reads the account again (R1.6.2).
             operations.warning("riconciliazione del conto non riuscita", extra={"flow_id": str(flow_id)})
-            return
+            return False
         for notification in _reconciliation_notifications(ports, outcome):
             ports.notify.execute(notification)
+        return True
 
 
 def _reconciliation_notifications(ports: TenantCyclePorts, outcome: ReconciliationOutcome) -> list[Notification]:

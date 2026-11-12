@@ -47,6 +47,9 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   fine di ogni ciclo, leggendo dall'exchange solo ciò che è nuovo; il ciclo legge i totali, mai lo storico. Se
   l'exchange non conserva più tutto ciò che è avvenuto dall'ultima lettura, tutti i flussi del conto vanno in pausa
   con il motivo "registro delle esecuzioni incompleto" (ADR 0063).
+- All'inizio del ciclo, dopo la riconciliazione, una posizione del conto su un asset del flusso diversa da quella
+  attesa dal registro ferma il ciclo prima di ogni ordine e mette in pausa il flusso con il motivo "posizione X
+  diversa da quella del flusso: attesa A, sul conto B" (ADR 0064).
 - Stati e transizioni sono regole del domain: avvia da fermo, pausa da attivo, riprendi da in pausa,
   archivia solo da fermo; un flusso archiviato non si avvia e non si modifica (ADR 0036).
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.

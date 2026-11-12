@@ -18,6 +18,7 @@ class FakeActivityReaderAdapter:
         self.funding: dict[str, list[FundingPayment]] = {}
         self.complete = True
         self.reachable = True
+        self.executions_reachable = True
         self.readings: list[tuple[str, datetime | None]] = []
 
     def activity(self, address: str) -> AccountActivity:
@@ -26,7 +27,7 @@ class FakeActivityReaderAdapter:
         return self.activities.get(address, an_activity())
 
     def since(self, address: str, since: datetime | None) -> ExecutionsWindow:
-        if not self.reachable:
+        if not (self.reachable and self.executions_reachable):
             raise FlowExchangeUnavailableError
         self.readings.append((address, since))
         return ExecutionsWindow(
