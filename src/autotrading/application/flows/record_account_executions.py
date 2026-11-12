@@ -11,9 +11,9 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.flows.ledger import AccountLedger, LedgerEntry, LedgerKeys
 
-# The exchange may publish an execution a moment after a later one: the window starts a little before the cursor,
-# and what is recorded already is read once.
-OVERLAP = timedelta(minutes=1)
+# The exchange may publish an execution or a funding payment after a later one, and funding is paid at the turn of
+# every hour: the window starts an hour before the cursor, and what is recorded already is read once (ADR 0076).
+OVERLAP = timedelta(hours=1)
 
 
 @dataclass(frozen=True, slots=True)
