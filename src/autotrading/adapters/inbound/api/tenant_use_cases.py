@@ -28,6 +28,10 @@ from autotrading.application.agent.remove_provider_key import RemoveProviderKeyU
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
+from autotrading.application.cycles.list_cycles import ListCyclesUseCase
+from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort
+from autotrading.application.cycles.read_cycle import ReadCycleUseCase
+from autotrading.application.cycles.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
@@ -38,6 +42,14 @@ from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import FlowPositionsPort, FlowRepositoryPort, RunningCyclePort
 from autotrading.application.flows.stop_flow import StopFlowUseCase
+from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
+from autotrading.application.flows.ports import (
+    AccountActivityPort,
+    ClosedPositionRepositoryPort,
+    FlowRepositoryPort,
+    PlatformOrdersPort,
+)
+from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
@@ -74,9 +86,14 @@ class TenantPorts:
     flow_positions: FlowPositionsPort
     running_cycles: RunningCyclePort
     account_flows: AccountFlowsPort
+    account_activity: AccountActivityPort
+    platform_orders: PlatformOrdersPort
     link_codes: LinkCodeRepositoryPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
+    closed_positions: ClosedPositionRepositoryPort
+    cycle_history: CycleHistoryPort
+    flow_directory: FlowDirectoryPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +118,7 @@ class TenantUseCases:
     create_flow: CreateFlowUseCase
     list_flows: ListFlowsUseCase
     read_free_capital: ReadFreeCapitalUseCase
+    read_flow_state: ReadFlowStateUseCase
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
@@ -112,6 +130,10 @@ class TenantUseCases:
     stop_flow: StopFlowUseCase
     change_allocated_capital: ChangeAllocatedCapitalUseCase
     list_capital_changes: ListCapitalChangesUseCase
+    list_closed_positions: ListClosedPositionsUseCase
+    list_cycles: ListCyclesUseCase
+    read_cycle: ReadCycleUseCase
+    read_flow_cost: ReadFlowCostUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -137,6 +159,7 @@ class TenantUseCases:
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
+            read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.platform_orders),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
@@ -150,4 +173,8 @@ class TenantUseCases:
                 ports.flows, ports.flow_checks.accounts, ports.flow_positions, ports.clock
             ),
             list_capital_changes=ListCapitalChangesUseCase(ports.flows),
+            list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
+            list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
+            read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
+            read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
         )

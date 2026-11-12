@@ -40,6 +40,7 @@ COMMANDS_TO = {
 
 class Lifecycle:
     """The user of the scenario, the refusal of what they asked if any, and the outcome of a stop."""
+    """The user of the scenario and the refusal of what they asked, if any."""
 
     def __init__(self) -> None:
         self.user = ""

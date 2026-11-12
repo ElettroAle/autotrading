@@ -1,5 +1,5 @@
 # language: it
-@R1.6.1 @wip
+@R1.6.1
 Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
   Come utente
   Voglio che lo stato di ogni flusso sia ricavato da ciò che l'exchange mostra

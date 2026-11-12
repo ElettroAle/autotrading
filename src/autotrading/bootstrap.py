@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import Protocol
 from uuid import UUID
 
 import httpx
@@ -17,6 +18,7 @@ from autotrading.adapters.inbound.api.app import Authentication, HealthReport, c
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings, OidcSigningKeys
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases, create_worker_api
+from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
 from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
@@ -27,6 +29,7 @@ from autotrading.adapters.outbound.httpx.telegram import (
     telegram_client,
 )
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
+from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
@@ -38,6 +41,10 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
+    SqlAlchemyClosedPositionRepositoryAdapter,
+)
+from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
@@ -46,6 +53,7 @@ from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
 )
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.running_cycle import SqlAlchemyRunningCycleAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
@@ -76,6 +84,7 @@ from autotrading.application.flows.errors import (
 )
 from autotrading.application.flows.ports import FlowAccount, FlowRepositoryPort, MarketsPort
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -110,6 +119,7 @@ from autotrading.domain.agent.errors import (
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -207,6 +217,16 @@ class ProviderKeyUsageFromFlows:
             for flow in self._flows.list()
             if flow.status.not_stopped and flow.model_provider == provider.value
         ]
+
+
+class FlowDirectoryFromFlows:
+    """Bridges the flows context to the cycles context (ADR 0046): the flows of the tenant are those it can consult."""
+
+    def __init__(self, flows: FlowRepositoryPort) -> None:
+        self._flows = flows
+
+    def exists(self, flow_id: UUID) -> bool:
+        return any(flow.id.value == flow_id for flow in self._flows.list())
 
 
 class FlowAccountsFromAccounts:
@@ -358,6 +378,7 @@ class WorkerExchanges:
 
     accounts: Mapping[str, ExchangePort]
     orders: Mapping[str, OrderExchangePort]
+    activity: Mapping[str, ActivityReaderPort]
 
 
 class TradingAccessFromAccounts:
@@ -378,6 +399,37 @@ class TradingAccessFromAccounts:
             raise OrderAccountNotFoundError from error
         credentials = self._opener.open(account)
         return TradingAccess(account.exchange.value, credentials.account_address, credentials.secret_key)
+
+
+class ActivityReaderPort(Protocol):
+    """What an exchange shows of an address: the adapter of the exchange behind the activity of the flows."""
+
+    def activity(self, address: str) -> AccountActivity: ...
+
+
+class AccountActivityFromAccounts:
+    """Bridges the accounts context to the flows context in the worker (ADR 0044).
+
+    The account is looked up for the tenant under row level security, then opened only to learn its address: the
+    readings of the exchange are public and sign nothing.
+    """
+
+    def __init__(
+        self, accounts: AccountRepositoryPort, opener: CredentialOpenerPort, readers: Mapping[str, ActivityReaderPort]
+    ) -> None:
+        self._accounts = accounts
+        self._opener = opener
+        self._readers = readers
+
+    def activity(self, account_id: UUID) -> AccountActivity:
+        try:
+            account = find_account(self._accounts, AccountId(account_id))
+        except AccountNotFoundError as error:
+            raise FlowAccountNotFoundError from error
+        reader = self._readers.get(account.exchange.value)
+        if reader is None:
+            raise FlowExchangeUnavailableError
+        return reader.activity(self._opener.open(account).account_address)
 
 
 class AccountReadingFromAccounts:
@@ -513,9 +565,14 @@ class TenantUseCaseFactory:
             account_flows=AccountFlowsFromFlows(
                 flows, StopFlowUseCase(flows, running_cycles, flow_positions), ArchiveFlowUseCase(flows)
             ),
+            account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
+            platform_orders=SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
             clock=now,
+            closed_positions=SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id),
+            cycle_history=SqlAlchemyCycleRepositoryAdapter(self._engine, tenant_id),
+            flow_directory=FlowDirectoryFromFlows(flows),
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -556,6 +613,9 @@ class WorkerUseCaseFactory:
                 now,
             ),
             notify=NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger),
+            read_account_activity=ReadAccountActivityUseCase(
+                AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
+            ),
         )
 
     def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
@@ -601,7 +661,9 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     opener = SodiumCredentialOpenerAdapter(
         {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     )
-    exchanges = WorkerExchanges(exchanges_for(environment), order_exchanges_for(environment))
+    exchanges = WorkerExchanges(
+        exchanges_for(environment), order_exchanges_for(environment), activity_readers_for(environment)
+    )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)
     token = _optional_secret(configuration, TELEGRAM_BOT_SETTING)
@@ -633,6 +695,10 @@ def markets_for(environment: str) -> dict[str, HyperliquidMarketsAdapter]:
 
 def order_exchanges_for(environment: str) -> dict[str, HyperliquidOrderExchangeAdapter]:
     return {HYPERLIQUID: HyperliquidOrderExchangeAdapter.for_network(testnet=environment == "dev")}
+
+
+def activity_readers_for(environment: str) -> dict[str, HyperliquidAccountActivityAdapter]:
+    return {HYPERLIQUID: HyperliquidAccountActivityAdapter.for_network(testnet=environment == "dev")}
 
 
 def slippage_from(configuration: Mapping[str, str]) -> Slippage:

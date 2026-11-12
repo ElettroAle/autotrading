@@ -7,6 +7,7 @@ from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, sel
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_capital_changes, flow_versions, flows
+from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowNameInUseError,

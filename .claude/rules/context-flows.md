@@ -56,8 +56,13 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `ModelSettingsPort`, `SourceSettingsPort`: modello e fonti con i parametri risolti, dai contesti `agent` e
   `sources`; un rifiuto arriva come `InvalidFlowSettingError` con il motivo del contesto che lo dà.
 - `MarketsPort`: asset negoziabili ora sull'exchange, per nome dell'exchange.
+- `AccountActivityPort`: ciò che l'exchange mostra del conto ora (posizioni con margine, esecuzioni con `cloid`,
+  movimenti del saldo), letto dal `worker` e chiesto dall'API via HTTP interno (ADR 0044).
+- `PlatformOrdersPort`: i `cloid` degli ordini registrati sul conto, con il flusso che li ha inviati (contesto `orders`).
+- `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).
+- `ClosedPositionsPort`: storico delle posizioni chiuse dei flussi (R1.7.2).
 - I bridge verso gli altri contesti vivono solo in `bootstrap.py`; `flows` fornisce ad `agent` i flussi che
   usano una chiave (`ProviderKeyUsageFromFlows`).
 
-Repository delle variazioni di capitale, delle posizioni chiuse e dei non attribuibili, e invio degli ordini
-attraverso `orders`, nascono con i requisiti che li usano.
+Repository delle variazioni di capitale e invio degli ordini attraverso `orders` nascono con i requisiti che li
+usano.

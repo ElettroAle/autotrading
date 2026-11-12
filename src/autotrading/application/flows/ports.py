@@ -5,6 +5,9 @@ from typing import Protocol
 from uuid import UUID
 
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.account_activity import AccountActivity
+from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, PlatformOrders
+from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
@@ -12,6 +15,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.user_id import UserId
+from autotrading.domain.flows.unattributable import UnattributableItem
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,3 +125,53 @@ class ExchangeLimitsPort(Protocol):
     def limits(self, asset: str) -> AssetLimits | None:
         """None when the exchange does not trade the asset. Raises FlowExchangeUnavailableError."""
         ...
+
+
+class AccountActivityPort(Protocol):
+    """Bound to the tenant of the request: what the exchange shows of one of its accounts now (R1.6.1)."""
+
+    def activity(self, account_id: UUID) -> AccountActivity:
+        """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
+        ...
+
+
+class PlatformOrdersPort(Protocol):
+    """Bound to the tenant of the request: the orders the platform sent, from the orders context."""
+
+    def orders_of_account(self, account_id: UUID) -> PlatformOrders:
+        """The client order id of every order sent on the account, with the flow that sent it, or None."""
+        ...
+
+
+class ReconciliationRepositoryPort(Protocol):
+    """Bound to the tenant of the request: the readings of its accounts and what no flow explains (R1.6.2)."""
+
+    def last_reading(self, account_id: UUID) -> AccountReading | None: ...
+
+    def save_reading(self, reading: AccountReading) -> None:
+        """Replaces the last reading of the account."""
+        ...
+
+    def record(self, item: UnattributableItem) -> bool:
+        """Records the item unless the same case is already recorded; True when it is new."""
+        ...
+
+    def resolve_positions(self, account_id: UUID, open_assets: frozenset[str]) -> None:
+        """Closes the recorded positions no longer open: a new position on that asset is a new case."""
+        ...
+
+
+class ClosedPositionsPort(Protocol):
+    """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
+
+    def add_closed_outside(self, closing: OutsideClosing) -> None: ...
+
+
+class ClosedPositionRepositoryPort(Protocol):
+    """Bound to the tenant of the request."""
+
+    def add(self, position: ClosedPosition) -> None:
+        """Raises CrossTenantAccessError for a position of another tenant."""
+        ...
+
+    def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...
