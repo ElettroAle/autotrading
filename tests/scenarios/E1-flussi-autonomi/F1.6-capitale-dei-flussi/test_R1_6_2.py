@@ -55,6 +55,17 @@ def opened_by_flow(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> No
     flow_cycles.platform.activity_reader.executions.setdefault(address, []).append(opening)
 
 
+@given(
+    step(r'che il flusso "{flow}" ha aperto altri {a} "{asset}" con un\'esecuzione pubblicata dopo la prima lettura')
+)
+def opened_late(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> None:
+    order, owner = uuid4(), flow_cycles.flow(flow)
+    flow_cycles.platform.platform_orders.add(order, owner.account_id, owner.id)
+    address = flow_cycles.credentials_of(flow).account_address
+    late = a_fill(asset, order, size=amount(a), fill_id="2", executed_at=READ_AT - timedelta(minutes=5))
+    flow_cycles.platform.activity_reader.late.setdefault(address, []).append(late)
+
+
 @given(step(r'che sull\'exchange il conto "{account}" ha una posizione di {a} "{asset}"'))
 def position_on_account(flow_cycles: FlowCycles, account: str, a: str, asset: str) -> None:
     (flow,) = flow_cycles.platform.flows.flows
@@ -77,6 +88,28 @@ def position_seen_open(bench: AttributionBench, flow: str, asset: str) -> None:
 @given(step(r'che sull\'exchange la posizione su "{asset}" non c\'è più'))
 def position_gone(bench: AttributionBench, asset: str) -> None:
     assert all(asset not in {p.asset for p in activity.positions} for activity in bench.exchange.activities.values())
+
+
+@given(step(r'che sul conto "{account}" la procedura di verifica ha aperto e chiuso {a} "{asset}"'))
+def verification_on_account(bench: AttributionBench, account: str, a: str, asset: str) -> None:
+    account_id, opening, closing = bench.account(account), uuid4(), uuid4()
+    bench.orders.add(opening, account_id, None, verification=True)
+    bench.orders.add(closing, account_id, None, verification=True)
+    size = amount(a)
+    bench.extend(
+        account_id,
+        fills=(
+            a_fill(asset, opening, size=size, fill_id="v1", executed_at=READ_AT - timedelta(minutes=2)),
+            a_fill(
+                asset,
+                closing,
+                size=-size,
+                start_position=size,
+                fill_id="v2",
+                executed_at=READ_AT - timedelta(minutes=1),
+            ),
+        ),
+    )
 
 
 @given(step(r'che il saldo del conto "{account}" è aumentato di {a} USDC senza esecuzioni dei flussi'))
@@ -116,6 +149,20 @@ def no_order(flow_cycles: FlowCycles) -> None:
 def paused_with_reason(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
     paused = flow_cycles.flow(flow)
     assert (paused.status, flow_cycles.platform.flows.pause_reasons[paused.id]) == (FlowStatus.PAUSED, reason)
+
+
+@then(step(r'il flusso "{flow}" non è in pausa'))
+def not_paused(flow_cycles: FlowCycles, flow: str) -> None:
+    assert flow_cycles.flow(flow).status is FlowStatus.ACTIVE
+    assert flow_cycles.flow(flow).id not in flow_cycles.platform.flows.pause_reasons
+
+
+@then(step(r'le esecuzioni della procedura di verifica non appartengono al flusso "{flow}"'))
+def verification_of_no_flow(bench: AttributionBench, flow: str) -> None:
+    entries = [entry for recorded in bench.ledger.entries.values() for entry in recorded]
+    owned = [entry for entry in entries if entry.execution.fill_id in {"v1", "v2"}]
+    assert [entry.flow_id for entry in owned] == [None, None]
+    assert bench.flow(flow).id not in bench.ledger.totals
 
 
 @then(step(r'"anna" riceve la notifica "{reason}"'))

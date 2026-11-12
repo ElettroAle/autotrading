@@ -18,13 +18,15 @@ from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchem
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.ledger import PlatformOrder
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
+from autotrading.domain.orders.order import Order
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.accounts import an_account
 from tests.support.flows import a_flow
-from tests.support.orders import a_flow_order, an_executed_order
+from tests.support.orders import EXECUTION, a_flow_order, a_request, an_executed_order
 
 pytestmark = pytest.mark.integration
 
@@ -123,7 +125,7 @@ def test_a_case_on_an_account_of_another_tenant_cannot_be_written(database: Engi
         SqlAlchemyReconciliationRepositoryAdapter(database, bruno).record(a_position(account_id))
 
 
-def test_the_orders_of_the_platform_are_those_of_the_account_with_their_flow(database: Engine) -> None:
+def test_the_orders_of_the_platform_are_those_of_the_account_with_their_flow_and_origin(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     _, other_account = new_account(database)
     flow = a_flow(tenant_id, name=f"alfa-{uuid4()}", account_id=account_id)
@@ -131,10 +133,16 @@ def test_the_orders_of_the_platform_are_those_of_the_account_with_their_flow(dat
     manual, of_flow = an_executed_order(account_id), a_flow_order(account_id, flow.id.value)
     SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(manual)
     SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(of_flow)
+    verification = Order.executed(a_request(account_id), EXECUTION)
+    SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(verification)
 
     orders = SqlAlchemyPlatformOrdersAdapter(database, tenant_id)
 
-    asked = (manual.id.value, of_flow.id.value, uuid4())
-    assert orders.orders_among(account_id, asked) == {manual.id.value: None, of_flow.id.value: flow.id}
+    asked = (manual.id.value, of_flow.id.value, verification.id.value, uuid4())
+    assert orders.orders_among(account_id, asked) == {
+        manual.id.value: PlatformOrder(None),
+        of_flow.id.value: PlatformOrder(flow.id),
+        verification.id.value: PlatformOrder(None, verification=True),
+    }
     assert orders.orders_among(other_account, asked) == {}
     assert orders.orders_among(account_id, ()) == {}

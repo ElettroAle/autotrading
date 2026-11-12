@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.domain.verification.errors import (
+    AssetOfFlowError,
     InsufficientMarginError,
     PositionAlreadyOpenError,
     VerificationNotStartedError,
@@ -14,6 +15,7 @@ from autotrading.domain.verification.procedure import (
     Step,
     missing_opening,
     remaining_position,
+    require_free_of_flows,
     require_startable,
 )
 from autotrading.domain.verification.reading import PositionReading
@@ -100,3 +102,18 @@ def test_the_reading_after_the_closing_holds_nothing_on_btc() -> None:
 
 def test_a_reading_after_the_closing_still_holding_btc_says_so() -> None:
     assert remaining_position(a_reading(LONG_BTC)) == "posizione su BTC ancora aperta"
+
+
+def test_an_account_without_a_flow_on_btc_starts() -> None:
+    require_free_of_flows(None)
+
+
+def test_a_flow_on_btc_stops_the_procedure_before_it_starts_with_its_name() -> None:
+    with pytest.raises(AssetOfFlowError) as raised:
+        require_free_of_flows("alfa")
+
+    assert (str(raised.value), raised.value.coin, raised.value.flow_name) == (
+        "BTC è un asset del flusso alfa",
+        "BTC",
+        "alfa",
+    )

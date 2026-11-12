@@ -12,11 +12,13 @@ from autotrading.adapters.inbound.api.app import Authentication, HealthReport, c
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.verification.verification_run import VerificationRun
+from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import HYPERLIQUID, STARTED_AT, Platform, registration
 from tests.support.steps import quoted
@@ -87,6 +89,17 @@ def account_without_position(session: Session, account: str, coin: str) -> None:
 def account_holds_position(session: Session, account: str, coin: str) -> None:
     position = HeldPosition(coin, Direction.SHORT, Decimal("0.0002"), 3)
     session.platform.order_exchange.hold(session.access_of(account), position)
+
+
+@given(quoted('che sul conto "{account}" il flusso "{flow}" attivo ha l\'asset "{coin}"'))
+def account_with_flow_on(session: Session, account: str, flow: str, coin: str) -> None:
+    owner = session.platform.account_named("anna", account)
+    configuration = a_configuration(assets=(coin,))
+    session.platform.flows.flows.append(
+        a_flow(
+            owner.tenant_id, name=flow, status=FlowStatus.ACTIVE, account_id=owner.id.value, configuration=configuration
+        )
+    )
 
 
 @given(parsers.re(r'^che il conto "(?P<account>[^"]+)" ha margine disponibile (?P<amount>\d+) USDC$'))

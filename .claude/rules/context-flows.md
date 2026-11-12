@@ -49,7 +49,10 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   con il motivo "registro delle esecuzioni incompleto" (ADR 0063).
 - All'inizio del ciclo, dopo la riconciliazione, una posizione del conto su un asset del flusso diversa da quella
   attesa dal registro ferma il ciclo prima di ogni ordine e mette in pausa il flusso con il motivo "posizione X
-  diversa da quella del flusso: attesa A, sul conto B" (ADR 0064).
+  diversa da quella del flusso: attesa A, sul conto B" (ADR 0064). Prima della pausa il conto si riconcilia
+  ancora una volta e il confronto si ripete: la pausa scatta solo se la differenza resta; se le esecuzioni non si
+  rileggono il ciclo fallisce senza pausa (ADR 0075). Le esecuzioni degli ordini della procedura di verifica non
+  appartengono a nessun flusso.
 - Stati e transizioni sono regole del domain: avvia da fermo, pausa da attivo, riprendi da in pausa,
   archivia solo da fermo; un flusso archiviato non si avvia e non si modifica (ADR 0036).
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.

@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
-from autotrading.domain.verification.errors import InsufficientMarginError, PositionAlreadyOpenError
+from autotrading.domain.verification.errors import (
+    AssetOfFlowError,
+    InsufficientMarginError,
+    PositionAlreadyOpenError,
+)
 from autotrading.domain.verification.reading import AccountReading
 
 
@@ -30,6 +34,12 @@ class Opening:
 
 PROCEDURE_OPENING = Opening(coin="BTC", side="long", leverage=2, value=Decimal(12))
 REQUIRED_MARGIN = Decimal(12)
+
+
+def require_free_of_flows(flow_name: str | None) -> None:
+    """The procedure does not start on the asset of a flow of the account (Bug 165, ADR 0075)."""
+    if flow_name is not None:
+        raise AssetOfFlowError(PROCEDURE_OPENING.coin, flow_name)
 
 
 def require_startable(reading: AccountReading) -> None:

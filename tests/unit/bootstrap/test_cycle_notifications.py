@@ -396,6 +396,45 @@ def test_without_the_new_executions_the_positions_are_compared_at_the_next_cycle
     assert isinstance(snapshot.state, CycleFlow)
 
 
+def test_an_execution_published_after_the_first_reading_does_not_stop_the_cycle(world: World) -> None:
+    reader = world.cycles.platform.activity_reader
+    reader.activities[world.address] = an_activity(positions=(a_position("BTC", size=Decimal("0.2")),))
+    world.cycles.platform.ledger.expect(world.flow.id, "BTC", Decimal("0.1"))
+    order = uuid4()
+    world.cycles.platform.platform_orders.add(order, world.flow.account_id, world.flow.id)
+    reader.late[world.address] = [
+        a_fill("BTC", order, size=Decimal("0.1"), start_position=Decimal("0.1"), executed_at=CLOSED_AT)
+    ]
+
+    snapshot = FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+
+    assert isinstance(snapshot.state, CycleFlow)
+
+
+def test_a_difference_the_new_executions_do_not_explain_still_stops_the_cycle(world: World) -> None:
+    reader = world.cycles.platform.activity_reader
+    reader.activities[world.address] = an_activity(positions=(a_position("BTC", size=Decimal("0.3")),))
+    world.cycles.platform.ledger.expect(world.flow.id, "BTC", Decimal("0.1"))
+    order = uuid4()
+    world.cycles.platform.platform_orders.add(order, world.flow.account_id, world.flow.id)
+    reader.late[world.address] = [
+        a_fill("BTC", order, size=Decimal("0.1"), start_position=Decimal("0.1"), executed_at=CLOSED_AT)
+    ]
+
+    with pytest.raises(FlowPositionMismatchError, match="attesa 0,2, sul conto 0,3"):
+        FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+
+
+def test_a_difference_is_not_a_pause_when_the_new_executions_cannot_be_read_again(world: World) -> None:
+    reader = world.cycles.platform.activity_reader
+    reader.activities[world.address] = an_activity(positions=(a_position("BTC", size=Decimal("0.2")),))
+    world.cycles.platform.ledger.expect(world.flow.id, "BTC", Decimal("0.1"))
+    reader.unreachable_after_first_reading = True
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+
+
 # FlowStateFromFlows.update: the reconciliation of the account
 
 

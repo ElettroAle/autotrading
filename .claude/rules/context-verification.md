@@ -19,3 +19,7 @@ paths:
   `OrderExecutionPort`), collegate in `bootstrap.py` ai casi d'uso di quei contesti. Nessun import
   dei loro interni.
 - Un passo fallito interrompe la procedura; gli esiti dei passi già eseguiti restano registrati.
+- La procedura non parte su BTC se un flusso attivo o in pausa del conto ha BTC tra i suoi asset
+  (`AssetOfFlowError`, 409): le sue esecuzioni cambierebbero la posizione che il flusso si aspetta e lo
+  metterebbero in pausa. I suoi ordini (origine "procedura di verifica") non appartengono a nessun flusso:
+  nel registro sono non attribuiti (ADR 0075).

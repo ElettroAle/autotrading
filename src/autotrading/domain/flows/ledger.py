@@ -12,7 +12,17 @@ from autotrading.domain.flows.flow_status import FlowStatus
 
 ZERO = Decimal(0)
 
-type PlatformOrders = Mapping[UUID, FlowId | None]
+
+@dataclass(frozen=True, slots=True)
+class PlatformOrder:
+    """An order the platform sent on the account: the flow that sent it, if any, and whether the verification
+    procedure sent it (R0.4.1)."""
+
+    flow_id: FlowId | None
+    verification: bool = False
+
+
+type PlatformOrders = Mapping[UUID, PlatformOrder]
 
 
 class ExecutionKind(StrEnum):
@@ -190,7 +200,11 @@ def _entry_of(
 ) -> LedgerEntry:
     owner = owners.get(execution.asset)
     if execution.order_id is not None and execution.order_id in orders:
-        flow_id = orders[execution.order_id] or owner
+        sent = orders[execution.order_id]
+        if sent.verification:
+            # The verification procedure runs on its own, whatever flow trades the asset (Bug 165, ADR 0075).
+            return LedgerEntry(execution, None, ExecutionKind.UNATTRIBUTED, platform_order=True)
+        flow_id = sent.flow_id or owner
         kind = ExecutionKind.FLOW_ORDER if flow_id is not None else ExecutionKind.UNATTRIBUTED
         return LedgerEntry(execution, flow_id, kind, platform_order=True)
     if owner is None:

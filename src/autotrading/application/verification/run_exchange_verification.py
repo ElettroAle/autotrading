@@ -16,6 +16,7 @@ from autotrading.domain.verification.procedure import (
     Step,
     missing_opening,
     remaining_position,
+    require_free_of_flows,
     require_startable,
 )
 from autotrading.domain.verification.reading import AccountReading
@@ -32,7 +33,8 @@ class RunExchangeVerificationCommand:
 class RunExchangeVerificationUseCase:
     """In the worker: opens, reads, closes and reads again a position, and records each step (R0.4.1, ADR 0024).
 
-    An account with a position on the asset, or without enough margin, does not start: nothing is sent or recorded.
+    An account with a flow on the asset, a position on it, or without enough margin, does not start: nothing is sent
+    or recorded. A flow on the asset would pause at its next cycle for the position the procedure changes (ADR 0075).
     Once started, the first step that fails stops the procedure; the steps already executed stay recorded.
     """
 
@@ -52,6 +54,7 @@ class RunExchangeVerificationUseCase:
 
     def execute(self, command: RunExchangeVerificationCommand) -> VerificationRun:
         started_at = self._clock()
+        require_free_of_flows(self._readings.flow_on(command.account_id, PROCEDURE_OPENING.coin))
         require_startable(self._readings.read(command.account_id))
         steps = self._steps_until_one_fails(command)
         run = VerificationRun(uuid4(), command.account_id, command.user_id.value, self._environment, started_at, steps)

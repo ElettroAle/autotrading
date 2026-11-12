@@ -8,6 +8,9 @@ Funzionalità: R0.4.1 Procedura di verifica dell'esecuzione
   La procedura apre una posizione long su BTC con leva 2 e valore 12 USDC, legge lo stato, la chiude e legge di nuovo lo stato.
   Va lanciata prima di collegare un flusso e dopo ogni modifica all'esecuzione degli ordini.
   Nell'ambiente "prod" la procedura opera con fondi reali.
+  La procedura non parte su un conto in cui BTC è un asset di un flusso attivo o in pausa: le sue esecuzioni
+  cambierebbero la posizione che il flusso si aspetta e lo metterebbero in pausa (R1.6.2). I suoi ordini non
+  appartengono a nessun flusso.
 
   Fuori ambito: verifica di stop loss e take profit, verifica su asset diversi da BTC.
 
@@ -32,6 +35,12 @@ Funzionalità: R0.4.1 Procedura di verifica dell'esecuzione
     Dato che il conto "test-1" ha una posizione aperta su "BTC"
     Quando "anna" lancia la procedura di verifica sul conto "test-1"
     Allora la procedura non parte con il motivo "posizione già aperta su BTC"
+    E nessun ordine è inviato all'exchange
+
+  Scenario: Procedura rifiutata su un asset di un flusso del conto
+    Dato che sul conto "test-1" il flusso "alfa" attivo ha l'asset "BTC"
+    Quando "anna" lancia la procedura di verifica sul conto "test-1"
+    Allora la procedura non parte con il motivo "BTC è un asset del flusso alfa"
     E nessun ordine è inviato all'exchange
 
   Scenario: Procedura rifiutata per margine insufficiente
