@@ -7,6 +7,7 @@ from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, Tenan
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
@@ -15,7 +16,11 @@ from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
     AccountReadingFromAccounts,
+    FlowAccountsFromAccounts,
+    ModelSettingsFromAgent,
     OrderExecutionFromOrders,
+    ProviderKeyUsageFromFlows,
+    SourceSettingsFromSources,
     TradingAccessFromAccounts,
 )
 from autotrading.domain.accounts.account import Account
@@ -29,12 +34,13 @@ from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
-    FakeProviderKeyUsageAdapter,
     FakeProviderKeyVerifierAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
@@ -68,7 +74,8 @@ class Platform:
         self.provider_keys = ProviderKeyStore()
         self.key_vault: ProviderKeyVault = {}
         self.providers = FakeProviderKeyVerifierAdapter()
-        self.flows_using_keys: dict[TenantId, FakeProviderKeyUsageAdapter] = {}
+        self.flows = FlowStore()
+        self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
         self.model_catalog: ModelCatalog = MODEL_CATALOG
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
@@ -98,19 +105,29 @@ class Platform:
         position_closing = FakePositionClosingAdapter(lambda: self.worker_for(tenant_id).close_exchange_position)
         verification = FakeVerificationAdapter(lambda: self.worker_for(tenant_id).run_exchange_verification)
         account_state.reachable = position_closing.reachable = verification.reachable = self.worker_reachable
+        accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
+        provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
+        flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
         ports = TenantPorts(
-            accounts=InMemoryAccountRepositoryAdapter(self.accounts, tenant_id),
+            accounts=accounts,
             sealer=self.sealer_of(tenant_id),
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=position_closing,
             verification=verification,
             source_catalog=SOURCE_CATALOG,
-            provider_keys=InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id),
+            provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_verifier=self.providers,
-            provider_key_usage=self.flows_using_keys.setdefault(tenant_id, FakeProviderKeyUsageAdapter()),
+            provider_key_usage=ProviderKeyUsageFromFlows(flows),
             model_catalog=self.model_catalog,
+            flows=flows,
+            flow_checks=FlowChecks(
+                accounts=FlowAccountsFromAccounts(accounts, account_state),
+                markets=self.markets,
+                models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
+                sources=SourceSettingsFromSources(SOURCE_CATALOG),
+            ),
         )
         return TenantUseCases.on(tenant_id, ports)
 

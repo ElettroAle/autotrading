@@ -28,9 +28,9 @@ from autotrading.application.verification.run_verification import RunVerificatio
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SLIPPAGE_SETTING,
+    ApiExchanges,
     InvalidConfigurationError,
     MissingConfigurationError,
-    ProviderKeyUsageBeforeFlows,
     PublicCredentialsKey,
     TenantUseCaseFactory,
     TradingAccessFromAccounts,
@@ -43,11 +43,11 @@ from autotrading.bootstrap import (
     create_application,
     create_worker_application,
     exchanges_for,
+    markets_for,
     now,
     order_exchanges_for,
     slippage_from,
 )
-from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.errors import InvalidSlippageError
 from autotrading.domain.orders.slippage import Slippage
@@ -180,7 +180,7 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
     factory = TenantUseCaseFactory(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker, httpx.Client()
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
 
     first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
@@ -209,7 +209,7 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
     worker = WorkerConnection(client, WORKER_TOKEN)
     factory = TenantUseCaseFactory(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker, httpx.Client()
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
 
     with pytest.raises(ExchangeUnavailableError):
@@ -263,6 +263,11 @@ def test_the_worker_refuses_to_start_with_a_malformed_private_key(tmp_path: Path
 @pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
 def test_the_exchange_network_follows_the_installation(environment: str, url: str) -> None:
     assert {name: exchange.base_url for name, exchange in exchanges_for(environment).items()} == {"Hyperliquid": url}
+
+
+@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
+def test_the_tradable_assets_are_read_on_the_network_of_the_installation(environment: str, url: str) -> None:
+    assert {name: markets.base_url for name, markets in markets_for(environment).items()} == {"Hyperliquid": url}
 
 
 @pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
@@ -353,7 +358,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     factory = TenantUseCaseFactory(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
-        {},
+        ApiExchanges({}, {}),
         WorkerConnection(client, WORKER_TOKEN),
         httpx.Client(),
     )
@@ -383,7 +388,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     factory = TenantUseCaseFactory(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
-        {},
+        ApiExchanges({}, {}),
         WorkerConnection(client, WORKER_TOKEN),
         httpx.Client(),
     )
@@ -410,10 +415,6 @@ def test_every_provider_of_the_catalog_has_a_way_to_verify_its_keys() -> None:
     assert {provider.value for provider in MODEL_CATALOG.providers} <= set(KEY_CHECKS)
 
 
-def test_no_flow_uses_a_provider_before_the_flows_exist() -> None:
-    assert ProviderKeyUsageBeforeFlows().flows_using(ProviderName("openrouter")) == []
-
-
 def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -434,7 +435,7 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
     worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
     providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
     factory = TenantUseCaseFactory(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), {}, worker, providers
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, providers
     )
 
     with pytest.raises(ProviderRejectedKeyError):

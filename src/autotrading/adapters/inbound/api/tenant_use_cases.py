@@ -24,6 +24,10 @@ from autotrading.application.agent.ports import (
 from autotrading.application.agent.register_provider_key import ProviderKeyServices, RegisterProviderKeyUseCase
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
+from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
+from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.ports import FlowRepositoryPort
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.application.sources.get_source import GetSourceUseCase
@@ -51,6 +55,8 @@ class TenantPorts:
     provider_key_verifier: ProviderKeyVerifierPort
     provider_key_usage: ProviderKeyUsagePort
     model_catalog: ModelCatalog
+    flows: FlowRepositoryPort
+    flow_checks: FlowChecks
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +78,9 @@ class TenantUseCases:
     remove_provider_key: RemoveProviderKeyUseCase
     list_provider_keys: ListProviderKeysUseCase
     list_models: ListModelsUseCase
+    create_flow: CreateFlowUseCase
+    list_flows: ListFlowsUseCase
+    read_free_capital: ReadFreeCapitalUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -94,4 +103,7 @@ class TenantUseCases:
             remove_provider_key=RemoveProviderKeyUseCase(keys, ports.provider_key_usage),
             list_provider_keys=ListProviderKeysUseCase(keys),
             list_models=ListModelsUseCase(ports.model_catalog, keys),
+            create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
+            list_flows=ListFlowsUseCase(ports.flows),
+            read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
         )

@@ -17,6 +17,23 @@ class SourceNotAvailableError(DomainError):
         self.name = name
 
 
+class SourceParameterOutOfRangeError(DomainError):
+    status_code = 422
+
+    def __init__(self, label: str) -> None:
+        super().__init__(f"parametro fuori dai valori ammessi: {label}")
+        self.label = label
+
+
+class UnknownSourceParameterError(DomainError):
+    status_code = 422
+
+    def __init__(self, source: str, key: str) -> None:
+        super().__init__(f"parametro sconosciuto della fonte {source}: {key}")
+        self.source = source
+        self.key = key
+
+
 class InvalidSentimentIndexError(DomainError):
     """A Fear & Greed reading outside 0-100, without classification or without its time zone."""
 

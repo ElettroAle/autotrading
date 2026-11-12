@@ -4,16 +4,14 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.agent.list_models import ModelListing
-from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import RangeParameter
+from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.4-agente-ia/R1.4.2-catalogo-dei-modelli.feature")
-
-KEY = "K-REGISTERED"
 
 
 @pytest.fixture
@@ -36,10 +34,9 @@ def catalog_with(platform: Platform, model: str, minimum: str, maximum: str, def
     platform.model_catalog = ModelCatalog((ModelDefinition(model, (temperature,)),))
 
 
-@given(quoted('che "{user}" ha registrato la chiave del fornitore "{provider}"'))
-def key_registered(platform: Platform, user: str, provider: str) -> None:
-    platform.providers.accept(provider, KEY)
-    platform.use_cases_of(user).register_provider_key.execute(RegisterProviderKeyCommand(provider, KEY))
+@given(quoted('che il modello "{model}" non supporta il livello di ragionamento'))
+def model_without_reasoning(platform: Platform, model: str) -> None:
+    assert "reasoning_effort" not in [parameter.key for parameter in platform.model_catalog.find(model).parameters]
 
 
 @when(quoted('"{user}" consulta il catalogo dei modelli'))

@@ -8,6 +8,8 @@ from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier,
 from autotrading.adapters.inbound.api.provider_keys import ProviderKeyRegistrationRequest, ProviderKeyReplacementRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.flows.flow_status import FlowStatus
+from tests.support.flows import a_flow
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
@@ -114,7 +116,7 @@ def test_the_removal_answers_with_no_content(client_of: Client) -> None:
 def test_the_removal_refused_by_a_flow_is_a_conflict(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     anna.post("/provider-keys", json={"provider": "openrouter", "key": KEY})
-    platform.flows_using_keys[platform.tenant_of("anna")].flows[ProviderName("openrouter")] = ["alfa"]
+    platform.flows.flows.append(a_flow(platform.tenant_of("anna"), status=FlowStatus.ACTIVE))
 
     response = anna.delete("/provider-keys/openrouter")
 

@@ -47,6 +47,14 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 
 ## Porte del contesto
 
-Repository dei flussi, delle versioni, delle variazioni di capitale, delle posizioni chiuse e dei non
-attribuibili; lettura del conto dall'exchange (saldo, posizioni, esecuzioni) attraverso il `worker`;
-invio degli ordini attraverso `orders`. I nomi esatti nascono con i requisiti che li usano.
+- `FlowRepositoryPort`: flussi del tenant con la versione di configurazione in vigore; nome unico tra i non
+  archiviati (ADR 0031).
+- `FlowAccountPort`: exchange e saldo del conto letti ora, dal contesto `accounts` attraverso il `worker`.
+- `ModelSettingsPort`, `SourceSettingsPort`: modello e fonti con i parametri risolti, dai contesti `agent` e
+  `sources`; un rifiuto arriva come `InvalidFlowSettingError` con il motivo del contesto che lo dà.
+- `MarketsPort`: asset negoziabili ora sull'exchange, per nome dell'exchange.
+- I bridge verso gli altri contesti vivono solo in `bootstrap.py`; `flows` fornisce ad `agent` i flussi che
+  usano una chiave (`ProviderKeyUsageFromFlows`).
+
+Repository delle variazioni di capitale, delle posizioni chiuse e dei non attribuibili, e invio degli ordini
+attraverso `orders`, nascono con i requisiti che li usano.
