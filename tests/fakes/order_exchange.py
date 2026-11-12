@@ -25,8 +25,8 @@ REALIZED_ON_CLOSE = Decimal("1.75")
 
 def default_markets() -> dict[str, Market]:
     return {
-        "BTC": Market("BTC", max_leverage=40, size_decimals=5, mid_price=Decimal(100000)),
-        "ETH": Market("ETH", max_leverage=25, size_decimals=4, mid_price=Decimal(4000)),
+        "BTC": Market("BTC", max_leverage=40, size_decimals=5, mid_price=Decimal(100000), min_order_value=Decimal(10)),
+        "ETH": Market("ETH", max_leverage=25, size_decimals=4, mid_price=Decimal(4000), min_order_value=Decimal(10)),
     }
 
 

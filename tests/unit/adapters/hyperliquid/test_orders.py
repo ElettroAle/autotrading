@@ -149,7 +149,7 @@ def calls_named(sdk: FakeSdk, name: str) -> list[Any]:
 
 
 def test_the_market_carries_leverage_size_decimals_and_mid_price() -> None:
-    assert adapter(FakeSdk()).market(ACCESS, "ETH") == Market("ETH", 25, 4, Decimal("4000.5"))
+    assert adapter(FakeSdk()).market(ACCESS, "ETH") == Market("ETH", 25, 4, Decimal("4000.5"), Decimal(10))
 
 
 def test_an_asset_the_exchange_does_not_list_is_refused_as_unknown() -> None:

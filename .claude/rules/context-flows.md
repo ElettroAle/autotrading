@@ -49,6 +49,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - Il capitale allocato cambia in ogni stato tranne archiviato: versione nuova della configurazione più una riga
   di cronologia; un aumento entro il capitale disponibile, una riduzione non sotto il margine impegnato (ADR 0053).
 - Ordine del controllo del rischio: leva, poi esposizione, poi coerenza con lo stato, poi importo minimo.
+  Le decisioni di un ciclo si controllano nel loro ordine: ogni apertura approvata impegna il suo margine e le
+  successive vedono la liquidità residua; una chiusura non libera liquidità prima dell'esecuzione (ADR 0065).
 - Gli ordini passano dal contesto `orders` (apertura, chiusura, esito reale); `flows` non parla con
   l'exchange per inviare ordini.
 

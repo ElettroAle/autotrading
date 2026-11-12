@@ -11,6 +11,8 @@ Funzionalità: R1.5.5 Esecuzione delle decisioni del flusso
   registra l'esito reale, non quello atteso (R0.3.4).
   Un ordine rifiutato dall'exchange si registra con il messaggio originale (R0.3.3) e non ferma gli altri ordini
   del ciclo. Un exchange che non risponde fa fallire il ciclo (R1.2.3).
+  La quantità di un'apertura si arrotonda per difetto al passo dell'asset; se così il valore scendesse sotto il
+  minimo dell'exchange, si arrotonda per eccesso di un passo, perché un'apertura approvata non sia rifiutata.
 
   Fuori ambito: stop loss e take profit sull'exchange, chiusure parziali.
 
@@ -40,3 +42,9 @@ Funzionalità: R1.5.5 Esecuzione delle decisioni del flusso
     Quando il flusso "alfa" esegue gli ordini del ciclo "c-1"
     Allora il ciclo registra per "ETH" l'ordine rifiutato con il messaggio "Order rejected"
     E l'ordine di apertura su "BTC" è inviato
+
+  Scenario: Arrotondamento che non scende sotto il minimo dell'exchange
+    Dato che l'exchange ammette per "BTC" un valore minimo di ordine di 10 USDC al prezzo di 60123 con 5 decimali di quantità
+    E che il rischio approva un'apertura long su "BTC" di valore 10 USDC
+    Quando il flusso "alfa" esegue gli ordini del ciclo "c-1"
+    Allora l'ordine su "BTC" è inviato con quantità 0,00017

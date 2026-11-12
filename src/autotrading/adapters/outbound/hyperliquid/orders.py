@@ -13,6 +13,7 @@ from hyperliquid.utils.types import Cloid
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
     INVALID_KEY_MESSAGE,
+    MIN_ORDER_VALUE,
     TIMEOUT_SECONDS,
     HyperliquidSdk,
     OfficialSdk,
@@ -133,7 +134,7 @@ def _market_of(coin: str, universe: Sequence[Mapping[str, Any]], mids: Mapping[s
         message = f"{UNKNOWN_ASSET} {coin}"
         raise ExchangeRejectedOrderError(message)
     try:
-        return Market(coin, int(asset["maxLeverage"]), int(asset["szDecimals"]), _decimal(mids[coin]))
+        return Market(coin, int(asset["maxLeverage"]), int(asset["szDecimals"]), _decimal(mids[coin]), MIN_ORDER_VALUE)
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error
 

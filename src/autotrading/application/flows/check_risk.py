@@ -18,7 +18,8 @@ class CheckRiskCommand:
 class CheckRiskUseCase:
     """Turns each decision of the agent into an approved order, a blocked decision or a hold (R1.5.1-R1.5.4).
 
-    Each decision is checked on its own: a blocked one never stops the others of the cycle.
+    A blocked decision never stops the others of the cycle; an approved opening commits its margin, so the next
+    decisions see only the liquidity left (ADR 0065).
     """
 
     def __init__(self, exchange_limits: ExchangeLimitsPort) -> None:

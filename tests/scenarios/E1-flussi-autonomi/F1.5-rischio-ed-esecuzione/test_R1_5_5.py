@@ -11,6 +11,7 @@ from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderStatus
 from tests.support.steps import quoted
 from tests.support.trading import HYPERLIQUID, Trading
@@ -92,6 +93,24 @@ def open_long(execution: FlowExecution, asset: str) -> None:
     execution.approved = [opening(asset)]
 
 
+@given(
+    parsers.re(
+        r'^che l\'exchange ammette per "(?P<asset>\w+)" un valore minimo di ordine di (?P<minimum>\d+) USDC'
+        r" al prezzo di (?P<price>\d+) con (?P<decimals>\d+) decimali di quantità$"
+    )
+)
+def exchange_market(execution: FlowExecution, asset: str, minimum: str, price: str, decimals: str) -> None:
+    current = execution.trading.exchange.markets[asset]
+    execution.trading.exchange.markets[asset] = Market(
+        asset, current.max_leverage, int(decimals), Decimal(price), Decimal(minimum)
+    )
+
+
+@given(quoted('che il rischio approva un\'apertura long su "{asset}" di valore {value} USDC'))
+def open_with_value(execution: FlowExecution, asset: str, value: str) -> None:
+    execution.approved = [FlowOpening(asset, Direction.LONG, Decimal(value), 1)]
+
+
 @given(parsers.re(r"^che l\'exchange esegue l\'ordine a (?P<price>\d+) con commissione (?P<fee>\d+,\d+) USDC$"))
 def exchange_fills_at(execution: FlowExecution, price: str, fee: str) -> None:
     execution.trading.exchange.fill_at = (Decimal(price), Decimal(fee.replace(",", ".")))
@@ -154,3 +173,9 @@ def rejection_recorded(execution: FlowExecution, asset: str, message: str) -> No
 def opening_sent(execution: FlowExecution, asset: str) -> None:
     assert execution.sent_index(asset, closing=False) >= 0
     assert execution.recorded(asset).status is OrderStatus.FILLED
+
+
+@then(parsers.re(r'^l\'ordine su "(?P<asset>\w+)" è inviato con quantità (?P<size>\d+,\d+)$'))
+def sent_with_size(execution: FlowExecution, asset: str, size: str) -> None:
+    sent = execution.trading.exchange.sent[execution.sent_index(asset, closing=False)]
+    assert sent.size == Decimal(size.replace(",", "."))

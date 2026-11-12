@@ -1,3 +1,4 @@
+from dataclasses import replace
 from decimal import Decimal
 
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -40,14 +41,14 @@ def price_moves(trading: Trading, coin: str, percent: str) -> None:
 @given(quoted('che l\'exchange ammette per "{coin}" una leva massima di {maximum}'))
 def maximum_leverage(trading: Trading, coin: str, maximum: str) -> None:
     market = trading.exchange.markets[coin]
-    trading.exchange.markets[coin] = type(market)(coin, int(maximum), market.size_decimals, market.mid_price)
+    trading.exchange.markets[coin] = replace(market, max_leverage=int(maximum))
 
 
 @given(quoted('che l\'exchange ammette per "{coin}" dimensioni multiple di {step}'))
 def size_step(trading: Trading, coin: str, step: str) -> None:
     market = trading.exchange.markets[coin]
     decimals = -int(Decimal(step).as_tuple().exponent)
-    trading.exchange.markets[coin] = type(market)(coin, market.max_leverage, decimals, market.mid_price)
+    trading.exchange.markets[coin] = replace(market, size_decimals=decimals)
 
 
 @when(

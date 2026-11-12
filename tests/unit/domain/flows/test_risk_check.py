@@ -194,3 +194,49 @@ def test_a_hold_stays_a_hold() -> None:
 )
 def test_numbers_are_written_as_the_user_reads_them(amount: Decimal, text: str) -> None:
     assert number(amount) == text
+
+
+def test_an_approved_opening_commits_the_liquidity_for_the_next_decisions() -> None:
+    risk = check(liquidity="100")
+
+    first = approved(risk.outcome(opening("0.06", 1, asset="BTC"), EXCHANGE))
+    second = risk.outcome(opening("0.06", 1, asset="ETH"), EXCHANGE)
+
+    assert first.margin == Decimal(60)
+    assert second == BlockedDecision("ETH", "liquidità del flusso insufficiente: 40 USDC")
+
+
+def test_the_remaining_liquidity_still_admits_an_opening_that_fits() -> None:
+    risk = check(liquidity="100")
+
+    risk.outcome(opening("0.06", 1, asset="BTC"), EXCHANGE)
+
+    assert approved(risk.outcome(opening("0.04", 2, asset="ETH"), EXCHANGE)).margin == Decimal(40)
+
+
+def test_an_opening_brought_to_the_minimum_commits_its_margin() -> None:
+    risk = check(liquidity="15", bring_to_minimum=True)
+
+    approved(risk.outcome(opening("0.006", 1, asset="BTC"), EXCHANGE))
+
+    assert risk.outcome(opening("0.006", 1, asset="ETH"), EXCHANGE) == BlockedDecision(
+        "ETH", "liquidità del flusso insufficiente: 5 USDC"
+    )
+
+
+def test_a_blocked_opening_commits_nothing() -> None:
+    risk = check(liquidity="50")
+
+    risk.outcome(opening("0.06", 1, asset="BTC"), EXCHANGE)
+
+    assert approved(risk.outcome(opening("0.05", 1, asset="ETH"), EXCHANGE)).margin == Decimal(50)
+
+
+def test_a_close_in_the_same_cycle_frees_no_liquidity() -> None:
+    risk = check(liquidity="40", open_assets=frozenset({"BTC"}))
+
+    risk.outcome(CloseIntent("BTC"), None)
+
+    assert risk.outcome(opening("0.05", 1, asset="ETH"), EXCHANGE) == BlockedDecision(
+        "ETH", "liquidità del flusso insufficiente: 40 USDC"
+    )

@@ -20,6 +20,8 @@ from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 
+# The exchange refuses any order below 10 USDC of value ("Order must have minimum value of $10").
+MIN_ORDER_VALUE = Decimal(10)
 TIMEOUT_SECONDS = 10.0
 PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
