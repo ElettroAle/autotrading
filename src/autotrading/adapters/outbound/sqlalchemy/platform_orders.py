@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy import Engine, func, select
 
 from autotrading.adapters.outbound.sqlalchemy.tables import orders
-from autotrading.domain.flows.account_reconciliation import PlatformOrders
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.ledger import PlatformOrders
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 

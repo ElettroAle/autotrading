@@ -1,11 +1,12 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
 from autotrading.domain.flows.account_activity import AccountActivity
-from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, PlatformOrders
+from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.flow import Flow
@@ -13,6 +14,14 @@ from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_timing import FlowTiming
+from autotrading.domain.flows.ledger import (
+    AccountLedger,
+    ExecutionsWindow,
+    FlowTotals,
+    LedgerEntry,
+    LedgerKeys,
+    PlatformOrders,
+)
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
@@ -156,6 +165,39 @@ class AccountActivityPort(Protocol):
 
     def activity(self, account_id: UUID) -> AccountActivity:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
+        ...
+
+
+class AccountExecutionsPort(Protocol):
+    """In the worker: the executions and the funding the exchange still holds of an account since a moment (ADR 0063).
+
+    Without a moment, everything the exchange still holds; the window says when part of it is gone already.
+    """
+
+    def since(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
+        """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
+        ...
+
+
+class FlowLedgerPort(Protocol):
+    """Bound to the tenant of the request: the ledger of the executions of its accounts and the running totals of
+    every flow, kept together (ADR 0063).
+    """
+
+    def cursor(self, account_id: UUID) -> datetime | None:
+        """The moment of the most recent execution or funding recorded for the account, or None before the first."""
+        ...
+
+    def recorded_since(self, account_id: UUID, since: datetime) -> LedgerKeys:
+        """What of the account is recorded already from that moment on, to read the overlap of two windows once."""
+        ...
+
+    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> tuple[LedgerEntry, ...]:
+        """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new."""
+        ...
+
+    def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
+        """The running totals of those flows; a flow without any execution yet has none."""
         ...
 
 
