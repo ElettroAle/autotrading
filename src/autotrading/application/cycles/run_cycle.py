@@ -1,0 +1,148 @@
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from uuid import UUID
+
+from autotrading.application.cycles.ports import (
+    AgentPort,
+    ClockPort,
+    ContextPort,
+    CycleRepositoryPort,
+    FlowLockPort,
+    FlowPausePort,
+    FlowStatePort,
+    OrderPort,
+    RiskPort,
+)
+from autotrading.application.cycles.source_collector import SourceCollector
+from autotrading.domain.cycles.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
+from autotrading.domain.cycles.cycle_schedule import CycleSchedule, delay_seconds
+from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.errors import AutotradingError
+
+operations = logging.getLogger("autotrading.cycles")
+
+
+@dataclass(frozen=True, slots=True)
+class RunCycleCommand:
+    flow_id: UUID
+    schedule: CycleSchedule
+    planned_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class CycleSteps:
+    """The other contexts behind the steps of the cycle, each through a port of its own (ADR 0041)."""
+
+    flow_state: FlowStatePort
+    sources: SourceCollector
+    context: ContextPort
+    agent: AgentPort
+    risk: RiskPort
+    orders: OrderPort
+
+
+@dataclass(frozen=True, slots=True)
+class CycleGuards:
+    """What keeps a planned cycle unique and alone, and what pauses the flows on a permanent error."""
+
+    cycles: CycleRepositoryPort
+    lock: FlowLockPort
+    pause: FlowPausePort
+    clock: ClockPort
+
+
+@dataclass(slots=True)
+class _Progress:
+    command: RunCycleCommand
+    started_at: datetime
+    done: list[CycleStep] = field(default_factory=list)
+    absent: tuple[AbsentSource, ...] = ()
+    current: CycleStep = CycleStep.READ_FLOW_STATE
+
+    def run[T](self, step: CycleStep, action: Callable[[], T]) -> T:
+        self.current = step
+        result = action()
+        self.done.append(step)
+        return result
+
+    def record(self, outcome: CycleOutcome, failure: CycleFailure | None = None) -> CycleRecord:
+        return CycleRecord(
+            flow_id=self.command.flow_id,
+            planned_at=self.command.planned_at,
+            outcome=outcome,
+            started_at=self.started_at,
+            delay_seconds=delay_seconds(self.command.planned_at, self.started_at),
+            steps=tuple(self.done),
+            absent_sources=self.absent,
+            failure=failure,
+        )
+
+
+class RunCycleUseCase:
+    """Runs one planned cycle of a flow, step by step, stopping at the first failure (R1.2.1-R1.2.5).
+
+    Fail fast: no retry and no step after the failing one. The only handler of the errors of the cycle records the
+    failed cycle and, for a permanent error, pauses the flows involved and raises the error anyway (R1.2.4).
+    """
+
+    def __init__(self, steps: CycleSteps, guards: CycleGuards) -> None:
+        self._steps = steps
+        self._guards = guards
+
+    def execute(self, command: RunCycleCommand) -> CycleRecord | None:
+        if not self._guards.cycles.claim(command.flow_id, command.planned_at):
+            return None
+        with self._guards.lock.hold(command.flow_id) as acquired:
+            if not acquired:
+                return self._recorded(CycleRecord.skipped(command.flow_id, command.planned_at))
+            return self._run(_Progress(command, self._guards.clock.now()))
+
+    def _run(self, progress: _Progress) -> CycleRecord:
+        try:
+            self._steps_of(progress)
+        except AutotradingError as error:
+            return self._failed(progress, error)
+        progress.done.append(CycleStep.RECORD_CYCLE)
+        return self._recorded(progress.record(CycleOutcome.COMPLETED))
+
+    def _steps_of(self, progress: _Progress) -> None:
+        flow_id, planned_at = progress.command.flow_id, progress.command.planned_at
+        steps = self._steps
+        snapshot = progress.run(CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id))
+        readings, absent = progress.run(
+            CycleStep.COLLECT_SOURCES,
+            lambda: steps.sources.collect(flow_id, snapshot.sources, progress.command.schedule.source_wait),
+        )
+        progress.absent = tuple(absent)
+        context = progress.run(
+            CycleStep.COMPOSE_CONTEXT, lambda: steps.context.compose(flow_id, snapshot, readings, absent)
+        )
+        decisions = progress.run(CycleStep.AGENT_DECISION, lambda: steps.agent.decide(flow_id, context))
+        orders = progress.run(CycleStep.RISK_CHECK, lambda: steps.risk.check(flow_id, snapshot, decisions))
+        executions = progress.run(
+            CycleStep.ORDER_EXECUTION,
+            lambda: [steps.orders.execute(flow_id, planned_at, order) for order in orders],
+        )
+        progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.flow_state.update(flow_id, executions))
+
+    def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:
+        failure = CycleFailure(progress.current, type(error).__name__, str(error))
+        record = self._recorded(progress.record(CycleOutcome.FAILED, failure))
+        if not error.permanent:
+            return record
+        self._guards.pause.pause_affected_by(progress.command.flow_id, error)
+        raise error
+
+    def _recorded(self, record: CycleRecord) -> CycleRecord:
+        self._guards.cycles.record(record)
+        operations.info(
+            "ciclo registrato",
+            extra={
+                "flow_id": str(record.flow_id),
+                "planned_at": record.planned_at.isoformat(),
+                "outcome": record.outcome,
+            },
+        )
+        return record

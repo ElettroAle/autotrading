@@ -1,5 +1,5 @@
 # language: it
-@R1.2.3 @wip
+@R1.2.3
 Funzionalità: R1.2.3 Ciclo fallito per un errore transitorio
   Come utente
   Voglio che un errore transitorio faccia fallire solo il ciclo in cui avviene
