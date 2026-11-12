@@ -1,5 +1,5 @@
 # language: it
-@R1.3.4 @wip
+@R1.3.4
 Funzionalità: R1.3.4 Fonte pivot point
   Come utente
   Voglio che l'agente riceva i pivot point di ogni asset e la posizione del prezzo rispetto a essi

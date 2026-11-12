@@ -35,6 +35,9 @@ Le fonti dati che l'agente riceve nel contesto.
   all'intervallo più fine conservato per la profondità richiesta), orizzonti 15 minuti e 1 ora; ogni previsione
   si registra e riceve il prezzo effettivo allo scadere; lo storico più corto della profondità si dichiara
   (ADR 0043).
+- Indicatori e pivot: dati di mercato pubblici di Hyperliquid (`MarketDataPort`), solo candele chiuse; timeframe
+  breve = intervallo di ciclo, o l'intervallo di candela più fine sotto di esso; lungo = 4 ore; pivot dalla
+  candela giornaliera UTC di ieri e dal mark price (ADR 0057, 0058).
 - Una fonte esterna che non risponde produce un errore tipizzato della porta; il ciclo la tratta come
   assente, mai come errore del ciclo.
 - I parametri non indicati assumono il predefinito del catalogo; un valore fuori dai valori ammessi rende
@@ -45,4 +48,4 @@ Le fonti dati che l'agente riceve nel contesto.
 ## Porte del contesto
 
 Porta comune delle fonti, catalogo, repository dei campioni e delle previsioni, candele e dati di mercato
-dall'exchange (`PriceHistoryPort`), registro delle previsioni (`ForecastRepositoryPort`).
+dall'exchange (`PriceHistoryPort`, `MarketDataPort`), registro delle previsioni (`ForecastRepositoryPort`).
