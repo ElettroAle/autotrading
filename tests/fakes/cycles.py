@@ -6,13 +6,18 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.cycles.ports import FlowSnapshot, ScheduledFlow, SourceReading, SourceRequest
+from autotrading.application.cycles.ports import FlowSnapshot, RiskReview, ScheduledFlow, SourceReading, SourceRequest
+from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.cycles.flow_cost import CycleCost
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.flow_repository import FlowStore
 
 ACTIVE, PAUSED = "attivo", "in pausa"
 # A silent source or a held cycle gives up after this many real seconds: a broken cycle fails the test, never hangs it.
@@ -61,6 +66,55 @@ class InMemoryCycleRepositoryAdapter:
     def record(self, record: CycleRecord) -> None:
         with self._guard:
             self.records.append(record)
+
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+        of_flow = sorted(
+            (record for record in self.records if record.flow_id == flow_id),
+            key=lambda record: record.planned_at,
+            reverse=True,
+        )
+        return of_flow[offset : offset + limit]
+
+    def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
+        return next(
+            (record for record in self.records if (record.flow_id, record.planned_at) == (flow_id, planned_at)), None
+        )
+
+    def costs(self, flow_id: UUID) -> list[CycleCost]:
+        return [
+            CycleCost(record.planned_at, record.cost)
+            for record in self.records
+            if record.flow_id == flow_id and record.cost is not None
+        ]
+
+
+class InMemoryCycleHistoryAdapter:
+    """The cycles of every tenant, bound to one like the real adapter under row level security."""
+
+    def __init__(self, cycles: InMemoryCycleRepositoryAdapter, flows: FlowStore, tenant_id: TenantId) -> None:
+        self._cycles = cycles
+        self._flows = flows
+        self._tenant_id = tenant_id
+
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+        return self._cycles.newest(flow_id, offset, limit) if self._owns(flow_id) else []
+
+    def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
+        return self._cycles.at(flow_id, planned_at) if self._owns(flow_id) else None
+
+    def costs(self, flow_id: UUID) -> list[CycleCost]:
+        return self._cycles.costs(flow_id) if self._owns(flow_id) else []
+
+    def _owns(self, flow_id: UUID) -> bool:
+        return any(flow.id.value == flow_id for flow in self._flows.of(self._tenant_id))
+
+
+class FakeFlowDirectoryAdapter:
+    def __init__(self, owned: set[UUID]) -> None:
+        self.owned = owned
+
+    def exists(self, flow_id: UUID) -> bool:
+        return flow_id in self.owned
 
 
 class InMemoryFlowLockAdapter:
@@ -146,9 +200,10 @@ class FakeFlowsAdapter:
         flow = self.flows[flow_id]
         return FlowSnapshot(flow.sources, {"flow": flow.name, "positions": sorted(flow.positions)})
 
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> None:
+    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:
         self._failures.raise_if_failing(flow_id, CycleStep.UPDATE_FLOW_STATE)
         self.updates.append((flow_id, executions))
+        return {"flow": self.flows[flow_id].name, "executions": len(executions)}
 
     def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
         account = getattr(error, "account", None)
@@ -232,11 +287,11 @@ class FakeRiskAdapter:
         self.snapshots: list[FlowSnapshot] = []
         self._failures = failures
 
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> Sequence[object]:
+    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:
         self._failures.raise_if_failing(flow_id, CycleStep.RISK_CHECK)
         self.snapshots.append(snapshot)
         assert isinstance(decisions, list)
-        return list(decisions)
+        return RiskReview(tuple(decisions), {asset: "approvata" for asset in decisions})
 
 
 class FakeOrderAdapter:
@@ -255,3 +310,16 @@ class FakeOrderAdapter:
             raise FakeTransientError(message)
         self.sent.append((flow_id, planned_at, order))
         return {"order": order, "filled": True}
+
+
+class FakeCycleJournalAdapter:
+    """Describes every result as text: what the real journal does per type, the fake does with its representation."""
+
+    def __init__(self) -> None:
+        self.cost: CallCost | None = CallCost(1000, 200, Decimal("0.002"))
+
+    def describe(self, step: CycleStep, result: object) -> dict[str, object]:
+        return {"step": step.value, "result": repr(result)}
+
+    def call_cost(self, decision: object) -> CallCost | None:  # noqa: ARG002 - the same cost for every call
+        return self.cost

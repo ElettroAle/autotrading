@@ -4,9 +4,10 @@ import logging
 import os
 import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from enum import Enum
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
@@ -51,12 +52,10 @@ from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumPr
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
-from autotrading.adapters.outbound.sqlalchemy.cycle_repository import (
-    SqlAlchemyCycleRepositoryAdapter,
-    SqlAlchemyFlowLockAdapter,
-    SqlAlchemyScheduledFlowsAdapter,
-    TenantScheduledFlow,
+from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
+    SqlAlchemyClosedPositionRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
@@ -69,6 +68,11 @@ from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchemySampleRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.scheduling import (
+    SqlAlchemyFlowLockAdapter,
+    SqlAlchemyScheduledFlowsAdapter,
+    TenantScheduledFlow,
+)
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
@@ -103,6 +107,7 @@ from autotrading.application.cycles.ports import (
     ClockPort,
     CycleLauncherPort,
     FlowSnapshot,
+    RiskReview,
     ScheduledFlow,
     SourceReading,
     SourceRequest,
@@ -171,7 +176,9 @@ from autotrading.domain.agent.errors import (
 )
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
-from autotrading.domain.cycles.cycle_record import AbsentSource
+from autotrading.domain.cycles.call_cost import CallCost
+from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.errors import ModelRequiredError
@@ -280,6 +287,16 @@ class ProviderKeyUsageFromFlows:
             for flow in self._flows.list()
             if flow.status.not_stopped and flow.model_provider == provider.value
         ]
+
+
+class FlowDirectoryFromFlows:
+    """Bridges the flows context to the cycles context (ADR 0046): the flows of the tenant are those it can consult."""
+
+    def __init__(self, flows: FlowRepositoryPort) -> None:
+        self._flows = flows
+
+    def exists(self, flow_id: UUID) -> bool:
+        return any(flow.id.value == flow_id for flow in self._flows.list())
 
 
 class FlowAccountsFromAccounts:
@@ -548,6 +565,9 @@ class TenantUseCaseFactory:
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
             clock=now,
+            closed_positions=SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id),
+            cycle_history=SqlAlchemyCycleRepositoryAdapter(self._engine, tenant_id),
+            flow_directory=FlowDirectoryFromFlows(flows),
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -672,6 +692,7 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
     public = httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS)
     testnet = environment == "dev"
     return CycleServices(
+        environment=environment,
         clock=SystemClock(),
         catalog=MODEL_CATALOG,
         provider_key_opener=SodiumProviderKeyOpenerAdapter(private_keys),
@@ -891,6 +912,7 @@ class CycleServices:
     news: NewsPort
     prices: PriceHistoryPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
+    environment: str
 
 
 type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
@@ -968,8 +990,9 @@ class FlowStateFromFlows:
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> None:
-        """Nothing to keep yet: the next cycle reads the state of the flow from the exchange again (R1.6.1)."""
+    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
+        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
+        return self.read(flow_id).state
 
 
 PROVIDER_ERRORS = (ModelKeyRejectedError, ModelCreditExhaustedError, ModelKeyMissingError, ProviderKeyNotOpenedError)
@@ -1148,7 +1171,7 @@ class RiskFromFlows:
     def __init__(self, exchange_limits: Mapping[str, ExchangeLimitsPort]) -> None:
         self._exchange_limits = exchange_limits
 
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> Sequence[object]:  # noqa: ARG002 - the signature of the port
+    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:  # noqa: ARG002 - the signature of the port
         if not isinstance(decisions, CycleDecisions):
             raise FlowOfCycleNotFoundError
         cycle_flow = decisions.flow
@@ -1165,11 +1188,12 @@ class RiskFromFlows:
             state,
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
-        return [
+        orders = tuple(
             CycleOrder(cycle_flow, outcome)
             for outcome in outcomes
             if isinstance(outcome, (ApprovedOpening, ApprovedClose))
-        ]
+        )
+        return RiskReview(orders, tuple(outcomes))
 
 
 def _intent_of(decision: Decision) -> TradeIntent:
@@ -1204,6 +1228,111 @@ def _flow_order_of(outcome: ApprovedOpening | ApprovedClose) -> FlowOrder:
     return FlowOpening(outcome.asset, Direction(outcome.side.value), outcome.value, outcome.leverage)
 
 
+class CycleJournalFromContexts:
+    """Describes for the record what each step produced, with the data of the context behind it (R1.7.1, ADR 0042).
+
+    Only the types of the cycle travel here: none of them carries a credential or a provider key.
+    """
+
+    def __init__(self, environment: str) -> None:
+        self._environment = environment
+
+    def describe(self, step: CycleStep, result: object) -> Mapping[str, object]:
+        if isinstance(result, CycleFlow):
+            return self._flow_of(result) if step is CycleStep.READ_FLOW_STATE else {"stato": _state_document(result)}
+        if isinstance(result, CycleContext):
+            messages = result.agent_context.messages()
+            return {"messaggi": [{"ruolo": message.role.value, "contenuto": message.content} for message in messages]}
+        if isinstance(result, CycleDecisions):
+            return _decisions_document(result.answer)
+        if isinstance(result, RiskReview):
+            return {"esiti": json_of(result.outcomes), "ordini_approvati": len(result.orders)}
+        if step is CycleStep.COLLECT_SOURCES and isinstance(result, list):
+            return {"fonti": [_reading_document(reading) for reading in result if isinstance(reading, SourceReading)]}
+        return {"risultato": json_of(result)}
+
+    def call_cost(self, decision: object) -> CallCost | None:
+        if not isinstance(decision, CycleDecisions):
+            return None
+        usage = decision.answer.usage
+        return CallCost(usage.input_tokens, usage.output_tokens, decision.answer.cost_usd)
+
+    def _flow_of(self, cycle_flow: CycleFlow) -> dict[str, object]:
+        configuration = cycle_flow.configuration
+        return {
+            "utente": str(cycle_flow.tenant_id.value),
+            "flusso": cycle_flow.flow.name.value,
+            "conto": cycle_flow.account_name,
+            "exchange": cycle_flow.exchange,
+            "ambiente": self._environment,
+            "versione": configuration.version,
+            "fornitore": configuration.model.name.partition("/")[0],
+            "modello": configuration.model.name,
+            "pesi_fonti": {source.name: source.weight for source in configuration.sources},
+            "stato": _state_document(cycle_flow),
+        }
+
+
+def _state_document(cycle_flow: CycleFlow) -> object:
+    return json_of(_state_view(cycle_flow))
+
+
+def _reading_document(reading: SourceReading) -> dict[str, object]:
+    return {"fonte": reading.source, "dati": json_of(reading.data)}
+
+
+def _decisions_document(answer: AgentAnswer) -> dict[str, object]:
+    response = answer.response
+    return {
+        "risposta": response.raw,
+        "decisioni": json_of(response.decisions),
+        "scartate": json_of(response.discarded),
+        "mancanti": list(response.missing),
+    }
+
+
+def json_of(value: object) -> object:
+    """The value as JSON data: the record of a cycle keeps what each step produced as it was (R1.7.1)."""
+    if value is None or isinstance(value, (bool, int, str, Decimal, UUID, datetime, Enum)):
+        return _scalar_of(value)
+    if isinstance(value, Mapping):
+        return {str(key): json_of(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, frozenset, set)):
+        return [json_of(item) for item in value]
+    if is_dataclass(value) and not isinstance(value, type):
+        document: dict[str, object] = {"tipo": type(value).__name__}
+        document.update({each.name: json_of(getattr(value, each.name)) for each in fields(value)})
+        return document
+    return str(value)
+
+
+def _scalar_of(value: object) -> object:
+    if isinstance(value, Enum):
+        return json_of(value.value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (Decimal, UUID)):
+        return str(value)
+    return value
+
+
+class CyclesOfTenants:
+    """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
+
+    def __init__(self, engine: Engine, directory: FlowDirectory) -> None:
+        self._engine = engine
+        self._directory = directory
+
+    def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
+        return self._of(flow_id).claim(flow_id, planned_at)
+
+    def record(self, record: CycleRecord) -> None:
+        self._of(record.flow_id).record(record)
+
+    def _of(self, flow_id: UUID) -> SqlAlchemyCycleRepositoryAdapter:
+        return SqlAlchemyCycleRepositoryAdapter(self._engine, self._directory.tenant_of(flow_id))
+
+
 @dataclass(frozen=True, slots=True)
 class CycleRuntime:
     """Where the worker finds the flows to plan, what keeps each cycle unique and alone, and how a cycle runs."""
@@ -1224,6 +1353,7 @@ def run_due_cycles(
         agent=AgentFromAgent(ports_of, services),
         risk=RiskFromFlows(services.exchange_limits),
         orders=OrdersFromOrders(ports_of),
+        journal=CycleJournalFromContexts(services.environment),
     )
     flows = ScheduledFlowsFromFlows(runtime.scheduled, directory)
     return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, runtime.guards), runtime.launcher, services.clock)
@@ -1239,7 +1369,7 @@ def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, servi
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
     directory = FlowDirectory()
     guards = CycleGuards(
-        cycles=SqlAlchemyCycleRepositoryAdapter(engine, directory.tenant_of),
+        cycles=CyclesOfTenants(engine, directory),
         lock=SqlAlchemyFlowLockAdapter(engine),
         pause=FlowPauseFromFlows(directory, ports_of),
         clock=services.clock,

@@ -1,17 +1,16 @@
-"""The cycles of the flows, their forecasts, and what the worker needs to plan them across tenants.
+"""The forecasts of the flows, and what the worker needs to plan their cycles across tenants.
 
 R1.2.1-R1.2.5, R1.3.5, ADR 0042.
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0014
+Revises: 0013
 """
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
-revision = "0013"
-down_revision = "0012"
+revision = "0014"
+down_revision = "0013"
 branch_labels = None
 depends_on = None
 
@@ -21,7 +20,6 @@ TENANT_OF_TRANSACTION = "NULLIF(current_setting('app.tenant_id', true), '')::uui
 
 def upgrade() -> None:
     _flows_for_the_scheduler()
-    _cycles()
     _forecasts()
 
 
@@ -62,28 +60,6 @@ def _flows_for_the_scheduler() -> None:
     )
 
 
-def _cycles() -> None:
-    op.create_table(
-        "cycles",
-        # One row per planned instant of a flow: of two executors, only the first one takes it (R1.2.2).
-        sa.Column("flow_id", sa.Uuid, primary_key=True),
-        sa.Column("planned_at", sa.DateTime(timezone=True), primary_key=True),
-        sa.Column("tenant_id", sa.Uuid, nullable=False),
-        sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("outcome", sa.Text),
-        sa.Column("started_at", sa.DateTime(timezone=True)),
-        sa.Column("delay_seconds", sa.Integer),
-        sa.Column("steps", postgresql.JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
-        sa.Column("absent_sources", postgresql.JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
-        sa.Column("failure", postgresql.JSONB),
-        sa.Column("recorded_at", sa.DateTime(timezone=True)),
-        sa.ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
-        sa.CheckConstraint("outcome IN ('completed', 'failed', 'skipped')", name="cycles_outcome_known"),
-    )
-    _of_tenant("cycles")
-    op.execute(f"GRANT SELECT, INSERT, UPDATE ON cycles TO {APPLICATION_ROLE}")
-
-
 def _forecasts() -> None:
     op.create_table(
         "forecasts",
@@ -115,7 +91,6 @@ def _of_tenant(table: str) -> None:
 
 def downgrade() -> None:
     op.drop_table("forecasts")
-    op.drop_table("cycles")
     op.execute("DROP POLICY flow_versions_scheduled ON flow_versions")
     op.execute("DROP POLICY flows_scheduled ON flows")
     op.execute("DROP TRIGGER flows_follow_status ON flows")

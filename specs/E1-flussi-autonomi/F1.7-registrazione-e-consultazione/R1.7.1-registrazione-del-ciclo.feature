@@ -1,5 +1,5 @@
 # language: it
-@R1.7.1 @wip
+@R1.7.1
 Funzionalità: R1.7.1 Registrazione completa del ciclo
   Come utente
   Voglio che ogni ciclo sia registrato con tutto ciò che lo ha prodotto
@@ -18,6 +18,8 @@ Funzionalità: R1.7.1 Registrazione completa del ciclo
   Contesto:
     Dato che "anna" ha il flusso "alfa" alla versione di configurazione 3 con modello "openrouter/deepseek-chat"
 
+  # @wip: i contenuti (versione, modello, pesi, contesto, rischio) arrivano dal ponte di integrazione dei cicli.
+  @wip
   Scenario: Ciclo concluso registrato per intero
     Quando il flusso "alfa" esegue un ciclo concluso con un'apertura su "BTC"
     Allora il ciclo registrato contiene:

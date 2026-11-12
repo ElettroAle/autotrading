@@ -1,9 +1,12 @@
 import logging
 from collections.abc import Iterator
+from decimal import Decimal
 
 import pytest
 
+from autotrading.application.cycles.ports import RiskReview
 from autotrading.application.cycles.run_cycle import RunCycleCommand
+from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_step import CycleStep
 from tests.fakes.cycles import ACTIVE, PAUSED, FakePermanentError, FakeTransientError
@@ -27,10 +30,65 @@ def run(cycles: Cycles, started: str = "10:22:00") -> CycleRecord | None:
 def test_a_completed_cycle_runs_every_step_and_is_recorded(cycles: Cycles) -> None:
     record = run(cycles)
 
-    assert record == CycleRecord(
-        cycles.id_of("alfa"), at("10:22:00"), CycleOutcome.COMPLETED, at("10:22:00"), None, tuple(CycleStep)
+    assert record is not None
+    assert (record.flow_id, record.planned_at, record.outcome) == (
+        cycles.id_of("alfa"),
+        at("10:22:00"),
+        CycleOutcome.COMPLETED,
     )
+    assert (record.started_at, record.delay_seconds, record.steps) == (at("10:22:00"), None, tuple(CycleStep))
     assert cycles.records.records == [record]
+
+
+def test_a_completed_cycle_records_what_every_step_produced(cycles: Cycles) -> None:
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC"]
+
+    record = run(cycles)
+
+    assert record is not None
+    assert [document.step for document in record.documents] == list(CycleStep)[:-1]
+    assert record.document(CycleStep.READ_FLOW_STATE) == described(
+        CycleStep.READ_FLOW_STATE, {"flow": "alfa", "positions": []}
+    )
+    assert record.document(CycleStep.COLLECT_SOURCES) == described(CycleStep.COLLECT_SOURCES, [])
+    assert record.document(CycleStep.AGENT_DECISION) == described(CycleStep.AGENT_DECISION, ["BTC"])
+    assert record.document(CycleStep.RISK_CHECK) == described(
+        CycleStep.RISK_CHECK, RiskReview(("BTC",), {"BTC": "approvata"})
+    )
+    assert record.document(CycleStep.ORDER_EXECUTION) == described(
+        CycleStep.ORDER_EXECUTION, [{"order": "BTC", "filled": True}]
+    )
+    assert record.document(CycleStep.UPDATE_FLOW_STATE) == described(
+        CycleStep.UPDATE_FLOW_STATE, {"flow": "alfa", "executions": 1}
+    )
+
+
+def test_a_completed_cycle_records_the_cost_of_the_model_call(cycles: Cycles) -> None:
+    cycles.journal.cost = CallCost(2000, 500, Decimal("0.0031"))
+
+    record = run(cycles)
+
+    assert record is not None
+    assert record.cost == CallCost(2000, 500, Decimal("0.0031"))
+
+
+def test_a_failed_cycle_records_what_it_produced_up_to_the_error(cycles: Cycles) -> None:
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakeTransientError("timeout"))
+
+    record = run(cycles)
+
+    assert record is not None
+    assert [document.step for document in record.documents] == [
+        CycleStep.READ_FLOW_STATE,
+        CycleStep.COLLECT_SOURCES,
+        CycleStep.COMPOSE_CONTEXT,
+    ]
+    assert record.document(CycleStep.AGENT_DECISION) is None
+    assert record.cost is None
+
+
+def described(step: CycleStep, result: object) -> dict[str, object]:
+    return {"step": step.value, "result": repr(result)}
 
 
 def test_the_cycle_carries_the_data_from_step_to_step(cycles: Cycles) -> None:

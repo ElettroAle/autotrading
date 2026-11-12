@@ -17,6 +17,7 @@ from tests.fakes.cycles import (
     FakeAgentAdapter,
     FakeClockAdapter,
     FakeContextAdapter,
+    FakeCycleJournalAdapter,
     FakeFlow,
     FakeFlowsAdapter,
     FakeOrderAdapter,
@@ -50,13 +51,14 @@ class Cycles:
         self.agent = FakeAgentAdapter(self.failures)
         self.risk = FakeRiskAdapter(self.failures)
         self.orders = FakeOrderAdapter(self.failures)
+        self.journal = FakeCycleJournalAdapter()
         self.launcher = ThreadCycleLauncherAdapter()
         self.raised: AutotradingError | None = None
         self.executors = [self._executor()]
 
     def run_cycle(self) -> RunCycleUseCase:
         collector = SourceCollector(self.sources, lambda wait: wait.total_seconds() * SECOND)
-        steps = CycleSteps(self.flows, collector, self.context, self.agent, self.risk, self.orders)
+        steps = CycleSteps(self.flows, collector, self.context, self.agent, self.risk, self.orders, self.journal)
         return RunCycleUseCase(steps, CycleGuards(self.records, self.lock, self.flows, self.clock))
 
     def _executor(self) -> RunDueCyclesUseCase:
@@ -65,9 +67,16 @@ class Cycles:
     def add_executor(self) -> None:
         self.executors.append(self._executor())
 
-    def add_flow(self, name: str, minutes: int = 15, anchor: str = "10:00:00", sources: tuple[str, ...] = ()) -> None:
+    def add_flow(
+        self,
+        name: str,
+        minutes: int = 15,
+        anchor: str = "10:00:00",
+        sources: tuple[str, ...] = (),
+        flow_id: UUID | None = None,
+    ) -> None:
         schedule = CycleSchedule(at(anchor), timedelta(minutes=minutes))
-        self.flows.flows[uuid4()] = FakeFlow(name, schedule, sources)
+        self.flows.flows[uuid4() if flow_id is None else flow_id] = FakeFlow(name, schedule, sources)
 
     def id_of(self, name: str) -> UUID:
         return next(flow_id for flow_id, flow in self.flows.flows.items() if flow.name == name)

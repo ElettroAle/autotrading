@@ -1,12 +1,15 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
+from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.cycles.flow_cost import CycleCost
 from autotrading.domain.errors import AutotradingError
 
 
@@ -48,6 +51,17 @@ class SourceReading:
     data: object
 
 
+@dataclass(frozen=True, slots=True)
+class RiskReview:
+    """The orders the risk check approved, and the outcome of every decision; the execution orders them (R1.5.5).
+
+    The outcomes travel only to the record: approved, reduced, blocked or discarded (R1.7.1).
+    """
+
+    orders: tuple[object, ...]
+    outcomes: object
+
+
 class ClockPort(Protocol):
     def now(self) -> datetime: ...
 
@@ -81,7 +95,9 @@ class CycleLauncherPort(Protocol):
 class FlowStatePort(Protocol):
     def read(self, flow_id: UUID) -> FlowSnapshot: ...
 
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> None: ...
+    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:
+        """Applies the executions of the cycle and gives back the state of the flow at the end of it."""
+        ...
 
 
 class SourcePort(Protocol):
@@ -107,9 +123,7 @@ class AgentPort(Protocol):
 
 
 class RiskPort(Protocol):
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> Sequence[object]:
-        """The orders approved by the risk check; the execution decides the order they are sent in (R1.5.5)."""
-        ...
+    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview: ...
 
 
 class OrderPort(Protocol):
@@ -121,4 +135,36 @@ class OrderPort(Protocol):
 class FlowPausePort(Protocol):
     def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
         """Pauses every active flow the permanent error involves, with the message of the error as reason (R1.2.4)."""
+        ...
+
+
+class CycleJournalPort(Protocol):
+    """Describes for the record what the steps produced: only the contexts behind the steps know their data."""
+
+    def describe(self, step: CycleStep, result: object) -> Mapping[str, object]:
+        """The result of the step as JSON data; a credential never appears in it (R1.7.1)."""
+        ...
+
+    def call_cost(self, decision: object) -> CallCost | None:
+        """Tokens and cost of the model call behind the decision of the agent (R1.4.6)."""
+        ...
+
+
+class CycleHistoryPort(Protocol):
+    """Bound to the tenant of the request: it never shows the cycles of a flow of another tenant."""
+
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+        """The cycles of the flow from the most recent planned instant."""
+        ...
+
+    def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None: ...
+
+    def costs(self, flow_id: UUID) -> list[CycleCost]:
+        """The cost of every cycle of the flow that called the model."""
+        ...
+
+
+class FlowDirectoryPort(Protocol):
+    def exists(self, flow_id: UUID) -> bool:
+        """True when the flow belongs to the tenant of the request."""
         ...

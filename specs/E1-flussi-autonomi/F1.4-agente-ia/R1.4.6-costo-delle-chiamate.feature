@@ -1,5 +1,5 @@
 # language: it
-@R1.4.6 @wip
+@R1.4.6
 Funzionalità: R1.4.6 Costo delle chiamate al modello
   Come utente
   Voglio conoscere il costo di ogni chiamata al modello e il totale per flusso
@@ -15,17 +15,21 @@ Funzionalità: R1.4.6 Costo delle chiamate al modello
   Contesto:
     Dato che "anna" ha il flusso "alfa"
 
+  # @wip: token e costo della chiamata arrivano al ciclo dal ponte di integrazione con il contesto agent.
+  @wip
   Scenario: Costo riportato dal fornitore
     Dato che il fornitore riporta per la chiamata 2000 token in ingresso, 500 in uscita e costo 0,0031 USD
     Quando il flusso "alfa" esegue un ciclo
     Allora il ciclo registra 2000 token in ingresso, 500 in uscita e costo 0,0031 USD
 
+  @wip
   Scenario: Costo calcolato dai prezzi del catalogo
     Dato che il fornitore non riporta il costo e riporta 1000 token in ingresso e 1000 in uscita
     E che il catalogo prezza il modello 1 USD per milione di token in ingresso e 2 USD per milione in uscita
     Quando il flusso "alfa" esegue un ciclo
     Allora il ciclo registra costo 0,003 USD
 
+  @wip
   Scenario: Costo non disponibile
     Dato che né il fornitore né il catalogo riportano il prezzo
     Quando il flusso "alfa" esegue un ciclo

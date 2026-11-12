@@ -180,21 +180,24 @@ telegram_chats = Table(
     Column("linked_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
-# One row per planned instant of a flow, taken before the cycle runs and completed when it is recorded (ADR 0042).
+# One row per planned instant of a flow: taking the row is what keeps a planned cycle unique (ADR 0041, ADR 0046).
 cycles = Table(
     "cycles",
     metadata,
     Column("flow_id", Uuid, primary_key=True),
     Column("planned_at", DateTime(timezone=True), primary_key=True),
     Column("tenant_id", Uuid, nullable=False),
-    Column("claimed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Empty while the cycle is in progress: the row is taken before the cycle runs.
     Column("outcome", Text),
     Column("started_at", DateTime(timezone=True)),
     Column("delay_seconds", Integer),
-    Column("steps", JSON, nullable=False),
-    Column("absent_sources", JSON, nullable=False),
+    Column("steps", JSON),
+    Column("absent_sources", JSON),
     Column("failure", JSON),
-    Column("recorded_at", DateTime(timezone=True)),
+    Column("documents", JSON),
+    Column("input_tokens", Integer),
+    Column("output_tokens", Integer),
+    Column("cost_usd", Numeric),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 
@@ -211,6 +214,26 @@ forecasts = Table(
     Column("history_days", Integer, nullable=False),
     Column("shortened", Boolean, nullable=False),
     Column("actual_price", Numeric),
+)
+
+closed_positions = Table(
+    "closed_positions",
+    metadata,
+    Column("id", Uuid, primary_key=True, server_default=text("gen_random_uuid()")),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("flow_id", Uuid, nullable=False),
+    Column("asset", Text, nullable=False),
+    Column("side", Text, nullable=False),
+    Column("leverage", Integer, nullable=False),
+    Column("margin", Numeric, nullable=False),
+    Column("open_price", Numeric, nullable=False),
+    Column("opened_at", DateTime(timezone=True), nullable=False),
+    Column("opening_cycle", DateTime(timezone=True)),
+    Column("close_price", Numeric, nullable=False),
+    Column("closed_at", DateTime(timezone=True), nullable=False),
+    Column("closing_cycle", DateTime(timezone=True)),
+    Column("fees", Numeric, nullable=False),
+    Column("reason", Text, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 

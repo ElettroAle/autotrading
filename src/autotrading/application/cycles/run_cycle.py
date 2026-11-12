@@ -8,6 +8,7 @@ from autotrading.application.cycles.ports import (
     AgentPort,
     ClockPort,
     ContextPort,
+    CycleJournalPort,
     CycleRepositoryPort,
     FlowLockPort,
     FlowPausePort,
@@ -17,7 +18,14 @@ from autotrading.application.cycles.ports import (
     SourceRequest,
 )
 from autotrading.application.cycles.source_collector import SourceCollector
-from autotrading.domain.cycles.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
+from autotrading.domain.cycles.call_cost import CallCost
+from autotrading.domain.cycles.cycle_record import (
+    AbsentSource,
+    CycleFailure,
+    CycleOutcome,
+    CycleRecord,
+    StepDocument,
+)
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule, delay_seconds
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
@@ -42,6 +50,7 @@ class CycleSteps:
     agent: AgentPort
     risk: RiskPort
     orders: OrderPort
+    journal: CycleJournalPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,14 +67,20 @@ class CycleGuards:
 class _Progress:
     command: RunCycleCommand
     started_at: datetime
+    journal: CycleJournalPort
     done: list[CycleStep] = field(default_factory=list)
+    documents: list[StepDocument] = field(default_factory=list)
     absent: tuple[AbsentSource, ...] = ()
+    cost: CallCost | None = None
     current: CycleStep = CycleStep.READ_FLOW_STATE
 
-    def run[T](self, step: CycleStep, action: Callable[[], T]) -> T:
+    def run[T](self, step: CycleStep, action: Callable[[], T], recorded: Callable[[T], object] | None = None) -> T:
+        """Runs the step and keeps what it produced, or the part of it that the record wants."""
         self.current = step
         result = action()
         self.done.append(step)
+        kept = result if recorded is None else recorded(result)
+        self.documents.append(StepDocument(step, self.journal.describe(step, kept)))
         return result
 
     def record(self, outcome: CycleOutcome, failure: CycleFailure | None = None) -> CycleRecord:
@@ -78,6 +93,8 @@ class _Progress:
             steps=tuple(self.done),
             absent_sources=self.absent,
             failure=failure,
+            documents=tuple(self.documents),
+            cost=self.cost,
         )
 
 
@@ -98,7 +115,7 @@ class RunCycleUseCase:
         with self._guards.lock.hold(command.flow_id) as acquired:
             if not acquired:
                 return self._recorded(CycleRecord.skipped(command.flow_id, command.planned_at))
-            return self._run(_Progress(command, self._guards.clock.now()))
+            return self._run(_Progress(command, self._guards.clock.now(), self._steps.journal))
 
     def _run(self, progress: _Progress) -> CycleRecord:
         try:
@@ -111,20 +128,26 @@ class RunCycleUseCase:
     def _steps_of(self, progress: _Progress) -> None:
         flow_id, planned_at = progress.command.flow_id, progress.command.planned_at
         steps = self._steps
-        snapshot = progress.run(CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id))
+        snapshot = progress.run(
+            CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id), lambda read: read.state
+        )
         readings, absent = progress.run(
             CycleStep.COLLECT_SOURCES,
             lambda: steps.sources.collect(
                 SourceRequest(flow_id, planned_at, snapshot), progress.command.schedule.source_wait
             ),
+            lambda collected: collected[0],
         )
         progress.absent = tuple(absent)
         context = progress.run(
             CycleStep.COMPOSE_CONTEXT, lambda: steps.context.compose(flow_id, snapshot, readings, absent)
         )
         decisions = progress.run(CycleStep.AGENT_DECISION, lambda: steps.agent.decide(flow_id, context))
-        orders = progress.run(CycleStep.RISK_CHECK, lambda: steps.risk.check(flow_id, snapshot, decisions))
-        executions = progress.run(CycleStep.ORDER_EXECUTION, lambda: steps.orders.execute(flow_id, planned_at, orders))
+        progress.cost = steps.journal.call_cost(decisions)
+        review = progress.run(CycleStep.RISK_CHECK, lambda: steps.risk.check(flow_id, snapshot, decisions))
+        executions = progress.run(
+            CycleStep.ORDER_EXECUTION, lambda: steps.orders.execute(flow_id, planned_at, review.orders)
+        )
         progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.flow_state.update(flow_id, executions))
 
     def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:
