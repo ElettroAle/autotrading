@@ -30,7 +30,9 @@ def test_a_flow_name_is_required(name: str) -> None:
 
 
 def test_every_new_flow_id_is_different() -> None:
-    assert FlowId.new() != FlowId.new()
+    first, second = FlowId.new(), FlowId.new()
+
+    assert first != second
 
 
 @pytest.mark.parametrize("minutes", [1, 15, 1440])

@@ -33,6 +33,8 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
 - Nessun limite di spesa sulla piattaforma: il flusso va in pausa solo quando il fornitore dichiara il
   credito esaurito o la chiave non valida (errore permanente, contesto `cycles`).
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
+- Formato della risposta, lettura delle decisioni, contesto e costo sono regole del domain (`AgentResponse`,
+  `AgentContext`, `ModelUsage`, ADR 0038): le chiavi della risposta sono i nomi dei campi dei motivi di scarto.
 
 - Una chiave si verifica presso il fornitore con un endpoint gratuito che la richiede (ADR 0029); il
   catalogo dei modelli è `adapters/outbound/json/models.json` (ADR 0030).
