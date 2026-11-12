@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from autotrading.adapters.outbound.httpx.telegram import (
+    HttpxTelegramBotIdentityAdapter,
     HttpxTelegramInboxAdapter,
     HttpxTelegramMessengerAdapter,
     TelegramTokenFilter,
@@ -157,3 +158,50 @@ def test_the_filter_lets_every_record_through() -> None:
 
     assert TelegramTokenFilter(FAKE_BOT).filter(record)
     assert record.getMessage() == "plain"
+
+
+def test_the_bot_username_comes_from_get_me_once_and_is_kept() -> None:
+    requests: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200, json={"ok": True, "result": {"id": 7, "is_bot": True, "username": "autotrading_bot"}}
+        )
+
+    identity = HttpxTelegramBotIdentityAdapter(client_answering(answer))
+
+    assert identity.username() == "autotrading_bot"
+    assert identity.username() == "autotrading_bot"
+    [request] = requests
+    assert (request.method, str(request.url)) == ("GET", f"{BASE}/getMe")
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        refusing,
+        lambda _: httpx.Response(401, json={"ok": False, "result": {"username": "autotrading_bot"}}),
+        lambda _: httpx.Response(200, json={"ok": True, "result": {"id": 7}}),
+        lambda _: httpx.Response(200, json={"ok": True, "result": {"username": ""}}),
+        lambda _: httpx.Response(200, json={"ok": True, "result": "autotrading_bot"}),
+        lambda _: httpx.Response(200, text="not json"),
+        lambda _: httpx.Response(200, json=["autotrading_bot"]),
+    ],
+)
+def test_a_get_me_without_a_username_gives_none_and_is_asked_again(
+    answer: Callable[[httpx.Request], httpx.Response], caplog: pytest.LogCaptureFixture
+) -> None:
+    calls: list[int] = []
+
+    def counted(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return answer(request)
+
+    identity = HttpxTelegramBotIdentityAdapter(client_answering(counted))
+
+    with caplog.at_level(logging.DEBUG):
+        assert identity.username() is None
+        assert identity.username() is None
+    assert len(calls) == 2
+    assert FAKE_BOT not in caplog.text

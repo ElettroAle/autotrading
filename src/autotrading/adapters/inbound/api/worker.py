@@ -21,6 +21,7 @@ from autotrading.application.flows.read_account_activity import (
     ReadAccountActivityUseCase,
 )
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.ports import BotIdentityPort
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -131,11 +132,18 @@ def background(loops: Sequence[BackgroundLoop]) -> Callable[[FastAPI], AbstractA
     return lifespan
 
 
+class BotResponse(BaseModel):
+    """The username of the platform bot; none while the worker runs without one (R1.8.1)."""
+
+    username: str | None
+
+
 def create_worker_api(
     token: str,
     for_tenant: Callable[[TenantId], WorkerUseCases],
     bot: BotPolling | None = None,
     cycles: CyclePolling | None = None,
+    bot_identity: BotIdentityPort | None = None,
 ) -> FastAPI:
     """The internal service of the worker: reachable only by the API on the network of the installation (ADR 0021).
 
@@ -184,6 +192,10 @@ def create_worker_api(
         command = RunExchangeVerificationCommand(account_id, UserId(request.user_id))
         run = for_tenant(TenantId(tenant_id)).run_exchange_verification.execute(command)
         return VerificationRunResponse.of(run)
+
+    @api.get("/bot", dependencies=[Depends(require_api)])
+    def read_bot() -> BotResponse:
+        return BotResponse(username=None if bot_identity is None else bot_identity.username())
 
     @api.get("/health")
     def read_health() -> dict[str, str]:

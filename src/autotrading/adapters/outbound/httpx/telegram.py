@@ -52,6 +52,34 @@ class HttpxTelegramMessengerAdapter:
             raise MessageNotDeliveredError from None
 
 
+class HttpxTelegramBotIdentityAdapter:
+    """The username of the platform bot, from Telegram itself: never written in the configuration (R1.8.1).
+
+    Asked once and kept; a failed answer is not kept, so the next request asks again.
+    """
+
+    def __init__(self, client: httpx.Client) -> None:
+        self._client = client
+        self._username: str | None = None
+
+    def username(self) -> str | None:
+        if self._username is None:
+            self._username = self._read()
+        return self._username
+
+    def _read(self) -> str | None:
+        try:
+            response = self._client.get("/getMe", timeout=SEND_TIMEOUT_SECONDS)
+            response.raise_for_status()
+            document = response.json()
+        except httpx.HTTPError, ValueError:
+            # Without the cause: its text names the URL, and the URL carries the token.
+            return None
+        result = document.get("result") if isinstance(document, Mapping) else None
+        username = result.get("username") if isinstance(result, Mapping) else None
+        return username if isinstance(username, str) and username else None
+
+
 class HttpxTelegramInboxAdapter:
     """Receives the messages sent to the platform bot by long polling: no inbound port is ever open (ADR 0035).
 

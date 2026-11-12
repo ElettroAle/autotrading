@@ -27,7 +27,13 @@ Le notifiche all'utente su Telegram.
 - Il codice si salva solo come digest; il bot trova il tenant dal digest e riscatta il codice con le porte
   legate a quel tenant. Il bot gira nel worker; senza token le notifiche sono disattivate, mai un errore
   di avvio (ADR 0035).
+- Il codice si legge da solo o dopo il comando di avvio; un messaggio senza codice, o un altro comando,
+  riceve le istruzioni per il collegamento, mai "codice non valido" (Bug 163).
+- Il codice arriva con il link `t.me/<bot>?start=<codice>`; il nome del bot si chiede a Telegram (`getMe`)
+  nel worker, l'API lo chiede al worker; senza bot attivo il link è assente e il codice vale lo stesso
+  (ADR 0072).
 
 ## Porte del contesto
 
-Repository delle chat collegate e dei codici, invio dei messaggi, ricezione dei messaggi al bot.
+Repository delle chat collegate e dei codici, invio dei messaggi, ricezione dei messaggi al bot, nome del
+bot (`BotIdentityPort`).
