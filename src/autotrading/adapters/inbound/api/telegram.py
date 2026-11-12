@@ -10,14 +10,16 @@ from autotrading.application.notifications.request_link_code import IssuedLinkCo
 
 
 class LinkCodeResponse(BaseModel):
-    """The code the user sends to the bot from the chat to link, and until when it is valid (R1.8.1)."""
+    """The code the user sends to the bot from the chat to link, until when it is valid, and the link that sends it
+    in one tap; no link while the bot is not active (R1.8.1)."""
 
     code: str
     expires_at: datetime
+    link: str | None
 
     @classmethod
     def of(cls, issued: IssuedLinkCode) -> LinkCodeResponse:
-        return cls(code=issued.code, expires_at=issued.expires_at)
+        return cls(code=issued.code, expires_at=issued.expires_at, link=issued.link)
 
 
 class LinkedChatResponse(BaseModel):

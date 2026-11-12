@@ -15,6 +15,10 @@ operations = logging.getLogger("autotrading.notifications")
 LINKED = "collegamento riuscito: questa chat riceverà le notifiche dei tuoi flussi"
 # The same answer whether the code expired, was used or never existed: it reveals nothing (R1.8.1).
 INVALID_CODE = "codice non valido"
+HOW_TO_LINK = (
+    "per collegare questa chat chiedi un codice di collegamento alla piattaforma e invialo qui, "
+    "oppure apri il link che la piattaforma ti dà insieme al codice"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +43,11 @@ class LinkChatUseCase:
         self._clock = clock
 
     def execute(self, command: LinkChatCommand) -> None:
-        linked = self._redeem(LinkCode.in_message(command.message), command.chat_id)
+        code = LinkCode.in_message(command.message)
+        if code is None:
+            self._answer(command.chat_id, HOW_TO_LINK)
+            return
+        linked = self._redeem(code, command.chat_id)
         self._answer(command.chat_id, LINKED if linked else INVALID_CODE)
 
     def _redeem(self, code: LinkCode, chat_id: ChatId) -> bool:
