@@ -9,8 +9,12 @@ from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdk, OfficialSdk
 from autotrading.application.sources.errors import SourceUnavailableError
+from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.forecast import FORECAST
+from autotrading.domain.sources.market_snapshot import MarketSnapshot
+from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import PricePoint
+from autotrading.domain.sources.timeframe import Timeframe
 
 MINUTES_PER_DAY = 24 * 60
 # Hyperliquid keeps only the most recent 5000 candles of each interval (info endpoint, candleSnapshot).
@@ -19,6 +23,8 @@ INTERVALS = ((1, "1m"), (3, "3m"), (5, "5m"), (15, "15m"), (30, "30m"), (60, "1h
 # A time range answers in pages: the next page starts after the last candle received.
 MAX_PAGES = 20
 MILLISECONDS = 1000
+DAY = "1d"
+MARKET_DATA = "dati di mercato di Hyperliquid"
 # An exchange that refuses, does not answer or answers in another shape: the source is absent from the cycle.
 UNAVAILABLE = (ClientError, ServerError, requests.RequestException, KeyError, TypeError, InvalidOperation)
 
@@ -81,3 +87,67 @@ def _point_of(candle: Mapping[str, Any]) -> PricePoint:
 
 def _milliseconds(moment: datetime) -> int:
     return int(moment.timestamp() * MILLISECONDS)
+
+
+class HyperliquidMarketDataAdapter:
+    """Candles, current values and previous day of an asset from the public info endpoint (R1.3.3, R1.3.4, ADR 0057).
+
+    The candle still open is left out: its close and its volume change until it closes.
+    """
+
+    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+        self._base_url = base_url
+        self._sdk = sdk or OfficialSdk()
+        self._timeout = timeout
+
+    @classmethod
+    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidMarketDataAdapter:
+        return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
+
+    def candles(self, asset: str, timeframe: Timeframe, count: int, now: datetime) -> Sequence[Candle]:
+        end = _milliseconds(now)
+        start = _milliseconds(now - timedelta(minutes=timeframe.minutes * (count + 1)))
+        try:
+            page = self._info().candles_snapshot(asset, timeframe.label, start, end)
+            closed = [_candle_of(candle) for candle in page if int(candle["T"]) < end]
+        except UNAVAILABLE as error:
+            raise SourceUnavailableError(MARKET_DATA) from error
+        return closed[-count:]
+
+    def snapshot(self, asset: str) -> MarketSnapshot:
+        try:
+            meta, contexts = self._info().meta_and_asset_ctxs()
+            names = [market["name"] for market in meta["universe"]]
+            context = contexts[names.index(asset)]
+            return MarketSnapshot(
+                price=Decimal(context["markPx"]),
+                mid=Decimal(context["midPx"]),
+                open_interest=Decimal(context["openInterest"]),
+                funding_rate=Decimal(context["funding"]),
+            )
+        except (*UNAVAILABLE, ValueError, IndexError) as error:
+            raise SourceUnavailableError(MARKET_DATA) from error
+
+    def previous_day(self, asset: str, now: datetime) -> DailyRange:
+        today = datetime(now.year, now.month, now.day, tzinfo=UTC)
+        yesterday = _milliseconds(today - timedelta(days=1))
+        try:
+            page = self._info().candles_snapshot(asset, DAY, yesterday, _milliseconds(today) - 1)
+            days = [_range_of(candle) for candle in page if int(candle["t"]) == yesterday]
+        except UNAVAILABLE as error:
+            raise SourceUnavailableError(MARKET_DATA) from error
+        if not days:
+            raise SourceUnavailableError(MARKET_DATA)
+        return days[0]
+
+    def _info(self) -> Any:
+        return self._sdk.info(self._base_url, self._timeout)
+
+
+def _candle_of(candle: Mapping[str, Any]) -> Candle:
+    closed_at = datetime.fromtimestamp((int(candle["T"]) + 1) / MILLISECONDS, UTC)
+    return Candle(closed_at, Decimal(str(candle["c"])), Decimal(str(candle["v"])))
+
+
+def _range_of(candle: Mapping[str, Any]) -> DailyRange:
+    return DailyRange(high=Decimal(str(candle["h"])), low=Decimal(str(candle["l"])), close=Decimal(str(candle["c"])))

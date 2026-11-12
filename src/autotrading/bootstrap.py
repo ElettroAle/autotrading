@@ -39,7 +39,10 @@ from autotrading.adapters.outbound.httpx.telegram import (
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
-from autotrading.adapters.outbound.hyperliquid.market_data import HyperliquidPriceHistoryAdapter
+from autotrading.adapters.outbound.hyperliquid.market_data import (
+    HyperliquidMarketDataAdapter,
+    HyperliquidPriceHistoryAdapter,
+)
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
@@ -165,13 +168,16 @@ from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
     NewsPort,
+    MarketDataPort,
     PriceHistoryPort,
     SampleRepositoryPort,
     SentimentPort,
     SourceReaderPort,
 )
 from autotrading.application.sources.read_forecast import ReadForecastUseCase
+from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase
 from autotrading.application.sources.read_news import MAX_AGE_HOURS, ReadNewsUseCase
+from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand, RecordActualPricesUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
@@ -850,6 +856,7 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
         },
         news=HttpxRssNewsAdapter(public),
         prices=HyperliquidPriceHistoryAdapter.for_network(testnet=testnet),
+        market=HyperliquidMarketDataAdapter.for_network(testnet=testnet),
         exchange_limits=markets_for(environment),
     )
 
@@ -1058,6 +1065,7 @@ class CycleServices:
     sentiments: Mapping[str, SentimentPort]
     news: NewsPort
     prices: PriceHistoryPort
+    market: MarketDataPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
 
@@ -1188,16 +1196,19 @@ class SourcesFromSources:
             configuration.assets,
             self._services.clock.now(),
         )
-        collected = CollectSourceUseCase(SOURCE_CATALOG, self._readers_of(ports), ports.samples).execute(command)
+        readers = self._readers_of(ports, configuration.cycle_interval.minutes)
+        collected = CollectSourceUseCase(SOURCE_CATALOG, readers, ports.samples).execute(command)
         return agent_sources_of([collected]) or _nothing_collected(selection)
 
-    def _readers_of(self, ports: TenantCyclePorts) -> dict[str, SourceReaderPort]:
+    def _readers_of(self, ports: TenantCyclePorts, cycle_minutes: int) -> dict[str, SourceReaderPort]:
         services = self._services
         readers: dict[str, SourceReaderPort] = {
             name: ReadSentimentUseCase(sentiment) for name, sentiment in services.sentiments.items()
         }
         readers[NEWS.name] = ReadNewsUseCase(services.news)
         readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(services.prices, ports.forecasts))
+        readers[INDICATORS.name] = ReadIndicatorsUseCase(services.market, cycle_minutes)
+        readers[PIVOTS.name] = ReadPivotsUseCase(services.market)
         return readers
 
 

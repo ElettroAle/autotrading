@@ -5,10 +5,14 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.sources.candle import Candle
+from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.news_item import NewsItem
+from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import PriceForecast, PricePoint
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
+from autotrading.domain.sources.timeframe import Timeframe
 
 
 class SentimentPort(Protocol):
@@ -39,6 +43,25 @@ class PriceHistoryPort(Protocol):
 
     def current_price(self, asset: str) -> Decimal:
         """The price of the asset now. Raises SourceUnavailableError."""
+        ...
+
+
+class MarketDataPort(Protocol):
+    """The public market data of the exchange for an asset, without credentials (R1.3.3, R1.3.4)."""
+
+    def candles(self, asset: str, timeframe: Timeframe, count: int, now: datetime) -> Sequence[Candle]:
+        """The last `count` closed candles of the timeframe, oldest first; fewer when the exchange has less.
+
+        Raises SourceUnavailableError.
+        """
+        ...
+
+    def snapshot(self, asset: str) -> MarketSnapshot:
+        """Mark price, mid price, open interest and funding rate now. Raises SourceUnavailableError."""
+        ...
+
+    def previous_day(self, asset: str, now: datetime) -> DailyRange:
+        """High, low and close of the UTC day before `now`. Raises SourceUnavailableError."""
         ...
 
 

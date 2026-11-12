@@ -1,5 +1,5 @@
 # language: it
-@R1.3.3 @wip
+@R1.3.3
 Funzionalità: R1.3.3 Fonte indicatori tecnici
   Come utente
   Voglio che l'agente riceva prezzo e indicatori tecnici di ogni asset su due timeframe

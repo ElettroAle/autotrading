@@ -49,6 +49,7 @@ from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.flow_repository import InMemoryAutomaticPauseAdapter, InMemoryFlowRepositoryAdapter
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
+from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,
@@ -99,6 +100,7 @@ class FlowCycles:
         }
         self.news = FakeNewsAdapter()
         self.prices = FakePriceHistoryAdapter()
+        self.market = FakeMarketDataAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
         self.samples: dict[TenantId, InMemorySampleRepositoryAdapter] = {}
         self.limits = FakeExchangeLimitsAdapter()
@@ -137,6 +139,7 @@ class FlowCycles:
             sentiments=self.sentiments,
             news=self.news,
             prices=self.prices,
+            market=self.market,
             exchange_limits={HYPERLIQUID: self.limits},
         )
 
