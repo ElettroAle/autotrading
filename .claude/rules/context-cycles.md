@@ -44,3 +44,4 @@ Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa n
 
 Repository dei cicli; orologio; esclusione per flusso; i passi del ciclo verso `flows`, `sources`,
 `agent`, `orders` e `notifications`, ciascuno con una porta propria collegata in `bootstrap.py`.
+`FlowSummaryPort` dà i flussi in uso già riassunti per l'elenco con ultimo e prossimo ciclo (ADR 0052).
