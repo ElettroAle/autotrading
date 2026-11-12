@@ -2,7 +2,7 @@ import base64
 import binascii
 import logging
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
@@ -85,10 +85,12 @@ from autotrading.application.orders.close_exchange_position import (
 from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
+from autotrading.application.sources.collect_source import CollectedSource
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.agent.agent_context import SourceData
 from autotrading.domain.agent.errors import (
     ModelNotAvailableError,
     ParameterNotSupportedError,
@@ -252,6 +254,15 @@ class SourceSettingsFromSources:
         except SOURCE_REFUSALS as error:
             raise InvalidFlowSettingError(str(error)) from error
         return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, parameters)
+
+
+def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
+    """Bridges the sources context to the agent context: each collected value with the weight of its source (R1.3.2)."""
+    return tuple(
+        SourceData(source.source, source.weight, sample.asset, sample.values)
+        for source in collected
+        for sample in source.samples
+    )
 
 
 @dataclass(frozen=True, slots=True)
