@@ -15,7 +15,6 @@ Funzionalità: R1.1.4 Avvio, pausa e ripresa di un flusso
   Contesto:
     Dato che "anna" ha il flusso "alfa"
 
-  @wip
   Scenario: Avvio di un flusso fermo
     Dato che il flusso "alfa" è fermo
     Quando "anna" avvia il flusso "alfa"

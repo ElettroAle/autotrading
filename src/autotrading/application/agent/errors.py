@@ -98,3 +98,25 @@ class ModelUnavailableError(ApplicationError):
         super().__init__(f"fornitore IA non raggiungibile: {provider.value}: {original}")
         self.provider = provider
         self.original = original
+
+
+class ModelKeyMissingError(ApplicationError):
+    """A flow runs on a provider the tenant has no key for: it repeats until the user registers one (R1.2.4)."""
+
+    status_code = 422
+    permanent = True
+
+    def __init__(self, provider: ProviderName) -> None:
+        super().__init__(f"nessuna chiave registrata per il fornitore: {provider.value}")
+        self.provider = provider
+
+
+class ProviderKeyNotOpenedError(ApplicationError):
+    """The worker cannot open a sealed key: it repeats until the user registers the key again (ADR 0029)."""
+
+    status_code = 500
+    permanent = True
+
+    def __init__(self, provider: ProviderName) -> None:
+        super().__init__(f"chiave del fornitore non leggibile: {provider.value}")
+        self.provider = provider

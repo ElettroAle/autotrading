@@ -2,10 +2,12 @@ import base64
 import binascii
 import logging
 import os
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+import threading
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from enum import Enum
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
@@ -17,12 +19,18 @@ from sqlalchemy import Engine
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, AuthenticationSettings, OidcSigningKeys
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
-from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases, create_worker_api
+from autotrading.adapters.inbound.api.worker import BotPolling, CyclePolling, WorkerUseCases, create_worker_api
 from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
+from autotrading.adapters.outbound.httpx.model_call import HttpxModelCallAdapter
+from autotrading.adapters.outbound.httpx.news import HttpxRssNewsAdapter
 from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
+from autotrading.adapters.outbound.httpx.sentiment import (
+    HttpxAlternativeMeSentimentAdapter,
+    HttpxCoinMarketCapSentimentAdapter,
+)
 from autotrading.adapters.outbound.httpx.telegram import (
     HttpxTelegramInboxAdapter,
     HttpxTelegramMessengerAdapter,
@@ -31,6 +39,7 @@ from autotrading.adapters.outbound.httpx.telegram import (
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.market_data import HyperliquidPriceHistoryAdapter
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
@@ -38,9 +47,11 @@ from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
 )
+from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
@@ -48,6 +59,7 @@ from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
     SqlAlchemyLinkCodeLookupAdapter,
     SqlAlchemyLinkCodeRepositoryAdapter,
@@ -57,12 +69,21 @@ from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.running_cycle import SqlAlchemyRunningCycleAdapter
+from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchemySampleRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.scheduling import (
+    SqlAlchemyFlowLockAdapter,
+    SqlAlchemyScheduledFlowsAdapter,
+    TenantScheduledFlow,
+)
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
+from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.application.accounts.errors import (
     AccountNotFoundError,
+    CredentialsNotOpenedError,
+    ExchangeRejectedCredentialsError,
     ExchangeUnavailableError,
     WorkerUnavailableError,
 )
@@ -74,16 +95,45 @@ from autotrading.application.accounts.ports import (
     ExchangePort,
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
-from autotrading.application.agent.errors import ProviderKeyNotFoundError
-from autotrading.application.agent.ports import ProviderKeyRepositoryPort
+from autotrading.application.agent.ask_agent import AgentAnswer, AskAgentCommand, AskAgentUseCase
+from autotrading.application.agent.errors import (
+    ModelCreditExhaustedError,
+    ModelKeyMissingError,
+    ModelKeyRejectedError,
+    ProviderKeyNotFoundError,
+    ProviderKeyNotOpenedError,
+)
+from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
+from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
+from autotrading.application.cycles.ports import (
+    ClockPort,
+    CycleLauncherPort,
+    FlowSnapshot,
+    RiskReview,
+    ScheduledFlow,
+    SourceReading,
+    SourceRequest,
+)
+from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
+from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
+from autotrading.application.cycles.source_collector import SourceCollector
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand, ArchiveFlowUseCase
+from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
+    FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
     InvalidFlowSettingError,
 )
-from autotrading.application.flows.ports import FlowAccount, FlowRepositoryPort, MarketsPort
+from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
+from autotrading.application.flows.ports import (
+    AutomaticPausePort,
+    ExchangeLimitsPort,
+    FlowAccount,
+    FlowRepositoryPort,
+    MarketsPort,
+)
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
@@ -101,16 +151,34 @@ from autotrading.application.orders.errors import (
     OrderExchangeUnavailableError,
     OrderWorkerUnavailableError,
 )
+from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
-from autotrading.application.sources.collect_source import CollectedSource
+from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
+from autotrading.application.sources.errors import SourceUnavailableError
+from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
+from autotrading.application.sources.ports import (
+    ForecastRepositoryPort,
+    NewsPort,
+    PriceHistoryPort,
+    SampleRepositoryPort,
+    SentimentPort,
+    SourceReaderPort,
+)
+from autotrading.application.sources.read_forecast import ReadForecastUseCase
+from autotrading.application.sources.read_news import MAX_AGE_HOURS, ReadNewsUseCase
+from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
+from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand, RecordActualPricesUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.accounts.account_state import AccountState
+from autotrading.domain.accounts.position import Position
 from autotrading.domain.accounts.removal import FlowPositionLeftOpen
-from autotrading.domain.agent.agent_context import SourceData
+from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
+from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection
 from autotrading.domain.agent.errors import (
     ModelNotAvailableError,
     ParameterNotSupportedError,
@@ -119,16 +187,24 @@ from autotrading.domain.agent.errors import (
 )
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.cycles.call_cost import CallCost
+from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.risk_check import RiskState
+from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource, OrderStatus
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -143,6 +219,7 @@ from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_catalog import SourceCatalog
+from autotrading.domain.sources.source_sample import CycleReference
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
@@ -160,6 +237,10 @@ SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNAT
 MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
+ZERO = Decimal(0)
+HUNDRED = Decimal(100)
+PERCENT = Decimal("0.01")
+LOWEST_LEVERAGE = 1
 
 operations = logging.getLogger("autotrading.bootstrap")
 
@@ -631,6 +712,22 @@ class WorkerUseCaseFactory:
             ),
         )
 
+    def cycle_ports_for(self, tenant_id: TenantId) -> TenantCyclePorts:
+        accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
+        orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
+        access = TradingAccessFromAccounts(accounts, self._opener)
+        slippage = self._settings.slippage
+        return TenantCyclePorts(
+            flows=SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id),
+            pause=SqlAlchemyAutomaticPauseAdapter(self._engine, tenant_id),
+            accounts=accounts,
+            read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
+            provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
+            forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
+            samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
+            execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
+        )
+
     def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
         return LinkStores(
             SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
@@ -671,9 +768,8 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
 def create_worker_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
     environment = _environment(configuration)
-    opener = SodiumCredentialOpenerAdapter(
-        {_credentials_key_version(configuration): _credentials_private_key(configuration)}
-    )
+    private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
+    opener = SodiumCredentialOpenerAdapter(private_keys)
     exchanges = WorkerExchanges(
         exchanges_for(environment), order_exchanges_for(environment), activity_readers_for(environment)
     )
@@ -686,7 +782,28 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     bot = None if client is None else telegram_bot(engine, worker, client, messenger)
     if bot is None:
         operations.warning("bot Telegram non configurato: notifiche disattivate")
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot)
+    cycles = worker_cycles(engine, worker.cycle_ports_for, cycle_services(environment, private_keys))
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles)
+
+
+def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
+    """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
+    public = httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS)
+    testnet = environment == "dev"
+    return CycleServices(
+        environment=environment,
+        clock=SystemClock(),
+        catalog=MODEL_CATALOG,
+        provider_key_opener=SodiumProviderKeyOpenerAdapter(private_keys),
+        model_call=HttpxModelCallAdapter(httpx.Client()),
+        sentiments={
+            SENTIMENT_ALTERNATIVE_ME.name: HttpxAlternativeMeSentimentAdapter(public),
+            SENTIMENT_COINMARKETCAP.name: HttpxCoinMarketCapSentimentAdapter(public),
+        },
+        news=HttpxRssNewsAdapter(public),
+        prices=HyperliquidPriceHistoryAdapter.for_network(testnet=testnet),
+        exchange_limits=markets_for(environment),
+    )
 
 
 def telegram_bot(
@@ -808,3 +925,559 @@ def _environment(configuration: Mapping[str, str]) -> str:
     if environment not in SUPPORTED_ENVIRONMENTS:
         raise UnsupportedEnvironmentError(environment)
     return environment
+
+
+# The cycles of the flows in the worker (ADR 0041, ADR 0042): the cycle names only the flow, the bridges below find
+# its tenant and run each step on the ports of that tenant.
+
+
+class SystemClock:
+    def now(self) -> datetime:
+        return now()
+
+
+class FlowDirectory:
+    """The tenant and the anchor of every flow the worker planned: the ports of the cycle name only the flow.
+
+    An entry is never forgotten, so a cycle still running finds its flow after the flow is paused.
+    """
+
+    def __init__(self) -> None:
+        self._guard = threading.Lock()
+        self._entries: dict[UUID, TenantScheduledFlow] = {}
+
+    def remember(self, entries: Iterable[TenantScheduledFlow]) -> None:
+        with self._guard:
+            self._entries.update({entry.flow.flow_id: entry for entry in entries})
+
+    def tenant_of(self, flow_id: UUID) -> TenantId:
+        return self._entry(flow_id).tenant_id
+
+    def anchor_of(self, flow_id: UUID) -> datetime:
+        return self._entry(flow_id).flow.schedule.anchor
+
+    def tenants(self) -> set[TenantId]:
+        with self._guard:
+            return {entry.tenant_id for entry in self._entries.values()}
+
+    def _entry(self, flow_id: UUID) -> TenantScheduledFlow:
+        with self._guard:
+            entry = self._entries.get(flow_id)
+        if entry is None:
+            raise FlowOfCycleNotFoundError
+        return entry
+
+
+class ScheduledFlowsSource(Protocol):
+    def active_of_every_tenant(self) -> list[TenantScheduledFlow]: ...
+
+
+class ScheduledFlowsFromFlows:
+    """Bridges the flows of every tenant to the cycles context in the worker (ADR 0042)."""
+
+    def __init__(self, source: ScheduledFlowsSource, directory: FlowDirectory) -> None:
+        self._source = source
+        self._directory = directory
+
+    def active(self) -> list[ScheduledFlow]:
+        entries = self._source.active_of_every_tenant()
+        self._directory.remember(entries)
+        return [entry.flow for entry in entries]
+
+
+@dataclass(frozen=True, slots=True)
+class TenantCyclePorts:
+    """The adapters a cycle uses, bound to the tenant of its flow."""
+
+    flows: FlowRepositoryPort
+    pause: AutomaticPausePort
+    accounts: AccountRepositoryPort
+    read_exchange_state: ReadExchangeStateUseCase
+    provider_keys: ProviderKeyRepositoryPort
+    forecasts: ForecastRepositoryPort
+    samples: SampleRepositoryPort
+    execute_flow_orders: ExecuteFlowOrdersUseCase
+
+
+@dataclass(frozen=True, slots=True)
+class CycleServices:
+    """What every cycle shares, whatever the tenant: the clock, the models, the sources, the exchanges."""
+
+    clock: ClockPort
+    catalog: ModelCatalog
+    provider_key_opener: ProviderKeyOpenerPort
+    model_call: ModelCallPort
+    sentiments: Mapping[str, SentimentPort]
+    news: NewsPort
+    prices: PriceHistoryPort
+    exchange_limits: Mapping[str, ExchangeLimitsPort]
+    environment: str
+
+
+type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
+
+
+@dataclass(frozen=True, slots=True)
+class CycleFlow:
+    """The flow of a cycle as read at its start: whose it is, its configuration in force, its account now.
+
+    Until the state of the flow is kept apart from the account (R1.6.1), the flow owns the positions of the account
+    on its own assets, and its liquidity is its capital less their margin, never more than the account has free.
+    """
+
+    tenant_id: TenantId
+    flow: Flow
+    account_name: str
+    exchange: str
+    started_at: datetime
+    account: AccountState
+
+    @property
+    def configuration(self) -> FlowConfiguration:
+        return self.flow.configuration
+
+    @property
+    def positions(self) -> tuple[Position, ...]:
+        return tuple(position for position in self.account.positions if position.coin in self.configuration.assets)
+
+    @property
+    def available_liquidity(self) -> Decimal:
+        margin = sum((position.size * position.entry_price / position.leverage for position in self.positions), ZERO)
+        free = min(self.configuration.allocated_capital - margin, self.account.available_margin.amount)
+        return max(free, ZERO)
+
+    @property
+    def total_value(self) -> Decimal:
+        pnl = sum((position.unrealized_pnl for position in self.positions), ZERO)
+        return self.configuration.allocated_capital + pnl
+
+    @property
+    def return_percent(self) -> Decimal:
+        capital = self.configuration.allocated_capital
+        return ((self.total_value - capital) / capital * HUNDRED).quantize(PERCENT)
+
+
+def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
+    flow = next((flow for flow in ports.flows.list() if flow.id.value == flow_id), None)
+    if flow is None:
+        raise FlowOfCycleNotFoundError
+    return flow
+
+
+class FlowStateFromFlows:
+    """Bridges the flows and accounts contexts to the cycles context in the worker (ADR 0042).
+
+    The state is read from the exchange at every cycle; a refusal of the credentials is a permanent error of the
+    account, so every flow of the account pauses (R1.2.4).
+    """
+
+    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+        self._directory = directory
+        self._ports_of = ports_of
+
+    def read(self, flow_id: UUID) -> FlowSnapshot:
+        tenant_id = self._directory.tenant_of(flow_id)
+        ports = self._ports_of(tenant_id)
+        flow = flow_of_cycle(ports, flow_id)
+        account = find_account(ports.accounts, AccountId(flow.account_id))
+        try:
+            state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
+        except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
+            raise FlowCredentialsRejectedError(account.name.value) from error
+        cycle_flow = CycleFlow(
+            tenant_id, flow, account.name.value, account.exchange.value, self._directory.anchor_of(flow_id), state
+        )
+        return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
+
+    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
+        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
+        return self.read(flow_id).state
+
+
+PROVIDER_ERRORS = (ModelKeyRejectedError, ModelCreditExhaustedError, ModelKeyMissingError, ProviderKeyNotOpenedError)
+
+
+class FlowPauseFromFlows:
+    """Bridges a permanent error of a cycle to the flows context: the account or the provider it concerns tells
+    which other flows pause with the flow of the cycle (R1.2.4).
+    """
+
+    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+        self._directory = directory
+        self._ports_of = ports_of
+
+    def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
+        ports = self._ports_of(self._directory.tenant_of(flow_id))
+        account_id = None
+        if isinstance(error, FlowCredentialsRejectedError):
+            account_id = flow_of_cycle(ports, flow_id).account_id
+        provider = error.provider.value if isinstance(error, PROVIDER_ERRORS) else None
+        command = PauseAffectedFlowsCommand(flow_id, str(error), account_id=account_id, provider=provider)
+        PauseAffectedFlowsUseCase(ports.flows, ports.pause).execute(command)
+
+
+class SourcesFromSources:
+    """Bridges the sources context to the cycles context: each active source collected with the parameters of the flow,
+    recorded for the cycle and given to the agent with its weight (R1.3.2-R1.3.8, ADR 0042).
+    """
+
+    def __init__(self, ports_of: CyclePortsOf, services: CycleServices) -> None:
+        self._ports_of = ports_of
+        self._services = services
+
+    def collect(self, request: SourceRequest, source: str) -> object:
+        cycle_flow = _cycle_flow_of(request.snapshot.state)
+        ports = self._ports_of(cycle_flow.tenant_id)
+        configuration = cycle_flow.configuration
+        selection = next((selected for selected in configuration.sources if selected.name == source), None)
+        if selection is None:
+            raise SourceUnavailableError(source)
+        command = CollectSourceCommand(
+            CycleReference(request.flow_id, request.planned_at),
+            selection.name,
+            selection.weight,
+            selection.parameters,
+            configuration.assets,
+            self._services.clock.now(),
+        )
+        collected = CollectSourceUseCase(SOURCE_CATALOG, self._readers_of(ports), ports.samples).execute(command)
+        return agent_sources_of([collected]) or _nothing_collected(selection)
+
+    def _readers_of(self, ports: TenantCyclePorts) -> dict[str, SourceReaderPort]:
+        services = self._services
+        readers: dict[str, SourceReaderPort] = {
+            name: ReadSentimentUseCase(sentiment) for name, sentiment in services.sentiments.items()
+        }
+        readers[NEWS.name] = ReadNewsUseCase(services.news)
+        readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(services.prices, ports.forecasts))
+        return readers
+
+
+def _nothing_collected(selection: SourceSelection) -> tuple[SourceData, ...]:
+    """An empty source still speaks to the agent: no recent news is itself a datum (R1.3.7)."""
+    if selection.name != NEWS.name:
+        return ()
+    hours = NEWS.settings(selection.parameters)[MAX_AGE_HOURS]
+    window = "nell'ultima ora" if hours == 1 else f"nelle ultime {hours} ore"
+    return (SourceData(selection.name, selection.weight, None, {"nota": f"nessuna notizia {window}"}),)
+
+
+@dataclass(frozen=True, slots=True)
+class CycleContext:
+    flow: CycleFlow
+    agent_context: AgentContext
+
+
+class ContextFromAgent:
+    """Bridges the state of the flow and the sources to the agent context: the flow alone, never the account
+    nor another flow (R1.4.3, ADR 0042).
+    """
+
+    def __init__(self, clock: ClockPort) -> None:
+        self._clock = clock
+
+    def compose(
+        self,
+        flow_id: UUID,  # noqa: ARG002 - the signature of the port
+        snapshot: FlowSnapshot,
+        readings: Sequence[SourceReading],
+        absent: Sequence[AbsentSource],
+    ) -> object:
+        cycle_flow = _cycle_flow_of(snapshot.state)
+        configuration = cycle_flow.configuration
+        agent_context = AgentContext(
+            instructions=configuration.instructions,
+            assets=configuration.assets,
+            max_leverage=configuration.risk_limits.max_leverage or LOWEST_LEVERAGE,
+            started_at=cycle_flow.started_at,
+            now=self._clock.now(),
+            state=_state_view(cycle_flow),
+            sources=tuple(data for reading in readings for data in _source_data_of(reading.data)),
+            missing=tuple(f"{source.source}: {source.reason}" for source in absent),
+        )
+        return CycleContext(cycle_flow, agent_context)
+
+
+def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
+    return FlowStateView(
+        currency=cycle_flow.account.balance.currency,
+        allocated_capital=cycle_flow.configuration.allocated_capital,
+        available_liquidity=cycle_flow.available_liquidity,
+        total_value=cycle_flow.total_value,
+        return_percent=cycle_flow.return_percent,
+        positions=tuple(
+            PositionView(
+                position.coin,
+                TradeDirection(position.side.value),
+                position.size,
+                position.leverage,
+                position.entry_price,
+                position.unrealized_pnl,
+                position.liquidation_price,
+            )
+            for position in cycle_flow.positions
+        ),
+    )
+
+
+def _cycle_flow_of(state: object) -> CycleFlow:
+    if not isinstance(state, CycleFlow):
+        raise FlowOfCycleNotFoundError
+    return state
+
+
+def _source_data_of(data: object) -> tuple[SourceData, ...]:
+    if not isinstance(data, tuple):
+        return ()
+    return tuple(item for item in data if isinstance(item, SourceData))
+
+
+@dataclass(frozen=True, slots=True)
+class CycleDecisions:
+    flow: CycleFlow
+    answer: AgentAnswer
+
+
+class AgentFromAgent:
+    """Bridges the agent context to the cycles context: the model of the flow with the key of its tenant (R1.4.4)."""
+
+    def __init__(self, ports_of: CyclePortsOf, services: CycleServices) -> None:
+        self._ports_of = ports_of
+        self._services = services
+
+    def decide(self, flow_id: UUID, context: object) -> object:  # noqa: ARG002 - the signature of the port
+        if not isinstance(context, CycleContext):
+            raise FlowOfCycleNotFoundError
+        ports = self._ports_of(context.flow.tenant_id)
+        services = self._services
+        model = context.flow.configuration.model
+        use_case = AskAgentUseCase(
+            services.catalog, ports.provider_keys, services.provider_key_opener, services.model_call
+        )
+        answer = use_case.execute(AskAgentCommand(model.name, model.parameters, context.agent_context))
+        return CycleDecisions(context.flow, answer)
+
+
+@dataclass(frozen=True, slots=True)
+class CycleOrder:
+    flow: CycleFlow
+    outcome: ApprovedOpening | ApprovedClose
+
+
+class RiskFromFlows:
+    """Bridges the decisions of the agent to the risk check of the flows context (R1.5.1-R1.5.4, ADR 0042)."""
+
+    def __init__(self, exchange_limits: Mapping[str, ExchangeLimitsPort]) -> None:
+        self._exchange_limits = exchange_limits
+
+    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:  # noqa: ARG002 - the signature of the port
+        if not isinstance(decisions, CycleDecisions):
+            raise FlowOfCycleNotFoundError
+        cycle_flow = decisions.flow
+        configuration = cycle_flow.configuration
+        state = RiskState(
+            currency=cycle_flow.account.balance.currency,
+            allocated_capital=configuration.allocated_capital,
+            available_liquidity=cycle_flow.available_liquidity,
+            open_assets=frozenset(position.coin for position in cycle_flow.positions),
+        )
+        command = CheckRiskCommand(
+            tuple(_intent_of(decision) for decision in decisions.answer.response.decisions),
+            configuration.risk_policy,
+            state,
+        )
+        outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
+        orders = tuple(
+            CycleOrder(cycle_flow, outcome)
+            for outcome in outcomes
+            if isinstance(outcome, (ApprovedOpening, ApprovedClose))
+        )
+        return RiskReview(orders, tuple(outcomes))
+
+
+def _intent_of(decision: Decision) -> TradeIntent:
+    opening = decision.opening
+    if decision.action is TradeAction.CLOSE:
+        return CloseIntent(decision.asset)
+    if decision.action is TradeAction.OPEN and opening is not None:
+        return OpenIntent(decision.asset, TradeSide(opening.direction.value), opening.margin_fraction, opening.leverage)
+    return HoldIntent(decision.asset)
+
+
+class OrdersFromOrders:
+    """Bridges the approved decisions of a cycle to the orders context, on the account of the flow (R1.5.5)."""
+
+    def __init__(self, ports_of: CyclePortsOf) -> None:
+        self._ports_of = ports_of
+
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
+        approved = [order for order in orders if isinstance(order, CycleOrder)]
+        if not approved:
+            return ()
+        cycle_flow = approved[0].flow
+        command = ExecuteFlowOrdersCommand(
+            cycle_flow.flow.account_id, flow_id, planned_at, tuple(_flow_order_of(order.outcome) for order in approved)
+        )
+        return self._ports_of(cycle_flow.tenant_id).execute_flow_orders.execute(command)
+
+
+def _flow_order_of(outcome: ApprovedOpening | ApprovedClose) -> FlowOrder:
+    if isinstance(outcome, ApprovedClose):
+        return FlowClosing(outcome.asset)
+    return FlowOpening(outcome.asset, Direction(outcome.side.value), outcome.value, outcome.leverage)
+
+
+class CycleJournalFromContexts:
+    """Describes for the record what each step produced, with the data of the context behind it (R1.7.1, ADR 0042).
+
+    Only the types of the cycle travel here: none of them carries a credential or a provider key.
+    """
+
+    def __init__(self, environment: str) -> None:
+        self._environment = environment
+
+    def describe(self, step: CycleStep, result: object) -> Mapping[str, object]:
+        if isinstance(result, CycleFlow):
+            return self._flow_of(result) if step is CycleStep.READ_FLOW_STATE else {"stato": _state_document(result)}
+        if isinstance(result, CycleContext):
+            messages = result.agent_context.messages()
+            return {"messaggi": [{"ruolo": message.role.value, "contenuto": message.content} for message in messages]}
+        if isinstance(result, CycleDecisions):
+            return _decisions_document(result.answer)
+        if isinstance(result, RiskReview):
+            return {"esiti": json_of(result.outcomes), "ordini_approvati": len(result.orders)}
+        if step is CycleStep.COLLECT_SOURCES and isinstance(result, list):
+            return {"fonti": [_reading_document(reading) for reading in result if isinstance(reading, SourceReading)]}
+        return {"risultato": json_of(result)}
+
+    def call_cost(self, decision: object) -> CallCost | None:
+        if not isinstance(decision, CycleDecisions):
+            return None
+        usage = decision.answer.usage
+        return CallCost(usage.input_tokens, usage.output_tokens, decision.answer.cost_usd)
+
+    def _flow_of(self, cycle_flow: CycleFlow) -> dict[str, object]:
+        configuration = cycle_flow.configuration
+        return {
+            "utente": str(cycle_flow.tenant_id.value),
+            "flusso": cycle_flow.flow.name.value,
+            "conto": cycle_flow.account_name,
+            "exchange": cycle_flow.exchange,
+            "ambiente": self._environment,
+            "versione": configuration.version,
+            "fornitore": configuration.model.name.partition("/")[0],
+            "modello": configuration.model.name,
+            "pesi_fonti": {source.name: source.weight for source in configuration.sources},
+            "stato": _state_document(cycle_flow),
+        }
+
+
+def _state_document(cycle_flow: CycleFlow) -> object:
+    return json_of(_state_view(cycle_flow))
+
+
+def _reading_document(reading: SourceReading) -> dict[str, object]:
+    return {"fonte": reading.source, "dati": json_of(reading.data)}
+
+
+def _decisions_document(answer: AgentAnswer) -> dict[str, object]:
+    response = answer.response
+    return {
+        "risposta": response.raw,
+        "decisioni": json_of(response.decisions),
+        "scartate": json_of(response.discarded),
+        "mancanti": list(response.missing),
+    }
+
+
+def json_of(value: object) -> object:
+    """The value as JSON data: the record of a cycle keeps what each step produced as it was (R1.7.1)."""
+    if value is None or isinstance(value, (bool, int, str, Decimal, UUID, datetime, Enum)):
+        return _scalar_of(value)
+    if isinstance(value, Mapping):
+        return {str(key): json_of(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, frozenset, set)):
+        return [json_of(item) for item in value]
+    if is_dataclass(value) and not isinstance(value, type):
+        document: dict[str, object] = {"tipo": type(value).__name__}
+        document.update({each.name: json_of(getattr(value, each.name)) for each in fields(value)})
+        return document
+    return str(value)
+
+
+def _scalar_of(value: object) -> object:
+    if isinstance(value, Enum):
+        return json_of(value.value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (Decimal, UUID)):
+        return str(value)
+    return value
+
+
+class CyclesOfTenants:
+    """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
+
+    def __init__(self, engine: Engine, directory: FlowDirectory) -> None:
+        self._engine = engine
+        self._directory = directory
+
+    def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
+        return self._of(flow_id).claim(flow_id, planned_at)
+
+    def record(self, record: CycleRecord) -> None:
+        self._of(record.flow_id).record(record)
+
+    def _of(self, flow_id: UUID) -> SqlAlchemyCycleRepositoryAdapter:
+        return SqlAlchemyCycleRepositoryAdapter(self._engine, self._directory.tenant_of(flow_id))
+
+
+@dataclass(frozen=True, slots=True)
+class CycleRuntime:
+    """Where the worker finds the flows to plan, what keeps each cycle unique and alone, and how a cycle runs."""
+
+    scheduled: ScheduledFlowsSource
+    guards: CycleGuards
+    launcher: CycleLauncherPort
+
+
+def run_due_cycles(
+    directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
+) -> RunDueCyclesUseCase:
+    """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
+    steps = CycleSteps(
+        flow_state=FlowStateFromFlows(directory, ports_of),
+        sources=SourceCollector(SourcesFromSources(ports_of, services)),
+        context=ContextFromAgent(services.clock),
+        agent=AgentFromAgent(ports_of, services),
+        risk=RiskFromFlows(services.exchange_limits),
+        orders=OrdersFromOrders(ports_of),
+        journal=CycleJournalFromContexts(services.environment),
+    )
+    flows = ScheduledFlowsFromFlows(runtime.scheduled, directory)
+    return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, runtime.guards), runtime.launcher, services.clock)
+
+
+def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices) -> None:
+    """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
+    command = RecordActualPricesCommand(services.clock.now())
+    for tenant_id in directory.tenants():
+        RecordActualPricesUseCase(services.prices, ports_of(tenant_id).forecasts).execute(command)
+
+
+def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
+    directory = FlowDirectory()
+    guards = CycleGuards(
+        cycles=CyclesOfTenants(engine, directory),
+        lock=SqlAlchemyFlowLockAdapter(engine),
+        pause=FlowPauseFromFlows(directory, ports_of),
+        clock=services.clock,
+    )
+    runtime = CycleRuntime(SqlAlchemyScheduledFlowsAdapter(engine), guards, ThreadCycleLauncherAdapter())
+    run_due = run_due_cycles(directory, ports_of, services, runtime)
+
+    def plan_round() -> None:
+        run_due.execute()
+        record_actual_prices(directory, ports_of, services)
+
+    return CyclePolling(plan_round)

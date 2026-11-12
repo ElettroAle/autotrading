@@ -5,24 +5,25 @@ from uuid import UUID
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.domain.cycles.cycle_record import CycleRecord
-from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.cycles import Cycles
-from tests.support.flows import OPENROUTER_MODEL, a_configuration, a_flow
-from tests.support.platform import Platform
+from tests.support.flow_cycles import FlowCycles
+from tests.support.flows import OPENROUTER_MODEL
 
 
 class Records:
     def __init__(self) -> None:
-        self.platform = Platform()
+        # The flows live on the platform the bridges of the worker run on, so a cycle can also run for real.
+        self.flow_cycles = FlowCycles()
+        self.platform = self.flow_cycles.platform
         self.cycles = Cycles()
+        self.flow_cycles.records = self.cycles.records
         # The runner records the cycles where the platform reads them, as the database does for worker and API.
         self.platform.cycles = self.cycles.records
         self.consulted: object = None
 
     def add_flow(self, user: str, name: str, version: int = 1, model: str = OPENROUTER_MODEL) -> UUID:
-        configuration = replace(a_configuration(model=model), version=version)
-        flow = a_flow(self.platform.tenant_of(user), name=name, status=FlowStatus.ACTIVE, configuration=configuration)
-        self.platform.flows.flows.append(flow)
+        flow = self.flow_cycles.add_flow(user, name, model=model)
+        self.flow_cycles.reconfigure(name, lambda configuration: replace(configuration, version=version))
         self.cycles.add_flow(name, flow_id=flow.id.value)
         return flow.id.value
 

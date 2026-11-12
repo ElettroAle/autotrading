@@ -14,7 +14,7 @@ e ogni ciclo legge la propria versione (ADR 0041).
 
 - **Versione + cronologia**: una variazione produce la versione successiva della configurazione
   (`Flow.with_capital`) e una riga `CapitalChange` (istante, prima, dopo, utente) nella tabella
-  `flow_capital_changes` (migrazione 0014, RLS, solo `SELECT` e `INSERT`), nella stessa transazione
+  `flow_capital_changes` (migrazione 0015, RLS, solo `SELECT` e `INSERT`), nella stessa transazione
   (`FlowRepositoryPort.add_capital_change`).
 - **Ammissione**: capitale disponibile = capitale libero del conto (ADR 0031, `free_capital_of`) + il
   capitale attuale del flusso; margine impegnato = somma di dimensione × prezzo di ingresso / leva delle posizioni

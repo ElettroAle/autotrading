@@ -15,6 +15,7 @@ from autotrading.application.cycles.ports import (
     FlowStatePort,
     OrderPort,
     RiskPort,
+    SourceRequest,
 )
 from autotrading.application.cycles.source_collector import SourceCollector
 from autotrading.domain.cycles.call_cost import CallCost
@@ -132,7 +133,9 @@ class RunCycleUseCase:
         )
         readings, absent = progress.run(
             CycleStep.COLLECT_SOURCES,
-            lambda: steps.sources.collect(flow_id, snapshot.sources, progress.command.schedule.source_wait),
+            lambda: steps.sources.collect(
+                SourceRequest(flow_id, planned_at, snapshot), progress.command.schedule.source_wait
+            ),
             lambda collected: collected[0],
         )
         progress.absent = tuple(absent)

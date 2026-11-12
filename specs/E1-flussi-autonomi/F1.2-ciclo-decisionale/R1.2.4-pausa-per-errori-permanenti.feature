@@ -31,15 +31,11 @@ Funzionalità: R1.2.4 Pausa automatica per un errore permanente
       | il fornitore "openrouter" rifiuta la chiave            | chiave del fornitore non valida: openrouter |
       | l'exchange rifiuta le credenziali del conto "test-1"   | credenziali del conto non valide: test-1  |
 
-  # @wip: chi condivide il conto o la chiave lo sa il ponte con i contesti flows e agent (PR di integrazione).
-  @wip
   Scenario: Le credenziali del conto mettono in pausa tutti i flussi del conto
     Dato che l'exchange rifiuta le credenziali del conto "test-1"
     Quando il flusso "alfa" esegue un ciclo
     Allora il flusso "beta" è nello stato "in pausa" con il motivo "credenziali del conto non valide: test-1"
 
-  # @wip: chi condivide il conto o la chiave lo sa il ponte con i contesti flows e agent (PR di integrazione).
-  @wip
   Scenario: La chiave del fornitore mette in pausa i flussi che la usano
     Dato che "anna" ha anche il flusso "gamma" attivo con un modello del fornitore "anthropic"
     E che il fornitore "openrouter" rifiuta la chiave

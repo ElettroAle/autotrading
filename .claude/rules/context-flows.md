@@ -67,8 +67,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `FlowPositionsPort`: chiusura di una posizione del flusso attraverso il `worker` (fill o rifiuto) e margine
   impegnato sugli asset (ADR 0052, ADR 0053).
 - `FlowOpeningsPort`: ultima apertura eseguita del flusso su un asset, dagli ordini registrati (ADR 0052).
-- `RunningCyclePort`: attesa della fine del ciclo in corso; advisory lock PostgreSQL con chiave `flow_lock_key`,
-  condivisa con l'esecutore dei cicli (ADR 0052).
+- `RunningCyclePort`: attesa della fine del ciclo in corso; advisory lock PostgreSQL con la chiave `lock_key`
+  che l'esecutore dei cicli tiene per tutto il ciclo (ADR 0042, ADR 0052).
 - I bridge verso gli altri contesti vivono solo in `bootstrap.py`; `flows` fornisce ad `agent` i flussi che
   usano una chiave (`ProviderKeyUsageFromFlows`).
 

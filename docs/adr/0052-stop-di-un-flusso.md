@@ -20,8 +20,8 @@ ADR 0047).
   l'utente, a cui si attribuisce ogni ordine di chiusura (R0.3.2), e il motivo (`FLOW_STOP` di norma,
   `ACCOUNT_REMOVAL` dalla rimozione del conto, ADR 0054).
 - **Attesa del ciclo**: `RunningCyclePort.wait_until_finished`; l'adapter PostgreSQL prende e rilascia subito
-  `pg_advisory_lock` con chiave = i primi 8 byte dell'UUID del flusso come bigint con segno (`flow_lock_key`).
-  L'esecutore dei cicli tiene lo stesso lock per la durata del ciclo: la chiave è un contratto tra i due.
+  `pg_advisory_lock` con chiave = i primi 8 byte dell'UUID del flusso come bigint con segno (`lock_key` di
+  `scheduling.py`), la stessa che `SqlAlchemyFlowLockAdapter` tiene per tutto il ciclo (ADR 0042).
 - **Chiusura**: `FlowPositionsPort.close` restituisce `PositionClosing` con il fill (prezzo medio, istante,
   commissione) o il motivo del rifiuto, o niente se sull'asset non c'è posizione. Il ponte in `bootstrap.py` usa
   `PositionClosingPort` di `orders`; un esito senza prezzo, istante o commissione (non confermato in tempo) conta
@@ -43,7 +43,7 @@ ADR 0047).
 
 ## Conseguenze
 
-- L'esecutore dei cicli (fork di integrazione) deve tenere `pg_advisory_lock(flow_lock_key(flow_id))` per tutto il
-  ciclo, altrimenti l'attesa ritorna subito.
+- La chiave del lock resta una sola (`lock_key`): se l'esecutore dei cicli la cambia, l'attesa dello stop ritorna
+  subito.
 - Lo schema "Motivi di chiusura" di R1.7.2 è attivo per stop e rimozione del conto; chiusura manuale e liquidazione
   restano `@wip` fino a R1.6.1.

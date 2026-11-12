@@ -1,5 +1,5 @@
 # language: it
-@R1.3.7 @wip
+@R1.3.7
 Funzionalità: R1.3.7 Fonte notizie
   Come utente
   Voglio che l'agente riceva le notizie cripto più recenti

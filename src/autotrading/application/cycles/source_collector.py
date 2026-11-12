@@ -1,10 +1,9 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import wait as wait_for
 from datetime import timedelta
-from uuid import UUID
 
-from autotrading.application.cycles.ports import SourcePort, SourceReading
+from autotrading.application.cycles.ports import SourcePort, SourceReading, SourceRequest
 from autotrading.domain.cycles.cycle_record import AbsentSource
 from autotrading.domain.errors import AutotradingError
 
@@ -23,11 +22,12 @@ class SourceCollector:
         # The tests compress time; the cycle waits for real seconds.
         self._seconds_of = seconds_of
 
-    def collect(self, flow_id: UUID, sources: Sequence[str], wait: timedelta) -> Outcomes:
+    def collect(self, request: SourceRequest, wait: timedelta) -> Outcomes:
+        sources = request.snapshot.sources
         if not sources:
             return [], []
         executor = ThreadPoolExecutor(max_workers=len(sources), thread_name_prefix="source")
-        futures = {source: executor.submit(self._sources.collect, flow_id, source) for source in sources}
+        futures = {source: executor.submit(self._sources.collect, request, source) for source in sources}
         answered, _ = wait_for(futures.values(), timeout=self._seconds_of(wait))
         # A source still running is abandoned, never awaited: the cycle goes on without it.
         executor.shutdown(wait=False, cancel_futures=True)

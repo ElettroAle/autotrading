@@ -1,6 +1,7 @@
 """The steps of the record and the consultation of the cycles (R1.7.1, R1.7.3, R1.4.6), shared by their modules."""
 
-from collections.abc import Callable, Iterator
+import json
+from collections.abc import Callable, Iterator, Mapping
 from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -8,18 +9,22 @@ from uuid import UUID
 import pytest
 from pytest_bdd import given, parsers, then, when
 
+from autotrading.application.agent.errors import ModelUnavailableError
 from autotrading.application.cycles.errors import CycleFlowNotFoundError
 from autotrading.application.cycles.list_cycles import ListCyclesCommand
 from autotrading.application.cycles.read_cycle import ReadCycleCommand
 from autotrading.application.cycles.read_flow_cost import ReadFlowCostCommand
+from autotrading.domain.agent.model_definition import ModelDefinition
+from autotrading.domain.agent.model_usage import ModelPrices, ModelUsage
+from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_page import CyclePage
 from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord, StepDocument
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.cycles.flow_cost import DailyCost, FlowCost
 from autotrading.domain.errors import AutotradingError
-from tests.fakes.cycles import FakeTransientError
 from tests.support.cycles import DAY, at
+from tests.support.flows import ANTHROPIC_MODEL, OPENROUTER_MODEL, TEMPERATURE, scenario_catalog
 from tests.support.records import Records
 from tests.support.steps import quoted
 
@@ -88,9 +93,45 @@ def flow_with_recorded_cycles(records: Records, user: str, flow: str, count: str
 
 @given("che il fornitore IA non risponde")
 def provider_silent(records: Records) -> None:
-    for flow_id in records.cycles.flows.flows:
-        error = FakeTransientError("fornitore IA non raggiungibile: openrouter")
-        records.cycles.failures.fail_once(flow_id, CycleStep.AGENT_DECISION, error)
+    records.flow_cycles.model.failure = ModelUnavailableError(ProviderName("openrouter"), "tempo di risposta scaduto")
+
+
+@given(
+    parsers.re(
+        r"^che il fornitore riporta per la chiamata (?P<tokens_in>\d+) token in ingresso, (?P<tokens_out>\d+) in "
+        r"uscita e costo (?P<cost>[\d,]+) USD$"
+    )
+)
+def provider_reports_cost(records: Records, tokens_in: str, tokens_out: str, cost: str) -> None:
+    records.flow_cycles.model.usage = ModelUsage(int(tokens_in), int(tokens_out), amount(cost))
+
+
+@given(
+    parsers.re(
+        r"^che il fornitore non riporta il costo e riporta (?P<tokens_in>\d+) token in ingresso e "
+        r"(?P<tokens_out>\d+) in uscita$"
+    )
+)
+def provider_without_cost(records: Records, tokens_in: str, tokens_out: str) -> None:
+    records.flow_cycles.model.usage = ModelUsage(int(tokens_in), int(tokens_out), None)
+
+
+@given(
+    parsers.re(
+        r"^che il catalogo prezza il modello (?P<price_in>[\d,]+) USD per milione di token in ingresso e "
+        r"(?P<price_out>[\d,]+) USD per milione in uscita$"
+    )
+)
+def catalog_prices(records: Records, price_in: str, price_out: str) -> None:
+    prices = ModelPrices(amount(price_in), amount(price_out))
+    records.platform.model_catalog = scenario_catalog(
+        ModelDefinition(OPENROUTER_MODEL, (TEMPERATURE,), prices), ModelDefinition(ANTHROPIC_MODEL, (TEMPERATURE,))
+    )
+
+
+@given("che né il fornitore né il catalogo riportano il prezzo")
+def no_price(records: Records) -> None:
+    records.flow_cycles.model.usage = ModelUsage(1000, 200, None)
 
 
 @given(
@@ -128,7 +169,15 @@ def cycles_with_cost(records: Records, *, flow: str, count: str, cost: str, yest
 
 @when(quoted('il flusso "{flow}" esegue un ciclo'))
 def flow_runs_cycle(records: Records, flow: str) -> None:
-    records.cycles.run_now(flow)
+    records.flow_cycles.run(flow)
+
+
+@when(quoted('il flusso "{flow}" esegue un ciclo concluso con un\'apertura su "{asset}"'))
+def flow_opens_in_cycle(records: Records, flow: str, asset: str) -> None:
+    opening = {"asset": asset, "azione": "apri", "direzione": "long", "quota": 0.5, "leva": 2, "ragionamento": "r"}
+    records.flow_cycles.model.text = json.dumps({"decisioni": [opening]})
+    records.flow_cycles.run(flow)
+    assert recorded(records).outcome is CycleOutcome.COMPLETED
 
 
 @when(quoted('"{user}" consulta i cicli del flusso "{flow}"'))
@@ -243,3 +292,85 @@ def daily_costs(records: Records, yesterday: str, today: str) -> None:
         DailyCost((DAY - timedelta(days=1)).date(), amount(yesterday)),
         DailyCost(DAY.date(), amount(today)),
     )
+
+
+@then("il ciclo registrato contiene:")
+def recorded_contents(records: Records, datatable: list[list[str]]) -> None:
+    record = recorded(records)
+    flow = record.document(CycleStep.READ_FLOW_STATE)
+    assert flow is not None
+    checks = {
+        "utente, flusso, conto e ambiente": lambda: all(flow[key] for key in ("utente", "flusso", "conto", "ambiente")),
+        "istante previsto e istante effettivo": lambda: record.started_at is not None and record.planned_at is not None,
+        "esito concluso": lambda: record.outcome is CycleOutcome.COMPLETED,
+        "pesi delle fonti": lambda: "pesi_fonti" in flow,
+        "dati raccolti": lambda: record.document(CycleStep.COLLECT_SOURCES) is not None,
+        "contesto integrale inviato all'agente": lambda: _context_sent(record),
+        "risposta integrale dell'agente": lambda: _decisions(record)["risposta"] == records.flow_cycles.model.text,
+        "decisioni interpretate": lambda: len(_list(_decisions(record)["decisioni"])) == 1,
+        "esito del rischio per ogni decisione": lambda: (
+            len(_list(_document(record, CycleStep.RISK_CHECK)["esiti"])) == 1
+        ),
+        "costo della chiamata al modello": lambda: record.cost is not None,
+        "istantanea dello stato del flusso": lambda: "stato" in _document(record, CycleStep.UPDATE_FLOW_STATE),
+    }
+    for [element] in datatable[1:]:
+        assert _element_holds(element, flow, record, checks), element
+
+
+def _element_holds(
+    element: str, flow: Mapping[str, object], record: CycleRecord, checks: Mapping[str, Callable[[], bool]]
+) -> bool:
+    if element.startswith("versione di configurazione "):
+        return flow["versione"] == int(element.rpartition(" ")[2])
+    if element.startswith("modello "):
+        return flow["modello"] == element.partition(" ")[2]
+    if element.startswith("ordine su "):
+        asset = element.split(" ")[2]
+        orders = _list(_document(record, CycleStep.ORDER_EXECUTION)["risultato"])
+        return any(asset in json.dumps(order) and "status" in json.dumps(order) for order in orders)
+    return checks[element]()
+
+
+def _document(record: CycleRecord, step: CycleStep) -> Mapping[str, object]:
+    document = record.document(step)
+    assert document is not None, step
+    return document
+
+
+def _decisions(record: CycleRecord) -> Mapping[str, object]:
+    return _document(record, CycleStep.AGENT_DECISION)
+
+
+def _context_sent(record: CycleRecord) -> bool:
+    messages = _list(_document(record, CycleStep.COMPOSE_CONTEXT)["messaggi"])
+    return len(messages) == 2
+
+
+def _list(value: object) -> list[object]:
+    assert isinstance(value, list), value
+    return value
+
+
+@then(
+    parsers.re(
+        r"^il ciclo registra (?P<tokens_in>\d+) token in ingresso, (?P<tokens_out>\d+) in uscita e costo "
+        r"(?P<cost>[\d,]+) USD$"
+    )
+)
+def recorded_tokens_and_cost(records: Records, tokens_in: str, tokens_out: str, cost: str) -> None:
+    assert recorded(records).cost == CallCost(int(tokens_in), int(tokens_out), amount(cost))
+
+
+@then(parsers.re(r"^il ciclo registra costo (?P<cost>[\d,]+) USD$"))
+def recorded_cost(records: Records, cost: str) -> None:
+    call = recorded(records).cost
+    assert call is not None
+    assert call.cost_usd == amount(cost)
+
+
+@then("il ciclo registra il costo come non disponibile")
+def recorded_cost_unavailable(records: Records) -> None:
+    call = recorded(records).cost
+    assert call is not None
+    assert call.cost_usd is None

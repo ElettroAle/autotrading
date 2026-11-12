@@ -5,7 +5,8 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import Engine, func, select
 
-from autotrading.adapters.outbound.sqlalchemy.running_cycle import SqlAlchemyRunningCycleAdapter, flow_lock_key
+from autotrading.adapters.outbound.sqlalchemy.running_cycle import SqlAlchemyRunningCycleAdapter
+from autotrading.adapters.outbound.sqlalchemy.scheduling import lock_key
 from autotrading.domain.flows.flow_id import FlowId
 
 pytestmark = pytest.mark.integration
@@ -23,7 +24,7 @@ def test_without_a_cycle_running_the_wait_returns_at_once(database: Engine) -> N
 
 def test_the_wait_lasts_until_the_cycle_releases_the_lock_of_its_flow(database: Engine) -> None:
     flow_id = FlowId(uuid4())
-    key = flow_lock_key(flow_id.value)
+    key = lock_key(flow_id.value)
     held = threading.Event()
 
     def cycle() -> None:
@@ -50,5 +51,5 @@ def test_the_wait_leaves_the_lock_free_for_the_next_cycle(database: Engine) -> N
     SqlAlchemyRunningCycleAdapter(database).wait_until_finished(flow_id)
 
     with database.connect() as connection:
-        assert connection.execute(select(func.pg_try_advisory_lock(flow_lock_key(flow_id.value)))).scalar_one()
-        connection.execute(select(func.pg_advisory_unlock(flow_lock_key(flow_id.value))))
+        assert connection.execute(select(func.pg_try_advisory_lock(lock_key(flow_id.value)))).scalar_one()
+        connection.execute(select(func.pg_advisory_unlock(lock_key(flow_id.value))))

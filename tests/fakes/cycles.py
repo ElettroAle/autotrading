@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.cycles.ports import FlowSnapshot, RiskReview, ScheduledFlow, SourceReading
+from autotrading.application.cycles.ports import FlowSnapshot, RiskReview, ScheduledFlow, SourceReading, SourceRequest
 from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
@@ -225,7 +225,8 @@ class FakeSourcesAdapter:
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
 
-    def collect(self, flow_id: UUID, source: str) -> object:
+    def collect(self, request: SourceRequest, source: str) -> object:
+        flow_id = request.flow_id
         if source in self.silent:
             self.released.wait(LONGEST_HOLD)
         if source in self.late:
