@@ -164,6 +164,25 @@ class CycleHistoryPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class FlowSummary:
+    """A flow in use as the consultation shows it; the schedule is None unless the flow is active (R1.7.3)."""
+
+    flow_id: UUID
+    name: str
+    account: str
+    status: str
+    pause_reason: str | None
+    model: str
+    schedule: CycleSchedule | None
+
+
+class FlowSummaryPort(Protocol):
+    """Bound to the tenant of the request: its flows in use, never another tenant's."""
+
+    def in_use(self) -> list[FlowSummary]: ...
+
+
 class FlowDirectoryPort(Protocol):
     def exists(self, flow_id: UUID) -> bool:
         """True when the flow belongs to the tenant of the request."""

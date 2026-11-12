@@ -103,7 +103,6 @@ class FlowCycles:
         self.samples: dict[TenantId, InMemorySampleRepositoryAdapter] = {}
         self.limits = FakeExchangeLimitsAdapter()
         self.launcher = ImmediateCycleLauncher()
-        self.anchors: dict[UUID, datetime] = {}
         self.credentials: dict[tuple[TenantId, str], Credentials] = {}
         self.users: dict[str, str] = {}
         self.running: threading.Thread | None = None
@@ -199,7 +198,7 @@ class FlowCycles:
         )
         self.platform.flows.flows.append(flow)
         self.register_key(tenant_id, model.partition("/")[0])
-        self.anchors[flow.id.value] = at(started)
+        self.platform.flows.anchors[flow.id] = at(started)
         return flow
 
     def flow(self, name: str) -> Flow:
@@ -257,7 +256,7 @@ class FlowCycles:
 
     def anchor_of(self, flow: Flow) -> datetime:
         """As the trigger of the database: a flow is anchored at the instant it is first seen active (ADR 0042)."""
-        return self.anchors.setdefault(flow.id.value, self.clock.now())
+        return self.platform.flows.anchors.setdefault(flow.id, self.clock.now())
 
     def last_record(self, name: str) -> CycleRecord:
         flow_id = self.flow(name).id.value

@@ -12,6 +12,7 @@ from pytest_bdd import given, parsers, then, when
 from autotrading.application.agent.errors import ModelUnavailableError
 from autotrading.application.cycles.errors import CycleFlowNotFoundError
 from autotrading.application.cycles.list_cycles import ListCyclesCommand
+from autotrading.application.cycles.list_flow_overviews import FlowOverview
 from autotrading.application.cycles.read_cycle import ReadCycleCommand
 from autotrading.application.cycles.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.agent.model_definition import ModelDefinition
@@ -23,6 +24,7 @@ from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord, St
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.cycles.flow_cost import DailyCost, FlowCost
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.flow_id import FlowId
 from tests.support.cycles import DAY, at
 from tests.support.flows import ANTHROPIC_MODEL, OPENROUTER_MODEL, TEMPERATURE, scenario_catalog
 from tests.support.records import Records
@@ -89,6 +91,9 @@ def flow_of_user(records: Records, user: str, flow: str) -> None:
 def flow_with_recorded_cycles(records: Records, user: str, flow: str, count: str, instant: str) -> None:
     flow_id = records.add_flow(user, flow)
     records.add_records(*(a_recorded_cycle(flow_id, instant, k * timedelta(minutes=15)) for k in range(int(count))))
+    # The flow started with its first recorded cycle, and the user consults it within the interval of the last one.
+    records.platform.flows.anchors[FlowId(flow_id)] = at(instant) - (int(count) - 1) * timedelta(minutes=15)
+    records.platform.now = at(instant) + timedelta(minutes=1)
 
 
 @given("che il fornitore IA non risponde")
@@ -178,6 +183,11 @@ def flow_opens_in_cycle(records: Records, flow: str, asset: str) -> None:
     records.flow_cycles.model.text = json.dumps({"decisioni": [opening]})
     records.flow_cycles.run(flow)
     assert recorded(records).outcome is CycleOutcome.COMPLETED
+
+
+@when(quoted('"{user}" consulta i propri flussi'))
+def consult_own_flows(records: Records, user: str) -> None:
+    consult(records, records.use_cases_of(user).list_flow_overviews.execute)
 
 
 @when(quoted('"{user}" consulta i cicli del flusso "{flow}"'))
@@ -374,3 +384,28 @@ def recorded_cost_unavailable(records: Records) -> None:
     call = recorded(records).cost
     assert call is not None
     assert call.cost_usd is None
+
+
+def overviews(records: Records) -> list[FlowOverview]:
+    assert isinstance(records.consulted, list), records.consulted
+    return [overview for overview in records.consulted if isinstance(overview, FlowOverview)]
+
+
+@then(
+    parsers.re(
+        r"^l'elenco contiene il flusso \"(?P<flow>[^\"]+)\" nello stato \"(?P<status>[^\"]+)\" con ultimo ciclo alle "
+        r"(?P<last>\d\d:\d\d:\d\d) concluso e prossimo ciclo alle (?P<following>\d\d:\d\d:\d\d)$"
+    )
+)
+def flow_in_overview(records: Records, flow: str, status: str, last: str, following: str) -> None:
+    [overview] = [overview for overview in overviews(records) if overview.summary.name == flow]
+    assert overview.summary.status == status
+    assert overview.last_cycle is not None
+    assert (overview.last_cycle.planned_at, overview.last_cycle.outcome) == (at(last), CycleOutcome.COMPLETED)
+    assert overview.next_cycle_at == at(following)
+    assert overview.environment == "dev"
+
+
+@then(quoted('l\'elenco non contiene il flusso "{flow}"'))
+def flow_not_in_overview(records: Records, flow: str) -> None:
+    assert flow not in [overview.summary.name for overview in overviews(records)]

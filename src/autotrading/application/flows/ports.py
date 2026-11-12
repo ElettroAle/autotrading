@@ -11,6 +11,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.unattributable import UnattributableItem
@@ -102,6 +103,12 @@ class AutomaticPausePort(Protocol):
     def pause(self, flow_ids: Sequence[FlowId], reason: str) -> None:
         """Pauses the flows still active, with the reason of the automatic pause; the others stay as they are."""
         ...
+
+
+class FlowTimingPort(Protocol):
+    """Bound to the tenant of the request: the instant every flow last started or resumed, and its pause reason."""
+
+    def timings(self) -> Mapping[FlowId, FlowTiming]: ...
 
 
 class AccountActivityPort(Protocol):

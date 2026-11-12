@@ -18,6 +18,7 @@ from autotrading.domain.cycles.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flows import a_flow
 from tests.support.identity_provider import SETTINGS, IdentityProvider
 from tests.support.platform import Platform
@@ -208,3 +209,44 @@ def test_a_flow_never_created_does_not_exist(client_of: Client) -> None:
     response = client_of("anna").get(f"/flows/{uuid4()}/cycles")
 
     assert response.status_code == 404
+
+
+def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = a_flow(platform.tenant_of("anna"), status=FlowStatus.ACTIVE)
+    platform.flows.flows.append(flow)
+    platform.flows.anchors[flow.id] = PLANNED - timedelta(minutes=15)
+    platform.cycles.record(a_completed_cycle(flow.id.value))
+    platform.now = PLANNED + timedelta(minutes=1)
+    paused = a_flow(platform.tenant_of("anna"), name="beta", status=FlowStatus.PAUSED)
+    platform.flows.flows.append(paused)
+    platform.flows.pause_reasons[paused.id] = "credito esaurito presso openrouter"
+    platform.flows.flows.append(a_flow(platform.tenant_of("bruno"), name="omega"))
+
+    response = anna.get("/flows/overview")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": str(flow.id.value),
+            "name": "alfa",
+            "account": "",
+            "environment": "dev",
+            "status": "attivo",
+            "pause_reason": None,
+            "model": flow.configuration.model.name,
+            "last_cycle": {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
+            "next_cycle_at": "2026-11-12T10:22:00Z",
+        },
+        {
+            "id": str(paused.id.value),
+            "name": "beta",
+            "account": "",
+            "environment": "dev",
+            "status": "in pausa",
+            "pause_reason": "credito esaurito presso openrouter",
+            "model": paused.configuration.model.name,
+            "last_cycle": None,
+            "next_cycle_at": None,
+        },
+    ]

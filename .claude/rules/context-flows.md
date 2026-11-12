@@ -61,6 +61,7 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `PlatformOrdersPort`: i `cloid` degli ordini registrati sul conto, con il flusso che li ha inviati (contesto `orders`).
 - `ReconciliationRepositoryPort`: ultima lettura di ogni conto e non attribuibili registrati una volta (ADR 0045).
 - `ClosedPositionsPort`: storico delle posizioni chiuse dei flussi (R1.7.2).
+- `FlowTimingPort`: ancora dei cicli (ultimo avvio o ripresa) e motivo della pausa automatica di ogni flusso (ADR 0052).
 - I bridge verso gli altri contesti vivono solo in `bootstrap.py`; `flows` fornisce ad `agent` i flussi che
   usano una chiave (`ProviderKeyUsageFromFlows`).
 
