@@ -11,14 +11,18 @@ from uuid import UUID
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.cycles.ports import ScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
+from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
+    AccountActivityFromAccounts,
+    ClosedPositionsFromOpenings,
     CycleRuntime,
     CycleServices,
     FlowDirectory,
     FlowPauseFromFlows,
+    NotifiedCycles,
     TenantCyclePorts,
     TradingAccessFromAccounts,
     record_actual_prices,
@@ -43,9 +47,11 @@ from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
+from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.cycles import FakeClockAdapter, InMemoryCycleRepositoryAdapter, InMemoryFlowLockAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
+from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import InMemoryAutomaticPauseAdapter, InMemoryFlowRepositoryAdapter
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
@@ -55,6 +61,7 @@ from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
 )
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
@@ -106,6 +113,7 @@ class FlowCycles:
         self.credentials: dict[tuple[TenantId, str], Credentials] = {}
         self.users: dict[str, str] = {}
         self.running: threading.Thread | None = None
+        self.readings = InMemoryReconciliationRepositoryAdapter()
 
     # The platform
 
@@ -113,9 +121,20 @@ class FlowCycles:
         platform = self.platform
         worker = platform.worker_for(tenant_id)
         accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
-        access = TradingAccessFromAccounts(accounts, FakeCredentialOpenerAdapter(platform.vault))
+        opener = FakeCredentialOpenerAdapter(platform.vault)
+        access = TradingAccessFromAccounts(accounts, opener)
+        flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
+        openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
+        closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
+        reconcile_account = ReconcileAccountUseCase(
+            flows,
+            AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            platform.platform_orders,
+            self.readings,
+            ClosedPositionsFromOpenings(flows, openings, closed_positions),
+        )
         return TenantCyclePorts(
-            flows=InMemoryFlowRepositoryAdapter(platform.flows, tenant_id),
+            flows=flows,
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
             accounts=accounts,
             read_exchange_state=worker.read_exchange_state,
@@ -125,6 +144,10 @@ class FlowCycles:
             execute_flow_orders=ExecuteFlowOrdersUseCase(
                 access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
             ),
+            reconcile_account=reconcile_account,
+            openings=openings,
+            closed_positions=closed_positions,
+            notify=platform.worker_for(tenant_id).notify,
         )
 
     def services(self) -> CycleServices:
@@ -248,7 +271,10 @@ class FlowCycles:
                 ]
 
         guards = CycleGuards(
-            self.records, InMemoryFlowLockAdapter(), FlowPauseFromFlows(self.directory, self.ports_of), self.clock
+            NotifiedCycles(self.records, self.directory, self.ports_of),
+            InMemoryFlowLockAdapter(),
+            FlowPauseFromFlows(self.directory, self.ports_of),
+            self.clock,
         )
         runtime = CycleRuntime(Scheduled(), guards, self.launcher)
         run_due_cycles(self.directory, self.ports_of, self.services(), runtime).execute()

@@ -219,3 +219,16 @@ def test_the_assets_open_on_the_account_are_those_of_the_reading() -> None:
     result = reconcile([flow_on("BTC")], an_activity(positions=(a_position("BTC"), a_position("SOL"))))
 
     assert result.open_assets == frozenset({"BTC", "SOL"})
+
+
+def test_a_position_closed_by_the_manual_command_alone_is_not_closed_outside() -> None:
+    flow, manual = flow_on("BTC"), uuid4()
+
+    result = reconcile(
+        [flow],
+        an_activity(fills=(a_fill("BTC", manual),)),
+        orders={manual: None},
+        last=previous({flow.id: frozenset({"BTC"})}),
+    )
+
+    assert result.closed_outside == ()

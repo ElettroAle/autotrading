@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -43,8 +44,10 @@ class PositionOpening:
     end: PositionEnd
     fee: Decimal
 
-    def closed(self, flow: Flow, asset: str, fill: ClosingFill, reason: CloseReason) -> ClosedPosition:
-        """The position closed by the fill, with the fees of both ends (R1.7.2)."""
+    def closed(
+        self, flow: Flow, asset: str, fill: ClosingFill, reason: CloseReason, cycle: datetime | None = None
+    ) -> ClosedPosition:
+        """The position closed by the fill, with the fees of both ends and the cycle that closed it, if one did."""
         return ClosedPosition(
             tenant_id=flow.tenant_id,
             flow_id=flow.id,
@@ -53,10 +56,21 @@ class PositionOpening:
             leverage=self.leverage,
             margin=self.margin,
             opening=self.end,
-            closing=PositionEnd(fill.price, fill.at),
+            closing=PositionEnd(fill.price, fill.at, cycle),
             fees=self.fee + fill.fee,
             reason=reason,
         )
+
+    def closed_outside(self, flow: Flow, closing: OutsideClosing) -> ClosedPosition:
+        """The position the exchange shows closed without the platform, liquidations included (R1.6.2, R1.7.2).
+
+        The exchange gives the realized PnL, not the price: the closing price is the one that PnL implies on the
+        value the margin held with the leverage, so the history shows the result the exchange reported.
+        """
+        sign = 1 if self.side is TradeSide.LONG else -1
+        move = closing.realized_pnl / (self.margin * self.leverage) * sign
+        fill = ClosingFill(self.end.price * (1 + move), closing.closed_at, closing.fee)
+        return self.closed(flow, closing.asset, fill, CloseReason.OUTSIDE_PLATFORM)
 
 
 @dataclass(frozen=True, slots=True)
