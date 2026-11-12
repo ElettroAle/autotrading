@@ -92,9 +92,10 @@ class SqlAlchemyCycleRepositoryAdapter:
             insert(cycles)
             .values(flow_id=flow_id, planned_at=planned_at, tenant_id=tenant_id.value, steps=[], absent_sources=[])
             .on_conflict_do_nothing(index_elements=[cycles.c.flow_id, cycles.c.planned_at])
+            .returning(cycles.c.flow_id)
         )
         with self._transaction(tenant_id) as connection:
-            return connection.execute(statement).rowcount == 1
+            return connection.execute(statement).first() is not None
 
     def record(self, record: CycleRecord) -> None:
         failure = record.failure
