@@ -21,7 +21,8 @@ paths:
 - L'apertura non è un comando dell'utente: la usano la procedura di verifica e, in seguito, i flussi.
   L'utente può solo chiudere manualmente (R0.3.2).
 - Leva massima e passo della dimensione dell'asset vengono dall'exchange; le regole di controllo e
-  di arrotondamento stanno nel domain.
+  di arrotondamento stanno nel domain. La quantità si arrotonda per difetto, ma per eccesso di un passo quando un
+  valore che rispetta il minimo dell'exchange scenderebbe sotto di esso (ADR 0066).
 - Nessun nuovo tentativo automatico di un ordine fallito (R0.3.3).
 
 ## Porte del contesto

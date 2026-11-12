@@ -53,6 +53,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   in ogni controllo e vista; solo lo storico delle posizioni chiuse tiene il margine dell'esecuzione di apertura,
   che l'exchange non dà più dopo la chiusura (ADR 0067).
 - Ordine del controllo del rischio: leva, poi esposizione, poi coerenza con lo stato, poi importo minimo.
+  Le decisioni di un ciclo si controllano nel loro ordine: ogni apertura approvata impegna il suo margine e le
+  successive vedono la liquidità residua; una chiusura non libera liquidità prima dell'esecuzione (ADR 0065).
 - Gli ordini passano dal contesto `orders` (apertura, chiusura, esito reale); `flows` non parla con
   l'exchange per inviare ordini.
 

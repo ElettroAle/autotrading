@@ -67,18 +67,26 @@ class RiskCheck:
     """Leverage, then exposure, then coherence with the state, then the exchange minimum (R1.5.1-R1.5.4).
 
     An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
+    The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
+    so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065).
     """
 
     def __init__(self, policy: RiskPolicy, state: RiskState) -> None:
         self._policy = policy
         self._state = state
+        self._liquidity = state.available_liquidity
 
     def outcome(self, intent: TradeIntent, limits: AssetLimits | None) -> RiskOutcome:
         if isinstance(intent, CloseIntent):
             return self._close(intent)
         if isinstance(intent, OpenIntent) and limits is not None:
-            return self._open(intent, limits)
+            return self._committed(self._open(intent, limits))
         return HeldPosition(intent.asset)
+
+    def _committed(self, outcome: RiskOutcome) -> RiskOutcome:
+        if isinstance(outcome, ApprovedOpening):
+            self._liquidity -= outcome.margin
+        return outcome
 
     def _close(self, intent: CloseIntent) -> RiskOutcome:
         if intent.asset not in self._state.open_assets:
@@ -89,7 +97,7 @@ class RiskCheck:
         sizing = self._within_exposure(self._within_leverage(intent, limits))
         if intent.asset in self._state.open_assets:
             return BlockedDecision(intent.asset, f"posizione già aperta su {intent.asset}")
-        if sizing.margin > self._state.available_liquidity:
+        if sizing.margin > self._liquidity:
             return self._short_of_liquidity(intent.asset)
         if sizing.value < limits.min_order_value:
             return self._at_minimum(intent, sizing, limits)
@@ -143,14 +151,12 @@ class RiskCheck:
             sizing.leverage,
             Adjustment(AdjustmentKind.VALUE, sizing.value, minimum, "portata al minimo dell'exchange"),
         )
-        if raised.margin > self._state.available_liquidity:
+        if raised.margin > self._liquidity:
             return self._short_of_liquidity(intent.asset)
         return ApprovedOpening(intent.asset, intent.side, raised.value, raised.leverage, raised.adjustments)
 
     def _short_of_liquidity(self, asset: str) -> BlockedDecision:
-        return BlockedDecision(
-            asset, f"liquidità del flusso insufficiente: {self._money(self._state.available_liquidity)}"
-        )
+        return BlockedDecision(asset, f"liquidità del flusso insufficiente: {self._money(self._liquidity)}")
 
     def _money(self, amount: Decimal) -> str:
         return f"{number(amount)} {self._state.currency}"

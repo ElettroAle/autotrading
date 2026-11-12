@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_UP, Decimal
 
 from autotrading.domain.orders.errors import (
     InvalidLeverageError,
@@ -17,9 +17,10 @@ class Market:
     max_leverage: int
     size_decimals: int
     mid_price: Decimal
+    min_order_value: Decimal
 
     def __post_init__(self) -> None:
-        if self.max_leverage < 1 or self.size_decimals < 0 or self.mid_price <= 0:
+        if self.max_leverage < 1 or self.size_decimals < 0 or self.mid_price <= 0 or self.min_order_value < 0:
             raise InvalidMarketError(self.coin)
 
     @property
@@ -33,8 +34,14 @@ class Market:
             raise LeverageAboveMaximumError(self.coin, self.max_leverage)
 
     def size_for(self, value: Decimal) -> Decimal:
-        """The size worth `value` at the current price, rounded down to the step: never more than asked."""
+        """The size worth `value` at the current price, rounded down to the step.
+
+        A value that meets the exchange minimum is rounded up instead when rounding down would fall below it: the
+        exchange would refuse an order the risk check approved (R1.5.5).
+        """
         size = (value / self.mid_price).quantize(self.size_step, rounding=ROUND_DOWN)
+        if value >= self.min_order_value and size * self.mid_price < self.min_order_value:
+            size = (value / self.mid_price).quantize(self.size_step, rounding=ROUND_UP)
         if size <= 0:
             raise OrderSizeBelowStepError(self.coin, self.size_step)
         return size
