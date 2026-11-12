@@ -45,6 +45,7 @@ class CreateFlowCommand:
     sources: tuple[SourceRequest, ...] = ()
     instructions: str = ""
     cycle_minutes: int | None = None
+    bring_to_minimum: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +96,7 @@ class CreateFlowUseCase:
                 command.max_leverage, command.max_margin_exposure_percent, command.max_value_exposure_percent
             ),
             allocated_capital=command.allocated_capital,
+            bring_to_minimum=command.bring_to_minimum,
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

@@ -95,13 +95,13 @@ class AgentPort(Protocol):
 
 class RiskPort(Protocol):
     def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> Sequence[object]:
-        """The orders approved by the risk check, in the order they must be sent."""
+        """The orders approved by the risk check; the execution decides the order they are sent in (R1.5.5)."""
         ...
 
 
 class OrderPort(Protocol):
-    def execute(self, flow_id: UUID, planned_at: datetime, order: object) -> object:
-        """Sends one order of the cycle and gives back its real outcome."""
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
+        """Sends the approved orders of the cycle, closings first, and gives back their real outcomes (R1.5.5)."""
         ...
 
 

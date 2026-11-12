@@ -85,9 +85,13 @@ orders = Table(
     Column("rejection_reason", Text),
     Column("exchange_message", Text),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("flow_id", Uuid),
+    Column("cycle_planned_at", DateTime(timezone=True)),
+    Column("decision_asset", Text),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="orders_account_of_tenant"
     ),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"], name="orders_flow_of_tenant"),
 )
 
 verification_runs = Table(
