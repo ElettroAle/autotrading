@@ -29,6 +29,8 @@ Le fonti dati che l'agente riceve nel contesto.
 - Sentiment: due fonti distinte (decisione del proprietario), perché sono due indici diversi con lo stesso
   nome: Crypto Fear & Greed Index di alternative.me e CMC Crypto Fear and Greed Index di CoinMarketCap, entrambi
   dagli endpoint pubblici senza chiave (ADR 0033).
+- Notizie: feed RSS di CoinDesk, Cointelegraph e Decrypt; un feed che non risponde si salta, la fonte
+  manca solo se nessun feed risponde. La scelta per età e numero è una regola del domain (ADR 0034).
 - Una fonte esterna che non risponde produce un errore tipizzato della porta; il ciclo la tratta come
   assente, mai come errore del ciclo.
 - I parametri non indicati assumono il predefinito del catalogo; un valore fuori dai valori ammessi rende
