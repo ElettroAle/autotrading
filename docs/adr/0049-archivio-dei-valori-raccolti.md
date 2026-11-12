@@ -19,7 +19,7 @@ il riuso tra flussi e il replay. Un ciclo è identificato dal suo flusso e dall'
   l'agente ha visto.
 - **Porta** `SampleRepositoryPort.add(samples)`, legata al tenant del flusso. `CollectSourceUseCase` registra i
   valori di una fonte tutti insieme, dopo che la lettura è riuscita per ogni asset.
-- **Adapter** `SqlAlchemySampleRepositoryAdapter` sulla tabella `source_samples` (migrazione `0010`): chiave
+- **Adapter** `SqlAlchemySampleRepositoryAdapter` sulla tabella `source_samples` (migrazione `0011`): chiave
   esterna composta verso `flows (id, tenant_id)`, indice per ciclo, row level security per tenant e soli permessi
   di lettura e inserimento: un valore raccolto è un fatto di un ciclo passato, non si modifica né si cancella.
 
