@@ -45,7 +45,7 @@ def client_of(platform: Platform) -> Client:
         HealthReport("1.0.0", "dev"),
         ResolveTenantUseCase(platform.tenants),
         platform.for_tenant,
-        Authentication(SETTINGS, verifier),
+        Authentication(SETTINGS, verifier, provider.login()),
     )
 
     def client(user: str) -> TestClient:
