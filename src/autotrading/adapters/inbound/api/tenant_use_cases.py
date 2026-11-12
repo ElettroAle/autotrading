@@ -25,9 +25,14 @@ from autotrading.application.agent.ports import (
 from autotrading.application.agent.register_provider_key import ProviderKeyServices, RegisterProviderKeyUseCase
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
+from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
+from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import FlowRepositoryPort
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
@@ -92,6 +97,11 @@ class TenantUseCases:
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
+    modify_flow: ModifyFlowUseCase
+    get_flow_version: GetFlowVersionUseCase
+    compare_flow_versions: CompareFlowVersionsUseCase
+    change_flow_status: ChangeFlowStatusUseCase
+    archive_flow: ArchiveFlowUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -120,4 +130,9 @@ class TenantUseCases:
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
+            modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks),
+            get_flow_version=GetFlowVersionUseCase(ports.flows),
+            compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
+            change_flow_status=ChangeFlowStatusUseCase(ports.flows),
+            archive_flow=ArchiveFlowUseCase(ports.flows),
         )

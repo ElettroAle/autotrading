@@ -1,5 +1,5 @@
 # language: it
-@R1.1.6 @wip
+@R1.1.6
 Funzionalità: R1.1.6 Archiviazione di un flusso
   Come utente
   Voglio archiviare un flusso che non uso più
@@ -15,6 +15,7 @@ Funzionalità: R1.1.6 Archiviazione di un flusso
     Dato che "anna" ha il conto "test-1" con saldo 1000 USDC
     E che "anna" ha il flusso "alfa" sul conto "test-1" con capitale allocato 400 USDC e 12 cicli registrati
 
+  @wip
   Scenario: Archiviazione di un flusso fermo
     Dato che il flusso "alfa" è fermo
     Quando "anna" archivia il flusso "alfa"

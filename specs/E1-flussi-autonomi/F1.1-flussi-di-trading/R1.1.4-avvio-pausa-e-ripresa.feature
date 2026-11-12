@@ -1,5 +1,5 @@
 # language: it
-@R1.1.4 @wip
+@R1.1.4
 Funzionalità: R1.1.4 Avvio, pausa e ripresa di un flusso
   Come utente
   Voglio avviare un flusso, metterlo in pausa e riprenderlo
@@ -15,12 +15,14 @@ Funzionalità: R1.1.4 Avvio, pausa e ripresa di un flusso
   Contesto:
     Dato che "anna" ha il flusso "alfa"
 
+  @wip
   Scenario: Avvio di un flusso fermo
     Dato che il flusso "alfa" è fermo
     Quando "anna" avvia il flusso "alfa"
     Allora il flusso "alfa" è nello stato "attivo"
     E il flusso "alfa" esegue il primo ciclo all'avvio
 
+  @wip
   Scenario: Pausa di un flusso attivo
     Dato che il flusso "alfa" è attivo con una posizione aperta su "BTC"
     Quando "anna" mette in pausa il flusso "alfa"
@@ -28,6 +30,7 @@ Funzionalità: R1.1.4 Avvio, pausa e ripresa di un flusso
     E il flusso "alfa" non esegue cicli
     E la posizione su "BTC" resta aperta sull'exchange
 
+  @wip
   Scenario: Ripresa di un flusso in pausa
     Dato che il flusso "alfa" è in pausa con una posizione aperta su "BTC" e capitale allocato 400 USDC
     Quando "anna" riprende il flusso "alfa"

@@ -1,5 +1,5 @@
 # language: it
-@R1.1.3 @wip
+@R1.1.3
 Funzionalità: R1.1.3 Modifica versionata della configurazione
   Come utente
   Voglio modificare la configurazione di un flusso conservando le versioni precedenti
@@ -28,6 +28,7 @@ Funzionalità: R1.1.3 Modifica versionata della configurazione
     Quando "anna" confronta le versioni 1 e 2 del flusso "alfa"
     Allora il confronto riporta solo la differenza sul modello, da "openrouter/deepseek-chat" a "anthropic/claude-sonnet"
 
+  @wip
   Scenario: La modifica non tocca il ciclo in corso
     Dato che un ciclo del flusso "alfa" è in corso con la versione 1
     Quando "anna" modifica il modello del flusso "alfa" in "anthropic/claude-sonnet"
@@ -39,6 +40,7 @@ Funzionalità: R1.1.3 Modifica versionata della configurazione
     Allora la modifica è rifiutata con il motivo "intervallo di ciclo fuori da 1-1440 minuti"
     E il flusso "alfa" resta alla versione di configurazione 1
 
+  @wip
   Scenario: Non si toglie un asset con posizione aperta
     Dato che il flusso "alfa" ha una posizione aperta su "ETH"
     Quando "anna" modifica gli asset del flusso "alfa" in "BTC"
