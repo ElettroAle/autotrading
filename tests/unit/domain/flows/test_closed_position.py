@@ -98,3 +98,18 @@ def test_fees_and_leverage_at_their_limits_are_admitted() -> None:
     position = replace(POSITION, leverage=1, fees=Decimal(0))
 
     assert (position.leverage, position.fees) == (1, Decimal(0))
+
+
+def test_the_result_the_exchange_reported_is_the_result_of_the_position() -> None:
+    position = replace(POSITION, realized_pnl=Decimal("4.20"))
+
+    assert position.pnl == Decimal("4.20")
+    assert position.pnl_percent_of_margin == Decimal("8.4")
+
+
+def test_a_reported_loss_is_kept_as_reported() -> None:
+    assert replace(POSITION, realized_pnl=Decimal(-3)).pnl == Decimal(-3)
+
+
+def test_a_reported_result_of_zero_is_a_result() -> None:
+    assert replace(POSITION, realized_pnl=Decimal(0)).pnl == Decimal(0)

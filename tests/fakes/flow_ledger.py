@@ -7,7 +7,15 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.ledger import AccountLedger, FlowTotals, FundingEntry, LedgerEntry, LedgerKeys
+from autotrading.domain.flows.ledger import (
+    AccountLedger,
+    Execution,
+    ExecutionKind,
+    FlowTotals,
+    FundingEntry,
+    LedgerEntry,
+    LedgerKeys,
+)
 
 
 @dataclass
@@ -51,6 +59,11 @@ class InMemoryFlowLedgerAdapter:
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         return {flow_id: self.totals[flow_id] for flow_id in flow_ids if flow_id in self.totals}
+
+    def add(self, account_id: UUID, flow_id: FlowId, execution: Execution) -> None:
+        """An execution of an order of the flow, as a cycle of the worker records it."""
+        entry = LedgerEntry(execution, flow_id, ExecutionKind.FLOW_ORDER, platform_order=True)
+        self.record(account_id, AccountLedger((entry,), ()), execution.executed_at)
 
     def entries_of(self, flow_id: FlowId) -> list[LedgerEntry]:
         return [entry for entries in self.entries.values() for entry in entries if entry.flow_id == flow_id]

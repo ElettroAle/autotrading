@@ -85,6 +85,20 @@ def test_the_anchor_moves_to_the_resume_and_stays_while_active(database: Engine)
     assert flow_row(database, flow)["cycle_anchor"] == resumed
 
 
+def test_the_first_start_is_stamped_once_and_a_resume_never_moves_it(database: Engine) -> None:
+    flow = new_flow(database)
+    assert flow_row(database, flow)["first_started_at"] is None
+    set_status(database, flow, "active")
+    started = flow_row(database, flow)["cycle_anchor"]
+    set_status(database, flow, "paused")
+
+    set_status(database, flow, "active")
+
+    row = flow_row(database, flow)
+    assert row["cycle_anchor"] > started
+    assert row["first_started_at"] == started
+
+
 def test_the_scheduler_reads_the_active_flows_of_every_tenant(database: Engine) -> None:
     active, other_tenant, stopped = new_flow(database, 15), new_flow(database, 60), new_flow(database)
     set_status(database, active, "active")
@@ -215,7 +229,9 @@ def test_the_timing_of_a_flow_tells_its_anchor_and_its_pause_reason(database: En
     timings = SqlAlchemyFlowTimingAdapter(database, flow.tenant_id).timings()
 
     assert set(timings) == {flow.id}
+    row = flow_row(database, flow)
     assert timings[flow.id] == FlowTiming(
-        flow_row(database, flow)["cycle_anchor"], "credito esaurito presso openrouter"
+        row["cycle_anchor"], "credito esaurito presso openrouter", row["first_started_at"]
     )
+    assert row["first_started_at"] == row["cycle_anchor"]
     assert other.id not in timings

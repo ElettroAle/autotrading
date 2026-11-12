@@ -12,13 +12,14 @@ from autotrading.application.flows.change_allocated_capital import (
 )
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand, ListCapitalChangesUseCase
+from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.errors import (
     ArchivedFlowNotModifiableError,
     CapitalAboveAvailableCapitalError,
-    CapitalBelowCommittedMarginError,
+    CapitalBelowFlowMinimumError,
     FlowCommandNotAllowedError,
 )
 from autotrading.domain.flows.flow import Flow
@@ -34,9 +35,12 @@ from autotrading.domain.flows.stop_outcome import (
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
+from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 USER = UserId("oid-anna")
@@ -53,9 +57,6 @@ class ScriptedPositions:
         self.events = events
         self.refusals: dict[str, str] = {}
         self.none_open: set[str] = set()
-        self.margin = Decimal(0)
-        self.margin_failure: Exception | None = None
-        self.margins_asked: list[tuple[UUID, tuple[str, ...]]] = []
 
     def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
         self.events.append(f"close {asset} {account_id} {user_id.value}")
@@ -64,12 +65,6 @@ class ScriptedPositions:
         if asset in self.refusals:
             return PositionClosing(asset, refusal=self.refusals[asset])
         return PositionClosing(asset, FILL)
-
-    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
-        self.margins_asked.append((account_id, assets))
-        if self.margin_failure is not None:
-            raise self.margin_failure
-        return self.margin
 
 
 class RecordingCycles:
@@ -112,8 +107,25 @@ class Flows:
                 InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
             ),
         )
-        self.change_capital = ChangeAllocatedCapitalUseCase(self.repository, self.accounts, self.positions, lambda: NOW)
+        self.activity = FakeAccountActivityAdapter()
+        self.ledger = InMemoryFlowLedgerAdapter()
+        self.change_capital = ChangeAllocatedCapitalUseCase(
+            self.repository,
+            self.accounts,
+            ReadFlowStateUseCase(self.repository, self.activity, self.ledger),
+            lambda: NOW,
+        )
         self.list_changes = ListCapitalChangesUseCase(self.repository)
+
+    def held(self, margin: str, *, asset: str = "BTC") -> None:
+        reading = self.activity.activities.get(self.account_id, an_activity())
+        position = a_position(asset, margin=Decimal(margin))
+        self.activity.activities[self.account_id] = replace(reading, positions=(*reading.positions, position))
+
+    def realized(self, flow: Flow, pnl: str, fees: str, *, asset: str = "BTC") -> None:
+        order_id = uuid4()
+        fill = a_fill(asset, order_id, realized_pnl=Decimal(pnl), fee=Decimal(fees), fill_id=str(order_id))
+        self.ledger.add(self.account_id, flow.id, fill)
 
     def saved(
         self,
@@ -207,7 +219,7 @@ def test_a_raise_within_the_free_capital_becomes_the_next_version_and_its_change
     assert flows.list_changes.execute(ListCapitalChangesCommand(flow.id)) == (
         CapitalChange(flow.id, NOW, Decimal(400), Decimal(900), USER),
     )
-    assert flows.positions.margins_asked == []
+    assert flows.activity.read == []
 
 
 def test_a_raise_beyond_the_capital_available_is_refused_and_nothing_changes(flows: Flows) -> None:
@@ -222,30 +234,45 @@ def test_a_raise_beyond_the_capital_available_is_refused_and_nothing_changes(flo
     assert flows.list_changes.execute(ListCapitalChangesCommand(flow.id)) == ()
 
 
-def test_a_reduction_is_checked_against_the_margin_of_the_positions_of_the_flow(flows: Flows) -> None:
+def test_a_reduction_is_checked_against_the_margin_the_exchange_declares_for_the_flow(flows: Flows) -> None:
     flow = flows.saved()
-    flows.positions.margin = Decimal(150)
+    flows.held("150")
+    flows.held("500", asset="SOL")
 
     changed = flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal(150), USER))
 
     assert changed.configuration.allocated_capital == Decimal(150)
-    assert flows.positions.margins_asked == [(flows.account_id, ("BTC", "ETH"))]
+    assert flows.activity.read == [flows.account_id]
 
 
 def test_a_reduction_below_the_committed_margin_is_refused(flows: Flows) -> None:
     flow = flows.saved()
-    flows.positions.margin = Decimal(150)
+    flows.held("150")
 
-    with pytest.raises(CapitalBelowCommittedMarginError) as raised:
+    with pytest.raises(CapitalBelowFlowMinimumError) as raised:
         flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal(149), USER))
 
-    assert raised.value.committed_margin == "150 USDC"
+    assert raised.value.minimum == "150 USDC"
     assert flows.repository.get(flow.id) == flow
 
 
-def test_a_margin_that_cannot_be_read_refuses_the_reduction(flows: Flows) -> None:
+def test_a_reduction_covers_what_the_flow_lost_and_paid_but_not_what_another_flow_did(flows: Flows) -> None:
     flow = flows.saved()
-    flows.positions.margin_failure = FlowExchangeUnavailableError()
+    other = flows.saved(name="beta", assets=("SOL",), capital=Decimal(100))
+    flows.held("150")
+    flows.realized(flow, "-200", "10")
+    flows.realized(other, "-90", "5", asset="SOL")
+
+    with pytest.raises(CapitalBelowFlowMinimumError) as raised:
+        flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal("359.99"), USER))
+
+    assert raised.value.minimum == "360 USDC"
+    assert flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal(360), USER))
+
+
+def test_a_reading_that_cannot_be_made_refuses_the_reduction(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.activity.reachable = False
 
     with pytest.raises(FlowExchangeUnavailableError):
         flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal(100), USER))
@@ -259,12 +286,13 @@ def test_the_same_capital_changes_nothing_and_reads_nothing(flows: Flows) -> Non
 
     assert flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal("400.00"), USER)) == flow
     assert flows.store.versions[flow.id] == [flow.configuration]
-    assert flows.positions.margins_asked == []
+    assert flows.activity.read == []
 
 
 def test_an_archived_flow_keeps_its_capital_before_anything_is_read(flows: Flows) -> None:
     flow = flows.saved(status=FlowStatus.ARCHIVED)
     flows.accounts.reachable = False
+    flows.activity.reachable = False
 
     with pytest.raises(ArchivedFlowNotModifiableError):
         flows.change_capital.execute(ChangeAllocatedCapitalCommand(flow.id, Decimal(400), USER))

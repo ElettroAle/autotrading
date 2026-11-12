@@ -127,6 +127,7 @@ class History:
             flows,
             InMemoryFlowOpeningsAdapter(self.platform.orders_of(operating.tenant_id)),
             InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
+            self.platform.worker_for(operating.tenant_id).notify,
         )
         record = RecordAccountExecutionsUseCase(
             flows, self.platform.account_activity, self.platform.platform_orders, self.platform.ledger

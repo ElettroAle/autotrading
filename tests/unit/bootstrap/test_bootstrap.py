@@ -21,6 +21,15 @@ from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.agent.errors import ProviderRejectedKeyError
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
+from autotrading.application.flows.ports import (
+    ClosedPositionRepositoryPort,
+    FlowOpeningsPort,
+    FlowPositionsPort,
+    FlowRepositoryPort,
+    RunningCyclePort,
+)
+from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
+from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
@@ -31,6 +40,7 @@ from autotrading.bootstrap import (
     ApiExchanges,
     InvalidConfigurationError,
     MissingConfigurationError,
+    NotifiedClosedPositions,
     PublicCredentialsKey,
     TenantUseCaseFactory,
     TradingAccessFromAccounts,
@@ -455,3 +465,39 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
 
     assert [str(request.url) for request in asked] == ["https://openrouter.ai/api/v1/key"]
     assert store.keys == []
+
+
+def test_the_api_records_stops_and_manual_closings_in_the_history_that_notifies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    histories: list[ClosedPositionRepositoryPort] = []
+    real_stop_ports, real_manual_closing = StopPorts, RecordManualClosingUseCase
+
+    def stop_ports(
+        cycles: RunningCyclePort,
+        positions: FlowPositionsPort,
+        openings: FlowOpeningsPort,
+        closed_positions: ClosedPositionRepositoryPort,
+    ) -> StopPorts:
+        histories.append(closed_positions)
+        return real_stop_ports(cycles, positions, openings, closed_positions)
+
+    def manual_closing(
+        flows: FlowRepositoryPort, openings: FlowOpeningsPort, closed_positions: ClosedPositionRepositoryPort
+    ) -> RecordManualClosingUseCase:
+        histories.append(closed_positions)
+        return real_manual_closing(flows, openings, closed_positions)
+
+    monkeypatch.setattr(bootstrap, "StopPorts", stop_ports)
+    monkeypatch.setattr(bootstrap, "RecordManualClosingUseCase", manual_closing)
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    factory = TenantUseCaseFactory(
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
+    )
+
+    factory.for_tenant(TenantId.new())
+
+    assert len(histories) == 2
+    assert all(isinstance(history, NotifiedClosedPositions) for history in histories)

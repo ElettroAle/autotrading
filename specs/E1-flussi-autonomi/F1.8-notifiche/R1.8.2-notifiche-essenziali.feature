@@ -11,6 +11,9 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
   direzione, leva e valore; per una chiusura asset e PnL; per un errore il messaggio originale.
   Una notifica non contiene mai credenziali. Le notifiche vanno solo alla chat collegata al tenant (R1.8.1).
   Un invio che fallisce si registra e non fa fallire il ciclo.
+  Ogni chiusura di una posizione di un flusso si notifica una volta, qualunque ne sia il motivo (decisione
+  dell'agente, stop del flusso, rimozione del conto, comando manuale, chiusura fuori dalla piattaforma), con lo
+  stesso PnL che entra nello storico delle posizioni chiuse: quello che l'exchange riporta.
 
   Fuori ambito: la scelta degli eventi e dei canali, l'email, i riepiloghi periodici.
 
@@ -31,6 +34,23 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
       | l'exchange rifiuta un ordine del flusso "alfa" con "Order rejected"   | alfa: ordine rifiutato, Order rejected   |
       | il flusso "alfa" va in pausa per "credito esaurito presso openrouter" | alfa: in pausa, credito esaurito presso openrouter |
       | sul conto di "alfa" compare una posizione non attribuibile su "SOL"   | posizione non attribuibile su SOL        |
+
+  Schema dello scenario: Ogni chiusura notificata una volta
+    Dato che il flusso "alfa" ha una posizione aperta su "BTC"
+    Quando la posizione su "BTC" del flusso "alfa" si chiude per <motivo> con PnL 4,20 USDC
+    Allora la chat "chat-anna" riceve una sola notifica che contiene "alfa: chiusa BTC, PnL 4,20 USDC"
+
+    Esempi:
+      | motivo                 |
+      | decisione dell'agente  |
+      | stop del flusso        |
+      | rimozione del conto    |
+      | comando manuale        |
+
+  Scenario: Notifica e storico con lo stesso PnL
+    Dato che il flusso "alfa" ha una posizione aperta su "BTC"
+    Quando la posizione su "BTC" del flusso "alfa" si chiude per decisione dell'agente con PnL 4,20 USDC
+    Allora lo storico del flusso "alfa" contiene la posizione su "BTC" con PnL 4,20 USDC
 
   Scenario: Invio fallito non ferma il ciclo
     Dato che Telegram non risponde

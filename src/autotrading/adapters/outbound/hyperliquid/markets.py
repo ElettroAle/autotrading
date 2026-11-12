@@ -1,17 +1,19 @@
-from decimal import Decimal
 from typing import Any
 
 import requests
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
-from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdk, OfficialSdk
+from autotrading.adapters.outbound.hyperliquid.exchange import (
+    MIN_ORDER_VALUE,
+    TIMEOUT_SECONDS,
+    HyperliquidSdk,
+    OfficialSdk,
+)
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.risk_check import AssetLimits
 
 SHAPE_ERRORS = (KeyError, TypeError, AttributeError)
-# The exchange refuses any order below 10 USDC of value ("Order must have minimum value of $10").
-MIN_ORDER_VALUE = Decimal(10)
 
 
 class HyperliquidMarketsAdapter:

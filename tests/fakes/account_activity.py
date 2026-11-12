@@ -1,4 +1,5 @@
-"""Fake of what the exchange shows of the accounts of a tenant: a reading per account, or out of reach.
+"""Fake of what the exchange shows of the accounts of a tenant: a reading per account, an empty one for an account
+with nothing on the exchange, or out of reach.
 
 It also holds the executions and funding of each account, read since a moment as the exchange does.
 """
@@ -6,9 +7,10 @@ It also holds the executions and funding of each account, read since a moment as
 from datetime import datetime
 from uuid import UUID
 
-from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
+from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
+from tests.support.activity import an_activity
 
 
 class FakeAccountActivityAdapter:
@@ -18,13 +20,13 @@ class FakeAccountActivityAdapter:
         self.funding: dict[UUID, list[FundingPayment]] = {}
         self.complete = True
         self.reachable = True
+        self.read: list[UUID] = []
 
     def activity(self, account_id: UUID) -> AccountActivity:
-        if account_id not in self.activities:
-            raise FlowAccountNotFoundError
+        self.read.append(account_id)
         if not self.reachable:
             raise FlowExchangeUnavailableError
-        return self.activities[account_id]
+        return self.activities.get(account_id, an_activity())
 
     def since(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
         if not self.reachable:

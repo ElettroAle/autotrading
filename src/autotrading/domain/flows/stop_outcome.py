@@ -18,11 +18,12 @@ class PositionLeftOpen:
 
 @dataclass(frozen=True, slots=True)
 class ClosingFill:
-    """What the exchange executed to close a position of the flow."""
+    """What the exchange executed to close a position of the flow, with the PnL it realized, when it reported it."""
 
     price: Decimal
     at: datetime
     fee: Decimal
+    realized_pnl: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,7 @@ class PositionOpening:
             closing=PositionEnd(fill.price, fill.at, cycle),
             fees=self.fee + fill.fee,
             reason=reason,
+            realized_pnl=fill.realized_pnl,
         )
 
     def closed_outside(self, flow: Flow, closing: OutsideClosing) -> ClosedPosition:
@@ -69,7 +71,7 @@ class PositionOpening:
         """
         sign = 1 if self.side is TradeSide.LONG else -1
         move = closing.realized_pnl / (self.margin * self.leverage) * sign
-        fill = ClosingFill(self.end.price * (1 + move), closing.closed_at, closing.fee)
+        fill = ClosingFill(self.end.price * (1 + move), closing.closed_at, closing.fee, closing.realized_pnl)
         return self.closed(flow, closing.asset, fill, CloseReason.OUTSIDE_PLATFORM)
 
 

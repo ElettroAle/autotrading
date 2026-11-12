@@ -10,10 +10,8 @@ import pytest
 from sqlalchemy import create_engine
 
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
-from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
-    SqlAlchemyClosedPositionRepositoryAdapter,
-)
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.cycles.ports import ScheduledFlow
@@ -26,8 +24,10 @@ from autotrading.application.flows.reconcile_account import ReconcileAccountUseC
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.bootstrap import (
     ClosedPositionsFromOpenings,
+    CycleFlow,
     FlowPauseFromFlows,
     FlowStateFromFlows,
+    NotifiedClosedPositions,
     NotifiedCycles,
     TenantCyclePorts,
     WorkerExchanges,
@@ -104,10 +104,13 @@ class World:
 
     def ports_of(self, tenant_id: object) -> TenantCyclePorts:
         assert tenant_id == self.tenant_id
-        return replace(
-            self.cycles.ports_of(self.tenant_id),
-            openings=self.openings,
-            closed_positions=InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
+        ports = self.cycles.ports_of(self.tenant_id)
+        return replace(ports, openings=self.openings, closed_positions=self.history(ports.notify))
+
+    def history(self, notify: NotifyUseCase) -> NotifiedClosedPositions:
+        flows = InMemoryFlowRepositoryAdapter(self.cycles.platform.flows, self.tenant_id)
+        return NotifiedClosedPositions(
+            InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id), flows, notify
         )
 
     @property
@@ -176,6 +179,7 @@ def test_an_executed_closing_enters_the_history_with_its_cycle_and_is_notified(w
     assert closed.closing == PositionEnd(Decimal("100.4"), CLOSED_AT, PLANNED_AT)
     assert closed.opening == OPENING.end
     assert closed.fees == Decimal("1.3")
+    assert closed.pnl == Decimal("4.20")
     assert world.openings.asked == [(world.flow.id, "BTC")]
     assert world.received == ["alfa: chiusa BTC, PnL 4,20 USDC"]
 
@@ -198,8 +202,8 @@ def outside(world: World, pnl: str) -> OutsideClosing:
 
 def closed_positions(world: World) -> ClosedPositionsFromOpenings:
     flows = InMemoryFlowRepositoryAdapter(world.cycles.platform.flows, world.tenant_id)
-    store = InMemoryClosedPositionRepositoryAdapter(world.closed, world.tenant_id)
-    return ClosedPositionsFromOpenings(flows, world.openings, store)
+    notify = world.ports.notify
+    return ClosedPositionsFromOpenings(flows, world.openings, world.history(notify), notify)
 
 
 def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_flow(world: World) -> None:
@@ -213,7 +217,9 @@ def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_fl
         2,
     )
     assert closed.closing == PositionEnd(Decimal(90), CLOSED_AT, None)
+    assert closed.pnl == Decimal(-10)
     assert world.openings.asked == [(world.flow.id, "BTC")]
+    assert world.received == ["alfa: chiusa BTC, PnL -10 USDC"]
 
 
 def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: pytest.LogCaptureFixture) -> None:
@@ -225,6 +231,7 @@ def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: p
     assert world.closed.positions == []
     assert [record.getMessage() for record in caplog.records] == ["posizione chiusa fuori senza apertura del flusso"]
     assert caplog.records[0].__dict__["asset"] == "BTC"
+    assert world.received == ["alfa: chiusa BTC, PnL -10 USDC"]
 
 
 def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
@@ -235,6 +242,7 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
 
     assert world.closed.positions == []
     assert [record.getMessage() for record in caplog.records] == ["esito della chiusura fuori non rappresentabile"]
+    assert world.received == ["alfa: chiusa BTC, PnL -100 USDC"]
 
 
 # NotifiedCycles
@@ -323,6 +331,37 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
     assert world.received == ["alfa: in pausa, registro delle esecuzioni incompleto"]
 
 
+# FlowStateFromFlows.read: the beginning of the flow
+
+
+def started_at(world: World) -> datetime:
+    snapshot = FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+    assert isinstance(snapshot.state, CycleFlow)
+    return snapshot.state.started_at
+
+
+def test_the_flow_began_at_its_first_start_whatever_its_resumes(world: World) -> None:
+    world.cycles.platform.flows.first_starts[world.flow.id] = at("08:00")
+
+    assert started_at(world) == at("08:00")
+
+
+def test_a_flow_not_stamped_yet_began_at_the_anchor_of_its_cycles(world: World) -> None:
+    del world.cycles.platform.flows.first_starts[world.flow.id]
+
+    assert started_at(world) == at("10:00")
+
+
+# NotifiedClosedPositions
+
+
+def test_the_history_reads_back_what_it_told(world: World) -> None:
+    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=True, execution=an_execution()))
+
+    assert world.ports.closed_positions.of_flow(world.flow.id) == world.closed.positions
+    assert len(world.closed.positions) == 1
+
+
 # FlowStateFromFlows.update: the reconciliation of the account
 
 
@@ -403,5 +442,6 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
 
     assert isinstance(ports.reconcile_account, ReconcileAccountUseCase)
     assert isinstance(ports.openings, SqlAlchemyFlowOpeningsAdapter)
-    assert isinstance(ports.closed_positions, SqlAlchemyClosedPositionRepositoryAdapter)
+    assert isinstance(ports.closed_positions, NotifiedClosedPositions)
     assert isinstance(ports.notify, NotifyUseCase)
+    assert isinstance(ports.timing, SqlAlchemyFlowTimingAdapter)

@@ -32,6 +32,7 @@ from autotrading.application.verification.run_exchange_verification import (
 )
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -59,6 +60,12 @@ class WorkerUseCases:
 class UserRequest(BaseModel):
     # The API has authenticated the user and sends who asked, so what follows is recorded with them.
     user_id: str
+
+
+class NotificationRequest(BaseModel):
+    # Built by the API from its own events: the worker only delivers it to the chat of the tenant.
+    subject: str
+    event: str
 
 
 class BotPolling:
@@ -166,6 +173,11 @@ def create_worker_api(
         command = CloseExchangePositionCommand(account_id, coin, OrderSource(OrderOrigin.MANUAL, request.user_id))
         order = for_tenant(TenantId(tenant_id)).close_exchange_position.execute(command)
         return OrderOutcomeResponse.of(OrderOutcome.of(order))
+
+    @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])
+    def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:
+        for_tenant(TenantId(tenant_id)).notify.execute(Notification(request.subject, request.event))
+        return {"status": "ok"}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])
     def run_verification(tenant_id: UUID, account_id: UUID, request: UserRequest) -> VerificationRunResponse:

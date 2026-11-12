@@ -99,10 +99,6 @@ class FlowPositionsPort(Protocol):
         """
         ...
 
-    def committed_margin(self, account_id: UUID, assets: tuple[str, ...]) -> Decimal:
-        """The margin the open positions on the assets hold now. Raises FlowExchangeUnavailableError."""
-        ...
-
 
 class FlowOpeningsPort(Protocol):
     """Bound to the tenant of the request: the openings the flows sent, from the orders the platform recorded."""

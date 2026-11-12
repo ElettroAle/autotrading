@@ -23,6 +23,8 @@ class FlowStore:
         self.flows: list[Flow] = []
         self.pause_reasons: dict[FlowId, str] = {}
         self.anchors: dict[FlowId, datetime] = {}
+        # As the trigger of the database: the first start is stamped once, a resume never moves it.
+        self.first_starts: dict[FlowId, datetime] = {}
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
         self.capital_changes: dict[FlowId, list[CapitalChange]] = {}
 
@@ -106,6 +108,10 @@ class InMemoryFlowTimingAdapter:
 
     def timings(self) -> dict[FlowId, FlowTiming]:
         return {
-            flow.id: FlowTiming(self._store.anchors.get(flow.id), self._store.pause_reasons.get(flow.id))
+            flow.id: FlowTiming(
+                self._store.anchors.get(flow.id),
+                self._store.pause_reasons.get(flow.id),
+                self._store.first_starts.get(flow.id),
+            )
             for flow in self._store.of(self._tenant_id)
         }
