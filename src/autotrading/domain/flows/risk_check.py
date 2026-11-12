@@ -12,6 +12,7 @@ from autotrading.domain.flows.risk_outcome import (
     RiskOutcome,
 )
 from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent
+from autotrading.domain.italian_text import money_text, number_text
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +108,7 @@ class RiskCheck:
         """The margin stays the same: a lower leverage gives a smaller position (R1.5.2)."""
         margin = intent.margin_fraction * self._state.allocated_capital
         sizing = _Sizing(margin * intent.leverage, intent.leverage, ())
-        flow_maximum = self._policy.limits.max_leverage or intent.leverage
+        flow_maximum = self._policy.limits.max_leverage
         reason = f"leva oltre il massimo del flusso: {flow_maximum}"
         sizing = _capped_leverage(sizing, flow_maximum, reason)
         exchange_reason = f"leva oltre il massimo dell'exchange per {intent.asset}: {limits.max_leverage}"
@@ -118,7 +119,7 @@ class RiskCheck:
         limit = self._binding_limit(sizing.leverage)
         if sizing.value <= limit.value_cap:
             return sizing
-        reason = f"esposizione del {limit.kind.value} oltre il {number(limit.percent)}%"
+        reason = f"esposizione del {limit.kind.value} oltre il {number_text(limit.percent)}%"
         if limit.kind is AdjustmentKind.MARGIN:
             adjustment = Adjustment(limit.kind, sizing.margin, limit.value_cap / sizing.leverage, reason)
         else:
@@ -159,7 +160,7 @@ class RiskCheck:
         return BlockedDecision(asset, f"liquidità del flusso insufficiente: {self._money(self._liquidity)}")
 
     def _money(self, amount: Decimal) -> str:
-        return f"{number(amount)} {self._state.currency}"
+        return f"{money_text(amount)} {self._state.currency}"
 
 
 def _capped_leverage(sizing: _Sizing, maximum: int, reason: str) -> _Sizing:
@@ -167,8 +168,3 @@ def _capped_leverage(sizing: _Sizing, maximum: int, reason: str) -> _Sizing:
         return sizing
     adjustment = Adjustment(AdjustmentKind.LEVERAGE, Decimal(sizing.leverage), Decimal(maximum), reason)
     return sizing.adjusted(sizing.margin * maximum, maximum, adjustment)
-
-
-def number(amount: Decimal) -> str:
-    """A number as the user reads it: no trailing zeros, decimal comma."""
-    return f"{amount.normalize():f}".replace(".", ",")

@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.account_activity import ActivityPositionResponse
+from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.free_capital import amount_text
 
 
 class FlowStateResponse(BaseModel):

@@ -2,7 +2,7 @@ from uuid import UUID
 
 from autotrading.application.errors import ApplicationError
 from autotrading.domain.flows.flow_state import PositionMismatch
-from autotrading.domain.flows.risk_check import number
+from autotrading.domain.italian_text import number_text
 
 
 class FlowNameInUseError(ApplicationError):
@@ -106,7 +106,7 @@ class FlowPositionMismatchError(ApplicationError):
     def __init__(self, mismatch: PositionMismatch) -> None:
         super().__init__(
             f"posizione {mismatch.asset} diversa da quella del flusso: "
-            f"attesa {number(mismatch.expected)}, sul conto {number(mismatch.held)}"
+            f"attesa {number_text(mismatch.expected)}, sul conto {number_text(mismatch.held)}"
         )
         self.mismatch = mismatch
 

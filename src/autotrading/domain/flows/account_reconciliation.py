@@ -11,8 +11,6 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import LedgerEntry
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 
-OUTSIDE_PLATFORM = "chiusa fuori dalla piattaforma"
-
 
 @dataclass(frozen=True, slots=True)
 class AccountReading:
@@ -29,7 +27,6 @@ class OutsideClosing:
 
     flow_id: FlowId
     asset: str
-    reason: str
     realized_pnl: Decimal
     fee: Decimal
     closed_at: datetime
@@ -69,13 +66,12 @@ class AccountReconciliation:
             ),
             closed_outside=() if previous is None else _closed_outside(previous, reading, new_entries, activity),
             reading=reading,
-            open_assets=frozenset(position.asset for position in activity.positions),
+            open_assets=activity.open_assets,
         )
 
 
 def _open_assets_of(flows: list[Flow], activity: AccountActivity) -> dict[FlowId, frozenset[str]]:
-    open_assets = {position.asset for position in activity.positions}
-    return {flow.id: frozenset(open_assets.intersection(flow.configuration.assets)) for flow in flows}
+    return {flow.id: activity.open_assets.intersection(flow.configuration.assets) for flow in flows}
 
 
 def _unowned_positions(account_id: UUID, flows: list[Flow], activity: AccountActivity) -> list[UnattributableItem]:
@@ -139,7 +135,6 @@ def _outside_closing(
     return OutsideClosing(
         flow_id=flow_id,
         asset=asset,
-        reason=OUTSIDE_PLATFORM,
         realized_pnl=sum((execution.realized_pnl for execution in outside), Decimal(0)),
         fee=sum((execution.fee for execution in outside), Decimal(0)),
         closed_at=max((execution.executed_at for execution in outside), default=activity.read_at),

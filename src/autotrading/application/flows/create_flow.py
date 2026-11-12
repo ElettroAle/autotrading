@@ -94,7 +94,7 @@ class CreateFlowUseCase:
             model=self._checks.models.selection(command.model, command.model_parameters),
             sources=tuple(self._source(request) for request in command.sources),
             instructions=command.instructions.strip(),
-            risk_limits=RiskLimits(
+            risk_limits=RiskLimits.of(
                 command.max_leverage, command.max_margin_exposure_percent, command.max_value_exposure_percent
             ),
             allocated_capital=command.allocated_capital,

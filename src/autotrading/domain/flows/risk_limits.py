@@ -13,13 +13,23 @@ VALUE_EXPOSURE = "esposizione massima del valore"
 class RiskLimits:
     """No defaults: the maximum leverage and at least one exposure per operation are the user's choice (R1.1.1)."""
 
-    max_leverage: int | None
+    max_leverage: int
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
 
-    def __post_init__(self) -> None:
-        if self.max_leverage is None:
+    @classmethod
+    def of(
+        cls,
+        max_leverage: int | None,
+        max_margin_exposure_percent: Decimal | None = None,
+        max_value_exposure_percent: Decimal | None = None,
+    ) -> RiskLimits:
+        """The limits the user configures, where the maximum leverage may still be missing and is refused."""
+        if max_leverage is None:
             raise MaxLeverageRequiredError
+        return cls(max_leverage, max_margin_exposure_percent, max_value_exposure_percent)
+
+    def __post_init__(self) -> None:
         if self.max_margin_exposure_percent is None and self.max_value_exposure_percent is None:
             raise ExposureLimitRequiredError
         if self.max_leverage < 1:

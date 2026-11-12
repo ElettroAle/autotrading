@@ -284,7 +284,6 @@ PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
 ZERO = Decimal(0)
 PERCENT = Decimal("0.01")
-LOWEST_LEVERAGE = 1
 
 operations = logging.getLogger("autotrading.bootstrap")
 # The notifications show the values of Hyperliquid, settled in USDC, and an opening by its value in whole units.
@@ -1462,7 +1461,7 @@ class ContextFromAgent:
         agent_context = AgentContext(
             instructions=configuration.instructions,
             assets=configuration.assets,
-            max_leverage=configuration.risk_limits.max_leverage or LOWEST_LEVERAGE,
+            max_leverage=configuration.risk_limits.max_leverage,
             started_at=cycle_flow.started_at,
             now=self._clock.now(),
             state=_state_view(cycle_flow),

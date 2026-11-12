@@ -6,10 +6,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.domain.flows.closed_position import ClosedPosition
-from autotrading.domain.flows.free_capital import amount_text
 
 
 class ClosedPositionResponse(BaseModel):

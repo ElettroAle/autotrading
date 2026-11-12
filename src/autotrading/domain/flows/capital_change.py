@@ -5,7 +5,8 @@ from decimal import Decimal
 from autotrading.domain.flows.errors import CapitalAboveAvailableCapitalError, CapitalBelowFlowMinimumError
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.free_capital import FreeCapital, amount_text
+from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.italian_text import money_text
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -24,7 +25,7 @@ def require_increase_within(current: Decimal, capital: Decimal, free_capital: Fr
     """The flow takes from its account only what no other flow holds: its own capital plus the free one."""
     available = free_capital.amount + current
     if capital > available:
-        available_text = f"{amount_text(available)} {free_capital.currency}"
+        available_text = f"{money_text(available)} {free_capital.currency}"
         raise CapitalAboveAvailableCapitalError(available_text)
 
 
@@ -36,5 +37,5 @@ def require_reduction_within(reduced: FlowState) -> None:
     """
     if reduced.available_liquidity < 0:
         minimum = reduced.allocated_capital - reduced.available_liquidity
-        minimum_text = f"{amount_text(minimum)} {reduced.currency}"
+        minimum_text = f"{money_text(minimum)} {reduced.currency}"
         raise CapitalBelowFlowMinimumError(minimum_text)

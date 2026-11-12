@@ -1,7 +1,6 @@
 import re
 import secrets
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
 
@@ -14,6 +13,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
+from autotrading.adapters.outbound.hyperliquid.user_state import UserPosition, user_state_of
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
@@ -102,27 +102,26 @@ def _require_accepted(response: Any, credentials: Credentials) -> None:
 def _account_state_of(state: Any) -> AccountState:
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
-        return AccountState(
-            balance=Balance(_decimal(state["marginSummary"]["accountValue"]), MARGIN_CURRENCY),
-            available_margin=Balance(_decimal(state["withdrawable"]), MARGIN_CURRENCY),
-            positions=tuple(_position_of(entry["position"]) for entry in state["assetPositions"]),
-            read_at=datetime.fromtimestamp(int(state["time"]) / 1000, UTC),
-        )
+        read = user_state_of(state)
     except (KeyError, TypeError, ValueError, InvalidOperation) as error:
         raise ExchangeUnavailableError from error
+    return AccountState(
+        balance=Balance(read.account_value, MARGIN_CURRENCY),
+        available_margin=Balance(read.withdrawable, MARGIN_CURRENCY),
+        positions=tuple(_position_of(position) for position in read.positions),
+        read_at=read.read_at,
+    )
 
 
-def _position_of(position: Mapping[str, Any]) -> Position:
-    size = _decimal(position["szi"])
-    liquidation = position.get("liquidationPx")
+def _position_of(position: UserPosition) -> Position:
     return Position(
-        coin=str(position["coin"]),
-        side=PositionSide.LONG if size > 0 else PositionSide.SHORT,
-        size=abs(size),
-        leverage=int(position["leverage"]["value"]),
-        entry_price=_decimal(position["entryPx"]),
-        unrealized_pnl=_decimal(position["unrealizedPnl"]),
-        liquidation_price=None if liquidation is None else _decimal(liquidation),
+        coin=position.coin,
+        side=PositionSide.LONG if position.signed_size > 0 else PositionSide.SHORT,
+        size=abs(position.signed_size),
+        leverage=position.leverage,
+        entry_price=position.entry_price,
+        unrealized_pnl=position.unrealized_pnl,
+        liquidation_price=position.liquidation_price,
     )
 
 

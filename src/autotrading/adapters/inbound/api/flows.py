@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 
+from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
@@ -24,7 +25,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_command import FlowCommand
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.free_capital import FreeCapital, amount_text
+from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome

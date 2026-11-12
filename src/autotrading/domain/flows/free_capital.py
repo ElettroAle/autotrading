@@ -5,6 +5,7 @@ from decimal import Decimal
 from autotrading.domain.flows.errors import CapitalAboveFreeCapitalError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.italian_text import money_text
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,10 +28,4 @@ class FreeCapital:
             raise CapitalAboveFreeCapitalError(str(self))
 
     def __str__(self) -> str:
-        return f"{amount_text(self.amount)} {self.currency}"
-
-
-def amount_text(amount: Decimal) -> str:
-    """The amount without trailing zeros and never in exponent form: 1000.00 is 1000."""
-    text = format(amount.normalize(), "f")
-    return "0" if text in {"-0", "0"} else text
+        return f"{money_text(self.amount)} {self.currency}"

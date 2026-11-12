@@ -4,7 +4,6 @@ from uuid import uuid4
 
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import (
-    OUTSIDE_PLATFORM,
     AccountReading,
     AccountReconciliation,
     OutsideClosing,
@@ -139,7 +138,7 @@ def test_a_position_of_a_flow_gone_from_the_exchange_was_closed_outside_the_plat
     result = reconcile([flow], recorded=recorded, last=previous({flow.id: frozenset({"BTC"})}))
 
     assert result.closed_outside == (
-        OutsideClosing(flow.id, "BTC", OUTSIDE_PLATFORM, Decimal(-50), Decimal(2), READ_AT - timedelta(minutes=1)),
+        OutsideClosing(flow.id, "BTC", Decimal(-50), Decimal(2), READ_AT - timedelta(minutes=1)),
     )
 
 
@@ -148,7 +147,7 @@ def test_a_position_closed_outside_without_executions_closes_at_the_reading() ->
 
     result = reconcile([flow], last=previous({flow.id: frozenset({"BTC"})}))
 
-    assert result.closed_outside == (OutsideClosing(flow.id, "BTC", OUTSIDE_PLATFORM, Decimal(0), Decimal(0), READ_AT),)
+    assert result.closed_outside == (OutsideClosing(flow.id, "BTC", Decimal(0), Decimal(0), READ_AT),)
 
 
 def test_the_outcome_of_a_closing_outside_ignores_the_executions_of_platform_orders_on_other_assets() -> None:

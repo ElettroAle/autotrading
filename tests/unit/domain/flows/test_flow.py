@@ -14,7 +14,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.free_capital import FreeCapital, amount_text
+from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -89,12 +89,8 @@ def test_a_capital_above_the_free_one_is_refused_with_the_free_capital() -> None
         FreeCapital(Decimal("1000.00"), "USDC").require_room_for(Decimal("1000.01"))
 
 
-@pytest.mark.parametrize(
-    ("amount", "text"),
-    [(Decimal("1000.00"), "1000"), (Decimal("1E+3"), "1000"), (Decimal("0.50"), "0.5"), (Decimal("-0.00"), "0")],
-)
-def test_an_amount_reads_without_trailing_zeros_nor_exponent(amount: Decimal, text: str) -> None:
-    assert amount_text(amount) == text
+def test_the_free_capital_reads_in_italian() -> None:
+    assert str(FreeCapital(Decimal("150.5"), "USDC")) == "150,50 USDC"
 
 
 def test_bringing_an_opening_to_the_exchange_minimum_is_off_unless_chosen() -> None:

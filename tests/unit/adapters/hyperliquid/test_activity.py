@@ -14,14 +14,28 @@ from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
 
+
+def position(coin: str, size: str, *, margin: str, pnl: str) -> dict[str, Any]:
+    """A position as the clearinghouse state carries it, with the fields every reader of it requires."""
+    return {
+        "coin": coin,
+        "szi": size,
+        "leverage": {"type": "cross", "value": 5},
+        "entryPx": "60000",
+        "unrealizedPnl": pnl,
+        "marginUsed": margin,
+        "liquidationPx": None,
+    }
+
+
 ADDRESS = "0x00000000000000000000000000000000000000Aa"
 OTHER = "0x00000000000000000000000000000000000000bb"
 STATE = {
     "marginSummary": {"accountValue": "1012.5"},
     "withdrawable": "862.5",
     "assetPositions": [
-        {"position": {"coin": "BTC", "szi": "0.002", "marginUsed": "100.0", "unrealizedPnl": "12.5"}},
-        {"position": {"coin": "ETH", "szi": "-0.5", "marginUsed": "50", "unrealizedPnl": "-3"}},
+        {"position": position("BTC", "0.002", margin="100.0", pnl="12.5")},
+        {"position": position("ETH", "-0.5", margin="50", pnl="-3")},
     ],
     "time": 1762941600000,
 }

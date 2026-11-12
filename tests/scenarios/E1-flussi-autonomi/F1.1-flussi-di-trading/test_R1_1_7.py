@@ -14,7 +14,6 @@ from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.free_capital import amount_text
 from tests.fakes.model_call import HELD_SECONDS
 from tests.support.activity import a_fill
 from tests.support.flow_cycles import FlowCycles
@@ -95,7 +94,7 @@ def allocated_capital(platform: Platform, lifecycle: Lifecycle, name: str, capit
 def account_free_capital(platform: Platform, lifecycle: Lifecycle, account: str, amount: str) -> None:
     command = ReadFreeCapitalCommand(account_id_of(platform, lifecycle.user, account))
     capital = platform.use_cases_of(lifecycle.user).read_free_capital.execute(command)
-    assert (amount_text(capital.amount), capital.currency) == (amount, "USDC")
+    assert (capital.amount, capital.currency) == (Decimal(amount), "USDC")
 
 
 @then(quoted('la variazione da {previous} a {new} USDC è registrata nello storico del flusso "{name}"'))

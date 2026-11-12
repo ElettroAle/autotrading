@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from autotrading.domain.italian_text import money_text
 from autotrading.domain.notifications.errors import InvalidNotificationError
 
 
@@ -10,8 +11,7 @@ class Amount:
     currency: str
 
     def __str__(self) -> str:
-        # The user reads Italian: decimal comma, and the digits as the event carried them.
-        return f"{format(self.value, 'f').replace('.', ',')} {self.currency}"
+        return f"{money_text(self.value)} {self.currency}"
 
 
 @dataclass(frozen=True, slots=True)
