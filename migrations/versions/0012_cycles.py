@@ -17,7 +17,6 @@ depends_on = None
 
 APPLICATION_ROLE = "autotrading_app"
 TENANT_OF_TRANSACTION = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-SCHEDULER_OF_TRANSACTION = "current_setting('app.scheduler', true) = 'on'"
 
 
 def upgrade() -> None:
@@ -53,11 +52,13 @@ def _flows_for_the_scheduler() -> None:
     # The worker plans the cycles of the whole installation: a transaction that declares itself the scheduler reads
     # the active flows of every tenant and their configurations, and nothing else, and only to read them.
     op.execute(
-        f"CREATE POLICY flows_scheduled ON flows FOR SELECT USING (status = 'active' AND {SCHEDULER_OF_TRANSACTION})"
+        "CREATE POLICY flows_scheduled ON flows FOR SELECT "
+        "USING (status = 'active' AND current_setting('app.scheduler', true) = 'on')"
     )
     op.execute(
         "CREATE POLICY flow_versions_scheduled ON flow_versions FOR SELECT "
-        f"USING ({SCHEDULER_OF_TRANSACTION} AND EXISTS (SELECT 1 FROM flows WHERE flows.id = flow_versions.flow_id))"
+        "USING (current_setting('app.scheduler', true) = 'on' "
+        "AND EXISTS (SELECT 1 FROM flows WHERE flows.id = flow_versions.flow_id))"
     )
 
 
