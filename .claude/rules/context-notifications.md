@@ -24,6 +24,9 @@ Le notifiche all'utente su Telegram.
 - Una notifica va solo alla chat collegata al tenant e non contiene mai credenziali.
 - Un invio che fallisce si registra e non fa fallire il ciclo. Senza chat collegata non si invia nulla.
 - La risposta a un codice scaduto, già usato o inesistente è la stessa e non rivela se il codice è esistito.
+- Il codice si salva solo come digest; il bot trova il tenant dal digest e riscatta il codice con le porte
+  legate a quel tenant. Il bot gira nel worker; senza token le notifiche sono disattivate, mai un errore
+  di avvio (ADR 0035).
 
 ## Porte del contesto
 

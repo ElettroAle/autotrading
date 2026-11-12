@@ -8,6 +8,9 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.notifications.link_chat import LinkChatUseCase
+from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.ports import LinkStores
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
@@ -35,7 +38,14 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.link_code_repository import (
+    InMemoryLinkCodeLookupAdapter,
+    InMemoryLinkCodeRepositoryAdapter,
+    LinkCodeStore,
+)
+from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.markets import FakeMarketsAdapter
+from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
@@ -77,6 +87,10 @@ class Platform:
         self.flows = FlowStore()
         self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
         self.model_catalog: ModelCatalog = MODEL_CATALOG
+        self.link_codes: LinkCodeStore = {}
+        self.chats: LinkedChatStore = {}
+        self.messenger = FakeMessengerAdapter()
+        self.now = STARTED_AT
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -128,6 +142,9 @@ class Platform:
                 models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
             ),
+            link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
+            linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            clock=lambda: self.now,
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -150,6 +167,19 @@ class Platform:
                 "dev",
                 lambda: STARTED_AT,
             ),
+            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+        )
+
+    def link_chat(self) -> LinkChatUseCase:
+        """What the bot of the worker runs for every message it receives."""
+        return LinkChatUseCase(
+            InMemoryLinkCodeLookupAdapter(self.link_codes),
+            lambda tenant_id: LinkStores(
+                InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
+                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            ),
+            self.messenger,
+            lambda: self.now,
         )
 
     def orders_of(self, tenant_id: TenantId) -> InMemoryOrderRepositoryAdapter:

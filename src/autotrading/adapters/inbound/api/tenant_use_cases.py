@@ -1,5 +1,6 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 
 from autotrading.application.accounts.get_account import GetAccountUseCase
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
@@ -28,6 +29,10 @@ from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChe
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.ports import FlowRepositoryPort
+from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
+from autotrading.application.notifications.ports import LinkCodeRepositoryPort, LinkedChatRepositoryPort
+from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
+from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.application.sources.get_source import GetSourceUseCase
@@ -57,6 +62,9 @@ class TenantPorts:
     model_catalog: ModelCatalog
     flows: FlowRepositoryPort
     flow_checks: FlowChecks
+    link_codes: LinkCodeRepositoryPort
+    linked_chats: LinkedChatRepositoryPort
+    clock: Callable[[], datetime]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +89,9 @@ class TenantUseCases:
     create_flow: CreateFlowUseCase
     list_flows: ListFlowsUseCase
     read_free_capital: ReadFreeCapitalUseCase
+    request_link_code: RequestLinkCodeUseCase
+    get_linked_chat: GetLinkedChatUseCase
+    unlink_chat: UnlinkChatUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -106,4 +117,7 @@ class TenantUseCases:
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
+            request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.clock),
+            get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
+            unlink_chat=UnlinkChatUseCase(ports.linked_chats),
         )
