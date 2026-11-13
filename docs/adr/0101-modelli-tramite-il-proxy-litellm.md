@@ -1,4 +1,4 @@
-# ADR 0098 — Chiamata ai modelli tramite il proxy LiteLLM con la chiave dell'utente
+# ADR 0101 — Chiamata ai modelli tramite il proxy LiteLLM con la chiave dell'utente
 
 - Stato: accettata (13 novembre 2026) per la parte conforme a `docs/architecture.md`; gli scostamenti elencati
   sotto attendono la conferma del proprietario

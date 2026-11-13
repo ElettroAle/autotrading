@@ -69,7 +69,7 @@ runs:
           "docker login ghcr.io -u '${GITHUB_ACTOR}' --password-stdin"
         ssh "${ssh_options[@]}" "$target" \
           'cd /opt/autotrading && docker compose pull; status=$?; docker logout ghcr.io; exit $status'
-        # The template of the LiteLLM configuration holds no secret: the machine adds the master key (ADR 0098).
+        # The template of the LiteLLM configuration holds no secret: the machine adds the master key (ADR 0101).
         ssh "${ssh_options[@]}" "$target" 'install -d -m 755 /opt/autotrading/litellm           && cat > /opt/autotrading/litellm/config.yaml' < deploy/litellm/config.yaml
         # Service secrets are generated on the machine and never leave it (ADR 0015).
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/prepare-installation.sh' \

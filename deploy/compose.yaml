@@ -43,7 +43,7 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # Gateway verso i modelli IA (ADR 0098): solo sulla rete dell'installazione, nessuna porta pubblicata. La
+  # Gateway verso i modelli IA (ADR 0101): solo sulla rete dell'installazione, nessuna porta pubblicata. La
   # configurazione, con la chiave master, è un file generato sulla macchina; nessuna chiave dei fornitori: la chiave
   # dell'utente arriva con ogni richiesta del worker (RF-01.05).
   litellm:

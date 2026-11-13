@@ -34,7 +34,7 @@ if [ ! -e secrets/telegram_bot_token ]; then
         && chown 65532:65532 /secrets/telegram_bot_token && chmod 0400 /secrets/telegram_bot_token"
 fi
 
-# The master key of the LiteLLM proxy (ADR 0098): only the worker and the API present it, on the network of the
+# The master key of the LiteLLM proxy (ADR 0101): only the worker and the API present it, on the network of the
 # installation. The proxy requires the sk- prefix.
 if [ ! -s secrets/litellm_master_key ]; then
   docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets --entrypoint sh "$postgres_image" \

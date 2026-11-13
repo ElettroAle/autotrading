@@ -1,4 +1,4 @@
-# Configurazione del proxy LiteLLM (ADR 0098), senza segreti: prepare-installation.sh vi aggiunge sulla macchina la
+# Configurazione del proxy LiteLLM (ADR 0101), senza segreti: prepare-installation.sh vi aggiunge sulla macchina la
 # chiave master e la monta nel container come file in sola lettura.
 #
 # Abilitare un fornitore = una rotta qui. Nessuna chiave dei fornitori: ogni richiesta del worker porta la chiave
