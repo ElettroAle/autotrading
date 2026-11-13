@@ -109,3 +109,20 @@ def test_a_failing_reading_records_nothing_of_the_source() -> None:
         use_case.execute(command("indicatori"))
 
     assert samples.samples == []
+
+
+def test_a_source_whose_silence_is_a_datum_says_so_without_recording_it() -> None:
+    samples = InMemorySampleRepositoryAdapter()
+    use_case = CollectSourceUseCase(CATALOG, {"notizie": FakeSourceReaderAdapter([])}, samples)
+
+    collected = use_case.execute(command("notizie", {"eta_massima_ore": 1}))
+
+    assert collected == CollectedSource("notizie", 5, (), {"nota": "nessuna notizia nell'ultima ora"})
+    assert samples.samples == []
+
+
+def test_a_silent_source_without_a_meaning_for_its_silence_gives_no_note() -> None:
+    readers = {"indicatori": FakeSourceReaderAdapter([])}
+    use_case = CollectSourceUseCase(CATALOG, readers, InMemorySampleRepositoryAdapter())
+
+    assert use_case.execute(command("indicatori")).note is None

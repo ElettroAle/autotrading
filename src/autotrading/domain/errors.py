@@ -1,5 +1,17 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import ClassVar
+from uuid import UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ErrorScope:
+    """What a permanent error concerns beyond the flow of its cycle: an account, a provider of models, or neither
+    (R1.2.4).
+    """
+
+    account_id: UUID | None = None
+    provider: str | None = None
 
 
 class AutotradingError(Exception):
@@ -12,6 +24,11 @@ class AutotradingError(Exception):
     @property
     def details(self) -> Mapping[str, object]:
         return {}
+
+    @property
+    def scope(self) -> ErrorScope:
+        """Only the flow of the cycle, unless the error declares an account or a provider (ADR 0082)."""
+        return ErrorScope()
 
 
 class DomainError(AutotradingError):

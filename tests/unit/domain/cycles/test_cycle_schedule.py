@@ -61,3 +61,12 @@ def test_sources_wait_a_quarter_of_the_interval_and_never_beyond_a_minute(interv
 @pytest.mark.parametrize(("seconds", "delay"), [(0, None), (40, None), (60, None), (61, 61), (90, 90)])
 def test_a_cycle_is_late_only_beyond_a_minute(seconds: int, delay: int | None) -> None:
     assert delay_seconds(ANCHOR, ANCHOR + timedelta(seconds=seconds)) == delay
+
+
+def test_a_running_flow_with_its_anchor_has_its_cycles_planned() -> None:
+    assert CycleSchedule.planned(True, ANCHOR, QUARTER) == CycleSchedule(ANCHOR, QUARTER)
+
+
+def test_a_flow_not_running_or_without_anchor_has_no_cycle_planned() -> None:
+    assert CycleSchedule.planned(False, ANCHOR, QUARTER) is None
+    assert CycleSchedule.planned(True, None, QUARTER) is None
