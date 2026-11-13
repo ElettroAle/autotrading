@@ -51,6 +51,7 @@ def factory(engine: Engine, messenger: MessengerPort) -> Callable[[TenantId], Wo
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
         accounts,
+        accounts,
     )
     settings = WorkerSettings("dev", Slippage.default())
     return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), exchanges, settings, messenger)

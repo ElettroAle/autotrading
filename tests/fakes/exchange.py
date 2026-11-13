@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.flows.errors import FlowCredentialsRefusedError, FlowExchangeUnavailableError
 from autotrading.application.verification.errors import (
     VerificationCredentialsRejectedError,
     VerificationExchangeUnavailableError,
@@ -11,6 +12,9 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.flows.cycle_access import CycleAccess
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
+from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -80,6 +84,30 @@ class FakeExchangeAdapter:
             state.available_margin.amount,
             state.balance.currency,
             tuple(PositionReading(p.coin, p.side.value, p.size, p.leverage) for p in state.positions),
+        )
+
+    def cycle_reading(self, access: CycleAccess) -> CycleAccount:
+        try:
+            state = self.read_state(Credentials(access.account_address, access.secret_key))
+        except ExchangeRejectedCredentialsError as error:
+            raise FlowCredentialsRefusedError from error
+        except ExchangeUnavailableError as error:
+            raise FlowExchangeUnavailableError from error
+        return CycleAccount(
+            state.balance.currency,
+            state.available_margin.amount,
+            tuple(
+                CyclePosition(
+                    p.coin,
+                    TradeSide(p.side.value),
+                    p.size,
+                    p.leverage,
+                    p.entry_price,
+                    p.unrealized_pnl,
+                    p.liquidation_price,
+                )
+                for p in state.positions
+            ),
         )
 
     def _traded_positions(self, credentials: Credentials) -> tuple[Position, ...]:

@@ -203,6 +203,22 @@ class Failures:
             raise error
 
 
+class FakeCycleStartAdapter:
+    def __init__(self, flows: FakeFlowsAdapter) -> None:
+        self._flows = flows
+
+    def execute(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot:
+        return self._flows.read(flow_id, anchor)
+
+
+class FakeCycleEndAdapter:
+    def __init__(self, flows: FakeFlowsAdapter) -> None:
+        self._flows = flows
+
+    def execute(self, flow_id: UUID, anchor: datetime, executions: Sequence[object]) -> object:
+        return self._flows.update(flow_id, anchor, executions)
+
+
 class FakeFlowsAdapter:
     """The flows context as the cycle sees it: schedules, state, pause."""
 

@@ -12,6 +12,7 @@ from autotrading.application.verification.errors import VerificationCredentialsN
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -59,6 +60,13 @@ class SodiumCredentialOpenerAdapter:
         if credentials is None:
             raise FlowCredentialsNotOpenedError
         return credentials.account_address
+
+    def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:
+        """The same opening for the cycle of a flow, which proves the credentials on the exchange (R1.2.4)."""
+        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        if credentials is None:
+            raise FlowCredentialsNotOpenedError
+        return CycleAccess(credentials.account_address, credentials.secret_key)
 
     def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
         """The same opening for the verification procedure, which proves the credentials on the exchange (ADR 0024)."""

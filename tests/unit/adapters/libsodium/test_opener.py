@@ -17,6 +17,7 @@ from autotrading.application.verification.errors import VerificationCredentialsN
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -184,6 +185,28 @@ def test_an_address_sealed_with_an_unknown_key_is_not_opened(
 
     with pytest.raises(FlowCredentialsNotOpenedError):
         opener.open_address(unknown)
+
+
+def test_opens_the_access_of_the_cycle_for_the_same_tenant_and_account(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    access = opener.open_cycle_access(sealed_address_of(sealed_account(private_key)))
+
+    assert access == CycleAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key)
+
+
+def test_the_cycle_access_of_another_account_is_not_opened(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    moved = dataclasses.replace(sealed_address_of(sealed_account(private_key)), account_id=uuid4())
+
+    with pytest.raises(FlowCredentialsNotOpenedError):
+        opener.open_cycle_access(moved)
+
+
+def test_the_cycle_access_hides_address_and_secret() -> None:
+    assert CREDENTIALS.secret_key not in repr(CycleAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key))
+    assert CREDENTIALS.account_address not in repr(CycleAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key))
 
 
 def sealed_verification_of(account: Account) -> SealedVerificationAccess:
