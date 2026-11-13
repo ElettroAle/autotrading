@@ -1,5 +1,4 @@
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from functools import partial
 
 from autotrading.adapters.configuration.source import PROCESS_ENVIRONMENT, ConfigurationSource
@@ -79,14 +78,10 @@ from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
 from autotrading.application.agent.model_gateways import ModelGateways
-from autotrading.application.agent.ports import (
-    ProviderKeyOpenerPort,
-    ProviderKeyRepositoryPort,
-)
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.create_flow import FlowChecks
-from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps, GraphCheckpoints
+from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
@@ -99,19 +94,10 @@ from autotrading.application.flows.pause_affected_flows import PauseAffectedFlow
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
-    AutomaticPausePort,
-    ClockPort,
-    ClosedPositionRepositoryPort,
     CycleContext,
     CycleDecisions,
-    CycleRepositoryPort,
-    ExchangeLimitsPort,
     FlowAccountPorts,
-    FlowLockPort,
     FlowModelsPort,
-    FlowOpeningsPort,
-    FlowRepositoryPort,
-    PlannedFlowsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
@@ -177,12 +163,7 @@ from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
 from autotrading.application.sources.ports import (
-    ForecastRepositoryPort,
-    MarketDataPort,
-    NewsPort,
     PriceForecasterPort,
-    PriceHistoryPort,
-    SampleRepositoryPort,
     SentimentPort,
 )
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
@@ -323,19 +304,32 @@ def worker_use_cases(
     return for_tenant
 
 
-def cycle_ports(
+def cycle_of(
     engine: SqlAlchemyEngine,
-    opener: SodiumCredentialOpenerAdapter,
-    environment: str,
-    slippage: Slippage,
+    openers: tuple[SodiumCredentialOpenerAdapter, SodiumProviderKeyOpenerAdapter],
+    trading: tuple[str, Slippage],
     messenger: MessengerPort,
-) -> Callable[[TenantId], TenantCyclePorts]:
-    """Builds, for each cycle, the adapters and use cases bound to the tenant of its flow."""
-    exchanges, _, order_exchanges, activity_readers, executions_readers, *_ = hyperliquid_adapters(
+    predictors: tuple[ModelGateways, PriceForecasterPort],
+) -> Callable[[TenantId], WorkerCycle]:
+    """Builds, for each cycle, its graph on the adapters bound to the tenant of its flow (ADR 0042, ADR 0104).
+
+    The clock, the models, the sources and the exchanges are the same for every tenant.
+    """
+    environment, slippage = trading
+    models, forecaster = predictors
+    opener, provider_key_opener = openers
+    exchanges, markets, order_exchanges, activity_readers, executions_readers, prices, market = hyperliquid_adapters(
         ExchangeNetwork.of_installation(environment)
     )
+    clock = system_clock_adapters()
+    sentiments: Mapping[str, SentimentPort] = {
+        SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
+        SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
+    }
+    news = rss_adapters()
+    lock = SqlAlchemyFlowLockAdapter(engine)
 
-    def cycle_ports_for(tenant_id: TenantId) -> TenantCyclePorts:
+    def cycle_for(tenant_id: TenantId) -> WorkerCycle:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
         access = OpenTradingAccessUseCase(accounts, opener)
@@ -383,30 +377,50 @@ def cycle_ports(
                 RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
             )
         )
-        return TenantCyclePorts(
-            flows=flows,
-            pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
-            start_cycle=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
-            end_cycle=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
-            provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id),
-            forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
-            samples=SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
-            send_orders=SendCycleOrdersUseCase(
+        steps = CycleSteps(
+            start=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            sources=ReadCycleSourceUseCase(
+                CollectCycleSourceUseCase(
+                    SOURCE_CATALOG,
+                    SourceSystems(sentiments, news, prices, forecaster, market),
+                    SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
+                    SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
+                ),
+                clock,
+            ),
+            calls=ThreadPoolConcurrentCallsAdapter(),
+            context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), clock),
+            agent=DecideCycleUseCase(
+                AskFlowAgentUseCase(
+                    ComposeAgentContextUseCase(),
+                    AskAgentUseCase(
+                        models, SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id), provider_key_opener
+                    ),
+                )
+            ),
+            risk=ReviewCycleRiskUseCase(CheckRiskUseCase(markets)),
+            orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(
                     ExecuteFlowOrdersUseCase(access, order_exchanges, orders, slippage), follow_flow_orders
                 )
             ),
-            openings=openings,
-            closed_positions=closed_positions,
-            follow_flow_orders=follow_flow_orders,
-            flow_paused_notice=NotifyFlowPausedUseCase(notify),
-            cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
-            settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
-            checkpoints=SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id),
-            notify=notify,
+            end=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            journal=JsonCycleJournalAdapter(environment),
         )
+        cycles = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
+        guards = CycleGuards(
+            cycles=cycles,
+            lock=lock,
+            pause=PauseAffectedFlowsUseCase(
+                flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify)
+            ),
+            clock=clock,
+            failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
+        )
+        checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
+        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints), guards)
 
-    return cycle_ports_for
+    return cycle_for
 
 
 def notify_for(engine: SqlAlchemyEngine, messenger: MessengerPort, tenant_id: TenantId) -> NotifyUseCase:
@@ -448,36 +462,11 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     messenger, inbox, start_link = telegram_adapters(source)
     for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
-    ports_of = cycle_ports(engine, opener, environment, slippage, messenger)
     models: ModelGateways = {**litellm_adapters(source), **openrouter_adapters()}
-    forecaster = forecaster_adapters(source)
-    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, models, forecaster))
+    predictors = (models, forecaster_adapters(source))
+    cycle_for = cycle_of(engine, (opener, provider_key_opener), (environment, slippage), messenger, predictors)
+    cycles = worker_cycles(engine, cycle_for, environment)
     return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
-
-
-def cycle_services(
-    environment: str,
-    provider_key_opener: SodiumProviderKeyOpenerAdapter,
-    models: ModelGateways,
-    forecaster: PriceForecasterPort,
-) -> CycleServices:
-    """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
-    _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
-    return CycleServices(
-        environment=environment,
-        clock=system_clock_adapters(),
-        model_gateways=models,
-        provider_key_opener=provider_key_opener,
-        sentiments={
-            SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
-            SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
-        },
-        news=rss_adapters(),
-        prices=prices,
-        forecaster=forecaster,
-        market=market,
-        exchange_limits=markets,
-    )
 
 
 def telegram_bot(engine: SqlAlchemyEngine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
@@ -494,118 +483,28 @@ def telegram_bot(engine: SqlAlchemyEngine, inbox: BotInboxPort, messenger: Messe
     return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
 
 
-# The cycles of the flows in the worker (ADR 0041, ADR 0042): each cycle runs on the ports of the tenant of its flow.
-
-
-@dataclass(frozen=True, slots=True)
-class TenantCyclePorts:
-    """The adapters a cycle uses, bound to the tenant of its flow."""
-
-    flows: FlowRepositoryPort
-    pause: AutomaticPausePort
-    start_cycle: StartCycleFlowUseCase
-    end_cycle: EndCycleFlowUseCase
-    provider_keys: ProviderKeyRepositoryPort
-    forecasts: ForecastRepositoryPort
-    samples: SampleRepositoryPort
-    send_orders: SendCycleOrdersUseCase
-    openings: FlowOpeningsPort
-    closed_positions: ClosedPositionRepositoryPort
-    follow_flow_orders: FollowFlowOrdersUseCase
-    flow_paused_notice: NotifyFlowPausedUseCase
-    cycle_failure: NotifyCycleFailureUseCase
-    notify: NotifyUseCase
-    settlement_currency: str
-    checkpoints: GraphCheckpoints
-
-
-@dataclass(frozen=True, slots=True)
-class CycleServices:
-    """What every cycle shares, whatever the tenant: the clock, the models, the sources, the exchanges."""
-
-    clock: ClockPort
-    model_gateways: ModelGateways
-    provider_key_opener: ProviderKeyOpenerPort
-    sentiments: Mapping[str, SentimentPort]
-    news: NewsPort
-    prices: PriceHistoryPort
-    forecaster: PriceForecasterPort
-    market: MarketDataPort
-    exchange_limits: Mapping[str, ExchangeLimitsPort]
-    environment: str
-
-
 type SourcesData = tuple[SourceData, ...]
 
 
 type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, object]
-type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
 
 
-def run_cycle_for(
-    ports_of: CyclePortsOf,
-    services: CycleServices,
-    cycles_of: Callable[[TenantId], CycleRepositoryPort],
-    lock: FlowLockPort,
-    tenant_id: TenantId,
-) -> WorkerCycle:
-    """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104)."""
-    ports = ports_of(tenant_id)
-    steps = CycleSteps(
-        start=ports.start_cycle,
-        sources=ReadCycleSourceUseCase(
-            CollectCycleSourceUseCase(
-                SOURCE_CATALOG,
-                SourceSystems(
-                    services.sentiments, services.news, services.prices, services.forecaster, services.market
-                ),
-                ports.forecasts,
-                ports.samples,
-            ),
-            services.clock,
-        ),
-        calls=ThreadPoolConcurrentCallsAdapter(),
-        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), services.clock),
-        agent=DecideCycleUseCase(
-            AskFlowAgentUseCase(
-                ComposeAgentContextUseCase(),
-                AskAgentUseCase(services.model_gateways, ports.provider_keys, services.provider_key_opener),
-            )
-        ),
-        risk=ReviewCycleRiskUseCase(CheckRiskUseCase(services.exchange_limits)),
-        orders=ports.send_orders,
-        end=ports.end_cycle,
-        journal=JsonCycleJournalAdapter(services.environment),
-    )
-    cycles = cycles_of(tenant_id)
-    guards = CycleGuards(
-        cycles=cycles,
-        lock=lock,
-        pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
-        clock=services.clock,
-        failures=ports.cycle_failure,
-    )
-    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards)
-
-
-def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
-    """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
-    record = RecordActualPricesOfTenantsUseCase(
-        services.prices, planned.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
-    )
-    record.execute(RecordActualPricesCommand(services.clock.now()))
-
-
-def worker_cycles(engine: SqlAlchemyEngine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
+def worker_cycles(
+    engine: SqlAlchemyEngine, cycle_for: Callable[[TenantId], WorkerCycle], environment: str
+) -> CyclePolling:
+    """Each round plans the cycles of the flows and records the actual price beside every expired forecast (R1.3.5)."""
+    *_, prices, _ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
+    clock = system_clock_adapters()
     planned = ThreadsPlannedFlowsAdapter()
-    cycles_of = partial(SqlAlchemyCycleRepositoryAdapter, engine)
-    run_cycle_of = partial(run_cycle_for, ports_of, services, cycles_of, SqlAlchemyFlowLockAdapter(engine))
     plan = PlanFlowCyclesUseCase(
-        SqlAlchemyScheduledFlowsAdapter(engine), planned, run_cycle_of, apscheduler_adapters(), services.clock
+        SqlAlchemyScheduledFlowsAdapter(engine), planned, cycle_for, apscheduler_adapters(), clock
+    )
+    record_actual_prices = RecordActualPricesOfTenantsUseCase(
+        prices, planned.tenants, partial(SqlAlchemyForecastRepositoryAdapter, engine)
     )
 
     def plan_round() -> None:
         plan.execute()
-        record_actual_prices(planned, ports_of, services)
+        record_actual_prices.execute(RecordActualPricesCommand(clock.now()))
 
     return CyclePolling(plan_round)

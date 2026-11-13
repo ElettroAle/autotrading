@@ -6,17 +6,12 @@ until it is removed. An entry never exists without its Bug on the board.
 
 from tests.support.architecture import Rule
 
-BUG_STRICTER_RULES = 177
-
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.PORTS_IN_PORTS_MODULES: {},
     Rule.PORT_NAMES: {},
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {},
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {},
-    Rule.BOOTSTRAP_WITHOUT_CLASSES: {
-        "bootstrap.py:CycleServices": BUG_STRICTER_RULES,
-        "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
-    },
+    Rule.BOOTSTRAP_WITHOUT_CLASSES: {},
     Rule.NO_BRIDGES: {},
     Rule.LIBRARIES_IN_THEIR_FOLDER: {},
     Rule.ADAPTERS_DO_NOT_ORCHESTRATE: {},

@@ -1,4 +1,4 @@
-"""The cycles of real flows as the worker runs them: the bridges of bootstrap on the fake adapters (ADR 0042)."""
+"""The cycles of real flows as the worker runs them: its composition on the fake adapters (ADR 0042)."""
 
 import json
 import threading
@@ -47,13 +47,6 @@ from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrde
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
-from autotrading.bootstrap import (
-    CycleServices,
-    TenantCyclePorts,
-    WorkerCycle,
-    record_actual_prices,
-    run_cycle_for,
-)
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.agent_context import MessageRole
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -104,6 +97,13 @@ from tests.fakes.provider_keys import (
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
+from tests.support.cycle_composition import (
+    CycleServices,
+    TenantCyclePorts,
+    WorkerCycle,
+    record_actual_prices,
+    run_cycle_for,
+)
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 
@@ -133,7 +133,7 @@ class ImmediateCycleScheduler:
 
 
 class FlowCycles:
-    """The flows of the users with their cycles, run on the bridges the worker uses."""
+    """The flows of the users with their cycles, run as the worker composes them."""
 
     def __init__(self) -> None:
         self.platform = Platform()
