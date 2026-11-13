@@ -23,11 +23,15 @@ class CollectSourceCommand:
 
 @dataclass(frozen=True, slots=True)
 class CollectedSource:
-    """The values of one active source in the cycle, with the weight the agent receives (R1.3.2)."""
+    """The values of one active source in the cycle, with the weight the agent receives (R1.3.2).
+
+    A source that collected nothing may still have a note for the agent (R1.3.7); it is never recorded as a sample.
+    """
 
     source: str
     weight: int
     samples: tuple[SourceSample, ...]
+    note: Mapping[str, str] | None = None
 
 
 class CollectSourceUseCase:
@@ -54,7 +58,8 @@ class CollectSourceUseCase:
             for value in reader.execute(ReadSourceCommand(command.cycle.flow_id, asset, settings, command.collected_at))
         )
         self._samples.add(samples)
-        return CollectedSource(definition.name, command.weight, samples)
+        note = None if samples else definition.silence_note(settings)
+        return CollectedSource(definition.name, command.weight, samples, note)
 
     def _reader_of(self, definition: SourceDefinition) -> SourceReaderPort:
         reader = self._readers.get(definition.name)

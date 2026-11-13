@@ -310,7 +310,7 @@ def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None
 
 
 def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: World) -> None:
-    error = FlowCredentialsRejectedError("test-1")
+    error = FlowCredentialsRejectedError("test-1", world.flow.account_id)
 
     FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
 
