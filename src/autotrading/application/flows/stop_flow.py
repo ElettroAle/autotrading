@@ -6,6 +6,7 @@ from autotrading.application.flows.ports import (
     FlowOpeningsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
+    PositionClosedNoticePort,
     RunningCyclePort,
 )
 from autotrading.domain.flows.closed_position import CloseReason
@@ -33,14 +34,15 @@ class StopPorts:
     positions: FlowPositionsPort
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
+    closing_notice: PositionClosedNoticePort
 
 
 class StopFlowUseCase:
     """Stops an active or paused flow and closes its open positions (R1.1.5, ADR 0055).
 
     The flow is stopped first, so no cycle starts any more; the cycle under way ends before the positions close, so
-    it never opens one after them. Each position closed enters the history with the reason (R1.7.2); a closing that
-    fails leaves the flow stopped and its position in the outcome.
+    it never opens one after them. Each position closed enters the history with the reason and is told (R1.7.2,
+    ADR 0070); a closing that fails leaves the flow stopped and its position in the outcome.
     """
 
     def __init__(self, flows: FlowRepositoryPort, ports: StopPorts) -> None:
@@ -76,4 +78,6 @@ class StopFlowUseCase:
                 "posizione chiusa senza apertura del flusso", extra={"flow_id": str(flow.id.value), "asset": asset}
             )
             return
-        self._ports.closed_positions.add(opening.closed(flow, asset, fill, reason))
+        position = opening.closed(flow, asset, fill, reason)
+        self._ports.closed_positions.add(position)
+        self._ports.closing_notice.execute(flow.name.value, asset, position.pnl)

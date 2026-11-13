@@ -1,14 +1,12 @@
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.record_manual_closing import (
-    RecordManualClosingCommand,
-    RecordManualClosingUseCase,
-)
+from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
@@ -18,12 +16,14 @@ from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
 ACCOUNT = uuid4()
 OPENED = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
-FILL = ClosingFill(Decimal(102000), datetime(2026, 11, 12, 9, 45, tzinfo=UTC), Decimal("0.05"))
+CLOSED = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
+FILL = ClosingFill(Decimal(102000), CLOSED, Decimal("0.05"))
 OPENING = PositionOpening(TradeSide.LONG, 2, Decimal(50), PositionEnd(Decimal(100000), OPENED, OPENED), Decimal("0.03"))
 
 
@@ -37,15 +37,30 @@ class KnownOpenings:
         return self.openings.get((flow_id, asset))
 
 
+@dataclass(frozen=True, slots=True)
+class Reported:
+    """What the orders context reports of a closing a user asked: nothing while the exchange did not confirm it."""
+
+    average_price: Decimal | None = None
+    executed_at: datetime | None = None
+    fee: Decimal | None = None
+    realized_pnl: Decimal | None = None
+
+
+CONFIRMED = Reported(Decimal(102000), CLOSED, Decimal("0.05"))
+
+
 class Bench:
     def __init__(self) -> None:
         self.store = FlowStore()
         self.history = ClosedPositionStore()
         self.openings = KnownOpenings()
+        self.notices = FakePositionClosedNoticeAdapter()
         self.use_case = RecordManualClosingUseCase(
             InMemoryFlowRepositoryAdapter(self.store, TENANT),
             self.openings,
             InMemoryClosedPositionRepositoryAdapter(self.history, TENANT),
+            self.notices,
         )
 
     def flow(
@@ -56,7 +71,7 @@ class Bench:
         return flow
 
     def record(self, asset: str = "BTC", account: UUID = ACCOUNT) -> None:
-        self.use_case.execute(RecordManualClosingCommand(account, asset, FILL))
+        self.use_case.execute(account, asset, CONFIRMED)
 
 
 @pytest.fixture
@@ -64,13 +79,17 @@ def bench() -> Bench:
     return Bench()
 
 
-def test_a_position_of_a_flow_closed_by_hand_enters_its_history_with_the_manual_reason(bench: Bench) -> None:
+def test_a_position_of_a_flow_closed_by_hand_enters_its_history_with_the_manual_reason_then_is_told(
+    bench: Bench,
+) -> None:
     flow = bench.flow(("ETH", "BTC"))
     bench.openings.openings[flow.id, "BTC"] = OPENING
 
     bench.record()
 
-    assert bench.history.positions == [OPENING.closed(flow, "BTC", FILL, CloseReason.MANUAL)]
+    position = OPENING.closed(flow, "BTC", FILL, CloseReason.MANUAL)
+    assert bench.history.positions == [position]
+    assert bench.notices.told == [(flow.name.value, "BTC", position.pnl)]
 
 
 @pytest.mark.parametrize("status", [FlowStatus.ACTIVE, FlowStatus.PAUSED, FlowStatus.STOPPED])
@@ -110,6 +129,7 @@ def test_a_position_the_flow_never_opened_has_no_history(bench: Bench, caplog: p
         bench.record()
 
     assert bench.history.positions == []
+    assert bench.notices.told == []
     (record,) = caplog.records
     assert record.getMessage() == "posizione chiusa a mano senza apertura del flusso"
     assert (record.__dict__["flow_id"], record.__dict__["asset"]) == (str(flow.id.value), "BTC")
@@ -119,6 +139,7 @@ def test_a_closing_not_confirmed_by_the_exchange_enters_no_history(bench: Bench)
     flow = bench.flow()
     bench.openings.openings[flow.id, "BTC"] = OPENING
 
-    bench.use_case.execute(RecordManualClosingCommand(ACCOUNT, "BTC", None))
+    bench.use_case.execute(ACCOUNT, "BTC", Reported())
 
     assert bench.history.positions == []
+    assert bench.notices.told == []

@@ -66,7 +66,7 @@ from autotrading.application.notifications.ports import (
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
-from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.application.orders.ports import ManualClosingRecorderPort, PositionClosingPort
 from autotrading.application.sources.get_source import GetSourceUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.verification.ports import VerificationPort
@@ -85,6 +85,7 @@ class TenantPorts:
     exchanges: Mapping[str, ExchangePort]
     account_state: AccountStatePort
     position_closing: PositionClosingPort
+    manual_closings: ManualClosingRecorderPort
     verification: VerificationPort
     source_catalog: SourceCatalog
     provider_keys: ProviderKeyRepositoryPort
@@ -173,7 +174,7 @@ class TenantUseCases:
                 StopFlowUseCase(ports.flows, ports.stop_ports),
                 ArchiveFlowUseCase(ports.flows),
             ),
-            close_position=ClosePositionUseCase(ports.position_closing),
+            close_position=ClosePositionUseCase(ports.position_closing, ports.manual_closings),
             run_verification=RunVerificationUseCase(ports.verification),
             list_sources=ListSourcesUseCase(ports.source_catalog),
             get_source=GetSourceUseCase(ports.source_catalog),

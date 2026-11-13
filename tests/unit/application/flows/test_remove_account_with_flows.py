@@ -32,6 +32,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter, RemovedAccount
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.accounts import an_account
 from tests.support.flows import a_configuration, a_flow
 
@@ -93,10 +94,11 @@ class Removal:
         self.closings = ScriptedClosings()
         self.closed = ClosedPositionStore()
         self.cycles = RecordingCycles()
+        self.notices = FakePositionClosedNoticeAdapter()
         repository = InMemoryFlowRepositoryAdapter(self.flows, TENANT)
         account_repository = InMemoryAccountRepositoryAdapter(self.accounts, TENANT)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed, TENANT)
-        stop_ports = StopPorts(self.cycles, self.closings, OpeningOfEveryAsset(), closed_positions)
+        stop_ports = StopPorts(self.cycles, self.closings, OpeningOfEveryAsset(), closed_positions, self.notices)
         self.use_case = RemoveAccountWithFlowsUseCase(
             repository,
             AccountRemovalPorts(self.positions, account_repository),
@@ -237,6 +239,7 @@ def test_a_confirmed_removal_stops_the_flows_then_removes_the_account_then_archi
     assert removal.closings.closed == [(account.id.value, "BTC", USER), (account.id.value, "ETH", USER)]
     assert len(removal.cycles.waited) == 2
     assert [position.reason for position in removal.closed.positions] == [CloseReason.ACCOUNT_REMOVAL] * 2
+    assert [(name, asset) for name, asset, _ in removal.notices.told] == [("attivo", "BTC"), ("pausa", "ETH")]
     assert removal.accounts.accounts == []
     statuses = removal.statuses()
     assert [statuses[name] for name in ("attivo", "pausa", "fermo", "altro conto")] == [

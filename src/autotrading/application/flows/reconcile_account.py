@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from autotrading.application.flows.ports import (
     AccountActivityPort,
-    ClosedPositionsPort,
     FlowRepositoryPort,
+    OutsideClosingRecorderPort,
     ReconciliationRepositoryPort,
 )
 from autotrading.application.flows.record_account_executions import (
@@ -41,7 +41,7 @@ class ReconcileAccountUseCase:
         flows: FlowRepositoryPort,
         activity: AccountActivityPort,
         readings: ReconciliationRepositoryPort,
-        closed_positions: ClosedPositionsPort,
+        closed_positions: OutsideClosingRecorderPort,
         record_executions: RecordAccountExecutionsUseCase,
     ) -> None:
         self._flows = flows
@@ -63,6 +63,6 @@ class ReconcileAccountUseCase:
         new_items = tuple(item for item in reconciliation.items if self._readings.record(item))
         self._readings.resolve_positions(account_id, reconciliation.open_assets)
         for closing in reconciliation.closed_outside:
-            self._closed_positions.add_closed_outside(closing)
+            self._closed_positions.execute(closing)
         self._readings.save_reading(reconciliation.reading)
         return ReconciliationOutcome(new_items, reconciliation.closed_outside)
