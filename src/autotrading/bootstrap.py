@@ -20,7 +20,6 @@ from autotrading.adapters.inbound.api.worker import (
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
-from autotrading.adapters.outbound.httpx.model_call import HttpxModelCallAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
@@ -33,6 +32,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
+from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
@@ -572,11 +572,14 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     ports_of = cycle_ports(engine, opener, environment, slippage, messenger)
-    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener))
+    model_call = litellm_adapters(source)
+    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, model_call))
     return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
 
 
-def cycle_services(environment: str, provider_key_opener: SodiumProviderKeyOpenerAdapter) -> CycleServices:
+def cycle_services(
+    environment: str, provider_key_opener: SodiumProviderKeyOpenerAdapter, model_call: ModelCallPort
+) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     return CycleServices(
@@ -584,7 +587,7 @@ def cycle_services(environment: str, provider_key_opener: SodiumProviderKeyOpene
         clock=system_clock_adapters(),
         catalog=load_model_catalog(),
         provider_key_opener=provider_key_opener,
-        model_call=HttpxModelCallAdapter(httpx.Client()),
+        model_call=model_call,
         sentiments={
             SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
             SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),

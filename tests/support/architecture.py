@@ -121,6 +121,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/hyperliquid": frozenset({"hyperliquid", "eth_account", "requests"}),
     "adapters/outbound/json": frozenset(),
     "adapters/outbound/libsodium": frozenset({"nacl"}),
+    # The LiteLLM proxy speaks the OpenAI API: its official SDK is the client (docs/architecture.md:169, ADR 0101).
+    "adapters/outbound/litellm": frozenset({"openai"}),
     "adapters/outbound/oidc": frozenset({"jwt"}),
     "adapters/outbound/rss": frozenset({"httpx"}),
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy"}),

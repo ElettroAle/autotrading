@@ -43,5 +43,7 @@ def worker_configuration(secrets: Path, **overrides: str) -> dict[str, str]:
     key = base64.b64encode(bytes(PrivateKey.generate())).decode()
     configuration = _database(secrets) | {
         "CREDENTIALS_PRIVATE_KEY_FILE": _secret(secrets, "credentials_private_key_v1", key),
+        "LITELLM_URL": "http://litellm:4000",
+        "LITELLM_MASTER_KEY_FILE": _secret(secrets, "litellm_master_key", f"sk-{token_hex(16)}\n"),
     }
     return configuration | overrides

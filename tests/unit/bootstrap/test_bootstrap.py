@@ -244,7 +244,15 @@ def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "name", ["APP_ENVIRONMENT", "CREDENTIALS_PRIVATE_KEY_FILE", "WORKER_TOKEN_FILE", "DATABASE_PASSWORD_FILE"]
+    "name",
+    [
+        "APP_ENVIRONMENT",
+        "CREDENTIALS_PRIVATE_KEY_FILE",
+        "WORKER_TOKEN_FILE",
+        "DATABASE_PASSWORD_FILE",
+        "LITELLM_URL",
+        "LITELLM_MASTER_KEY_FILE",
+    ],
 )
 def test_the_worker_refuses_to_start_without_its_configuration(tmp_path: Path, name: str) -> None:
     with pytest.raises(AutotradingError):

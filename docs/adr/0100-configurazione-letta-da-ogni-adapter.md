@@ -31,12 +31,12 @@ che legge la sua sezione e registra i servizi pronti.
   che la legge, applica i default e valida forma e presenza. Cartelle toccate: `sqlalchemy` (database),
   `libsodium` (chiave pubblica o privata e versione), `oidc` (issuer e audience), `worker` (indirizzo e token del
   worker), `telegram` (token del bot, che c'era già come impostazione privata), `hyperliquid` (slippage degli
-  ordini a mercato, accanto alla rete che c'era già), `inbound/api` (versione, client del login, token del worker).
+  ordini a mercato, accanto alla rete che c'era già), `litellm` (indirizzo del proxy e master key, ADR 0101), `inbound/api` (versione, client del login, token del worker).
 - **Composizione per cartella** (l'equivalente di `Add{X}`): `composition.py` espone `<tecnologia>_adapters(source,
   ...)`, che restituisce adapter pronti: `sqlalchemy_adapters` (engine), `libsodium_sealing_adapters` (sigillatori
   legati al tenant), `libsodium_opening_adapters`, `oidc_adapters` (o `None` senza issuer),
   `worker_adapters` e `telegram_adapters` (ora ricevono la sorgente invece di indirizzo e token),
-  `hyperliquid_slippage_adapters`, `api_adapters`, `worker_api_adapters`.
+  `hyperliquid_slippage_adapters`, `litellm_adapters`, `api_adapters`, `worker_api_adapters`.
 - **Regole di business nel domain**: gli ambienti ammessi diventano `InstallationEnvironment` in
   `domain/accounts/installation_environment.py`, accanto a `ExchangeNetwork.of_installation`, con
   `UndeclaredEnvironmentError` e `UnsupportedEnvironmentError` negli errori del contesto; la slippage resta

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -35,7 +35,7 @@ class Session:
     platform: Platform = field(default_factory=Platform)
     identity_provider: IdentityProvider = field(default_factory=IdentityProvider)
     credentials: dict[str, Credentials] = field(default_factory=dict)
-    response: httpx.Response | None = None
+    response: httpx2.Response | None = None
 
     def api(self) -> FastAPI:
         provider = self.identity_provider
