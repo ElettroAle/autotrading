@@ -2,12 +2,12 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.user_id import UserId

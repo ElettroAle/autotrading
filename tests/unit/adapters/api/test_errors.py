@@ -8,9 +8,6 @@ from pydantic import BaseModel
 from autotrading.adapters.inbound.api.errors import (
     PROBLEM_MEDIA_TYPE,
     AuthenticationNotConfiguredError,
-    IdentityProviderUnavailableError,
-    NotAuthenticatedError,
-    UserRoleMissingError,
     install_error_responses,
 )
 from autotrading.application.accounts.errors import (
@@ -29,7 +26,11 @@ from autotrading.application.orders.errors import (
     OrderWorkerUnavailableError,
     UnsupportedOrderExchangeError,
 )
-from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.application.tenancy.errors import (
+    CrossTenantAccessError,
+    IdentityProviderUnavailableError,
+    NotAuthenticatedError,
+)
 from autotrading.application.verification.errors import (
     VerificationAccountNotFoundError,
     VerificationStepError,
@@ -46,6 +47,7 @@ from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.errors import OpenPositionsNeedConfirmationError
 from autotrading.domain.orders.errors import InvalidLeverageError, ManualOpeningNotAllowedError
+from autotrading.domain.tenancy.errors import UserRoleMissingError
 from autotrading.domain.verification.errors import InsufficientMarginError, PositionAlreadyOpenError
 
 TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"

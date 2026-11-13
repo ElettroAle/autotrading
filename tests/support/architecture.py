@@ -99,6 +99,7 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/hyperliquid": frozenset({"hyperliquid", "eth_account", "requests"}),
     "adapters/outbound/json": frozenset(),
     "adapters/outbound/libsodium": frozenset({"nacl"}),
+    "adapters/outbound/oidc": frozenset({"jwt"}),
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy"}),
     "adapters/outbound/threads": frozenset(),
 }

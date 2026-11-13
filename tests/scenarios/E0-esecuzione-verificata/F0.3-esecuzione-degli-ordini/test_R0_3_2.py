@@ -7,8 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.orders.direction import Direction
@@ -16,7 +15,7 @@ from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.trading_access import TradingAccess
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
 from tests.support.steps import quoted
 
@@ -34,12 +33,9 @@ class Session:
 
     def api(self) -> FastAPI:
         provider = self.identity_provider
-        verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
         health = HealthReport(version="1.0.0", environment="dev")
         resolve_tenant = ResolveTenantUseCase(self.platform.tenants)
-        return create_api(
-            health, resolve_tenant, self.platform.for_tenant, Authentication(SETTINGS, verifier, provider.login())
-        )
+        return create_api(health, resolve_tenant, self.platform.for_tenant, provider.authentication())
 
     def post_as(self, user: str, path: str, body: object = None) -> None:
         token = self.identity_provider.token_for(self.platform.directory.person(user))

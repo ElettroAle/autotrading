@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
 from uuid import UUID
 
 import httpx
@@ -11,8 +10,8 @@ from autotrading.application.orders.errors import (
     OrderExchangeUnavailableError,
     OrderWorkerUnavailableError,
 )
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.order import OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.rejection import RejectionReason
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -82,5 +81,5 @@ def _outcome_of(response: httpx.Response) -> OrderOutcome:
         raise OrderWorkerUnavailableError from error
 
 
-def _decimal(value: Any) -> Decimal | None:
+def _decimal(value: str | int | float | None) -> Decimal | None:
     return None if value is None else Decimal(value)

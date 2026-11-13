@@ -16,12 +16,6 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 
 from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import (
-    AccessTokenVerifier,
-    AuthenticationSettings,
-    OidcLoginEndpoints,
-    OidcSigningKeys,
-)
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
@@ -63,6 +57,8 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
+from autotrading.adapters.outbound.oidc.access_token_verifier import OidcAccessTokenVerifierAdapter
+from autotrading.adapters.outbound.oidc.login_endpoints import OidcLoginEndpointsAdapter
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
@@ -193,7 +189,6 @@ from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersCo
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.order_failures import answered_or_named
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.application.orders.read_market import ReadMarketCommand, ReadMarketUseCase
@@ -262,6 +257,7 @@ from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.sources.errors import (
     SourceNotAvailableError,
@@ -876,16 +872,12 @@ def _authentication(configuration: Mapping[str, str]) -> Authentication | None:
     # Until the installation declares its identity provider, every protected function answers 503 (ADR 0016).
     if not configuration.get("AUTH_ISSUER", "").strip():
         return None
-    settings = AuthenticationSettings(
-        issuer=_required(configuration, "AUTH_ISSUER"),
-        audience=_required(configuration, "AUTH_AUDIENCE"),
+    issuer = _required(configuration, "AUTH_ISSUER")
+    return Authentication(
         client_id=_required(configuration, "AUTH_CLIENT_ID"),
         scope=_required(configuration, "AUTH_SCOPE"),
-    )
-    return Authentication(
-        settings,
-        AccessTokenVerifier(settings, OidcSigningKeys(settings.discovery_url)),
-        OidcLoginEndpoints(settings.discovery_url),
+        verifier=OidcAccessTokenVerifierAdapter(issuer, _required(configuration, "AUTH_AUDIENCE")),
+        login=OidcLoginEndpointsAdapter(issuer),
     )
 
 

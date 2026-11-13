@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from autotrading.application.sources.ports import ReadSourceCommand
+from autotrading.application.sources.ports import SourceRequest
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 
 
@@ -9,9 +9,9 @@ class FakeSourceReaderAdapter:
 
     def __init__(self, values: Sequence[SourceValue] = ()) -> None:
         self.values = list(values)
-        self.readings: list[ReadSourceCommand] = []
+        self.readings: list[SourceRequest] = []
 
-    def execute(self, command: ReadSourceCommand) -> list[SourceValue]:
+    def execute(self, command: SourceRequest) -> list[SourceValue]:
         self.readings.append(command)
         return self.values
 

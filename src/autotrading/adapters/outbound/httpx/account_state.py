@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict, cast
 from uuid import UUID
 
 import httpx
@@ -21,6 +21,30 @@ from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 TIMEOUT_SECONDS = 15.0
+
+
+class _AmountBody(TypedDict):
+    amount: str
+    currency: str
+
+
+class _PositionBody(TypedDict):
+    coin: str
+    side: str
+    size: str
+    leverage: int
+    entry_price: str
+    unrealized_pnl: str
+    liquidation_price: str | None
+
+
+class _StateBody(TypedDict):
+    """What the worker answers for a state; its shape is checked while it is read, a wrong one is a shape error."""
+
+    balance: _AmountBody
+    available_margin: _AmountBody
+    positions: list[_PositionBody]
+    read_at: str
 
 
 class HttpxAccountStateAdapter:
@@ -64,7 +88,7 @@ class HttpxAccountStateAdapter:
             raise FlowExchangeUnavailableError from error
 
 
-def _body_of(response: httpx.Response) -> Mapping[str, Any]:
+def _body_of(response: httpx.Response) -> Mapping[str, object]:
     try:
         body = response.json()
     except ValueError as error:
@@ -74,20 +98,21 @@ def _body_of(response: httpx.Response) -> Mapping[str, Any]:
     return body
 
 
-def _state_of(body: Mapping[str, Any], status: int) -> AccountState:
+def _state_of(body: Mapping[str, object], status: int) -> AccountState:
     _raise_for_refusal(body, status)
+    state = cast("_StateBody", body)
     try:
         return AccountState(
-            balance=_balance_of(body["balance"]),
-            available_margin=_balance_of(body["available_margin"]),
-            positions=tuple(_position_of(position) for position in body["positions"]),
-            read_at=datetime.fromisoformat(body["read_at"]),
+            balance=_balance_of(state["balance"]),
+            available_margin=_balance_of(state["available_margin"]),
+            positions=tuple(_position_of(position) for position in state["positions"]),
+            read_at=datetime.fromisoformat(state["read_at"]),
         )
     except (KeyError, TypeError, ValueError, InvalidOperation) as error:
         raise WorkerUnavailableError from error
 
 
-def _raise_for_refusal(body: Mapping[str, Any], status: int) -> None:
+def _raise_for_refusal(body: Mapping[str, object], status: int) -> None:
     if status == httpx.codes.OK:
         return
     if status == httpx.codes.NOT_FOUND:
@@ -99,11 +124,11 @@ def _raise_for_refusal(body: Mapping[str, Any], status: int) -> None:
     raise WorkerUnavailableError
 
 
-def _balance_of(amount: Mapping[str, Any]) -> Balance:
+def _balance_of(amount: _AmountBody) -> Balance:
     return Balance(Decimal(amount["amount"]), str(amount["currency"]))
 
 
-def _position_of(position: Mapping[str, Any]) -> Position:
+def _position_of(position: _PositionBody) -> Position:
     liquidation = position["liquidation_price"]
     return Position(
         coin=str(position["coin"]),

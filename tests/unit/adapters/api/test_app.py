@@ -1,13 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from autotrading.adapters.inbound.api.app import ENVIRONMENT_HEADER, Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import ENVIRONMENT_HEADER, HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Person
-from tests.support.identity_provider import AUTHORIZATION_URL, SETTINGS, TOKEN_URL, IdentityProvider
+from tests.support.identity_provider import AUTHORIZATION_URL, CLIENT_ID, SCOPE, TOKEN_URL, IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
@@ -29,8 +28,7 @@ def client_for(
 ) -> TestClient:
     authentication = None
     if provider is not None:
-        verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
-        authentication = Authentication(SETTINGS, verifier, provider.login())
+        authentication = provider.authentication()
     resolve_tenant = ResolveTenantUseCase(tenants or InMemoryTenantRepositoryAdapter())
     health = HealthReport("1.2.1-dev.57", environment)
     return TestClient(create_api(health, resolve_tenant, Platform().for_tenant, authentication))
@@ -108,13 +106,13 @@ def test_openapi_page_logs_in_with_the_issuer_through_pkce(provider: IdentityPro
                 "authorizationCode": {
                     "authorizationUrl": AUTHORIZATION_URL,
                     "tokenUrl": TOKEN_URL,
-                    "scopes": {SETTINGS.scope: "accesso ad AutoTrading"},
+                    "scopes": {SCOPE: "accesso ad AutoTrading"},
                 }
             },
         }
     }
     assert '"usePkceWithAuthorizationCodeGrant": true' in page
-    assert f'"clientId": "{SETTINGS.client_id}"' in page
+    assert f'"clientId": "{CLIENT_ID}"' in page
 
 
 def test_every_function_of_the_openapi_page_asks_for_the_login_of_the_issuer(provider: IdentityProvider) -> None:

@@ -154,5 +154,6 @@ modules = [
     "autotrading.adapters.outbound.hyperliquid",
     "autotrading.adapters.outbound.httpx",
     "autotrading.adapters.outbound.json",
+    "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.threads",
 ]

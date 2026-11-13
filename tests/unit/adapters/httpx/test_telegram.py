@@ -125,7 +125,9 @@ def test_a_poll_telegram_does_not_answer_is_unreachable_and_never_shows_the_toke
     assert raised.value.__suppress_context__
 
 
-@pytest.mark.parametrize("body", [{"ok": True}, {"ok": True, "result": 3}, {"ok": True, "result": [{"no": "id"}]}])
+@pytest.mark.parametrize(
+    "body", [[{"ok": True}], {"ok": True}, {"ok": True, "result": 3}, {"ok": True, "result": [{"no": "id"}]}]
+)
 def test_a_poll_answered_in_another_shape_is_unreachable(body: object) -> None:
     with pytest.raises(BotUnreachableError):
         HttpxTelegramInboxAdapter(client_answering(lambda _: httpx.Response(200, json=body))).receive()

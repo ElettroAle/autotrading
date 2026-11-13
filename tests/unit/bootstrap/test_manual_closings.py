@@ -8,10 +8,10 @@ import pytest
 
 from autotrading.application.flows.record_manual_closing import RecordManualClosingCommand
 from autotrading.application.orders.errors import NoOpenPositionError
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.bootstrap import ManualClosingsRecordedInFlows
 from autotrading.domain.flows.stop_outcome import ClosingFill
 from autotrading.domain.orders.order import OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.user_id import UserId
 
 ACCOUNT = uuid4()

@@ -1,6 +1,5 @@
-from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import TypedDict, cast
 
 import httpx
 
@@ -15,6 +14,26 @@ ALTERNATIVE_ME_URL = "https://api.alternative.me/fng/?limit=1"
 COINMARKETCAP_URL = "https://pro-api.coinmarketcap.com/public-api/v3/fear-and-greed/latest"
 
 
+class _AlternativeMeEntry(TypedDict):
+    timestamp: str
+    value: str
+    value_classification: str
+
+
+class _AlternativeMeDocument(TypedDict):
+    data: list[_AlternativeMeEntry]
+
+
+class _CoinMarketCapEntry(TypedDict):
+    update_time: str
+    value: int
+    value_classification: str
+
+
+class _CoinMarketCapDocument(TypedDict):
+    data: _CoinMarketCapEntry
+
+
 class HttpxAlternativeMeSentimentAdapter:
     """The Crypto Fear & Greed Index of alternative.me, from its public endpoint (R1.3.6)."""
 
@@ -23,7 +42,7 @@ class HttpxAlternativeMeSentimentAdapter:
 
     def read_index(self) -> SentimentIndex:
         source = SENTIMENT_ALTERNATIVE_ME.name
-        document = _document(self._client, ALTERNATIVE_ME_URL, source)
+        document = cast("_AlternativeMeDocument", _document(self._client, ALTERNATIVE_ME_URL, source))
         try:
             entry = document["data"][0]
             updated_at = datetime.fromtimestamp(int(entry["timestamp"]), UTC)
@@ -40,7 +59,7 @@ class HttpxCoinMarketCapSentimentAdapter:
 
     def read_index(self) -> SentimentIndex:
         source = SENTIMENT_COINMARKETCAP.name
-        document = _document(self._client, COINMARKETCAP_URL, source)
+        document = cast("_CoinMarketCapDocument", _document(self._client, COINMARKETCAP_URL, source))
         try:
             entry = document["data"]
             updated_at = datetime.fromisoformat(entry["update_time"])
@@ -49,12 +68,12 @@ class HttpxCoinMarketCapSentimentAdapter:
             raise SourceUnavailableError(source) from error
 
 
-def _document(client: httpx.Client, url: str, source: str) -> Mapping[str, Any]:
+def _document(client: httpx.Client, url: str, source: str) -> object:
     try:
         response = client.get(url, timeout=TIMEOUT_SECONDS)
         response.raise_for_status()
         # Any other shape fails on the first lookup, inside the adapter that reads it.
-        document: Mapping[str, Any] = response.json()
+        document: object = response.json()
     except (httpx.HTTPError, ValueError) as error:
         raise SourceUnavailableError(source) from error
     return document
