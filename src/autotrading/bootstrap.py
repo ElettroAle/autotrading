@@ -164,7 +164,7 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
-from autotrading.application.orders.close_flow_position import CloseFlowPositionCommand, CloseFlowPositionUseCase
+from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import (
@@ -197,7 +197,6 @@ from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.source_data import SourceData
-from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
@@ -210,22 +209,6 @@ from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 
 PROVIDER_TIMEOUT_SECONDS = 10.0
-
-
-class FlowPositionsFromOrders:
-    """Bridges the orders context to the flows context in the API (ADR 0055).
-
-    The positions are closed by the worker, the only service holding the key (ADR 0023). Their margin is the one the
-    exchange declares, read with the state of the flow (R1.6.1, ADR 0067).
-    """
-
-    def __init__(self, closing: CloseFlowPositionUseCase) -> None:
-        self._closing = closing
-
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
-        report = self._closing.execute(CloseFlowPositionCommand(account_id, asset, user_id))
-        fill = ClosingFill.reported(report.average_price, report.executed_at, report.fee, report.realized_pnl)
-        return PositionClosing.reported(asset, found=report.found, fill=fill, refusal=report.refusal)
 
 
 class OrderExecutionFromOrders:
@@ -296,7 +279,7 @@ def tenant_use_cases(
         bot_identity, account_state, account_activity, position_closing, verification, notifier = worker_of(tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
-        flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
+        flow_positions = CloseFlowPositionUseCase(position_closing)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(
             notifier,

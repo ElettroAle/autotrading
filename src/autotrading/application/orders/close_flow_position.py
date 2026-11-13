@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID
 
 from autotrading.application.orders.errors import (
     NoOpenPositionError,
@@ -9,17 +8,9 @@ from autotrading.application.orders.errors import (
     OrderExchangeUnavailableError,
     OrderWorkerUnavailableError,
 )
-from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.application.orders.ports import FlowPositionToClosePort, PositionClosingPort
 from autotrading.domain.orders.order import OrderStatus
 from autotrading.domain.orders.order_outcome import OrderOutcome
-from autotrading.domain.tenancy.user_id import UserId
-
-
-@dataclass(frozen=True, slots=True)
-class CloseFlowPositionCommand:
-    account_id: UUID
-    coin: str
-    user_id: UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,9 +31,9 @@ class CloseFlowPositionUseCase:
     def __init__(self, closing: PositionClosingPort) -> None:
         self._closing = closing
 
-    def execute(self, command: CloseFlowPositionCommand) -> ClosingReport:
+    def execute(self, position: FlowPositionToClosePort) -> ClosingReport:
         try:
-            outcome = self._closing.close(command.account_id, command.coin, command.user_id)
+            outcome = self._closing.close(position.account_id, position.asset, position.user_id)
         except NoOpenPositionError:
             return ClosingReport(found=False)
         except (OrderAccountNotFoundError, OrderExchangeUnavailableError, OrderWorkerUnavailableError) as error:

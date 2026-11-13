@@ -40,7 +40,7 @@ from autotrading.domain.flows.operations import Operation, OperationsOwner, Oper
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
-from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
+from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -165,15 +165,44 @@ class AccountRemovalPorts:
     removal: FlowAccountRemovalPort
 
 
+@dataclass(frozen=True, slots=True)
+class PositionToClose:
+    """The position of a flow to close: the whole position of its account on one of its assets (R1.1.2)."""
+
+    account_id: UUID
+    asset: str
+    user_id: UserId
+
+
+class ClosingAnswerPort(Protocol):
+    """What closing a position gave, as data: found or not, the fill confirmed in time, or the reason it was not."""
+
+    @property
+    def found(self) -> bool: ...
+
+    @property
+    def refusal(self) -> str | None: ...
+
+    @property
+    def average_price(self) -> Decimal | None: ...
+
+    @property
+    def executed_at(self) -> datetime | None: ...
+
+    @property
+    def fee(self) -> Decimal | None: ...
+
+    @property
+    def realized_pnl(self) -> Decimal | None: ...
+
+
 class FlowPositionsPort(Protocol):
-    """Bound to the tenant of the request: the positions of a flow are those of its account on its assets (R1.1.2)."""
+    """It is CloseFlowPositionUseCase of the orders context, bound to the tenant of the request (ADR 0023, ADR 0055).
 
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
-        """Closes the whole position on the asset, through the worker that holds the key (ADR 0023).
+    The position is closed through the worker, the only service that holds the key; the answer never raises.
+    """
 
-        None when there was no position; otherwise the fill, or the reason the exchange or the worker gave.
-        """
-        ...
+    def execute(self, position: PositionToClose) -> ClosingAnswerPort: ...
 
 
 class FlowOpeningsPort(Protocol):
