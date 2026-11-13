@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
-from autotrading.application.flows.errors import FlowAccountNotFoundError
+from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.flows.errors import AccountToRemoveNotFoundError, FlowAccountNotFoundError
 from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
@@ -107,10 +107,13 @@ class InMemoryAccountRepositoryAdapter:
             raise AccountNameInUseError(account.name)
         self._store.accounts.append(account)
 
-    def remove(self, account_id: AccountId) -> None:
-        account = self.get(account_id)
+    def has_account(self, account_id: UUID) -> bool:
+        return self.get(AccountId(account_id)) is not None
+
+    def remove_account(self, account_id: UUID) -> None:
+        account = self.get(AccountId(account_id))
         if account is None:
-            raise AccountNotFoundError
+            raise AccountToRemoveNotFoundError
         self._store.accounts.remove(account)
         self._store.removed.append(RemovedAccount(account.id, account.tenant_id, account.name.value))
 

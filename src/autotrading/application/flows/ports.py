@@ -116,6 +116,40 @@ class FlowAccountPorts:
     balances: FlowAccountBalancePort
 
 
+class FlowAccountPositionsPort(Protocol):
+    """Bound to the tenant of the request: the positions open now on an account, before it is removed (R0.2.5)."""
+
+    def open_positions_of(self, account_id: UUID) -> tuple[str, ...]:
+        """The assets of the open positions.
+
+        Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the positions cannot be read.
+        """
+        ...
+
+
+class FlowAccountRemovalPort(Protocol):
+    """Bound to the tenant of the request: the removal of an account, as the accounts context defines it."""
+
+    def has_account(self, account_id: UUID) -> bool:
+        """Whether the tenant has the account and has not removed it."""
+        ...
+
+    def remove_account(self, account_id: UUID) -> None:
+        """Deletes the credentials and hides the account, keeping its history (ADR 0025).
+
+        Raises AccountToRemoveNotFoundError when the tenant has no such account, also when it was already removed.
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class AccountRemovalPorts:
+    """What the removal of an account needs of the account itself (ADR 0090)."""
+
+    positions: FlowAccountPositionsPort
+    removal: FlowAccountRemovalPort
+
+
 class FlowPositionsPort(Protocol):
     """Bound to the tenant of the request: the positions of a flow are those of its account on its assets (R1.1.2)."""
 
