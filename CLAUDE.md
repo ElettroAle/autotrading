@@ -18,8 +18,8 @@ Le regole di dettaglio per percorso sono in `.claude/rules/` (indice in fondo).
 ## Stack
 
 Python 3.15, uv, ruff, mypy (strict), pytest + pytest-bdd, import-linter. FastAPI, SQLAlchemy 2 +
-Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, Entra ID. Dettagli e motivazioni in
-`docs/architecture.md`.
+Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, LangGraph (ciclo decisionale), Entra ID.
+Dettagli e motivazioni in `docs/architecture.md`.
 
 ## Architettura target
 
@@ -100,6 +100,11 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
 
 - `domain` non importa nulla di `application`, `adapters`, `bootstrap`, né librerie esterne.
 - `application` importa solo `domain` e la libreria standard.
+- **Eccezione architetturale nominale, decisa dal proprietario** (vincolo di campo, ADR 0102): LangGraph
+  orchestra il ciclo decisionale come grafo. `langgraph` si importa solo in
+  `application/flows/cycle_graph.py` (il grafo: nodi che chiamano le porte dei passi) e in
+  `adapters/outbound/sqlalchemy/cycle_checkpoints.py` (il checkpointer su PostgreSQL). Nessun altro modulo, e
+  nessun'altra libreria per analogia.
 - Le librerie tecnologiche si importano solo nella cartella del loro adapter, `bootstrap.py` compreso.
 - **Un adapter = una e una sola tecnologia**: virtualmente una libreria a sé, staccabile. Tecnologia =
   sistema integrato (Hyperliquid, Telegram, l'API interna del worker, un feed RSS, alternative.me,
@@ -132,7 +137,8 @@ regola ha eccezioni per nome**.
   stanno nel proprio contratto di indipendenza.
 - Librerie: ogni cartella di tecnologia dichiara le sue librerie esterne e importa solo quelle; una
   libreria appartiene a una sola cartella, salvo le librerie di trasporto (`httpx`); `domain`,
-  `application` e `bootstrap.py` non importano librerie esterne.
+  `application` e `bootstrap.py` non importano librerie esterne. Unica eccezione `langgraph`, solo nei due moduli
+  che la regola delle dipendenze nomina.
 - Adapter: non riceve porte né casi d'uso nel costruttore (salvo il decorator della stessa porta,
   dichiarata tra le basi) e da `application` importa solo `ports.py` ed `errors.py`.
 - Nessun ponte: nessuna classe `*Bridge*` o `<X>From<Y>`.

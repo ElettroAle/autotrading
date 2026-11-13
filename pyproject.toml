@@ -9,6 +9,8 @@ dependencies = [
     "fastapi>=0.120",
     "httpx>=0.28",
     "hyperliquid-python-sdk>=0.24.0",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.0",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
     "pynacl>=1.6.2",
@@ -114,6 +116,7 @@ forbidden_modules = [
     "eth_account",
     "requests",
     "httpx",
+    "langgraph",
 ]
 
 [[tool.importlinter.contracts]]
@@ -161,3 +164,6 @@ modules = [
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
 ]
+
+[tool.uv]
+override-dependencies = ["zstandard; sys_platform == 'never'"]
