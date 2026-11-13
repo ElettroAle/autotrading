@@ -6,9 +6,9 @@ from uuid import uuid4
 import pytest
 
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
-from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
-from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule
+from autotrading.application.flows.errors import FlowOfCycleNotFoundError
+from autotrading.application.flows.ports import ScheduledFlow, TenantScheduledFlow
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 ANCHOR = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)

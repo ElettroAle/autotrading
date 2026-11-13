@@ -8,15 +8,15 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import (
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
     CycleOutcome,
     CycleRecord,
     StepDocument,
 )
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flows import a_flow
 from tests.support.identity_provider import IdentityProvider

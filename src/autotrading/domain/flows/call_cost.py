@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from autotrading.domain.cycles.errors import InvalidCallCostError
+from autotrading.domain.flows.errors import InvalidCallCostError
 
 
 @dataclass(frozen=True, slots=True)

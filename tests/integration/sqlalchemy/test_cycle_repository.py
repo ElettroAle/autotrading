@@ -12,16 +12,16 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyF
 from autotrading.adapters.outbound.sqlalchemy.tables import cycles
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import (
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
     CycleOutcome,
     CycleRecord,
     StepDocument,
 )
-from autotrading.domain.cycles.cycle_step import CycleStep
-from autotrading.domain.cycles.flow_cost import CycleCost
+from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow_cost import CycleCost
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId

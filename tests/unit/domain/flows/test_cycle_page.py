@@ -1,7 +1,7 @@
 import pytest
 
-from autotrading.domain.cycles.cycle_page import CYCLES_PER_PAGE, PageNumber
-from autotrading.domain.cycles.errors import InvalidPageNumberError
+from autotrading.domain.flows.cycle_page import CYCLES_PER_PAGE, PageNumber
+from autotrading.domain.flows.errors import InvalidPageNumberError
 
 
 def test_a_page_holds_fifty_cycles() -> None:

@@ -5,8 +5,8 @@ from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
-from autotrading.domain.cycles.cycle_record import CycleOutcome
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
+from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.fakes.model_call import HELD_SECONDS
 from tests.support.flow_cycles import FlowCycles

@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from uuid import UUID
 
-from autotrading.application.cycles.ports import CycleFailureNoticePort, FlowTenantPort
+from autotrading.application.flows.ports import CycleFailureNoticePort, FlowTenantPort
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 

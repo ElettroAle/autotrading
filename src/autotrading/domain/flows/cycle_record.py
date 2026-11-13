@@ -4,8 +4,8 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_step import CycleStep
 
 
 class CycleOutcome(StrEnum):

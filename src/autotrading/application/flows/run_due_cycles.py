@@ -1,7 +1,7 @@
 from functools import partial
 
-from autotrading.application.cycles.ports import ClockPort, CycleLauncherPort, ScheduledFlowsPort
-from autotrading.application.cycles.run_cycle import RunCycleCommand, RunCycleUseCase
+from autotrading.application.flows.ports import ClockPort, CycleLauncherPort, ScheduledFlowsPort
+from autotrading.application.flows.run_cycle import RunCycleCommand, RunCycleUseCase
 
 
 class RunDueCyclesUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:

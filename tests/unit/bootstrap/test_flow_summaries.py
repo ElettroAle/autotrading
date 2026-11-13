@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from autotrading.bootstrap import FlowSummariesFromFlows
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter

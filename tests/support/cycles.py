@@ -5,12 +5,12 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
-from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleCommand, RunCycleUseCase
-from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
-from autotrading.application.cycles.source_collector import SourceCollector
-from autotrading.domain.cycles.cycle_record import CycleRecord
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule
+from autotrading.application.flows.run_cycle import CycleGuards, CycleSteps, RunCycleCommand, RunCycleUseCase
+from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
+from autotrading.application.flows.source_collector import SourceCollector
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.cycle_record import CycleRecord
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from tests.fakes.cycles import (
     ACTIVE,
     PAUSED,

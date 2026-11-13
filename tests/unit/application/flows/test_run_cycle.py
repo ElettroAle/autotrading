@@ -4,11 +4,11 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.application.cycles.ports import RiskReview
-from autotrading.application.cycles.run_cycle import RunCycleCommand
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.application.flows.ports import RiskReview
+from autotrading.application.flows.run_cycle import RunCycleCommand
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_step import CycleStep
 from tests.fakes.cycles import ACTIVE, PAUSED, FakePermanentError, FakeTransientError
 from tests.support.cycles import Cycles, at
 

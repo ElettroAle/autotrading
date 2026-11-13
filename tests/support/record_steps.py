@@ -10,20 +10,20 @@ import pytest
 from pytest_bdd import given, parsers, then, when
 
 from autotrading.application.agent.errors import ModelUnavailableError
-from autotrading.application.cycles.errors import CycleFlowNotFoundError
-from autotrading.application.cycles.list_cycles import ListCyclesCommand
-from autotrading.application.cycles.list_flow_overviews import FlowOverview
-from autotrading.application.cycles.read_cycle import ReadCycleCommand
-from autotrading.application.cycles.read_flow_cost import ReadFlowCostCommand
+from autotrading.application.flows.errors import CycleFlowNotFoundError
+from autotrading.application.flows.list_cycles import ListCyclesCommand
+from autotrading.application.flows.list_flow_overviews import FlowOverview
+from autotrading.application.flows.read_cycle import ReadCycleCommand
+from autotrading.application.flows.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_usage import ModelPrices, ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_page import CyclePage
-from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord, StepDocument
-from autotrading.domain.cycles.cycle_step import CycleStep
-from autotrading.domain.cycles.flow_cost import DailyCost, FlowCost
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_page import CyclePage
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
+from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow_cost import DailyCost, FlowCost
 from autotrading.domain.flows.flow_id import FlowId
 from tests.support.cycles import DAY, at
 from tests.support.flows import ANTHROPIC_MODEL, OPENROUTER_MODEL, TEMPERATURE, scenario_catalog

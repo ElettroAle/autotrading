@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from autotrading.application.cycles.errors import CycleFlowNotFoundError
-from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort
-from autotrading.domain.cycles.cycle_page import CYCLES_PER_PAGE, CyclePage, PageNumber
+from autotrading.application.flows.errors import CycleFlowNotFoundError
+from autotrading.application.flows.ports import CycleHistoryPort, FlowDirectoryPort
+from autotrading.domain.flows.cycle_page import CYCLES_PER_PAGE, CyclePage, PageNumber
 
 
 @dataclass(frozen=True, slots=True)

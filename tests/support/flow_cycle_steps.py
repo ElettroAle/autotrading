@@ -13,8 +13,8 @@ from pytest_bdd import given, parsers, then, when
 from autotrading.application.agent.errors import ModelCreditExhaustedError, ModelKeyRejectedError
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.agent.provider_name import ProviderName
-from autotrading.domain.cycles.cycle_record import CycleOutcome
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.trade_intent import TradeSide

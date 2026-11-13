@@ -10,9 +10,9 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
-from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
-from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.fakes.model_call import HELD_SECONDS
 from tests.support.activity import a_fill

@@ -5,7 +5,7 @@ import threading
 import pytest
 
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
-from autotrading.application.cycles.ports import CallAnswered, CallFailed, CallUnanswered
+from autotrading.application.flows.ports import CallAnswered, CallFailed, CallUnanswered
 from tests.fakes.cycles import FakeTransientError
 
 WAIT_SECONDS = 1.0

@@ -15,7 +15,7 @@ from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.bootstrap import HYPERLIQUID
 from autotrading.domain.agent.provider_name import ProviderName
-from autotrading.domain.cycles.cycle_record import CycleOutcome
+from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.trading_access import TradingAccess

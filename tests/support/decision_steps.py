@@ -11,7 +11,7 @@ from pytest_bdd import given, parsers, then
 
 from autotrading.bootstrap import HYPERLIQUID
 from autotrading.domain.accounts.position import PositionSide
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.trading_access import TradingAccess

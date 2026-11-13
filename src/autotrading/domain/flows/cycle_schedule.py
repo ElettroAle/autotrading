@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from autotrading.domain.cycles.errors import InvalidScheduleError
+from autotrading.domain.flows.errors import InvalidScheduleError
 
 PUNCTUALITY = timedelta(seconds=60)
 # A source answers within a quarter of the interval, and never later than a minute (R1.2.5).

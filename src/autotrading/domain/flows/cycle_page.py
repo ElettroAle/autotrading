@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from autotrading.domain.cycles.cycle_record import CycleRecord
-from autotrading.domain.cycles.errors import InvalidPageNumberError
+from autotrading.domain.flows.cycle_record import CycleRecord
+from autotrading.domain.flows.errors import InvalidPageNumberError
 
 CYCLES_PER_PAGE = 50
 

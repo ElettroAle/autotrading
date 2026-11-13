@@ -1,10 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from autotrading.application.cycles.list_flow_overviews import ListFlowOverviewsUseCase
-from autotrading.application.cycles.ports import FlowSummary
-from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule
+from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
+from autotrading.application.flows.ports import FlowSummary
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
 
 STARTED = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)

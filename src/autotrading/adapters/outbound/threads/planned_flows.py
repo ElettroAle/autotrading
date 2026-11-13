@@ -3,8 +3,8 @@ from collections.abc import Iterable
 from datetime import datetime
 from uuid import UUID
 
-from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
-from autotrading.application.cycles.ports import TenantScheduledFlow
+from autotrading.application.flows.errors import FlowOfCycleNotFoundError
+from autotrading.application.flows.ports import TenantScheduledFlow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 

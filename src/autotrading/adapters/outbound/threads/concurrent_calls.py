@@ -2,7 +2,7 @@ from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import wait as wait_for
 
-from autotrading.application.cycles.ports import CallAnswered, CallFailed, CallOutcome, CallUnanswered
+from autotrading.application.flows.ports import CallAnswered, CallFailed, CallOutcome, CallUnanswered
 from autotrading.domain.errors import AutotradingError
 
 

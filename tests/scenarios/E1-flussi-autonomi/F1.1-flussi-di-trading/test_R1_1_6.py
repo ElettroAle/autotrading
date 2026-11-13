@@ -4,8 +4,8 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.cycles.list_cycles import ListCyclesCommand
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
+from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.flows import ANTHROPIC_MODEL, account_id_of, scenario_catalog

@@ -4,7 +4,7 @@ from dataclasses import replace
 from uuid import UUID
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
-from autotrading.domain.cycles.cycle_record import CycleRecord
+from autotrading.domain.flows.cycle_record import CycleRecord
 from tests.support.cycles import Cycles
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flows import OPENROUTER_MODEL

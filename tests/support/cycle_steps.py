@@ -6,8 +6,8 @@ from collections.abc import Iterator
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from autotrading.domain.cycles.cycle_record import CycleOutcome
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.flows.cycle_step import CycleStep
 from tests.fakes.cycles import ACTIVE, FakePermanentError, FakeTransientError
 from tests.support.cycles import Cycles, at
 from tests.support.steps import quoted
