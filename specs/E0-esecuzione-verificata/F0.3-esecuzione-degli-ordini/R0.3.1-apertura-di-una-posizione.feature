@@ -9,6 +9,8 @@ Funzionalità: R0.3.1 Apertura di una posizione sull'exchange
   Ogni ordine porta un identificativo assegnato dalla piattaforma, che lo collega a chi lo ha generato.
   L'ordine è a mercato con uno scostamento massimo di prezzo; oltre lo scostamento non viene eseguito.
   Lo scostamento massimo è configurabile; il valore predefinito è 5%.
+  Ogni posizione si apre con margine isolato: la sua perdita massima è il margine che le è assegnato, e non
+  intacca la garanzia delle altre posizioni del conto, anche quando appartengono ad altri flussi.
 
   Fuori ambito: ordini limite in attesa, chiusure parziali, stop loss e take profit.
 
@@ -19,6 +21,7 @@ Funzionalità: R0.3.1 Apertura di una posizione sull'exchange
     Quando la piattaforma apre sul conto "test-1" una posizione "<direzione>" su "<asset>" con leva <leva> e valore 20 USDC
     Allora sull'exchange il conto "test-1" ha una posizione "<direzione>" su "<asset>"
     E la posizione su "<asset>" ha leva <leva>
+    E la posizione su "<asset>" ha margine isolato
     E l'ordine inviato porta un identificativo della piattaforma
 
     Esempi:
