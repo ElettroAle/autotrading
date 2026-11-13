@@ -69,6 +69,9 @@ runs:
           printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
+        # Every release pulls new images and the old ones stay on the small disk of the machine: the images no container
+        # uses are removed before the pull, the running ones are kept (Bug 186: disk full at the first forecaster pull).
+        ssh "${ssh_options[@]}" "$target" 'docker image prune --all --force > /dev/null'
         # Il token di registro vale solo per questa esecuzione e viene rimosso subito dopo il pull.
         printf '%s' "$REGISTRY_TOKEN" | ssh "${ssh_options[@]}" "$target" \
           "docker login ghcr.io -u '${GITHUB_ACTOR}' --password-stdin"

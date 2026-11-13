@@ -99,6 +99,7 @@ services:
       TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
       LITELLM_URL: http://litellm:4000
       LITELLM_MASTER_KEY_FILE: /run/secrets/litellm_master_key
+      FORECASTER_URL: http://forecaster:8000
     secrets:
       - postgres_app_password
       - credentials_private_key_v1
@@ -112,6 +113,9 @@ services:
         condition: service_completed_successfully
       # Senza il proxy fallisce solo la chiamata al modello del ciclo, non il worker.
       litellm:
+        condition: service_started
+      # Senza il forecaster manca solo la fonte forecast del ciclo, non il worker.
+      forecaster:
         condition: service_started
 
   api:

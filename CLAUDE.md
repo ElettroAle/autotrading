@@ -78,7 +78,8 @@ src/autotrading/
     inbound/api/                FastAPI
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
-                                alternative_me/, coinmarketcap/, litellm/, openrouter/, apscheduler/
+                                alternative_me/, coinmarketcap/, litellm/, openrouter/, forecaster/,
+                                apscheduler/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md

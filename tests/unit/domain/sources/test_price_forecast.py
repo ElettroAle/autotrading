@@ -78,18 +78,15 @@ def test_fewer_than_three_points_are_not_a_history() -> None:
         PriceHistory(tuple(rising(1)[-2:]), 1, NOW)
 
 
-@pytest.mark.parametrize(
-    ("horizon", "predicted"),
-    [(ForecastHorizon.MINUTES_15, Decimal("100.25")), (ForecastHorizon.HOUR_1, Decimal("101.00"))],
-)
-def test_the_forecast_extends_the_trend_over_the_horizon(horizon: ForecastHorizon, predicted: Decimal) -> None:
-    made = PriceForecast.of(FLOW, "BTC", history_of(rising(7), 7, NOW), horizon)
+@pytest.mark.parametrize("horizon", list(ForecastHorizon))
+def test_the_forecast_carries_the_predicted_price_of_its_horizon(horizon: ForecastHorizon) -> None:
+    made = PriceForecast.of(FLOW, "BTC", history_of(rising(7), 7, NOW), horizon, Decimal("101.25"))
 
     assert (made.horizon, made.made_at, made.last_price, made.predicted_price) == (
         horizon,
         NOW,
         Decimal(100),
-        predicted,
+        Decimal("101.25"),
     )
     assert (made.flow_id, made.asset, made.history_days, made.shortened, made.actual_price) == (
         FLOW,
@@ -101,15 +98,17 @@ def test_the_forecast_extends_the_trend_over_the_horizon(horizon: ForecastHorizo
 
 
 def test_the_forecast_declares_a_shortened_history() -> None:
-    made = PriceForecast.of(FLOW, "BTC", history_of(rising(3), 30, NOW), ForecastHorizon.HOUR_1)
+    made = PriceForecast.of(FLOW, "BTC", history_of(rising(3), 30, NOW), ForecastHorizon.HOUR_1, Decimal(101))
 
     assert (made.history_days, made.shortened) == (3, True)
 
 
 def test_the_predicted_price_keeps_two_more_decimals_than_the_last_price() -> None:
-    made = PriceForecast.of(FLOW, "BTC", history_of(rising(7, last="100.5"), 7, NOW), ForecastHorizon.MINUTES_15)
+    history = history_of(rising(7, last="100.5"), 7, NOW)
 
-    assert made.predicted_price.as_tuple().exponent == -3
+    made = PriceForecast.of(FLOW, "BTC", history, ForecastHorizon.MINUTES_15, Decimal("100.123456"))
+
+    assert made.predicted_price == Decimal("100.123")
 
 
 def test_the_change_is_a_percentage_of_the_last_price_with_two_decimals() -> None:
@@ -145,4 +144,4 @@ def test_a_last_price_that_is_not_a_number_cannot_be_forecast() -> None:
     history = PriceHistory((*rising(1)[:-1], PricePoint(NOW, Decimal("Infinity"))), 1, NOW)
 
     with pytest.raises(InvalidPriceForecastError):
-        PriceForecast.of(FLOW, "BTC", history, ForecastHorizon.MINUTES_15)
+        PriceForecast.of(FLOW, "BTC", history, ForecastHorizon.MINUTES_15, Decimal(101))
