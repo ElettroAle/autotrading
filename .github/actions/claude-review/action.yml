@@ -47,9 +47,11 @@ runs:
           2. Leggi i thread di review della pull request con `gh api graphql` (reviewThreads con id, isResolved,
              path, line e i commenti con autore e corpo). I tuoi thread sono quelli il cui primo commento contiene
              `<!-- revisione-ai -->` oppure `<!-- revisione-ai:proprietario -->`.
-          3. Per ogni tuo thread aperto con `<!-- revisione-ai -->`: se nel commit head la violazione non c'è più,
-             rispondi nel thread con `addPullRequestReviewThreadReply` dicendo in una riga che è corretta, poi
-             chiudilo con `resolveReviewThread`. Se è ancora presente, lascialo com'è. Non chiudere mai un thread
+          3. Per ogni tuo thread aperto (isResolved falso) con `<!-- revisione-ai -->`: se nel commit head la
+             violazione non c'è più, rispondi nel thread con `addPullRequestReviewThreadReply` dicendo in una riga che
+             è corretta (salvo che una tua risposta lo dica già) e poi chiama sempre `resolveReviewThread` con l'id
+             del thread: un thread corretto non resta mai aperto, anche se lo hai già commentato in un giro
+             precedente. Se la violazione è ancora presente, lascialo com'è. Non chiudere mai un thread
              con `<!-- revisione-ai:proprietario -->` né un thread aperto da altri.
           4. Esamina le righe aggiunte o modificate dalla pull request. Apri un thread solo per la violazione di una
              regola scritta in CLAUDE.md o in una rule applicabile, e solo se nessun tuo thread aperto la segnala già.
