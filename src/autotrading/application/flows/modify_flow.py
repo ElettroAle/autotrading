@@ -89,13 +89,13 @@ class ModifyFlowUseCase:
         if command.model is None and command.model_parameters is None:
             return current
         if command.model is None:
-            return self._checks.models.selection(current.name, command.model_parameters or {})
+            return self._checks.models.execute(current.name, command.model_parameters or {})
         # A new model without parameters takes its own defaults, not those of the model it replaces.
-        return self._checks.models.selection(command.model, command.model_parameters or {})
+        return self._checks.models.execute(command.model, command.model_parameters or {})
 
     def _sources(self, requests: tuple[SourceRequest, ...]) -> tuple[SourceSelection, ...]:
         return tuple(
-            self._checks.sources.selection(request.name, request.weight, request.parameters) for request in requests
+            self._checks.sources.execute(request.name, request.weight, request.parameters) for request in requests
         )
 
     def _require_assets_admitted(self, flow: Flow, assets: tuple[str, ...]) -> None:

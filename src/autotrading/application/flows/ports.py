@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -146,17 +147,25 @@ class MarketsPort(Protocol):
 
 
 class ModelSettingsPort(Protocol):
-    """Bound to the tenant of the request: a model is usable only with the key of its provider (R1.4.1)."""
+    """Bound to the tenant of the request: it is SelectModelUseCase (R1.4.1, R1.4.2)."""
 
-    def selection(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
+    def execute(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
         """The model with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
         ...
 
 
 class SourceSettingsPort(Protocol):
-    def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
+    """It is SelectSourceUseCase (R1.3.1)."""
+
+    def execute(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         """The source with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
         ...
+
+
+class FlowProviderKeysPort(Protocol):
+    """Bound to the tenant of the request: the providers it registered a key for (R1.4.1)."""
+
+    def has_key(self, provider: ProviderName) -> bool: ...
 
 
 class RunningVerificationsPort(Protocol):

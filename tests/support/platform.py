@@ -16,6 +16,8 @@ from autotrading.application.flows.list_account_flows import ListAccountFlowsUse
 from autotrading.application.flows.ports import FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
+from autotrading.application.flows.select_model import SelectModelUseCase
+from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -40,10 +42,8 @@ from autotrading.bootstrap import (
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
     ManualClosingsRecordedInFlows,
-    ModelSettingsFromAgent,
     NotifiedClosedPositions,
     OrderExecutionFromOrders,
-    SourceSettingsFromSources,
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
@@ -200,8 +200,8 @@ class Platform:
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
-                models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
-                sources=SourceSettingsFromSources(SOURCE_CATALOG),
+                models=SelectModelUseCase(self.model_catalog, provider_keys),
+                sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,

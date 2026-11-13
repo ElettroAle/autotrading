@@ -12,7 +12,7 @@ class FakeModelSettingsAdapter:
         self.models = set(models)
         self.asked: list[str] = []
 
-    def selection(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
+    def execute(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
         self.asked.append(model)
         if model not in self.models:
             reason = f"modello non disponibile: {model}"

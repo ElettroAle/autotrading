@@ -79,6 +79,10 @@ class InMemoryProviderKeyRepositoryAdapter:
     def list(self) -> list[RegisteredProviderKey]:
         return sorted(self._store.of(self._tenant_id), key=lambda key: key.provider.value)
 
+    def has_key(self, provider: ProviderName) -> bool:
+        """The flows context asks only whether the tenant can use the provider (R1.4.1)."""
+        return self.get(provider) is not None
+
     def get(self, provider: ProviderName) -> RegisteredProviderKey | None:
         return next((key for key in self.list() if key.provider == provider), None)
 

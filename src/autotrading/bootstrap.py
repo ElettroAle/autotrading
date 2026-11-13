@@ -112,9 +112,6 @@ from autotrading.application.accounts.ports import (
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AgentAnswer, AskAgentCommand, AskAgentUseCase
-from autotrading.application.agent.errors import (
-    ProviderKeyNotFoundError,
-)
 from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.cycles.ports import (
     ClockPort,
@@ -137,7 +134,6 @@ from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRisk
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
-    InvalidFlowSettingError,
 )
 from autotrading.application.flows.list_account_flows import ListAccountFlowsCommand, ListAccountFlowsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
@@ -172,6 +168,8 @@ from autotrading.application.flows.record_outside_closing import (
     RecordOutsideClosingCommand,
     RecordOutsideClosingUseCase,
 )
+from autotrading.application.flows.select_model import SelectModelUseCase
+from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
@@ -231,12 +229,6 @@ from autotrading.domain.accounts.position import Position
 from autotrading.domain.accounts.removal import FlowPositionLeftOpen
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
 from autotrading.domain.agent.decision import TradeDirection
-from autotrading.domain.agent.errors import (
-    ModelNotAvailableError,
-    ParameterNotSupportedError,
-    ParameterOutOfRangeError,
-    UnknownParameterError,
-)
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
@@ -246,7 +238,6 @@ from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_funds import CycleFunds
-from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
@@ -254,7 +245,6 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
-from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
@@ -265,11 +255,6 @@ from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
-from autotrading.domain.sources.errors import (
-    SourceNotAvailableError,
-    SourceParameterOutOfRangeError,
-    UnknownSourceParameterError,
-)
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
@@ -332,10 +317,6 @@ class WorkerConnection:
 
     client: httpx.Client
     token: str = field(repr=False)
-
-
-MODEL_REFUSALS = (ModelNotAvailableError, ParameterOutOfRangeError, ParameterNotSupportedError, UnknownParameterError)
-SOURCE_REFUSALS = (SourceNotAvailableError, SourceParameterOutOfRangeError, UnknownSourceParameterError)
 
 
 class FlowSummariesFromFlows:
@@ -435,44 +416,6 @@ class AccountFlowsFromFlows:
 
     def _operating_on(self, account_id: AccountId) -> list[Flow]:
         return self._operating.execute(ListAccountFlowsCommand(account_id.value))
-
-
-class ModelSettingsFromAgent:
-    """Bridges the agent context to the flows context in the API (ADR 0031).
-
-    A model of the catalog is usable only with a registered key of its provider (R1.4.1), and only with the
-    parameters it admits (R1.4.2); a refusal reaches the flow with the reason the agent context gives.
-    """
-
-    def __init__(self, catalog: ModelCatalog, keys: ProviderKeyRepositoryPort) -> None:
-        self._catalog = catalog
-        self._keys = keys
-
-    def selection(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
-        if not model.strip():
-            raise ModelRequiredError
-        try:
-            definition = self._catalog.find(model)
-            parameters = definition.settings(requested)
-        except MODEL_REFUSALS as error:
-            raise InvalidFlowSettingError(str(error)) from error
-        if self._keys.get(definition.provider) is None:
-            raise InvalidFlowSettingError(str(ProviderKeyNotFoundError(definition.provider)))
-        return ModelSelection(definition.name, parameters)
-
-
-class SourceSettingsFromSources:
-    """Bridges the sources context to the flows context (ADR 0031): a source of the catalog, its parameters checked."""
-
-    def __init__(self, catalog: SourceCatalog) -> None:
-        self._catalog = catalog
-
-    def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
-        try:
-            parameters = self._catalog.find(source).settings(requested)
-        except SOURCE_REFUSALS as error:
-            raise InvalidFlowSettingError(str(error)) from error
-        return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, parameters)
 
 
 def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
@@ -619,8 +562,8 @@ class TenantUseCaseFactory:
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=self._exchanges.markets,
-                models=ModelSettingsFromAgent(MODEL_CATALOG, provider_keys),
-                sources=SourceSettingsFromSources(SOURCE_CATALOG),
+                models=SelectModelUseCase(MODEL_CATALOG, provider_keys),
+                sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,

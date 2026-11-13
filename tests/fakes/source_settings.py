@@ -10,7 +10,7 @@ class FakeSourceSettingsAdapter:
     def __init__(self, *sources: str) -> None:
         self.sources = set(sources)
 
-    def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
+    def execute(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         if source not in self.sources:
             reason = f"fonte non disponibile: {source}"
             raise InvalidFlowSettingError(reason)

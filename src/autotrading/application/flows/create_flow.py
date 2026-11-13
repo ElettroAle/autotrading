@@ -92,7 +92,7 @@ class CreateFlowUseCase:
             version=FIRST_VERSION,
             assets=assets_of(command.assets),
             cycle_interval=CycleInterval.of(command.cycle_minutes),
-            model=self._checks.models.selection(command.model, command.model_parameters),
+            model=self._checks.models.execute(command.model, command.model_parameters),
             sources=tuple(self._source(request) for request in command.sources),
             instructions=command.instructions.strip(),
             risk_limits=RiskLimits.of(
@@ -103,4 +103,4 @@ class CreateFlowUseCase:
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:
-        return self._checks.sources.selection(request.name, request.weight, request.parameters)
+        return self._checks.sources.execute(request.name, request.weight, request.parameters)
