@@ -30,6 +30,10 @@ class Notification:
         return f"{self.subject}: {self.event}"
 
     @classmethod
+    def test(cls) -> Notification:
+        return cls("notifica di prova", "le notifiche dei tuoi flussi arrivano qui")
+
+    @classmethod
     def position_opened(cls, flow: str, asset: str, direction: str, leverage: int, value: Amount) -> Notification:
         return cls(flow, f"aperta {direction} {asset}, leva {leverage}, {value}")
 

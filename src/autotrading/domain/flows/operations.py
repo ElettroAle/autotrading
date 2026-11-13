@@ -1,7 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
-from enum import IntEnum
+from enum import IntEnum, StrEnum
+from uuid import UUID
+
+from autotrading.domain.flows.flow_id import FlowId
 
 PAGE_SIZE = 50
 FUNDING = "funding"
@@ -27,7 +30,8 @@ class OperationCursor:
 class Operation:
     """A row of the ledger as the user reads it: an execution with its kind, or a funding payment (ADR 0063).
 
-    Sizes are signed, positive for a purchase; a funding payment has no size and no price.
+    Sizes are signed, positive for a purchase; a funding payment has no size and no price. `flow` is the name of the
+    flow the row belongs to, None when it belongs to no flow.
     """
 
     cursor: OperationCursor
@@ -38,6 +42,7 @@ class Operation:
     fee: Decimal
     realized_pnl: Decimal
     funding: Decimal
+    flow: str | None = None
 
     @property
     def occurred_at(self) -> datetime:
@@ -62,6 +67,10 @@ class OperationsQuery:
             and (self.after is None or operation.cursor < self.after)
         )
 
+    def unpaged(self) -> OperationsQuery:
+        """The same filters over every row: what the totals and the export read (ADR 0080)."""
+        return replace(self, after=None)
+
 
 @dataclass(frozen=True, slots=True)
 class OperationsPage:
@@ -76,3 +85,46 @@ class OperationsPage:
         page = tuple(newest_first[:limit])
         more = len(newest_first) > limit
         return cls(page, page[-1].cursor if more and page else None)
+
+
+@dataclass(frozen=True, slots=True)
+class OperationsTotals:
+    """The sums of every row a query admits, whatever the page (ADR 0080)."""
+
+    count: int
+    realized_pnl: Decimal
+    fees: Decimal
+    funding: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class OperationsReport:
+    """A page of rows and the totals of the whole filter it belongs to."""
+
+    page: OperationsPage
+    totals: OperationsTotals
+
+
+class AccountScope(StrEnum):
+    """Which rows of an account to read: those of no flow only, or all of them, of every flow and of none."""
+
+    UNATTRIBUTED = "unattributed"
+    ALL = "all"
+
+
+@dataclass(frozen=True, slots=True)
+class FlowOperations:
+    """The rows of one flow."""
+
+    flow_id: FlowId
+
+
+@dataclass(frozen=True, slots=True)
+class AccountOperations:
+    """The rows of one account, in the given scope."""
+
+    account_id: UUID
+    scope: AccountScope
+
+
+type OperationsOwner = FlowOperations | AccountOperations

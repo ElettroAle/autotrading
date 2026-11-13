@@ -79,7 +79,10 @@ from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
     SqlAlchemyLinkCodeLookupAdapter,
     SqlAlchemyLinkCodeRepositoryAdapter,
 )
-from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import (
+    SqlAlchemyLinkedChatLookupAdapter,
+    SqlAlchemyLinkedChatRepositoryAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
@@ -174,6 +177,7 @@ from autotrading.application.notifications.errors import MessageNotDeliveredErro
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import LinkStores, MessengerPort
+from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -871,7 +875,7 @@ class WorkerUseCaseFactory:
                 self._settings.environment,
                 now,
             ),
-            notify=NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger),
+            notify=self.notify_for(tenant_id),
             read_account_activity=ReadAccountActivityUseCase(
                 AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
             ),
@@ -884,7 +888,7 @@ class WorkerUseCaseFactory:
         slippage = self._settings.slippage
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
-        notify = NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger)
+        notify = self.notify_for(tenant_id)
         closed_positions = NotifiedClosedPositions(
             SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id), flows, notify
         )
@@ -919,6 +923,9 @@ class WorkerUseCaseFactory:
             notify=notify,
             timing=SqlAlchemyFlowTimingAdapter(self._engine, tenant_id),
         )
+
+    def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
+        return NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger)
 
     def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
         return LinkStores(
@@ -1008,7 +1015,11 @@ def telegram_bot(
 ) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
     link_chat = LinkChatUseCase(SqlAlchemyLinkCodeLookupAdapter(engine), worker.link_stores_for, messenger, now)
-    return BotPolling(AnswerBotMessagesUseCase(HttpxTelegramInboxAdapter(client), link_chat).execute)
+    test_notification = SendTestNotificationUseCase(
+        SqlAlchemyLinkedChatLookupAdapter(engine), worker.notify_for, messenger
+    )
+    inbox = HttpxTelegramInboxAdapter(client)
+    return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
 
 
 def exchanges_for(environment: str) -> dict[str, HyperliquidExchangeAdapter]:

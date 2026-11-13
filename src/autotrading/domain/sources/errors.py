@@ -73,3 +73,11 @@ class InvalidSourceSampleError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("valore raccolto non valido")
+
+
+class TimeframeNotAvailableError(DomainError):
+    """The exchange publishes no candle interval as fine as the cycle interval: the indicators cannot be read."""
+
+    def __init__(self, cycle_minutes: int) -> None:
+        super().__init__(f"nessun intervallo di candela dell'exchange entro {cycle_minutes} minuti")
+        self.cycle_minutes = cycle_minutes

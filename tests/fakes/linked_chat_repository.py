@@ -1,5 +1,6 @@
 from autotrading.application.notifications.errors import ChatNotLinkedError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -24,3 +25,11 @@ class InMemoryLinkedChatRepositoryAdapter:
     def unlink(self) -> None:
         if self._store.pop(self._tenant_id, None) is None:
             raise ChatNotLinkedError
+
+
+class InMemoryLinkedChatLookupAdapter:
+    def __init__(self, store: LinkedChatStore) -> None:
+        self._store = store
+
+    def tenants_of(self, chat_id: ChatId) -> tuple[TenantId, ...]:
+        return tuple(tenant_id for tenant_id, chat in self._store.items() if chat.chat_id == chat_id)

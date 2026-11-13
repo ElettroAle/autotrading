@@ -36,6 +36,8 @@ from autotrading.application.flows.change_allocated_capital import ChangeAllocat
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
+from autotrading.application.flows.export_account_operations import ExportAccountOperationsUseCase
+from autotrading.application.flows.export_flow_operations import ExportFlowOperationsUseCase
 from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.list_account_operations import ListAccountOperationsUseCase
@@ -147,6 +149,8 @@ class TenantUseCases:
     list_closed_positions: ListClosedPositionsUseCase
     list_flow_operations: ListFlowOperationsUseCase
     list_account_operations: ListAccountOperationsUseCase
+    export_flow_operations: ExportFlowOperationsUseCase
+    export_account_operations: ExportAccountOperationsUseCase
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
@@ -196,6 +200,8 @@ class TenantUseCases:
             list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
             list_flow_operations=ListFlowOperationsUseCase(ports.flows, ports.flow_operations),
             list_account_operations=ListAccountOperationsUseCase(ports.flow_operations),
+            export_flow_operations=ExportFlowOperationsUseCase(ports.flows, ports.flow_operations),
+            export_account_operations=ExportAccountOperationsUseCase(ports.flow_operations),
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
