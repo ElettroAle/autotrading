@@ -132,7 +132,10 @@ from autotrading.application.flows.errors import (
 )
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
-from autotrading.application.flows.notify_unattributable import NotifyUnattributableUseCase
+from autotrading.application.flows.notify_unattributable import (
+    NotifyUnattributableUseCase,
+    UnattributableNotices,
+)
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
@@ -174,6 +177,13 @@ from autotrading.application.notifications.notify_flow_paused import NotifyFlowP
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
+from autotrading.application.notifications.notify_unattributable_movement import (
+    NotifyUnattributableMovementUseCase,
+)
+from autotrading.application.notifications.notify_unattributable_position import (
+    NotifyUnattributablePositionUseCase,
+)
 from autotrading.application.notifications.ports import (
     BotInboxPort,
     LinkStores,
@@ -608,7 +618,15 @@ class WorkerUseCaseFactory:
             samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
             reconcile_for_cycle=ReconcileAccountForCycleUseCase(
-                reconcile_account, NotifyUnattributableUseCase(accounts, notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+                reconcile_account,
+                NotifyUnattributableUseCase(
+                    accounts,
+                    UnattributableNotices(
+                        NotifyUnattributablePositionUseCase(notify),
+                        NotifyUnattributableFillUseCase(notify),
+                        NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                    ),
+                ),
             ),
             openings=openings,
             closed_positions=closed_positions,

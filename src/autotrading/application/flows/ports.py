@@ -30,7 +30,6 @@ from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
-from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -297,10 +296,22 @@ class FlowAccountNamePort(Protocol):
         ...
 
 
-class FlowNotifierPort(Protocol):
-    """Bound to the tenant of the request: it is NotifyUseCase of the notifications context (R1.8.1)."""
+class UnattributablePositionNoticePort(Protocol):
+    def execute(self, account_name: str, asset: str) -> None:
+        """Tells the user the account holds a position no flow opened (R1.6.2)."""
+        ...
 
-    def execute(self, notification: Notification) -> None: ...
+
+class UnattributableFillNoticePort(Protocol):
+    def execute(self, account_name: str, asset: str) -> None:
+        """Tells the user the account shows an execution no flow ordered (R1.6.2)."""
+        ...
+
+
+class UnattributableMovementNoticePort(Protocol):
+    def execute(self, account_name: str, amount: Decimal) -> None:
+        """Tells the user the balance of the account changed with no flow behind it (R1.6.2)."""
+        ...
 
 
 class AccountExecutionsPort(Protocol):

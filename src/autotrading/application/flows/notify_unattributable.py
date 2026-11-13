@@ -1,8 +1,22 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
 
-from autotrading.application.flows.ports import FlowAccountNamePort, FlowNotifierPort
+from autotrading.application.flows.ports import (
+    FlowAccountNamePort,
+    UnattributableFillNoticePort,
+    UnattributableMovementNoticePort,
+    UnattributablePositionNoticePort,
+)
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
-from autotrading.domain.notifications.notification import Amount, Notification
+
+
+@dataclass(frozen=True, slots=True)
+class UnattributableNotices:
+    """Who tells each kind of case no flow explains: a position, an execution, a movement of the balance."""
+
+    positions: UnattributablePositionNoticePort
+    fills: UnattributableFillNoticePort
+    movements: UnattributableMovementNoticePort
 
 
 class NotifyUnattributableUseCase:
@@ -11,20 +25,20 @@ class NotifyUnattributableUseCase:
     A position closed outside is told by the history it enters (ADR 0070): only the new cases arrive here.
     """
 
-    def __init__(self, accounts: FlowAccountNamePort, notifier: FlowNotifierPort, settlement_currency: str) -> None:
+    def __init__(self, accounts: FlowAccountNamePort, notices: UnattributableNotices) -> None:
         self._accounts = accounts
-        self._notifier = notifier
-        self._settlement_currency = settlement_currency
+        self._notices = notices
 
     def execute(self, items: Sequence[UnattributableItem]) -> None:
         for item in items:
-            self._notifier.execute(self._notification_of(item))
+            self._tell(item)
 
-    def _notification_of(self, item: UnattributableItem) -> Notification:
+    def _tell(self, item: UnattributableItem) -> None:
         account = self._accounts.account_name(item.account_id)
-        asset = item.asset or ""
         if item.kind is UnattributableKind.POSITION:
-            return Notification.unattributable_position(account, asset)
+            self._notices.positions.execute(account, item.asset or "")
+            return
         if item.kind is UnattributableKind.FILL:
-            return Notification.unattributable_fill(account, asset)
-        return Notification.unattributable_movement(account, Amount(item.amount, self._settlement_currency))
+            self._notices.fills.execute(account, item.asset or "")
+            return
+        self._notices.movements.execute(account, item.amount)
