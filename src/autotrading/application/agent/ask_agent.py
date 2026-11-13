@@ -3,10 +3,14 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.application.agent.errors import ModelKeyMissingError
-from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
+from autotrading.application.agent.ports import (
+    ModelCallPort,
+    ModelCatalogPort,
+    ProviderKeyOpenerPort,
+    ProviderKeyRepositoryPort,
+)
 from autotrading.domain.agent.agent_context import AgentContext
 from autotrading.domain.agent.agent_response import AgentResponse
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -37,7 +41,7 @@ class AskAgentUseCase:
 
     def __init__(
         self,
-        catalog: ModelCatalog,
+        catalog: ModelCatalogPort,
         keys: ProviderKeyRepositoryPort,
         opener: ProviderKeyOpenerPort,
         model_call: ModelCallPort,
@@ -48,7 +52,7 @@ class AskAgentUseCase:
         self._model_call = model_call
 
     def execute(self, command: AskAgentCommand) -> AgentAnswer:
-        definition = self._catalog.find(command.model)
+        definition = self._catalog.catalog().find(command.model)
         key = self._key_of(definition.provider)
         reply = self._model_call.call(definition.name, key, command.settings, command.context.messages())
         return AgentAnswer(
