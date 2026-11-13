@@ -5,9 +5,10 @@ from uuid import uuid4
 
 import pytest
 
-from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.errors import SourceNotSelectedError
+from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.flow_timing import FlowTiming, flow_beginning
+from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
@@ -53,9 +54,27 @@ def test_only_an_active_flow_runs_cycles(status: FlowStatus, runs: bool) -> None
 
 
 def test_a_flow_begins_at_its_first_start() -> None:
-    assert flow_beginning(FlowTiming(ANCHOR, None, FIRST_START), ANCHOR) == FIRST_START
+    assert FlowTiming(ANCHOR, None, FIRST_START).beginning(ANCHOR) == FIRST_START
 
 
 def test_a_flow_not_stamped_yet_begins_at_the_anchor_of_its_cycles() -> None:
-    assert flow_beginning(FlowTiming(ANCHOR, None), ANCHOR) == ANCHOR
-    assert flow_beginning(None, ANCHOR) == ANCHOR
+    assert FlowTiming(ANCHOR, None).beginning(ANCHOR) == ANCHOR
+    assert UNSTAMPED.beginning(ANCHOR) == ANCHOR
+
+
+def test_the_holder_of_an_asset_is_named_and_a_free_asset_has_none() -> None:
+    stopped, active = flow(FlowStatus.STOPPED), flow(FlowStatus.ACTIVE)
+
+    assert holder_of([stopped, active], ACCOUNT, "BTC") == active.name.value
+    assert holder_of([stopped], ACCOUNT, "BTC") is None
+
+
+def test_the_positions_held_by_a_flow_are_those_on_its_assets() -> None:
+    configuration = a_configuration(assets=("BTC",))
+
+    assert configuration.held(["BTC", "ETH", "BTC"], lambda asset: asset) == ("BTC", "BTC")
+
+
+def test_a_source_the_flow_does_not_select_is_refused() -> None:
+    with pytest.raises(SourceNotSelectedError, match=r"^fonte non attiva nel flusso: notizie$"):
+        a_configuration().source("notizie")

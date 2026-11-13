@@ -102,7 +102,8 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `RunningCyclePort`: attesa della fine del ciclo in corso; advisory lock PostgreSQL con la chiave `lock_key`
   che l'esecutore dei cicli tiene per tutto il ciclo (ADR 0042, ADR 0055).
 - `FlowTimingPort`: ancora dei cicli (ultimo avvio o ripresa) e motivo della pausa automatica di ogni flusso (ADR 0052).
-- I bridge verso gli altri contesti vivono solo in `bootstrap.py`; `flows` fornisce ad `agent` i flussi che
-  usano una chiave (`ProviderKeyUsageFromFlows`).
+- Nessun ponte verso gli altri contesti (ADR 0089): il contesto che usa un dato dichiara la sua porta nel
+  proprio `ports.py`, l'adapter della tecnologia che ha il dato la realizza nella sua cartella, il caso d'uso
+  orchestra, `bootstrap.py` solo collega. Così `agent` legge i flussi che usano una chiave.
 
 Invio degli ordini attraverso `orders` nasce con i requisiti che lo usano.

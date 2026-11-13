@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from autotrading.application.flows.ports import AutomaticPausePort, FlowRepositoryPort
+from autotrading.application.flows.ports import AutomaticPausePort, FlowRepositoryPort, PausedFlowNoticePort
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -30,13 +30,16 @@ class PauseAffectedFlowsUseCase:
     of that provider. The positions stay open on the exchange: a pause sends no order.
     """
 
-    def __init__(self, flows: FlowRepositoryPort, pause: AutomaticPausePort) -> None:
+    def __init__(self, flows: FlowRepositoryPort, pause: AutomaticPausePort, notices: PausedFlowNoticePort) -> None:
         self._flows = flows
         self._pause = pause
+        self._notices = notices
 
     def execute(self, command: PauseAffectedFlowsCommand) -> list[Flow]:
         affected = [flow for flow in self._flows.list() if _involved(flow, command)]
         self._pause.pause([flow.id for flow in affected], command.reason)
+        for flow in affected:
+            self._notices.paused(flow, command.reason)
         return affected
 
 

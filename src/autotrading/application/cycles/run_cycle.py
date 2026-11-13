@@ -8,6 +8,7 @@ from autotrading.application.cycles.ports import (
     AgentPort,
     ClockPort,
     ContextPort,
+    CycleFailureNoticePort,
     CycleJournalPort,
     CycleRepositoryPort,
     FlowLockPort,
@@ -59,12 +60,15 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
 
 @dataclass(frozen=True, slots=True)
 class CycleGuards:
-    """What keeps a planned cycle unique and alone, and what pauses the flows on a permanent error."""
+    """What keeps a planned cycle unique and alone, what pauses the flows on a permanent error and tells the user of
+    a failed cycle.
+    """
 
     cycles: CycleRepositoryPort
     lock: FlowLockPort
     pause: FlowPausePort
     clock: ClockPort
+    failures: CycleFailureNoticePort
 
 
 @dataclass(slots=True)
@@ -157,6 +161,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:
         failure = CycleFailure(progress.current, type(error).__name__, str(error))
         record = self._recorded(progress.record(CycleOutcome.FAILED, failure))
+        self._guards.failures.failed(progress.command.flow_id, failure.message)
         if not error.permanent:
             return record
         self._guards.pause.pause_affected_by(progress.command.flow_id, error)

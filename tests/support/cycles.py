@@ -25,6 +25,7 @@ from tests.fakes.cycles import (
     FakeSourcesAdapter,
     InMemoryCycleRepositoryAdapter,
     InMemoryFlowLockAdapter,
+    RecordedCycleFailuresAdapter,
     ThreadCycleLauncherAdapter,
 )
 
@@ -52,6 +53,7 @@ class Cycles:
         self.risk = FakeRiskAdapter(self.failures)
         self.orders = FakeOrderAdapter(self.failures)
         self.journal = FakeCycleJournalAdapter()
+        self.failure_notices = RecordedCycleFailuresAdapter()
         self.launcher = ThreadCycleLauncherAdapter()
         self.raised: AutotradingError | None = None
         self.executors = [self._executor()]
@@ -59,7 +61,9 @@ class Cycles:
     def run_cycle(self) -> RunCycleUseCase:
         collector = SourceCollector(self.sources, lambda wait: wait.total_seconds() * SECOND)
         steps = CycleSteps(self.flows, collector, self.context, self.agent, self.risk, self.orders, self.journal)
-        return RunCycleUseCase(steps, CycleGuards(self.records, self.lock, self.flows, self.clock))
+        return RunCycleUseCase(
+            steps, CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices)
+        )
 
     def _executor(self) -> RunDueCyclesUseCase:
         return RunDueCyclesUseCase(self.flows, self.run_cycle(), self.launcher, self.clock)

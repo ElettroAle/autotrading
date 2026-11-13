@@ -146,3 +146,13 @@ class InvalidClosedPositionError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("posizione chiusa non valida")
+
+
+class SourceNotSelectedError(DomainError):
+    """A source the configuration of the cycle does not select: the cycle goes on without it (R1.2.5)."""
+
+    status_code = 404
+
+    def __init__(self, source: str) -> None:
+        super().__init__(f"fonte non attiva nel flusso: {source}")
+        self.source = source

@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from uuid import UUID
@@ -69,3 +70,11 @@ class Flow(TenantOwned):
     def with_capital(self, capital: Decimal) -> Flow:
         """The flow with another allocated capital as its next version: a cycle under way keeps its own (R1.1.7)."""
         return self.reconfigured(replace(self.configuration, allocated_capital=capital))
+
+
+def holder_of(flows: Iterable[Flow], account_id: UUID, asset: str) -> str | None:
+    """The name of the flow that holds the asset on the account, if one does (ADR 0075)."""
+    holder = next((flow for flow in flows if flow.holds(account_id, asset)), None)
+    if holder is None:
+        return None
+    return holder.name.value
