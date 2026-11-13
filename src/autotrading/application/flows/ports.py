@@ -3,7 +3,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from autotrading.domain.agent.provider_name import ProviderName
@@ -38,6 +38,9 @@ from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpeni
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
+
+if TYPE_CHECKING:
+    from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 
 
 @dataclass(frozen=True, slots=True)
@@ -519,17 +522,9 @@ class RiskReview[O = object]:
 
 
 class PlannedFlowsPort(Protocol):
-    """The tenant and the anchor of every flow the worker planned: the ports of the cycle name only the flow."""
+    """The tenants of the flows the worker planned: the actual prices of their forecasts follow (R1.3.5)."""
 
     def remember(self, entries: Iterable[TenantScheduledFlow]) -> None: ...
-
-    def tenant_of(self, flow_id: UUID) -> TenantId:
-        """Raises FlowOfCycleNotFoundError for a flow the worker never planned."""
-        ...
-
-    def anchor_of(self, flow_id: UUID) -> datetime:
-        """Raises FlowOfCycleNotFoundError for a flow the worker never planned."""
-        ...
 
     def tenants(self) -> set[TenantId]: ...
 
@@ -565,12 +560,6 @@ class ClockPort(Protocol):
     def now(self) -> datetime: ...
 
 
-class ScheduledFlowsPort(Protocol):
-    def active(self) -> list[ScheduledFlow]:
-        """Every active flow of every tenant: the worker plans the cycles of the whole installation."""
-        ...
-
-
 class TenantScheduledFlowsPort(Protocol):
     def active_of_every_tenant(self) -> list[TenantScheduledFlow]:
         """Every active flow of every tenant, with the tenant it belongs to."""
@@ -598,9 +587,11 @@ class CycleLauncherPort(Protocol):
 
 
 class FlowStatePort[S = object, E = object](Protocol):
-    def read(self, flow_id: UUID) -> FlowSnapshot[S]: ...
+    def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot[S]:
+        """The state of the flow at the start of the cycle; the anchor is the start of its schedule."""
+        ...
 
-    def update(self, flow_id: UUID, executions: Sequence[E]) -> object:
+    def update(self, flow_id: UUID, anchor: datetime, executions: Sequence[E]) -> object:
         """Applies the executions of the cycle and gives back the state of the flow at the end of it."""
         ...
 
@@ -638,7 +629,7 @@ class OrderPort[O = object, E = object](Protocol):
 
 
 class FlowPausePort(Protocol):
-    def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
+    def execute(self, command: PauseAffectedFlowsCommand) -> object:
         """Pauses every active flow the permanent error involves, with the message of the error as reason (R1.2.4)."""
         ...
 
@@ -646,12 +637,6 @@ class FlowPausePort(Protocol):
 class CycleFailureNoticePort(Protocol):
     def execute(self, flow_id: UUID, reason: str) -> None:
         """Tells the user the cycle of the flow failed, with the message of its error (R1.8.2)."""
-        ...
-
-
-class FlowTenantPort(Protocol):
-    def tenant_of(self, flow_id: UUID) -> TenantId:
-        """The tenant of a flow the worker planned."""
         ...
 
 

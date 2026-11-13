@@ -7,10 +7,18 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
-from autotrading.application.flows.ports import FlowSnapshot, RiskReview, ScheduledFlow, SourceReading, SourceRequest
-from autotrading.domain.errors import AutotradingError
+from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
+from autotrading.application.flows.ports import (
+    FlowSnapshot,
+    RiskReview,
+    ScheduledFlow,
+    SourceReading,
+    SourceRequest,
+    TenantScheduledFlow,
+)
+from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
@@ -20,6 +28,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_repository import FlowStore
 
 ACTIVE, PAUSED = "attivo", "in pausa"
+TENANT = TenantId(UUID("00000000-0000-4000-8000-000000000001"))
 # A silent source or a held cycle gives up after this many real seconds: a broken cycle fails the test, never hangs it.
 LONGEST_HOLD = 3.0
 
@@ -40,6 +49,15 @@ class FakePermanentError(AutotradingError):
         super().__init__(message)
         self.account = account
         self.provider = provider
+
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(None if self.account is None else account_id_of(self.account), self.provider)
+
+
+def account_id_of(name: str) -> UUID:
+    """The fake flows name their account; the scope of an error names it by identifier."""
+    return uuid5(NAMESPACE_URL, name)
 
 
 class FakeClockAdapter:
@@ -167,6 +185,7 @@ class FakeFlow:
     status: str = ACTIVE
     pause_reason: str | None = None
     positions: set[str] = field(default_factory=set)
+    tenant_id: TenantId = TENANT
 
 
 class Failures:
@@ -192,27 +211,38 @@ class FakeFlowsAdapter:
         self.updates: list[tuple[UUID, Sequence[object]]] = []
         self._failures = failures
 
-    def active(self) -> list[ScheduledFlow]:
-        return [ScheduledFlow(flow_id, flow.schedule) for flow_id, flow in self.flows.items() if flow.status == ACTIVE]
+    def active_of_every_tenant(self) -> list[TenantScheduledFlow]:
+        return [
+            TenantScheduledFlow(flow.tenant_id, ScheduledFlow(flow_id, flow.schedule))
+            for flow_id, flow in self.flows.items()
+            if flow.status == ACTIVE
+        ]
 
-    def read(self, flow_id: UUID) -> FlowSnapshot:
+    def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot:  # noqa: ARG002 - the signature of the port
         self._failures.raise_if_failing(flow_id, CycleStep.READ_FLOW_STATE)
         flow = self.flows[flow_id]
         return FlowSnapshot(flow.sources, {"flow": flow.name, "positions": sorted(flow.positions)})
 
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:
+    def update(
+        self,
+        flow_id: UUID,
+        anchor: datetime,  # noqa: ARG002 - the signature of the port
+        executions: Sequence[object],
+    ) -> object:
         self._failures.raise_if_failing(flow_id, CycleStep.UPDATE_FLOW_STATE)
         self.updates.append((flow_id, executions))
         return {"flow": self.flows[flow_id].name, "executions": len(executions)}
 
-    def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
-        account = getattr(error, "account", None)
-        provider = getattr(error, "provider", None)
-        failing = self.flows[flow_id]
+    def execute(self, command: PauseAffectedFlowsCommand) -> None:
+        failing = self.flows[command.flow_id]
         for flow in self.flows.values():
-            involved = flow is failing or flow.account == account or flow.provider == provider
+            involved = (
+                flow is failing
+                or account_id_of(flow.account) == command.account_id
+                or flow.provider == command.provider
+            )
             if involved and flow.status == ACTIVE:
-                flow.status, flow.pause_reason = PAUSED, str(error)
+                flow.status, flow.pause_reason = PAUSED, command.reason
 
 
 class FakeSourcesAdapter:

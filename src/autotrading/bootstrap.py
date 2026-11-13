@@ -119,17 +119,18 @@ from autotrading.application.flows.notify_unattributable import (
     NotifyUnattributableUseCase,
     UnattributableNotices,
 )
-from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
+from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
     ActivityReaderPort,
     AutomaticPausePort,
     ClockPort,
     ClosedPositionRepositoryPort,
-    CycleLauncherPort,
+    CycleRepositoryPort,
     ExchangeLimitsPort,
     ExecutionsReaderPort,
     FlowAccountPorts,
+    FlowLockPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
     FlowSnapshot,
@@ -138,10 +139,8 @@ from autotrading.application.flows.ports import (
     MarketsPort,
     PlannedFlowsPort,
     RiskReview,
-    ScheduledFlow,
     SourceReading,
     SourceRequest,
-    TenantScheduledFlowsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
@@ -164,7 +163,6 @@ from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.source_collector import SourceCollector
 from autotrading.application.flows.stop_flow import StopPorts
-from autotrading.application.flows.tell_cycle_failure import TellCycleFailureUseCase
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -238,7 +236,7 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_funds import CycleFunds
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow import Flow
@@ -841,26 +839,12 @@ def _environment(configuration: Mapping[str, str]) -> str:
     return environment
 
 
-# The cycles of the flows in the worker (ADR 0041, ADR 0042): the cycle names only the flow, the bridges below find
-# its tenant and run each step on the ports of that tenant.
+# The cycles of the flows in the worker (ADR 0041, ADR 0042): each cycle runs on the ports of the tenant of its flow.
 
 
 class SystemClock:
     def now(self) -> datetime:
         return now()
-
-
-class ScheduledFlowsFromFlows:
-    """Bridges the flows of every tenant to the cycles context in the worker (ADR 0042)."""
-
-    def __init__(self, source: TenantScheduledFlowsPort, directory: PlannedFlowsPort) -> None:
-        self._source = source
-        self._directory = directory
-
-    def active(self) -> list[ScheduledFlow]:
-        entries = self._source.active_of_every_tenant()
-        self._directory.remember(entries)
-        return [entry.flow for entry in entries]
 
 
 @dataclass(frozen=True, slots=True)
@@ -901,9 +885,6 @@ class CycleServices:
     market: MarketDataPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
-
-
-type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
 
 
 @dataclass(frozen=True, slots=True)
@@ -955,10 +936,6 @@ class CycleFlow:
         )
 
 
-def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
-    return ports.flows.get(FlowId(flow_id))
-
-
 class FlowStateFromFlows:
     """Bridges the flows and accounts contexts to the cycles context in the worker (ADR 0042).
 
@@ -967,25 +944,27 @@ class FlowStateFromFlows:
     execution the state counts (ReadCycleFlowStateUseCase).
     """
 
-    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
-        self._directory = directory
-        self._ports_of = ports_of
+    def __init__(self, ports: TenantCyclePorts) -> None:
+        self._ports = ports
 
-    def read(self, flow_id: UUID) -> FlowSnapshot[CycleFlow]:
-        ports = self._ports_of(self._directory.tenant_of(flow_id))
-        reconciled = ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
-        return self._snapshot(flow_id, reconciled=reconciled)
+    def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot[CycleFlow]:
+        reconciled = self._ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
+        return self._snapshot(flow_id, anchor, reconciled=reconciled)
 
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
+    def update(
+        self,
+        flow_id: UUID,
+        anchor: datetime,
+        executions: Sequence[object],  # noqa: ARG002 - the signature of the port
+    ) -> object:
         """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
-        ports = self._ports_of(self._directory.tenant_of(flow_id))
-        ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
-        return self._snapshot(flow_id, reconciled=False).state
+        self._ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
+        return self._snapshot(flow_id, anchor, reconciled=False).state
 
-    def _snapshot(self, flow_id: UUID, *, reconciled: bool) -> FlowSnapshot[CycleFlow]:
-        tenant_id = self._directory.tenant_of(flow_id)
-        ports = self._ports_of(tenant_id)
-        flow = flow_of_cycle(ports, flow_id)
+    def _snapshot(self, flow_id: UUID, anchor: datetime, *, reconciled: bool) -> FlowSnapshot[CycleFlow]:
+        ports = self._ports
+        flow = ports.flows.get(FlowId(flow_id))
+        started_at = ports.timing.timings().get(flow.id, UNSTAMPED).beginning(anchor)
         account = find_account(ports.accounts, AccountId(flow.account_id))
         try:
             state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
@@ -993,26 +972,10 @@ class FlowStateFromFlows:
             raise FlowCredentialsRejectedError(account.name.value, account.id.value) from error
         read_cycle_state = ReadCycleFlowStateUseCase(ports.read_flow_state, ports.reconcile_for_cycle)
         attributed = read_cycle_state.execute(ReadCycleFlowStateCommand(flow.id, reconciled))
-        started_at = ports.timing.timings().get(flow.id, UNSTAMPED).beginning(self._directory.anchor_of(flow_id))
         cycle_flow = CycleFlow(
-            tenant_id, flow, account.name.value, account.exchange.value, started_at, state, attributed
+            flow.tenant_id, flow, account.name.value, account.exchange.value, started_at, state, attributed
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
-
-
-class FlowPauseFromFlows:
-    """Bridges a permanent error of a cycle to the flows context: the error declares the account or the provider it
-    concerns, and the flows context pauses the flows involved (R1.2.4, ADR 0082).
-    """
-
-    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
-        self._directory = directory
-        self._ports_of = ports_of
-
-    def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
-        ports = self._ports_of(self._directory.tenant_of(flow_id))
-        command = PauseAffectedFlowsCommand.of_error(flow_id, error)
-        PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice).execute(command)
 
 
 class SourcesFromSources:
@@ -1020,13 +983,12 @@ class SourcesFromSources:
     recorded for the cycle and given to the agent with its weight (R1.3.2-R1.3.8, ADR 0042).
     """
 
-    def __init__(self, ports_of: CyclePortsOf, services: CycleServices) -> None:
-        self._ports_of = ports_of
+    def __init__(self, ports: TenantCyclePorts, services: CycleServices) -> None:
+        self._ports = ports
         self._services = services
 
     def collect(self, request: SourceRequest[CycleFlow], source: str) -> SourcesData:
         cycle_flow = request.snapshot.state
-        ports = self._ports_of(cycle_flow.tenant_id)
         configuration = cycle_flow.configuration
         selection = configuration.source(source)
         command = CollectSourceCommand(
@@ -1037,17 +999,17 @@ class SourcesFromSources:
             configuration.assets,
             self._services.clock.now(),
         )
-        readers = self._readers_of(ports, configuration.cycle_interval.minutes)
-        collected = CollectSourceUseCase(SOURCE_CATALOG, readers, ports.samples).execute(command)
+        readers = self._readers_of(configuration.cycle_interval.minutes)
+        collected = CollectSourceUseCase(SOURCE_CATALOG, readers, self._ports.samples).execute(command)
         return agent_sources_of([collected])
 
-    def _readers_of(self, ports: TenantCyclePorts, cycle_minutes: int) -> dict[str, SourceReaderPort]:
+    def _readers_of(self, cycle_minutes: int) -> dict[str, SourceReaderPort]:
         services = self._services
         readers: dict[str, SourceReaderPort] = {
             name: ReadSentimentUseCase(sentiment) for name, sentiment in services.sentiments.items()
         }
         readers[NEWS.name] = ReadNewsUseCase(services.news)
-        readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(services.prices, ports.forecasts))
+        readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(services.prices, self._ports.forecasts))
         readers[INDICATORS.name] = ReadIndicatorsUseCase(services.market, cycle_minutes)
         readers[PIVOTS.name] = ReadPivotsUseCase(services.market)
         return readers
@@ -1124,16 +1086,15 @@ class CycleDecisions:
 class AgentFromAgent:
     """Bridges the agent context to the cycles context: the model of the flow with the key of its tenant (R1.4.4)."""
 
-    def __init__(self, ports_of: CyclePortsOf, services: CycleServices) -> None:
-        self._ports_of = ports_of
+    def __init__(self, ports: TenantCyclePorts, services: CycleServices) -> None:
+        self._ports = ports
         self._services = services
 
     def decide(self, flow_id: UUID, context: CycleContext) -> CycleDecisions:  # noqa: ARG002 - the signature of the port
-        ports = self._ports_of(context.flow.tenant_id)
         services = self._services
         model = context.flow.configuration.model
         use_case = AskAgentUseCase(
-            services.catalog, ports.provider_keys, services.provider_key_opener, services.model_call
+            services.catalog, self._ports.provider_keys, services.provider_key_opener, services.model_call
         )
         answer = use_case.execute(AskAgentCommand(model.name, model.parameters, context.agent_context))
         return CycleDecisions(context.flow, answer)
@@ -1175,8 +1136,8 @@ class RiskFromFlows:
 class OrdersFromOrders:
     """Bridges the approved decisions of a cycle to the orders context, on the account of the flow (R1.5.5)."""
 
-    def __init__(self, ports_of: CyclePortsOf) -> None:
-        self._ports_of = ports_of
+    def __init__(self, ports: TenantCyclePorts) -> None:
+        self._ports = ports
 
     def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[CycleOrder]) -> Sequence[Order]:
         approved = list(orders)
@@ -1186,10 +1147,9 @@ class OrdersFromOrders:
         command = ExecuteFlowOrdersCommand(
             cycle_flow.flow.account_id, flow_id, planned_at, tuple(_flow_order_of(order.outcome) for order in approved)
         )
-        ports = self._ports_of(cycle_flow.tenant_id)
-        sent = ports.execute_flow_orders.execute(command)
+        sent = self._ports.execute_flow_orders.execute(command)
         flow = cycle_flow.flow
-        ports.follow_flow_orders.execute(
+        self._ports.follow_flow_orders.execute(
             FollowFlowOrdersCommand(flow.id.value, flow.name.value, planned_at, tuple(sent))
         )
         return sent
@@ -1266,74 +1226,56 @@ def _decisions_document(answer: AgentAnswer) -> dict[str, object]:
     }
 
 
-class CyclesOfTenants:
-    """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
-
-    def __init__(self, engine: Engine, directory: PlannedFlowsPort) -> None:
-        self._engine = engine
-        self._directory = directory
-
-    def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
-        return self._of(flow_id).claim(flow_id, planned_at)
-
-    def record(self, record: CycleRecord) -> None:
-        self._of(record.flow_id).record(record)
-
-    def _of(self, flow_id: UUID) -> SqlAlchemyCycleRepositoryAdapter:
-        return SqlAlchemyCycleRepositoryAdapter(self._engine, self._directory.tenant_of(flow_id))
+type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, Order]
+type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
 
 
-@dataclass(frozen=True, slots=True)
-class CycleRuntime:
-    """Where the worker finds the flows to plan, what keeps each cycle unique and alone, and how a cycle runs."""
-
-    scheduled: TenantScheduledFlowsPort
-    guards: CycleGuards
-    launcher: CycleLauncherPort
-
-
-type WorkerCycles = RunDueCyclesUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, Order]
-
-
-def run_due_cycles(
-    directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
-) -> WorkerCycles:
-    """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
+def run_cycle_for(
+    ports_of: CyclePortsOf,
+    services: CycleServices,
+    cycles_of: Callable[[TenantId], CycleRepositoryPort],
+    lock: FlowLockPort,
+    tenant_id: TenantId,
+) -> WorkerCycle:
+    """The cycle of a flow of the tenant, every step on the adapters of that tenant (ADR 0041, ADR 0042)."""
+    ports = ports_of(tenant_id)
     steps = CycleSteps(
-        flow_state=FlowStateFromFlows(directory, ports_of),
-        sources=SourceCollector(SourcesFromSources(ports_of, services), ThreadPoolConcurrentCallsAdapter()),
+        flow_state=FlowStateFromFlows(ports),
+        sources=SourceCollector(SourcesFromSources(ports, services), ThreadPoolConcurrentCallsAdapter()),
         context=ContextFromAgent(services.clock),
-        agent=AgentFromAgent(ports_of, services),
+        agent=AgentFromAgent(ports, services),
         risk=RiskFromFlows(services.exchange_limits),
-        orders=OrdersFromOrders(ports_of),
+        orders=OrdersFromOrders(ports),
         journal=CycleJournalFromContexts(services.environment),
     )
-    flows = ScheduledFlowsFromFlows(runtime.scheduled, directory)
-    return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, runtime.guards), runtime.launcher, services.clock)
+    guards = CycleGuards(
+        cycles=cycles_of(tenant_id),
+        lock=lock,
+        pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
+        clock=services.clock,
+        failures=ports.cycle_failure,
+    )
+    return RunCycleUseCase(steps, guards)
 
 
-def record_actual_prices(directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
+def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
     """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
     record = RecordActualPricesOfTenantsUseCase(
-        services.prices, directory.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
+        services.prices, planned.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
     )
     record.execute(RecordActualPricesCommand(services.clock.now()))
 
 
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
-    directory = ThreadsPlannedFlowsAdapter()
-    guards = CycleGuards(
-        cycles=CyclesOfTenants(engine, directory),
-        lock=SqlAlchemyFlowLockAdapter(engine),
-        pause=FlowPauseFromFlows(directory, ports_of),
-        clock=services.clock,
-        failures=TellCycleFailureUseCase(directory, lambda tenant_id: ports_of(tenant_id).cycle_failure),
+    planned = ThreadsPlannedFlowsAdapter()
+    cycles_of = partial(SqlAlchemyCycleRepositoryAdapter, engine)
+    run_cycle_of = partial(run_cycle_for, ports_of, services, cycles_of, SqlAlchemyFlowLockAdapter(engine))
+    run_due = RunDueCyclesUseCase(
+        SqlAlchemyScheduledFlowsAdapter(engine), planned, run_cycle_of, ThreadCycleLauncherAdapter(), services.clock
     )
-    runtime = CycleRuntime(SqlAlchemyScheduledFlowsAdapter(engine), guards, ThreadCycleLauncherAdapter())
-    run_due = run_due_cycles(directory, ports_of, services, runtime)
 
     def plan_round() -> None:
         run_due.execute()
-        record_actual_prices(directory, ports_of, services)
+        record_actual_prices(planned, ports_of, services)
 
     return CyclePolling(plan_round)

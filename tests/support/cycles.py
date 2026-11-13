@@ -5,15 +5,18 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
+from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.flows.run_cycle import CycleGuards, CycleSteps, RunCycleCommand, RunCycleUseCase
 from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.source_collector import SourceCollector
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
+from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.cycles import (
     ACTIVE,
     PAUSED,
+    TENANT,
     Failures,
     FakeAgentAdapter,
     FakeClockAdapter,
@@ -57,6 +60,8 @@ class Cycles:
         self.failure_notices = RecordedCycleFailuresAdapter()
         self.launcher = ThreadCycleLauncherAdapter()
         self.raised: AutotradingError | None = None
+        self.planned = ThreadsPlannedFlowsAdapter()
+        self.cycle_tenants: list[TenantId] = []
         self.executors = [self._executor()]
 
     def run_cycle(self) -> RunCycleUseCase:
@@ -69,7 +74,13 @@ class Cycles:
         )
 
     def _executor(self) -> RunDueCyclesUseCase:
-        return RunDueCyclesUseCase(self.flows, self.run_cycle(), self.launcher, self.clock)
+        run_cycle = self.run_cycle()
+
+        def run_cycle_of(tenant_id: TenantId) -> RunCycleUseCase:
+            self.cycle_tenants.append(tenant_id)
+            return run_cycle
+
+        return RunDueCyclesUseCase(self.flows, self.planned, run_cycle_of, self.launcher, self.clock)
 
     def add_executor(self) -> None:
         self.executors.append(self._executor())
@@ -81,9 +92,12 @@ class Cycles:
         anchor: str = "10:00:00",
         sources: tuple[str, ...] = (),
         flow_id: UUID | None = None,
+        *,
+        tenant_id: TenantId = TENANT,
     ) -> None:
         schedule = CycleSchedule(at(anchor), timedelta(minutes=minutes))
-        self.flows.flows[uuid4() if flow_id is None else flow_id] = FakeFlow(name, schedule, sources)
+        flow = FakeFlow(name, schedule, sources, tenant_id=tenant_id)
+        self.flows.flows[uuid4() if flow_id is None else flow_id] = flow
 
     def id_of(self, name: str) -> UUID:
         return next(flow_id for flow_id, flow in self.flows.flows.items() if flow.name == name)
