@@ -44,8 +44,8 @@ from autotrading.bootstrap import (
     TenantCyclePorts,
     WorkerExchanges,
     WorkerSettings,
-    WorkerUseCaseFactory,
     activity_readers_for,
+    cycle_ports,
     exchanges_for,
     executions_readers_for,
     order_exchanges_for,
@@ -478,7 +478,7 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
     assert bridge.update(world.flow.id.value, ()) == bridge.read(world.flow.id.value).state
 
 
-# WorkerUseCaseFactory.cycle_ports_for
+# cycle_ports
 
 
 def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
@@ -491,7 +491,7 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
         accounts,
     )
     messenger = FakeMessengerAdapter()
-    worker = WorkerUseCaseFactory(
+    worker = cycle_ports(
         create_engine("sqlite://"),
         SodiumCredentialOpenerAdapter({}),
         exchanges,
@@ -499,7 +499,7 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
         messenger,
     )
 
-    ports = worker.cycle_ports_for(TenantId.new())
+    ports = worker(TenantId.new())
 
     assert isinstance(ports.reconcile_for_cycle, ReconcileAccountForCycleUseCase)
     assert isinstance(ports.openings, SqlAlchemyFlowOpeningsAdapter)
