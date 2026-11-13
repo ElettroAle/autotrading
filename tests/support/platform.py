@@ -10,6 +10,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY a
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
@@ -35,7 +36,6 @@ from autotrading.application.verification.run_exchange_verification import (
 )
 from autotrading.bootstrap import (
     FlowPositionsFromOrders,
-    FlowSummariesFromFlows,
     OrderExecutionFromOrders,
 )
 from autotrading.domain.accounts.account import Account
@@ -80,7 +80,6 @@ from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
-    FakeProviderKeyVerifierAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
     ProviderKeyVault,
@@ -115,7 +114,6 @@ class Platform:
         self.runs: dict[TenantId, InMemoryVerificationRunRepositoryAdapter] = {}
         self.provider_keys = ProviderKeyStore()
         self.key_vault: ProviderKeyVault = {}
-        self.providers = FakeProviderKeyVerifierAdapter()
         self.flows = FlowStore()
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
@@ -185,7 +183,6 @@ class Platform:
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
-            provider_key_verifier=self.providers,
             provider_key_usage=flows,
             model_catalog=InMemoryModelCatalogAdapter(self.model_catalog),
             flows=flows,
@@ -213,7 +210,7 @@ class Platform:
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
-            flow_summaries=FlowSummariesFromFlows(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
+            flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             environment="dev",
         )
         return TenantUseCases.on(tenant_id, ports)

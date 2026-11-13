@@ -6,8 +6,6 @@ from autotrading.application.agent.errors import (
     ProviderKeyAlreadyRegisteredError,
     ProviderKeyInUseError,
     ProviderKeyNotFoundError,
-    ProviderRejectedKeyError,
-    ProviderUnavailableError,
     UnsupportedProviderError,
 )
 from autotrading.application.agent.list_models import ListModelsUseCase, ProviderListing
@@ -31,7 +29,6 @@ from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     FakeProviderKeyUsageAdapter,
-    FakeProviderKeyVerifierAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
     ProviderKeyVault,
@@ -56,11 +53,9 @@ class Keys:
         self.store = ProviderKeyStore()
         self.vault: ProviderKeyVault = {}
         self.repository = InMemoryProviderKeyRepositoryAdapter(self.store, self.tenant_id)
-        self.verifier = FakeProviderKeyVerifierAdapter()
         self.usage = FakeProviderKeyUsageAdapter()
         self.services = ProviderKeyServices(
             InMemoryModelCatalogAdapter(CATALOG),
-            self.verifier,
             FakeProviderKeySealerAdapter(self.tenant_id, self.vault),
         )
 
@@ -89,8 +84,7 @@ def keys() -> Keys:
     return Keys()
 
 
-def test_a_key_the_provider_accepts_is_saved_sealed_for_the_tenant(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
+def test_a_key_is_saved_sealed_for_the_tenant_without_asking_the_provider(keys: Keys) -> None:
 
     assert keys.register(" OpenRouter ", "K-OR") == OPENROUTER
 
@@ -100,41 +94,19 @@ def test_a_key_the_provider_accepts_is_saved_sealed_for_the_tenant(keys: Keys) -
     assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR")
 
 
-def test_a_key_the_provider_refuses_is_not_saved(keys: Keys) -> None:
-    with pytest.raises(ProviderRejectedKeyError, match=r"^chiave rifiutata dal fornitore: openrouter$"):
-        keys.register("openrouter", "K-BAD")
-
-    assert keys.store.keys == []
-
-
-def test_a_provider_out_of_reach_saves_nothing(keys: Keys) -> None:
-    keys.verifier.unreachable.add(OPENROUTER)
-
-    with pytest.raises(ProviderUnavailableError) as raised:
-        keys.register("openrouter", "K-OR")
-
-    assert raised.value.status_code == 503
-    assert keys.store.keys == []
-
-
-def test_a_provider_outside_the_catalog_is_refused_before_asking_it(keys: Keys) -> None:
+def test_a_provider_outside_the_catalog_is_refused(keys: Keys) -> None:
     with pytest.raises(UnsupportedProviderError, match=r"^fornitore non supportato: openai$") as raised:
         keys.register("openai", "K-OA")
 
     assert raised.value.details == {"supported": ["anthropic", "openrouter"]}
-    assert keys.verifier.checked == []
 
 
-def test_an_empty_key_is_refused_before_asking_the_provider(keys: Keys) -> None:
+def test_an_empty_key_is_refused(keys: Keys) -> None:
     with pytest.raises(ProviderKeyRequiredError):
         keys.register("openrouter", "  ")
 
-    assert keys.verifier.checked == []
 
-
-def test_a_second_key_for_the_same_provider_is_refused_before_asking_it(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
-    keys.verifier.accept("openrouter", "K-OR2")
+def test_a_second_key_for_the_same_provider_is_refused(keys: Keys) -> None:
     keys.register("openrouter", "K-OR")
 
     with pytest.raises(
@@ -142,13 +114,10 @@ def test_a_second_key_for_the_same_provider_is_refused_before_asking_it(keys: Ke
     ):
         keys.register("openrouter", "K-OR2")
 
-    assert keys.verifier.checked == [OPENROUTER]
     assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR")
 
 
-def test_the_replacement_puts_the_new_accepted_key_in_place(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
-    keys.verifier.accept("openrouter", "K-OR2")
+def test_the_replacement_puts_the_new_key_in_place(keys: Keys) -> None:
     keys.register("openrouter", "K-OR")
 
     assert keys.replace("openrouter", "K-OR2") == OPENROUTER
@@ -157,27 +126,13 @@ def test_the_replacement_puts_the_new_accepted_key_in_place(keys: Keys) -> None:
     assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR2")
 
 
-def test_a_refused_replacement_keeps_the_old_key(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
-    keys.register("openrouter", "K-OR")
-
-    with pytest.raises(ProviderRejectedKeyError):
-        keys.replace("openrouter", "K-BAD")
-
-    assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR")
-
-
 def test_a_replacement_without_a_registered_key_is_refused(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
 
     with pytest.raises(ProviderKeyNotFoundError, match=r"^nessuna chiave registrata per il fornitore: openrouter$"):
         keys.replace("openrouter", "K-OR")
 
-    assert keys.verifier.checked == []
-
 
 def test_the_removal_deletes_the_key(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
     keys.register("openrouter", "K-OR")
 
     keys.remove("OpenRouter")
@@ -186,7 +141,6 @@ def test_the_removal_deletes_the_key(keys: Keys) -> None:
 
 
 def test_the_removal_is_refused_while_flows_that_are_not_stopped_use_the_provider(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
     keys.register("openrouter", "K-OR")
     keys.usage.uses = [
         ModelUse("beta", "openrouter", running=True),
@@ -202,7 +156,6 @@ def test_the_removal_is_refused_while_flows_that_are_not_stopped_use_the_provide
 
 
 def test_flows_stopped_or_on_another_provider_leave_the_key_removable(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
     keys.register("openrouter", "K-OR")
     keys.usage.uses = [ModelUse("fermo", "openrouter", running=False), ModelUse("altro", "anthropic", running=True)]
 
@@ -217,8 +170,6 @@ def test_the_removal_of_a_key_never_registered_is_refused(keys: Keys) -> None:
 
 
 def test_the_list_names_the_providers_and_never_the_keys(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
-    keys.verifier.accept("anthropic", "K-AN")
     keys.register("openrouter", "K-OR")
     keys.register("anthropic", "K-AN")
 
@@ -226,7 +177,6 @@ def test_the_list_names_the_providers_and_never_the_keys(keys: Keys) -> None:
 
 
 def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys: Keys) -> None:
-    keys.verifier.accept("openrouter", "K-OR")
     keys.register("openrouter", "K-OR")
 
     listing = ListModelsUseCase(InMemoryModelCatalogAdapter(CATALOG), keys.repository).execute()

@@ -1,12 +1,8 @@
-import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import timedelta
 from decimal import Decimal
 from functools import partial
 from uuid import UUID
-
-import httpx
 
 from autotrading.adapters.configuration.source import PROCESS_ENVIRONMENT, ConfigurationSource
 from autotrading.adapters.inbound.api.app import ApiApplication
@@ -20,7 +16,6 @@ from autotrading.adapters.inbound.api.worker import (
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
-from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
@@ -77,9 +72,6 @@ from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolCon
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.adapters.outbound.worker.composition import WorkerAdaptersOfTenant, worker_adapters
-from autotrading.application.accounts.ports import (
-    AccountRepositoryPort,
-)
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
@@ -96,7 +88,7 @@ from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps, GraphCheckpoints
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
-from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.notify_unattributable import (
     NotifyUnattributableUseCase,
@@ -117,8 +109,6 @@ from autotrading.application.flows.ports import (
     FlowModelsPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
-    FlowSummary,
-    FlowTimingPort,
     PlannedFlowsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
@@ -203,9 +193,6 @@ from autotrading.application.verification.run_exchange_verification import (
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
-from autotrading.domain.flows.cycle_schedule import CycleSchedule
-from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.orders.direction import Direction
@@ -218,44 +205,6 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
-
-PROVIDER_TIMEOUT_SECONDS = 10.0
-
-operations = logging.getLogger("autotrading.bootstrap")
-
-
-class FlowSummariesFromFlows:
-    """Bridges the flows and accounts contexts to the consultation of the cycles (R1.7.3, ADR 0042).
-
-    The schedule of a flow starts at its last start or resume, the anchor the database stamps on the flow.
-    """
-
-    def __init__(self, flows: FlowRepositoryPort, accounts: AccountRepositoryPort, timing: FlowTimingPort) -> None:
-        self._flows = flows
-        self._accounts = accounts
-        self._timing = timing
-
-    def in_use(self) -> list[FlowSummary]:
-        timings = self._timing.timings()
-        names = {account.id.value: account.name.value for account in self._accounts.list()}
-        return [
-            _summary_of(flow, names.get(flow.account_id, ""), timings.get(flow.id, UNSTAMPED))
-            for flow in ListFlowsUseCase(self._flows).execute()
-        ]
-
-
-def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
-    configuration = flow.configuration
-    interval = timedelta(minutes=configuration.cycle_interval.minutes)
-    return FlowSummary(
-        flow_id=flow.id.value,
-        name=flow.name.value,
-        account=account,
-        status=flow.status.value,
-        pause_reason=timing.pause_reason,
-        model=configuration.model.name,
-        schedule=CycleSchedule.planned(flow.status.runs_cycles, timing.anchor, interval),
-    )
 
 
 class FlowPositionsFromOrders:
@@ -328,11 +277,10 @@ def tenant_use_cases(
     ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
-    providers: tuple[httpx.Client, ModelCatalogPort, FlowModelsPort],
+    providers: tuple[ModelCatalogPort, FlowModelsPort],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
-    verification_client, model_catalog, flow_models = providers
-    provider_key_verifier = HttpxProviderKeyVerifierAdapter(verification_client)
+    model_catalog, flow_models = providers
     credential_sealer, provider_key_sealer = sealers
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
@@ -363,7 +311,6 @@ def tenant_use_cases(
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
-            provider_key_verifier=provider_key_verifier,
             provider_key_usage=flows,
             model_catalog=model_catalog,
             flows=flows,
@@ -387,7 +334,7 @@ def tenant_use_cases(
             closed_positions=closed_positions,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
             flow_directory=flows,
-            flow_summaries=FlowSummariesFromFlows(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
+            flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             environment=environment,
         )
         return TenantUseCases.on(tenant_id, ports)
@@ -542,7 +489,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
         libsodium_sealing_adapters(source),
         source.environment(),
         worker_adapters(source),
-        (httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS), catalog, catalog),
+        (catalog, catalog),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
