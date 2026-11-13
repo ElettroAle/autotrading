@@ -18,32 +18,6 @@ class UnsupportedProviderError(ApplicationError):
         return {"supported": list(self.supported)}
 
 
-class ProviderRejectedKeyError(ApplicationError):
-    status_code = 422
-
-    def __init__(self, provider: ProviderName) -> None:
-        super().__init__(f"chiave rifiutata dal fornitore: {provider.value}")
-        self.provider = provider
-
-
-class ProviderUnavailableError(ApplicationError):
-    status_code = 503
-
-    def __init__(self, provider: ProviderName) -> None:
-        super().__init__(f"fornitore non raggiungibile, riprovare: {provider.value}")
-        self.provider = provider
-
-
-class ProviderNotVerifiableError(ApplicationError):
-    """A provider of the catalog without a way to verify its keys: a defect of the configuration (ADR 0029)."""
-
-    status_code = 500
-
-    def __init__(self, provider: ProviderName) -> None:
-        super().__init__(f"verifica della chiave non disponibile per il fornitore: {provider.value}")
-        self.provider = provider
-
-
 class ProviderKeyAlreadyRegisteredError(ApplicationError):
     status_code = 409
 
