@@ -172,6 +172,7 @@ modules = [
     "autotrading.adapters.outbound.json",
     "autotrading.adapters.outbound.litellm",
     "autotrading.adapters.outbound.oidc",
+    "autotrading.adapters.outbound.openrouter",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
 ]

@@ -100,6 +100,18 @@ class ModelCallPort(Protocol):
         ...
 
 
+class ModelGatewayPort(Protocol):
+    """Abstract factory of one model gateway: the call and the catalog of the same models, one family (ADR 0109).
+
+    Each gateway serves the models of its own catalog; the use case uses the one whose catalog holds the model the
+    flow chose.
+    """
+
+    def model_call(self) -> ModelCallPort: ...
+
+    def model_catalog(self) -> ModelCatalogPort: ...
+
+
 class QuestionPositionPort(Protocol):
     """An open position of the flow, as the cycle of the flow hands it to the agent."""
 
