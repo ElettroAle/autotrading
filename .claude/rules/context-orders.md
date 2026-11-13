@@ -30,3 +30,5 @@ paths:
 ## Porte del contesto
 
 `ExchangePort` (ordini, ricerca per identificativo, metadati degli asset), `OrderRepositoryPort`.
+Gli ordini approvati di un ciclo arrivano da `flows` come `CycleOrdersPort` con elementi `ApprovedOrderPort`;
+`ExecuteCycleOrdersUseCase` li invia e li segue (ADR 0098).

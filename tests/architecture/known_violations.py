@@ -15,8 +15,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
         "bootstrap.py:CycleJournalFromContexts.call_cost": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowStateFromFlows._snapshot": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:OrdersFromOrders.execute": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_authentication": BUG_STRICTER_RULES,
         "bootstrap.py:_credentials_private_key": BUG_STRICTER_RULES,
         "bootstrap.py:_credentials_public_key": BUG_STRICTER_RULES,
@@ -40,15 +38,11 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     },
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:ApiExchanges": BUG_STRICTER_RULES,
         "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:CycleContext": BUG_STRICTER_RULES,
         "bootstrap.py:CycleDecisions": BUG_STRICTER_RULES,
-        "bootstrap.py:CycleFlow": BUG_STRICTER_RULES,
-        "bootstrap.py:CycleOrder": BUG_STRICTER_RULES,
         "bootstrap.py:CycleServices": BUG_STRICTER_RULES,
         "bootstrap.py:FlowPositionsFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:FlowSummariesFromFlows": BUG_STRICTER_RULES,
@@ -68,8 +62,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     },
     Rule.NO_BRIDGES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:FlowPositionsFromOrders": BUG_STRICTER_RULES,

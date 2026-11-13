@@ -49,6 +49,15 @@ class FlowCredentialsNotOpenedError(ApplicationError):
         super().__init__("credenziali del conto non leggibili")
 
 
+class FlowCredentialsRefusedError(ApplicationError):
+    """The exchange refuses the credentials a cycle proves: the cycle names the account in the error it raises."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("credenziali rifiutate dall'exchange")
+
+
 class FlowExchangeUnavailableError(ApplicationError):
     status_code = 503
 

@@ -14,8 +14,8 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
-from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.application.agent.errors import ModelCreditExhaustedError
+from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
@@ -24,9 +24,9 @@ from autotrading.application.flows.errors import (
 )
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
-from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
+from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -37,8 +37,6 @@ from autotrading.application.orders.follow_flow_orders import (
     FollowFlowOrdersUseCase,
 )
 from autotrading.bootstrap import (
-    CycleFlow,
-    FlowStateFromFlows,
     TenantCyclePorts,
     WorkerExchanges,
     WorkerSettings,
@@ -53,6 +51,7 @@ from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
+from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import PositionOpening
@@ -103,9 +102,6 @@ class World:
         self.cycles.platform.chats[self.tenant_id] = LinkedChat(self.tenant_id, CHAT)
         self.openings = ScriptedOpenings(OPENING)
         self.closed = ClosedPositionStore()
-
-    def flow_state(self) -> FlowStateFromFlows:
-        return FlowStateFromFlows(self.ports_of(self.tenant_id))
 
     def pause(self, error: AutotradingError) -> None:
         """As the cycle of the worker pauses the flows a permanent error involves (bootstrap.run_cycle_for)."""
@@ -324,11 +320,11 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
     assert world.received == ["alfa: in pausa, registro delle esecuzioni incompleto"]
 
 
-# FlowStateFromFlows.read: the beginning of the flow
+# StartCycleFlowUseCase: the beginning of the flow
 
 
 def started_at(world: World) -> datetime:
-    snapshot = world.flow_state().read(world.flow.id.value, ANCHOR)
+    snapshot = world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
     assert isinstance(snapshot.state, CycleFlow)
     return snapshot.state.started_at
 
@@ -345,7 +341,7 @@ def test_a_flow_not_stamped_yet_began_at_the_anchor_of_its_cycles(world: World) 
     assert started_at(world) == at("10:00")
 
 
-# FlowStateFromFlows.read: the position the flow expects (Bug 155)
+# StartCycleFlowUseCase: the position the flow expects (Bug 155)
 
 
 def test_a_position_the_flow_does_not_expect_stops_the_cycle_at_its_start(world: World) -> None:
@@ -355,7 +351,7 @@ def test_a_position_the_flow_does_not_expect_stops_the_cycle_at_its_start(world:
     world.cycles.platform.ledger.expect(world.flow.id, "BTC", Decimal("0.1"))
 
     with pytest.raises(FlowPositionMismatchError) as raised:
-        world.flow_state().read(world.flow.id.value, ANCHOR)
+        world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
 
     assert str(raised.value) == "posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
     assert raised.value.permanent
@@ -364,7 +360,7 @@ def test_a_position_the_flow_does_not_expect_stops_the_cycle_at_its_start(world:
 def test_the_state_at_the_end_of_the_cycle_is_read_whatever_the_position(world: World) -> None:
     world.cycles.platform.activity_reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
 
-    state = world.flow_state().update(world.flow.id.value, ANCHOR, ())
+    state = world.ports.end_cycle.execute(world.flow.id.value, ANCHOR, ())
 
     assert isinstance(state, CycleFlow)
 
@@ -373,7 +369,7 @@ def test_without_the_new_executions_the_positions_are_compared_at_the_next_cycle
     world.cycles.platform.activity_reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
     world.cycles.platform.activity_reader.executions_reachable = False
 
-    snapshot = world.flow_state().read(world.flow.id.value, ANCHOR)
+    snapshot = world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
 
     assert isinstance(snapshot.state, CycleFlow)
 
@@ -388,7 +384,7 @@ def test_an_execution_published_after_the_first_reading_does_not_stop_the_cycle(
         a_fill("BTC", order, size=Decimal("0.1"), start_position=Decimal("0.1"), executed_at=CLOSED_AT)
     ]
 
-    snapshot = world.flow_state().read(world.flow.id.value, ANCHOR)
+    snapshot = world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
 
     assert isinstance(snapshot.state, CycleFlow)
 
@@ -404,7 +400,7 @@ def test_a_difference_the_new_executions_do_not_explain_still_stops_the_cycle(wo
     ]
 
     with pytest.raises(FlowPositionMismatchError, match="attesa 0,2, sul conto 0,3"):
-        world.flow_state().read(world.flow.id.value, ANCHOR)
+        world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
 
 
 def test_a_difference_is_not_a_pause_when_the_new_executions_cannot_be_read_again(world: World) -> None:
@@ -414,14 +410,14 @@ def test_a_difference_is_not_a_pause_when_the_new_executions_cannot_be_read_agai
     reader.unreachable_after_first_reading = True
 
     with pytest.raises(FlowExchangeUnavailableError):
-        world.flow_state().read(world.flow.id.value, ANCHOR)
+        world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
 
 
-# FlowStateFromFlows.update: the reconciliation of the account
+# EndCycleFlowUseCase: the reconciliation of the account
 
 
 def update(world: World) -> object:
-    return world.flow_state().update(world.flow.id.value, ANCHOR, ())
+    return world.ports.end_cycle.execute(world.flow.id.value, ANCHOR, ())
 
 
 def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: World) -> None:
@@ -472,9 +468,12 @@ def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the
 
 
 def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world: World) -> None:
-    bridge = world.flow_state()
+    ports = world.ports
 
-    assert bridge.update(world.flow.id.value, ANCHOR, ()) == bridge.read(world.flow.id.value, ANCHOR).state
+    assert (
+        ports.end_cycle.execute(world.flow.id.value, ANCHOR, ())
+        == ports.start_cycle.execute(world.flow.id.value, ANCHOR).state
+    )
 
 
 # cycle_ports
@@ -488,6 +487,7 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
         accounts,
+        accounts,
     )
     messenger = FakeMessengerAdapter()
     worker = cycle_ports(
@@ -500,10 +500,10 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
 
     ports = worker(TenantId.new())
 
-    assert isinstance(ports.reconcile_for_cycle, ReconcileAccountForCycleUseCase)
+    assert isinstance(ports.start_cycle, StartCycleFlowUseCase)
+    assert isinstance(ports.end_cycle, EndCycleFlowUseCase)
     assert isinstance(ports.openings, SqlAlchemyFlowOpeningsAdapter)
     assert isinstance(ports.closed_positions, SqlAlchemyClosedPositionRepositoryAdapter)
     assert isinstance(ports.follow_flow_orders, FollowFlowOrdersUseCase)
     assert isinstance(ports.cycle_failure, NotifyCycleFailureUseCase)
     assert isinstance(ports.notify, NotifyUseCase)
-    assert isinstance(ports.timing, SqlAlchemyFlowTimingAdapter)

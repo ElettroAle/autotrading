@@ -9,12 +9,13 @@ from autotrading.application.flows.ports import (
     AgentPort,
     ClockPort,
     ContextPort,
+    CycleEndPort,
     CycleFailureNoticePort,
     CycleJournalPort,
     CycleRepositoryPort,
+    CycleStartPort,
     FlowLockPort,
     FlowPausePort,
-    FlowStatePort,
     OrderPort,
     RiskPort,
     SourceRequest,
@@ -50,12 +51,13 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
     sources, the context, the decisions, the approved orders and their executions (ADR 0082).
     """
 
-    flow_state: FlowStatePort[S, E]
+    start: CycleStartPort[S]
     sources: SourceCollector[S, D]
     context: ContextPort[S, D, C]
     agent: AgentPort[C, A]
     risk: RiskPort[S, A, O]
     orders: OrderPort[O, E]
+    end: CycleEndPort[E]
     journal: CycleJournalPort
 
 
@@ -139,7 +141,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         anchor = progress.command.schedule.anchor
         steps = self._steps
         snapshot = progress.run(
-            CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id, anchor), lambda read: read.state
+            CycleStep.READ_FLOW_STATE, lambda: steps.start.execute(flow_id, anchor), lambda read: read.state
         )
         readings, absent = progress.run(
             CycleStep.COLLECT_SOURCES,
@@ -158,7 +160,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         executions = progress.run(
             CycleStep.ORDER_EXECUTION, lambda: steps.orders.execute(flow_id, planned_at, review.orders)
         )
-        progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.flow_state.update(flow_id, anchor, executions))
+        progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.end.execute(flow_id, anchor, executions))
 
     def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:
         failure = CycleFailure(progress.current, type(error).__name__, str(error))

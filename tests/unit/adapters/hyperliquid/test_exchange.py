@@ -18,6 +18,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     HyperliquidSdkAdapter,
 )
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.flows.errors import FlowCredentialsRefusedError, FlowExchangeUnavailableError
 from autotrading.application.verification.errors import (
     VerificationCredentialsRejectedError,
     VerificationExchangeUnavailableError,
@@ -26,6 +27,9 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.flows.cycle_access import CycleAccess
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
+from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
 
@@ -235,3 +239,32 @@ def test_an_exchange_that_does_not_answer_is_a_failed_verification_step() -> Non
         HyperliquidExchangeAdapter(BASE_URL, sdk).verification_reading(VERIFICATION_ACCESS)
 
     assert raised.value.message == "exchange non raggiungibile, riprovare"
+
+
+CYCLE_ACCESS = CycleAccess(ADDRESS, WALLET.key.hex())
+
+
+def test_the_cycle_reads_margin_and_positions_proving_the_signer() -> None:
+    sdk = FakeSdk(state=STATE | {"assetPositions": [{"type": "oneWay", "position": LONG_BTC}]})
+
+    account = HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
+
+    position = CyclePosition(
+        "BTC", TradeSide.LONG, Decimal("0.02"), 2, Decimal("60000.0"), Decimal("12.5"), Decimal("31000.0")
+    )
+    assert account == CycleAccount("USDC", Decimal("1000.5"), (position,))
+    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+
+
+def test_a_signer_refused_is_a_refusal_of_the_credentials_of_the_flow() -> None:
+    sdk = FakeSdk(cancel_answer={"status": "err", "response": f"User or API Wallet {ADDRESS} does not exist."})
+
+    with pytest.raises(FlowCredentialsRefusedError, match=r"^credenziali rifiutate dall'exchange$"):
+        HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
+
+
+def test_an_exchange_that_does_not_answer_the_cycle_is_unavailable() -> None:
+    sdk = FakeSdk(failure=ServerError(502, "bad gateway"))
+
+    with pytest.raises(FlowExchangeUnavailableError, match=r"^exchange non raggiungibile, riprovare$"):
+        HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
