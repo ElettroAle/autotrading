@@ -75,7 +75,7 @@ def test_the_worker_api_refuses_a_caller_without_the_token_of_the_machine(tmp_pa
     source = ConfigurationSource({"WORKER_TOKEN_FILE": str(token)})
     client = TestClient(worker_api_adapters(source, _no_worker_use_cases, None, None, None))
 
-    response = client.get("/bot", headers={"Authorization": "Bearer wrong"})
+    response = client.get("/bot/start-link", headers={"Authorization": "Bearer wrong"})
 
     assert response.status_code == 401
 
