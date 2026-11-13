@@ -649,9 +649,23 @@ class CycleCheckpointsPort[K = object](Protocol):
         ...
 
 
-class CycleLauncherPort(Protocol):
-    def launch(self, task: Callable[[], object]) -> None:
-        """Runs the cycle apart from the others, so a slow flow never delays another (R1.2.1)."""
+@dataclass(frozen=True, slots=True)
+class CycleJob:
+    """The cycles of one active flow: run at every instant of its schedule (R1.2.1).
+
+    The key changes with the tenant, the flow, the anchor and the interval: a resumed flow or a new interval is a new
+    job, and the job of a flow no longer active disappears.
+    """
+
+    key: str
+    schedule: CycleSchedule
+    run: Callable[[], object]
+
+
+class CycleSchedulerPort(Protocol):
+    def keep(self, jobs: Sequence[CycleJob]) -> None:
+        """Runs each job at the instants of its schedule, at once when it is new, each apart from the others so a
+        slow flow never delays another; drops the jobs not given."""
         ...
 
 

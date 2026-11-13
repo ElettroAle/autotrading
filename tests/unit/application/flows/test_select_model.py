@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
-from autotrading.application.flows.errors import InvalidFlowSettingError
+from autotrading.application.flows.errors import FlowModelCatalogUnavailableError, InvalidFlowSettingError
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
@@ -30,7 +30,7 @@ class Models:
         self.platform = Platform()
         self.tenant_id = self.platform.tenant_of("anna")
         self.keys = InMemoryProviderKeyRepositoryAdapter(self.platform.provider_keys, self.tenant_id)
-        self.use_case = SelectModelUseCase(InMemoryModelCatalogAdapter(CATALOG), self.keys)
+        self.use_case = SelectModelUseCase({"models": InMemoryModelCatalogAdapter(CATALOG)}, self.keys)
 
     def register(self, provider: str) -> None:
         self.platform.use_cases_of("anna").register_provider_key.execute(RegisterProviderKeyCommand(provider, "K-TEST"))
@@ -84,3 +84,36 @@ def test_a_model_of_a_provider_without_key_is_refused() -> None:
 
     with pytest.raises(InvalidFlowSettingError, match=r"^nessuna chiave registrata per il fornitore: anthropic$"):
         models.use_case.execute("anthropic/claude-sonnet", {})
+
+
+def two_gateways(*, second_available: bool) -> SelectModelUseCase:
+    models = Models()
+    models.register("anthropic")
+    models.register("openrouter")
+    first = InMemoryModelCatalogAdapter(ModelCatalog((CATALOG.find("anthropic/claude-sonnet"),)))
+    second = InMemoryModelCatalogAdapter(
+        ModelCatalog((CATALOG.find("openrouter/deepseek-chat"),)), available=second_available
+    )
+    return SelectModelUseCase({"first": first, "second": second}, models.keys)
+
+
+def test_the_model_is_found_in_the_catalog_of_the_gateway_that_offers_it() -> None:
+    selection = two_gateways(second_available=True).execute("openrouter/deepseek-chat", {})
+
+    assert selection.name == "openrouter/deepseek-chat"
+
+
+def test_an_unavailable_catalog_does_not_hide_the_models_of_the_others() -> None:
+    selection = two_gateways(second_available=False).execute("anthropic/claude-sonnet", {})
+
+    assert selection.name == "anthropic/claude-sonnet"
+
+
+def test_a_model_only_an_unavailable_catalog_could_offer_is_an_unavailable_catalog() -> None:
+    with pytest.raises(FlowModelCatalogUnavailableError):
+        two_gateways(second_available=False).execute("openrouter/deepseek-chat", {})
+
+
+def test_a_model_no_catalog_offers_is_not_available() -> None:
+    with pytest.raises(InvalidFlowSettingError, match=r"^modello non disponibile: openai/x$"):
+        two_gateways(second_available=True).execute("openai/x", {})

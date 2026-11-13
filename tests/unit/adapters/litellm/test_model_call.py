@@ -10,7 +10,6 @@ from openai import OpenAI
 
 from autotrading.adapters.outbound.litellm.model_call import (
     LiteLlmModelCallAdapter,
-    litellm_model_call,
 )
 from autotrading.application.agent.errors import (
     ModelCreditExhaustedError,
@@ -97,68 +96,35 @@ def test_the_request_reaches_the_proxy_with_the_master_key_and_the_key_of_the_us
     assert proxy.sent["api_key"] == KEY.secret
 
 
-def test_openai_gets_a_json_answer_and_the_reasoning_effort() -> None:
+@pytest.mark.parametrize(
+    "model", ["anthropic/claude-sonnet-5-5", "openai/gpt-4.1-mini", "deepseek/deepseek-chat", "gemini/gemini-pro"]
+)
+def test_every_provider_gets_the_same_request_of_the_openai_api(model: str) -> None:
     proxy = Proxy()
+
+    call(proxy, model)
+
+    assert proxy.sent == {
+        "model": model,
+        "messages": SENT_MESSAGES,
+        "max_tokens": 2048,
+        "temperature": 0.7,
+        "response_format": {"type": "json_object"},
+        "reasoning_effort": "high",
+        "api_key": KEY.secret,
+    }
+
+
+def test_a_cost_the_provider_reports_is_the_cost_of_the_call() -> None:
+    proxy = Proxy(body={**REPLY, "usage": {**USAGE, "cost": 0.0031}})
 
     reply = call(proxy, "openai/gpt-4.1-mini")
 
-    assert reply == ModelReply(ANSWER, ModelUsage(2000, 500, None))
-    assert proxy.sent == {
-        "model": "openai/gpt-4.1-mini",
-        "messages": SENT_MESSAGES,
-        "max_tokens": 2048,
-        "temperature": 0.7,
-        "response_format": {"type": "json_object"},
-        "reasoning_effort": "high",
-        "api_key": KEY.secret,
-    }
-
-
-def test_deepseek_gets_a_json_answer_and_the_reasoning_effort() -> None:
-    proxy = Proxy()
-
-    call(proxy, "deepseek/deepseek-chat")
-
-    assert proxy.sent == {
-        "model": "deepseek/deepseek-chat",
-        "messages": SENT_MESSAGES,
-        "max_tokens": 2048,
-        "temperature": 0.7,
-        "response_format": {"type": "json_object"},
-        "reasoning_effort": "high",
-        "api_key": KEY.secret,
-    }
-
-
-def test_anthropic_gets_the_effort_of_its_output_and_no_thinking_budget() -> None:
-    proxy = Proxy()
-
-    call(proxy, "anthropic/claude-sonnet-5-5")
-
-    assert proxy.sent == {
-        "model": "anthropic/claude-sonnet-5-5",
-        "messages": SENT_MESSAGES,
-        "max_tokens": 2048,
-        "temperature": 0.7,
-        "output_config": {"effort": "high"},
-        "api_key": KEY.secret,
-    }
-
-
-def test_openrouter_gets_its_reasoning_object_and_reports_the_cost() -> None:
-    proxy = Proxy(body={**REPLY, "usage": {**USAGE, "cost": 0.0031}})
-
-    reply = call(proxy, "openrouter/deepseek/deepseek-chat")
-
     assert reply == ModelReply(ANSWER, ModelUsage(2000, 500, Decimal("0.0031")))
-    assert proxy.sent == {
-        "model": "openrouter/deepseek/deepseek-chat",
-        "messages": SENT_MESSAGES,
-        "max_tokens": 2048,
-        "temperature": 0.7,
-        "reasoning": {"effort": "high"},
-        "api_key": KEY.secret,
-    }
+
+
+def test_without_a_reported_cost_the_prices_of_the_catalog_apply() -> None:
+    assert call(Proxy(), "openai/gpt-4.1-mini") == ModelReply(ANSWER, ModelUsage(2000, 500, None))
 
 
 @pytest.mark.parametrize(("effort", "expected"), [("basso", "low"), ("medio", "medium"), ("alto", "high")])
@@ -170,7 +136,7 @@ def test_the_reasoning_levels_become_the_names_of_the_provider(effort: str, expe
     assert proxy.sent["reasoning_effort"] == expected
 
 
-@pytest.mark.parametrize("model", ["openai/gpt", "deepseek/deepseek-chat", "openrouter/x/y", "anthropic/claude"])
+@pytest.mark.parametrize("model", ["openai/gpt", "deepseek/deepseek-chat", "anthropic/claude"])
 def test_without_settings_the_defaults_apply(model: str) -> None:
     proxy = Proxy()
 
@@ -178,20 +144,11 @@ def test_without_settings_the_defaults_apply(model: str) -> None:
 
     sent = proxy.sent
     assert sent["max_tokens"] == 4096
-    assert not {"temperature", "reasoning_effort", "reasoning", "output_config"} & set(sent)
-
-
-def test_a_provider_without_a_field_of_its_own_takes_the_reasoning_effort_of_litellm() -> None:
-    proxy = Proxy()
-
-    call(proxy, "gemini/gemini-pro")
-
-    assert proxy.sent["reasoning_effort"] == "high"
-    assert "response_format" not in proxy.sent
+    assert not {"temperature", "reasoning_effort"} & set(sent)
 
 
 @pytest.mark.parametrize("status", [401, 403])
-@pytest.mark.parametrize("model", ["openrouter/x/y", "anthropic/claude", "openai/gpt", "deepseek/deepseek-chat"])
+@pytest.mark.parametrize("model", ["anthropic/claude", "openai/gpt", "deepseek/deepseek-chat"])
 def test_a_key_rejected_by_the_provider_is_a_permanent_error(status: int, model: str) -> None:
     proxy = refusal(status, f"litellm.AuthenticationError: Incorrect API key provided: {KEY.secret}{ROUTING_NOISE}")
 
@@ -212,7 +169,7 @@ def test_a_master_key_the_proxy_does_not_know_is_transient() -> None:
     assert not raised.value.permanent
 
 
-@pytest.mark.parametrize("model", ["openrouter/x/y", "deepseek/deepseek-chat"])
+@pytest.mark.parametrize("model", ["openai/gpt", "deepseek/deepseek-chat"])
 def test_payment_required_is_an_exhausted_credit(model: str) -> None:
     proxy = refusal(
         402, f'litellm.APIError: {{"error": {{"code": 402, "message": "Insufficient credits"}}}}{ROUTING_NOISE}'
@@ -281,7 +238,7 @@ def test_a_long_original_message_is_cut() -> None:
 
 def test_the_key_never_travels_in_a_transient_error() -> None:
     with pytest.raises(ModelUnavailableError) as raised:
-        call(refusal(500, f"upstream rejected header Bearer {KEY.secret}"), "openrouter/x/y")
+        call(refusal(500, f"upstream rejected header Bearer {KEY.secret}"), "openai/gpt")
 
     assert KEY.secret not in str(raised.value)
     assert raised.value.__cause__ is None
@@ -292,9 +249,9 @@ def test_a_timeout_is_transient() -> None:
         raise httpx2.ReadTimeout(TIMED_OUT, request=request)
 
     with pytest.raises(
-        ModelUnavailableError, match=r"^fornitore IA non raggiungibile: openrouter: tempo di risposta scaduto$"
+        ModelUnavailableError, match=r"^fornitore IA non raggiungibile: openai: tempo di risposta scaduto$"
     ):
-        adapter_on(slow).call("openrouter/x/y", KEY, {}, MESSAGES)
+        adapter_on(slow).call("openai/gpt", KEY, {}, MESSAGES)
 
 
 def test_an_unreachable_proxy_is_transient_and_carries_no_request() -> None:
@@ -302,9 +259,9 @@ def test_an_unreachable_proxy_is_transient_and_carries_no_request() -> None:
         raise httpx2.ConnectError(REFUSED, request=request)
 
     with pytest.raises(
-        ModelUnavailableError, match=r"^fornitore IA non raggiungibile: openrouter: APIConnectionError$"
+        ModelUnavailableError, match=r"^fornitore IA non raggiungibile: openai: APIConnectionError$"
     ) as raised:
-        adapter_on(refuse).call("openrouter/x/y", KEY, {}, MESSAGES)
+        adapter_on(refuse).call("openai/gpt", KEY, {}, MESSAGES)
 
     assert raised.value.__cause__ is None
 
@@ -332,10 +289,3 @@ def test_an_answer_in_another_shape_is_transient(body: object) -> None:
 def test_an_answer_that_is_not_json_is_transient() -> None:
     with pytest.raises(ModelUnavailableError, match=r"risposta del fornitore inattesa$"):
         call(Proxy(200, text="<html>ok</html>"), "openai/gpt")
-
-
-def test_the_adapter_of_the_installation_talks_to_the_proxy_at_its_address() -> None:
-    adapter = litellm_model_call("http://127.0.0.1:9", MASTER_KEY)
-
-    with pytest.raises(ModelUnavailableError, match=r"APIConnectionError$"):
-        adapter.call("openai/gpt", KEY, {}, MESSAGES)

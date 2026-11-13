@@ -53,8 +53,9 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
-from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.support.activity import a_fill, a_movement, a_position, an_activity
 from tests.support.cycle_composition import TenantCyclePorts
 from tests.support.flow_cycles import FlowCycles, at
@@ -475,7 +476,7 @@ def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
         (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({})),
         ("dev", Slippage.default()),
         FakeMessengerAdapter(),
-        (FakeModelCallAdapter(), catalog),
+        ({"models": FakeModelGatewayAdapter(catalog)}, FakePriceForecasterAdapter()),
     )
 
     assert isinstance(worker(TenantId.new()), RunCycleUseCase)

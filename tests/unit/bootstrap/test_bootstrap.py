@@ -53,6 +53,7 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
 from tests.support.model_catalog import PLATFORM_MODELS
@@ -67,10 +68,10 @@ AUTHENTICATION = {
 }
 
 
-def providers_of() -> tuple[InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
-    """The models of the API: the catalog of the test models, for the agent and for the flows."""
+def providers_of() -> tuple[dict[str, FakeModelGatewayAdapter], dict[str, InMemoryModelCatalogAdapter]]:
+    """The models of the API: one gateway of the test models, for the agent and for the flows."""
     catalog = InMemoryModelCatalogAdapter(PLATFORM_MODELS)
-    return catalog, catalog
+    return {"models": FakeModelGatewayAdapter(catalog)}, {"models": catalog}
 
 
 def _sealers(
@@ -263,6 +264,7 @@ def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
         "DATABASE_PASSWORD_FILE",
         "LITELLM_URL",
         "LITELLM_MASTER_KEY_FILE",
+        "FORECASTER_URL",
     ],
 )
 def test_the_worker_refuses_to_start_without_its_configuration(tmp_path: Path, name: str) -> None:

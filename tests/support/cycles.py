@@ -7,8 +7,8 @@ from uuid import UUID, uuid4
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps
+from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleCommand, RunCycleUseCase
-from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
@@ -23,6 +23,7 @@ from tests.fakes.cycles import (
     FakeContextAdapter,
     FakeCycleEndAdapter,
     FakeCycleJournalAdapter,
+    FakeCycleSchedulerAdapter,
     FakeCycleStartAdapter,
     FakeFlow,
     FakeFlowsAdapter,
@@ -33,7 +34,6 @@ from tests.fakes.cycles import (
     InMemoryCycleRepositoryAdapter,
     InMemoryFlowLockAdapter,
     RecordedCycleFailuresAdapter,
-    ThreadCycleLauncherAdapter,
 )
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
@@ -64,7 +64,7 @@ class Cycles:
         self.journal = FakeCycleJournalAdapter()
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
         self.failure_notices = RecordedCycleFailuresAdapter()
-        self.launcher = ThreadCycleLauncherAdapter()
+        self.scheduler = FakeCycleSchedulerAdapter()
         self.raised: AutotradingError | None = None
         self.planned = ThreadsPlannedFlowsAdapter()
         self.cycle_tenants: list[TenantId] = []
@@ -89,14 +89,14 @@ class Cycles:
         )
         return CycleGraph(steps, self.records, self.checkpoints, lambda wait: wait.total_seconds() * SECOND)
 
-    def _executor(self) -> RunDueCyclesUseCase:
+    def _executor(self) -> PlanFlowCyclesUseCase:
         run_cycle = self.run_cycle()
 
         def run_cycle_of(tenant_id: TenantId) -> RunCycleUseCase:
             self.cycle_tenants.append(tenant_id)
             return run_cycle
 
-        return RunDueCyclesUseCase(self.flows, self.planned, run_cycle_of, self.launcher, self.clock)
+        return PlanFlowCyclesUseCase(self.flows, self.planned, run_cycle_of, self.scheduler, self.clock)
 
     def add_executor(self) -> None:
         self.executors.append(self._executor())
@@ -164,7 +164,7 @@ class Cycles:
             found = [record for record in self.records_of(name) if record.planned_at == at(instant)]
             if found:
                 # The record is written before the cycle lets go of its flow: let it finish, as minutes would.
-                self.launcher.settle(FINISHING)
+                self.scheduler.settle(FINISHING)
                 return found[0]
             time.sleep(SECOND)
         message = f"nessun ciclo registrato per {name} alle {instant}"

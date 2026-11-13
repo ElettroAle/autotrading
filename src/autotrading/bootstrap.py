@@ -12,7 +12,9 @@ from autotrading.adapters.inbound.api.worker import (
     bot_polling,
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
+from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
+from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
@@ -24,7 +26,10 @@ from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumPr
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
+from autotrading.adapters.outbound.litellm.model_gateway import LiteLlmModelGatewayAdapter
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
+from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
+from autotrading.adapters.outbound.openrouter.model_gateway import OpenRouterModelGatewayAdapter
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -66,17 +71,13 @@ from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import
 from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
-from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.adapters.outbound.worker.composition import WorkerAdaptersOfTenant, worker_adapters
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
-from autotrading.application.agent.ports import (
-    ModelCallPort,
-    ModelCatalogPort,
-)
+from autotrading.application.agent.model_gateways import ModelGateways
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.create_flow import FlowChecks
@@ -90,6 +91,7 @@ from autotrading.application.flows.notify_unattributable import (
     UnattributableNotices,
 )
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
     CycleContext,
@@ -116,7 +118,6 @@ from autotrading.application.flows.record_manual_closing import RecordManualClos
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
-from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -161,7 +162,10 @@ from autotrading.application.orders.order_failures import FailureNames
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
-from autotrading.application.sources.ports import SentimentPort
+from autotrading.application.sources.ports import (
+    PriceForecasterPort,
+    SentimentPort,
+)
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
@@ -189,10 +193,10 @@ def tenant_use_cases(
     ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
-    providers: tuple[ModelCatalogPort, FlowModelsPort],
+    models: tuple[ModelGateways, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
-    model_catalog, flow_models = providers
+    model_gateways, flow_models = models
     credential_sealer, provider_key_sealer = sealers
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
@@ -224,7 +228,7 @@ def tenant_use_cases(
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_usage=flows,
-            model_catalog=model_catalog,
+            model_gateways=model_gateways,
             flows=flows,
             running_verifications=SqlAlchemyRunningVerificationsAdapter(engine),
             flow_checks=FlowChecks(
@@ -305,14 +309,14 @@ def cycle_of(
     openers: tuple[SodiumCredentialOpenerAdapter, SodiumProviderKeyOpenerAdapter],
     trading: tuple[str, Slippage],
     messenger: MessengerPort,
-    models: tuple[ModelCallPort, ModelCatalogPort],
+    predictors: tuple[ModelGateways, PriceForecasterPort],
 ) -> Callable[[TenantId], WorkerCycle]:
     """Builds, for each cycle, its graph on the adapters bound to the tenant of its flow (ADR 0042, ADR 0104).
 
     The clock, the models, the sources and the exchanges are the same for every tenant.
     """
     environment, slippage = trading
-    model_call, catalog = models
+    models, forecaster = predictors
     opener, provider_key_opener = openers
     exchanges, markets, order_exchanges, activity_readers, executions_readers, prices, market = hyperliquid_adapters(
         ExchangeNetwork.of_installation(environment)
@@ -378,7 +382,7 @@ def cycle_of(
             sources=ReadCycleSourceUseCase(
                 CollectCycleSourceUseCase(
                     SOURCE_CATALOG,
-                    SourceSystems(sentiments, news, prices, market),
+                    SourceSystems(sentiments, news, prices, forecaster, market),
                     SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
                     SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
                 ),
@@ -390,10 +394,7 @@ def cycle_of(
                 AskFlowAgentUseCase(
                     ComposeAgentContextUseCase(),
                     AskAgentUseCase(
-                        catalog,
-                        SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id),
-                        provider_key_opener,
-                        model_call,
+                        models, SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id), provider_key_opener
                     ),
                 )
             ),
@@ -437,13 +438,16 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     source = ConfigurationSource(configuration)
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
-    _, catalog = litellm_adapters(source)
+    gateways: dict[str, LiteLlmModelGatewayAdapter | OpenRouterModelGatewayAdapter] = {
+        **litellm_adapters(source),
+        **openrouter_adapters(),
+    }
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
         source.environment(),
         worker_adapters(source),
-        (catalog, catalog),
+        (gateways, {name: gateway.model_catalog() for name, gateway in gateways.items()}),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
@@ -458,8 +462,9 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     messenger, inbox, start_link = telegram_adapters(source)
     for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
-    models = litellm_adapters(source)
-    cycle_for = cycle_of(engine, (opener, provider_key_opener), (environment, slippage), messenger, models)
+    models: ModelGateways = {**litellm_adapters(source), **openrouter_adapters()}
+    predictors = (models, forecaster_adapters(source))
+    cycle_for = cycle_of(engine, (opener, provider_key_opener), (environment, slippage), messenger, predictors)
     cycles = worker_cycles(engine, cycle_for, environment)
     return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
 
@@ -487,19 +492,19 @@ type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDe
 def worker_cycles(
     engine: SqlAlchemyEngine, cycle_for: Callable[[TenantId], WorkerCycle], environment: str
 ) -> CyclePolling:
-    """Each round runs the cycles due and records the actual price beside every expired forecast (R1.3.5)."""
+    """Each round plans the cycles of the flows and records the actual price beside every expired forecast (R1.3.5)."""
     *_, prices, _ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     clock = system_clock_adapters()
     planned = ThreadsPlannedFlowsAdapter()
-    run_due = RunDueCyclesUseCase(
-        SqlAlchemyScheduledFlowsAdapter(engine), planned, cycle_for, ThreadCycleLauncherAdapter(), clock
+    plan = PlanFlowCyclesUseCase(
+        SqlAlchemyScheduledFlowsAdapter(engine), planned, cycle_for, apscheduler_adapters(), clock
     )
     record_actual_prices = RecordActualPricesOfTenantsUseCase(
         prices, planned.tenants, partial(SqlAlchemyForecastRepositoryAdapter, engine)
     )
 
     def plan_round() -> None:
-        run_due.execute()
+        plan.execute()
         record_actual_prices.execute(RecordActualPricesCommand(clock.now()))
 
     return CyclePolling(plan_round)

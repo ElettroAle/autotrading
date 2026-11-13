@@ -9,7 +9,6 @@ from openai import OpenAI
 from autotrading.adapters.outbound.litellm.model_catalog import (
     REFRESH_SECONDS,
     LiteLlmModelCatalogAdapter,
-    litellm_model_catalog,
 )
 from autotrading.application.agent.errors import ModelCatalogUnavailableError
 from autotrading.application.flows.errors import FlowModelCatalogUnavailableError
@@ -95,7 +94,7 @@ def test_a_model_of_the_proxy_becomes_a_model_of_the_catalog_with_its_parameters
     assert sonnet == ModelDefinition(
         "anthropic/claude-sonnet-5-5",
         (
-            RangeParameter("temperature", Decimal(0), Decimal(1), Decimal(1)),
+            RangeParameter("temperature", Decimal(0), Decimal(2), Decimal(1)),
             RangeParameter("max_tokens", Decimal(1), Decimal(128000), Decimal(4096), whole=True),
             ChoiceParameter("reasoning_effort", ("basso", "medio", "alto"), "medio"),
         ),
@@ -103,7 +102,7 @@ def test_a_model_of_the_proxy_becomes_a_model_of_the_catalog_with_its_parameters
     )
 
 
-def test_a_model_without_reasoning_has_no_level_and_its_provider_its_own_temperature_range() -> None:
+def test_a_model_without_reasoning_has_no_level() -> None:
     gpt = catalog_on(Proxy()).catalog().find("openai/gpt-4.1-mini")
 
     assert gpt.parameters == (
@@ -152,7 +151,7 @@ def test_a_short_answer_limit_is_also_the_default() -> None:
     ],
 )
 def test_a_model_without_prices_leaves_the_cost_to_the_provider(prices: dict[str, object]) -> None:
-    (model,) = catalog_on(Proxy([group("openrouter/deepseek/deepseek-chat", **prices)])).catalog().models
+    (model,) = catalog_on(Proxy([group("deepseek/deepseek-chat", **prices)])).catalog().models
 
     assert model.prices is None
 
@@ -206,11 +205,6 @@ def test_a_flow_is_told_when_its_model_is_not_offered() -> None:
 def test_a_flow_is_told_when_the_catalog_is_unavailable() -> None:
     with pytest.raises(FlowModelCatalogUnavailableError):
         catalog_on(Proxy(status=500, body={"error": {"message": "boom"}})).definition_of("openai/gpt-4.1-mini")
-
-
-def test_the_catalog_of_the_installation_asks_the_proxy_at_its_address() -> None:
-    with pytest.raises(ModelCatalogUnavailableError):
-        litellm_model_catalog("http://127.0.0.1:9", MASTER_KEY).catalog()
 
 
 REFUSED = "connection refused"

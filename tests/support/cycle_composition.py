@@ -11,12 +11,8 @@ from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolCon
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
-from autotrading.application.agent.ports import (
-    ModelCallPort,
-    ModelCatalogPort,
-    ProviderKeyOpenerPort,
-    ProviderKeyRepositoryPort,
-)
+from autotrading.application.agent.model_gateways import ModelGateways
+from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps, GraphCheckpoints
@@ -50,6 +46,7 @@ from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
     MarketDataPort,
     NewsPort,
+    PriceForecasterPort,
     PriceHistoryPort,
     SampleRepositoryPort,
     SentimentPort,
@@ -90,12 +87,12 @@ class CycleServices:
     """What every cycle shares, whatever the tenant: the clock, the models, the sources, the exchanges."""
 
     clock: ClockPort
-    catalog: ModelCatalogPort
+    model_gateways: ModelGateways
     provider_key_opener: ProviderKeyOpenerPort
-    model_call: ModelCallPort
     sentiments: Mapping[str, SentimentPort]
     news: NewsPort
     prices: PriceHistoryPort
+    forecaster: PriceForecasterPort
     market: MarketDataPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
@@ -122,7 +119,9 @@ def run_cycle_for(
         sources=ReadCycleSourceUseCase(
             CollectCycleSourceUseCase(
                 SOURCE_CATALOG,
-                SourceSystems(services.sentiments, services.news, services.prices, services.market),
+                SourceSystems(
+                    services.sentiments, services.news, services.prices, services.forecaster, services.market
+                ),
                 ports.forecasts,
                 ports.samples,
             ),
@@ -133,9 +132,7 @@ def run_cycle_for(
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
                 ComposeAgentContextUseCase(),
-                AskAgentUseCase(
-                    services.catalog, ports.provider_keys, services.provider_key_opener, services.model_call
-                ),
+                AskAgentUseCase(services.model_gateways, ports.provider_keys, services.provider_key_opener),
             )
         ),
         risk=ReviewCycleRiskUseCase(CheckRiskUseCase(services.exchange_limits)),
