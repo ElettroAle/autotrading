@@ -23,7 +23,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     },
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {
         "bootstrap.py:DEFAULT_CREDENTIALS_KEY_VERSION": BUG_STRICTER_RULES,
-        "bootstrap.py:DEFAULT_DATABASE_PORT": BUG_STRICTER_RULES,
         "bootstrap.py:PROVIDER_TIMEOUT_SECONDS": BUG_STRICTER_RULES,
         "bootstrap.py:SLIPPAGE_SETTING": BUG_STRICTER_RULES,
         "bootstrap.py:SUPPORTED_ENVIRONMENTS": BUG_STRICTER_RULES,
@@ -51,9 +50,7 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
     },
     Rule.LIBRARIES_IN_THEIR_FOLDER: {
-        "bootstrap.py:fastapi": BUG_STRICTER_RULES,
         "bootstrap.py:httpx": BUG_STRICTER_RULES,
-        "bootstrap.py:sqlalchemy": BUG_STRICTER_RULES,
     },
     Rule.ADAPTERS_DO_NOT_ORCHESTRATE: {},
     Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {
