@@ -1,0 +1,29 @@
+name: review
+
+on:
+  pull_request:
+    branches: [main]
+    # Not on edited: correcting the description must not spend the subscription quota on a new review (ADR 0113).
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    uses: ./.github/workflows/reusable-review.yml
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      number: ${{ github.event.pull_request.number }}
+      base: ${{ github.event.pull_request.base.sha }}
+      head: ${{ github.event.pull_request.head.sha }}
+      head-repository: ${{ github.event.pull_request.head.repo.full_name }}
+      author: ${{ github.event.pull_request.user.login }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

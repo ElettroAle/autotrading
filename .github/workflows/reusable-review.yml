@@ -1,0 +1,65 @@
+# Orchestratore della revisione AI obbligatoria (R0.5.1, ADR 0113). Il job è il controllo obbligatorio
+# "review / revisione" del ruleset di main; le violazioni diventano thread, che il ruleset chiede di risolvere.
+name: reusable-review
+
+on:
+  workflow_call:
+    inputs:
+      number:
+        description: Numero della pull request
+        type: number
+        required: true
+      base:
+        description: Commit base della pull request, cartella di lavoro della revisione
+        type: string
+        required: true
+      head:
+        description: Commit head della pull request, con il codice e le regole da esaminare
+        type: string
+        required: true
+      head-repository:
+        description: Repository da cui proviene la pull request
+        type: string
+        required: true
+      author:
+        description: Autore della pull request
+        type: string
+        required: true
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  revisione:
+    name: revisione
+    # Fork and Dependabot pull requests receive no repository secrets: the job is skipped, which satisfies the
+    # required check, and the owner integrates them by hand.
+    if: inputs.head-repository == github.repository && inputs.author != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    # resolveReviewThread is refused to the job token without contents: write (ADR 0113).
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # The base commit is the working tree, so no file of the pull request is loaded as Claude Code settings;
+      # the code and the rules of the pull request are read from git history (ADR 0113).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.base }}
+          fetch-depth: 0
+      # The review action itself comes from the pull request, in its own folder, so that a change to it is
+      # exercised before integration; like a change to the rules, it needs an ADR in the same pull request.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: .review-action
+          sparse-checkout: .github/actions/claude-review
+      - uses: ./.review-action/.github/actions/claude-review
+        with:
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github-token: ${{ github.token }}
+          number: ${{ inputs.number }}
+          base: ${{ inputs.base }}
+          head: ${{ inputs.head }}
