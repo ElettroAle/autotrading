@@ -1,0 +1,19 @@
+name: work-item-link
+description: Verifica che la descrizione della pull request colleghi almeno un work item della board con AB#<id>.
+inputs:
+  body:
+    description: Descrizione della pull request
+    required: false
+    default: ""
+  author:
+    description: Autore della pull request
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Collegamento ai work item
+      shell: bash
+      env:
+        BODY: ${{ inputs.body }}
+        AUTHOR: ${{ inputs.author }}
+      run: printf '%s' "$BODY" | uv run python -m tools.work_item_link "$AUTHOR"
