@@ -32,6 +32,7 @@ from autotrading.application.flows.record_manual_closing import RecordManualClos
 from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
+from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
 from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.bootstrap import (
@@ -43,7 +44,6 @@ from autotrading.bootstrap import (
     NotifiedClosedPositions,
     PublicCredentialsKey,
     TenantUseCaseFactory,
-    TradingAccessFromAccounts,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
     WorkerConnection,
@@ -337,11 +337,11 @@ def test_the_access_to_trade_is_opened_from_the_account_of_the_tenant() -> None:
     worker = Worker()
     account = worker.saved_account()
     credentials = worker.vault[account.credentials.ciphertext][2]
-    accesses = TradingAccessFromAccounts(
+    accesses = OpenTradingAccessUseCase(
         InMemoryAccountRepositoryAdapter(worker.store, account.tenant_id), FakeCredentialOpenerAdapter(worker.vault)
     )
 
-    assert accesses.access(account.id.value) == TradingAccess(
+    assert accesses.execute(OpenTradingAccessCommand(account.id.value)) == TradingAccess(
         "Hyperliquid", credentials.account_address, credentials.secret_key
     )
 
@@ -350,20 +350,22 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
     worker = Worker()
     theirs = worker.saved_account(TenantId.new())
     opener = FakeCredentialOpenerAdapter(worker.vault)
-    accesses = TradingAccessFromAccounts(InMemoryAccountRepositoryAdapter(worker.store, TenantId.new()), opener)
+    accesses = OpenTradingAccessUseCase(InMemoryAccountRepositoryAdapter(worker.store, TenantId.new()), opener)
 
     with pytest.raises(OrderAccountNotFoundError):
-        accesses.access(theirs.id.value)
+        accesses.execute(OpenTradingAccessCommand(theirs.id.value))
 
-    assert opener.opened == []
+    assert opener.opened_accesses == []
 
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
+    accounts = exchanges_for(ExchangeNetwork.TEST)
     exchanges = WorkerExchanges(
-        exchanges_for(ExchangeNetwork.TEST),
+        accounts,
         order_exchanges_for(ExchangeNetwork.TEST),
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
+        accounts,
     )
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())

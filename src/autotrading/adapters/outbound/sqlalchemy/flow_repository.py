@@ -18,7 +18,7 @@ from autotrading.application.flows.errors import (
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cycle_interval import CycleInterval
-from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
@@ -39,6 +39,10 @@ class SqlAlchemyFlowRepositoryAdapter:
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
         self._engine = engine
         self._tenant_id = tenant_id
+
+    def flow_on(self, account_id: UUID, asset: str) -> str | None:
+        """The flow the verification procedure keeps off the asset of the account (ADR 0075)."""
+        return holder_of(self.list(), account_id, asset)
 
     def list(self) -> list[Flow]:
         with self._transaction() as connection:

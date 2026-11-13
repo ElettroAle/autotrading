@@ -18,10 +18,16 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     HyperliquidSdkAdapter,
 )
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.verification.errors import (
+    VerificationCredentialsRejectedError,
+    VerificationExchangeUnavailableError,
+)
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.verification.reading import AccountReading, PositionReading
+from autotrading.domain.verification.verification_access import VerificationAccess
 
 BASE_URL = "https://api.hyperliquid-testnet.xyz"
 WALLET = EthereumAccount.create()
@@ -197,3 +203,35 @@ def test_the_network_follows_the_installation(testnet: bool, url: str) -> None:
     HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=sdk).read_state(CREDENTIALS)
 
     assert sdk.calls[0][1][1] == url
+
+
+VERIFICATION_ACCESS = VerificationAccess(ADDRESS, WALLET.key.hex())
+
+
+def test_the_verification_reads_balance_margin_and_positions_proving_the_signer() -> None:
+    sdk = FakeSdk(state=STATE | {"assetPositions": [{"type": "oneWay", "position": LONG_BTC}]})
+
+    reading = HyperliquidExchangeAdapter(BASE_URL, sdk).verification_reading(VERIFICATION_ACCESS)
+
+    assert reading == AccountReading(
+        Decimal("1234.56"), Decimal("1000.5"), "USDC", (PositionReading("BTC", "long", Decimal("0.02"), 2),)
+    )
+    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+
+
+def test_a_signer_refused_is_a_failed_verification_step_without_the_message_of_the_exchange() -> None:
+    sdk = FakeSdk(cancel_answer={"status": "err", "response": f"User or API Wallet {ADDRESS} does not exist."})
+
+    with pytest.raises(VerificationCredentialsRejectedError) as raised:
+        HyperliquidExchangeAdapter(BASE_URL, sdk).verification_reading(VERIFICATION_ACCESS)
+
+    assert raised.value.message == "credenziali rifiutate dall'exchange"
+
+
+def test_an_exchange_that_does_not_answer_is_a_failed_verification_step() -> None:
+    sdk = FakeSdk(failure=ServerError(502, "bad gateway"))
+
+    with pytest.raises(VerificationExchangeUnavailableError) as raised:
+        HyperliquidExchangeAdapter(BASE_URL, sdk).verification_reading(VERIFICATION_ACCESS)
+
+    assert raised.value.message == "exchange non raggiungibile, riprovare"

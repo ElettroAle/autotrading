@@ -7,15 +7,45 @@ from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 from autotrading.domain.verification.reading import AccountReading
+from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 from autotrading.domain.verification.verification_run import VerificationRun
 
 
 class AccountReadingPort(Protocol):
-    """Reads the account: what the exchange shows of it and the flows that trade on it."""
+    """Reads what the exchange shows of the account: it is ReadAccountForVerificationUseCase."""
 
-    def read(self, account_id: UUID) -> AccountReading:
-        """Raises VerificationStepError when the exchange cannot be read."""
+    def execute(self, account_id: UUID) -> AccountReading:
+        """Raises VerificationAccountNotFoundError, or VerificationStepError when the exchange cannot be read."""
         ...
+
+
+class VerificationAccountPort(Protocol):
+    """Bound to the tenant of the request: the account as the worker opens it for the procedure."""
+
+    def sealed_verification(self, account_id: UUID) -> SealedVerificationAccess:
+        """Raises VerificationAccountNotFoundError for an account missing or of another tenant (R0.1.3)."""
+        ...
+
+
+class VerificationOpenerPort(Protocol):
+    """In the worker: opens the sealed credentials of the account for the procedure (ADR 0007)."""
+
+    def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
+        """Raises VerificationCredentialsNotOpenedError when the sealed text is of another account or no key opens
+        it."""
+        ...
+
+
+class AccountReaderPort(Protocol):
+    """An exchange: balance, available margin and positions of the account, proving the credentials still work."""
+
+    def verification_reading(self, access: VerificationAccess) -> AccountReading:
+        """Raises VerificationCredentialsRejectedError, or VerificationExchangeUnavailableError."""
+        ...
+
+
+class FlowsOnAccountPort(Protocol):
+    """Bound to the tenant of the request: the flows that trade on the account."""
 
     def flow_on(self, account_id: UUID, asset: str) -> str | None:
         """The name of a flow of the account trading the asset, if any: active or paused, it compares its position

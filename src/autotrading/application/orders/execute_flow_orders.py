@@ -5,7 +5,8 @@ from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.orders.errors import ExchangeRejectedOrderError
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort, TradingAccessPort
+from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
+from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, in_sending_order
@@ -48,7 +49,7 @@ class ExecuteFlowOrdersUseCase:
 
     def __init__(
         self,
-        access: TradingAccessPort,
+        access: OpenTradingAccessUseCase,
         exchanges: Mapping[str, ExchangePort],
         orders: OrderRepositoryPort,
         slippage: Slippage,
@@ -61,7 +62,7 @@ class ExecuteFlowOrdersUseCase:
     def execute(self, command: ExecuteFlowOrdersCommand) -> tuple[Order, ...]:
         if not command.orders:
             return ()
-        access = self._access.access(command.account_id)
+        access = self._access.execute(OpenTradingAccessCommand(command.account_id))
         sending = _Sending(supported_exchange(self._exchanges, access.exchange), access, command)
         executed = (self._executed(sending, order) for order in in_sending_order(command.orders))
         return tuple(order for order in executed if order is not None)

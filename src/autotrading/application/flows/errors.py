@@ -30,6 +30,15 @@ class AssetNotTradableError(ApplicationError):
         self.assets = assets
 
 
+class FlowCredentialsNotOpenedError(ApplicationError):
+    """The worker cannot open the sealed credentials of the account to learn its address."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto non leggibili")
+
+
 class FlowExchangeUnavailableError(ApplicationError):
     status_code = 503
 

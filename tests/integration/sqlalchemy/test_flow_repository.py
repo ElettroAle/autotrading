@@ -232,3 +232,16 @@ def test_a_flow_or_version_missing_or_of_another_tenant_is_not_found(database: E
     with pytest.raises(FlowVersionNotFoundError):
         SqlAlchemyFlowRepositoryAdapter(database, anna).version(flow.id, 2)
     assert SqlAlchemyFlowRepositoryAdapter(database, anna).get(flow.id) == flow
+
+
+def test_the_flow_on_an_asset_of_the_account_is_the_active_or_paused_one_of_the_tenant(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    btc = a_configuration(assets=("BTC",))
+    repository.add(a_flow(tenant_id, name="fermo", status=FlowStatus.STOPPED, account_id=account_id, configuration=btc))
+    repository.add(a_flow(tenant_id, name="alfa", status=FlowStatus.PAUSED, account_id=account_id, configuration=btc))
+    other_tenant, _ = new_account(database)
+
+    assert repository.flow_on(account_id, "BTC") == "alfa"
+    assert repository.flow_on(account_id, "ETH") is None
+    assert SqlAlchemyFlowRepositoryAdapter(database, other_tenant).flow_on(account_id, "BTC") is None

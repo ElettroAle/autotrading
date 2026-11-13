@@ -9,6 +9,7 @@ from autotrading.application.verification.errors import VerificationAccountNotFo
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationCommand,
     RunExchangeVerificationUseCase,
+    VerificationReadings,
 )
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.errors import (
@@ -39,7 +40,7 @@ class ScriptedReadings:
     asked: list[UUID] = field(default_factory=list)
     flows: dict[tuple[UUID, str], str] = field(default_factory=dict)
 
-    def read(self, account_id: UUID) -> AccountReading:
+    def execute(self, account_id: UUID) -> AccountReading:
         self.asked.append(account_id)
         answer = self.answers.pop(0)
         if isinstance(answer, Exception):
@@ -100,7 +101,9 @@ def runs() -> InMemoryVerificationRunRepositoryAdapter:
 @pytest.fixture
 def build(runs: InMemoryVerificationRunRepositoryAdapter) -> Build:
     def use_case(readings: ScriptedReadings, orders: ScriptedOrders) -> RunExchangeVerificationUseCase:
-        return RunExchangeVerificationUseCase(readings, orders, runs, "prod", lambda: STARTED_AT)
+        return RunExchangeVerificationUseCase(
+            VerificationReadings(readings, readings), orders, runs, "prod", lambda: STARTED_AT
+        )
 
     return use_case
 

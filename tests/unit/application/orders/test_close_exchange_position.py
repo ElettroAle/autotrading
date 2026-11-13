@@ -49,7 +49,7 @@ def account_id(accesses: FakeTradingAccessAdapter, exchange: FakeOrderExchangeAd
 def use_case(
     accesses: FakeTradingAccessAdapter, exchange: FakeOrderExchangeAdapter, orders: InMemoryOrderRepositoryAdapter
 ) -> CloseExchangePositionUseCase:
-    return CloseExchangePositionUseCase(accesses, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
+    return CloseExchangePositionUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
 
 
 def test_closes_the_whole_position_with_a_reduce_only_order(

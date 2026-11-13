@@ -3,10 +3,16 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.verification.errors import (
+    VerificationCredentialsRejectedError,
+    VerificationExchangeUnavailableError,
+)
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.verification.reading import AccountReading, PositionReading
+from autotrading.domain.verification.verification_access import VerificationAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 
 # What the user reads of a refusal: the text of the exchange with the address masked (R0.2.3).
@@ -61,6 +67,20 @@ class FakeExchangeAdapter:
         shown = replace(state, positions=(*state.positions, *self._traded_positions(credentials)))
         self.shown.setdefault(credentials, []).append(shown)
         return shown
+
+    def verification_reading(self, access: VerificationAccess) -> AccountReading:
+        try:
+            state = self.read_state(Credentials(access.account_address, access.secret_key))
+        except ExchangeRejectedCredentialsError as error:
+            raise VerificationCredentialsRejectedError from error
+        except ExchangeUnavailableError as error:
+            raise VerificationExchangeUnavailableError from error
+        return AccountReading(
+            state.balance.amount,
+            state.available_margin.amount,
+            state.balance.currency,
+            tuple(PositionReading(p.coin, p.side.value, p.size, p.leverage) for p in state.positions),
+        )
 
     def _traded_positions(self, credentials: Credentials) -> tuple[Position, ...]:
         if self._orders is None:

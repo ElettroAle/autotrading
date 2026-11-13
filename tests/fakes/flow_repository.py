@@ -9,7 +9,7 @@ from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.capital_change import CapitalChange
-from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
@@ -40,6 +40,9 @@ class InMemoryFlowRepositoryAdapter:
     def __init__(self, store: FlowStore, tenant_id: TenantId) -> None:
         self._store = store
         self._tenant_id = tenant_id
+
+    def flow_on(self, account_id: UUID, asset: str) -> str | None:
+        return holder_of(self.list(), account_id, asset)
 
     def list(self) -> list[Flow]:
         return self._store.of(self._tenant_id)

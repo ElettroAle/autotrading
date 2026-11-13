@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from autotrading.application.orders.errors import NoOpenPositionError
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort, TradingAccessPort
+from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
+from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import Order, OrderRequest, OrderSource
@@ -29,7 +30,7 @@ class CloseExchangePositionUseCase:
 
     def __init__(
         self,
-        access: TradingAccessPort,
+        access: OpenTradingAccessUseCase,
         exchanges: Mapping[str, ExchangePort],
         orders: OrderRepositoryPort,
         slippage: Slippage,
@@ -40,7 +41,7 @@ class CloseExchangePositionUseCase:
         self._slippage = slippage
 
     def execute(self, command: CloseExchangePositionCommand) -> Order:
-        access = self._access.access(command.account_id)
+        access = self._access.execute(OpenTradingAccessCommand(command.account_id))
         exchange = supported_exchange(self._exchanges, access.exchange)
         position = _open_position(exchange, access, command.coin)
         closing = position.closing_order(self._slippage)
