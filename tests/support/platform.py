@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from secrets import token_hex
+from uuid import UUID
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
@@ -106,6 +107,8 @@ class Platform:
         self.key_vault: ProviderKeyVault = {}
         self.providers = FakeProviderKeyVerifierAdapter()
         self.flows = FlowStore()
+        # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
+        self.running_verifications: set[tuple[UUID, str]] = set()
         self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
         self.model_catalog: ModelCatalog = MODEL_CATALOG
         self.link_codes: LinkCodeStore = {}
