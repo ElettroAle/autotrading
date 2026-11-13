@@ -47,8 +47,6 @@ def test_a_registered_key_answers_with_the_provider_only(client_of: Client) -> N
     assert KEY not in response.text
 
 
-
-
 def test_a_missing_key_answers_with_the_reason(client_of: Client) -> None:
     response = client_of("anna").post("/provider-keys", json={"provider": "openrouter"})
 
