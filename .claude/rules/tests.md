@@ -45,3 +45,4 @@ tests/
 - Nomi dei test: il comportamento atteso in inglese, es. `test_rejects_leverage_above_exchange_maximum`.
 - Configurazione pytest: layout `src`, `--import-mode=importlib`, `--strict-markers`.
 - I principi di codice di `CLAUDE.md` valgono anche nei test.
+- Ogni file di test termina con una riga vuota.
