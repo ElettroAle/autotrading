@@ -147,3 +147,14 @@ def test_a_position_on_an_asset_of_the_flow_it_never_opened_is_a_mismatch() -> N
     state = FlowState.attributed(flow, an_activity(positions=(a_position("BTC"),)), FlowTotals(flow.id))
 
     assert state.position_mismatch() == PositionMismatch("BTC", Decimal(0), Decimal(1))
+
+
+def test_the_money_of_the_flow_is_the_capital_plus_realized_pnl_and_funding_less_fees_whatever_the_margin() -> None:
+    flow = flow_on("BTC")
+    activity = an_activity(positions=(a_position("BTC", margin=Decimal(100)),))
+
+    state = FlowState.attributed(
+        flow, activity, totals_of(flow, realized_pnl=Decimal(40), fees=Decimal(2), funding=Decimal(-5))
+    )
+
+    assert state.funds == Decimal(533)

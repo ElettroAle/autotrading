@@ -42,7 +42,7 @@ CONTEXT = AgentContext(
     max_leverage=5,
     started_at=NOW,
     now=NOW,
-    state=FlowStateView("USDC", Decimal(400), Decimal(400), Decimal(400), Decimal(0), ()),
+    state=FlowStateView("USDC", Decimal(400), Decimal(400), Decimal(400), Decimal(400), Decimal(0), ()),
     sources=(),
     missing=(),
 )
