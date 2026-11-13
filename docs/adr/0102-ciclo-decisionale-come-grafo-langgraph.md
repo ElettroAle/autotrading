@@ -58,6 +58,8 @@ in CLAUDE.md e nelle verifiche, per nome.
 - **Versioni fissate**: `langgraph>=1.2` e `langgraph-checkpoint-postgres>=3.0`, bloccate da `uv.lock`.
   `zstandard`, dipendenza di `langsmith` (tracciamento, mai attivo: nessuna variabile `LANGSMITH_*`) senza wheel
   per Python 3.15, è esclusa con `override-dependencies` in `pyproject.toml`; `langsmith` si importa senza.
+  Esclusa allo stesso modo `httpx2`, che `langsmith` usa solo se presente (altrimenti `httpx`) e che sostituirebbe
+  `httpx` sotto il client di prova di Starlette.
 
 ## Alternative scartate
 

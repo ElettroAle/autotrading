@@ -166,4 +166,9 @@ modules = [
 ]
 
 [tool.uv]
-override-dependencies = ["zstandard; sys_platform == 'never'"]
+override-dependencies = [
+    # Without a wheel for Python 3.15; only the tracing of langsmith uses it, never enabled (ADR 0102).
+    "zstandard; sys_platform == 'never'",
+    # langsmith falls back to httpx; httpx2 would replace httpx under the test client of starlette (ADR 0102).
+    "httpx2; sys_platform == 'never'",
+]
