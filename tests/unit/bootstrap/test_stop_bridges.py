@@ -9,6 +9,7 @@ import pytest
 
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
+from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.errors import (
     NoOpenPositionError,
     OrderAccountNotFoundError,
@@ -61,7 +62,7 @@ def closing() -> ScriptedClosing:
 
 @pytest.fixture
 def positions(closing: ScriptedClosing) -> FlowPositionsFromOrders:
-    return FlowPositionsFromOrders(closing)
+    return FlowPositionsFromOrders(CloseFlowPositionUseCase(closing))
 
 
 EXECUTED = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)

@@ -260,3 +260,9 @@ class ClosedPositionRepositoryPort(Protocol):
         ...
 
     def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...
+
+
+class ClosingNoticePort(Protocol):
+    def tell(self, flow: Flow, asset: str, realized_pnl: Decimal) -> None:
+        """Tells a closing of the flow with no history to enter, once, with the PnL the exchange reported (ADR 0070)."""
+        ...

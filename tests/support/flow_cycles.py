@@ -8,25 +8,29 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
+from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.cycles.ports import ScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
+from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
     AccountActivityFromAccounts,
     AccountExecutionsFromAccounts,
-    ClosedPositionsFromOpenings,
+    ClosingNoticeByNotification,
     CycleRuntime,
     CycleServices,
     FlowDirectory,
     FlowPauseFromFlows,
     NotifiedClosedPositions,
     NotifiedCycles,
+    OutsideClosingsInHistory,
     TenantCyclePorts,
     TradingAccessFromAccounts,
     record_actual_prices,
@@ -137,8 +141,12 @@ class FlowCycles:
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         notify = platform.worker_for(tenant_id).notify
         closed_positions = NotifiedClosedPositions(
-            InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id), flows, notify
+            InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id),
+            flows,
+            notify,
+            HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
+        closing_notice = ClosingNoticeByNotification(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         record_executions = RecordAccountExecutionsUseCase(
             flows,
@@ -150,7 +158,7 @@ class FlowCycles:
             flows,
             activity,
             self.readings,
-            ClosedPositionsFromOpenings(flows, openings, closed_positions, notify),
+            OutsideClosingsInHistory(RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice)),
             record_executions,
         )
         return TenantCyclePorts(
@@ -168,7 +176,9 @@ class FlowCycles:
             reconcile_account=reconcile_account,
             openings=openings,
             closed_positions=closed_positions,
+            record_closing=RecordFlowClosingUseCase(openings, closed_positions, closing_notice),
             notify=notify,
+            settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             timing=InMemoryFlowTimingAdapter(platform.flows, tenant_id),
         )
 

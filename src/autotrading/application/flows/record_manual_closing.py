@@ -14,12 +14,13 @@ operations = logging.getLogger("autotrading.flows")
 class RecordManualClosingCommand:
     account_id: UUID
     asset: str
-    fill: ClosingFill
+    fill: ClosingFill | None
 
 
 class RecordManualClosingUseCase:
     """A position a user closed by hand enters the history of the flow that trades its asset (R1.7.2, ADR 0061).
 
+    A closing the exchange did not confirm in time leaves the position as the exchange shows it: nothing to record.
     The asset conflict rule leaves at most one flow not archived on an asset of an account (R1.1.2): that flow takes
     the closing. A position no flow trades, or one the flow never opened, has no history to enter.
     """
@@ -32,6 +33,9 @@ class RecordManualClosingUseCase:
         self._closed_positions = closed_positions
 
     def execute(self, command: RecordManualClosingCommand) -> None:
+        if command.fill is None:
+            return
+        fill = command.fill
         owners = [
             flow
             for flow in self._flows.list()
@@ -49,4 +53,4 @@ class RecordManualClosingUseCase:
                 extra={"flow_id": str(flow.id.value), "asset": command.asset},
             )
             return
-        self._closed_positions.add(opening.closed(flow, command.asset, command.fill, CloseReason.MANUAL))
+        self._closed_positions.add(opening.closed(flow, command.asset, fill, CloseReason.MANUAL))

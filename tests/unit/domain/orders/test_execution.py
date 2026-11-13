@@ -24,3 +24,9 @@ def test_an_execution_keeps_what_the_exchange_read() -> None:
 def test_an_execution_without_size_is_refused(size: Decimal) -> None:
     with pytest.raises(EmptyExecutionError):
         Execution(size, Decimal(1), Decimal(0), Decimal(0), AT)
+
+
+def test_the_value_of_an_execution_is_its_size_at_its_average_price() -> None:
+    execution = Execution(Decimal("0.0002"), Decimal(100030), Decimal("0.009"), Decimal("-0.5"), AT)
+
+    assert execution.value == Decimal("20.006")

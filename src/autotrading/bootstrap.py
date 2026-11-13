@@ -46,6 +46,7 @@ from autotrading.adapters.outbound.httpx.telegram import (
 )
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
+from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.executions import HyperliquidAccountExecutionsAdapter
 from autotrading.adapters.outbound.hyperliquid.market_data import (
@@ -166,7 +167,12 @@ from autotrading.application.flows.reconcile_account_for_cycle import (
     ReconcileAccountForCycleUseCase,
 )
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.application.flows.record_flow_closing import RecordFlowClosingCommand, RecordFlowClosingUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingCommand, RecordManualClosingUseCase
+from autotrading.application.flows.record_outside_closing import (
+    RecordOutsideClosingCommand,
+    RecordOutsideClosingUseCase,
+)
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
@@ -178,13 +184,12 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
+from autotrading.application.orders.close_flow_position import CloseFlowPositionCommand, CloseFlowPositionUseCase
 from autotrading.application.orders.errors import (
-    NoOpenPositionError,
     OrderAccountNotFoundError,
-    OrderExchangeUnavailableError,
-    OrderWorkerUnavailableError,
 )
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
+from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersCommand, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
@@ -233,7 +238,7 @@ from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_funds import CycleFunds
-from autotrading.domain.flows.errors import InvalidClosedPositionError, ModelRequiredError
+from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
@@ -252,7 +257,7 @@ from autotrading.domain.notifications.notification import Amount, Notification
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
-from autotrading.domain.orders.order import Order, OrderOrigin, OrderRequest, OrderSource, OrderStatus
+from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.sources.errors import (
@@ -286,9 +291,6 @@ PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
 
 operations = logging.getLogger("autotrading.bootstrap")
-# The notifications show the values of Hyperliquid, settled in USDC, and an opening by its value in whole units.
-USDC = "USDC"
-WHOLE_UNIT = Decimal(1)
 
 
 class MissingConfigurationError(AutotradingError):
@@ -422,24 +424,13 @@ class FlowPositionsFromOrders:
     exchange declares, read with the state of the flow (R1.6.1, ADR 0067).
     """
 
-    def __init__(self, closing: PositionClosingPort) -> None:
+    def __init__(self, closing: CloseFlowPositionUseCase) -> None:
         self._closing = closing
 
     def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
-        try:
-            outcome = self._closing.close(account_id, asset, user_id)
-        except NoOpenPositionError:
-            return None
-        except (OrderAccountNotFoundError, OrderExchangeUnavailableError, OrderWorkerUnavailableError) as error:
-            return PositionClosing(asset, refusal=str(error))
-        if outcome.status == OrderStatus.REJECTED:
-            return PositionClosing(asset, refusal=outcome.exchange_message or str(outcome.reason))
-        if outcome.average_price is None or outcome.executed_at is None or outcome.fee is None:
-            # Not confirmed in time: the position may still be open, so it is reported as such.
-            return PositionClosing(asset, refusal=outcome.status.value)
-        return PositionClosing(
-            asset, ClosingFill(outcome.average_price, outcome.executed_at, outcome.fee, outcome.realized_pnl)
-        )
+        report = self._closing.execute(CloseFlowPositionCommand(account_id, asset, user_id))
+        fill = ClosingFill.reported(report.average_price, report.executed_at, report.fee, report.realized_pnl)
+        return PositionClosing.reported(asset, found=report.found, fill=fill, refusal=report.refusal)
 
 
 class ManualClosingRecorder(Protocol):
@@ -459,9 +450,7 @@ class ManualClosingsRecordedInFlows:
 
     def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
         outcome = self._closing.close(account_id, coin, user_id)
-        if outcome.average_price is None or outcome.executed_at is None or outcome.fee is None:
-            return outcome
-        fill = ClosingFill(outcome.average_price, outcome.executed_at, outcome.fee, outcome.realized_pnl)
+        fill = ClosingFill.reported(outcome.average_price, outcome.executed_at, outcome.fee, outcome.realized_pnl)
         self._history.execute(RecordManualClosingCommand(account_id, coin, fill))
         return outcome
 
@@ -758,10 +747,13 @@ class TenantUseCaseFactory:
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         position_closing = HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id)
-        flow_positions = FlowPositionsFromOrders(position_closing)
+        flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
         notified_closings = NotifiedClosedPositions(
-            closed_positions, flows, HttpxNotificationAdapter(self._worker.client, self._worker.token, tenant_id)
+            closed_positions,
+            flows,
+            HttpxNotificationAdapter(self._worker.client, self._worker.token, tenant_id),
+            HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         flow_openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
         stop_ports = StopPorts(
@@ -864,8 +856,12 @@ class WorkerUseCaseFactory:
         openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
         notify = self.notify_for(tenant_id)
         closed_positions = NotifiedClosedPositions(
-            SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id), flows, notify
+            SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id),
+            flows,
+            notify,
+            HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
+        closing_notice = ClosingNoticeByNotification(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
         ledger = SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
@@ -878,7 +874,7 @@ class WorkerUseCaseFactory:
             flows,
             activity,
             SqlAlchemyReconciliationRepositoryAdapter(self._engine, tenant_id),
-            ClosedPositionsFromOpenings(flows, openings, closed_positions, notify),
+            OutsideClosingsInHistory(RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice)),
             record_executions,
         )
         return TenantCyclePorts(
@@ -894,6 +890,8 @@ class WorkerUseCaseFactory:
             reconcile_account=reconcile_account,
             openings=openings,
             closed_positions=closed_positions,
+            record_closing=RecordFlowClosingUseCase(openings, closed_positions, closing_notice),
+            settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             notify=notify,
             timing=SqlAlchemyFlowTimingAdapter(self._engine, tenant_id),
         )
@@ -1191,7 +1189,9 @@ class TenantCyclePorts:
     reconcile_account: ReconcileAccountUseCase
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
+    record_closing: RecordFlowClosingUseCase
     notify: NotifyUseCase
+    settlement_currency: str
     timing: FlowTimingPort
 
 
@@ -1334,7 +1334,7 @@ def _unattributable_notification(ports: TenantCyclePorts, item: UnattributableIt
         return Notification.unattributable_position(account, asset)
     if item.kind is UnattributableKind.FILL:
         return Notification.unattributable_fill(account, asset)
-    return Notification.unattributable_movement(account, Amount(item.amount, USDC))
+    return Notification.unattributable_movement(account, Amount(item.amount, ports.settlement_currency))
 
 
 class FlowPauseFromFlows:
@@ -1538,49 +1538,47 @@ class OrdersFromOrders:
         )
         ports = self._ports_of(cycle_flow.tenant_id)
         sent = ports.execute_flow_orders.execute(command)
-        for order in sent:
-            _follow_order(ports, cycle_flow.flow, planned_at, order)
+        events = FlowOrderEvents(ports, cycle_flow.flow, planned_at)
+        FollowFlowOrdersUseCase(events).execute(FollowFlowOrdersCommand(tuple(sent)))
         return sent
 
 
-def _follow_order(ports: TenantCyclePorts, flow: Flow, planned_at: datetime, order: Order) -> None:
-    """What an order of the cycle leaves behind: its notification (R1.8.2) and, for a closing, the history (R1.7.2)."""
-    if order.rejection is not None:
-        ports.notify.execute(Notification.order_rejected(flow.name.value, order.rejection.exchange_message))
-        return
-    if order.execution is None:
-        return
-    if order.request.market_order.reduce_only:
-        _follow_closing(ports, flow, planned_at, order.request.market_order.coin, order.execution)
-        return
-    ports.notify.execute(_opening_notification(flow, order.request, order.execution))
+class FlowOrderEvents:
+    """Bridges what the orders of a cycle left behind to the flow that sent them (R1.7.2, R1.8.2, ADR 0085)."""
 
+    def __init__(self, ports: TenantCyclePorts, flow: Flow, planned_at: datetime) -> None:
+        self._ports = ports
+        self._flow = flow
+        self._planned_at = planned_at
 
-def _opening_notification(flow: Flow, request: OrderRequest, execution: Execution) -> Notification:
-    market_order = request.market_order
-    value = Amount((execution.filled_size * execution.average_price).quantize(WHOLE_UNIT), USDC)
-    return Notification.position_opened(
-        flow.name.value, market_order.coin, market_order.direction.value, request.leverage, value
-    )
+    def rejected(self, message: str) -> None:
+        self._ports.notify.execute(Notification.order_rejected(self._flow.name.value, message))
 
+    def opened(self, coin: str, direction: str, leverage: int, value: Decimal) -> None:
+        amount = Amount(value, self._ports.settlement_currency)
+        self._ports.notify.execute(
+            Notification.position_opened(self._flow.name.value, coin, direction, leverage, amount)
+        )
 
-def _follow_closing(
-    ports: TenantCyclePorts, flow: Flow, planned_at: datetime, asset: str, execution: Execution
-) -> None:
-    opening = ports.openings.last_opening(flow.id, asset)
-    if opening is None:
-        # No history to enter, so no history to tell it: the closing is notified on its own (ADR 0070).
-        pnl = Amount(execution.realized_pnl, USDC)
-        ports.notify.execute(Notification.position_closed(flow.name.value, asset, pnl))
-        return
-    fill = ClosingFill(execution.average_price, execution.executed_at, execution.fee, execution.realized_pnl)
-    ports.closed_positions.add(opening.closed(flow, asset, fill, CloseReason.AGENT, cycle=planned_at))
+    def closed(self, coin: str, execution: Execution) -> None:
+        command = RecordFlowClosingCommand(
+            self._flow,
+            coin,
+            execution.average_price,
+            execution.executed_at,
+            execution.fee,
+            execution.realized_pnl,
+            self._planned_at,
+        )
+        self._ports.record_closing.execute(command)
 
 
 def _flow_order_of(outcome: ApprovedOpening | ApprovedClose) -> FlowOrder:
-    if isinstance(outcome, ApprovedClose):
-        return FlowClosing(outcome.asset)
-    return FlowOpening(outcome.asset, Direction(outcome.side.value), outcome.value, outcome.leverage)
+    return outcome.order_with(_flow_opening_of, FlowClosing)
+
+
+def _flow_opening_of(asset: str, side: str, value: Decimal, leverage: int) -> FlowOrder:
+    return FlowOpening(asset, Direction(side), value, leverage)
 
 
 class CycleJournalFromContexts:
@@ -1671,51 +1669,26 @@ def _scalar_of(value: object) -> object:
     return value
 
 
-class ClosedPositionsFromOpenings:
-    """Bridges a position the reconciliation finds closed outside the platform to the history of the flow (ADR 0056).
+class OutsideClosingsInHistory:
+    """Bridges a position the reconciliation finds closed outside the platform to the history of the flow (ADR 0056)."""
 
-    The history shows a position with both its ends: the opening is the last order of the flow on the asset; a
-    position the flow never opened has no history to enter.
-    """
-
-    def __init__(
-        self,
-        flows: FlowRepositoryPort,
-        openings: FlowOpeningsPort,
-        closed_positions: ClosedPositionRepositoryPort,
-        notifier: Notifier,
-    ) -> None:
-        self._flows = flows
-        self._openings = openings
-        self._closed_positions = closed_positions
-        self._notifier = notifier
+    def __init__(self, record: RecordOutsideClosingUseCase) -> None:
+        self._record = record
 
     def add_closed_outside(self, closing: OutsideClosing) -> None:
-        flow = self._flows.get(closing.flow_id)
-        opening = self._openings.last_opening(flow.id, closing.asset)
-        if opening is None:
-            operations.warning(
-                "posizione chiusa fuori senza apertura del flusso",
-                extra={"flow_id": str(flow.id.value), "asset": closing.asset},
-            )
-            self._notify_outside_history(flow, closing)
-            return
-        try:
-            closed = opening.closed_outside(flow, closing)
-        except InvalidClosedPositionError:
-            # A loss beyond the value the position held implies no price: the case stays among the unattributable.
-            operations.warning(
-                "esito della chiusura fuori non rappresentabile",
-                extra={"flow_id": str(flow.id.value), "asset": closing.asset},
-            )
-            self._notify_outside_history(flow, closing)
-            return
-        self._closed_positions.add(closed)
+        self._record.execute(RecordOutsideClosingCommand(closing))
 
-    def _notify_outside_history(self, flow: Flow, closing: OutsideClosing) -> None:
-        """A closing with no history to enter is told on its own, once, with the PnL the exchange reported."""
-        pnl = Amount(closing.realized_pnl, USDC)
-        self._notifier.execute(Notification.position_closed(flow.name.value, closing.asset, pnl))
+
+class ClosingNoticeByNotification:
+    """Tells a closing with no history to enter through the notifications, in the currency of the exchange."""
+
+    def __init__(self, notifier: Notifier, currency: str) -> None:
+        self._notifier = notifier
+        self._currency = currency
+
+    def tell(self, flow: Flow, asset: str, realized_pnl: Decimal) -> None:
+        pnl = Amount(realized_pnl, self._currency)
+        self._notifier.execute(Notification.position_closed(flow.name.value, asset, pnl))
 
 
 class Notifier(Protocol):
@@ -1728,15 +1701,19 @@ class NotifiedClosedPositions:
     The notification carries the PnL the history keeps, so the user reads the same result in both.
     """
 
-    def __init__(self, history: ClosedPositionRepositoryPort, flows: FlowRepositoryPort, notifier: Notifier) -> None:
+    def __init__(
+        self, history: ClosedPositionRepositoryPort, flows: FlowRepositoryPort, notifier: Notifier, currency: str
+    ) -> None:
         self._history = history
         self._flows = flows
         self._notifier = notifier
+        self._currency = currency
 
     def add(self, position: ClosedPosition) -> None:
         self._history.add(position)
         flow = self._flows.get(position.flow_id)
-        notification = Notification.position_closed(flow.name.value, position.asset, Amount(position.pnl, USDC))
+        pnl = Amount(position.pnl, self._currency)
+        notification = Notification.position_closed(flow.name.value, position.asset, pnl)
         self._notifier.execute(notification)
 
     def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]:

@@ -5,6 +5,7 @@ from secrets import token_hex
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
+from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
@@ -18,6 +19,7 @@ from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
+from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
@@ -163,11 +165,13 @@ class Platform:
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
-        flow_positions = FlowPositionsFromOrders(position_closing)
+        flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
-        notified_closings = NotifiedClosedPositions(closed_positions, flows, self.worker_for(tenant_id).notify)
+        notified_closings = NotifiedClosedPositions(
+            closed_positions, flows, self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY
+        )
         stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, notified_closings)
         ports = TenantPorts(
             accounts=accounts,

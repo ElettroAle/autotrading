@@ -48,13 +48,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:_unattributable_notification": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:flow_of_cycle": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:json_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:ClosedPositionsFromOpenings.add_closed_outside": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:FlowPositionsFromOrders.close": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:ManualClosingsRecordedInFlows.close": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:_flow_order_of": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:_follow_closing": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:_follow_order": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:_opening_notification": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
         "bootstrap.py:_result_of": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
         "bootstrap.py:AccountFlowsFromFlows._operating_on": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:AccountFlowsFromFlows.archive": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
@@ -73,8 +66,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_BUSINESS_CONSTANTS: {
         "bootstrap.py:MODEL_REFUSALS": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:SOURCE_REFUSALS": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:USDC": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
-        "bootstrap.py:WHOLE_UNIT": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
     },
     Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {
         "application/cycles/source_collector.py:concurrent.futures": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
