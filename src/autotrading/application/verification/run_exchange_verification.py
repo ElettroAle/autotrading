@@ -7,7 +7,9 @@ from uuid import UUID, uuid4
 from autotrading.application.verification.errors import VerificationStepError
 from autotrading.application.verification.ports import (
     AccountReadingPort,
+    FlowsOnAccountPort,
     OrderExecutionPort,
+    ReadAccountForVerificationCommand,
     VerificationRunRepositoryPort,
 )
 from autotrading.domain.tenancy.user_id import UserId
@@ -35,6 +37,14 @@ class RunExchangeVerificationCommand:
     amount: Decimal | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class VerificationReadings:
+    """What the procedure reads of the account: its state on the exchange and the flows that trade on it."""
+
+    account: AccountReadingPort
+    flows: FlowsOnAccountPort
+
+
 class RunExchangeVerificationUseCase:
     """In the worker: opens, reads, closes and reads again a position, and records each step (R0.4.1, ADR 0024).
 
@@ -46,7 +56,7 @@ class RunExchangeVerificationUseCase:
 
     def __init__(
         self,
-        readings: AccountReadingPort,
+        readings: VerificationReadings,
         orders: OrderExecutionPort,
         runs: VerificationRunRepositoryPort,
         environment: str,
@@ -71,8 +81,8 @@ class RunExchangeVerificationUseCase:
 
     def _startable_opening(self, command: RunExchangeVerificationCommand) -> Opening:
         account_id = command.account_id
-        require_free_of_flows(self._readings.flow_on(account_id, PROCEDURE_COIN))
-        reading = self._readings.read(account_id)
+        require_free_of_flows(self._readings.flows.flow_on(account_id, PROCEDURE_COIN))
+        reading = self._read(account_id)
         minimum = self._orders.minimum_value(account_id, PROCEDURE_COIN)
         opening = procedure_opening(command.amount, minimum, reading.currency)
         require_startable(reading, opening)
@@ -93,10 +103,13 @@ class RunExchangeVerificationUseCase:
         if step is Step.OPENING:
             return _order_step(step, lambda: self._orders.open(account_id, opening, user_id))
         if step is Step.READING_AFTER_OPENING:
-            return _reading_step(step, lambda: self._readings.read(account_id), missing_opening)
+            return _reading_step(step, lambda: self._read(account_id), missing_opening)
         if step is Step.CLOSING:
             return _order_step(step, lambda: self._orders.close(account_id, opening.coin, user_id))
-        return _reading_step(step, lambda: self._readings.read(account_id), remaining_position)
+        return _reading_step(step, lambda: self._read(account_id), remaining_position)
+
+    def _read(self, account_id: UUID) -> AccountReading:
+        return self._readings.account.execute(ReadAccountForVerificationCommand(account_id))
 
 
 def _order_step(step: Step, send: Callable[[], OrderResult]) -> StepOutcome:

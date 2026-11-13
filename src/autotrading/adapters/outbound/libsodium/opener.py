@@ -9,6 +9,7 @@ from nacl.public import PrivateKey, SealedBox
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
 from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
+from autotrading.application.verification.errors import VerificationCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.errors import AutotradingError
@@ -16,6 +17,7 @@ from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 
 PRIVATE_KEY_BYTES = 32
 
@@ -58,6 +60,13 @@ class SodiumCredentialOpenerAdapter:
         if credentials is None:
             raise FlowCredentialsNotOpenedError
         return credentials.account_address
+
+    def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
+        """The same opening for the verification procedure, which proves the credentials on the exchange (ADR 0024)."""
+        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        if credentials is None:
+            raise VerificationCredentialsNotOpenedError
+        return VerificationAccess(credentials.account_address, credentials.secret_key)
 
     def _opened(self, key_version: int, ciphertext: bytes, tenant_id: TenantId, account_id: UUID) -> Credentials | None:
         document = self._document_of(key_version, ciphertext)

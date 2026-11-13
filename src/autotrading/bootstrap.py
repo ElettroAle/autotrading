@@ -215,7 +215,12 @@ from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand, RecordActualPricesUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
-from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
+from autotrading.application.verification.ports import AccountReaderPort
+from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
+from autotrading.application.verification.run_exchange_verification import (
+    RunExchangeVerificationUseCase,
+    VerificationReadings,
+)
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.position import Position
@@ -239,7 +244,7 @@ from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_funds import CycleFunds
 from autotrading.domain.flows.errors import ModelRequiredError
-from autotrading.domain.flows.flow import Flow, holder_of
+from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
@@ -274,7 +279,6 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
-from autotrading.domain.verification.reading import AccountReading, PositionReading
 
 SUPPORTED_ENVIRONMENTS = ("dev", "prod")
 DEFAULT_DATABASE_PORT = "5432"
@@ -547,38 +551,7 @@ class WorkerExchanges:
     orders: Mapping[str, OrderExchangePort]
     activity: Mapping[str, ActivityReaderPort]
     executions: Mapping[str, ExecutionsReaderPort]
-
-
-class AccountReadingFromAccounts:
-    """Bridges the accounts and flows contexts to the verification context in the worker (ADR 0024, ADR 0075).
-
-    The state is read as the worker reads it for the API; a failure becomes a failed step with its message. A stopped
-    flow runs no cycle, so only an active or paused flow keeps the procedure off its assets.
-    """
-
-    def __init__(self, read_exchange_state: ReadExchangeStateUseCase, flows: FlowRepositoryPort) -> None:
-        self._read_exchange_state = read_exchange_state
-        self._flows = flows
-
-    def read(self, account_id: UUID) -> AccountReading:
-        try:
-            state = self._read_exchange_state.execute(ReadExchangeStateCommand(AccountId(account_id)))
-        except AccountNotFoundError as error:
-            raise VerificationAccountNotFoundError from error
-        except AutotradingError as error:
-            raise VerificationStepError(str(error)) from error
-        return AccountReading(
-            balance=state.balance.amount,
-            available_margin=state.available_margin.amount,
-            currency=state.balance.currency,
-            positions=tuple(
-                PositionReading(position.coin, position.side.value, position.size, position.leverage)
-                for position in state.positions
-            ),
-        )
-
-    def flow_on(self, account_id: UUID, asset: str) -> str | None:
-        return holder_of(self._flows.list(), account_id, asset)
+    readings: Mapping[str, AccountReaderPort]
 
 
 class OrderExecutionFromOrders:
@@ -750,8 +723,9 @@ class WorkerUseCaseFactory:
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(
-                    read_exchange_state, SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
+                VerificationReadings(
+                    ReadAccountForVerificationUseCase(accounts, self._opener, self._exchanges.readings),
+                    SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id),
                 ),
                 OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
                 SqlAlchemyVerificationRunRepositoryAdapter(self._engine, tenant_id),
@@ -856,11 +830,13 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     environment = _environment(configuration)
     private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     opener = SodiumCredentialOpenerAdapter(private_keys)
+    accounts = exchanges_for(environment)
     exchanges = WorkerExchanges(
-        exchanges_for(environment),
+        accounts,
         order_exchanges_for(environment),
         activity_readers_for(environment),
         executions_readers_for(environment),
+        accounts,
     )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)

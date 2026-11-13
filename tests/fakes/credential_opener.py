@@ -1,12 +1,14 @@
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
 from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
+from autotrading.application.verification.errors import VerificationCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 from tests.fakes.credential_sealer import SealedVault
 
 
@@ -48,3 +50,12 @@ class FakeCredentialOpenerAdapter:
             raise FlowCredentialsNotOpenedError
         self.opened_addresses.append(sealed)
         return credentials.account_address
+
+    def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
+        opened = self._vault.get(sealed.ciphertext)
+        if opened is None:
+            raise VerificationCredentialsNotOpenedError
+        tenant_id, account_id, credentials = opened
+        if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
+            raise VerificationCredentialsNotOpenedError
+        return VerificationAccess(credentials.account_address, credentials.secret_key)

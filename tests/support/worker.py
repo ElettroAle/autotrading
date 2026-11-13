@@ -12,9 +12,12 @@ from autotrading.application.orders.close_exchange_position import CloseExchange
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
-from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
+from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
+from autotrading.application.verification.run_exchange_verification import (
+    RunExchangeVerificationUseCase,
+    VerificationReadings,
+)
 from autotrading.bootstrap import (
-    AccountReadingFromAccounts,
     OrderExecutionFromOrders,
 )
 from autotrading.domain.accounts.account import Account
@@ -66,7 +69,10 @@ class Worker:
             read_exchange_state=read_exchange_state,
             close_exchange_position=closing,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
+                VerificationReadings(
+                    ReadAccountForVerificationUseCase(accounts, opener, {HYPERLIQUID: self.exchange}),
+                    InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ),
                 OrderExecutionFromOrders(opening, closing, ReadMarketUseCase(access, order_exchanges)),
                 self.runs,
                 "dev",

@@ -25,12 +25,15 @@ from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
-from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
+from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
+from autotrading.application.verification.run_exchange_verification import (
+    RunExchangeVerificationUseCase,
+    VerificationReadings,
+)
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
     AccountFlowsFromFlows,
-    AccountReadingFromAccounts,
     FlowAccountsFromAccounts,
     FlowDirectoryFromFlows,
     FlowPositionsFromOrders,
@@ -235,7 +238,10 @@ class Platform:
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
+                VerificationReadings(
+                    ReadAccountForVerificationUseCase(accounts, opener, self.exchanges),
+                    InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ),
                 OrderExecutionFromOrders(
                     open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)
                 ),

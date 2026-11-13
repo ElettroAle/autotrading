@@ -40,8 +40,9 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
 def factory(messenger: MessengerPort) -> WorkerUseCaseFactory:
+    accounts = exchanges_for("dev")
     exchanges = WorkerExchanges(
-        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+        accounts, order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev"), accounts
     )
     settings = WorkerSettings("dev", Slippage.default())
     return WorkerUseCaseFactory(

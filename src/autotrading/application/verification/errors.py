@@ -20,6 +20,26 @@ class VerificationStepError(ApplicationError):
         self.message = message
 
 
+class VerificationExchangeUnsupportedError(VerificationStepError):
+    def __init__(self) -> None:
+        super().__init__("exchange non supportato")
+
+
+class VerificationCredentialsNotOpenedError(VerificationStepError):
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto non leggibili")
+
+
+class VerificationCredentialsRejectedError(VerificationStepError):
+    def __init__(self) -> None:
+        super().__init__("credenziali rifiutate dall'exchange")
+
+
+class VerificationExchangeUnavailableError(VerificationStepError):
+    def __init__(self) -> None:
+        super().__init__("exchange non raggiungibile, riprovare")
+
+
 class VerificationWorkerUnavailableError(ApplicationError):
     status_code = 503
 

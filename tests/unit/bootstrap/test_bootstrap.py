@@ -350,8 +350,9 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
+    accounts = exchanges_for("dev")
     exchanges = WorkerExchanges(
-        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+        accounts, order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev"), accounts
     )
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())

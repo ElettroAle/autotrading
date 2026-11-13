@@ -16,7 +16,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:ScheduledFlowsSource": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
     },
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
-        "bootstrap.py:AccountReadingFromAccounts.read": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.call_cost": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowDirectory._entry": BUG_CYCLE_RULES_IN_BOOTSTRAP,
