@@ -43,6 +43,25 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Gateway verso i modelli IA (ADR 0101): solo sulla rete dell'installazione, nessuna porta pubblicata. La
+  # configurazione, con la chiave master, è un file generato sulla macchina; nessuna chiave dei fornitori: la chiave
+  # dell'utente arriva con ogni richiesta del worker (RF-01.05).
+  litellm:
+    image: ghcr.io/berriai/litellm-non_root:main-v1.83.14-stable@sha256:5bb1d45eefe9b8bdc8d1b34617b8112d03bfc78fc247bea62d7ebd89918c875c
+    command: ["--config", "/run/secrets/litellm_config", "--port", "4000"]
+    secrets:
+      - litellm_config
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
   # Il worker è l'unico servizio che riceve la chiave privata delle credenziali (ADR 0007, ADR 0021).
   # Nessuna porta pubblicata: lo raggiunge solo l'API sulla rete dell'installazione, con il token generato sulla macchina.
   worker:
@@ -59,16 +78,22 @@ services:
       WORKER_TOKEN_FILE: /run/secrets/worker_token
       # Vuoto finché il proprietario non vi scrive il token del bot: il worker parte con le notifiche disattivate (ADR 0035).
       TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+      LITELLM_URL: http://litellm:4000
+      LITELLM_MASTER_KEY_FILE: /run/secrets/litellm_master_key
     secrets:
       - postgres_app_password
       - credentials_private_key_v1
       - worker_token
       - telegram_bot_token
+      - litellm_master_key
     read_only: true
     restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
+      # Senza il proxy fallisce solo la chiamata al modello del ciclo, non il worker.
+      litellm:
+        condition: service_started
 
   api:
     image: ${API_IMAGE:-}
@@ -88,16 +113,21 @@ services:
       AUTH_SCOPE: ${AUTH_SCOPE:-}
       WORKER_URL: http://worker:8000
       WORKER_TOKEN_FILE: /run/secrets/worker_token
+      LITELLM_URL: http://litellm:4000
+      LITELLM_MASTER_KEY_FILE: /run/secrets/litellm_master_key
     secrets:
       - postgres_app_password
       - credentials_public_key
       - worker_token
+      - litellm_master_key
     read_only: true
     restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
       worker:
+        condition: service_started
+      litellm:
         condition: service_started
     ports:
       - "127.0.0.1:8000:8000"
@@ -115,6 +145,10 @@ secrets:
     file: ./secrets/worker_token
   telegram_bot_token:
     file: ./secrets/telegram_bot_token
+  litellm_master_key:
+    file: ./secrets/litellm_master_key
+  litellm_config:
+    file: ./secrets/litellm_config
 
 volumes:
   postgres-data:

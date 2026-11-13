@@ -69,6 +69,8 @@ runs:
           "docker login ghcr.io -u '${GITHUB_ACTOR}' --password-stdin"
         ssh "${ssh_options[@]}" "$target" \
           'cd /opt/autotrading && docker compose pull; status=$?; docker logout ghcr.io; exit $status'
+        # The template of the LiteLLM configuration holds no secret: the machine adds the master key (ADR 0101).
+        ssh "${ssh_options[@]}" "$target" 'install -d -m 755 /opt/autotrading/litellm           && cat > /opt/autotrading/litellm/config.yaml' < deploy/litellm/config.yaml
         # Service secrets are generated on the machine and never leave it (ADR 0015).
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/prepare-installation.sh' \
           < deploy/prepare-installation.sh
@@ -83,7 +85,10 @@ runs:
         fi
         # On failure the container state and logs explain why; lines naming a password are dropped.
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans \
-          || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate worker | grep -vi password; exit 1; }'
+          || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate litellm worker | grep -vi password; exit 1; }'
         # The worker reads the token only when it starts: a changed token recreates the worker alone.
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && if [ -e .telegram_bot_token_changed ]; then
           docker compose up -d --no-deps --force-recreate worker && rm -f .telegram_bot_token_changed; fi'
+        # The proxy reads its configuration only when it starts: a changed configuration recreates the proxy alone.
+        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && if [ -e .litellm_config_changed ]; then
+          docker compose up -d --no-deps --force-recreate litellm && rm -f .litellm_config_changed; fi'
