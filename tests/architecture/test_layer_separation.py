@@ -7,6 +7,7 @@ from tests.architecture.known_violations import KNOWN_VIOLATIONS
 from tests.support.architecture import (
     SOURCE_ROOT,
     TECHNOLOGY_LIBRARIES,
+    TRANSPORT_LIBRARIES,
     Rule,
     Violation,
     source_modules,
@@ -79,6 +80,8 @@ def test_every_technology_folder_declares_its_libraries() -> None:
 
 
 def test_every_library_belongs_to_one_technology_folder() -> None:
-    libraries = [library for owned in TECHNOLOGY_LIBRARIES.values() for library in owned]
+    libraries = [
+        library for owned in TECHNOLOGY_LIBRARIES.values() for library in owned if library not in TRANSPORT_LIBRARIES
+    ]
 
     assert len(libraries) == len(set(libraries))

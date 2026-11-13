@@ -11,15 +11,13 @@ from sqlalchemy import Engine, create_engine
 
 from autotrading import bootstrap
 from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases
-from autotrading.adapters.outbound.httpx.telegram import HttpxTelegramInboxAdapter, HttpxTelegramMessengerAdapter
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import SqlAlchemyLinkCodeRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
-from autotrading.application.notifications.errors import MessageNotDeliveredError
+from autotrading.adapters.outbound.telegram.bot_api import TelegramInboxAdapter, TelegramMessengerAdapter
 from autotrading.application.notifications.ports import BotInboxPort, MessengerPort
 from autotrading.bootstrap import (
     TELEGRAM_BOT_SETTING,
-    UnconfiguredMessenger,
     WorkerExchanges,
     WorkerSettings,
     activity_readers_for,
@@ -33,7 +31,6 @@ from autotrading.bootstrap import (
     worker_use_cases,
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
-from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.messenger import FakeMessengerAdapter
@@ -95,14 +92,9 @@ def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
         )
 
     [(inbox, messenger)] = started
-    assert isinstance(inbox, HttpxTelegramInboxAdapter)
-    assert isinstance(messenger, HttpxTelegramMessengerAdapter)
+    assert isinstance(inbox, TelegramInboxAdapter)
+    assert isinstance(messenger, TelegramMessengerAdapter)
     assert caplog.records == []
-
-
-def test_the_unconfigured_messenger_delivers_nothing() -> None:
-    with pytest.raises(MessageNotDeliveredError):
-        UnconfiguredMessenger().send(ChatId(1), "text")
 
 
 def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
@@ -114,7 +106,7 @@ def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
         return httpx.Response(200, json={"ok": True, "result": []})
 
     client = httpx.Client(base_url=f"https://api.telegram.org/bot{FAKE_BOT}", transport=httpx.MockTransport(answer))
-    inbox = HttpxTelegramInboxAdapter(client)
+    inbox = TelegramInboxAdapter(client)
     bot = telegram_bot(create_engine("sqlite://"), inbox, FakeMessengerAdapter())
 
     bot.run(polled)

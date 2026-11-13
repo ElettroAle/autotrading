@@ -40,7 +40,7 @@ CONFIGURATION_READER = "def _required(c, n):\n    if not c.get(n):\n        rais
 VIOLATING = [
     Case(Rule.PORTS_IN_PORTS_MODULES, "bootstrap.py", "from typing import Protocol\nclass Reader(Protocol): ...\n"),
     Case(Rule.PORTS_IN_PORTS_MODULES, "domain/flows/flow.py", "import typing\nclass Rule(typing.Protocol): ...\n"),
-    Case(Rule.PORTS_IN_PORTS_MODULES, "adapters/outbound/httpx/news.py", "class NewsPort: ...\n"),
+    Case(Rule.PORTS_IN_PORTS_MODULES, "adapters/outbound/rss/news.py", "class NewsPort: ...\n"),
     Case(Rule.PORTS_IN_PORTS_MODULES, "application/flows/create_flow.py", "class Clock(Protocol[T]): ...\n"),
     Case(Rule.PORT_NAMES, "application/orders/ports.py", "class Exchange(Protocol): ...\n"),
     Case(Rule.PORT_NAMES, "application/orders/ports.py", "@dataclass(frozen=True)\nclass ExchangePort: ...\n"),
@@ -78,10 +78,10 @@ VIOLATING = [
     Case(Rule.ADAPTERS_DO_NOT_ORCHESTRATE, "adapters/outbound/sqlalchemy/x.py", ORCHESTRATING_ADAPTER),
     Case(
         Rule.ADAPTERS_DO_NOT_ORCHESTRATE,
-        "adapters/outbound/httpx/x.py",
+        "adapters/outbound/telegram/x.py",
         "class HttpxReaderAdapter:\n    def __init__(self, readers: Mapping[str, ActivityReaderPort]) -> None: ...\n",
     ),
-    Case(Rule.ADAPTERS_DO_NOT_ORCHESTRATE, "adapters/outbound/httpx/x.py", UNDECLARED_DECORATOR),
+    Case(Rule.ADAPTERS_DO_NOT_ORCHESTRATE, "adapters/outbound/telegram/x.py", UNDECLARED_DECORATOR),
     Case(Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY, "application/cycles/run.py", "import threading\n"),
     Case(Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY, "domain/flows/flow.py", "from os import environ\n"),
     Case(
@@ -98,11 +98,11 @@ VIOLATING = [
     ),
     Case(Rule.CORE_WITHOUT_TECHNOLOGY_NAMES, "domain/accounts/x.py", 'class A:\n    name = "Hyperliquid"\n'),
     Case(Rule.ONLY_PROJECT_EXCEPTIONS_RAISED, "domain/flows/flow.py", 'def f():\n    raise ValueError("no")\n'),
-    Case(Rule.ONLY_PROJECT_EXCEPTIONS_RAISED, "adapters/outbound/httpx/news.py", "def f():\n    raise RuntimeError\n"),
+    Case(Rule.ONLY_PROJECT_EXCEPTIONS_RAISED, "adapters/outbound/rss/news.py", "def f():\n    raise RuntimeError\n"),
     Case(Rule.ERROR_SHAPE, "adapters/outbound/hyperliquid/x.py", "class ShapeError(Exception): ...\n"),
     Case(Rule.ERROR_SHAPE, "domain/flows/x.py", "class FlowNotFoundError(DomainProblem): ...\n"),
     Case(Rule.ERROR_SHAPE, "domain/flows/x.py", "class Refusal(ValueError): ...\n"),
-    Case(Rule.NO_GENERIC_EXCEPT, "adapters/outbound/httpx/news.py", "try:\n    f()\nexcept Exception:\n    pass\n"),
+    Case(Rule.NO_GENERIC_EXCEPT, "adapters/outbound/rss/news.py", "try:\n    f()\nexcept Exception:\n    pass\n"),
     Case(Rule.NO_GENERIC_EXCEPT, "bootstrap.py", "try:\n    f()\nexcept:\n    pass\n"),
     Case(Rule.NO_GENERIC_EXCEPT, "domain/x.py", "try:\n    f()\nexcept (KeyError, BaseException):\n    pass\n"),
     Case(
@@ -130,7 +130,7 @@ VIOLATING = [
     Case(Rule.ADAPTER_NAMES, "adapters/outbound/hyperliquid/user_state.py", "class UserState: ...\n"),
     Case(Rule.NO_GENERIC_FOLDERS, "domain/common/x.py", "X = 1\n"),
     Case(Rule.NO_GENERIC_FOLDERS, "adapters/outbound/utils/x.py", "X = 1\n"),
-    Case(Rule.NO_ANY, "adapters/outbound/httpx/x.py", "from typing import Any\n"),
+    Case(Rule.NO_ANY, "adapters/outbound/telegram/x.py", "from typing import Any\n"),
     Case(Rule.NO_ANY, "domain/x.py", "import typing\nX: typing.Any = 1\n"),
     Case(Rule.TYPE_IGNORE_EXPLAINED, "adapters/inbound/api/app.py", "api.openapi = openapi  # type: ignore\n"),
     Case(
@@ -149,7 +149,7 @@ CLEAN = [
         'def wire(x: int | None) -> str | None:\n    return "a" + x.name\n',
     ),
     Case(Rule.BOOTSTRAP_WITHOUT_DECISIONS, "bootstrap.py", "def wire(x):\n    return [y for y in x]\n"),
-    Case(Rule.BOOTSTRAP_WITHOUT_DECISIONS, "adapters/outbound/httpx/news.py", "def f(x):\n    return x or 1\n"),
+    Case(Rule.BOOTSTRAP_WITHOUT_DECISIONS, "adapters/outbound/rss/news.py", "def f(x):\n    return x or 1\n"),
     Case(Rule.BOOTSTRAP_WITHOUT_CONSTANTS, "bootstrap.py", "import logging\ndef wire(): ...\n"),
     Case(Rule.BOOTSTRAP_WITHOUT_CLASSES, "bootstrap.py", "def wire(settings):\n    return Adapter(settings)\n"),
     Case(Rule.NO_BRIDGES, "adapters/outbound/sqlalchemy/x.py", "class SqlAlchemyAccountRepositoryAdapter: ...\n"),
@@ -157,7 +157,7 @@ CLEAN = [
     Case(Rule.LIBRARIES_IN_THEIR_FOLDER, "adapters/outbound/hyperliquid/x.py", "from eth_account import Account\n"),
     Case(Rule.LIBRARIES_IN_THEIR_FOLDER, "domain/flows/flow.py", "from decimal import Decimal\nimport autotrading\n"),
     Case(Rule.ADAPTERS_DO_NOT_ORCHESTRATE, "adapters/outbound/sqlalchemy/x.py", CONTRACT_IMPORTS),
-    Case(Rule.ADAPTERS_DO_NOT_ORCHESTRATE, "adapters/outbound/httpx/x.py", DECORATOR),
+    Case(Rule.ADAPTERS_DO_NOT_ORCHESTRATE, "adapters/outbound/telegram/x.py", DECORATOR),
     Case(
         Rule.ADAPTERS_DO_NOT_ORCHESTRATE,
         "adapters/inbound/api/x.py",
@@ -173,9 +173,7 @@ CLEAN = [
         "domain/errors.py",
         "class AutotradingError(Exception): ...\nclass DomainError(AutotradingError): ...\n",
     ),
-    Case(
-        Rule.NO_GENERIC_EXCEPT, "adapters/outbound/httpx/news.py", "try:\n    f()\nexcept httpx.HTTPError:\n    pass\n"
-    ),
+    Case(Rule.NO_GENERIC_EXCEPT, "adapters/outbound/rss/news.py", "try:\n    f()\nexcept httpx.HTTPError:\n    pass\n"),
     Case(
         Rule.USE_CASE_SHAPE,
         "application/flows/create_flow.py",
