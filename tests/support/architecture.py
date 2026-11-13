@@ -8,7 +8,7 @@ import ast
 import builtins
 import re
 import sys
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -290,21 +290,9 @@ def technology_folders(root: Path = SOURCE_ROOT) -> list[str]:
     )
 
 
-def folders_without_a_rule(folders: Iterable[str], rule_paths: Iterable[str]) -> list[str]:
-    """The technology folders that no technology rule in the index of CLAUDE.md covers with its paths."""
-    covered = set(rule_paths)
-    return sorted(folder for folder in folders if f"src/autotrading/{folder}/**" not in covered)
-
-
 def indexed_technology_rules(contract: str) -> list[str]:
     """The technology rules the index of CLAUDE.md lists, by file name."""
     return re.findall(r"^\| `(tech-[a-z0-9-]+\.md)` \|", contract, flags=re.MULTILINE)
-
-
-def paths_of_rule(rule: str) -> list[str]:
-    """The paths a rule declares in its front matter."""
-    front_matter = rule.split("---", 2)[1] if rule.startswith("---") else ""
-    return re.findall(r'^\s+- "([^"]+)"', front_matter, flags=re.MULTILINE)
 
 
 def violations_of(module: SourceModule) -> list[Violation]:
