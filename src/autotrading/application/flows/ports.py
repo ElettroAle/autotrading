@@ -13,6 +13,8 @@ from autotrading.domain.flows.account_reconciliation import AccountReading, Outs
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
+from autotrading.domain.flows.cycle_access import CycleAccess
+from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -267,6 +269,20 @@ class AddressOpenerPort(Protocol):
 
     def open_address(self, sealed: SealedAddress) -> str:
         """Raises FlowCredentialsNotOpenedError when the sealed text is of another account or no key opens it."""
+        ...
+
+
+class CycleAccessOpenerPort(Protocol):
+    def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:
+        """Opens the credentials a cycle proves on the exchange; raises FlowCredentialsNotOpenedError."""
+        ...
+
+
+class CycleAccountReaderPort(Protocol):
+    def cycle_reading(self, access: CycleAccess) -> CycleAccount:
+        """Reads the account proving the credentials; raises FlowCredentialsRefusedError when the exchange refuses
+        them and FlowExchangeUnavailableError when it does not answer.
+        """
         ...
 
 
@@ -586,12 +602,14 @@ class CycleLauncherPort(Protocol):
         ...
 
 
-class FlowStatePort[S = object, E = object](Protocol):
-    def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot[S]:
+class CycleStartPort[S = object](Protocol):
+    def execute(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot[S]:
         """The state of the flow at the start of the cycle; the anchor is the start of its schedule."""
         ...
 
-    def update(self, flow_id: UUID, anchor: datetime, executions: Sequence[E]) -> object:
+
+class CycleEndPort[E = object](Protocol):
+    def execute(self, flow_id: UUID, anchor: datetime, executions: Sequence[E]) -> object:
         """Applies the executions of the cycle and gives back the state of the flow at the end of it."""
         ...
 

@@ -4,11 +4,9 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from autotrading.bootstrap import CycleFlow
-from autotrading.domain.accounts.account_state import AccountState
-from autotrading.domain.accounts.balance import Balance
-from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
+from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -20,8 +18,8 @@ TENANT = TenantId.new()
 FLOW = a_flow(TENANT, configuration=replace(a_configuration(), assets=("BTC",), allocated_capital=Decimal(500)))
 
 
-def held(coin: str) -> Position:
-    return Position(coin, PositionSide.LONG, Decimal(1), 2, Decimal(100), Decimal(5), Decimal(60))
+def held(asset: str) -> CyclePosition:
+    return CyclePosition(asset, TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(5), Decimal(60))
 
 
 def attributed(
@@ -32,9 +30,7 @@ def attributed(
 
 
 def cycle_flow(state: FlowState, free_margin: Decimal = Decimal(10000)) -> CycleFlow:
-    account = AccountState(
-        Balance(Decimal(10000), "USDC"), Balance(free_margin, "USDC"), (held("BTC"), held("ETH")), READ_AT
-    )
+    account = CycleAccount("USDC", free_margin, (held("BTC"), held("ETH")))
     return CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", READ_AT, account, state)
 
 
@@ -66,7 +62,7 @@ def test_the_return_keeps_two_decimals() -> None:
 
 
 def test_the_positions_shown_are_those_of_the_account_on_the_assets_of_the_flow() -> None:
-    assert [position.coin for position in cycle_flow(attributed()).positions] == ["BTC"]
+    assert [position.asset for position in cycle_flow(attributed()).positions] == ["BTC"]
 
 
 def test_the_risk_measures_quotas_and_limits_on_the_money_of_the_flow() -> None:

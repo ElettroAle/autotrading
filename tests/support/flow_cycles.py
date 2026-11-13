@@ -10,6 +10,7 @@ from uuid import UUID
 
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
+from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.notify_unattributable import (
     NotifyUnattributableUseCase,
@@ -18,6 +19,9 @@ from autotrading.application.flows.notify_unattributable import (
 from autotrading.application.flows.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
+from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
+from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
@@ -25,6 +29,7 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
+from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
@@ -146,7 +151,6 @@ class FlowCycles:
 
     def ports_of(self, tenant_id: TenantId) -> TenantCyclePorts:
         platform = self.platform
-        worker = platform.worker_for(tenant_id)
         accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(platform.vault)
         access = OpenTradingAccessUseCase(accounts, opener)
@@ -169,28 +173,33 @@ class FlowCycles:
             RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
             record_executions,
         )
+        reconcile_for_cycle = ReconcileAccountForCycleUseCase(
+            reconcile_account,
+            NotifyUnattributableUseCase(
+                accounts,
+                UnattributableNotices(
+                    NotifyUnattributablePositionUseCase(notify),
+                    NotifyUnattributableFillUseCase(notify),
+                    NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                ),
+            ),
+        )
+        read_cycle_flow = ReadCycleFlowUseCase(
+            flows,
+            InMemoryFlowTimingAdapter(platform.flows, tenant_id),
+            ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
+            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, platform.ledger), reconcile_for_cycle),
+        )
         return TenantCyclePorts(
             flows=flows,
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
-            accounts=accounts,
-            read_exchange_state=worker.read_exchange_state,
-            read_flow_state=ReadFlowStateUseCase(flows, activity, platform.ledger),
+            start_cycle=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            end_cycle=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(
                 access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
-            ),
-            reconcile_for_cycle=ReconcileAccountForCycleUseCase(
-                reconcile_account,
-                NotifyUnattributableUseCase(
-                    accounts,
-                    UnattributableNotices(
-                        NotifyUnattributablePositionUseCase(notify),
-                        NotifyUnattributableFillUseCase(notify),
-                        NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                    ),
-                ),
             ),
             openings=openings,
             closed_positions=closed_positions,
@@ -205,7 +214,6 @@ class FlowCycles:
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
-            timing=InMemoryFlowTimingAdapter(platform.flows, tenant_id),
         )
 
     def services(self) -> CycleServices:
