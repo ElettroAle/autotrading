@@ -1,5 +1,6 @@
 """The record of a cycle keeps what each step produced as JSON data, with the flow it ran for (R1.7.1, R1.4.6)."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -49,10 +50,17 @@ class Prompt:
 
 @dataclass(frozen=True, slots=True)
 class Decision:
+    action: str
     asset: str
 
-    def intent_with[O, C, H](self, opening: object, closing: object, holding: object) -> O | C | H:
-        raise AssertionError
+    def intent_with[O, C, H](
+        self, opening: Callable[[str, str, Decimal, int], O], closing: Callable[[str], C], holding: Callable[[str], H]
+    ) -> O | C | H:
+        if self.action == "open":
+            return opening(self.asset, "long", Decimal("0.1"), 2)
+        if self.action == "close":
+            return closing(self.asset)
+        return holding(self.asset)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +84,7 @@ class Reply:
     cost_usd: Decimal | None
 
 
-REPLY = Reply(Response("{}", (Decision("BTC"),), ("x",), ("ETH",)), Usage(120, 30), Decimal("0.01"))
+REPLY = Reply(Response("{}", (Decision("hold", "BTC"),), ("x",), ("ETH",)), Usage(120, 30), Decimal("0.01"))
 
 
 def journal() -> JsonCycleJournalAdapter:
@@ -115,7 +123,7 @@ def test_the_context_is_recorded_as_the_messages_the_agent_receives() -> None:
 def test_the_decisions_are_recorded_with_the_raw_answer_the_discarded_and_the_missing() -> None:
     assert journal().describe(CycleStep.AGENT_DECISION, CycleDecisions(CYCLE_FLOW, REPLY)) == {
         "risposta": "{}",
-        "decisioni": [{"tipo": "Decision", "asset": "BTC"}],
+        "decisioni": [{"tipo": "Decision", "action": "hold", "asset": "BTC"}],
         "scartate": ["x"],
         "mancanti": ["ETH"],
     }

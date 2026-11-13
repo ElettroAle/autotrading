@@ -52,28 +52,31 @@ class Composer:
 
 
 @dataclass(frozen=True, slots=True)
-class Closing:
+class Decision:
+    action: str
     asset: str
 
     def intent_with[O, C, H](
         self, opening: Callable[[str, str, Decimal, int], O], closing: Callable[[str], C], holding: Callable[[str], H]
     ) -> O | C | H:
-        return closing(self.asset)
+        if self.action == "open":
+            return opening(self.asset, "long", Decimal("0.1"), 2)
+        if self.action == "close":
+            return closing(self.asset)
+        return holding(self.asset)
 
 
-@dataclass(frozen=True, slots=True)
-class Opening:
-    asset: str
+def Opening(asset: str) -> Decision:  # noqa: N802 - reads as the decision it builds
+    return Decision("open", asset)
 
-    def intent_with[O, C, H](
-        self, opening: Callable[[str, str, Decimal, int], O], closing: Callable[[str], C], holding: Callable[[str], H]
-    ) -> O | C | H:
-        return opening(self.asset, "long", Decimal("0.1"), 2)
+
+def Closing(asset: str) -> Decision:  # noqa: N802 - reads as the decision it builds
+    return Decision("close", asset)
 
 
 @dataclass(frozen=True, slots=True)
 class Response:
-    decisions: tuple[Closing | Opening, ...]
+    decisions: tuple[Decision, ...]
     raw: str = "{}"
     discarded: tuple[object, ...] = ()
     missing: tuple[str, ...] = ()
