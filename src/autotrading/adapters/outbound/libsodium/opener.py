@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Mapping
 from uuid import UUID
 
@@ -20,6 +21,8 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 
 PRIVATE_KEY_BYTES = 32
+# The register of the openings the threat model counts on to detect misuse (docs/architecture.md §8.2, ADR 0007).
+decryptions = logging.getLogger("autotrading.credentials")
 
 
 class InvalidPrivateCredentialsKeyError(AutotradingError):
@@ -42,40 +45,51 @@ class SodiumCredentialOpenerAdapter:
 
     def open(self, account: Account) -> Credentials:
         sealed = account.credentials
-        credentials = self._opened(sealed.key_version, sealed.ciphertext, account.tenant_id, account.id.value)
+        credentials = self._opened("conto", sealed.key_version, sealed.ciphertext, account.tenant_id, account.id.value)
         if credentials is None:
             raise CredentialsNotOpenedError
         return credentials
 
     def open_access(self, sealed: SealedAccess) -> TradingAccess:
         """The same opening for the orders context, which signs its orders with it (ADR 0023)."""
-        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        credentials = self._opened("ordini", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
         if credentials is None:
             raise OrderCredentialsNotOpenedError
         return TradingAccess(sealed.exchange, credentials.account_address, credentials.secret_key)
 
     def open_address(self, sealed: SealedAddress) -> str:
         """The same opening for the flows context, which only reads the account on its exchange (ADR 0044)."""
-        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        credentials = self._opened("flussi", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
         if credentials is None:
             raise FlowCredentialsNotOpenedError
         return credentials.account_address
 
     def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:
         """The same opening for the cycle of a flow, which proves the credentials on the exchange (R1.2.4)."""
-        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        credentials = self._opened("ciclo", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
         if credentials is None:
             raise FlowCredentialsNotOpenedError
         return CycleAccess(credentials.account_address, credentials.secret_key)
 
     def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
         """The same opening for the verification procedure, which proves the credentials on the exchange (ADR 0024)."""
-        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        credentials = self._opened(
+            "verifica", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id
+        )
         if credentials is None:
             raise VerificationCredentialsNotOpenedError
         return VerificationAccess(credentials.account_address, credentials.secret_key)
 
-    def _opened(self, key_version: int, ciphertext: bytes, tenant_id: TenantId, account_id: UUID) -> Credentials | None:
+    def _opened(
+        self, purpose: str, key_version: int, ciphertext: bytes, tenant_id: TenantId, account_id: UUID
+    ) -> Credentials | None:
+        credentials = self._credentials_in(key_version, ciphertext, tenant_id, account_id)
+        record_opening(purpose, f"conto {account_id}", tenant_id, key_version, opened=credentials is not None)
+        return credentials
+
+    def _credentials_in(
+        self, key_version: int, ciphertext: bytes, tenant_id: TenantId, account_id: UUID
+    ) -> Credentials | None:
         document = self._document_of(key_version, ciphertext)
         if document is None or (document.get("tenant_id"), document.get("account_id")) != (
             str(tenant_id.value),
@@ -96,6 +110,18 @@ class SodiumCredentialOpenerAdapter:
         if not isinstance(document, Mapping):
             return None
         return document
+
+
+def record_opening(purpose: str, subject: str, tenant_id: TenantId, key_version: int, *, opened: bool) -> None:
+    """Records who was opened, for what, with which key and how it went; the moment is the time of the record."""
+    if opened:
+        decryptions.info(
+            "decifratura riuscita per %s: tenant %s, %s, versione %s", purpose, tenant_id.value, subject, key_version
+        )
+        return
+    decryptions.warning(
+        "decifratura rifiutata per %s: tenant %s, %s, versione %s", purpose, tenant_id.value, subject, key_version
+    )
 
 
 def private_key_of(raw: bytes) -> PrivateKey:
