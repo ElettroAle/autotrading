@@ -2,12 +2,12 @@ from dataclasses import dataclass, field
 
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError
 from autotrading.application.agent.ports import (
+    ModelCatalogPort,
     ProviderKeyRepositoryPort,
     ProviderKeySealerPort,
     ProviderKeyVerifierPort,
 )
 from autotrading.application.agent.provider_keys import operations, supported_provider
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -24,7 +24,7 @@ class RegisterProviderKeyCommand:
 class ProviderKeyServices:
     """What a use case needs to accept a key: the models offered, the provider that checks it, the seal."""
 
-    catalog: ModelCatalog
+    catalog: ModelCatalogPort
     verifier: ProviderKeyVerifierPort
     sealer: ProviderKeySealerPort
 

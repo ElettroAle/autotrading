@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
+from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
@@ -208,6 +209,14 @@ class SourceSettingsPort(Protocol):
 
     def execute(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         """The source with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
+        ...
+
+
+class FlowModelsPort(Protocol):
+    """The models a flow can choose, as the catalog of the platform describes them now (R1.4.2)."""
+
+    def definition_of(self, model: str) -> ModelDefinition:
+        """Raises ModelNotAvailableError or FlowModelCatalogUnavailableError."""
         ...
 
 

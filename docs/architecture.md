@@ -14,9 +14,9 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
 |------|-----------|--------|
 | Linguaggio backend | **Python 3.15** | SDK ufficiale Hyperliquid, CCXT, Prophet, LangGraph: tutto l'ecosistema di riferimento è Python. |
 | Esecuzione | **Container**, cloud agnostic | Nessun servizio proprietario di un cloud, a parte i fornitori dei modelli IA. Deve girare uguale su Docker Compose locale, su una VM, su Azure Container Apps o su Railway. Costi minimi. |
-| Database | **PostgreSQL 16** (scelta delegata) | Un solo database per tutto: dati di dominio, JSON dei contesti, serie temporali, stato di LangGraph, spesa di LiteLLM. Disponibile ovunque. |
+| Database | **PostgreSQL 16** (scelta delegata) | Un solo database per tutto: dati di dominio, JSON dei contesti, serie temporali, stato di LangGraph. Il proxy LiteLLM gira senza database (ADR 0101). Disponibile ovunque. |
 | Orchestrazione dell'agente | **LangGraph** | Grafo tipizzato con fan-out parallelo delle fonti; stessa base per comitato (6.28) e doppio timeframe (6.27). |
-| Accesso ai modelli | **LiteLLM proxy** self-hosted | API unica OpenAI-compatible verso oltre 100 fornitori (OpenAI, Anthropic, DeepSeek, Gemini, xAI, Mistral, Kimi, Groq, Azure OpenAI, Bedrock, Vertex, OpenRouter, Ollama) **[doc]**. Chiavi virtuali con budget per tenant e spesa tracciata in PostgreSQL **[doc]**. Cambio modello = configurazione (RF-16). |
+| Accesso ai modelli | **LiteLLM proxy** self-hosted | API unica OpenAI-compatible verso oltre 100 fornitori (OpenAI, Anthropic, DeepSeek, Gemini, xAI, Mistral, Kimi, Groq, Azure OpenAI, Bedrock, Vertex, OpenRouter, Ollama) **[doc]**. Nessuna chiave dei fornitori nel proxy: ogni richiesta porta la chiave dell'utente del flusso (RF-01.05, ADR 0101). Catalogo dei modelli letto dal proxy, dalle rotte wildcard e dalla mappa dei modelli di LiteLLM (ADR 0103). Cambio modello = configurazione (RF-16). |
 | Identità | **OIDC generico**, primo IdP Entra ID | L'applicazione conosce solo issuer, client id e claim; Entra ID è sostituibile con qualunque IdP OIDC. Vedi 7.1 per i limiti con utenti esterni. |
 | Dashboard | **React + TypeScript** (fase F2) | Frontend separato che consuma la stessa API programmatica di F1. |
 | Budget | Nessun vincolo ora | I costi vengono misurati per flusso (RNF-09) e decisi dopo. |
@@ -48,7 +48,7 @@ Sei container, tutti sostituibili e tutti senza dipendenze da un cloud specifico
 | Container | Ruolo | Fase |
 |-----------|-------|------|
 | `postgres` | Unico stato persistente. | F0 |
-| `litellm` | Gateway verso i modelli IA; chiavi virtuali per tenant; registro spesa. | F1 |
+| `litellm` | Gateway verso i modelli IA con la chiave dell'utente di ogni richiesta; catalogo dei modelli; senza database (ADR 0101, ADR 0103). | F1 |
 | `api` | Interfaccia programmatica (RF-21): autenticazione OIDC, tenancy, configurazione versionata, comandi, consultazione. Serve anche la dashboard statica in F2. | F0 |
 | `worker` | Pianificatore e ciclo decisionale dei flussi (RF-04), esecuzione ordini, contabilità virtuale, riconciliazione, notifiche. | F1 |
 | `forecaster` | Servizio interno per le previsioni Prophet (RF-08), isolato perché pesante (cmdstan) e condivisibile tra flussi. | F1 |
@@ -60,30 +60,30 @@ Sei container, tutti sostituibili e tutti senza dipendenze da un cloud specifico
 
 ## 3. Struttura del repository
 
+Architettura esagonale: prima il livello, poi il contesto. Regole e nomenclatura vincolanti in `CLAUDE.md`.
+
 ```
 autotrading/
-├── backend/
-│   ├── pyproject.toml              # uv/poetry, Python 3.15
-│   └── autotrading/
-│       ├── api/                    # FastAPI: router per tenant, conti, flussi, cicli, comandi
-│       ├── worker/                 # scheduler, esecuzione cicli, riconciliazione, notifiche
-│       ├── core/                   # dominio: modelli, contabilità virtuale, rischio, versioning
-│       ├── graph/                  # LangGraph: stato del ciclo, nodi, grafi (agente unico, comitato, strategico)
-│       ├── sources/                # fonti dati: interfaccia + un modulo per fonte
-│       ├── exchanges/              # adapter exchange: interfaccia + hyperliquid + simulato (replay)
-│       ├── llm/                    # client verso LiteLLM, schema output, costi
-│       ├── notify/                 # telegram, email
-│       ├── db/                     # SQLAlchemy 2 + Alembic
-│       └── settings.py
-├── forecaster/                     # servizio Prophet (FastAPI minimale)
-├── dashboard/                      # React + TypeScript (F2)
-├── deploy/
-│   ├── compose.yaml                # sviluppo e produzione piccola
-│   ├── litellm/config.yaml
-│   └── env.example
-├── docs/
-└── .github/workflows/              # lint, test, build immagini su GHCR
+├── src/autotrading/
+│   ├── domain/                     # regole di business per contesto, solo libreria standard
+│   ├── application/                # casi d'uso e porte (*Port) per contesto
+│   ├── adapters/
+│   │   ├── configuration/          # ConfigurationSource: valori e segreti da file montati
+│   │   ├── inbound/api/            # FastAPI (api e API interna del worker)
+│   │   └── outbound/               # un sistema integrato per cartella: hyperliquid/, litellm/, sqlalchemy/,
+│   │                               #   libsodium/, oidc/, telegram/, worker/, rss/, alternative_me/,
+│   │                               #   coinmarketcap/, json/, threads/, system_clock/
+│   └── bootstrap.py                # composition root
+├── migrations/                     # Alembic
+├── tests/                          # unit, scenari, integrazione, architettura
+├── specs/                          # scenari Gherkin
+├── tools/                          # script della pipeline
+├── deploy/                         # cloud-init, compose.yaml, litellm/config.yaml, postgres, tailscale
+├── docs/                           # requisiti, architettura, adr/
+└── .github/                        # workflow e action della pipeline
 ```
+
+I container `forecaster` e `dashboard` della sezione 2 non sono ancora presenti.
 
 ---
 
@@ -111,7 +111,8 @@ Tutte le tabelle di dominio hanno `tenant_id`; l'API filtra sempre per il tenant
 | `llm_calls` | Ogni chiamata: modello, token, costo, latenza, ciclo, ruolo (agente, analista, gestore). | RF-16.06 |
 | `reconciliations` | Esiti delle riconciliazioni per conto. | RF-13.06 |
 | `notifications` | Eventi notificati, canale, esito. | 6.24 |
-| `models_catalog` | Fornitori e modelli disponibili, parametri ammessi, data di cutoff. | RF-16.05, RF-28.10 |
+
+Il catalogo dei modelli (fornitori, modelli, parametri ammessi; RF-16.05) non è una tabella: lo legge l'adapter `litellm` dal proxy (ADR 0103).
 
 Serie temporali (`source_samples`, `equity_snapshots`, `forecasts`) partizionate per mese. TimescaleDB non necessario in F1; opzione futura, resta PostgreSQL.
 
@@ -166,7 +167,7 @@ Fonti F1: `indicators` (candele dall'exchange, calcolo con pandas-ta), `pivots`,
 
 ### 6.2 Modello IA
 
-Nessun adapter per fornitore: il client parla con LiteLLM via SDK OpenAI (`base_url` del proxy). Il "fornitore" nella configurazione del flusso è il nome modello di LiteLLM (`provider/model`). Per ogni chiamata si passano metadata (tenant, flusso, ciclo, ruolo) usati da LiteLLM per il registro spesa **[doc]**. Parametri per flusso: temperatura, limite token, livello di ragionamento se supportato. Il catalogo (`models_catalog`) è sincronizzato dalla configurazione di LiteLLM.
+Nessun adapter per fornitore: il client parla con LiteLLM via SDK OpenAI (`base_url` del proxy). Il "fornitore" nella configurazione del flusso è il nome modello di LiteLLM (`provider/model`). La chiave del fornitore è quella dell'utente del flusso e viaggia solo nella sua richiesta (RF-01.05, ADR 0101). Il proxy non ha database: il costo di ogni chiamata si registra nel ciclo del flusso (R1.4.6), senza metadata verso LiteLLM. Parametri per flusso: temperatura, limite token, livello di ragionamento se supportato. Il catalogo è letto dal proxy: rotte wildcard per fornitore espanse con la mappa dei modelli di LiteLLM; i modelli OpenRouter, che la mappa non descrive, si scrivono nella configurazione del proxy (ADR 0103). La verifica di una chiave alla registrazione resta diretta presso il fornitore, senza consumare credito (ADR 0029, ADR 0101).
 
 ### 6.3 Exchange
 
@@ -225,10 +226,10 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 
   La verifica delle credenziali alla registrazione e alla sostituzione (R0.2.1, R0.2.4) usa le credenziali presenti nella richiesta prima di cifrarle, quindi l'API non ha bisogno di decifrarle. Le funzioni che usano credenziali salvate (stato del conto R0.2.2, ordini R0.3) le esegue il `worker`, che l'API chiama via HTTP sulla rete interna dell'installazione con un token generato sulla macchina (ADR 0021).
 - **Chiavi**: generate dalla pipeline direttamente sul server al primo deploy, se assenti; la privata è un file leggibile solo dall'utente dell'immagine (65532), montato in sola lettura nel solo container `worker` (ADR 0021). Non passano mai da GitHub né da una persona. Rotazione periodica e su richiesta dalla pipeline: requisito futuro R0.2.6; la versione della chiave nel formato salvato la rende possibile senza migrazioni.
-- **Segreti dei servizi** (password del database, chiavi dei fornitori dei modelli): segreti degli environment GitHub, consegnati dalla pipeline come file montati in sola lettura, leggibili solo dall'utente del container.
+- **Segreti dei servizi** (password del database, token del bot Telegram): segreti degli environment GitHub, consegnati dalla pipeline come file montati in sola lettura, leggibili solo dall'utente del container.
 - **Mai variabili d'ambiente per i segreti** (visibili con `docker inspect` e da `/proc`): solo file montati.
 - **Registro delle decifrature**: ogni decifratura registra conto e momento, mai il contenuto.
-- **LiteLLM**: chiavi dei fornitori come file montati; una chiave virtuale per tenant con budget mensile.
+- **LiteLLM**: nessuna chiave dei fornitori nel proxy; la chiave IA dell'utente, cifrata nel database, la decifra il `worker` e la passa solo nella richiesta del suo flusso (RF-01.05). La chiave master del proxy è generata sulla macchina e montata come file in `api` e `worker` (ADR 0101).
 
 **Limitare il danno se la macchina è compromessa.**
 
@@ -309,7 +310,7 @@ Configurazione del nodo (F0):
 | T1 | Hyperliquid testnet: faucet, disponibilità ordini trigger, liquidità dei mercati. | Verificare in F0 con la procedura RF-19.05. |
 | T2 | LangGraph e LangChain evolvono velocemente (versioni major frequenti). | Fissare le versioni; isolare l'uso in `graph/`; il dominio non importa LangChain. |
 | T3 | Prophet: immagine pesante (cmdstan), addestramento lento con storici lunghi. | Servizio separato, cache dei modelli, riaddestramento a intervalli, non a ogni ciclo. |
-| T4 | Costo LLM con più flussi e comitato. | Budget per tenant in LiteLLM; stima prima del salvataggio della configurazione (RF-28.08). |
+| T4 | Costo LLM con più flussi e comitato. | Costo di ogni chiamata registrato nel ciclo del flusso (R1.4.6); stima prima del salvataggio della configurazione (RF-28.08). |
 | T5 | Entra ID per utenti esterni self-service. | Entra ID workforce con inviti finché bastano; External ID o altro IdP OIDC dopo, senza cambi nell'app. |
 | T6 | Scadenza API wallet (180 giorni). | Campo `expires_at` sul conto, notifica 14 giorni prima. |
 | T7 | Nonce con più worker. | Un API wallet per replica; in F1 una sola replica. |

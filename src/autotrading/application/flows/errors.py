@@ -203,3 +203,12 @@ class UnrecordableDocumentError(ApplicationError):
 
     def __init__(self, kind: str) -> None:
         super().__init__(f"documento del ciclo non registrabile: {kind}")
+
+
+class FlowModelCatalogUnavailableError(ApplicationError):
+    """The catalog of the models cannot be read now: the model of a flow cannot be checked (ADR 0103)."""
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("catalogo dei modelli non disponibile")

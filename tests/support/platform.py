@@ -7,7 +7,6 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
@@ -74,6 +73,7 @@ from tests.fakes.linked_chat_repository import (
 )
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
@@ -91,6 +91,7 @@ from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.directory import Directory
+from tests.support.model_catalog import PLATFORM_MODELS
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -119,7 +120,7 @@ class Platform:
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
         self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
-        self.model_catalog: ModelCatalog = load_model_catalog()
+        self.model_catalog: ModelCatalog = PLATFORM_MODELS
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
@@ -186,13 +187,13 @@ class Platform:
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_verifier=self.providers,
             provider_key_usage=flows,
-            model_catalog=self.model_catalog,
+            model_catalog=InMemoryModelCatalogAdapter(self.model_catalog),
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
-                models=SelectModelUseCase(self.model_catalog, provider_keys),
+                models=SelectModelUseCase(InMemoryModelCatalogAdapter(self.model_catalog), provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,

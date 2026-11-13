@@ -24,7 +24,6 @@ from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProvi
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
-from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.composition import libsodium_opening_adapters, libsodium_sealing_adapters
 from autotrading.adapters.outbound.libsodium.opener import (
     SodiumCredentialOpenerAdapter,
@@ -84,7 +83,12 @@ from autotrading.application.accounts.read_exchange_state import ReadExchangeSta
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
-from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
+from autotrading.application.agent.ports import (
+    ModelCallPort,
+    ModelCatalogPort,
+    ProviderKeyOpenerPort,
+    ProviderKeyRepositoryPort,
+)
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.create_flow import FlowChecks
@@ -108,6 +112,7 @@ from autotrading.application.flows.ports import (
     ExchangeLimitsPort,
     FlowAccountPorts,
     FlowLockPort,
+    FlowModelsPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
     FlowSummary,
@@ -202,7 +207,6 @@ from autotrading.application.verification.run_exchange_verification import (
     VerificationReadings,
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
@@ -344,12 +348,12 @@ def tenant_use_cases(
     ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
-    providers: httpx.Client,
+    providers: tuple[httpx.Client, ModelCatalogPort, FlowModelsPort],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
-    provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
+    verification_client, model_catalog, flow_models = providers
+    provider_key_verifier = HttpxProviderKeyVerifierAdapter(verification_client)
     credential_sealer, provider_key_sealer = sealers
-    model_catalog = load_model_catalog()
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
@@ -387,7 +391,7 @@ def tenant_use_cases(
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=markets,
-                models=SelectModelUseCase(model_catalog, provider_keys),
+                models=SelectModelUseCase(flow_models, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
@@ -551,12 +555,13 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     source = ConfigurationSource(configuration)
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
+    _, catalog = litellm_adapters(source)
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
         source.environment(),
         worker_adapters(source),
-        httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
+        (httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS), catalog, catalog),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
@@ -572,22 +577,24 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     ports_of = cycle_ports(engine, opener, environment, slippage, messenger)
-    model_call = litellm_adapters(source)
-    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, model_call))
+    models = litellm_adapters(source)
+    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, models))
     return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
 
 
 def cycle_services(
-    environment: str, provider_key_opener: SodiumProviderKeyOpenerAdapter, model_call: ModelCallPort
+    environment: str,
+    provider_key_opener: SodiumProviderKeyOpenerAdapter,
+    models: tuple[ModelCallPort, ModelCatalogPort],
 ) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     return CycleServices(
         environment=environment,
         clock=system_clock_adapters(),
-        catalog=load_model_catalog(),
+        catalog=models[1],
         provider_key_opener=provider_key_opener,
-        model_call=model_call,
+        model_call=models[0],
         sentiments={
             SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
             SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
@@ -642,7 +649,7 @@ class CycleServices:
     """What every cycle shares, whatever the tenant: the clock, the models, the sources, the exchanges."""
 
     clock: ClockPort
-    catalog: ModelCatalog
+    catalog: ModelCatalogPort
     provider_key_opener: ProviderKeyOpenerPort
     model_call: ModelCallPort
     sentiments: Mapping[str, SentimentPort]

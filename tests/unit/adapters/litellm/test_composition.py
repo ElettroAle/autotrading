@@ -1,4 +1,4 @@
-"""The model call of the installation through the LiteLLM proxy, reached with the master key (ADR 0101)."""
+"""Model call and catalog of the installation through the LiteLLM proxy, with the master key (ADR 0101, 0103)."""
 
 from pathlib import Path
 
@@ -9,6 +9,7 @@ from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.adapters.outbound.litellm.configuration import _LiteLlmSettings
 from autotrading.adapters.outbound.litellm.model_call import LiteLlmModelCallAdapter
+from autotrading.adapters.outbound.litellm.model_catalog import LiteLlmModelCatalogAdapter
 
 MASTER_KEY = "sk-fake-master-key"
 URL = "http://litellm:4000"
@@ -20,8 +21,11 @@ def _configuration(tmp_path: Path, **overrides: str) -> dict[str, str]:
     return {"LITELLM_URL": URL, "LITELLM_MASTER_KEY_FILE": str(location), **overrides}
 
 
-def test_the_model_call_reaches_the_proxy_of_the_installation(tmp_path: Path) -> None:
-    assert isinstance(litellm_adapters(ConfigurationSource(_configuration(tmp_path))), LiteLlmModelCallAdapter)
+def test_the_model_call_and_the_catalog_reach_the_proxy_of_the_installation(tmp_path: Path) -> None:
+    model_call, catalog = litellm_adapters(ConfigurationSource(_configuration(tmp_path)))
+
+    assert isinstance(model_call, LiteLlmModelCallAdapter)
+    assert isinstance(catalog, LiteLlmModelCatalogAdapter)
 
 
 @pytest.mark.parametrize("name", ["LITELLM_URL", "LITELLM_MASTER_KEY_FILE"])
