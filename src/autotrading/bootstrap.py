@@ -137,6 +137,7 @@ from autotrading.application.flows.errors import (
 )
 from autotrading.application.flows.list_account_flows import ListAccountFlowsCommand, ListAccountFlowsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.notify_unattributable import NotifyUnattributableUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
     ActivityReaderPort,
@@ -247,7 +248,6 @@ from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
-from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.notification import Amount, Notification
 from autotrading.domain.orders.direction import Direction
@@ -673,7 +673,9 @@ class WorkerUseCaseFactory:
             forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
-            reconcile_account=reconcile_account,
+            reconcile_for_cycle=ReconcileAccountForCycleUseCase(
+                reconcile_account, NotifyUnattributableUseCase(accounts, notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
             openings=openings,
             closed_positions=closed_positions,
             record_closing=RecordFlowClosingUseCase(openings, closed_positions, closing_notice),
@@ -935,7 +937,7 @@ class TenantCyclePorts:
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
     execute_flow_orders: ExecuteFlowOrdersUseCase
-    reconcile_account: ReconcileAccountUseCase
+    reconcile_for_cycle: ReconcileAccountForCycleUseCase
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
     record_closing: RecordFlowClosingUseCase
@@ -1030,13 +1032,13 @@ class FlowStateFromFlows:
 
     def read(self, flow_id: UUID) -> FlowSnapshot[CycleFlow]:
         ports = self._ports_of(self._directory.tenant_of(flow_id))
-        reconciled = _reconcile_for_cycle(ports).execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
+        reconciled = ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
         return self._snapshot(flow_id, reconciled=reconciled)
 
     def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
         """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
         ports = self._ports_of(self._directory.tenant_of(flow_id))
-        _reconcile_for_cycle(ports).execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
+        ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
         return self._snapshot(flow_id, reconciled=False).state
 
     def _snapshot(self, flow_id: UUID, *, reconciled: bool) -> FlowSnapshot[CycleFlow]:
@@ -1048,39 +1050,13 @@ class FlowStateFromFlows:
             state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
         except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
             raise FlowCredentialsRejectedError(account.name.value, account.id.value) from error
-        read_cycle_state = ReadCycleFlowStateUseCase(ports.read_flow_state, _reconcile_for_cycle(ports))
+        read_cycle_state = ReadCycleFlowStateUseCase(ports.read_flow_state, ports.reconcile_for_cycle)
         attributed = read_cycle_state.execute(ReadCycleFlowStateCommand(flow.id, reconciled))
         started_at = ports.timing.timings().get(flow.id, UNSTAMPED).beginning(self._directory.anchor_of(flow_id))
         cycle_flow = CycleFlow(
             tenant_id, flow, account.name.value, account.exchange.value, started_at, state, attributed
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
-
-
-def _reconcile_for_cycle(ports: TenantCyclePorts) -> ReconcileAccountForCycleUseCase:
-    return ReconcileAccountForCycleUseCase(ports.reconcile_account, UnattributableNotices(ports))
-
-
-class UnattributableNotices:
-    """Bridges the cases no flow explains to the notifications of the tenant (R1.6.2)."""
-
-    def __init__(self, ports: TenantCyclePorts) -> None:
-        self._ports = ports
-
-    def notice(self, items: Sequence[UnattributableItem]) -> None:
-        # A position closed outside is told by the history it enters (ADR 0070): only the new cases remain.
-        for item in items:
-            self._ports.notify.execute(_unattributable_notification(self._ports, item))
-
-
-def _unattributable_notification(ports: TenantCyclePorts, item: UnattributableItem) -> Notification:
-    account = find_account(ports.accounts, AccountId(item.account_id)).name.value
-    asset = item.asset or ""
-    if item.kind is UnattributableKind.POSITION:
-        return Notification.unattributable_position(account, asset)
-    if item.kind is UnattributableKind.FILL:
-        return Notification.unattributable_fill(account, asset)
-    return Notification.unattributable_movement(account, Amount(item.amount, ports.settlement_currency))
 
 
 class FlowPauseFromFlows:

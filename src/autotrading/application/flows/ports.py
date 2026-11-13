@@ -30,6 +30,7 @@ from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
+from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -241,9 +242,25 @@ class PausedFlowNoticePort(Protocol):
 
 
 class UnattributableNoticePort(Protocol):
-    def notice(self, items: Sequence[UnattributableItem]) -> None:
+    """In the worker: NotifyUnattributableUseCase (R1.6.2)."""
+
+    def execute(self, items: Sequence[UnattributableItem]) -> None:
         """Tells the user what the account shows that no flow explains, each case the first time found (R1.6.2)."""
         ...
+
+
+class FlowAccountNamePort(Protocol):
+    """Bound to the tenant of the request: the name the user gave an account, to tell it in a notification."""
+
+    def account_name(self, account_id: UUID) -> str:
+        """Raises FlowAccountNotFoundError for an account that does not exist or belongs to another tenant."""
+        ...
+
+
+class FlowNotifierPort(Protocol):
+    """Bound to the tenant of the request: it is NotifyUseCase of the notifications context (R1.8.1)."""
+
+    def execute(self, notification: Notification) -> None: ...
 
 
 class AccountExecutionsPort(Protocol):

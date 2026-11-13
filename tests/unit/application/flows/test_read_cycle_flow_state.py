@@ -48,7 +48,7 @@ class RecordedNotices:
     def __init__(self) -> None:
         self.items: list[UnattributableItem] = []
 
-    def notice(self, items: Sequence[UnattributableItem]) -> None:
+    def execute(self, items: Sequence[UnattributableItem]) -> None:
         self.items.extend(items)
 
 

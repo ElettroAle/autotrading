@@ -20,7 +20,7 @@ from autotrading.application.flows.errors import (
     FlowLedgerIncompleteError,
     FlowPositionMismatchError,
 )
-from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -492,7 +492,7 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
 
     ports = worker.cycle_ports_for(TenantId.new())
 
-    assert isinstance(ports.reconcile_account, ReconcileAccountUseCase)
+    assert isinstance(ports.reconcile_for_cycle, ReconcileAccountForCycleUseCase)
     assert isinstance(ports.openings, SqlAlchemyFlowOpeningsAdapter)
     assert isinstance(ports.closed_positions, NotifiedClosedPositions)
     assert isinstance(ports.notify, NotifyUseCase)

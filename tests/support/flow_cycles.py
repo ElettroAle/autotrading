@@ -12,10 +12,12 @@ from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY a
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
+from autotrading.application.flows.notify_unattributable import NotifyUnattributableUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
@@ -172,7 +174,9 @@ class FlowCycles:
             execute_flow_orders=ExecuteFlowOrdersUseCase(
                 access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
             ),
-            reconcile_account=reconcile_account,
+            reconcile_for_cycle=ReconcileAccountForCycleUseCase(
+                reconcile_account, NotifyUnattributableUseCase(accounts, notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
             openings=openings,
             closed_positions=closed_positions,
             record_closing=RecordFlowClosingUseCase(openings, closed_positions, closing_notice),

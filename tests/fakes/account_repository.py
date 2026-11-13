@@ -62,6 +62,13 @@ class InMemoryAccountRepositoryAdapter:
             account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
         )
 
+    def account_name(self, account_id: UUID) -> str:
+        """The name of the account as the flows context tells it in a notification (R1.6.2)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.name.value
+
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         account = self.get(AccountId(account_id))
         if account is None:
