@@ -5,12 +5,15 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
+from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
+from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleCommand, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.cycles.source_collector import SourceCollector
 from autotrading.domain.cycles.cycle_record import CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.cycles import (
     ACTIVE,
     PAUSED,
@@ -45,7 +48,10 @@ class Cycles:
     def __init__(self) -> None:
         self.failures = Failures()
         self.clock = FakeClockAdapter(at("10:00:00"))
+        self.tenant = TenantId(uuid4())
         self.records = InMemoryCycleRepositoryAdapter()
+        self.records_of_tenants: dict[TenantId, InMemoryCycleRepositoryAdapter] = {self.tenant: self.records}
+        self.planned = ThreadsPlannedFlowsAdapter()
         self.lock = InMemoryFlowLockAdapter()
         self.flows = FakeFlowsAdapter(self.failures)
         self.sources = FakeSourcesAdapter(SECOND)
@@ -65,8 +71,12 @@ class Cycles:
         )
         steps = CycleSteps(self.flows, collector, self.context, self.agent, self.risk, self.orders, self.journal)
         return RunCycleUseCase(
-            steps, CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices)
+            steps,
+            CycleGuards(self.planned, self.cycles_of, self.lock, self.flows, self.clock, self.failure_notices),
         )
+
+    def cycles_of(self, tenant_id: TenantId) -> InMemoryCycleRepositoryAdapter:
+        return self.records_of_tenants.setdefault(tenant_id, InMemoryCycleRepositoryAdapter())
 
     def _executor(self) -> RunDueCyclesUseCase:
         return RunDueCyclesUseCase(self.flows, self.run_cycle(), self.launcher, self.clock)
@@ -81,9 +91,14 @@ class Cycles:
         anchor: str = "10:00:00",
         sources: tuple[str, ...] = (),
         flow_id: UUID | None = None,
+        *,
+        tenant_id: TenantId | None = None,
     ) -> None:
         schedule = CycleSchedule(at(anchor), timedelta(minutes=minutes))
-        self.flows.flows[uuid4() if flow_id is None else flow_id] = FakeFlow(name, schedule, sources)
+        identifier = uuid4() if flow_id is None else flow_id
+        self.flows.flows[identifier] = FakeFlow(name, schedule, sources)
+        owner = self.tenant if tenant_id is None else tenant_id
+        self.planned.remember([TenantScheduledFlow(owner, ScheduledFlow(identifier, schedule))])
 
     def id_of(self, name: str) -> UUID:
         return next(flow_id for flow_id, flow in self.flows.flows.items() if flow.name == name)

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from uuid import UUID
 
@@ -240,7 +241,7 @@ from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, 
 from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.cycles.cycle_record import AbsentSource
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
@@ -1308,41 +1309,19 @@ def _scalar_of(value: object) -> object:
     return value
 
 
-class CyclesOfTenants:
-    """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
-
-    def __init__(self, engine: Engine, directory: PlannedFlowsPort) -> None:
-        self._engine = engine
-        self._directory = directory
-
-    def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
-        return self._of(flow_id).claim(flow_id, planned_at)
-
-    def record(self, record: CycleRecord) -> None:
-        self._of(record.flow_id).record(record)
-
-    def _of(self, flow_id: UUID) -> SqlAlchemyCycleRepositoryAdapter:
-        return SqlAlchemyCycleRepositoryAdapter(self._engine, self._directory.tenant_of(flow_id))
-
-
-@dataclass(frozen=True, slots=True)
-class CycleRuntime:
-    """Where the worker finds the flows to plan, what keeps each cycle unique and alone, and how a cycle runs."""
-
-    scheduled: TenantScheduledFlowsPort
-    guards: CycleGuards
-    launcher: CycleLauncherPort
-
-
 type WorkerCycles = RunDueCyclesUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, Order]
 
 
 def run_due_cycles(
-    directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
+    ports_of: CyclePortsOf,
+    services: CycleServices,
+    scheduled: TenantScheduledFlowsPort,
+    guards: CycleGuards,
+    launcher: CycleLauncherPort,
 ) -> WorkerCycles:
     """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
     steps = CycleSteps(
-        flow_state=FlowStateFromFlows(directory, ports_of),
+        flow_state=FlowStateFromFlows(guards.planned, ports_of),
         sources=SourceCollector(SourcesFromSources(ports_of, services), ThreadPoolConcurrentCallsAdapter()),
         context=ContextFromAgent(services.clock),
         agent=AgentFromAgent(ports_of, services),
@@ -1350,8 +1329,8 @@ def run_due_cycles(
         orders=OrdersFromOrders(ports_of),
         journal=CycleJournalFromContexts(services.environment),
     )
-    flows = ScheduledFlowsFromFlows(runtime.scheduled, directory)
-    return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, runtime.guards), runtime.launcher, services.clock)
+    flows = ScheduledFlowsFromFlows(scheduled, guards.planned)
+    return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, guards), launcher, services.clock)
 
 
 def record_actual_prices(directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
@@ -1365,14 +1344,16 @@ def record_actual_prices(directory: PlannedFlowsPort, ports_of: CyclePortsOf, se
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
     directory = ThreadsPlannedFlowsAdapter()
     guards = CycleGuards(
-        cycles=CyclesOfTenants(engine, directory),
+        planned=directory,
+        cycles=partial(SqlAlchemyCycleRepositoryAdapter, engine),
         lock=SqlAlchemyFlowLockAdapter(engine),
         pause=FlowPauseFromFlows(directory, ports_of),
         clock=services.clock,
         failures=TellCycleFailureUseCase(directory, lambda tenant_id: ports_of(tenant_id).cycle_failure),
     )
-    runtime = CycleRuntime(SqlAlchemyScheduledFlowsAdapter(engine), guards, ThreadCycleLauncherAdapter())
-    run_due = run_due_cycles(directory, ports_of, services, runtime)
+    run_due = run_due_cycles(
+        ports_of, services, SqlAlchemyScheduledFlowsAdapter(engine), guards, ThreadCycleLauncherAdapter()
+    )
 
     def plan_round() -> None:
         run_due.execute()

@@ -15,6 +15,7 @@ from autotrading.application.cycles.ports import (
     FlowPausePort,
     FlowStatePort,
     OrderPort,
+    PlannedFlowsPort,
     RiskPort,
     SourceRequest,
 )
@@ -30,6 +31,7 @@ from autotrading.domain.cycles.cycle_record import (
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule, delay_seconds
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.tenancy.tenant_id import TenantId
 
 operations = logging.getLogger("autotrading.cycles")
 
@@ -61,10 +63,11 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
 @dataclass(frozen=True, slots=True)
 class CycleGuards:
     """What keeps a planned cycle unique and alone, what pauses the flows on a permanent error and tells the user of
-    a failed cycle.
+    a failed cycle. The cycles are recorded in the tenant of their flow, the one the worker planned it for.
     """
 
-    cycles: CycleRepositoryPort
+    planned: PlannedFlowsPort
+    cycles: Callable[[TenantId], CycleRepositoryPort]
     lock: FlowLockPort
     pause: FlowPausePort
     clock: ClockPort
@@ -118,7 +121,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         self._guards = guards
 
     def execute(self, command: RunCycleCommand) -> CycleRecord | None:
-        if not self._guards.cycles.claim(command.flow_id, command.planned_at):
+        if not self._cycles_of(command.flow_id).claim(command.flow_id, command.planned_at):
             return None
         with self._guards.lock.hold(command.flow_id) as acquired:
             if not acquired:
@@ -167,8 +170,11 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         self._guards.pause.pause_affected_by(progress.command.flow_id, error)
         raise error
 
+    def _cycles_of(self, flow_id: UUID) -> CycleRepositoryPort:
+        return self._guards.cycles(self._guards.planned.tenant_of(flow_id))
+
     def _recorded(self, record: CycleRecord) -> CycleRecord:
-        self._guards.cycles.record(record)
+        self._cycles_of(record.flow_id).record(record)
         operations.info(
             "ciclo registrato",
             extra={

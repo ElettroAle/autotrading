@@ -44,7 +44,6 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
-    CycleRuntime,
     CycleServices,
     FlowPauseFromFlows,
     TenantCyclePorts,
@@ -333,14 +332,14 @@ class FlowCycles:
                 ]
 
         guards = CycleGuards(
-            self.records,
+            self.directory,
+            lambda _tenant_id: self.records,
             InMemoryFlowLockAdapter(),
             FlowPauseFromFlows(self.directory, self.ports_of),
             self.clock,
             TellCycleFailureUseCase(self.directory, lambda tenant_id: self.ports_of(tenant_id).cycle_failure),
         )
-        runtime = CycleRuntime(Scheduled(), guards, self.launcher)
-        run_due_cycles(self.directory, self.ports_of, self.services(), runtime).execute()
+        run_due_cycles(self.ports_of, self.services(), Scheduled(), guards, self.launcher).execute()
         record_actual_prices(self.directory, self.ports_of, self.services())
 
     def anchor_of(self, flow: Flow) -> datetime:
