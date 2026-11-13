@@ -18,3 +18,8 @@ class Execution:
     def __post_init__(self) -> None:
         if self.filled_size <= 0:
             raise EmptyExecutionError
+
+    @property
+    def value(self) -> Decimal:
+        """What the execution put on the market: its size at its average price."""
+        return self.filled_size * self.average_price

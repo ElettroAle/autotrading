@@ -25,6 +25,15 @@ class ClosingFill:
     fee: Decimal
     realized_pnl: Decimal | None = None
 
+    @classmethod
+    def reported(
+        cls, price: Decimal | None, at: datetime | None, fee: Decimal | None, realized_pnl: Decimal | None
+    ) -> ClosingFill | None:
+        """The fill of a closing the exchange confirmed in time; none while its price, time or fee is missing."""
+        if price is None or at is None or fee is None:
+            return None
+        return cls(price, at, fee, realized_pnl)
+
 
 @dataclass(frozen=True, slots=True)
 class PositionClosing:
@@ -33,6 +42,17 @@ class PositionClosing:
     asset: str
     fill: ClosingFill | None = None
     refusal: str | None = None
+
+    @classmethod
+    def reported(
+        cls, asset: str, *, found: bool, fill: ClosingFill | None, refusal: str | None
+    ) -> PositionClosing | None:
+        """What closing the position gave: nothing without a position, else its fill or, unconfirmed, the reason."""
+        if not found:
+            return None
+        if fill is None:
+            return cls(asset, refusal=refusal)
+        return cls(asset, fill)
 
 
 @dataclass(frozen=True, slots=True)

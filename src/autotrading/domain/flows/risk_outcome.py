@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -36,10 +36,26 @@ class ApprovedOpening:
     def margin(self) -> Decimal:
         return self.value / self.leverage
 
+    def order_with[T](
+        self,
+        opening: Callable[[str, str, Decimal, int], T],
+        closing: Callable[[str], T],  # noqa: ARG002 - each outcome builds one of the two orders
+    ) -> T:
+        """The order that executes the opening, built by whoever sends it: asset, side, value and leverage."""
+        return opening(self.asset, self.side.value, self.value, self.leverage)
+
 
 @dataclass(frozen=True, slots=True)
 class ApprovedClose:
     asset: str
+
+    def order_with[T](
+        self,
+        opening: Callable[[str, str, Decimal, int], T],  # noqa: ARG002 - each outcome builds one of the two orders
+        closing: Callable[[str], T],
+    ) -> T:
+        """The order that executes the close, built by whoever sends it: a close is always total (R1.4.4)."""
+        return closing(self.asset)
 
 
 @dataclass(frozen=True, slots=True)

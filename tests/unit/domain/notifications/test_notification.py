@@ -63,3 +63,9 @@ def test_a_linked_chat_belongs_to_its_tenant() -> None:
 
 def test_the_test_notification_says_where_the_notifications_arrive() -> None:
     assert Notification.test().text == "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
+
+
+def test_an_opening_is_told_by_its_value_in_whole_units() -> None:
+    notification = Notification.position_opened("alfa", "BTC", "long", 3, Amount(Decimal("20.006"), "USDC"))
+
+    assert notification.text == "alfa: aperta long BTC, leva 3, 20 USDC"

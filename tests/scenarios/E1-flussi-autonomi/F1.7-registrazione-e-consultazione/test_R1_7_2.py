@@ -10,9 +10,10 @@ from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
-from autotrading.bootstrap import ClosedPositionsFromOpenings
+from autotrading.bootstrap import ClosingNoticeByNotification, OutsideClosingsInHistory
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
@@ -123,11 +124,14 @@ class History:
             AccountReading(account_id, READ_AT - timedelta(minutes=5), {operating.id: frozenset({"BTC"})})
         )
         flows = InMemoryFlowRepositoryAdapter(self.platform.flows, operating.tenant_id)
-        history = ClosedPositionsFromOpenings(
-            flows,
-            InMemoryFlowOpeningsAdapter(self.platform.orders_of(operating.tenant_id)),
-            InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
-            self.platform.worker_for(operating.tenant_id).notify,
+        notify = self.platform.worker_for(operating.tenant_id).notify
+        history = OutsideClosingsInHistory(
+            RecordOutsideClosingUseCase(
+                flows,
+                InMemoryFlowOpeningsAdapter(self.platform.orders_of(operating.tenant_id)),
+                InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
+                ClosingNoticeByNotification(notify, "USDC"),
+            )
         )
         record = RecordAccountExecutionsUseCase(
             flows, self.platform.account_activity, self.platform.platform_orders, self.platform.ledger
