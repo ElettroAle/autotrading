@@ -1,6 +1,6 @@
 # ADR 0030 — Catalogo dei modelli IA: file JSON di configurazione, parametri validati nel domain
 
-- Stato: accettata (11 novembre 2026)
+- Stato: superata da ADR 0103 (13 novembre 2026)
 - Requisiti: R1.4.2 (Task T1.4.2.1)
 
 ## Contesto

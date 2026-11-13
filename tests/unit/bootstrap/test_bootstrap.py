@@ -12,8 +12,6 @@ from sqlalchemy import create_engine
 from autotrading import bootstrap
 from autotrading.adapters.configuration.errors import MissingConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
-from autotrading.adapters.outbound.httpx.provider_key_verifier import KEY_CHECKS
-from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
@@ -56,9 +54,11 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter, ProviderKeyStore
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
+from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.problems import reason_of
 from tests.support.worker import Worker
 
@@ -68,6 +68,14 @@ AUTHENTICATION = {
     "AUTH_CLIENT_ID": "swagger-client",
     "AUTH_SCOPE": "api://autotrading/access",
 }
+
+
+def providers_of(
+    verification: httpx.Client | None = None,
+) -> tuple[httpx.Client, InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
+    """The providers of the API: the client that verifies the keys and the catalog of the test models."""
+    catalog = InMemoryModelCatalogAdapter(PLATFORM_MODELS)
+    return verification or httpx.Client(), catalog, catalog
 
 
 def _sealers(
@@ -184,7 +192,7 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, httpx.Client())
+    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of())
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
 
@@ -210,7 +218,7 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, httpx.Client())
+    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of())
 
     with pytest.raises(ExchangeUnavailableError):
         factory(tenant_id).read_account_state.execute(ReadAccountStateCommand(account.id))
@@ -221,6 +229,14 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
 
 @pytest.mark.parametrize("name", ["WORKER_URL", "WORKER_TOKEN_FILE"])
 def test_application_refuses_to_start_without_the_worker(tmp_path: Path, name: str) -> None:
+    with pytest.raises(MissingConfigurationError) as raised:
+        create_application(installation_configuration(tmp_path, **{name: ""}))
+
+    assert raised.value.name == name
+
+
+@pytest.mark.parametrize("name", ["LITELLM_URL", "LITELLM_MASTER_KEY_FILE"])
+def test_application_refuses_to_start_without_the_model_proxy(tmp_path: Path, name: str) -> None:
     with pytest.raises(MissingConfigurationError) as raised:
         create_application(installation_configuration(tmp_path, **{name: ""}))
 
@@ -324,7 +340,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
         _sealers(public_key),
         "dev",
         worker,
-        httpx.Client(),
+        providers_of(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
 
@@ -352,7 +368,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
         _sealers(public_key),
         "dev",
         worker,
-        httpx.Client(),
+        providers_of(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
 
@@ -362,10 +378,6 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     assert [request.url.path for request in asked] == [
         f"/tenants/{tenant_id.value}/accounts/{account_id}/verifications"
     ]
-
-
-def test_every_provider_of_the_catalog_has_a_way_to_verify_its_keys() -> None:
-    assert {provider.value for provider in load_model_catalog().providers} <= set(KEY_CHECKS)
 
 
 def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
@@ -387,7 +399,7 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
     providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers)
+    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of(providers))
 
     with pytest.raises(ProviderRejectedKeyError):
         factory(TenantId.new()).register_provider_key.execute(RegisterProviderKeyCommand("openrouter", "K-MADE-UP"))
@@ -426,7 +438,7 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, httpx.Client())
+    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of())
 
     factory(TenantId.new())
 

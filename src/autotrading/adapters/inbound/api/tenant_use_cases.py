@@ -16,6 +16,7 @@ from autotrading.application.accounts.replace_credentials import ReplaceCredenti
 from autotrading.application.agent.list_models import ListModelsUseCase
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
 from autotrading.application.agent.ports import (
+    ModelCatalogPort,
     ProviderKeyRepositoryPort,
     ProviderKeySealerPort,
     ProviderKeyUsagePort,
@@ -73,7 +74,6 @@ from autotrading.application.sources.get_source import GetSourceUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.verification.ports import VerificationPort
 from autotrading.application.verification.run_verification import RunVerificationUseCase
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -94,7 +94,7 @@ class TenantPorts:
     provider_key_sealer: ProviderKeySealerPort
     provider_key_verifier: ProviderKeyVerifierPort
     provider_key_usage: ProviderKeyUsagePort
-    model_catalog: ModelCatalog
+    model_catalog: ModelCatalogPort
     flows: FlowRepositoryPort
     running_verifications: RunningVerificationsPort
     flow_checks: FlowChecks

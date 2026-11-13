@@ -137,3 +137,12 @@ class ProviderKeyNotOpenedError(ApplicationError):
     @property
     def scope(self) -> ErrorScope:
         return ErrorScope(provider=self.provider.value)
+
+
+class ModelCatalogUnavailableError(ApplicationError):
+    """The model gateway does not tell which models it offers right now: nothing is chosen or called (ADR 0103)."""
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("catalogo dei modelli non disponibile")

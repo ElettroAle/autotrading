@@ -1,14 +1,13 @@
 from collections.abc import Mapping
 
 from autotrading.application.flows.errors import FlowProviderKeyMissingError, InvalidFlowSettingError
-from autotrading.application.flows.ports import FlowProviderKeysPort
+from autotrading.application.flows.ports import FlowModelsPort, FlowProviderKeysPort
 from autotrading.domain.agent.errors import (
     ModelNotAvailableError,
     ParameterNotSupportedError,
     ParameterOutOfRangeError,
     UnknownParameterError,
 )
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.selections import ModelSelection
 
@@ -20,15 +19,15 @@ class SelectModelUseCase:
     flow with the reason the catalog gives.
     """
 
-    def __init__(self, catalog: ModelCatalog, keys: FlowProviderKeysPort) -> None:
-        self._catalog = catalog
+    def __init__(self, models: FlowModelsPort, keys: FlowProviderKeysPort) -> None:
+        self._models = models
         self._keys = keys
 
     def execute(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
         if not model.strip():
             raise ModelRequiredError
         try:
-            definition = self._catalog.find(model)
+            definition = self._models.definition_of(model)
             parameters = definition.settings(requested)
         except (
             ModelNotAvailableError,
