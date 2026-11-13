@@ -31,8 +31,10 @@ indipendenza vieta che un contesto di application importi gli errori di un altro
 
 - **orders**: `OrderAccountPort`, `AccessOpenerPort`; sequenza in `OpenTradingAccessUseCase`.
 - **flows**: `SealedAddressPort`, `AddressOpenerPort`, `ActivityReaderPort`, `ExecutionsReaderPort`; sequenza in
-  `ReadAccountActivityUseCase` e `ReadAccountExecutionsUseCase`. `AccountActivityPort` ha la forma `execute(command)`
-  come `SourceReaderPort`: nel worker è il caso d'uso stesso, nell'API il client HTTP del worker.
+  `ReadAccountActivityUseCase` e `ReadAccountExecutionsUseCase`. `AccountActivityPort` ha la forma
+  `execute(account_id)`: nel worker la realizza il caso d'uso stesso, nell'API il client HTTP del worker. Il caso
+  d'uso riceve l'identificativo e non un comando perché un adapter importa da application solo porte ed errori
+  (ADR 0089).
 - **verification**: `VerificationAccountPort`, `VerificationOpenerPort`, `AccountReaderPort` (realizzata dall'adapter
   Hyperliquid che già legge lo stato del conto), `FlowsOnAccountPort` (realizzata dal repository dei flussi);
   sequenza in `ReadAccountForVerificationUseCase`. Ogni errore di lettura è un `VerificationStepError` con lo stesso

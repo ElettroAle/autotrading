@@ -1,5 +1,4 @@
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
@@ -12,15 +11,10 @@ from autotrading.domain.verification.verification_access import SealedVerificati
 from autotrading.domain.verification.verification_run import VerificationRun
 
 
-@dataclass(frozen=True, slots=True)
-class ReadAccountForVerificationCommand:
-    account_id: UUID
-
-
 class AccountReadingPort(Protocol):
     """Reads what the exchange shows of the account: it is ReadAccountForVerificationUseCase."""
 
-    def execute(self, command: ReadAccountForVerificationCommand) -> AccountReading:
+    def execute(self, account_id: UUID) -> AccountReading:
         """Raises VerificationAccountNotFoundError, or VerificationStepError when the exchange cannot be read."""
         ...
 

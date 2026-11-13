@@ -4,7 +4,6 @@ from autotrading.application.flows.ports import (
     AccountActivityPort,
     FlowLedgerPort,
     FlowRepositoryPort,
-    ReadAccountActivityCommand,
 )
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
@@ -26,6 +25,6 @@ class ReadFlowStateUseCase:
 
     def execute(self, command: ReadFlowStateCommand) -> FlowState:
         flow = self._flows.get(command.flow_id)
-        activity = self._activity.execute(ReadAccountActivityCommand(flow.account_id))
+        activity = self._activity.execute(flow.account_id)
         totals = self._ledger.totals_of((flow.id,)).get(flow.id) or FlowTotals(flow.id)
         return FlowState.attributed(flow, activity, totals)

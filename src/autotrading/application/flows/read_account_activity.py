@@ -1,10 +1,10 @@
 from collections.abc import Mapping
+from uuid import UUID
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import (
     ActivityReaderPort,
     AddressOpenerPort,
-    ReadAccountActivityCommand,
     SealedAddressPort,
 )
 from autotrading.domain.flows.account_activity import AccountActivity
@@ -23,8 +23,8 @@ class ReadAccountActivityUseCase:
         self._opener = opener
         self._readers = readers
 
-    def execute(self, command: ReadAccountActivityCommand) -> AccountActivity:
-        sealed = self._accounts.sealed_address(command.account_id)
+    def execute(self, account_id: UUID) -> AccountActivity:
+        sealed = self._accounts.sealed_address(account_id)
         reader = self._readers.get(sealed.exchange)
         if reader is None:
             raise FlowExchangeUnavailableError

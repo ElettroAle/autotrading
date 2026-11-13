@@ -6,14 +6,20 @@ ports the worker realizes with its reading use cases, the activity and the execu
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import overload
 from uuid import UUID
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
-from autotrading.application.flows.ports import ReadAccountActivityCommand, ReadAccountExecutionsCommand
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
 from tests.support.activity import an_activity
+
+
+class _Reading(Enum):
+    """Without a moment the fake answers the activity, with one the executions: the two ports it realizes."""
+
+    ACTIVITY = "activity"
 
 
 class FakeAccountActivityAdapter:
@@ -26,17 +32,17 @@ class FakeAccountActivityAdapter:
         self.read: list[UUID] = []
 
     @overload
-    def execute(self, command: ReadAccountActivityCommand) -> AccountActivity: ...
+    def execute(self, account_id: UUID) -> AccountActivity: ...
 
     @overload
-    def execute(self, command: ReadAccountExecutionsCommand) -> ExecutionsWindow: ...
+    def execute(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow: ...
 
     def execute(
-        self, command: ReadAccountActivityCommand | ReadAccountExecutionsCommand
+        self, account_id: UUID, since: datetime | _Reading | None = _Reading.ACTIVITY
     ) -> AccountActivity | ExecutionsWindow:
-        if isinstance(command, ReadAccountActivityCommand):
-            return self.activity(command.account_id)
-        return self.since(command.account_id, command.since)
+        if since is _Reading.ACTIVITY:
+            return self.activity(account_id)
+        return self.since(account_id, since)
 
     def activity(self, account_id: UUID) -> AccountActivity:
         self.read.append(account_id)

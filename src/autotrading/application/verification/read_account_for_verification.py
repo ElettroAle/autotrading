@@ -1,9 +1,9 @@
 from collections.abc import Mapping
+from uuid import UUID
 
 from autotrading.application.verification.errors import VerificationExchangeUnsupportedError
 from autotrading.application.verification.ports import (
     AccountReaderPort,
-    ReadAccountForVerificationCommand,
     VerificationAccountPort,
     VerificationOpenerPort,
 )
@@ -27,8 +27,8 @@ class ReadAccountForVerificationUseCase:
         self._opener = opener
         self._readers = readers
 
-    def execute(self, command: ReadAccountForVerificationCommand) -> AccountReading:
-        sealed = self._accounts.sealed_verification(command.account_id)
+    def execute(self, account_id: UUID) -> AccountReading:
+        sealed = self._accounts.sealed_verification(account_id)
         reader = self._readers.get(sealed.exchange)
         if reader is None:
             raise VerificationExchangeUnsupportedError

@@ -4,7 +4,15 @@ from pathlib import Path
 import pytest
 
 from tests.architecture.known_violations import KNOWN_VIOLATIONS
-from tests.support.architecture import SOURCE_ROOT, Rule, Violation, source_modules, violations_of
+from tests.support.architecture import (
+    SOURCE_ROOT,
+    TECHNOLOGY_LIBRARIES,
+    Rule,
+    Violation,
+    source_modules,
+    technology_folders,
+    violations_of,
+)
 
 PYPROJECT = SOURCE_ROOT.parents[1] / "pyproject.toml"
 
@@ -64,3 +72,13 @@ def test_every_context_but_tenancy_is_in_the_independence_contract(layer: str) -
     expected = {f"autotrading.{layer}.{context}" for context in contexts}
 
     assert expected <= _independent_modules()
+
+
+def test_every_technology_folder_declares_its_libraries() -> None:
+    assert set(technology_folders()) == set(TECHNOLOGY_LIBRARIES)
+
+
+def test_every_library_belongs_to_one_technology_folder() -> None:
+    libraries = [library for owned in TECHNOLOGY_LIBRARIES.values() for library in owned]
+
+    assert len(libraries) == len(set(libraries))

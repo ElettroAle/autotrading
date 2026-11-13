@@ -1435,7 +1435,7 @@ class OrdersFromOrders:
 
 
 class FlowOrderEvents:
-    """Bridges what the orders of a cycle left behind to the flow that sent them (R1.7.2, R1.8.2, ADR 0085)."""
+    """Bridges what the orders of a cycle left behind to the flow that sent them (R1.7.2, R1.8.2, ADR 0086)."""
 
     def __init__(self, ports: TenantCyclePorts, flow: Flow, planned_at: datetime) -> None:
         self._ports = ports

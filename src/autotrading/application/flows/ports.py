@@ -168,18 +168,13 @@ class FlowTimingPort(Protocol):
     def timings(self) -> Mapping[FlowId, FlowTiming]: ...
 
 
-@dataclass(frozen=True, slots=True)
-class ReadAccountActivityCommand:
-    account_id: UUID
-
-
 class AccountActivityPort(Protocol):
     """Bound to the tenant of the request: what the exchange shows of one of its accounts now (R1.6.1).
 
     In the worker it is ReadAccountActivityUseCase; in the API, the client that asks the worker for it.
     """
 
-    def execute(self, command: ReadAccountActivityCommand) -> AccountActivity:
+    def execute(self, account_id: UUID) -> AccountActivity:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
 
@@ -220,21 +215,13 @@ class UnattributableNoticePort(Protocol):
         ...
 
 
-@dataclass(frozen=True, slots=True)
-class ReadAccountExecutionsCommand:
-    """Without a moment, everything the exchange still holds of the account."""
-
-    account_id: UUID
-    since: datetime | None
-
-
 class AccountExecutionsPort(Protocol):
     """In the worker: the executions and the funding the exchange still holds of an account since a moment (ADR 0063).
 
     It is ReadAccountExecutionsUseCase; the window says when part of what was asked is gone already.
     """
 
-    def execute(self, command: ReadAccountExecutionsCommand) -> ExecutionsWindow:
+    def execute(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
 

@@ -16,7 +16,6 @@ from autotrading.adapters.inbound.api.errors import NotAuthenticatedError, insta
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
-from autotrading.application.flows.ports import ReadAccountActivityCommand
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotIdentityPort
@@ -173,7 +172,7 @@ def create_worker_api(
 
     @api.get("/tenants/{tenant_id}/accounts/{account_id}/activity", dependencies=[Depends(require_api)])
     def read_activity(tenant_id: UUID, account_id: UUID) -> AccountActivityResponse:
-        command = ReadAccountActivityCommand(account_id)
+        command = account_id
         return AccountActivityResponse.of(for_tenant(TenantId(tenant_id)).read_account_activity.execute(command))
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])

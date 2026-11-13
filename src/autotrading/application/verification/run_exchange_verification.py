@@ -9,7 +9,6 @@ from autotrading.application.verification.ports import (
     AccountReadingPort,
     FlowsOnAccountPort,
     OrderExecutionPort,
-    ReadAccountForVerificationCommand,
     VerificationRunRepositoryPort,
 )
 from autotrading.domain.tenancy.user_id import UserId
@@ -109,7 +108,7 @@ class RunExchangeVerificationUseCase:
         return _reading_step(step, lambda: self._read(account_id), remaining_position)
 
     def _read(self, account_id: UUID) -> AccountReading:
-        return self._readings.account.execute(ReadAccountForVerificationCommand(account_id))
+        return self._readings.account.execute(account_id)
 
 
 def _order_step(step: Step, send: Callable[[], OrderResult]) -> StepOutcome:

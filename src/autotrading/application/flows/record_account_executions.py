@@ -8,7 +8,6 @@ from autotrading.application.flows.ports import (
     FlowLedgerPort,
     FlowRepositoryPort,
     PlatformOrdersPort,
-    ReadAccountExecutionsCommand,
 )
 from autotrading.domain.flows.ledger import AccountLedger, LedgerEntry, LedgerKeys
 
@@ -45,7 +44,7 @@ class RecordAccountExecutionsUseCase:
         account_id = command.account_id
         cursor = self._ledger.cursor(account_id)
         since = None if cursor is None else cursor - OVERLAP
-        window = self._executions.execute(ReadAccountExecutionsCommand(account_id, since))
+        window = self._executions.execute(account_id, since)
         if not window.complete:
             raise FlowLedgerIncompleteError(account_id)
         known = LedgerKeys() if since is None else self._ledger.recorded_since(account_id, since)
