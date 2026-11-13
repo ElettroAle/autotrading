@@ -1,9 +1,10 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict
 
 import requests
+from hyperliquid.info import Info
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
@@ -15,6 +16,18 @@ from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import PricePoint
 from autotrading.domain.sources.timeframe import Timeframe
+
+
+class _Candle(TypedDict):
+    """A candle as Hyperliquid answers it; a wrong shape fails while it is read."""
+
+    t: int
+    T: int
+    c: str
+    v: str
+    h: str
+    l: str  # noqa: E741 - the name Hyperliquid gives the low of the candle
+
 
 MINUTES_PER_HOUR = 60
 MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
@@ -84,12 +97,12 @@ def interval_for(days: int) -> tuple[int, str]:
     return INTERVALS[-1]
 
 
-def _all_pages(info: Any, asset: str, days: int, now: datetime) -> list[Mapping[str, Any]]:
+def _all_pages(info: Info, asset: str, days: int, now: datetime) -> list[_Candle]:
     minutes, interval = interval_for(days)
     step = minutes * 60 * MILLISECONDS
     end = _milliseconds(now)
     page_start = _milliseconds(now - timedelta(days=days))
-    candles: list[Mapping[str, Any]] = []
+    candles: list[_Candle] = []
     for _ in range(MAX_PAGES):
         page = info.candles_snapshot(asset, interval, page_start, end)
         if not page:
@@ -101,7 +114,7 @@ def _all_pages(info: Any, asset: str, days: int, now: datetime) -> list[Mapping[
     return candles
 
 
-def _point_of(candle: Mapping[str, Any]) -> PricePoint:
+def _point_of(candle: _Candle) -> PricePoint:
     return PricePoint(datetime.fromtimestamp(int(candle["T"]) / MILLISECONDS, UTC), Decimal(str(candle["c"])))
 
 
@@ -168,14 +181,14 @@ class HyperliquidMarketDataAdapter:
             raise SourceUnavailableError(MARKET_DATA)
         return days[0]
 
-    def _info(self) -> Any:
+    def _info(self) -> Info:
         return self._sdk.info(self._base_url, self._timeout)
 
 
-def _candle_of(candle: Mapping[str, Any]) -> Candle:
+def _candle_of(candle: _Candle) -> Candle:
     closed_at = datetime.fromtimestamp((int(candle["T"]) + 1) / MILLISECONDS, UTC)
     return Candle(closed_at, Decimal(str(candle["c"])), Decimal(str(candle["v"])))
 
 
-def _range_of(candle: Mapping[str, Any]) -> DailyRange:
+def _range_of(candle: _Candle) -> DailyRange:
     return DailyRange(high=Decimal(str(candle["h"])), low=Decimal(str(candle["l"])), close=Decimal(str(candle["c"])))

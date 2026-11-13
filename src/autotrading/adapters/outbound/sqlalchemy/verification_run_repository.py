@@ -1,6 +1,5 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import Engine, func, insert, select
@@ -53,7 +52,7 @@ def _row_of(run: VerificationRun, tenant_id: TenantId) -> dict[str, object]:
     }
 
 
-def _step_of(outcome: StepOutcome) -> dict[str, Any]:
+def _step_of(outcome: StepOutcome) -> dict[str, object]:
     return {
         "step": outcome.step.value,
         "succeeded": outcome.succeeded,
@@ -63,7 +62,7 @@ def _step_of(outcome: StepOutcome) -> dict[str, Any]:
     }
 
 
-def _reading_of(reading: AccountReading) -> dict[str, Any]:
+def _reading_of(reading: AccountReading) -> dict[str, object]:
     # Amounts are kept as text, so no precision is lost in the JSON.
     return {
         "balance": str(reading.balance),
@@ -75,7 +74,7 @@ def _reading_of(reading: AccountReading) -> dict[str, Any]:
     }
 
 
-def _order_of(result: OrderResult) -> dict[str, Any]:
+def _order_of(result: OrderResult) -> dict[str, object]:
     return {
         "succeeded": result.succeeded,
         "fee": str(result.fee),

@@ -1,6 +1,6 @@
 from autotrading.application.sources.errors import AssetRequiredError
 from autotrading.application.sources.forecast_asset import ForecastAssetCommand, ForecastAssetUseCase
-from autotrading.application.sources.ports import ReadSourceCommand
+from autotrading.application.sources.ports import SourceRequest
 from autotrading.domain.sources.price_forecast import PriceForecast
 from autotrading.domain.sources.source_sample import SourceValue
 
@@ -13,7 +13,7 @@ class ReadForecastUseCase:
     def __init__(self, forecast: ForecastAssetUseCase) -> None:
         self._forecast = forecast
 
-    def execute(self, command: ReadSourceCommand) -> tuple[SourceValue]:
+    def execute(self, command: SourceRequest) -> tuple[SourceValue]:
         if command.asset is None:
             raise AssetRequiredError
         forecasts = self._forecast.execute(

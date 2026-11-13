@@ -13,8 +13,8 @@ from autotrading.application.flows.errors import (
     FlowNameInUseError,
     InvalidFlowSettingError,
 )
-from autotrading.application.flows.free_capital import ReadFreeCapitalCommand, ReadFreeCapitalUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand, ReadFreeCapitalUseCase
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.errors import (
     CapitalAboveFreeCapitalError,

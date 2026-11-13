@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from autotrading.application.sources.errors import AssetRequiredError
-from autotrading.application.sources.ports import MarketDataPort, ReadSourceCommand
+from autotrading.application.sources.ports import MarketDataPort, SourceRequest
 from autotrading.application.sources.read_indicators import text_of
 from autotrading.domain.sources.pivot_levels import NearestLevel, PivotLevels
 from autotrading.domain.sources.source_sample import SourceValue
@@ -21,7 +21,7 @@ class ReadPivotsUseCase:
     def __init__(self, market: MarketDataPort) -> None:
         self._market = market
 
-    def execute(self, command: ReadSourceCommand) -> tuple[SourceValue]:
+    def execute(self, command: SourceRequest) -> tuple[SourceValue]:
         if command.asset is None:
             raise AssetRequiredError
         levels = PivotLevels.of(self._market.previous_day(command.asset, command.now))

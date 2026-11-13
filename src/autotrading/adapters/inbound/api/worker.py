@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.account_activity import AccountActivityResponse
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
-from autotrading.adapters.inbound.api.errors import NotAuthenticatedError, install_error_responses
+from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
@@ -26,7 +26,7 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
-from autotrading.application.orders.outcome import OrderOutcome
+from autotrading.application.tenancy.errors import NotAuthenticatedError
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationCommand,
     RunExchangeVerificationUseCase,
@@ -35,6 +35,7 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 

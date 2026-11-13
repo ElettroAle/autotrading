@@ -15,3 +15,17 @@ class CrossTenantAccessError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("non trovato")
+
+
+class NotAuthenticatedError(ApplicationError):
+    status_code = 401
+
+    def __init__(self) -> None:
+        super().__init__("non autenticato")
+
+
+class IdentityProviderUnavailableError(ApplicationError):
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("directory non raggiungibile")

@@ -1,8 +1,8 @@
 from uuid import UUID, uuid4
 
 from autotrading.application.orders.close_position import ClosePositionCommand, ClosePositionUseCase
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.order import OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.user_id import UserId
 
 ANNA = UserId("oid-anna")

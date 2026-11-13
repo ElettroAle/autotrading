@@ -1,14 +1,8 @@
-from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
-from autotrading.application.flows.ports import FlowAccount, FlowAccountPort, FlowRepositoryPort
-from autotrading.domain.flows.flow import Flow
+from autotrading.application.flows.ports import FlowAccountPort, FlowRepositoryPort
 from autotrading.domain.flows.free_capital import FreeCapital
-
-
-def free_capital_of(account: FlowAccount, account_id: UUID, flows: Iterable[Flow]) -> FreeCapital:
-    return FreeCapital.of(account.balance, account.currency, (flow for flow in flows if flow.account_id == account_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,4 +19,4 @@ class ReadFreeCapitalUseCase:
 
     def execute(self, command: ReadFreeCapitalCommand) -> FreeCapital:
         account = self._accounts.account(command.account_id)
-        return free_capital_of(account, command.account_id, self._flows.list())
+        return FreeCapital.of_account(account.balance, account.currency, command.account_id, self._flows.list())

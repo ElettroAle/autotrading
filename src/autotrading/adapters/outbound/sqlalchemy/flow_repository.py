@@ -1,7 +1,7 @@
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from decimal import Decimal
-from typing import Any
+from typing import NotRequired, TypedDict, cast
 
 from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,36 @@ from autotrading.domain.tenancy.user_id import UserId
 NAME_UNIQUE_IN_TENANT = "flows_name_unique_in_tenant"
 ACCOUNT_OF_TENANT = "flows_account_of_tenant"
 NOT_ARCHIVED = flows.c.status != FlowStatus.ARCHIVED.name.lower()
+
+
+class _ModelDocument(TypedDict):
+    name: str
+    parameters: dict[str, dict[str, str]]
+
+
+class _SourceDocument(TypedDict):
+    name: str
+    weight: int
+    parameters: dict[str, int]
+
+
+class _RiskLimitsDocument(TypedDict):
+    max_leverage: int
+    max_margin_exposure_percent: str | None
+    max_value_exposure_percent: str | None
+
+
+class _ConfigurationDocument(TypedDict):
+    """A configuration version as saved in JSON; a wrong shape fails while it is read."""
+
+    assets: list[str]
+    cycle_minutes: int
+    model: _ModelDocument
+    sources: list[_SourceDocument]
+    instructions: str
+    risk_limits: _RiskLimitsDocument
+    allocated_capital: str
+    bring_to_minimum: NotRequired[bool]
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -140,7 +170,7 @@ class SqlAlchemyFlowRepositoryAdapter:
             yield connection
 
 
-def _in_force() -> Select[Any]:
+def _in_force() -> Select[tuple[object, ...]]:
     """Every flow with its configuration version in force: the highest number it has."""
     current = (
         select(flow_versions.c.flow_id, func.max(flow_versions.c.version).label("version"))
@@ -176,7 +206,7 @@ def _version_row_of(flow: Flow) -> dict[str, object]:
     }
 
 
-def document_of(configuration: FlowConfiguration) -> dict[str, Any]:
+def document_of(configuration: FlowConfiguration) -> dict[str, object]:
     """The configuration as JSON: amounts and parameters as text, so no number is rounded."""
     limits = configuration.risk_limits
     return {
@@ -198,7 +228,8 @@ def document_of(configuration: FlowConfiguration) -> dict[str, Any]:
     }
 
 
-def configuration_of(version: int, document: Mapping[str, Any]) -> FlowConfiguration:
+def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfiguration:
+    document = cast("_ConfigurationDocument", saved)
     limits = document["risk_limits"]
     model = document["model"]
     return FlowConfiguration(

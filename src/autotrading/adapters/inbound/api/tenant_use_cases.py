@@ -38,7 +38,6 @@ from autotrading.application.flows.compare_flow_versions import CompareFlowVersi
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.export_account_operations import ExportAccountOperationsUseCase
 from autotrading.application.flows.export_flow_operations import ExportFlowOperationsUseCase
-from autotrading.application.flows.free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.list_account_operations import ListAccountOperationsUseCase
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
@@ -56,6 +55,7 @@ from autotrading.application.flows.ports import (
     RunningVerificationsPort,
 )
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import (

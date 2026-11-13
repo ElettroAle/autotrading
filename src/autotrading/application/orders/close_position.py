@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.user_id import UserId
 
 

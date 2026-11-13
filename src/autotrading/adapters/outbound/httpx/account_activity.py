@@ -1,7 +1,6 @@
-from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict
 from uuid import UUID
 
 import httpx
@@ -12,6 +11,31 @@ from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, InvalidOperation)
+
+
+class _PositionBody(TypedDict):
+    asset: str
+    side: str
+    size: str
+    margin: str
+    unrealized_pnl: str
+
+
+class _MovementBody(TypedDict):
+    movement_id: str
+    amount: str
+    moved_at: str
+
+
+class _ActivityBody(TypedDict):
+    """What the worker answers; its shape is checked while it is read, a wrong one is a shape error."""
+
+    currency: str
+    balance: str
+    available_margin: str
+    positions: list[_PositionBody]
+    movements: list[_MovementBody]
+    read_at: str
 
 
 class HttpxAccountActivityAdapter:
@@ -45,7 +69,7 @@ class HttpxAccountActivityAdapter:
             raise FlowExchangeUnavailableError from error
 
 
-def _activity_of(body: Mapping[str, Any]) -> AccountActivity:
+def _activity_of(body: _ActivityBody) -> AccountActivity:
     return AccountActivity(
         currency=str(body["currency"]),
         balance=Decimal(body["balance"]),
@@ -56,7 +80,7 @@ def _activity_of(body: Mapping[str, Any]) -> AccountActivity:
     )
 
 
-def _position_of(position: Mapping[str, Any]) -> AccountPosition:
+def _position_of(position: _PositionBody) -> AccountPosition:
     return AccountPosition(
         asset=str(position["asset"]),
         side=TradeSide(position["side"]),
@@ -66,7 +90,7 @@ def _position_of(position: Mapping[str, Any]) -> AccountPosition:
     )
 
 
-def _movement_of(movement: Mapping[str, Any]) -> BalanceMovement:
+def _movement_of(movement: _MovementBody) -> BalanceMovement:
     return BalanceMovement(
         str(movement["movement_id"]), Decimal(movement["amount"]), datetime.fromisoformat(movement["moved_at"])
     )

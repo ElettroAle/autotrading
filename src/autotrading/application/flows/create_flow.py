@@ -5,7 +5,6 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.errors import FlowNameInUseError
-from autotrading.application.flows.free_capital import free_capital_of
 from autotrading.application.flows.ports import (
     FlowAccountPort,
     FlowRepositoryPort,
@@ -19,6 +18,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -76,7 +76,8 @@ class CreateFlowUseCase:
         require_tradable(self._checks.markets, account.exchange, configuration.assets)
         existing = self._flows.list()
         require_assets_free(command.account_id, configuration.assets, existing)
-        free_capital_of(account, command.account_id, existing).require_room_for(configuration.allocated_capital)
+        free_capital = FreeCapital.of_account(account.balance, account.currency, command.account_id, existing)
+        free_capital.require_room_for(configuration.allocated_capital)
         flow = Flow.created(self._tenant_id, command.account_id, name, configuration)
         self._flows.add(flow)
         operations.info("flusso creato", extra={"flow_id": str(flow.id.value)})

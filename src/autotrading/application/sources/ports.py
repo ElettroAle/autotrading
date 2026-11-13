@@ -84,8 +84,8 @@ class ForecastRepositoryPort(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class ReadSourceCommand:
-    """One reading of a source: for an asset, or for the whole market when asset is None (R1.3.2)."""
+class SourceRequest:
+    """What a reader of a source is asked: for an asset, or for the whole market when asset is None (R1.3.2)."""
 
     flow_id: UUID
     asset: str | None
@@ -96,7 +96,7 @@ class ReadSourceCommand:
 class SourceReaderPort(Protocol):
     """Reads one source of the catalog with the parameters of the flow (R1.3.2)."""
 
-    def execute(self, command: ReadSourceCommand) -> Sequence[SourceValue]:
+    def execute(self, command: SourceRequest) -> Sequence[SourceValue]:
         """The values read, each with its reference instant. Raises a typed error when the source has no data."""
         ...
 

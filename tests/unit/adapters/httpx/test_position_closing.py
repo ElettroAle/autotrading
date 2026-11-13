@@ -16,11 +16,11 @@ from autotrading.application.orders.errors import (
     OrderExchangeUnavailableError,
     OrderWorkerUnavailableError,
 )
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import OrderOrigin, OrderSource, OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.rejection import RejectionReason
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId

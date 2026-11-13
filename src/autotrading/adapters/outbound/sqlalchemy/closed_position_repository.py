@@ -1,6 +1,9 @@
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from typing import Any
+from datetime import datetime
+from decimal import Decimal
+from typing import TypedDict, cast
+from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, func, insert, select
 
@@ -10,6 +13,24 @@ from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+
+
+class _ClosedPositionRow(TypedDict):
+    tenant_id: UUID
+    flow_id: UUID
+    asset: str
+    side: str
+    leverage: int
+    margin: Decimal
+    open_price: Decimal
+    opened_at: datetime
+    opening_cycle: datetime | None
+    close_price: Decimal
+    closed_at: datetime
+    closing_cycle: datetime | None
+    fees: Decimal
+    reason: str
+    realized_pnl: Decimal
 
 
 class SqlAlchemyClosedPositionRepositoryAdapter:
@@ -62,7 +83,8 @@ def row_of(position: ClosedPosition) -> dict[str, object]:
     }
 
 
-def position_of(row: RowMapping | Mapping[str, Any]) -> ClosedPosition:
+def position_of(columns: RowMapping | Mapping[str, object]) -> ClosedPosition:
+    row = cast("_ClosedPositionRow", columns)
     return ClosedPosition(
         tenant_id=TenantId(row["tenant_id"]),
         flow_id=FlowId(row["flow_id"]),

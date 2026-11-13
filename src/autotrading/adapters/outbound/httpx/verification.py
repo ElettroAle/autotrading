@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict
 from uuid import UUID
 
 import httpx
@@ -22,6 +22,37 @@ from autotrading.domain.verification.verification_run import VerificationRun
 # About ten calls to the exchange, each allowed up to 10 seconds (ADR 0024).
 TIMEOUT_SECONDS = 120.0
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, InvalidOperation)
+
+
+class _PositionBody(TypedDict):
+    coin: str
+    side: str
+    size: str
+    leverage: int
+
+
+class _ReadingBody(TypedDict):
+    balance: str
+    available_margin: str
+    currency: str
+    positions: list[_PositionBody]
+
+
+class _OrderBody(TypedDict):
+    succeeded: bool
+    fee: str
+    realized_pnl: str
+    message: str
+
+
+class _StepBody(TypedDict):
+    """A step as the worker answers it; a wrong shape fails while it is read."""
+
+    step: str
+    succeeded: bool
+    message: str
+    reading: _ReadingBody | None
+    order: _OrderBody | None
 
 
 class HttpxVerificationAdapter:
@@ -93,7 +124,7 @@ def _run_of(response: httpx.Response) -> VerificationRun:
         raise VerificationWorkerUnavailableError from error
 
 
-def _step_of(body: Any) -> StepOutcome:
+def _step_of(body: _StepBody) -> StepOutcome:
     reading, order = body["reading"], body["order"]
     return StepOutcome(
         step=Step(body["step"]),
@@ -104,7 +135,7 @@ def _step_of(body: Any) -> StepOutcome:
     )
 
 
-def _reading_of(body: Any) -> AccountReading:
+def _reading_of(body: _ReadingBody) -> AccountReading:
     return AccountReading(
         balance=Decimal(body["balance"]),
         available_margin=Decimal(body["available_margin"]),
@@ -116,7 +147,7 @@ def _reading_of(body: Any) -> AccountReading:
     )
 
 
-def _order_of(body: Any) -> OrderResult:
+def _order_of(body: _OrderBody) -> OrderResult:
     return OrderResult(
         succeeded=bool(body["succeeded"]),
         fee=Decimal(body["fee"]),

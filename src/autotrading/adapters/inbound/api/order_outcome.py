@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
-from autotrading.application.orders.outcome import OrderOutcome
+from autotrading.domain.orders.order_outcome import OrderOutcome
 
 
 def _text(amount: Decimal | None) -> str | None:

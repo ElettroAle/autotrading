@@ -1,8 +1,38 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import NotRequired, TypedDict, cast
+
+
+class _Leverage(TypedDict):
+    value: int
+
+
+class _PositionEntry(TypedDict):
+    coin: str
+    szi: str
+    leverage: _Leverage
+    entryPx: str
+    unrealizedPnl: str
+    marginUsed: str
+    liquidationPx: NotRequired[str | None]
+
+
+class _AssetPosition(TypedDict):
+    position: _PositionEntry
+
+
+class _MarginSummary(TypedDict):
+    accountValue: str
+
+
+class _ClearinghouseState(TypedDict):
+    """The clearinghouse state as Hyperliquid answers it; a wrong shape fails while it is read."""
+
+    marginSummary: _MarginSummary
+    withdrawable: str
+    assetPositions: list[_AssetPosition]
+    time: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,8 +58,9 @@ class _UserState:
     read_at: datetime
 
 
-def user_state_of(state: Any) -> _UserState:
+def user_state_of(answer: object) -> _UserState:
     """Raises KeyError, TypeError, ValueError or InvalidOperation on an answer of unexpected shape."""
+    state = cast("_ClearinghouseState", answer)
     return _UserState(
         account_value=decimal_of(state["marginSummary"]["accountValue"]),
         withdrawable=decimal_of(state["withdrawable"]),
@@ -38,11 +69,11 @@ def user_state_of(state: Any) -> _UserState:
     )
 
 
-def decimal_of(value: Any) -> Decimal:
+def decimal_of(value: object) -> Decimal:
     return Decimal(str(value))
 
 
-def _position_of(position: Mapping[str, Any]) -> _UserPosition:
+def _position_of(position: _PositionEntry) -> _UserPosition:
     liquidation = position.get("liquidationPx")
     return _UserPosition(
         coin=str(position["coin"]),

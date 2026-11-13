@@ -6,8 +6,8 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionUseCase,
 )
 from autotrading.application.orders.errors import OrderWorkerUnavailableError
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.user_id import UserId
 
 

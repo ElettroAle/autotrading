@@ -6,13 +6,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.support.directory import Directory
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
@@ -39,12 +38,11 @@ def tenants() -> InMemoryTenantRepositoryAdapter:
 
 @pytest.fixture
 def api(identity_provider: IdentityProvider, tenants: InMemoryTenantRepositoryAdapter) -> FastAPI:
-    verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, identity_provider.fetch))
     return create_api(
         HealthReport(version="1.0.0", environment="dev"),
         ResolveTenantUseCase(tenants),
         Platform().for_tenant,
-        Authentication(SETTINGS, verifier, identity_provider.login()),
+        identity_provider.authentication(),
     )
 
 

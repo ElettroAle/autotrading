@@ -8,8 +8,8 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
-from autotrading.application.flows.free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.capital_change import CapitalChange

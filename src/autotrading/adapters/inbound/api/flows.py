@@ -14,10 +14,10 @@ from autotrading.application.flows.change_allocated_capital import ChangeAllocat
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
-from autotrading.application.flows.free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference

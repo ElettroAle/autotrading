@@ -1,7 +1,7 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import NotRequired, TypedDict, cast
 from uuid import UUID
 
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
@@ -17,6 +17,35 @@ FUNDING_PAGE = 500
 FILLS_KEPT = 10000
 FROM_THE_START = 0
 PURCHASE = "B"
+
+type Page = list[Mapping[str, object]]
+
+
+class _Fill(TypedDict):
+    """A fill as Hyperliquid answers it; a wrong shape fails while it is read."""
+
+    tid: int
+    oid: int
+    cloid: NotRequired[str | None]
+    coin: str
+    side: str
+    sz: str
+    px: str
+    fee: str
+    closedPnl: str
+    startPosition: str
+    liquidation: NotRequired[object]
+    time: int
+
+
+class _FundingDelta(TypedDict):
+    coin: str
+    usdc: str
+
+
+class _FundingPayment(TypedDict):
+    delta: _FundingDelta
+    time: int
 
 
 class HyperliquidAccountExecutionsAdapter:
@@ -57,18 +86,19 @@ class HyperliquidAccountExecutionsAdapter:
             )
 
 
-def _pages(read: Any, start: int, page_size: int) -> list[Mapping[str, Any]]:
-    items: list[Mapping[str, Any]] = []
+def _pages(read: Callable[[int], Page], start: int, page_size: int) -> Page:
+    items: Page = []
     moment = start
     while True:
         page = read(moment)
         items.extend(page)
         if len(page) < page_size:
             return items
-        moment = int(page[-1]["time"]) + 1
+        moment = int(str(page[-1]["time"])) + 1
 
 
-def _execution_of(fill: Mapping[str, Any]) -> Execution:
+def _execution_of(entry: Mapping[str, object]) -> Execution:
+    fill = cast("_Fill", entry)
     cloid = fill.get("cloid")
     size = _decimal(fill["sz"])
     return Execution(
@@ -86,14 +116,15 @@ def _execution_of(fill: Mapping[str, Any]) -> Execution:
     )
 
 
-def _payment_of(payment: Mapping[str, Any]) -> FundingPayment:
+def _payment_of(entry: Mapping[str, object]) -> FundingPayment:
+    payment = cast("_FundingPayment", entry)
     delta = payment["delta"]
     return FundingPayment(str(delta["coin"]), _decimal(delta["usdc"]), _instant(payment["time"]))
 
 
-def _instant(milliseconds: Any) -> datetime:
+def _instant(milliseconds: int | str) -> datetime:
     return datetime.fromtimestamp(int(milliseconds) / 1000, UTC)
 
 
-def _decimal(value: Any) -> Decimal:
+def _decimal(value: object) -> Decimal:
     return Decimal(str(value))

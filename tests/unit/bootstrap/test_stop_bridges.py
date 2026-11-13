@@ -16,7 +16,6 @@ from autotrading.application.orders.errors import (
     OrderExchangeUnavailableError,
     OrderWorkerUnavailableError,
 )
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.bootstrap import AccountFlowsFromFlows, FlowPositionsFromOrders
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.removal import FlowPositionLeftOpen
@@ -26,6 +25,7 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing, PositionOpening
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.orders.order import OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.rejection import RejectionReason
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId

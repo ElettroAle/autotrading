@@ -1,6 +1,5 @@
 import json
 from collections.abc import Mapping
-from typing import Any
 
 from nacl.exceptions import CryptoError
 from nacl.public import SealedBox
@@ -32,7 +31,7 @@ class SodiumProviderKeyOpenerAdapter:
             raise ProviderKeyNotOpenedError(key.provider)
         return ProviderKey(secret)
 
-    def _document_of(self, key: RegisteredProviderKey) -> Mapping[str, Any]:
+    def _document_of(self, key: RegisteredProviderKey) -> Mapping[str, object]:
         box = self._boxes.get(key.sealed.key_version)
         if box is None:
             raise ProviderKeyNotOpenedError(key.provider)

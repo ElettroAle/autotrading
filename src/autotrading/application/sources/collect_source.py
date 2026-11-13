@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from autotrading.application.sources.ports import ReadSourceCommand, SampleRepositoryPort, SourceReaderPort
+from autotrading.application.sources.ports import SampleRepositoryPort, SourceReaderPort, SourceRequest
 from autotrading.domain.sources.errors import SourceNotAvailableError
 from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.sources.source_definition import SourceDefinition
@@ -63,7 +63,7 @@ class CollectSourceUseCase:
         samples = tuple(
             SourceSample.of(command.cycle, definition.name, asset, value, command.collected_at)
             for asset in _targets_of(definition, command.assets)
-            for value in reader.execute(ReadSourceCommand(command.cycle.flow_id, asset, settings, command.collected_at))
+            for value in reader.execute(SourceRequest(command.cycle.flow_id, asset, settings, command.collected_at))
         )
         self._samples.add(samples)
         note = None if samples else definition.silence_note(settings)

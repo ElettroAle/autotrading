@@ -7,8 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.adapters.inbound.api.operations import cursor_of, cursor_text
 from autotrading.application.flows.errors import OperationsCursorInvalidError
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
@@ -24,7 +23,7 @@ from autotrading.domain.flows.ledger import (
 )
 from autotrading.domain.flows.operations import OperationCursor, OperationSource
 from tests.support.flows import a_flow, account_id_of
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
@@ -41,12 +40,11 @@ def platform() -> Platform:
 @pytest.fixture
 def client_of(platform: Platform) -> Client:
     provider = IdentityProvider()
-    verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
     api = create_api(
         HealthReport("1.0.0", "dev"),
         ResolveTenantUseCase(platform.tenants),
         platform.for_tenant,
-        Authentication(SETTINGS, verifier, provider.login()),
+        provider.authentication(),
     )
 
     def client(user: str) -> TestClient:

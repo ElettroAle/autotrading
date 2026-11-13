@@ -1,6 +1,5 @@
 import json
 from collections.abc import Mapping
-from typing import Any
 
 from nacl.exceptions import CryptoError
 from nacl.public import PrivateKey, SealedBox
@@ -40,7 +39,7 @@ class SodiumCredentialOpenerAdapter:
             raise CredentialsNotOpenedError
         return _credentials_of(document)
 
-    def _document_of(self, account: Account) -> Mapping[str, Any]:
+    def _document_of(self, account: Account) -> Mapping[str, object]:
         box = self._boxes.get(account.credentials.key_version)
         if box is None:
             raise CredentialsNotOpenedError
@@ -59,7 +58,7 @@ def private_key_of(raw: bytes) -> PrivateKey:
     return PrivateKey(raw)
 
 
-def _credentials_of(document: Mapping[str, Any]) -> Credentials:
+def _credentials_of(document: Mapping[str, object]) -> Credentials:
     address, secret = document.get("account_address"), document.get("secret_key")
     if not isinstance(address, str) or not isinstance(secret, str):
         raise CredentialsNotOpenedError
