@@ -1,6 +1,11 @@
 from collections.abc import Iterable
 
 from autotrading.domain.sources.errors import SourceNotAvailableError
+from autotrading.domain.sources.forecast import FORECAST
+from autotrading.domain.sources.indicators import INDICATORS
+from autotrading.domain.sources.news import NEWS
+from autotrading.domain.sources.pivots import PIVOTS
+from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_definition import SourceDefinition
 
 
@@ -19,3 +24,6 @@ class SourceCatalog:
             if source.name == name:
                 return source
         raise SourceNotAvailableError(name)
+
+
+SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP, NEWS))

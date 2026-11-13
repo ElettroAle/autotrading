@@ -9,7 +9,6 @@ from decimal import Decimal
 
 from pytest_bdd import given, parsers, then
 
-from autotrading.bootstrap import HYPERLIQUID
 from autotrading.domain.accounts.position import PositionSide
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.orders.direction import Direction
@@ -17,6 +16,7 @@ from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.support.flow_cycle_steps import names_of, position
 from tests.support.flow_cycles import FlowCycles
+from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 
 FIELDS_OF_OPENING = ("direzione", "quota", "leva")

@@ -27,11 +27,8 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {
         "bootstrap.py:DEFAULT_CREDENTIALS_KEY_VERSION": BUG_STRICTER_RULES,
         "bootstrap.py:DEFAULT_DATABASE_PORT": BUG_STRICTER_RULES,
-        "bootstrap.py:HYPERLIQUID": BUG_STRICTER_RULES,
-        "bootstrap.py:MODEL_CATALOG": BUG_STRICTER_RULES,
         "bootstrap.py:PROVIDER_TIMEOUT_SECONDS": BUG_STRICTER_RULES,
         "bootstrap.py:SLIPPAGE_SETTING": BUG_STRICTER_RULES,
-        "bootstrap.py:SOURCE_CATALOG": BUG_STRICTER_RULES,
         "bootstrap.py:SUPPORTED_ENVIRONMENTS": BUG_STRICTER_RULES,
         "bootstrap.py:TELEGRAM_BOT_SETTING": BUG_STRICTER_RULES,
         "bootstrap.py:operations": BUG_STRICTER_RULES,
@@ -39,7 +36,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
-        "bootstrap.py:ApiExchanges": BUG_STRICTER_RULES,
         "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:CycleContext": BUG_STRICTER_RULES,
         "bootstrap.py:CycleDecisions": BUG_STRICTER_RULES,
@@ -55,7 +51,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
         "bootstrap.py:UndeclaredEnvironmentError": BUG_STRICTER_RULES,
         "bootstrap.py:UnsupportedEnvironmentError": BUG_STRICTER_RULES,
-        "bootstrap.py:WorkerExchanges": BUG_STRICTER_RULES,
         "bootstrap.py:WorkerSettings": BUG_STRICTER_RULES,
     },
     Rule.NO_BRIDGES: {

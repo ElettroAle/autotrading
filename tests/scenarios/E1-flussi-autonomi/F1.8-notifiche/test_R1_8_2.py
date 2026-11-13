@@ -13,7 +13,6 @@ from autotrading.application.flows.remove_account_with_flows import RemoveAccoun
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
-from autotrading.bootstrap import HYPERLIQUID
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.orders.direction import Direction
@@ -23,6 +22,7 @@ from tests.fakes.cycles import FakeTransientError
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import FlowCycles
 from tests.support.notifications import chat_named
+from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.8-notifiche/R1.8.2-notifiche-essenziali.feature")
