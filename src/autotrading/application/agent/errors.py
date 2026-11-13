@@ -2,6 +2,7 @@ from collections.abc import Iterable, Mapping
 
 from autotrading.application.errors import ApplicationError
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.errors import ErrorScope
 
 
 class UnsupportedProviderError(ApplicationError):
@@ -77,6 +78,10 @@ class ModelKeyRejectedError(ApplicationError):
         super().__init__(f"chiave del fornitore non valida: {provider.value}")
         self.provider = provider
 
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(provider=self.provider.value)
+
 
 class ModelCreditExhaustedError(ApplicationError):
     """The account of the user at the provider has no credit left: it repeats until the user tops it up (R1.2.4)."""
@@ -87,6 +92,10 @@ class ModelCreditExhaustedError(ApplicationError):
     def __init__(self, provider: ProviderName) -> None:
         super().__init__(f"credito esaurito presso {provider.value}")
         self.provider = provider
+
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(provider=self.provider.value)
 
 
 class ModelUnavailableError(ApplicationError):
@@ -110,6 +119,10 @@ class ModelKeyMissingError(ApplicationError):
         super().__init__(f"nessuna chiave registrata per il fornitore: {provider.value}")
         self.provider = provider
 
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(provider=self.provider.value)
+
 
 class ProviderKeyNotOpenedError(ApplicationError):
     """The worker cannot open a sealed key: it repeats until the user registers the key again (ADR 0029)."""
@@ -120,3 +133,7 @@ class ProviderKeyNotOpenedError(ApplicationError):
     def __init__(self, provider: ProviderName) -> None:
         super().__init__(f"chiave del fornitore non leggibile: {provider.value}")
         self.provider = provider
+
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(provider=self.provider.value)

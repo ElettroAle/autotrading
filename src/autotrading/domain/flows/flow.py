@@ -38,6 +38,13 @@ class Flow(TenantOwned):
     def model_provider(self) -> str:
         return self.configuration.model.name.partition("/")[0]
 
+    def holds(self, account_id: UUID, asset: str) -> bool:
+        """An active or paused flow keeps its asset on its account: nothing else may trade it there (ADR 0075).
+
+        A stopped flow runs no cycle, so it leaves the asset free.
+        """
+        return self.account_id == account_id and self.status.not_stopped and self.configuration.covers(asset)
+
     def after(self, command: FlowCommand) -> Flow:
         """The flow in the status the command leads to, when the command starts from its status (R1.1.4, R1.1.5)."""
         if self.status not in command.starts_from:

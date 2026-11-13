@@ -20,6 +20,13 @@ class CycleSchedule:
         if self.anchor.tzinfo is None or self.interval <= timedelta(0):
             raise InvalidScheduleError
 
+    @classmethod
+    def planned(cls, runs_cycles: bool, anchor: datetime | None, interval: timedelta) -> CycleSchedule | None:
+        """Only a running flow stamped with its anchor has cycles planned (R1.7.3)."""
+        if not runs_cycles or anchor is None:
+            return None
+        return cls(anchor, interval)
+
     def due_at(self, now: datetime) -> datetime | None:
         """The latest planned instant not after now; None before the first one."""
         if now < self.anchor:

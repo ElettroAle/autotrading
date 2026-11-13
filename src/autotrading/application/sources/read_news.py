@@ -1,11 +1,9 @@
 from datetime import timedelta
 
 from autotrading.application.sources.ports import NewsPort, ReadSourceCommand
+from autotrading.domain.sources.news import COUNT, MAX_AGE_HOURS
 from autotrading.domain.sources.news_item import NewsItem, recent_news
 from autotrading.domain.sources.source_sample import SourceValue
-
-COUNT = "numero_notizie"
-MAX_AGE_HOURS = "eta_massima_ore"
 
 
 class ReadNewsUseCase:

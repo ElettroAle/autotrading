@@ -31,3 +31,9 @@ def test_every_collected_value_reaches_the_agent_with_the_weight_of_its_source()
 
 def test_a_source_without_values_gives_nothing_to_the_agent() -> None:
     assert agent_sources_of([CollectedSource("notizie", 5, ())]) == ()
+
+
+def test_the_note_of_a_silent_source_reaches_the_agent_with_its_weight() -> None:
+    collected = [CollectedSource("notizie", 5, (), {"nota": "nessuna notizia nell'ultima ora"})]
+
+    assert agent_sources_of(collected) == (SourceData("notizie", 5, None, {"nota": "nessuna notizia nell'ultima ora"}),)
