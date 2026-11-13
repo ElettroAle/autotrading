@@ -1,6 +1,6 @@
 # ADR 0093 — Cicli presi e registrati nel tenant del flusso dal caso d'uso
 
-- Stato: accettata (13 novembre 2026)
+- Stato: proposta (13 novembre 2026): si discosta dalla decisione del proprietario (adapter SQL che trova il tenant con una query), in attesa di conferma
 - Requisiti: R1.2.1-R1.2.5, R1.7.1; Bug B0.0.3 (177)
 - Supera: la parte di ADR 0042 e 0046 che affida a `CyclesOfTenants` in `bootstrap.py` la scelta del tenant in cui
   prendere e registrare un ciclo, e il contenitore `CycleRuntime`
