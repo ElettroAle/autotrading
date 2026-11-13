@@ -38,15 +38,9 @@ from autotrading.application.orders.follow_flow_orders import (
 )
 from autotrading.bootstrap import (
     TenantCyclePorts,
-    WorkerExchanges,
     WorkerSettings,
-    activity_readers_for,
     cycle_ports,
-    exchanges_for,
-    executions_readers_for,
-    order_exchanges_for,
 )
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
@@ -480,20 +474,10 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
 
 
 def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
-    accounts = exchanges_for(ExchangeNetwork.TEST)
-    exchanges = WorkerExchanges(
-        accounts,
-        order_exchanges_for(ExchangeNetwork.TEST),
-        activity_readers_for(ExchangeNetwork.TEST),
-        executions_readers_for(ExchangeNetwork.TEST),
-        accounts,
-        accounts,
-    )
     messenger = FakeMessengerAdapter()
     worker = cycle_ports(
         create_engine("sqlite://"),
         SodiumCredentialOpenerAdapter({}),
-        exchanges,
         WorkerSettings("dev", Slippage.default()),
         messenger,
     )
