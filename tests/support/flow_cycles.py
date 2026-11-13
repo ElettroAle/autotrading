@@ -76,7 +76,12 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
-from tests.fakes.cycles import FakeClockAdapter, InMemoryCycleRepositoryAdapter, InMemoryFlowLockAdapter
+from tests.fakes.cycles import (
+    FakeClockAdapter,
+    InMemoryCycleCheckpointsAdapter,
+    InMemoryCycleRepositoryAdapter,
+    InMemoryFlowLockAdapter,
+)
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import (
@@ -131,6 +136,7 @@ class FlowCycles:
         self.platform = Platform()
         self.platform.model_catalog = scenario_catalog()
         self.clock = FakeClockAdapter(at("10:00"))
+        self.checkpoints = InMemoryCycleCheckpointsAdapter()
         self.records = InMemoryCycleRepositoryAdapter()
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
@@ -218,6 +224,7 @@ class FlowCycles:
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
+            checkpoints=self.checkpoints,
         )
 
     def services(self) -> CycleServices:

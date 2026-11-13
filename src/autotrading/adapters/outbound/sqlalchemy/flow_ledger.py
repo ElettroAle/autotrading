@@ -3,7 +3,6 @@ from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
-from types import MappingProxyType
 from uuid import UUID
 
 from sqlalchemy import Connection, Engine, func, select
@@ -75,7 +74,7 @@ class SqlAlchemyFlowLedgerAdapter:
                 row["realized_pnl"],
                 row["fees"],
                 row["funding"],
-                MappingProxyType(held[row["flow_id"]]),
+                frozendict(held[row["flow_id"]]),
             )
             for row in rows
         }
@@ -98,7 +97,7 @@ class SqlAlchemyFlowLedgerAdapter:
             realized, fees = connection.execute(executions).one()
             paid = connection.execute(funding).scalar_one()
             held = {str(asset): size for asset, size in connection.execute(positions)}
-        return FlowTotals(flow_id, realized, fees, paid, MappingProxyType(held))
+        return FlowTotals(flow_id, realized, fees, paid, frozendict(held))
 
     def _add_execution(self, connection: Connection, account_id: UUID, entry: LedgerEntry) -> bool:
         execution = entry.execution
