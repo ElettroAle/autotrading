@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule, delay_seconds
-from autotrading.domain.cycles.errors import InvalidScheduleError
+from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
+from autotrading.domain.flows.errors import InvalidScheduleError
 
 ANCHOR = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
 QUARTER = timedelta(minutes=15)

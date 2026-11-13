@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from autotrading.application.cycles.ports import (
+from autotrading.application.flows.ports import (
     AgentPort,
     ClockPort,
     ContextPort,
@@ -18,18 +18,18 @@ from autotrading.application.cycles.ports import (
     RiskPort,
     SourceRequest,
 )
-from autotrading.application.cycles.source_collector import SourceCollector
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import (
+from autotrading.application.flows.source_collector import SourceCollector
+from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
     CycleOutcome,
     CycleRecord,
     StepDocument,
 )
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule, delay_seconds
-from autotrading.domain.cycles.cycle_step import CycleStep
-from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
+from autotrading.domain.flows.cycle_step import CycleStep
 
 operations = logging.getLogger("autotrading.cycles")
 

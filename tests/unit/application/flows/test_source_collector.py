@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
-from autotrading.application.cycles.ports import FlowSnapshot, SourceReading, SourceRequest
-from autotrading.application.cycles.source_collector import SourceCollector, real_seconds
-from autotrading.domain.cycles.cycle_record import AbsentSource
+from autotrading.application.flows.ports import FlowSnapshot, SourceReading, SourceRequest
+from autotrading.application.flows.source_collector import SourceCollector, real_seconds
+from autotrading.domain.flows.cycle_record import AbsentSource
 from tests.fakes.cycles import FakeSourcesAdapter, FakeTransientError
 
 SECOND = 0.01

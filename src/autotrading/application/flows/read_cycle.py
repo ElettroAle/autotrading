@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from autotrading.application.cycles.errors import CycleFlowNotFoundError, CycleNotFoundError
-from autotrading.application.cycles.ports import CycleHistoryPort, FlowDirectoryPort
-from autotrading.domain.cycles.cycle_record import CycleRecord
+from autotrading.application.flows.errors import CycleFlowNotFoundError, CycleNotFoundError
+from autotrading.application.flows.ports import CycleHistoryPort, FlowDirectoryPort
+from autotrading.domain.flows.cycle_record import CycleRecord
 
 
 @dataclass(frozen=True, slots=True)

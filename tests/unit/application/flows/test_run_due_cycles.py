@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from autotrading.domain.cycles.cycle_record import CycleOutcome
+from autotrading.domain.flows.cycle_record import CycleOutcome
 from tests.support.cycles import Cycles, at
 
 

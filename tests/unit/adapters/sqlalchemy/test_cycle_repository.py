@@ -5,16 +5,16 @@ from uuid import uuid4
 import pytest
 
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import plain, record_of, row_of
-from autotrading.application.cycles.errors import UnrecordableDocumentError
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import (
+from autotrading.application.flows.errors import UnrecordableDocumentError
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
     CycleOutcome,
     CycleRecord,
     StepDocument,
 )
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 PLANNED = datetime(2026, 11, 12, 10, 22, tzinfo=UTC)

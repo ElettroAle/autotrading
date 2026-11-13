@@ -13,7 +13,7 @@ from autotrading.application.flows.list_account_operations import (
     ListAccountOperationsUseCase,
 )
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand, ListFlowOperationsUseCase
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import ExecutionKind, FlowTotals
 from autotrading.domain.flows.operations import FUNDING, AccountScope, OperationsPage, OperationsQuery

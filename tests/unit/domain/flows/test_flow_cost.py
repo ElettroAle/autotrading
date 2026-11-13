@@ -1,8 +1,8 @@
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.flow_cost import CycleCost, DailyCost, FlowCost
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.flow_cost import CycleCost, DailyCost, FlowCost
 
 DAY = datetime(2026, 11, 12, 10, tzinfo=UTC)
 

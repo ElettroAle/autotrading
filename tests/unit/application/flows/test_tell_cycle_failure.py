@@ -2,7 +2,7 @@
 
 from uuid import UUID, uuid4
 
-from autotrading.application.cycles.tell_cycle_failure import TellCycleFailureUseCase
+from autotrading.application.flows.tell_cycle_failure import TellCycleFailureUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()

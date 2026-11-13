@@ -7,9 +7,9 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.exc import DBAPIError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
-from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
-from autotrading.domain.cycles.cycle_schedule import CycleSchedule
+from autotrading.application.flows.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 

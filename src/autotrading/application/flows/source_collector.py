@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import timedelta
 
-from autotrading.application.cycles.ports import (
+from autotrading.application.flows.ports import (
     CallAnswered,
     CallFailed,
     CallOutcome,
@@ -10,7 +10,7 @@ from autotrading.application.cycles.ports import (
     SourceReading,
     SourceRequest,
 )
-from autotrading.domain.cycles.cycle_record import AbsentSource
+from autotrading.domain.flows.cycle_record import AbsentSource
 
 type Outcomes[D] = tuple[list[SourceReading[D]], list[AbsentSource]]
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from autotrading.domain.cycles.call_cost import CallCost
+from autotrading.domain.flows.call_cost import CallCost
 
 
 @dataclass(frozen=True, slots=True)

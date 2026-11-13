@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord, StepDocument
-from autotrading.domain.cycles.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
+from autotrading.domain.flows.cycle_step import CycleStep
 
 
 def test_a_skipped_cycle_keeps_only_its_planned_instant() -> None:

@@ -2,8 +2,8 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.errors import InvalidCallCostError
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.errors import InvalidCallCostError
 
 
 def test_a_call_cost_keeps_tokens_and_cost() -> None:

@@ -3,10 +3,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.cycles.errors import CycleFlowNotFoundError
-from autotrading.application.cycles.list_cycles import ListCyclesCommand, ListCyclesUseCase
-from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
-from autotrading.domain.cycles.errors import InvalidPageNumberError
+from autotrading.application.flows.errors import CycleFlowNotFoundError
+from autotrading.application.flows.list_cycles import ListCyclesCommand, ListCyclesUseCase
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.errors import InvalidPageNumberError
 from tests.fakes.cycles import FakeFlowDirectoryAdapter, InMemoryCycleRepositoryAdapter
 
 FIRST = datetime(2026, 11, 12, tzinfo=UTC)

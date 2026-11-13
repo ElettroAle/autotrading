@@ -2,8 +2,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
-from autotrading.application.cycles.ports import CycleHistoryPort, FlowSummary, FlowSummaryPort
-from autotrading.domain.cycles.cycle_record import CycleRecord
+from autotrading.application.flows.ports import CycleHistoryPort, FlowSummary, FlowSummaryPort
+from autotrading.domain.flows.cycle_record import CycleRecord
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,11 +1,14 @@
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.cycles.errors import CycleFlowNotFoundError, CycleNotFoundError
-from autotrading.application.cycles.read_cycle import ReadCycleCommand, ReadCycleUseCase
-from autotrading.domain.cycles.cycle_record import CycleOutcome, CycleRecord
+from autotrading.application.flows.errors import CycleFlowNotFoundError
+from autotrading.application.flows.read_flow_cost import ReadFlowCostCommand, ReadFlowCostUseCase
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.flow_cost import DailyCost, FlowCost
 from tests.fakes.cycles import FakeFlowDirectoryAdapter, InMemoryCycleRepositoryAdapter
 
 FIRST = datetime(2026, 11, 12, tzinfo=UTC)
@@ -31,24 +34,20 @@ def instants(records: tuple[CycleRecord, ...]) -> list[int]:
     return [int((record.planned_at - FIRST).total_seconds() // 60) for record in records]
 
 
-def test_a_cycle_is_read_with_everything_recorded(
+def test_the_cost_of_a_flow_adds_the_cost_of_its_cycles(
     history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
 ) -> None:
-    record_cycles(history, 3)
+    for minute, amount in enumerate(("0.01", "0.02")):
+        history.record(
+            CycleRecord(
+                FLOW, FIRST + timedelta(minutes=minute), CycleOutcome.COMPLETED, cost=CallCost(1, 1, Decimal(amount))
+            )
+        )
+    history.record(CycleRecord(FLOW, FIRST + timedelta(minutes=5), CycleOutcome.SKIPPED))
 
-    record = ReadCycleUseCase(directory, history).execute(ReadCycleCommand(FLOW, FIRST + timedelta(minutes=1)))
+    cost = ReadFlowCostUseCase(directory, history).execute(ReadFlowCostCommand(FLOW))
 
-    assert record == CycleRecord(FLOW, FIRST + timedelta(minutes=1), CycleOutcome.COMPLETED)
-
-
-def test_a_cycle_never_recorded_is_not_found(
-    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
-) -> None:
-    with pytest.raises(CycleNotFoundError) as raised:
-        ReadCycleUseCase(directory, history).execute(ReadCycleCommand(FLOW, FIRST))
-
-    assert raised.value.status_code == 404
-    assert str(raised.value) == "ciclo non trovato"
+    assert cost == FlowCost(Decimal("0.03"), (DailyCost(FIRST.date(), Decimal("0.03")),), 0)
 
 
 def test_a_flow_of_another_tenant_does_not_exist(
@@ -58,7 +57,7 @@ def test_a_flow_of_another_tenant_does_not_exist(
     record_cycles(history, 1, other)
 
     with pytest.raises(CycleFlowNotFoundError) as raised:
-        ReadCycleUseCase(directory, history).execute(ReadCycleCommand(other, FIRST))
+        ReadFlowCostUseCase(directory, history).execute(ReadFlowCostCommand(other))
 
     assert raised.value.status_code == 404
     assert str(raised.value) == "flusso non trovato"

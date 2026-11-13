@@ -10,17 +10,17 @@ from sqlalchemy import Connection, Engine, RowMapping, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import cycles
-from autotrading.application.cycles.errors import UnrecordableDocumentError
-from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import (
+from autotrading.application.flows.errors import UnrecordableDocumentError
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
     CycleOutcome,
     CycleRecord,
     StepDocument,
 )
-from autotrading.domain.cycles.cycle_step import CycleStep
-from autotrading.domain.cycles.flow_cost import CycleCost
+from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow_cost import CycleCost
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]

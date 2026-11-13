@@ -5,7 +5,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
-from autotrading.domain.cycles.cycle_record import CycleOutcome
+from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flow_cycles import ACCOUNT, FlowCycles

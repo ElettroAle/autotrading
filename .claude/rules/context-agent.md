@@ -31,7 +31,7 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   pubblica, decifrabili solo dal `worker`, mai in una risposta, in un log o nel contesto.
 - Un flusso usa solo modelli di fornitori di cui l'utente ha la chiave.
 - Nessun limite di spesa sulla piattaforma: il flusso va in pausa solo quando il fornitore dichiara il
-  credito esaurito o la chiave non valida (errore permanente, contesto `cycles`).
+  credito esaurito o la chiave non valida (errore permanente, ciclo decisionale di `flows`).
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
 - Formato della risposta, lettura delle decisioni, contesto e costo sono regole del domain (`AgentResponse`,
   `AgentContext`, `ModelUsage`, ADR 0038): le chiavi della risposta sono i nomi dei campi dei motivi di scarto.
