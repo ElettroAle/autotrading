@@ -2,8 +2,7 @@ import base64
 import binascii
 import logging
 import os
-import threading
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -100,6 +99,7 @@ from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
+from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.accounts.errors import (
     AccountNotFoundError,
     CredentialsNotOpenedError,
@@ -119,12 +119,12 @@ from autotrading.application.agent.errors import (
     ProviderKeyNotFoundError,
 )
 from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
-from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
 from autotrading.application.cycles.ports import (
     ClockPort,
     CycleLauncherPort,
     FlowSnapshot,
     FlowSummary,
+    PlannedFlowsPort,
     RiskReview,
     ScheduledFlow,
     SourceReading,
@@ -1015,38 +1015,6 @@ class SystemClock:
         return now()
 
 
-class FlowDirectory:
-    """The tenant and the anchor of every flow the worker planned: the ports of the cycle name only the flow.
-
-    An entry is never forgotten, so a cycle still running finds its flow after the flow is paused.
-    """
-
-    def __init__(self) -> None:
-        self._guard = threading.Lock()
-        self._entries: dict[UUID, TenantScheduledFlow] = {}
-
-    def remember(self, entries: Iterable[TenantScheduledFlow]) -> None:
-        with self._guard:
-            self._entries.update({entry.flow.flow_id: entry for entry in entries})
-
-    def tenant_of(self, flow_id: UUID) -> TenantId:
-        return self._entry(flow_id).tenant_id
-
-    def anchor_of(self, flow_id: UUID) -> datetime:
-        return self._entry(flow_id).flow.schedule.anchor
-
-    def tenants(self) -> set[TenantId]:
-        with self._guard:
-            return {entry.tenant_id for entry in self._entries.values()}
-
-    def _entry(self, flow_id: UUID) -> TenantScheduledFlow:
-        with self._guard:
-            entry = self._entries.get(flow_id)
-        if entry is None:
-            raise FlowOfCycleNotFoundError
-        return entry
-
-
 class ScheduledFlowsSource(Protocol):
     def active_of_every_tenant(self) -> list[TenantScheduledFlow]: ...
 
@@ -1054,7 +1022,7 @@ class ScheduledFlowsSource(Protocol):
 class ScheduledFlowsFromFlows:
     """Bridges the flows of every tenant to the cycles context in the worker (ADR 0042)."""
 
-    def __init__(self, source: ScheduledFlowsSource, directory: FlowDirectory) -> None:
+    def __init__(self, source: ScheduledFlowsSource, directory: PlannedFlowsPort) -> None:
         self._source = source
         self._directory = directory
 
@@ -1166,7 +1134,7 @@ class FlowStateFromFlows:
     execution the state counts (ReadCycleFlowStateUseCase).
     """
 
-    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
@@ -1230,7 +1198,7 @@ class FlowPauseFromFlows:
     concerns, and the flows context pauses the flows involved (R1.2.4, ADR 0082).
     """
 
-    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
@@ -1614,7 +1582,7 @@ class NotifiedClosedPositions:
 class CycleFailureNotices:
     """Bridges a failed cycle to the notifications of the tenant of its flow (R1.8.2)."""
 
-    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
@@ -1626,7 +1594,7 @@ class CycleFailureNotices:
 class CyclesOfTenants:
     """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
 
-    def __init__(self, engine: Engine, directory: FlowDirectory) -> None:
+    def __init__(self, engine: Engine, directory: PlannedFlowsPort) -> None:
         self._engine = engine
         self._directory = directory
 
@@ -1653,7 +1621,7 @@ type WorkerCycles = RunDueCyclesUseCase[CycleFlow, SourcesData, CycleContext, Cy
 
 
 def run_due_cycles(
-    directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
+    directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
 ) -> WorkerCycles:
     """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
     steps = CycleSteps(
@@ -1669,7 +1637,7 @@ def run_due_cycles(
     return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, runtime.guards), runtime.launcher, services.clock)
 
 
-def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices) -> None:
+def record_actual_prices(directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
     """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
     command = RecordActualPricesCommand(services.clock.now())
     for tenant_id in directory.tenants():
@@ -1677,7 +1645,7 @@ def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, servi
 
 
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
-    directory = FlowDirectory()
+    directory = ThreadsPlannedFlowsAdapter()
     guards = CycleGuards(
         cycles=CyclesOfTenants(engine, directory),
         lock=SqlAlchemyFlowLockAdapter(engine),

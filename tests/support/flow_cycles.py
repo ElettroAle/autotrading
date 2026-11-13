@@ -9,6 +9,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
+from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
@@ -27,7 +28,6 @@ from autotrading.bootstrap import (
     CycleFailureNotices,
     CycleRuntime,
     CycleServices,
-    FlowDirectory,
     FlowPauseFromFlows,
     NotifiedClosedPositions,
     OutsideClosingsInHistory,
@@ -111,7 +111,7 @@ class FlowCycles:
         self.platform.model_catalog = scenario_catalog()
         self.clock = FakeClockAdapter(at("10:00"))
         self.records = InMemoryCycleRepositoryAdapter()
-        self.directory = FlowDirectory()
+        self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
         self.sentiments = {
             name: FakeSentimentAdapter(name) for name in (SENTIMENT_ALTERNATIVE_ME.name, SENTIMENT_COINMARKETCAP.name)

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
@@ -70,6 +70,22 @@ class RiskReview[O = object]:
 
     orders: tuple[O, ...]
     outcomes: object
+
+
+class PlannedFlowsPort(Protocol):
+    """The tenant and the anchor of every flow the worker planned: the ports of the cycle name only the flow."""
+
+    def remember(self, entries: Iterable[TenantScheduledFlow]) -> None: ...
+
+    def tenant_of(self, flow_id: UUID) -> TenantId:
+        """Raises FlowOfCycleNotFoundError for a flow the worker never planned."""
+        ...
+
+    def anchor_of(self, flow_id: UUID) -> datetime:
+        """Raises FlowOfCycleNotFoundError for a flow the worker never planned."""
+        ...
+
+    def tenants(self) -> set[TenantId]: ...
 
 
 class ClockPort(Protocol):

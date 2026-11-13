@@ -20,7 +20,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
         "bootstrap.py:CycleJournalFromContexts.call_cost": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowDirectory._entry": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows._snapshot": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:ModelSettingsFromAgent.selection": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders.execute": BUG_CYCLE_RULES_IN_BOOTSTRAP,
@@ -68,7 +67,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     },
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowDirectory": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:ModelSettingsFromAgent": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
@@ -151,7 +149,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {
         "application/cycles/source_collector.py:concurrent.futures": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:os": BUG_STRICTER_RULES,
-        "bootstrap.py:threading": BUG_STRICTER_RULES,
     },
     Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {
         "domain/notifications/link_code.py:<modulo>": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
