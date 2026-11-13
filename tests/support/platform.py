@@ -35,7 +35,6 @@ from autotrading.application.verification.run_exchange_verification import (
     VerificationReadings,
 )
 from autotrading.bootstrap import (
-    FlowPositionsFromOrders,
     OrderExecutionFromOrders,
 )
 from autotrading.domain.accounts.account import Account
@@ -166,7 +165,7 @@ class Platform:
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
-        flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
+        flow_positions = CloseFlowPositionUseCase(position_closing)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).

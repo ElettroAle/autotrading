@@ -15,12 +15,10 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {},
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
         "bootstrap.py:CycleServices": BUG_STRICTER_RULES,
-        "bootstrap.py:FlowPositionsFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:OrderExecutionFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
     },
     Rule.NO_BRIDGES: {
-        "bootstrap.py:FlowPositionsFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:OrderExecutionFromOrders": BUG_STRICTER_RULES,
     },
     Rule.LIBRARIES_IN_THEIR_FOLDER: {},

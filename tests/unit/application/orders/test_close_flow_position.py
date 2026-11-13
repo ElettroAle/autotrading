@@ -1,5 +1,6 @@
 """Closing a position for a flow: what happened, as data the flows context reads, never as an error (ADR 0086)."""
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -7,7 +8,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.application.orders.close_flow_position import (
-    CloseFlowPositionCommand,
     CloseFlowPositionUseCase,
     ClosingReport,
 )
@@ -41,8 +41,17 @@ class ScriptedClosing:
         return self.outcome
 
 
+@dataclass(frozen=True, slots=True)
+class PositionAsked:
+    """The position a flow asks to close, as the flows context describes it."""
+
+    account_id: UUID
+    asset: str
+    user_id: UserId
+
+
 def report_of(closing: ScriptedClosing) -> ClosingReport:
-    return CloseFlowPositionUseCase(closing).execute(CloseFlowPositionCommand(ACCOUNT, "BTC", USER))
+    return CloseFlowPositionUseCase(closing).execute(PositionAsked(ACCOUNT, "BTC", USER))
 
 
 def test_an_executed_closing_reports_its_fill() -> None:

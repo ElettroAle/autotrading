@@ -2,7 +2,7 @@ import logging
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -12,6 +12,7 @@ from autotrading.application.flows.change_allocated_capital import (
 )
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand, ListCapitalChangesUseCase
+from autotrading.application.flows.ports import PositionToClose
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -27,7 +28,6 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import (
     ClosingFill,
-    PositionClosing,
     PositionLeftOpen,
     PositionOpening,
     StopOutcome,
@@ -43,6 +43,7 @@ from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
+from tests.support.position_closings import NOTHING_TO_CLOSE, ClosingAnswer, closed_by, refused
 
 USER = UserId("oid-anna")
 OPENED = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
@@ -59,13 +60,14 @@ class ScriptedPositions:
         self.refusals: dict[str, str] = {}
         self.none_open: set[str] = set()
 
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
+    def execute(self, position: PositionToClose) -> ClosingAnswer:
+        account_id, asset, user_id = position.account_id, position.asset, position.user_id
         self.events.append(f"close {asset} {account_id} {user_id.value}")
         if asset in self.none_open:
-            return None
+            return NOTHING_TO_CLOSE
         if asset in self.refusals:
-            return PositionClosing(asset, refusal=self.refusals[asset])
-        return PositionClosing(asset, FILL)
+            return refused(self.refusals[asset])
+        return closed_by(FILL)
 
 
 class RecordingCycles:
