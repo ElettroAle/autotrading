@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.worker import (
     bot_polling,
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
+from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
@@ -71,7 +72,6 @@ from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import
 from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
-from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.adapters.outbound.worker.composition import WorkerAdaptersOfTenant, worker_adapters
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
@@ -96,6 +96,7 @@ from autotrading.application.flows.notify_unattributable import (
     UnattributableNotices,
 )
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
     AutomaticPausePort,
@@ -131,7 +132,6 @@ from autotrading.application.flows.record_manual_closing import RecordManualClos
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
-from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -600,12 +600,12 @@ def worker_cycles(engine: SqlAlchemyEngine, ports_of: CyclePortsOf, services: Cy
     planned = ThreadsPlannedFlowsAdapter()
     cycles_of = partial(SqlAlchemyCycleRepositoryAdapter, engine)
     run_cycle_of = partial(run_cycle_for, ports_of, services, cycles_of, SqlAlchemyFlowLockAdapter(engine))
-    run_due = RunDueCyclesUseCase(
-        SqlAlchemyScheduledFlowsAdapter(engine), planned, run_cycle_of, ThreadCycleLauncherAdapter(), services.clock
+    plan = PlanFlowCyclesUseCase(
+        SqlAlchemyScheduledFlowsAdapter(engine), planned, run_cycle_of, apscheduler_adapters(), services.clock
     )
 
     def plan_round() -> None:
-        run_due.execute()
+        plan.execute()
         record_actual_prices(planned, ports_of, services)
 
     return CyclePolling(plan_round)

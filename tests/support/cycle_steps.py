@@ -250,13 +250,13 @@ def flow_runs_cycle_of(cycles: Cycles, flow: str, instant: str) -> None:
 
 @then(parsers.re(r"^il ciclo è registrato con un ritardo di (?P<seconds>\d+) secondi$"))
 def recorded_late(cycles: Cycles, seconds: str) -> None:
-    cycles.launcher.settle()
+    cycles.scheduler.settle()
     assert cycles.last_record("alfa").delay_seconds == int(seconds)
 
 
 @then("il ciclo è registrato senza ritardo")
 def recorded_punctual(cycles: Cycles) -> None:
-    cycles.launcher.settle()
+    cycles.scheduler.settle()
     record = cycles.last_record("alfa")
     assert record.outcome is CycleOutcome.COMPLETED
     assert record.delay_seconds is None
@@ -280,7 +280,7 @@ def next_planned(cycles: Cycles, flow: str, instant: str) -> None:
 
 @then(parsers.re(rf'^il ciclo delle {TIME} del flusso "(?P<flow>[^"]+)" è eseguito una sola volta$'))
 def run_once(cycles: Cycles, instant: str, flow: str) -> None:
-    cycles.launcher.settle()
+    cycles.scheduler.settle()
     assert [record.planned_at for record in cycles.records_of(flow)] == [at(instant)]
     assert cycles.agent.calls == [cycles.id_of(flow)]
 

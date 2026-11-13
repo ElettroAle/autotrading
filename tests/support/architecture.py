@@ -116,6 +116,8 @@ TRANSPORT_LIBRARIES = frozenset({"httpx"})
 TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/inbound/api": frozenset({"fastapi", "pydantic", "starlette"}),
     "adapters/outbound/alternative_me": frozenset({"httpx"}),
+    # The scheduler of the cycles of the worker (docs/architecture.md:144, ADR 0112).
+    "adapters/outbound/apscheduler": frozenset({"apscheduler"}),
     "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
     # The internal API of the forecaster service (ADR 0107): Prophet stays inside the service.
     "adapters/outbound/forecaster": frozenset({"httpx"}),
