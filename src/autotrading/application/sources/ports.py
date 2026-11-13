@@ -9,7 +9,7 @@ from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.pivot_levels import DailyRange
-from autotrading.domain.sources.price_forecast import PriceForecast, PricePoint
+from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, PricePoint
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.timeframe import Timeframe
@@ -66,6 +66,16 @@ class MarketDataPort(Protocol):
 
     def previous_day(self, asset: str, now: datetime) -> DailyRange:
         """High, low and close of the UTC day before `now`. Raises SourceUnavailableError."""
+        ...
+
+
+class PriceForecasterPort(Protocol):
+    """The model that forecasts the price of an asset from its history (R1.3.5, ADR 0107)."""
+
+    def predict(
+        self, asset: str, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]
+    ) -> Mapping[ForecastHorizon, Decimal]:
+        """The predicted price at every horizon after the last point; SourceUnavailableError when it does not answer."""
         ...
 
 

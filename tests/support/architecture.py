@@ -117,6 +117,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/inbound/api": frozenset({"fastapi", "pydantic", "starlette"}),
     "adapters/outbound/alternative_me": frozenset({"httpx"}),
     "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
+    # The internal API of the forecaster service (ADR 0107): Prophet stays inside the service.
+    "adapters/outbound/forecaster": frozenset({"httpx"}),
     # eth_account and requests are the signing and transport libraries of the official Hyperliquid SDK.
     "adapters/outbound/hyperliquid": frozenset({"hyperliquid", "eth_account", "requests"}),
     "adapters/outbound/json": frozenset(),
