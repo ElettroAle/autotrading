@@ -12,9 +12,11 @@ from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
+from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.notifications.ports import LinkStores
+from autotrading.application.notifications.ports import BotMessage, LinkStores
+from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
@@ -40,6 +42,7 @@ from autotrading.bootstrap import (
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
+from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -48,6 +51,7 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
+from tests.fakes.bot_inbox import FakeBotInboxAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
@@ -62,7 +66,11 @@ from tests.fakes.link_code_repository import (
     InMemoryLinkCodeRepositoryAdapter,
     LinkCodeStore,
 )
-from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.linked_chat_repository import (
+    InMemoryLinkedChatLookupAdapter,
+    InMemoryLinkedChatRepositoryAdapter,
+    LinkedChatStore,
+)
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -189,7 +197,9 @@ class Platform:
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
             flow_operations=InMemoryFlowOperationsAdapter(
-                self.ledger, lambda: [account.id.value for account in accounts.list()]
+                self.ledger,
+                lambda: [account.id.value for account in accounts.list()],
+                lambda: {flow.id: flow.name.value for flow in self.flows.flows},
             ),
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             bot_identity=FakeBotIdentityAdapter(self.bot_username),
@@ -239,6 +249,17 @@ class Platform:
             self.messenger,
             lambda: self.now,
         )
+
+    def bot_receives(self, chat_id: ChatId, text: str) -> None:
+        """One round of the bot of the worker with this message waiting for it."""
+        inbox = FakeBotInboxAdapter()
+        inbox.waiting = [BotMessage(chat_id, text)]
+        test_notification = SendTestNotificationUseCase(
+            InMemoryLinkedChatLookupAdapter(self.chats),
+            lambda tenant_id: NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+            self.messenger,
+        )
+        AnswerBotMessagesUseCase(inbox, self.link_chat(), test_notification).execute()
 
     def orders_of(self, tenant_id: TenantId) -> InMemoryOrderRepositoryAdapter:
         return self.orders.setdefault(tenant_id, InMemoryOrderRepositoryAdapter())

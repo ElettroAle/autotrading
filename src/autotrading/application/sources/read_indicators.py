@@ -19,7 +19,7 @@ class ReadIndicatorsUseCase:
 
     def __init__(self, market: MarketDataPort, cycle_minutes: int) -> None:
         self._market = market
-        self._short = short_timeframe_of(cycle_minutes)
+        self._short = short_timeframe_of(cycle_minutes, market.timeframes())
 
     def execute(self, command: ReadSourceCommand) -> tuple[SourceValue]:
         if command.asset is None:

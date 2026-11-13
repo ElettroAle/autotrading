@@ -29,11 +29,14 @@ Le notifiche all'utente su Telegram.
   di avvio (ADR 0035).
 - Il codice si legge da solo o dopo il comando di avvio; un messaggio senza codice, o un altro comando,
   riceve le istruzioni per il collegamento, mai "codice non valido" (Bug 163).
+- Il comando `/prova` (anche `/prova@<bot>`) dalla chat collegata invia una notifica di prova con il
+  `NotifyUseCase` di ogni tenant collegato alla chat; da una chat non collegata riceve le istruzioni. Il bot
+  trova i tenant dalla chat con `LinkedChatLookupPort`, unica lettura delle chat prima del tenant (ADR 0081).
 - Il codice arriva con il link `t.me/<bot>?start=<codice>`; il nome del bot si chiede a Telegram (`getMe`)
   nel worker, l'API lo chiede al worker; senza bot attivo il link è assente e il codice vale lo stesso
   (ADR 0072).
 
 ## Porte del contesto
 
-Repository delle chat collegate e dei codici, invio dei messaggi, ricezione dei messaggi al bot, nome del
+Repository delle chat collegate e dei codici, ricerca dei tenant di una chat (`LinkedChatLookupPort`), invio dei messaggi, ricezione dei messaggi al bot, nome del
 bot (`BotIdentityPort`).

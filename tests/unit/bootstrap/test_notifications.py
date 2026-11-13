@@ -122,3 +122,4 @@ def test_the_link_stores_and_the_notifications_are_bound_to_the_tenant() -> None
     assert isinstance(stores.codes, SqlAlchemyLinkCodeRepositoryAdapter)
     assert isinstance(stores.chats, SqlAlchemyLinkedChatRepositoryAdapter)
     assert worker.for_tenant(tenant).notify is not worker.for_tenant(tenant).notify
+    assert worker.notify_for(tenant) is not worker.notify_for(tenant)

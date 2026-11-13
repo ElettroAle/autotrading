@@ -16,6 +16,10 @@ from autotrading.application.notifications.link_chat import (
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.request_link_code import IssuedLinkCode, RequestLinkCodeUseCase
+from autotrading.application.notifications.send_test_notification import (
+    SendTestNotificationCommand,
+    SendTestNotificationUseCase,
+)
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.link_code import LinkCode
@@ -30,13 +34,18 @@ from tests.fakes.link_code_repository import (
     LinkCodeStore,
     RacedLinkCodeRepositoryAdapter,
 )
-from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.linked_chat_repository import (
+    InMemoryLinkedChatLookupAdapter,
+    InMemoryLinkedChatRepositoryAdapter,
+    LinkedChatStore,
+)
 from tests.fakes.messenger import FakeMessengerAdapter
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
 FAILED = Notification.cycle_failed("alfa", "timeout")
+TEST_TEXT = "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
 
 
 class Telegram:
@@ -73,8 +82,20 @@ class Telegram:
     def linked(self, tenant_id: TenantId) -> LinkedChat | None:
         return GetLinkedChatUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)).execute()
 
+    def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
+        return NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger)
+
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:
-        NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger).execute(notification)
+        self.notify_for(tenant_id).execute(notification)
+
+    def test_notification(self) -> SendTestNotificationUseCase:
+        return SendTestNotificationUseCase(InMemoryLinkedChatLookupAdapter(self.chats), self.notify_for, self.messenger)
+
+    def answering_bot(self, inbox: FakeBotInboxAdapter) -> AnswerBotMessagesUseCase:
+        return AnswerBotMessagesUseCase(inbox, self.link_chat(), self.test_notification())
+
+    def ask_for_test(self, chat_id: ChatId) -> None:
+        self.test_notification().execute(SendTestNotificationCommand(chat_id))
 
 
 class RecordingLinkCodeLookupAdapter(InMemoryLinkCodeLookupAdapter):
@@ -301,13 +322,17 @@ def test_a_notification_telegram_does_not_take_is_recorded_without_failing(
     assert (record.__dict__["tenant_id"], record.__dict__["subject"]) == (str(ANNA.value), "alfa")
 
 
-def test_every_message_the_bot_receives_is_a_link_attempt(telegram: Telegram) -> None:
+def test_every_message_but_the_test_command_is_a_link_attempt(telegram: Telegram) -> None:
     inbox = FakeBotInboxAdapter()
-    inbox.waiting = [BotMessage(CHAT, telegram.request_code(ANNA)), BotMessage(OTHER_CHAT, "hello")]
+    inbox.waiting = [
+        BotMessage(CHAT, telegram.request_code(ANNA)),
+        BotMessage(OTHER_CHAT, "hello"),
+        BotMessage(CHAT, "/prova"),
+    ]
 
-    AnswerBotMessagesUseCase(inbox, telegram.link_chat()).execute()
+    telegram.answering_bot(inbox).execute()
 
-    assert telegram.messenger.sent == [(CHAT, LINKED), (OTHER_CHAT, INVALID_CODE)]
+    assert telegram.messenger.sent == [(CHAT, LINKED), (OTHER_CHAT, INVALID_CODE), (CHAT, TEST_TEXT)]
     assert inbox.waiting == []
 
 
@@ -316,4 +341,56 @@ def test_a_bot_round_without_telegram_fails_for_the_next_round_to_retry(telegram
     inbox.reachable = False
 
     with pytest.raises(BotUnreachableError, match=r"^bot Telegram non raggiungibile$"):
-        AnswerBotMessagesUseCase(inbox, telegram.link_chat()).execute()
+        telegram.answering_bot(inbox).execute()
+
+
+def test_a_linked_chat_receives_the_test_notification_by_the_road_of_the_real_ones(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+
+    telegram.ask_for_test(CHAT)
+
+    assert telegram.messenger.received_by(CHAT) == [LINKED, TEST_TEXT]
+
+
+def test_a_chat_linked_to_two_tenants_receives_one_test_notification_for_each(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+    telegram.send(CHAT, telegram.request_code(BRUNO))
+
+    telegram.ask_for_test(CHAT)
+
+    assert telegram.messenger.received_by(CHAT) == [LINKED, LINKED, TEST_TEXT, TEST_TEXT]
+
+
+def test_a_chat_not_linked_asking_for_a_test_receives_how_to_link(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+
+    telegram.ask_for_test(OTHER_CHAT)
+
+    assert telegram.messenger.received_by(OTHER_CHAT) == [HOW_TO_LINK]
+    assert telegram.messenger.received_by(CHAT) == [LINKED]
+
+
+def test_instructions_telegram_does_not_take_are_recorded_without_failing(
+    telegram: Telegram, caplog: pytest.LogCaptureFixture
+) -> None:
+    telegram.messenger.reachable = False
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
+        telegram.ask_for_test(OTHER_CHAT)
+
+    [record] = caplog.records
+    assert record.getMessage() == "risposta del bot non consegnata"
+
+
+def test_a_test_notification_telegram_does_not_take_is_recorded_like_a_real_one(
+    telegram: Telegram, caplog: pytest.LogCaptureFixture
+) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+    telegram.messenger.reachable = False
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
+        telegram.ask_for_test(CHAT)
+
+    [record] = caplog.records
+    assert record.getMessage() == "invio della notifica fallito"
+    assert record.__dict__["subject"] == "notifica di prova"

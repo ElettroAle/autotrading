@@ -8,8 +8,11 @@ from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
     SqlAlchemyLinkCodeLookupAdapter,
     SqlAlchemyLinkCodeRepositoryAdapter,
 )
-from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.tables import telegram_link_codes
+from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import (
+    SqlAlchemyLinkedChatLookupAdapter,
+    SqlAlchemyLinkedChatRepositoryAdapter,
+)
+from autotrading.adapters.outbound.sqlalchemy.tables import telegram_chats, telegram_link_codes
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.application.notifications.errors import ChatNotLinkedError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
@@ -111,3 +114,29 @@ def test_a_tenant_never_sees_nor_touches_the_chat_of_another(database: Engine) -
     with pytest.raises(CrossTenantAccessError):
         bruno_chats.link(LinkedChat(anna, ChatId(666)))
     assert SqlAlchemyLinkedChatRepositoryAdapter(database, anna).get() == LinkedChat(anna, ChatId(1001))
+
+
+def test_the_lookup_finds_the_tenants_of_a_chat_and_nothing_else(database: Engine) -> None:
+    anna, bruno, carla = new_tenant(database), new_tenant(database), new_tenant(database)
+    SqlAlchemyLinkedChatRepositoryAdapter(database, anna).link(LinkedChat(anna, ChatId(-4004)))
+    SqlAlchemyLinkedChatRepositoryAdapter(database, bruno).link(LinkedChat(bruno, ChatId(-4004)))
+    SqlAlchemyLinkedChatRepositoryAdapter(database, carla).link(LinkedChat(carla, ChatId(5005)))
+    lookup = SqlAlchemyLinkedChatLookupAdapter(database)
+
+    assert set(lookup.tenants_of(ChatId(-4004))) == {anna, bruno}
+    assert lookup.tenants_of(ChatId(6006)) == ()
+
+
+def test_declaring_a_chat_shows_its_links_alone_and_only_to_read(database: Engine) -> None:
+    anna, bruno = new_tenant(database), new_tenant(database)
+    SqlAlchemyLinkedChatRepositoryAdapter(database, anna).link(LinkedChat(anna, ChatId(7007)))
+    SqlAlchemyLinkedChatRepositoryAdapter(database, bruno).link(LinkedChat(bruno, ChatId(8008)))
+
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.telegram_chat_id", "7007", True)))
+        visible = connection.execute(select(telegram_chats.c.tenant_id)).scalars().all()
+        changed = connection.execute(telegram_chats.update().values(chat_id=9009)).rowcount
+        removed = connection.execute(telegram_chats.delete()).rowcount
+
+    assert visible == [anna.value]
+    assert (changed, removed) == (0, 0)
