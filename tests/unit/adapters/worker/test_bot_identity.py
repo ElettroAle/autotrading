@@ -8,16 +8,16 @@ from secrets import token_hex
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.worker.bot_identity import TIMEOUT_SECONDS, WorkerBotIdentityAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
+from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TOKEN, Worker
 
 
 def adapter_on(bot: FakeBotIdentityAdapter | None, token: str = TOKEN) -> WorkerBotIdentityAdapter:
-    client = TestClient(create_worker_api(TOKEN, Worker().for_tenant, bot_start_link=bot))
+    client = served_in_memory(create_worker_api(TOKEN, Worker().for_tenant, bot_start_link=bot))
     return WorkerBotIdentityAdapter(client, token)
 
 

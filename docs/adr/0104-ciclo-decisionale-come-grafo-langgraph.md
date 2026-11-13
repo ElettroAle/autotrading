@@ -1,4 +1,4 @@
-# ADR 0102 Ciclo decisionale come grafo LangGraph
+# ADR 0104 Ciclo decisionale come grafo LangGraph
 
 - Stato: accettata (13 novembre 2026)
 - Requisiti: R1.2.1-R1.2.5, R1.3.x, R1.4.x, R1.5.x, R1.6.x, R1.7.x, R1.8.x (Bug 183, Bug 177)
@@ -58,8 +58,6 @@ in CLAUDE.md e nelle verifiche, per nome.
 - **Versioni fissate**: `langgraph>=1.2` e `langgraph-checkpoint-postgres>=3.0`, bloccate da `uv.lock`.
   `zstandard`, dipendenza di `langsmith` (tracciamento, mai attivo: nessuna variabile `LANGSMITH_*`) senza wheel
   per Python 3.15, è esclusa con `override-dependencies` in `pyproject.toml`; `langsmith` si importa senza.
-  Esclusa allo stesso modo `httpx2`, che `langsmith` usa solo se presente (altrimenti `httpx`) e che sostituirebbe
-  `httpx` sotto il client di prova di Starlette.
 
 ## Alternative scartate
 

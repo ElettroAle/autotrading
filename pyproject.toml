@@ -11,6 +11,7 @@ dependencies = [
     "hyperliquid-python-sdk>=0.24.0",
     "langgraph>=1.2",
     "langgraph-checkpoint-postgres>=3.0",
+    "openai>=3.50,<4",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
     "pynacl>=1.6.2",
@@ -117,6 +118,7 @@ forbidden_modules = [
     "requests",
     "httpx",
     "langgraph",
+    "openai",
 ]
 
 [[tool.importlinter.contracts]]
@@ -146,6 +148,12 @@ modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "La sorgente della configurazione non importa le cartelle di tecnologia"
+type = "forbidden"
+source_modules = ["autotrading.adapters.configuration"]
+forbidden_modules = ["autotrading.adapters.inbound", "autotrading.adapters.outbound", "autotrading.application"]
+
+[[tool.importlinter.contracts]]
 name = "Una cartella di tecnologia non importa un'altra"
 type = "independence"
 modules = [
@@ -160,6 +168,7 @@ modules = [
     "autotrading.adapters.outbound.telegram",
     "autotrading.adapters.outbound.worker",
     "autotrading.adapters.outbound.json",
+    "autotrading.adapters.outbound.litellm",
     "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
@@ -167,8 +176,6 @@ modules = [
 
 [tool.uv]
 override-dependencies = [
-    # Without a wheel for Python 3.15; only the tracing of langsmith uses it, never enabled (ADR 0102).
+    # Without a wheel for Python 3.15; only the tracing of langsmith uses it, never enabled (ADR 0104).
     "zstandard; sys_platform == 'never'",
-    # langsmith falls back to httpx; httpx2 would replace httpx under the test client of starlette (ADR 0102).
-    "httpx2; sys_platform == 'never'",
 ]

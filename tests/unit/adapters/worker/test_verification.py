@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.worker.verification import TIMEOUT_SECONDS, WorkerVerificationAdapter
@@ -24,6 +23,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.errors import VerificationNotStartedError
 from tests.support.platform import HYPERLIQUID
+from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 ANNA = UserId("oid-anna")
@@ -37,7 +37,7 @@ def worker() -> Worker:
 
 
 def adapter_on(worker: Worker, token: str = TOKEN) -> WorkerVerificationAdapter:
-    return WorkerVerificationAdapter(TestClient(create_worker_api(TOKEN, worker.for_tenant)), token, TENANT)
+    return WorkerVerificationAdapter(served_in_memory(create_worker_api(TOKEN, worker.for_tenant)), token, TENANT)
 
 
 def answering(status: int, body: object) -> WorkerVerificationAdapter:

@@ -38,7 +38,6 @@ from autotrading.application.orders.follow_flow_orders import (
 )
 from autotrading.bootstrap import (
     TenantCyclePorts,
-    WorkerSettings,
     cycle_ports,
 )
 from autotrading.domain.agent.provider_name import ProviderName
@@ -478,7 +477,8 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
     worker = cycle_ports(
         create_engine("sqlite://"),
         SodiumCredentialOpenerAdapter({}),
-        WorkerSettings("dev", Slippage.default()),
+        "dev",
+        Slippage.default(),
         messenger,
     )
 

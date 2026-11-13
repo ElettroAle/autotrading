@@ -27,3 +27,14 @@ class CredentialsOfAnotherAccountError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("le credenziali appartengono a un altro conto dell'exchange")
+
+
+class UndeclaredEnvironmentError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("ambiente non dichiarato")
+
+
+class UnsupportedEnvironmentError(DomainError):
+    def __init__(self, environment: str, supported: tuple[str, ...]) -> None:
+        super().__init__("ambiente non ammesso: sono ammessi " + " e ".join(supported))
+        self.environment = environment

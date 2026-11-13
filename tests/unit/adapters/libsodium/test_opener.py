@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import logging
 from uuid import uuid4
 
 import pytest
@@ -241,3 +242,64 @@ def test_a_verification_access_sealed_with_an_unknown_key_is_not_opened(
 
     with pytest.raises(VerificationCredentialsNotOpenedError):
         opener.open_verification(unknown)
+
+
+def _decryption_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if record.name == "autotrading.credentials"]
+
+
+def test_every_opening_records_tenant_account_key_version_and_outcome_never_the_secret(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    account = sealed_account(private_key)
+
+    with caplog.at_level(logging.INFO, logger="autotrading.credentials"):
+        opener.open(account)
+
+    (record,) = _decryption_records(caplog)
+    message = record.getMessage()
+    assert record.levelno == logging.INFO
+    assert str(TENANT.value) in message
+    assert str(account.id.value) in message
+    assert "versione 1" in message
+    assert "riuscita" in message
+    assert record.created > 0
+    assert CREDENTIALS.secret_key not in message
+    assert CREDENTIALS.account_address not in message
+
+
+def test_a_refused_opening_is_recorded_as_refused(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    account = sealed_account(private_key, version=7)
+
+    with caplog.at_level(logging.INFO, logger="autotrading.credentials"), pytest.raises(CredentialsNotOpenedError):
+        opener.open(account)
+
+    (record,) = _decryption_records(caplog)
+    assert record.levelno == logging.WARNING
+    assert "rifiutata" in record.getMessage()
+    assert str(account.id.value) in record.getMessage()
+
+
+def test_the_opening_for_every_context_is_recorded_with_its_purpose(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    account = sealed_account(private_key)
+
+    with caplog.at_level(logging.INFO, logger="autotrading.credentials"):
+        opener.open_access(sealed_access_of(account))
+        opener.open_address(sealed_address_of(account))
+        opener.open_cycle_access(sealed_address_of(account))
+        opener.open_verification(sealed_verification_of(account))
+
+    messages = [record.getMessage() for record in _decryption_records(caplog)]
+    assert [
+        purpose for purpose in ("ordini", "flussi", "ciclo", "verifica") for message in messages if purpose in message
+    ] == [
+        "ordini",
+        "flussi",
+        "ciclo",
+        "verifica",
+    ]
+    assert all(str(account.id.value) in message for message in messages)

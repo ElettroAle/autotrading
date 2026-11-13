@@ -17,8 +17,6 @@ from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlA
 from autotrading.adapters.outbound.telegram.bot_api import TelegramInboxAdapter, TelegramMessengerAdapter
 from autotrading.application.notifications.ports import BotInboxPort, MessengerPort
 from autotrading.bootstrap import (
-    TELEGRAM_BOT_SETTING,
-    WorkerSettings,
     create_worker_application,
     link_stores_for,
     notify_for,
@@ -35,8 +33,7 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
 def factory(engine: Engine, messenger: MessengerPort) -> Callable[[TenantId], WorkerUseCases]:
-    settings = WorkerSettings("dev", Slippage.default())
-    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), settings, messenger)
+    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), "dev", Slippage.default(), messenger)
 
 
 def token_file(tmp_path: Path, content: str) -> str:
@@ -54,7 +51,7 @@ def test_without_the_bot_token_the_worker_starts_with_notifications_off(
     settings = {"missing": str(tmp_path / "absent"), "empty": token_file(tmp_path, " \n"), "": ""}
 
     with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
-        create_worker_application(worker_configuration(tmp_path, **{TELEGRAM_BOT_SETTING: settings[location]}))
+        create_worker_application(worker_configuration(tmp_path, **{"TELEGRAM_BOT_TOKEN_FILE": settings[location]}))
 
     assert started == []
     assert [record.getMessage() for record in caplog.records] == [DISABLED]
@@ -73,7 +70,7 @@ def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
 
     with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
         create_worker_application(
-            worker_configuration(tmp_path, **{TELEGRAM_BOT_SETTING: token_file(tmp_path, FAKE_BOT)})
+            worker_configuration(tmp_path, **{"TELEGRAM_BOT_TOKEN_FILE": token_file(tmp_path, FAKE_BOT)})
         )
 
     [(inbox, messenger)] = started
