@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
@@ -12,6 +12,7 @@ from autotrading.adapters.inbound.api.app import Authentication, HealthReport, c
 from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
@@ -46,9 +47,10 @@ class Session:
             health, resolve_tenant, self.platform.for_tenant, Authentication(SETTINGS, verifier, provider.login())
         )
 
-    def post_as(self, user: str, path: str) -> None:
+    def post_as(self, user: str, path: str, body: dict[str, str] | None = None) -> None:
         token = self.identity_provider.token_for(self.platform.directory.person(user))
-        self.response = TestClient(self.api()).post(path, headers={"Authorization": f"Bearer {token}"})
+        headers = {"Authorization": f"Bearer {token}"}
+        self.response = TestClient(self.api()).post(path, headers=headers, json=body)
 
     def answer(self, status: int) -> dict[str, Any]:
         assert self.response is not None, "no request was made"
@@ -65,6 +67,10 @@ class Session:
         credentials = self.credentials[account]
         return TradingAccess(HYPERLIQUID, credentials.account_address, credentials.secret_key)
 
+    def flow_named(self, name: str) -> Flow:
+        (flow,) = [flow for flow in self.platform.flows.flows if flow.name.value == name]
+        return flow
+
     def recorded_run(self, user: str) -> VerificationRun:
         (run,) = self.platform.runs_of(self.platform.tenant_of(user)).runs
         return run
@@ -75,7 +81,7 @@ def session() -> Session:
     return Session()
 
 
-@given(quoted('che "{user}" ha il conto "{account}" su "{exchange}" con margine disponibile di almeno 12 USDC'))
+@given(quoted('che "{user}" ha il conto "{account}" su "{exchange}" con margine disponibile sufficiente'))
 def user_has_account(session: Session, user: str, account: str, exchange: str) -> None:
     session.platform.directory.person(user).roles.add("Utente")
     session.credentials[account] = session.platform.accepted_credentials()
@@ -93,15 +99,38 @@ def account_holds_position(session: Session, account: str, coin: str) -> None:
     session.platform.order_exchange.hold(session.access_of(account), position)
 
 
-@given(quoted('che sul conto "{account}" il flusso "{flow}" attivo ha l\'asset "{coin}"'))
-def account_with_flow_on(session: Session, account: str, flow: str, coin: str) -> None:
+@given(
+    parsers.re(
+        r'^che sul conto "(?P<account>[^"]+)" il flusso "(?P<flow>[^"]+)" (?P<status>attivo|fermo|in pausa) '
+        r'ha l\'asset "(?P<coin>[^"]+)"$'
+    )
+)
+def account_with_flow_on(session: Session, account: str, flow: str, status: str, coin: str) -> None:
     owner = session.platform.account_named("anna", account)
     configuration = a_configuration(assets=(coin,))
     session.platform.flows.flows.append(
         a_flow(
-            owner.tenant_id, name=flow, status=FlowStatus.ACTIVE, account_id=owner.id.value, configuration=configuration
+            owner.tenant_id,
+            name=flow,
+            status=FlowStatus(status),
+            account_id=owner.id.value,
+            configuration=configuration,
         )
     )
+
+
+@given(quoted('che l\'exchange del conto "{account}" accetta ordini da almeno {amount} USDC'))
+def exchange_minimum(session: Session, account: str, amount: str) -> None:
+    assert account in session.credentials
+    markets = session.platform.order_exchange.markets
+    for coin, market in markets.items():
+        markets[coin] = replace(market, min_order_value=Decimal(amount))
+
+
+@given(quoted('che la procedura di verifica è in corso su "{coin}" sul conto "{account}"'))
+def verification_in_progress(session: Session, coin: str, account: str) -> None:
+    account_id = session.platform.account_named("anna", account).id.value
+    session.platform.running_verifications.add((account_id, coin))
 
 
 @given(parsers.re(r'^che il conto "(?P<account>[^"]+)" ha margine disponibile (?P<amount>\d+) USDC$'))
@@ -123,6 +152,24 @@ def exchange_refuses_closing(session: Session) -> None:
 def user_runs_verification(session: Session, user: str, account: str) -> None:
     account_id = session.platform.account_named(user, account).id.value
     session.post_as(user, f"/accounts/{account_id}/verifications")
+
+
+@when(quoted('"{user}" lancia la procedura di verifica sul conto "{account}" con importo {amount} USDC'))
+def user_runs_verification_with_amount(session: Session, user: str, account: str, amount: str) -> None:
+    account_id = session.platform.account_named(user, account).id.value
+    session.post_as(user, f"/accounts/{account_id}/verifications", {"amount": amount})
+
+
+@when(quoted('"{user}" avvia il flusso "{flow}"'))
+def user_starts_flow(session: Session, user: str, flow: str) -> None:
+    assert user == "anna"
+    session.post_as(user, f"/flows/{session.flow_named(flow).id.value}/start")
+
+
+@when(quoted('"{user}" riprende il flusso "{flow}"'))
+def user_resumes_flow(session: Session, user: str, flow: str) -> None:
+    assert user == "anna"
+    session.post_as(user, f"/flows/{session.flow_named(flow).id.value}/resume")
 
 
 @then(quoted('il passo "{name}" è riuscito'))
@@ -183,6 +230,25 @@ def readings_match_exchange(session: Session, account: str) -> None:
 def verification_not_started(session: Session, reason: str) -> None:
     assert session.answer(409)["detail"] == reason
     assert session.platform.runs_of(session.platform.tenant_of("anna")).runs == []
+
+
+@then(quoted('il passo "{name}" apre una posizione di valore {value} USDC'))
+def step_opens_value(session: Session, name: str, value: str) -> None:
+    assert session.step(name)["succeeded"]
+    opening = session.platform.order_exchange.sent[0]
+    market = session.platform.order_exchange.markets[opening.coin]
+    assert (opening.coin, opening.direction) == ("BTC", Direction.LONG)
+    assert opening.size * market.mid_price == Decimal(value)
+
+
+@then(quoted('il comando è rifiutato con il motivo "{reason}"'))
+def command_refused(session: Session, reason: str) -> None:
+    assert session.answer(409)["detail"] == reason
+
+
+@then(quoted('il flusso "{flow}" resta "{status}"'))
+def flow_stays(session: Session, flow: str, status: str) -> None:
+    assert session.flow_named(flow).status is FlowStatus(status)
 
 
 @then("nessun ordine è inviato all'exchange")

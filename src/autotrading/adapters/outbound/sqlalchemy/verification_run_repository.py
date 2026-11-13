@@ -1,9 +1,14 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import Engine, func, insert, select
 
 from autotrading.adapters.outbound.sqlalchemy.tables import verification_runs
+from autotrading.adapters.outbound.sqlalchemy.verification_locks import verification_locks
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.verification.errors import VerificationInProgressError
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.reading import AccountReading
 from autotrading.domain.verification.step_outcome import StepOutcome
@@ -22,6 +27,14 @@ class SqlAlchemyVerificationRunRepositoryAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             connection.execute(insert(verification_runs).values(_row_of(run, self._tenant_id)))
+
+    @contextmanager
+    def running(self, account_id: UUID, coin: str) -> Iterator[None]:
+        # The same lock the API tries before a flow on the asset starts or resumes (ADR 0079).
+        with verification_locks(self._engine, account_id, (coin,)) as busy:
+            if busy is not None:
+                raise VerificationInProgressError(busy)
+            yield
 
 
 def _row_of(run: VerificationRun, tenant_id: TenantId) -> dict[str, object]:

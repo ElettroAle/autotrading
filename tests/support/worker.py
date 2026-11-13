@@ -10,6 +10,7 @@ from autotrading.application.flows.read_account_activity import ReadAccountActiv
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.bootstrap import (
     AccountActivityFromAccounts,
@@ -67,7 +68,7 @@ class Worker:
             close_exchange_position=closing,
             run_exchange_verification=RunExchangeVerificationUseCase(
                 AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
-                OrderExecutionFromOrders(opening, closing),
+                OrderExecutionFromOrders(opening, closing, ReadMarketUseCase(access, order_exchanges)),
                 self.runs,
                 "dev",
                 lambda: STARTED_AT,

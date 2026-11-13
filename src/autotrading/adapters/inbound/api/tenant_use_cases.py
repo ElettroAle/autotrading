@@ -53,6 +53,7 @@ from autotrading.application.flows.ports import (
     FlowOperationsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
+    RunningVerificationsPort,
 )
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -92,6 +93,7 @@ class TenantPorts:
     provider_key_usage: ProviderKeyUsagePort
     model_catalog: ModelCatalog
     flows: FlowRepositoryPort
+    running_verifications: RunningVerificationsPort
     flow_checks: FlowChecks
     flow_positions: FlowPositionsPort
     stop_ports: StopPorts
@@ -185,7 +187,7 @@ class TenantUseCases:
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
-            change_flow_status=ChangeFlowStatusUseCase(ports.flows),
+            change_flow_status=ChangeFlowStatusUseCase(ports.flows, ports.running_verifications),
             archive_flow=ArchiveFlowUseCase(ports.flows),
             stop_flow=StopFlowUseCase(ports.flows, ports.stop_ports),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
