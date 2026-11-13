@@ -1,4 +1,4 @@
-# ADR 0090 — Un adapter, una tecnologia fuori da bootstrap: OIDC, esiti degli ordini, tipi precisi
+# ADR 0091 — Un adapter, una tecnologia fuori da bootstrap: OIDC, esiti degli ordini, tipi precisi
 
 - Stato: accettata (13 novembre 2026)
 - Requisiti: Bug B0.0.3 (177)
