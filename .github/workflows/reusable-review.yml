@@ -39,8 +39,9 @@ jobs:
     # required check, and the owner integrates them by hand.
     if: inputs.head-repository == github.repository && inputs.author != 'dependabot[bot]'
     runs-on: ubuntu-24.04
+    # resolveReviewThread is refused to the job token without contents: write (ADR 0099).
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     steps:
       # The base commit is the working tree, so CLAUDE.md and the rules are those of main, never those the pull

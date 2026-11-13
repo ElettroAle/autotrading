@@ -64,7 +64,9 @@ l'integrazione, si discute dove sta il codice, e il proprietario può chiudere a
   bloccata fino a una nuova esecuzione.
 - Il job è saltato, e per GitHub un job saltato soddisfa il controllo obbligatorio, per `dependabot[bot]` e per le
   pull request da fork, che non ricevono i segreti del repository.
-- Permessi del job: `contents: read`, `pull-requests: write`.
+- Permessi del job: `pull-requests: write` e `contents: write`. GitHub rifiuta `resolveReviewThread` al token del job
+  senza `contents: write` («Resource not accessible by integration»), provato su questa pull request. Il prompt
+  ammette solo le mutation `addPullRequestReviewThreadReply` e `resolveReviewThread`.
 
 ### Conseguenze
 
@@ -76,6 +78,9 @@ l'integrazione, si discute dove sta il codice, e il proprietario può chiudere a
   con molte pull request può esaurirla e bloccare le pull request fino al ripristino.
 - Il token va rigenerato ogni anno; scaduto, ogni pull request resta bloccata finché il segreto non viene aggiornato.
 - Le pull request di dependabot e da fork si integrano senza revisione AI: le integra il proprietario, a mano.
+- Il job che esegue il modello ha il permesso di scrittura sul repository: un prompt injection nel codice della pull
+  request potrebbe spingere commit su un ramo diverso da `main`, che resta protetto dal ruleset. Il proprietario ha
+  preferito questo rischio a un secondo job senza modello dedicato alla chiusura dei thread.
 - Con l'evento `pull_request` il workflow viene dalla pull request: una pull request può modificarlo e saltare la
   revisione. Il thread per il proprietario su quei file rende la modifica visibile; il ruleset di un repository personale non può
   imporre un workflow obbligatorio.
