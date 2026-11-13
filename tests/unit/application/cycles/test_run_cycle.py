@@ -222,3 +222,18 @@ def test_every_recorded_cycle_is_logged(cycles: Cycles, caplog: pytest.LogCaptur
     assert entry.__dict__["flow_id"] == str(cycles.id_of("alfa"))
     assert entry.__dict__["planned_at"] == at("10:22:00").isoformat()
     assert entry.__dict__["outcome"] == CycleOutcome.FAILED
+
+
+def test_a_failed_cycle_is_told_to_the_user_with_its_message(cycles: Cycles) -> None:
+    flow_id = cycles.id_of("alfa")
+    cycles.failures.fail_once(flow_id, CycleStep.AGENT_DECISION, FakeTransientError("timeout"))
+
+    run(cycles)
+
+    assert cycles.failure_notices.told == [(flow_id, "timeout")]
+
+
+def test_a_completed_cycle_is_not_told(cycles: Cycles) -> None:
+    run(cycles)
+
+    assert cycles.failure_notices.told == []

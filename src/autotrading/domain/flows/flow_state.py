@@ -52,7 +52,7 @@ class FlowState:
             flow_id=flow.id,
             currency=activity.currency,
             allocated_capital=flow.configuration.allocated_capital,
-            positions=tuple(position for position in activity.positions if flow.configuration.covers(position.asset)),
+            positions=flow.configuration.held(activity.positions, lambda position: position.asset),
             realized_pnl=totals.realized_pnl,
             fees=totals.fees,
             funding=totals.funding,

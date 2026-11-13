@@ -209,6 +209,12 @@ class ExecutionsReaderPort(Protocol):
     def since(self, address: str, since: datetime | None) -> ExecutionsWindow: ...
 
 
+class PausedFlowNoticePort(Protocol):
+    def paused(self, flow: Flow, reason: str) -> None:
+        """Tells the user the flow paused on its own, with the reason (R1.2.4, R1.8.2)."""
+        ...
+
+
 class UnattributableNoticePort(Protocol):
     def notice(self, items: Sequence[UnattributableItem]) -> None:
         """Tells the user what the account shows that no flow explains, each case the first time found (R1.6.2)."""
