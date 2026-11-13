@@ -1,9 +1,11 @@
 """The Telegram adapters of the installation: without the token of the bot the notifications are off (ADR 0035)."""
 
 import logging
+from pathlib import Path
 
 import pytest
 
+from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.telegram.bot_api import (
     TelegramBotIdentityAdapter,
     TelegramDisabledMessengerAdapter,
@@ -16,11 +18,20 @@ from autotrading.application.notifications.errors import MessageNotDeliveredErro
 from autotrading.domain.notifications.chat_id import ChatId
 
 
+def _with_token(tmp_path: Path, content: str) -> ConfigurationSource:
+    location = tmp_path / "telegram_bot_token"
+    location.write_text(content, encoding="utf-8")
+    return ConfigurationSource({"TELEGRAM_BOT_TOKEN_FILE": str(location)})
+
+
+@pytest.mark.parametrize("token", [None, " "], ids=["no-file", "empty-file"])
 def test_without_a_token_the_messenger_is_the_disabled_one_and_no_bot_answers(
-    caplog: pytest.LogCaptureFixture,
+    caplog: pytest.LogCaptureFixture, tmp_path: Path, token: str | None
 ) -> None:
+    source = ConfigurationSource({}) if token is None else _with_token(tmp_path, token)
+
     with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
-        messenger, inbox, start_link = telegram_adapters(None)
+        messenger, inbox, start_link = telegram_adapters(source)
 
     assert isinstance(messenger, TelegramDisabledMessengerAdapter)
     assert (inbox, start_link) == (None, None)
@@ -32,8 +43,8 @@ def test_the_disabled_messenger_fails_every_message_so_the_failure_is_recorded()
         TelegramDisabledMessengerAdapter().send(ChatId(1), "text")
 
 
-def test_with_a_token_messenger_inbox_and_start_link_talk_to_telegram() -> None:
-    messenger, inbox, start_link = telegram_adapters("BOT-FAKE")
+def test_with_a_token_messenger_inbox_and_start_link_talk_to_telegram(tmp_path: Path) -> None:
+    messenger, inbox, start_link = telegram_adapters(_with_token(tmp_path, "BOT-FAKE"))
 
     assert isinstance(messenger, TelegramMessengerAdapter)
     assert isinstance(inbox, TelegramInboxAdapter)

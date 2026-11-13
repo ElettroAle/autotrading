@@ -1,43 +1,39 @@
-import base64
-import binascii
 import logging
-import os
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from functools import partial
-from pathlib import Path
 from uuid import UUID
 
 import httpx
 
-from autotrading.adapters.inbound.api.app import ApiApplication, Authentication, HealthReport, create_api
+from autotrading.adapters.configuration.source import PROCESS_ENVIRONMENT, ConfigurationSource
+from autotrading.adapters.inbound.api.app import ApiApplication
+from autotrading.adapters.inbound.api.composition import api_adapters, worker_api_adapters
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
     CyclePolling,
     WorkerUseCases,
     bot_polling,
-    create_worker_api,
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
-from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters
+from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
+from autotrading.adapters.outbound.libsodium.composition import libsodium_opening_adapters, libsodium_sealing_adapters
 from autotrading.adapters.outbound.libsodium.opener import (
-    InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
 )
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
-from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
-from autotrading.adapters.outbound.litellm.model_call import litellm_model_call
-from autotrading.adapters.outbound.oidc.access_token_verifier import OidcAccessTokenVerifierAdapter
-from autotrading.adapters.outbound.oidc.login_endpoints import OidcLoginEndpointsAdapter
+from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
+from autotrading.adapters.outbound.litellm.composition import litellm_adapters
+from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -207,7 +203,6 @@ from autotrading.application.verification.run_exchange_verification import (
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.agent.model_catalog import ModelCatalog
-from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
@@ -231,42 +226,9 @@ from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 
-SUPPORTED_ENVIRONMENTS = ("dev", "prod")
-DEFAULT_CREDENTIALS_KEY_VERSION = "1"
-SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
 PROVIDER_TIMEOUT_SECONDS = 10.0
-TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
 
 operations = logging.getLogger("autotrading.bootstrap")
-
-
-class MissingConfigurationError(AutotradingError):
-    def __init__(self, name: str) -> None:
-        super().__init__(f"configurazione mancante: {name}")
-        self.name = name
-
-
-class InvalidConfigurationError(AutotradingError):
-    def __init__(self, name: str) -> None:
-        super().__init__(f"configurazione non valida: {name}")
-        self.name = name
-
-
-class UndeclaredEnvironmentError(AutotradingError):
-    def __init__(self) -> None:
-        super().__init__("ambiente non dichiarato")
-
-
-class UnsupportedEnvironmentError(AutotradingError):
-    def __init__(self, environment: str) -> None:
-        super().__init__("ambiente non ammesso: sono ammessi " + " e ".join(SUPPORTED_ENVIRONMENTS))
-        self.environment = environment
-
-
-@dataclass(frozen=True, slots=True)
-class PublicCredentialsKey:
-    key: bytes = field(repr=False)
-    version: int
 
 
 class FlowSummariesFromFlows:
@@ -375,29 +337,24 @@ def _order_result(order: Order) -> OrderResult:
     return OrderResult.reported(outcome.fee, outcome.realized_pnl, outcome.exchange_message, outcome.status.value)
 
 
-@dataclass(frozen=True, slots=True)
-class WorkerSettings:
-    """What the installation declares to the worker beyond its secrets."""
-
-    environment: str
-    slippage: Slippage
-
-
 def tenant_use_cases(
     engine: SqlAlchemyEngine,
-    public_key: PublicCredentialsKey,
+    sealers: tuple[
+        Callable[[TenantId], SodiumCredentialSealerAdapter], Callable[[TenantId], SodiumProviderKeySealerAdapter]
+    ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
     providers: httpx.Client,
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
+    credential_sealer, provider_key_sealer = sealers
     model_catalog = load_model_catalog()
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
-        sealer = SodiumCredentialSealerAdapter(public_key.key, public_key.version, tenant_id)
+        sealer = credential_sealer(tenant_id)
         bot_identity, account_state, account_activity, position_closing, verification, notifier = worker_of(tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
@@ -421,7 +378,7 @@ def tenant_use_cases(
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
-            provider_key_sealer=SodiumProviderKeySealerAdapter(public_key.key, public_key.version, tenant_id),
+            provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_verifier=provider_key_verifier,
             provider_key_usage=flows,
             model_catalog=model_catalog,
@@ -457,19 +414,19 @@ def tenant_use_cases(
 def worker_use_cases(
     engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
-    settings: WorkerSettings,
+    environment: str,
+    slippage: Slippage,
     messenger: MessengerPort,
 ) -> Callable[[TenantId], WorkerUseCases]:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
     exchanges, _, order_exchanges, activity_readers, *_ = hyperliquid_adapters(
-        ExchangeNetwork.of_installation(settings.environment)
+        ExchangeNetwork.of_installation(environment)
     )
 
     def for_tenant(tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
         access = OpenTradingAccessUseCase(accounts, opener)
-        slippage = settings.slippage
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, exchanges)
         close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, slippage)
         open_position = OpenPositionUseCase(access, order_exchanges, orders, slippage)
@@ -484,7 +441,7 @@ def worker_use_cases(
                 ),
                 OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
                 SqlAlchemyVerificationRunRepositoryAdapter(engine, tenant_id),
-                settings.environment,
+                environment,
                 system_clock_adapters().now,
             ),
             notify=notify_for(engine, messenger, tenant_id),
@@ -497,19 +454,19 @@ def worker_use_cases(
 def cycle_ports(
     engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
-    settings: WorkerSettings,
+    environment: str,
+    slippage: Slippage,
     messenger: MessengerPort,
 ) -> Callable[[TenantId], TenantCyclePorts]:
     """Builds, for each cycle, the adapters and use cases bound to the tenant of its flow."""
     exchanges, _, order_exchanges, activity_readers, executions_readers, *_ = hyperliquid_adapters(
-        ExchangeNetwork.of_installation(settings.environment)
+        ExchangeNetwork.of_installation(environment)
     )
 
     def cycle_ports_for(tenant_id: TenantId) -> TenantCyclePorts:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
         access = OpenTradingAccessUseCase(accounts, opener)
-        slippage = settings.slippage
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
         openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
         notify = notify_for(engine, messenger, tenant_id)
@@ -590,49 +547,46 @@ def link_stores_for(engine: SqlAlchemyEngine, tenant_id: TenantId) -> LinkStores
     )
 
 
-def create_application(configuration: Mapping[str, str] = os.environ) -> ApiApplication:
-    health = HealthReport(
-        version=_required(configuration, "APP_VERSION"),
-        environment=_environment(configuration),
-    )
-    engine = _database(configuration)
+def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
+    source = ConfigurationSource(configuration)
+    engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
     for_tenant = tenant_use_cases(
         engine,
-        PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
-        health.environment,
-        worker_adapters(_required(configuration, "WORKER_URL"), _secret(configuration, "WORKER_TOKEN_FILE")),
+        libsodium_sealing_adapters(source),
+        source.environment(),
+        worker_adapters(source),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
-    return create_api(health, resolve_tenant, for_tenant, _authentication(configuration))
+    return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
 
-def create_worker_application(configuration: Mapping[str, str] = os.environ) -> ApiApplication:
+def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
-    environment = _environment(configuration)
-    private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
-    opener = SodiumCredentialOpenerAdapter(private_keys)
-    settings = WorkerSettings(environment, slippage_from(configuration))
-    engine = _database(configuration)
-    messenger, inbox, start_link = telegram_adapters(_optional_secret(configuration, TELEGRAM_BOT_SETTING))
-    for_tenant = worker_use_cases(engine, opener, settings, messenger)
+    source = ConfigurationSource(configuration)
+    environment = source.environment()
+    opener, provider_key_opener = libsodium_opening_adapters(source)
+    slippage = hyperliquid_slippage_adapters(source)
+    engine = sqlalchemy_adapters(source)
+    messenger, inbox, start_link = telegram_adapters(source)
+    for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
-    ports_of = cycle_ports(engine, opener, settings, messenger)
-    model_call = litellm_model_call(
-        _required(configuration, "LITELLM_URL"), _secret(configuration, "LITELLM_MASTER_KEY_FILE")
-    )
-    cycles = worker_cycles(engine, ports_of, cycle_services(environment, private_keys, model_call))
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), for_tenant, bot, cycles, start_link)
+    ports_of = cycle_ports(engine, opener, environment, slippage, messenger)
+    model_call = litellm_adapters(source)
+    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, model_call))
+    return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
 
 
-def cycle_services(environment: str, private_keys: Mapping[int, bytes], model_call: ModelCallPort) -> CycleServices:
+def cycle_services(
+    environment: str, provider_key_opener: SodiumProviderKeyOpenerAdapter, model_call: ModelCallPort
+) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     return CycleServices(
         environment=environment,
         clock=system_clock_adapters(),
         catalog=load_model_catalog(),
-        provider_key_opener=SodiumProviderKeyOpenerAdapter(private_keys),
+        provider_key_opener=provider_key_opener,
         model_call=model_call,
         sentiments={
             SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
@@ -657,96 +611,6 @@ def telegram_bot(engine: SqlAlchemyEngine, inbox: BotInboxPort, messenger: Messe
         SqlAlchemyLinkedChatLookupAdapter(engine), partial(notify_for, engine, messenger), messenger
     )
     return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
-
-
-def slippage_from(configuration: Mapping[str, str]) -> Slippage:
-    """The largest distance from the current price an order accepts: 5% unless the installation says otherwise."""
-    text = configuration.get(SLIPPAGE_SETTING, "").strip()
-    if not text:
-        return Slippage.default()
-    try:
-        percent = Decimal(text)
-    except InvalidOperation as error:
-        raise InvalidConfigurationError(SLIPPAGE_SETTING) from error
-    if not percent.is_finite():
-        raise InvalidConfigurationError(SLIPPAGE_SETTING)
-    return Slippage.percent(percent)
-
-
-def _credentials_public_key(configuration: Mapping[str, str]) -> bytes:
-    name = "CREDENTIALS_PUBLIC_KEY_FILE"
-    try:
-        public_key = base64.b64decode(_secret(configuration, name), validate=True)
-    except binascii.Error as error:
-        raise InvalidCredentialsKeyError from error
-    SodiumCredentialSealerAdapter(public_key, 0, TenantId.new())  # refuses a malformed key at startup
-    return public_key
-
-
-def _credentials_private_key(configuration: Mapping[str, str]) -> bytes:
-    try:
-        return base64.b64decode(_secret(configuration, "CREDENTIALS_PRIVATE_KEY_FILE"), validate=True)
-    except binascii.Error as error:
-        raise InvalidPrivateCredentialsKeyError from error
-
-
-def _credentials_key_version(configuration: Mapping[str, str]) -> int:
-    return int(configuration.get("CREDENTIALS_KEY_VERSION", DEFAULT_CREDENTIALS_KEY_VERSION))
-
-
-def _database(configuration: Mapping[str, str]) -> SqlAlchemyEngine:
-    return sqlalchemy_adapters(
-        _required(configuration, "DATABASE_HOST"),
-        configuration.get("DATABASE_PORT"),
-        _required(configuration, "DATABASE_NAME"),
-        _required(configuration, "DATABASE_USER"),
-        # A secret is a mounted read-only file, never an environment variable (ADR 0015).
-        _secret(configuration, "DATABASE_PASSWORD_FILE"),
-    )
-
-
-def _authentication(configuration: Mapping[str, str]) -> Authentication | None:
-    # Until the installation declares its identity provider, every protected function answers 503 (ADR 0016).
-    if not configuration.get("AUTH_ISSUER", "").strip():
-        return None
-    issuer = _required(configuration, "AUTH_ISSUER")
-    return Authentication(
-        client_id=_required(configuration, "AUTH_CLIENT_ID"),
-        scope=_required(configuration, "AUTH_SCOPE"),
-        verifier=OidcAccessTokenVerifierAdapter(issuer, _required(configuration, "AUTH_AUDIENCE")),
-        login=OidcLoginEndpointsAdapter(issuer),
-    )
-
-
-def _required(configuration: Mapping[str, str], name: str) -> str:
-    value = configuration.get(name, "").strip()
-    if not value:
-        raise MissingConfigurationError(name)
-    return value
-
-
-def _secret(configuration: Mapping[str, str], name: str) -> str:
-    secret = Path(_required(configuration, name)).read_text(encoding="utf-8").strip()
-    if not secret:
-        raise MissingConfigurationError(name)
-    return secret
-
-
-def _optional_secret(configuration: Mapping[str, str], name: str) -> str | None:
-    """A secret the installation may not have yet: unset, missing or empty means absent, never an error."""
-    location = configuration.get(name, "").strip()
-    if not location or not Path(location).is_file():
-        return None
-    return Path(location).read_text(encoding="utf-8").strip() or None
-
-
-def _environment(configuration: Mapping[str, str]) -> str:
-    environment = configuration.get("APP_ENVIRONMENT", "").strip()
-    if not environment:
-        raise UndeclaredEnvironmentError
-    if environment not in SUPPORTED_ENVIRONMENTS:
-        raise UnsupportedEnvironmentError(environment)
-    return environment
 
 
 # The cycles of the flows in the worker (ADR 0041, ADR 0042): each cycle runs on the ports of the tenant of its flow.

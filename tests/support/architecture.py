@@ -37,6 +37,9 @@ class Rule(StrEnum):
     NO_GENERIC_FOLDERS = "nessuna-cartella-generica"
     NO_ANY = "nessun-any"
     TYPE_IGNORE_EXPLAINED = "type-ignore-motivato"
+    CONFIGURATION_THROUGH_SOURCE = "configurazione-solo-dalla-sorgente"
+    SETTINGS_IN_THEIR_FOLDER = "impostazioni-nella-loro-cartella"
+    BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS = "bootstrap-configura-solo-con-composizioni"
 
 
 REMEDIES = {
@@ -88,6 +91,19 @@ REMEDIES = {
     Rule.NO_ANY: "si dichiara il tipo vero: typing.Any non si usa",
     Rule.TYPE_IGNORE_EXPLAINED: (
         "un type: ignore nomina il codice dell'errore e ha un commento col motivo, sulla stessa riga o sopra"
+    ),
+    Rule.CONFIGURATION_THROUGH_SOURCE: (
+        "l'ambiente del processo e i file di configurazione si leggono solo in adapters/configuration/: ogni "
+        "cartella adapter legge le sue impostazioni dalla ConfigurationSource nel suo configuration.py"
+    ),
+    Rule.SETTINGS_IN_THEIR_FOLDER: (
+        "configuration.py di una cartella adapter lo importa solo il composition.py della stessa cartella; "
+        "adapters/configuration/ lo importano solo configuration.py, composition.py e bootstrap.py; il "
+        "costruttore di un adapter riceve impostazioni tipizzate o client, mai la ConfigurationSource"
+    ),
+    Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS: (
+        "bootstrap.py crea la ConfigurationSource e la passa solo alle funzioni <tecnologia>_adapters delle "
+        "cartelle adapter (ne legge al più environment()); nessun nome di variabile, nessun default"
     ),
 }
 
@@ -177,6 +193,16 @@ PROJECT_ROOT_ERROR = "AutotradingError"
 PORTS_MODULE = re.compile(r"application/[a-z_]+/ports\.py")
 APPLICATION_CONTRACT_MODULE = re.compile(r"autotrading\.application(\.[a-z_]+)?\.(ports|errors)")
 BRIDGE_NAME = re.compile(r"\w*Bridge\w*|\w+From[A-Z]\w*")
+CONFIGURATION_PACKAGE = "autotrading.adapters.configuration"
+CONFIGURATION_FOLDER = "adapters/configuration/"
+CONFIGURATION_MODULES = frozenset({"configuration.py", "composition.py"})
+ENVIRONMENT_READERS = frozenset({"environ", "environb", "getenv", "getenvb", "putenv", "unsetenv"})
+CONFIGURATION_FILE_LIBRARIES = frozenset({"configparser", "dotenv", "tomllib"})
+SETTINGS_MODULE = re.compile(r"autotrading\.adapters\.(?P<folder>[a-z_]+\.[a-z_]+)\.configuration")
+SOURCE_TYPE = "ConfigurationSource"
+SOURCE_READ_IN_BOOTSTRAP = "environment"
+COMPOSITION_SUFFIX = "_adapters"
+CONFIGURATION_NAME = re.compile(r"[A-Z][A-Z0-9]*(_[A-Z0-9]+)+")
 TYPE_IGNORE = re.compile(r"#\s*type:\s*ignore(?P<code>\[[^\]]+\])?(?P<rest>.*)")
 SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 ANNOTATION_FIELDS = frozenset({"annotation", "returns"})
@@ -612,6 +638,107 @@ def _unexplained_type_ignores(module: SourceModule) -> Iterator[Violation]:
         yield _violation(Rule.TYPE_IGNORE_EXPLAINED, module, scoped, line.strip(), number)
 
 
+def _reads_process_environment(node: ast.AST) -> bool:
+    if isinstance(node, ast.ImportFrom) and node.module == "os":
+        return any(alias.name in ENVIRONMENT_READERS for alias in node.names)
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr in ENVIRONMENT_READERS
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "os"
+    )
+
+
+def _configuration_outside_source(module: SourceModule) -> Iterator[Violation]:
+    if module.path.startswith(CONFIGURATION_FOLDER):
+        return
+    for scoped in _scoped_nodes(module):
+        if _reads_process_environment(scoped.node):
+            yield _violation(Rule.CONFIGURATION_THROUGH_SOURCE, module, scoped, "lettura dell'ambiente del processo")
+    for scoped, imported in _imports(module):
+        if imported.split(".")[0] in CONFIGURATION_FILE_LIBRARIES:
+            detail = f"file di configurazione letto con {imported}"
+            yield _violation(Rule.CONFIGURATION_THROUGH_SOURCE, module, scoped, detail)
+
+
+def _module_name(module: SourceModule) -> str:
+    return module.path.rsplit("/", 1)[-1]
+
+
+def _settings_outside_their_folder(module: SourceModule) -> Iterator[Violation]:
+    in_composition = _module_name(module) == "composition.py"
+    reads_source = (
+        module.is_bootstrap
+        or module.path.startswith(CONFIGURATION_FOLDER)
+        or (module.technology_folder is not None and _module_name(module) in CONFIGURATION_MODULES)
+    )
+    for scoped, imported in _imports(module):
+        settings = SETTINGS_MODULE.fullmatch(imported)
+        own = settings is not None and module.technology_folder == "adapters/" + settings["folder"].replace(".", "/")
+        if settings and not (own and in_composition):
+            yield _violation(Rule.SETTINGS_IN_THEIR_FOLDER, module, scoped, f"import di {imported}")
+        if imported.startswith(CONFIGURATION_PACKAGE) and not reads_source:
+            yield _violation(Rule.SETTINGS_IN_THEIR_FOLDER, module, scoped, f"import di {imported}")
+    for scoped, node in _classes(module):
+        for initializer in [m for m in node.body if isinstance(m, ast.FunctionDef) and m.name == "__init__"]:
+            if SOURCE_TYPE in _collaborators_of_type(initializer):
+                detail = f"{node.name} riceve la {SOURCE_TYPE}"
+                yield _violation(Rule.SETTINGS_IN_THEIR_FOLDER, module, scoped, detail, initializer.lineno)
+
+
+def _collaborators_of_type(initializer: ast.FunctionDef) -> set[str]:
+    arguments = [*initializer.args.posonlyargs, *initializer.args.args, *initializer.args.kwonlyargs]
+    return {name for argument in arguments for name in _annotation_names(argument.annotation)}
+
+
+def _source_names(function: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """The names that hold the ConfigurationSource inside one function: its parameter or what it creates."""
+    names = set()
+    for node in ast.walk(function):
+        if isinstance(node, ast.arg) and SOURCE_TYPE in _annotation_names(node.annotation):
+            names.add(node.arg)
+        if isinstance(node, ast.Assign) and _called_name(node.value) == SOURCE_TYPE:
+            names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+    return names
+
+
+def _called_name(node: ast.AST) -> str:
+    if not isinstance(node, ast.Call):
+        return ""
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    return ""
+
+
+def _source_uses(function: ast.FunctionDef | ast.AsyncFunctionDef) -> Iterator[tuple[ast.AST, str]]:
+    sources = _source_names(function)
+    for node in ast.walk(function):
+        if isinstance(node, ast.Call):
+            passed = [*node.args, *(keyword.value for keyword in node.keywords)]
+            gives_source = any(isinstance(value, ast.Name) and value.id in sources for value in passed)
+            if gives_source and not _called_name(node).endswith(COMPOSITION_SUFFIX):
+                yield node, f"la {SOURCE_TYPE} passata a {_called_name(node) or 'una chiamata'}"
+        if not isinstance(node, ast.Attribute) or node.attr == SOURCE_READ_IN_BOOTSTRAP:
+            continue
+        if isinstance(node.value, ast.Name) and node.value.id in sources:
+            yield node, f"{SOURCE_TYPE}.{node.attr} letto in bootstrap.py"
+
+
+def _configuration_in_bootstrap(module: SourceModule) -> Iterator[Violation]:
+    if not module.is_bootstrap:
+        return
+    for scoped in _scoped_nodes(module):
+        node = scoped.node
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            for use, detail in _source_uses(node):
+                yield _violation(Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS, module, scoped, detail, _line_of(use))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and CONFIGURATION_NAME.fullmatch(node.value):
+            detail = f"nome di configurazione {node.value}"
+            yield _violation(Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS, module, scoped, detail)
+
+
 CHECKS: tuple[Callable[[SourceModule], Iterator[Violation]], ...] = (
     _ports_outside_ports_modules,
     _port_names,
@@ -632,4 +759,7 @@ CHECKS: tuple[Callable[[SourceModule], Iterator[Violation]], ...] = (
     _generic_folders,
     _any_uses,
     _unexplained_type_ignores,
+    _configuration_outside_source,
+    _settings_outside_their_folder,
+    _configuration_in_bootstrap,
 )
