@@ -10,7 +10,7 @@ Funzionalità: R0.5.1 Controlli di qualità obbligatori sulle pull request
   Soglie di copertura del codice dagli unit test: 90% sul livello domain e sul livello application, 80% sul totale.
 
   Ogni pull request riceve una revisione AI che verifica le regole del repository: CLAUDE.md e le rule che coprono i file modificati.
-  Le regole valutate sono quelle del ramo principale, mai quelle che la pull request propone.
+  Le regole valutate sono quelle che la pull request porta; una modifica alle regole o alla revisione stessa è ammessa solo se un'ADR della stessa pull request la decide.
   Ogni violazione apre un thread sulla riga che la contiene; un thread aperto blocca l'integrazione.
 
   Fuori ambito: revisione obbligatoria da parte di un'altra persona, test di integrazione contro servizi (entrano con il primo adapter), rilievi di stile, design o gusto che non violano una regola scritta.
@@ -78,11 +78,19 @@ Funzionalità: R0.5.1 Controlli di qualità obbligatori sulle pull request
     E la pull request si può integrare
 
   @pipeline
-  Scenario: Una modifica alle regole del repository attende il proprietario
-    Dato che una pull request modifica CLAUDE.md, una rule, un contratto di architettura o l'elenco delle violazioni note
+  Scenario: Una modifica alle regole senza ADR apre un thread che blocca l'integrazione
+    Dato che una pull request modifica CLAUDE.md, una rule, un contratto di architettura, l'elenco delle violazioni note o la revisione stessa
+    E nessuna ADR della pull request decide la modifica
     Quando la revisione AI esamina la pull request
-    Allora la revisione apre un thread che chiede l'approvazione del proprietario
-    E il thread lo chiude solo il proprietario
+    Allora la revisione apre un thread sul file modificato
+    E la pull request non si può integrare finché il thread resta aperto
+
+  @pipeline
+  Scenario: Una modifica alle regole decisa da un'ADR non blocca l'integrazione
+    Dato che una pull request modifica le regole del repository e ha un thread aperto dalla revisione AI su quella modifica
+    Quando la pull request contiene l'ADR che decide la modifica
+    Allora la revisione chiude il thread
+    E la pull request si può integrare
 
   @pipeline
   Scenario: Una revisione che non si completa blocca l'integrazione

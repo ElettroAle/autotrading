@@ -32,9 +32,10 @@ Decisioni in `docs/adr/0001`-`0013`, `0084` e `0113`. Requisiti in `specs/E0-ese
   Telegram) arrivano dal segreto dell'environment via stdin di Tailscale SSH e diventano file 0400 (ADR 0071).
 - Permessi minimi per job (`contents: read` salvo necessità dichiarata).
 - I nomi dei job di `reusable-quality.yml` sono i controlli obbligatori del ruleset di `main`.
-- La revisione AI (`review / revisione`, ADR 0113) giudica ogni pull request con `CLAUDE.md` e le rule di
-  `main` e apre un thread per ogni violazione. Un suo thread lo chiude solo la revisione stessa, quando la
-  violazione è corretta, o il proprietario: mai un agente.
+- La revisione AI (`review / revisione`, ADR 0113) giudica ogni pull request con `CLAUDE.md` e le rule che
+  la pull request porta e apre un thread per ogni violazione; una modifica alle regole o alla revisione è una
+  violazione se nessuna ADR della stessa pull request la decide. Un suo thread lo chiude solo la revisione
+  stessa, quando la violazione è corretta, o il proprietario: mai un agente.
 - Ogni pull request verso `main` collega i suoi work item con `AB#<id>` nella descrizione (`quality / work item`,
   ADR 0084); esente solo `dependabot[bot]`.
 - Il deploy usa sempre il digest dell'immagine; la promozione non ricostruisce.

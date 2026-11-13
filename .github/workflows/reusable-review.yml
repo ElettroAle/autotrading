@@ -10,11 +10,11 @@ on:
         type: number
         required: true
       base:
-        description: Commit base della pull request, da cui si leggono le regole
+        description: Commit base della pull request, cartella di lavoro della revisione
         type: string
         required: true
       head:
-        description: Commit head della pull request, il codice da esaminare
+        description: Commit head della pull request, con il codice e le regole da esaminare
         type: string
         required: true
       head-repository:
@@ -44,14 +44,14 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      # The base commit is the working tree, so CLAUDE.md and the rules are those of main, never those the pull
-      # request proposes; the proposed code is read from git history.
+      # The base commit is the working tree, so no file of the pull request is loaded as Claude Code settings;
+      # the code and the rules of the pull request are read from git history (ADR 0113).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.base }}
           fetch-depth: 0
       # The review action itself comes from the pull request, in its own folder, so that a change to it is
-      # exercised before integration; such a change waits for the owner's approval like a change to the rules.
+      # exercised before integration; like a change to the rules, it needs an ADR in the same pull request.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: .review-action

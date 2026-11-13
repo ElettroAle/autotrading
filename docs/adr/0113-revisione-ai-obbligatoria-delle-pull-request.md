@@ -49,17 +49,20 @@ l'integrazione, si discute dove sta il codice, e il proprietario può chiudere a
 - L'action `.github/actions/claude-review` incapsula `anthropics/claude-code-action`, fissata per hash, con
   `claude_code_oauth_token` dal segreto di repository `CLAUDE_CODE_OAUTH_TOKEN`, `github_token` del job (nessuna GitHub
   App da installare) e modello `claude-opus-5-5`.
-- Il checkout è sul commit base della pull request: Claude Code carica `CLAUDE.md` e le rule di `main`, così una pull
-  request non può indebolire le regole con cui viene giudicata. Il codice proposto lo legge dalla storia git
-  (`git diff`, `git show` sul commit head), senza scriverlo nella cartella di lavoro. L'action della revisione
-  invece viene dalla pull request, in una cartella a parte (`.review-action/`, checkout parziale): una sua modifica si
-  prova prima dell'integrazione e attende l'approvazione del proprietario come una modifica alle regole.
+- Il checkout è sul commit base della pull request, così nessun file della pull request viene caricato come
+  impostazione di Claude Code. Codice e regole della pull request la revisione li legge dalla storia git (`git diff`,
+  `git show` sul commit head), senza scriverli nella cartella di lavoro. Le regole che valgono sono quelle che la pull
+  request porta: una pull request che cambia una regola non risulta in violazione della regola vecchia. L'action della
+  revisione viene dalla pull request, in una cartella a parte (`.review-action/`, checkout parziale): una sua modifica si
+  prova prima dell'integrazione.
 - Thread inline solo per violazioni di una regola scritta, citandola; nessun rilievo di stile, design o gusto. A ogni
   push la revisione rilegge i propri thread aperti: chiude quelli corretti, non ripete quelli ancora validi.
 - Una modifica a `CLAUDE.md`, a `.claude/rules/`, ai contratti di import-linter in `pyproject.toml`, a
   `tests/architecture/known_violations.py` o ai file della revisione stessa (`review.yml`, `reusable-review.yml`,
-  `.github/actions/claude-review/`) apre un thread che chiede l'approvazione del proprietario: la revisione non
-  lo chiude mai, lo chiude il proprietario.
+  `.github/actions/claude-review/`) è ammessa solo se un'ADR aggiunta o modificata dalla stessa pull request la decide,
+  nominando il file e che cosa cambia: «Ogni decisione tecnica presa da un lavoro vive in `docs/adr/`» (CLAUDE.md).
+  Senza ADR la revisione apre un thread sul file; con l'ADR lo chiude da sola. Il proprietario non chiude mai nulla a
+  mano: ha scelto la revisione per non doverlo fare, e vede le decisioni nelle ADR.
 - Se la revisione non si completa (quota esaurita, token scaduto, errore), il job fallisce e la pull request resta
   bloccata fino a una nuova esecuzione.
 - Il job è saltato, e per GitHub un job saltato soddisfa il controllo obbligatorio, per `dependabot[bot]` e per le
@@ -81,9 +84,11 @@ l'integrazione, si discute dove sta il codice, e il proprietario può chiudere a
 - Il job che esegue il modello ha il permesso di scrittura sul repository: un prompt injection nel codice della pull
   request potrebbe spingere commit su un ramo diverso da `main`, che resta protetto dal ruleset. Il proprietario ha
   preferito questo rischio a un secondo job senza modello dedicato alla chiusura dei thread.
+- Un agente può scrivere da sé l'ADR che allenta una regola e integrarla con l'auto-merge: la revisione garantisce
+  che ogni cambio alle regole sia deciso per iscritto, non che il proprietario lo abbia approvato prima.
 - Con l'evento `pull_request` il workflow viene dalla pull request: una pull request può modificarlo e saltare la
-  revisione. Il thread per il proprietario su quei file rende la modifica visibile; il ruleset di un repository personale non può
-  imporre un workflow obbligatorio.
+  revisione. L'ADR obbligatoria rende la modifica visibile; il ruleset di un repository personale non può imporre un
+  workflow obbligatorio.
 
 ## Ulteriori informazioni
 
