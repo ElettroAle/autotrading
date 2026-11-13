@@ -15,7 +15,7 @@ class FakeFlowSummariesAdapter:
     def __init__(self, *summaries: FlowSummary) -> None:
         self.summaries = list(summaries)
 
-    def in_use(self) -> list[FlowSummary]:
+    def execute(self) -> list[FlowSummary]:
         return self.summaries
 
 
