@@ -1,6 +1,5 @@
 from datetime import timedelta
 from decimal import Decimal
-from types import MappingProxyType
 from uuid import uuid4
 
 from autotrading.domain.flows.flow import Flow
@@ -32,7 +31,7 @@ def flow_on(*assets: str, status: FlowStatus = FlowStatus.ACTIVE) -> Flow:
 
 
 def holding(flow: Flow, asset: str, size: Decimal) -> dict[FlowId, FlowTotals]:
-    return {flow.id: FlowTotals(flow.id, positions=MappingProxyType({asset: size}))}
+    return {flow.id: FlowTotals(flow.id, positions=frozendict({asset: size}))}
 
 
 def attributed(

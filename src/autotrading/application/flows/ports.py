@@ -608,6 +608,18 @@ class FlowLockPort(Protocol):
         ...
 
 
+class CycleCheckpointsPort[K = object](Protocol):
+    """Where the graph of a cycle keeps its checkpoints, to resume from the last node done and to debug (ADR 0104)."""
+
+    def thread(self, flow_id: UUID, planned_at: datetime) -> str:
+        """The thread of the checkpoints of one planned cycle of a flow of the tenant."""
+        ...
+
+    def opened(self) -> AbstractContextManager[K]:
+        """The checkpointer of the cycles of the tenant, open for one cycle."""
+        ...
+
+
 class CycleLauncherPort(Protocol):
     def launch(self, task: Callable[[], object]) -> None:
         """Runs the cycle apart from the others, so a slow flow never delays another (R1.2.1)."""

@@ -120,6 +120,8 @@ forbidden_modules = [
     "langgraph",
     "openai",
 ]
+# The owner's named architectural exception (ADR 0104): LangGraph orchestrates the decision cycle, only here.
+ignore_imports = ["autotrading.application.flows.cycle_graph -> langgraph"]
 
 [[tool.importlinter.contracts]]
 name = "I contesti di domain non si importano a vicenda (tenancy esclusa)"

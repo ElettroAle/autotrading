@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
-from types import MappingProxyType
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.flow import Flow
@@ -44,7 +43,7 @@ class FlowState:
     realized_pnl: Decimal
     fees: Decimal
     funding: Decimal
-    expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: MappingProxyType({}))
+    expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
 
     @classmethod
     def attributed(cls, flow: Flow, activity: AccountActivity, totals: FlowTotals) -> FlowState:

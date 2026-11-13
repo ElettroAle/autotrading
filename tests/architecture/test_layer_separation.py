@@ -110,3 +110,9 @@ def test_no_technology_folder_is_named_after_a_transport_library() -> None:
 )
 def test_a_folder_named_after_a_transport_library_is_found(folder: str, misnamed: bool) -> None:
     assert bool(folders_named_after_a_transport([folder])) is misnamed
+
+
+def test_every_module_an_architectural_exception_names_exists() -> None:
+    named = {module for modules in ARCHITECTURAL_LIBRARIES.values() for module in modules}
+
+    assert {module for module in named if not (SOURCE_ROOT / module).is_file()} == set()

@@ -121,6 +121,10 @@ Invio degli ordini attraverso `orders` nasce con i requisiti che lo usano.
 Il ciclo decisionale appartiene a `flows` (ADR 0094), che dichiara le porte verso gli altri contesti.
 Contesto, decisione dell'agente e controllo del rischio sono casi d'uso di `flows` sulle sue porte del consumatore;
 il registro del ciclo è `JsonCycleJournalAdapter` (ADR 0099).
+Il ciclo è un grafo LangGraph in `application/flows/cycle_graph.py` (`CycleGraph`, ADR 0104, ADR 0105): ogni nodo
+chiama la porta del suo passo, le fonti attive partono insieme con `Send`, il checkpointer del tenant
+(`CycleCheckpointsPort`) salva lo stato dopo ogni nodo. `RunCycleUseCase` tiene le guardie (istante preso, lock,
+pausa, notifica del fallimento). I valori nello stato devono essere serializzabili da LangGraph.
 
 Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa ne resta.
 
