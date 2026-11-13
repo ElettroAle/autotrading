@@ -14,15 +14,6 @@ from autotrading.domain.agent.registered_provider_key import RegisteredProviderK
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 
 
-class ProviderKeyVerifierPort(Protocol):
-    def verify(self, provider: ProviderName, key: ProviderKey) -> None:
-        """Asks the provider whether it accepts the key, without spending any credit of the user.
-
-        Raises ProviderRejectedKeyError, ProviderUnavailableError, or ProviderNotVerifiableError.
-        """
-        ...
-
-
 class ProviderKeySealerPort(Protocol):
     """Bound to the tenant of the request: the sealed text names tenant and provider (ADR 0029)."""
 

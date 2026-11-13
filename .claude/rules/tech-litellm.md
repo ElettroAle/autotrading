@@ -20,7 +20,7 @@ paths:
   risposta inattesa, chiave master sconosciuta e catalogo non raggiungibile sono transitori. Il nuovo tentativo è il
   ciclo successivo, mai un tentativo del proxy.
 - **Catalogo dal proxy, mai scritto a mano**: rotte wildcard per fornitore in `deploy/litellm/config.yaml`, espanse
-  con la mappa dei modelli di LiteLLM. Abilitare un fornitore = una rotta più il controllo della sua chiave (ADR 0103);
+  con la mappa dei modelli di LiteLLM. Abilitare un fornitore = una rotta (ADR 0103, ADR 0108);
   unica eccezione i modelli OpenRouter, che la mappa non descrive.
 - Il proxy gira senza database: il costo di ogni chiamata si registra nel ciclo del flusso (R1.4.6).
 - `composition.py` espone `litellm_adapters(source)`; `configuration.py` la dataclass privata `_LiteLlmSettings`

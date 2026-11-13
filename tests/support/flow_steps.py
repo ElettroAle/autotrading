@@ -72,7 +72,6 @@ def names(listed: str) -> tuple[str, ...]:
 
 @given(quoted('che "{user}" ha registrato la chiave del fornitore "{provider}"'))
 def provider_key_registered(platform: Platform, user: str, provider: str) -> None:
-    platform.providers.accept(provider, KEY)
     platform.use_cases_of(user).register_provider_key.execute(RegisterProviderKeyCommand(provider, KEY))
 
 
