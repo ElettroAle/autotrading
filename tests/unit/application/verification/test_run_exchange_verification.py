@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -6,6 +8,12 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
+from autotrading.application.verification.ports import (
+    ProcedureAsset,
+    ProcedureClosing,
+    ProcedureOpening,
+    ProcedureOrders,
+)
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationCommand,
     RunExchangeVerificationUseCase,
@@ -76,6 +84,51 @@ class ScriptedOrders:
         return _answer(self.closing)
 
 
+@dataclass(frozen=True, slots=True)
+class OrderAnswer:
+    """The answer of the orders context for an order of the procedure."""
+
+    fee: Decimal | None
+    realized_pnl: Decimal | None
+    exchange_message: str | None
+    status: str
+
+    @classmethod
+    def of(cls, result: OrderResult) -> OrderAnswer:
+        if result.succeeded:
+            return cls(result.fee, result.realized_pnl, None, "eseguito")
+        return cls(None, None, result.message, "rifiutato")
+
+
+@dataclass(frozen=True, slots=True)
+class MinimumOf:
+    orders: ScriptedOrders
+
+    def execute(self, asset: ProcedureAsset) -> Decimal:
+        return self.orders.minimum_value(asset.account_id, asset.coin)
+
+
+@dataclass(frozen=True, slots=True)
+class OpeningOf:
+    orders: ScriptedOrders
+
+    def execute(self, opening: ProcedureOpening) -> OrderAnswer:
+        asked = Opening(opening.coin, opening.side, opening.leverage, opening.value)
+        return OrderAnswer.of(self.orders.open(opening.account_id, asked, opening.user_id))
+
+
+@dataclass(frozen=True, slots=True)
+class ClosingOf:
+    orders: ScriptedOrders
+
+    def execute(self, closing: ProcedureClosing) -> OrderAnswer:
+        return OrderAnswer.of(self.orders.close(closing.account_id, closing.coin, closing.user_id))
+
+
+def procedure_orders(orders: ScriptedOrders) -> ProcedureOrders:
+    return ProcedureOrders(MinimumOf(orders), OpeningOf(orders), ClosingOf(orders))
+
+
 def an_opening(value: Decimal) -> Opening:
     return Opening(coin="BTC", side="long", leverage=2, value=value)
 
@@ -102,7 +155,7 @@ def runs() -> InMemoryVerificationRunRepositoryAdapter:
 def build(runs: InMemoryVerificationRunRepositoryAdapter) -> Build:
     def use_case(readings: ScriptedReadings, orders: ScriptedOrders) -> RunExchangeVerificationUseCase:
         return RunExchangeVerificationUseCase(
-            VerificationReadings(readings, readings), orders, runs, "prod", lambda: STARTED_AT
+            VerificationReadings(readings, readings), procedure_orders(orders), runs, "prod", lambda: STARTED_AT
         )
 
     return use_case
