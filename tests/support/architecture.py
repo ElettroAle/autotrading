@@ -124,6 +124,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     # The LiteLLM proxy speaks the OpenAI API: its official SDK is the client (docs/architecture.md:169, ADR 0101).
     "adapters/outbound/litellm": frozenset({"openai"}),
     "adapters/outbound/oidc": frozenset({"jwt"}),
+    # OpenRouter is reached on its own API with the transport of the platform (ADR 0109).
+    "adapters/outbound/openrouter": frozenset({"httpx"}),
     "adapters/outbound/rss": frozenset({"httpx"}),
     # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle.
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy", "psycopg"}),
