@@ -10,7 +10,6 @@ from openai import OpenAI
 
 from autotrading.adapters.outbound.litellm.model_call import (
     LiteLlmModelCallAdapter,
-    litellm_model_call,
 )
 from autotrading.application.agent.errors import (
     ModelCreditExhaustedError,
@@ -290,10 +289,3 @@ def test_an_answer_in_another_shape_is_transient(body: object) -> None:
 def test_an_answer_that_is_not_json_is_transient() -> None:
     with pytest.raises(ModelUnavailableError, match=r"risposta del fornitore inattesa$"):
         call(Proxy(200, text="<html>ok</html>"), "openai/gpt")
-
-
-def test_the_adapter_of_the_installation_talks_to_the_proxy_at_its_address() -> None:
-    adapter = litellm_model_call("http://127.0.0.1:9", MASTER_KEY)
-
-    with pytest.raises(ModelUnavailableError, match=r"APIConnectionError$"):
-        adapter.call("openai/gpt", KEY, {}, MESSAGES)

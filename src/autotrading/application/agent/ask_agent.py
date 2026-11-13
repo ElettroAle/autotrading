@@ -3,12 +3,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.application.agent.errors import ModelKeyMissingError
-from autotrading.application.agent.ports import (
-    ModelCallPort,
-    ModelCatalogPort,
-    ProviderKeyOpenerPort,
-    ProviderKeyRepositoryPort,
-)
+from autotrading.application.agent.model_gateways import ModelGateways, gateway_of
+from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.domain.agent.agent_context import AgentContext
 from autotrading.domain.agent.agent_response import AgentResponse
 from autotrading.domain.agent.model_parameter import ParameterValue
@@ -36,25 +32,19 @@ class AgentAnswer:
 class AskAgentUseCase:
     """Asks the model of the flow with the key of the tenant, in the worker, and reads its answer (R1.4.3-R1.4.6).
 
-    One call per cycle: a failing call fails the cycle, never retried in the same cycle (R1.4.5).
+    One call per cycle: a failing call fails the cycle, never retried in the same cycle (R1.4.5). The gateway that
+    calls is the one whose catalog holds the model of the flow (ADR 0109).
     """
 
-    def __init__(
-        self,
-        catalog: ModelCatalogPort,
-        keys: ProviderKeyRepositoryPort,
-        opener: ProviderKeyOpenerPort,
-        model_call: ModelCallPort,
-    ) -> None:
-        self._catalog = catalog
+    def __init__(self, gateways: ModelGateways, keys: ProviderKeyRepositoryPort, opener: ProviderKeyOpenerPort) -> None:
+        self._gateways = gateways
         self._keys = keys
         self._opener = opener
-        self._model_call = model_call
 
     def execute(self, command: AskAgentCommand) -> AgentAnswer:
-        definition = self._catalog.catalog().find(command.model)
+        definition, gateway = gateway_of(self._gateways, command.model)
         key = self._key_of(definition.provider)
-        reply = self._model_call.call(definition.name, key, command.settings, command.context.messages())
+        reply = gateway.model_call().call(definition.name, key, command.settings, command.context.messages())
         return AgentAnswer(
             AgentResponse.read(reply.text, command.context.assets),
             reply.usage,

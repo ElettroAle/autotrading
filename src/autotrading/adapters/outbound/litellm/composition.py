@@ -1,11 +1,18 @@
+from openai import OpenAI
+
 from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.litellm.configuration import _settings_of
-from autotrading.adapters.outbound.litellm.model_call import LiteLlmModelCallAdapter, litellm_model_call
-from autotrading.adapters.outbound.litellm.model_catalog import LiteLlmModelCatalogAdapter, litellm_model_catalog
+from autotrading.adapters.outbound.litellm.model_call import TIMEOUT_SECONDS
+from autotrading.adapters.outbound.litellm.model_gateway import LiteLlmModelGatewayAdapter
+
+GATEWAY_NAME = "litellm"
 
 
-def litellm_adapters(source: ConfigurationSource) -> tuple[LiteLlmModelCallAdapter, LiteLlmModelCatalogAdapter]:
-    """The model call and the catalog of the models, through the proxy of the installation (ADR 0101, ADR 0103)."""
+def litellm_adapters(source: ConfigurationSource) -> dict[str, LiteLlmModelGatewayAdapter]:
+    """The gateway of the proxy of the installation, by its name (ADR 0101, ADR 0103, ADR 0109).
+
+    The proxy is reached at its internal address with the master key, with no retries: the next cycle retries.
+    """
     settings = _settings_of(source)
-    model_call = litellm_model_call(settings.url, settings.master_key)
-    return model_call, litellm_model_catalog(settings.url, settings.master_key)
+    client = OpenAI(api_key=settings.master_key, base_url=settings.url, timeout=TIMEOUT_SECONDS, max_retries=0)
+    return {GATEWAY_NAME: LiteLlmModelGatewayAdapter(client)}

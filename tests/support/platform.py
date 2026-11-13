@@ -70,6 +70,7 @@ from tests.fakes.linked_chat_repository import (
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
@@ -181,13 +182,13 @@ class Platform:
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_usage=flows,
-            model_catalog=InMemoryModelCatalogAdapter(self.model_catalog),
+            model_gateways={"models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(self.model_catalog))},
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
-                models=SelectModelUseCase(InMemoryModelCatalogAdapter(self.model_catalog), provider_keys),
+                models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
