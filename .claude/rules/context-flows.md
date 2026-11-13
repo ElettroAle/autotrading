@@ -60,6 +60,11 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - Lo stop chiude sempre le posizioni del flusso (decisione del proprietario: senza stop loss sull'exchange
   una posizione lasciata aperta non è protetta), dopo il ciclo in corso; ogni posizione chiusa entra nello
   storico col motivo dello stop o della rimozione del conto (ADR 0055).
+- La rimozione di un conto è un caso d'uso di `flows` (`RemoveAccountWithFlowsUseCase`, ADR 0090): senza conferma
+  respinge un conto con flussi attivi o in pausa, poi uno con posizioni aperte (R1.1.8, R0.2.5); con conferma ferma
+  i flussi del conto chiudendone le posizioni, rimuove il conto solo se nessuna posizione resta aperta, poi
+  archivia i flussi. Le regole sono in `domain/flows/account_removal.py`; il conto si legge e si rimuove dalle porte
+  `FlowAccountPositionsPort` e `FlowAccountRemovalPort`.
 - Una posizione chiusa a mano (R0.3.2) entra nello storico del flusso che ha l'asset sul conto, col motivo
   "comando manuale", quando l'exchange conferma l'esecuzione (ADR 0061).
 - Il capitale allocato cambia in ogni stato tranne archiviato: versione nuova della configurazione più una riga

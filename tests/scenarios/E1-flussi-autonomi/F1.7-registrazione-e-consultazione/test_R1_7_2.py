@@ -6,15 +6,14 @@ from uuid import UUID
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
+from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.bootstrap import ClosingNoticeByNotification, OutsideClosingsInHistory
-from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
@@ -102,8 +101,8 @@ class History:
     def remove_account(self, flow: str) -> None:
         owner = self.owners[flow]
         account_id = self.operating_with_open_position(flow)
-        command = RemoveAccountCommand(AccountId(account_id), self.platform.user_id_of(owner), confirmed=True)
-        self.platform.use_cases_of(owner).remove_account.execute(command)
+        command = RemoveAccountWithFlowsCommand(account_id, self.platform.user_id_of(owner), confirmed=True)
+        self.platform.use_cases_of(owner).remove_account_with_flows.execute(command)
 
     def close_by_hand(self, flow: str) -> None:
         owner = self.owners[flow]

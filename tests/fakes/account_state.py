@@ -26,10 +26,16 @@ class FakeAccountStateAdapter:
         return self._worker().execute(ReadExchangeStateCommand(account_id))
 
     def balance_of(self, account_id: UUID) -> FlowBalance:
+        balance = self._state_for_flows(account_id).balance
+        return FlowBalance(balance.amount, balance.currency)
+
+    def open_positions_of(self, account_id: UUID) -> tuple[str, ...]:
+        return tuple(position.coin for position in self._state_for_flows(account_id).positions)
+
+    def _state_for_flows(self, account_id: UUID) -> AccountState:
         try:
-            balance = self.read_state(AccountId(account_id)).balance
+            return self.read_state(AccountId(account_id))
         except AccountNotFoundError as error:
             raise FlowAccountNotFoundError from error
         except (ExchangeUnavailableError, WorkerUnavailableError) as error:
             raise FlowExchangeUnavailableError from error
-        return FlowBalance(balance.amount, balance.currency)
