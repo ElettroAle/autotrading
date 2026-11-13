@@ -95,7 +95,7 @@ def test_a_model_of_the_proxy_becomes_a_model_of_the_catalog_with_its_parameters
     assert sonnet == ModelDefinition(
         "anthropic/claude-sonnet-5-5",
         (
-            RangeParameter("temperature", Decimal(0), Decimal(1), Decimal(1)),
+            RangeParameter("temperature", Decimal(0), Decimal(2), Decimal(1)),
             RangeParameter("max_tokens", Decimal(1), Decimal(128000), Decimal(4096), whole=True),
             ChoiceParameter("reasoning_effort", ("basso", "medio", "alto"), "medio"),
         ),
@@ -103,7 +103,7 @@ def test_a_model_of_the_proxy_becomes_a_model_of_the_catalog_with_its_parameters
     )
 
 
-def test_a_model_without_reasoning_has_no_level_and_its_provider_its_own_temperature_range() -> None:
+def test_a_model_without_reasoning_has_no_level() -> None:
     gpt = catalog_on(Proxy()).catalog().find("openai/gpt-4.1-mini")
 
     assert gpt.parameters == (
@@ -152,7 +152,7 @@ def test_a_short_answer_limit_is_also_the_default() -> None:
     ],
 )
 def test_a_model_without_prices_leaves_the_cost_to_the_provider(prices: dict[str, object]) -> None:
-    (model,) = catalog_on(Proxy([group("openrouter/deepseek/deepseek-chat", **prices)])).catalog().models
+    (model,) = catalog_on(Proxy([group("deepseek/deepseek-chat", **prices)])).catalog().models
 
     assert model.prices is None
 
