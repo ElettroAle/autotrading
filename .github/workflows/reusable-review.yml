@@ -51,7 +51,7 @@ jobs:
           ref: ${{ inputs.base }}
           fetch-depth: 0
       # The review action itself comes from the pull request, in its own folder, so that a change to it is
-      # exercised before integration; like a change to the rules, it needs an ADR in the same pull request.
+      # exercised before integration.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: .review-action
