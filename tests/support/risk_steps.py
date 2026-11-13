@@ -23,6 +23,7 @@ from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenI
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 
 NUMBER = r"(?P<{}>\d+(?:,\d+)?)"
+EXCHANGE = "Hyperliquid"
 CURRENCY = "USDC"
 
 
@@ -63,8 +64,8 @@ class RiskBench:
         margin_percent = self.margin_percent if exposure_set else Decimal(100)
         limits = RiskLimits(self.max_leverage, margin_percent, self.value_percent)
         state = RiskState(CURRENCY, self.funds, self.liquidity, frozenset(self.open_assets))
-        command = CheckRiskCommand(tuple(self.intents), RiskPolicy(limits, self.bring_to_minimum), state)
-        self.outcomes = CheckRiskUseCase(self.exchange).execute(command)
+        command = CheckRiskCommand(tuple(self.intents), RiskPolicy(limits, self.bring_to_minimum), state, EXCHANGE)
+        self.outcomes = CheckRiskUseCase({EXCHANGE: self.exchange}).execute(command)
 
     def open_with_value(self, asset: str, value: Decimal) -> None:
         self.intents.append(OpenIntent(asset, TradeSide.LONG, value / self.funds, 1))

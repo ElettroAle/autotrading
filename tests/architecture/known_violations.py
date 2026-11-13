@@ -6,15 +6,12 @@ until it is removed. An entry never exists without its Bug on the board.
 
 from tests.support.architecture import Rule
 
-BUG_CYCLE_RULES_IN_BOOTSTRAP = 170
 BUG_STRICTER_RULES = 177
 
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.PORTS_IN_PORTS_MODULES: {},
     Rule.PORT_NAMES: {},
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
-        "bootstrap.py:CycleJournalFromContexts.call_cost": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_authentication": BUG_STRICTER_RULES,
         "bootstrap.py:_credentials_private_key": BUG_STRICTER_RULES,
         "bootstrap.py:_credentials_public_key": BUG_STRICTER_RULES,
@@ -34,11 +31,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:operations": BUG_STRICTER_RULES,
     },
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
-        "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
-        "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
-        "bootstrap.py:CycleContext": BUG_STRICTER_RULES,
-        "bootstrap.py:CycleDecisions": BUG_STRICTER_RULES,
         "bootstrap.py:CycleServices": BUG_STRICTER_RULES,
         "bootstrap.py:FlowPositionsFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:FlowSummariesFromFlows": BUG_STRICTER_RULES,
@@ -46,7 +38,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:MissingConfigurationError": BUG_STRICTER_RULES,
         "bootstrap.py:OrderExecutionFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:PublicCredentialsKey": BUG_STRICTER_RULES,
-        "bootstrap.py:RiskFromFlows": BUG_STRICTER_RULES,
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
         "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
         "bootstrap.py:UndeclaredEnvironmentError": BUG_STRICTER_RULES,
@@ -54,13 +45,9 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:WorkerSettings": BUG_STRICTER_RULES,
     },
     Rule.NO_BRIDGES: {
-        "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
-        "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:FlowPositionsFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:FlowSummariesFromFlows": BUG_STRICTER_RULES,
         "bootstrap.py:OrderExecutionFromOrders": BUG_STRICTER_RULES,
-        "bootstrap.py:RiskFromFlows": BUG_STRICTER_RULES,
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
     },
     Rule.LIBRARIES_IN_THEIR_FOLDER: {
