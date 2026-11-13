@@ -51,9 +51,8 @@ runs:
           2. Leggi i thread di review della pull request con `gh api graphql` (reviewThreads con id, isResolved,
              path, line e i commenti con autore e corpo). I tuoi thread sono quelli il cui primo commento contiene
              `<!-- revisione-ai`.
-          3. Per ogni tuo thread aperto (isResolved falso): se nel commit head la violazione non c'è più (per una
-             modifica alle regole: se un'ADR della pull request ora la decide, come al punto 5), rispondi nel thread
-             con `addPullRequestReviewThreadReply` dicendo in una riga che è corretta (salvo che una tua risposta lo
+          3. Per ogni tuo thread aperto (isResolved falso): se nel commit head la violazione non c'è più, o se non
+             è una violazione secondo il punto 4, rispondi nel thread con `addPullRequestReviewThreadReply` dicendo in una riga che è corretta (salvo che una tua risposta lo
              dica già) e poi chiama sempre `resolveReviewThread` con l'id del thread: un thread corretto non resta mai
              aperto, anche se lo hai già commentato in un giro precedente. Se la violazione è ancora presente,
              lascialo com'è. Non chiudere mai un thread aperto da altri.
@@ -61,15 +60,9 @@ runs:
              regola scritta in CLAUDE.md o in una rule applicabile, e solo se nessun tuo thread aperto la segnala già.
              Non segnalare stile, design, gusto, possibili miglioramenti né ciò che i controlli automatici già
              verificano (ruff, mypy, import-linter, test di architettura) a meno che violi anche una regola scritta.
-             Nel dubbio non segnalare.
-          5. Le regole cambiano solo per decisione scritta: «Ogni decisione tecnica presa da un lavoro vive in
-             `docs/adr/NNNN-titolo.md`» (CLAUDE.md). Se la pull request modifica CLAUDE.md, un file di
-             .claude/rules/, la sezione [tool.importlinter] di pyproject.toml, tests/architecture/known_violations.py,
-             .github/workflows/review.yml, .github/workflows/reusable-review.yml o .github/actions/claude-review/,
-             ogni modifica deve essere decisa da un'ADR in docs/adr/ aggiunta o modificata dalla stessa pull request,
-             che nomina il file e dice che cosa cambia. Per ogni file così modificato che nessuna ADR della pull
-             request copre apri un solo thread, sulla prima riga modificata, salvo che un tuo thread aperto su quel
-             file esista già.
+             Nel dubbio non segnalare. Una modifica a CLAUDE.md, alle rule, ai contratti di architettura, a
+             tests/architecture/known_violations.py o a questa revisione non è mai di per sé una violazione: giudichi
+             il codice con le regole, non i cambi alle regole.
 
           Ogni thread si apre con mcp__github_inline_comment__create_inline_comment su una riga del commit head
           presente nel diff, con `confirmed: true`. Il corpo è in italiano, inizia con `<!-- revisione-ai -->` e
