@@ -24,32 +24,11 @@ _CHALLENGE = {"WWW-Authenticate": "Bearer"}
 errors_log = logging.getLogger("autotrading.api.errors")
 
 
-class NotAuthenticatedError(AutotradingError):
-    status_code = 401
-
-    def __init__(self) -> None:
-        super().__init__("non autenticato")
-
-
-class UserRoleMissingError(AutotradingError):
-    status_code = 403
-
-    def __init__(self) -> None:
-        super().__init__("ruolo Utente assente")
-
-
 class AuthenticationNotConfiguredError(AutotradingError):
     status_code = 503
 
     def __init__(self) -> None:
         super().__init__("autenticazione non configurata")
-
-
-class IdentityProviderUnavailableError(AutotradingError):
-    status_code = 503
-
-    def __init__(self) -> None:
-        super().__init__("directory non raggiungibile")
 
 
 def install_error_responses(api: FastAPI) -> None:

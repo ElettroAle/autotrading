@@ -80,6 +80,18 @@ def test_the_free_capital_is_the_balance_less_the_flows_not_archived() -> None:
     assert FreeCapital.of(Decimal(1000), "USDC", flows) == FreeCapital(Decimal(600), "USDC")
 
 
+def test_the_free_capital_of_an_account_ignores_the_flows_of_other_accounts() -> None:
+    tenant_id, account_id = TenantId.new(), uuid4()
+    flows = [
+        a_flow(
+            tenant_id, name="alfa", account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(300))
+        ),
+        a_flow(tenant_id, name="beta", configuration=a_configuration(allocated_capital=Decimal(500))),
+    ]
+
+    assert FreeCapital.of_account(Decimal(1000), "USDC", account_id, flows) == FreeCapital(Decimal(700), "USDC")
+
+
 def test_a_capital_up_to_the_free_one_fits() -> None:
     FreeCapital(Decimal(600), "USDC").require_room_for(Decimal(600))
 

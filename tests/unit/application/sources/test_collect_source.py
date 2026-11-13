@@ -5,7 +5,7 @@ import pytest
 
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
 from autotrading.application.sources.errors import SourceUnavailableError
-from autotrading.application.sources.ports import ReadSourceCommand
+from autotrading.application.sources.ports import SourceRequest
 from autotrading.domain.sources.errors import SourceNotAvailableError, SourceParameterOutOfRangeError
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
@@ -31,8 +31,8 @@ def test_a_per_asset_source_is_read_for_every_asset_with_the_settings_of_the_flo
     use_case.execute(command("indicatori", {"lunghezza_serie": 20}))
 
     assert reader.readings == [
-        ReadSourceCommand(CYCLE.flow_id, "BTC", {"lunghezza_serie": 20}, COLLECTED),
-        ReadSourceCommand(CYCLE.flow_id, "ETH", {"lunghezza_serie": 20}, COLLECTED),
+        SourceRequest(CYCLE.flow_id, "BTC", {"lunghezza_serie": 20}, COLLECTED),
+        SourceRequest(CYCLE.flow_id, "ETH", {"lunghezza_serie": 20}, COLLECTED),
     ]
 
 
@@ -43,7 +43,7 @@ def test_a_market_source_is_read_once_with_the_defaults_of_the_catalog() -> None
     use_case.execute(command("notizie"))
 
     assert reader.readings == [
-        ReadSourceCommand(CYCLE.flow_id, None, {"numero_notizie": 10, "eta_massima_ore": 24}, COLLECTED)
+        SourceRequest(CYCLE.flow_id, None, {"numero_notizie": 10, "eta_massima_ore": 24}, COLLECTED)
     ]
 
 
@@ -95,7 +95,7 @@ def test_a_source_of_the_catalog_without_reader_is_not_available() -> None:
 
 
 class FailingReader:
-    def execute(self, command: ReadSourceCommand) -> list[SourceValue]:
+    def execute(self, command: SourceRequest) -> list[SourceValue]:
         if command.asset == "ETH":
             raise SourceUnavailableError(INDICATORS.name)
         return [VALUE]

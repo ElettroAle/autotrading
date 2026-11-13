@@ -268,9 +268,15 @@ class ActivityReaderPort(Protocol):
         ...
 
 
-class PausedFlowNoticePort(Protocol):
-    def paused(self, flow: Flow, reason: str) -> None:
+class FlowPausedNoticePort(Protocol):
+    def execute(self, flow_name: str, reason: str) -> None:
         """Tells the user the flow paused on its own, with the reason (R1.2.4, R1.8.2)."""
+        ...
+
+
+class CycleFailedNoticePort(Protocol):
+    def execute(self, flow_name: str, reason: str) -> None:
+        """Tells the user a cycle of the flow failed, with the message of its error (R1.8.2)."""
         ...
 
 
@@ -363,10 +369,12 @@ class ReconciliationRepositoryPort(Protocol):
         ...
 
 
-class ClosedPositionsPort(Protocol):
+class OutsideClosingRecorderPort(Protocol):
     """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
 
-    def add_closed_outside(self, closing: OutsideClosing) -> None: ...
+    def execute(self, closing: OutsideClosing) -> None:
+        """Records a position the reconciliation finds closed outside the platform (ADR 0056)."""
+        ...
 
 
 class ClosedPositionRepositoryPort(Protocol):
@@ -379,7 +387,39 @@ class ClosedPositionRepositoryPort(Protocol):
     def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...
 
 
-class ClosingNoticePort(Protocol):
-    def tell(self, flow: Flow, asset: str, realized_pnl: Decimal) -> None:
-        """Tells a closing of the flow with no history to enter, once, with the PnL the exchange reported (ADR 0070)."""
+class PositionClosedNoticePort(Protocol):
+    def execute(self, flow_name: str, asset: str, pnl: Decimal) -> None:
+        """Tells a closing of the flow once, with the PnL its history keeps or the exchange reported (ADR 0070)."""
         ...
+
+
+class ExecutedFillPort(Protocol):
+    """What the exchange executed for an order of a cycle that closed a position, as the orders context reports it."""
+
+    @property
+    def average_price(self) -> Decimal: ...
+
+    @property
+    def executed_at(self) -> datetime: ...
+
+    @property
+    def fee(self) -> Decimal: ...
+
+    @property
+    def realized_pnl(self) -> Decimal: ...
+
+
+class ReportedFillPort(Protocol):
+    """What the exchange reported of a closing a user asked: every value missing while it is not confirmed."""
+
+    @property
+    def average_price(self) -> Decimal | None: ...
+
+    @property
+    def executed_at(self) -> datetime | None: ...
+
+    @property
+    def fee(self) -> Decimal | None: ...
+
+    @property
+    def realized_pnl(self) -> Decimal | None: ...

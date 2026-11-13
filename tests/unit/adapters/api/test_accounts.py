@@ -5,11 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.accounts import AccountRegistrationRequest
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from tests.fakes.exchange import REDACTED_REJECTION
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform
 from tests.support.problems import reason_of
 
@@ -22,12 +21,11 @@ def platform() -> Platform:
 @pytest.fixture
 def client(platform: Platform) -> TestClient:
     provider = IdentityProvider()
-    verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
     api = create_api(
         HealthReport("1.0.0", "dev"),
         ResolveTenantUseCase(platform.tenants),
         platform.for_tenant,
-        Authentication(SETTINGS, verifier, provider.login()),
+        provider.authentication(),
     )
     anna = platform.directory.person("anna")
     anna.roles.add("Utente")

@@ -4,15 +4,14 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.order_exchange import EXECUTED_AT, REALIZED_ON_CLOSE
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
 
 Client = Callable[[str], TestClient]
@@ -27,12 +26,11 @@ def platform() -> Platform:
 @pytest.fixture
 def client_of(platform: Platform) -> Client:
     provider = IdentityProvider()
-    verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
     api = create_api(
         HealthReport("1.0.0", "dev"),
         ResolveTenantUseCase(platform.tenants),
         platform.for_tenant,
-        Authentication(SETTINGS, verifier, provider.login()),
+        provider.authentication(),
     )
 
     def client(user: str) -> TestClient:

@@ -1,7 +1,7 @@
 from decimal import Context, Decimal
 
 from autotrading.application.sources.errors import AssetRequiredError
-from autotrading.application.sources.ports import MarketDataPort, ReadSourceCommand
+from autotrading.application.sources.ports import MarketDataPort, SourceRequest
 from autotrading.domain.sources.indicator_series import WARM_UP, indicator_series
 from autotrading.domain.sources.source_sample import SourceValue
 from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe, short_timeframe_of
@@ -21,7 +21,7 @@ class ReadIndicatorsUseCase:
         self._market = market
         self._short = short_timeframe_of(cycle_minutes, market.timeframes())
 
-    def execute(self, command: ReadSourceCommand) -> tuple[SourceValue]:
+    def execute(self, command: SourceRequest) -> tuple[SourceValue]:
         if command.asset is None:
             raise AssetRequiredError
         length = command.settings[SERIES_LENGTH]

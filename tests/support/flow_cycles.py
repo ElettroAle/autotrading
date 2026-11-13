@@ -12,6 +12,8 @@ from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY a
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
+from autotrading.application.cycles.tell_cycle_failure import TellCycleFailureUseCase
+from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
@@ -19,18 +21,20 @@ from autotrading.application.flows.reconcile_account import ReconcileAccountUseC
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
+from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
+from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
+from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
+from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
+from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
-    ClosingNoticeByNotification,
-    CycleFailureNotices,
     CycleRuntime,
     CycleServices,
     FlowPauseFromFlows,
-    NotifiedClosedPositions,
-    OutsideClosingsInHistory,
     TenantCyclePorts,
     record_actual_prices,
     run_due_cycles,
@@ -139,13 +143,8 @@ class FlowCycles:
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         notify = platform.worker_for(tenant_id).notify
-        closed_positions = NotifiedClosedPositions(
-            InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id),
-            flows,
-            notify,
-            HYPERLIQUID_SETTLEMENT_CURRENCY,
-        )
-        closing_notice = ClosingNoticeByNotification(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
+        closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         record_executions = RecordAccountExecutionsUseCase(
             flows,
@@ -157,7 +156,7 @@ class FlowCycles:
             flows,
             activity,
             self.readings,
-            OutsideClosingsInHistory(RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice)),
+            RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
             record_executions,
         )
         return TenantCyclePorts(
@@ -175,7 +174,15 @@ class FlowCycles:
             reconcile_account=reconcile_account,
             openings=openings,
             closed_positions=closed_positions,
-            record_closing=RecordFlowClosingUseCase(openings, closed_positions, closing_notice),
+            follow_flow_orders=FollowFlowOrdersUseCase(
+                FlowOrderFollowers(
+                    NotifyOrderRejectedUseCase(notify),
+                    NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                    RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+                )
+            ),
+            flow_paused_notice=NotifyFlowPausedUseCase(notify),
+            cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             timing=InMemoryFlowTimingAdapter(platform.flows, tenant_id),
@@ -308,7 +315,7 @@ class FlowCycles:
             InMemoryFlowLockAdapter(),
             FlowPauseFromFlows(self.directory, self.ports_of),
             self.clock,
-            CycleFailureNotices(self.directory, self.ports_of),
+            TellCycleFailureUseCase(self.directory, lambda tenant_id: self.ports_of(tenant_id).cycle_failure),
         )
         runtime = CycleRuntime(Scheduled(), guards, self.launcher)
         run_due_cycles(self.directory, self.ports_of, self.services(), runtime).execute()

@@ -1,24 +1,15 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, Request, Response, Security
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.accounts import accounts_router
-from autotrading.adapters.inbound.api.authentication import (
-    AccessTokenVerifier,
-    AuthenticationSettings,
-    OidcLoginEndpoints,
-)
 from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
 from autotrading.adapters.inbound.api.cycles import cycles_router
-from autotrading.adapters.inbound.api.errors import (
-    AuthenticationNotConfiguredError,
-    NotAuthenticatedError,
-    install_error_responses,
-)
+from autotrading.adapters.inbound.api.errors import AuthenticationNotConfiguredError, install_error_responses
 from autotrading.adapters.inbound.api.flow_state import flow_state_router
 from autotrading.adapters.inbound.api.flows import flows_router
 from autotrading.adapters.inbound.api.models import models_router
@@ -29,6 +20,8 @@ from autotrading.adapters.inbound.api.sources import sources_router
 from autotrading.adapters.inbound.api.telegram import telegram_router
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.adapters.inbound.api.verifications import verifications_router
+from autotrading.application.tenancy.errors import NotAuthenticatedError
+from autotrading.application.tenancy.ports import AccessTokenVerifierPort, LoginEndpointsPort
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -47,9 +40,12 @@ class HealthReport:
 
 @dataclass(frozen=True, slots=True)
 class Authentication:
-    settings: AuthenticationSettings
-    verifier: AccessTokenVerifier
-    login: OidcLoginEndpoints
+    """The login the OpenAPI page offers and who verifies the tokens it obtains (ADR 0016, ADR 0073)."""
+
+    client_id: str
+    scope: str
+    verifier: AccessTokenVerifierPort
+    login: LoginEndpointsPort
 
 
 class Identity(BaseModel):
@@ -77,7 +73,7 @@ def create_api(
         # Without an identity provider nobody gets in: the platform fails closed.
         if authentication is None:
             raise AuthenticationNotConfiguredError
-        return authentication.verifier.verify(token)
+        return authentication.verifier.verify(token).user()
 
     # Every function of the platform lives on this router, so none is reachable without an identity (R0.1.1).
     protected = APIRouter(dependencies=[Security(_security_scheme(authentication)), Depends(current_user)])
@@ -144,10 +140,10 @@ def _publish_login(api: FastAPI, authentication: Authentication | None) -> None:
     if authentication is None:
         return
     login = authentication.login
-    scope = authentication.settings.scope
+    scope = authentication.scope
     generate = api.openapi
 
-    def openapi() -> dict[str, Any]:
+    def openapi() -> dict[str, object]:
         schema = generate()
         endpoints = login.endpoints()
         schema["components"]["securitySchemes"][LOGIN_SCHEME] = {
@@ -166,11 +162,11 @@ def _publish_login(api: FastAPI, authentication: Authentication | None) -> None:
     api.openapi = openapi  # type: ignore[method-assign]
 
 
-def _swagger_login(authentication: Authentication | None) -> dict[str, Any] | None:
+def _swagger_login(authentication: Authentication | None) -> dict[str, object] | None:
     if authentication is None:
         return None
     return {
-        "clientId": authentication.settings.client_id,
+        "clientId": authentication.client_id,
         "usePkceWithAuthorizationCodeGrant": True,
-        "scopes": authentication.settings.scope,
+        "scopes": authentication.scope,
     }

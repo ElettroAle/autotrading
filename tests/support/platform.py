@@ -19,6 +19,7 @@ from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
@@ -37,8 +38,6 @@ from autotrading.bootstrap import (
     SOURCE_CATALOG,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
-    ManualClosingsRecordedInFlows,
-    NotifiedClosedPositions,
     OrderExecutionFromOrders,
 )
 from autotrading.domain.accounts.account import Account
@@ -172,18 +171,15 @@ class Platform:
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
-        notified_closings = NotifiedClosedPositions(
-            closed_positions, flows, self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY
-        )
-        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, notified_closings)
+        closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice)
         ports = TenantPorts(
             accounts=accounts,
             sealer=self.sealer_of(tenant_id),
             exchanges=self.exchanges,
             account_state=account_state,
-            position_closing=ManualClosingsRecordedInFlows(
-                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings).execute
-            ),
+            position_closing=position_closing,
+            manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,

@@ -1,26 +1,25 @@
-"""Closings that enter the history of a flow, from a cycle or from outside the platform (R1.7.2, ADR 0056, 0070)."""
+"""Closings that enter the history of a flow and are told, from a cycle or from outside the platform (R1.7.2, ADR 0056,
+0070)."""
 
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
-from autotrading.application.flows.record_flow_closing import RecordFlowClosingCommand, RecordFlowClosingUseCase
-from autotrading.application.flows.record_outside_closing import (
-    RecordOutsideClosingCommand,
-    RecordOutsideClosingUseCase,
-)
+from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
+from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
-from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionOpening
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.flows import a_flow
 
 TENANT = TenantId(uuid4())
@@ -38,12 +37,12 @@ class KnownOpenings:
         return self.openings.get((flow_id, asset))
 
 
-class ToldClosings:
-    def __init__(self) -> None:
-        self.told: list[tuple[str, str, Decimal]] = []
-
-    def tell(self, flow: Flow, asset: str, realized_pnl: Decimal) -> None:
-        self.told.append((flow.name.value, asset, realized_pnl))
+@dataclass(frozen=True, slots=True)
+class Executed:
+    average_price: Decimal
+    executed_at: datetime
+    fee: Decimal
+    realized_pnl: Decimal
 
 
 class Bench:
@@ -51,24 +50,21 @@ class Bench:
         self.flows = FlowStore()
         self.history = ClosedPositionStore()
         self.openings = KnownOpenings()
-        self.notices = ToldClosings()
+        self.notices = FakePositionClosedNoticeAdapter()
         self.flow = a_flow(TENANT)
         self.flows.flows.append(self.flow)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.history, TENANT)
-        self.cycle_closing = RecordFlowClosingUseCase(self.openings, closed_positions, self.notices)
-        self.outside_closing = RecordOutsideClosingUseCase(
-            InMemoryFlowRepositoryAdapter(self.flows, TENANT), self.openings, closed_positions, self.notices
-        )
+        flows = InMemoryFlowRepositoryAdapter(self.flows, TENANT)
+        self.cycle_closing = RecordFlowClosingUseCase(flows, self.openings, closed_positions, self.notices)
+        self.outside_closing = RecordOutsideClosingUseCase(flows, self.openings, closed_positions, self.notices)
 
     def close_in_cycle(self) -> None:
-        command = RecordFlowClosingCommand(
-            self.flow, "BTC", Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"), CYCLE
-        )
-        self.cycle_closing.execute(command)
+        fill = Executed(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
+        self.cycle_closing.execute(self.flow.id.value, CYCLE, "BTC", fill)
 
     def close_outside(self, realized_pnl: Decimal = Decimal("2")) -> OutsideClosing:
         closing = OutsideClosing(self.flow.id, "BTC", realized_pnl, Decimal("0.04"), CLOSED)
-        self.outside_closing.execute(RecordOutsideClosingCommand(closing))
+        self.outside_closing.execute(closing)
         return closing
 
 
@@ -77,14 +73,15 @@ def bench() -> Bench:
     return Bench()
 
 
-def test_a_cycle_closing_enters_the_history_with_the_agent_reason_and_its_cycle(bench: Bench) -> None:
+def test_a_cycle_closing_enters_the_history_with_the_agent_reason_and_its_cycle_then_is_told(bench: Bench) -> None:
     bench.openings.openings[bench.flow.id, "BTC"] = OPENING
 
     bench.close_in_cycle()
 
     fill = ClosingFill(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
-    assert bench.history.positions == [OPENING.closed(bench.flow, "BTC", fill, CloseReason.AGENT, cycle=CYCLE)]
-    assert bench.notices.told == []
+    position = OPENING.closed(bench.flow, "BTC", fill, CloseReason.AGENT, cycle=CYCLE)
+    assert bench.history.positions == [position]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", position.pnl)]
 
 
 def test_a_cycle_closing_the_flow_never_opened_is_told_on_its_own(bench: Bench) -> None:
@@ -94,13 +91,14 @@ def test_a_cycle_closing_the_flow_never_opened_is_told_on_its_own(bench: Bench) 
     assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("1.5"))]
 
 
-def test_a_position_closed_outside_enters_the_history_of_the_flow(bench: Bench) -> None:
+def test_a_position_closed_outside_enters_the_history_of_the_flow_then_is_told(bench: Bench) -> None:
     bench.openings.openings[bench.flow.id, "BTC"] = OPENING
 
     closing = bench.close_outside()
 
-    assert bench.history.positions == [OPENING.closed_outside(bench.flow, closing)]
-    assert bench.notices.told == []
+    position = OPENING.closed_outside(bench.flow, closing)
+    assert bench.history.positions == [position]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", position.pnl)]
 
 
 def test_a_position_closed_outside_the_flow_never_opened_is_told_and_logged(

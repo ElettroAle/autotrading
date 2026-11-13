@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from autotrading.application.sources.ports import NewsPort, ReadSourceCommand
+from autotrading.application.sources.ports import NewsPort, SourceRequest
 from autotrading.domain.sources.news import COUNT, MAX_AGE_HOURS
 from autotrading.domain.sources.news_item import NewsItem, recent_news
 from autotrading.domain.sources.source_sample import SourceValue
@@ -12,7 +12,7 @@ class ReadNewsUseCase:
     def __init__(self, news: NewsPort) -> None:
         self._news = news
 
-    def execute(self, command: ReadSourceCommand) -> tuple[SourceValue, ...]:
+    def execute(self, command: SourceRequest) -> tuple[SourceValue, ...]:
         max_age = timedelta(hours=command.settings[MAX_AGE_HOURS])
         stories = recent_news(self._news.read_latest(), command.settings[COUNT], max_age, command.now)
         return tuple(_value_of(story) for story in stories)

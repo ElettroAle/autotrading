@@ -24,8 +24,8 @@ class World:
         pause = InMemoryAutomaticPauseAdapter(self.store, TENANT)
         self.use_case = PauseAffectedFlowsUseCase(flows, pause, self)
 
-    def paused(self, flow: Flow, reason: str) -> None:
-        self.told.append((flow.name.value, reason))
+    def execute(self, flow_name: str, reason: str) -> None:
+        self.told.append((flow_name, reason))
 
     def add(
         self, name: str, status: FlowStatus = FlowStatus.ACTIVE, account_id: UUID = ACCOUNT, model: str = ""

@@ -1,8 +1,8 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict
 
 import requests
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
@@ -20,6 +20,21 @@ from autotrading.domain.flows.trade_intent import TradeSide
 
 FROM_THE_START = 0
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, InvalidOperation)
+
+
+class _LedgerDelta(TypedDict, total=False):
+    type: str
+    usdc: str
+    destination: str
+    toPerp: bool
+
+
+class _LedgerUpdate(TypedDict):
+    """An update of the non-funding ledger as Hyperliquid answers it; a wrong shape fails while it is read."""
+
+    delta: _LedgerDelta
+    hash: str
+    time: int
 
 
 class HyperliquidAccountActivityAdapter:
@@ -80,7 +95,7 @@ def _position_of(position: _UserPosition) -> AccountPosition:
     )
 
 
-def _movement_of(update: Mapping[str, Any], address: str) -> BalanceMovement | None:
+def _movement_of(update: _LedgerUpdate, address: str) -> BalanceMovement | None:
     delta = update["delta"]
     amount = _signed_amount(delta, address.lower())
     if amount is None:
@@ -88,7 +103,7 @@ def _movement_of(update: Mapping[str, Any], address: str) -> BalanceMovement | N
     return BalanceMovement(str(update["hash"]), amount, _instant(update["time"]))
 
 
-def _signed_amount(delta: Mapping[str, Any], address: str) -> Decimal | None:
+def _signed_amount(delta: _LedgerDelta, address: str) -> Decimal | None:
     """The change of the perpetual balance a ledger update makes, or None for one that is not a movement."""
     kind = delta["type"]
     if kind == "deposit":
@@ -103,9 +118,9 @@ def _signed_amount(delta: Mapping[str, Any], address: str) -> Decimal | None:
     return None
 
 
-def _instant(milliseconds: Any) -> datetime:
+def _instant(milliseconds: int | str) -> datetime:
     return datetime.fromtimestamp(int(milliseconds) / 1000, UTC)
 
 
-def _decimal(value: Any) -> Decimal:
+def _decimal(value: object) -> Decimal:
     return Decimal(str(value))

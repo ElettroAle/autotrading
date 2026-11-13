@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TypedDict, cast
 
 import httpx
 
@@ -32,7 +32,45 @@ TOO_MANY_REQUESTS = 429
 INSUFFICIENT_QUOTA = "insufficient_quota"
 
 type Settings = Mapping[str, ParameterValue]
-type Document = Mapping[str, Any]
+type Document = Mapping[str, object]
+
+
+class _ChatMessage(TypedDict):
+    content: str
+
+
+class _ChatChoice(TypedDict):
+    message: _ChatMessage
+
+
+class _ChatUsage(TypedDict, total=False):
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float | str | None
+
+
+class _ChatDocument(TypedDict):
+    """A chat completion as OpenAI, DeepSeek and OpenRouter answer it; a wrong shape fails while it is read."""
+
+    choices: list[_ChatChoice]
+    usage: _ChatUsage
+
+
+class _AnthropicBlock(TypedDict, total=False):
+    type: str
+    text: str
+
+
+class _AnthropicUsage(TypedDict):
+    input_tokens: int
+    output_tokens: int
+
+
+class _AnthropicDocument(TypedDict):
+    """A message as Anthropic answers it; a wrong shape fails while it is read."""
+
+    content: list[_AnthropicBlock]
+    usage: _AnthropicUsage
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +80,7 @@ class _ProviderApi:
     url: str
     headers: Callable[[ProviderKey], dict[str, str]]
     body: Callable[[str, Settings, tuple[ModelMessage, ...]], dict[str, object]]
-    reply: Callable[[Document], ModelReply]
+    reply: Callable[[object], ModelReply]
 
 
 class HttpxModelCallAdapter:
@@ -187,7 +225,8 @@ def _anthropic_body(model_id: str, settings: Settings, messages: tuple[ModelMess
     }
 
 
-def _chat_reply(document: Document) -> ModelReply:
+def _chat_reply(answer: object) -> ModelReply:
+    document = cast("_ChatDocument", answer)
     usage = document["usage"]
     cost = usage.get("cost")
     return ModelReply(
@@ -196,7 +235,8 @@ def _chat_reply(document: Document) -> ModelReply:
     )
 
 
-def _anthropic_reply(document: Document) -> ModelReply:
+def _anthropic_reply(answer: object) -> ModelReply:
+    document = cast("_AnthropicDocument", answer)
     usage = document["usage"]
     text = "".join(block["text"] for block in document["content"] if block["type"] == "text")
     return ModelReply(text, ModelUsage(int(usage["input_tokens"]), int(usage["output_tokens"]), None))

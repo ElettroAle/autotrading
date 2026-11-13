@@ -8,12 +8,16 @@ from typing import Any
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from autotrading.adapters.inbound.api.authentication import AuthenticationSettings, OidcLoginEndpoints
+from autotrading.adapters.inbound.api.app import Authentication
+from autotrading.adapters.outbound.oidc.access_token_verifier import OidcAccessTokenVerifierAdapter
+from autotrading.adapters.outbound.oidc.login_endpoints import OidcLoginEndpointsAdapter
 from tests.support.directory import Person
 
 ISSUER = "https://login.example.test/tenant-id/v2.0"
 AUDIENCE = "api://autotrading-test"
-SETTINGS = AuthenticationSettings(issuer=ISSUER, audience=AUDIENCE, client_id="swagger-client", scope="api://x/access")
+CLIENT_ID = "swagger-client"
+SCOPE = "api://x/access"
+DISCOVERY_URL = f"{ISSUER}/.well-known/openid-configuration"
 JWKS_URI = f"{ISSUER}/keys"
 AUTHORIZATION_URL = f"{ISSUER}/authorize"
 TOKEN_URL = f"{ISSUER}/token"
@@ -27,12 +31,12 @@ class IdentityProvider:
         self.requests: list[str] = []
         self.reachable = True
 
-    def fetch(self, url: str) -> Mapping[str, Any]:
+    def fetch(self, url: str) -> Mapping[str, object]:
         """Serves the discovery document and the key set, as the issuer does over HTTPS."""
         self.requests.append(url)
         if not self.reachable:
             raise ConnectionRefusedError
-        if url == SETTINGS.discovery_url:
+        if url == DISCOVERY_URL:
             return {
                 "issuer": ISSUER,
                 "jwks_uri": JWKS_URI,
@@ -43,9 +47,17 @@ class IdentityProvider:
             return {"keys": [self._public_jwk()]}
         raise FileNotFoundError(url)
 
-    def login(self) -> OidcLoginEndpoints:
+    def verifier(self) -> OidcAccessTokenVerifierAdapter:
+        """The verifier of the platform, trusting this provider."""
+        return OidcAccessTokenVerifierAdapter(ISSUER, AUDIENCE, self.fetch)
+
+    def login(self) -> OidcLoginEndpointsAdapter:
         """Where the OpenAPI page of a test sends the user to log in at this provider."""
-        return OidcLoginEndpoints(SETTINGS.discovery_url, self.fetch)
+        return OidcLoginEndpointsAdapter(ISSUER, self.fetch)
+
+    def authentication(self) -> Authentication:
+        """The authentication of an API under test, wired to this provider."""
+        return Authentication(CLIENT_ID, SCOPE, self.verifier(), self.login())
 
     def token_for(self, person: Person, **overrides: object) -> str:
         now = int(time.time())

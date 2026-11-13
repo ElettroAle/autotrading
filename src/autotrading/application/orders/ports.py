@@ -1,13 +1,14 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.user_id import UserId
@@ -69,11 +70,25 @@ class OrderRepositoryPort(Protocol):
     def add(self, order: Order) -> None: ...
 
 
-class FlowOrderEventsPort(Protocol):
-    """What the orders of one cycle of a flow left behind, told to the flow that sent them (R1.7.2, R1.8.2)."""
+class OrderRejectedNoticePort(Protocol):
+    def execute(self, flow_name: str, message: str) -> None:
+        """Tells the user the exchange refused an order of the flow, with its message (R1.8.2)."""
+        ...
 
-    def rejected(self, message: str) -> None: ...
 
-    def opened(self, coin: str, direction: str, leverage: int, value: Decimal) -> None: ...
+class PositionOpenedNoticePort(Protocol):
+    def execute(self, flow_name: str, asset: str, direction: str, leverage: int, value: Decimal) -> None:
+        """Tells the user the flow opened a position, with the value the exchange executed (R1.8.2)."""
+        ...
 
-    def closed(self, coin: str, execution: Execution) -> None: ...
+
+class FlowClosingRecorderPort(Protocol):
+    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution) -> None:
+        """Records in the history of the flow a position an order of its cycle closed (R1.7.2)."""
+        ...
+
+
+class ManualClosingRecorderPort(Protocol):
+    def execute(self, account_id: UUID, asset: str, fill: OrderOutcome) -> None:
+        """Records in the history of the flow that trades the asset a position a user closed by hand (ADR 0061)."""
+        ...
