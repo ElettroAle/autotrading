@@ -44,6 +44,7 @@ class RiskBench:
     def __init__(self) -> None:
         self.capital = Decimal(1000)
         self.liquidity = Decimal(1000)
+        self.realized = Decimal(0)
         self.open_assets: set[str] = set()
         self.max_leverage = 50
         self.margin_percent: Decimal | None = None
@@ -53,16 +54,20 @@ class RiskBench:
         self.intents: list[TradeIntent] = []
         self.outcomes: tuple[RiskOutcome, ...] = ()
 
+    @property
+    def funds(self) -> Decimal:
+        return self.capital + self.realized
+
     def check(self) -> None:
         exposure_set = self.margin_percent is not None or self.value_percent is not None
         margin_percent = self.margin_percent if exposure_set else Decimal(100)
         limits = RiskLimits(self.max_leverage, margin_percent, self.value_percent)
-        state = RiskState(CURRENCY, self.capital, self.liquidity, frozenset(self.open_assets))
+        state = RiskState(CURRENCY, self.funds, self.liquidity, frozenset(self.open_assets))
         command = CheckRiskCommand(tuple(self.intents), RiskPolicy(limits, self.bring_to_minimum), state)
         self.outcomes = CheckRiskUseCase(self.exchange).execute(command)
 
     def open_with_value(self, asset: str, value: Decimal) -> None:
-        self.intents.append(OpenIntent(asset, TradeSide.LONG, value / self.capital, 1))
+        self.intents.append(OpenIntent(asset, TradeSide.LONG, value / self.funds, 1))
 
     def outcome_of(self, asset: str) -> RiskOutcome:
         return next(outcome for outcome in self.outcomes if outcome.asset == asset)
@@ -126,6 +131,18 @@ def both_limits(bench: RiskBench, a: str, b: str) -> None:
 @given(step(r'che il flusso "alfa" ha esposizione massima del margine {a}%'))
 def margin_limit(bench: RiskBench, a: str) -> None:
     bench.margin_percent = amount(a)
+
+
+@given(
+    parsers.re(
+        r'^che il flusso "alfa" ha (?P<outcome>perso|guadagnato) (?P<value>\d+(?:,\d+)?) USDC in posizioni chiuse$'
+    )
+)
+def closed_result(bench: RiskBench, outcome: str, value: str) -> None:
+    """A closed result moves both the money of the flow and its liquidity (R1.5.1)."""
+    realized = amount(value) if outcome == "guadagnato" else -amount(value)
+    bench.realized += realized
+    bench.liquidity += realized
 
 
 @given(step(r'che il flusso "alfa" ha leva massima {a}'))

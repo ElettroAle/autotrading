@@ -22,13 +22,14 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   `archived` (archiviato, definitivo) (R1.1.4-R1.1.6).
 - **Allocated capital**: quota del saldo del conto assegnata al flusso. **Free capital** del conto: saldo
   letto dall'exchange meno i capitali allocati ai flussi non archiviati (R1.1.7).
-- **Available liquidity** del flusso: capitale allocato, più PnL realizzato e funding, meno le commissioni, meno il
+- **Funds** (soldi del flusso): capitale allocato, più PnL realizzato e funding, meno le commissioni; base delle
+  quote e dei limiti percentuali del rischio (R1.5.1, ADR 0078). **Available liquidity** del flusso: i soldi meno il
   margine delle sue posizioni aperte (R1.6.1). PnL, commissioni e funding vengono dai totali del registro.
 - **Ledger** (registro delle operazioni): storico di ogni esecuzione e pagamento di funding di un conto, scritto una
   volta sola, con il flusso a cui appartiene o nessuno; **flow totals**: PnL realizzato, commissioni, funding e
   posizione attesa per asset di un flusso, aggiornati con le sole righe nuove (ADR 0063).
 - **Risk limits**: leva massima (obbligatoria) ed esposizione per operazione sul margine e sul valore
-  (almeno una); opzione "porta al minimo" (R1.5.1-R1.5.4).
+  (almeno una), in percentuale dei soldi del flusso; opzione "porta al minimo" (R1.5.1-R1.5.4).
 - **Risk outcome** di una decisione: approvata, ridotta, bloccata (R1.5.x); scartata è di `agent` (R1.4.5).
 - **Unattributable item**: posizione, esecuzione o variazione di saldo del conto che nessun flusso spiega
   (R1.6.2).

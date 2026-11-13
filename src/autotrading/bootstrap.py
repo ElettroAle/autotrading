@@ -1250,6 +1250,14 @@ class CycleFlow:
     def return_percent(self) -> Decimal:
         return self.attributed.return_percent.quantize(PERCENT)
 
+    def risk_state(self) -> RiskState:
+        return RiskState(
+            currency=self.account.balance.currency,
+            funds=self.attributed.funds,
+            available_liquidity=self.available_liquidity,
+            open_assets=frozenset(position.coin for position in self.positions),
+        )
+
 
 def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
     flow = next((flow for flow in ports.flows.list() if flow.id.value == flow_id), None)
@@ -1475,6 +1483,7 @@ def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
     return FlowStateView(
         currency=cycle_flow.account.balance.currency,
         allocated_capital=cycle_flow.configuration.allocated_capital,
+        funds=cycle_flow.attributed.funds,
         available_liquidity=cycle_flow.available_liquidity,
         total_value=cycle_flow.total_value,
         return_percent=cycle_flow.return_percent,
@@ -1548,16 +1557,10 @@ class RiskFromFlows:
             raise FlowOfCycleNotFoundError
         cycle_flow = decisions.flow
         configuration = cycle_flow.configuration
-        state = RiskState(
-            currency=cycle_flow.account.balance.currency,
-            allocated_capital=configuration.allocated_capital,
-            available_liquidity=cycle_flow.available_liquidity,
-            open_assets=frozenset(position.coin for position in cycle_flow.positions),
-        )
         command = CheckRiskCommand(
             tuple(_intent_of(decision) for decision in decisions.answer.response.decisions),
             configuration.risk_policy,
-            state,
+            cycle_flow.risk_state(),
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
         orders = tuple(

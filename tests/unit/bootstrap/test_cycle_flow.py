@@ -10,6 +10,7 @@ from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
@@ -66,3 +67,9 @@ def test_the_return_keeps_two_decimals() -> None:
 
 def test_the_positions_shown_are_those_of_the_account_on_the_assets_of_the_flow() -> None:
     assert [position.coin for position in cycle_flow(attributed()).positions] == ["BTC"]
+
+
+def test_the_risk_measures_quotas_and_limits_on_the_money_of_the_flow() -> None:
+    flow = cycle_flow(attributed(realized_pnl=Decimal(-100), fees=Decimal(2), margin=Decimal(50)), Decimal(300))
+
+    assert flow.risk_state() == RiskState("USDC", Decimal(398), Decimal(300), frozenset({"BTC"}))

@@ -15,6 +15,7 @@ from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.cycle_record import CycleOutcome
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
@@ -159,6 +160,19 @@ def show_activity(flow_cycles: FlowCycles, flow: str, held: AccountPosition) -> 
     flow_cycles.platform.activity_reader.activities[address] = an_activity(positions=(held,))
     signed = held.size if held.side is TradeSide.LONG else -held.size
     flow_cycles.platform.ledger.expect(flow_cycles.flow(flow).id, held.asset, signed)
+
+
+@given(
+    parsers.re(
+        r'^che il flusso "(?P<flow>[^"]+)" ha (?P<outcome>perso|guadagnato) (?P<value>[\d,]+) USDC in posizioni chiuse$'
+    )
+)
+def closed_result(flow_cycles: FlowCycles, flow: str, outcome: str, value: str) -> None:
+    realized = number(value) if outcome == "guadagnato" else -number(value)
+    ledger = flow_cycles.platform.ledger
+    flow_id = flow_cycles.flow(flow).id
+    totals = ledger.totals.get(flow_id, FlowTotals(flow_id))
+    ledger.totals[flow_id] = replace(totals, realized_pnl=totals.realized_pnl + realized)
 
 
 @given(parsers.re(r'^che il flusso "(?P<flow>[^"]+)" ha un rendimento dall\'avvio del (?P<percent>[\d,]+)%$'))
@@ -482,6 +496,11 @@ def capital_in_context(flow_cycles: FlowCycles, capital: str, liquidity: str) ->
     assert state["valuta"] == "USDC"
     assert Decimal(str(state["capitale_allocato"])) == number(capital)
     assert Decimal(str(state["liquidita_disponibile"])) == number(liquidity)
+
+
+@then(parsers.re(r"^il contesto contiene i soldi del flusso (?P<funds>[\d,]+) USDC$"))
+def funds_in_context(flow_cycles: FlowCycles, funds: str) -> None:
+    assert Decimal(str(state_in_context(flow_cycles)["soldi_del_flusso"])) == number(funds)
 
 
 @then(parsers.re(r"^il contesto contiene il rendimento dall'avvio del (?P<percent>[\d,]+)%$"))
