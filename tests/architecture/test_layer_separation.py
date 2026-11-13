@@ -11,6 +11,7 @@ from tests.support.architecture import (
     TRANSPORT_LIBRARIES,
     Rule,
     Violation,
+    folders_named_after_a_transport,
     folders_without_a_rule,
     indexed_technology_rules,
     paths_of_rule,
@@ -142,3 +143,20 @@ def test_the_index_and_the_paths_of_a_rule_are_read() -> None:
 
     assert indexed_technology_rules(contract) == ["tech-rss.md"]
     assert paths_of_rule(rule) == ["src/autotrading/adapters/outbound/rss/**"]
+
+
+def test_no_technology_folder_is_named_after_a_transport_library() -> None:
+    misnamed = folders_named_after_a_transport(technology_folders())
+
+    assert not misnamed, (
+        "una cartella di tecnologia porta il nome del sistema integrato, non della libreria di trasporto: "
+        + ", ".join(misnamed)
+    )
+
+
+@pytest.mark.parametrize(
+    ("folder", "misnamed"),
+    [("adapters/outbound/httpx", True), ("adapters/outbound/telegram", False), ("adapters/inbound/api", False)],
+)
+def test_a_folder_named_after_a_transport_library_is_found(folder: str, misnamed: bool) -> None:
+    assert bool(folders_named_after_a_transport([folder])) is misnamed

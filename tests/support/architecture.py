@@ -289,6 +289,11 @@ def technology_folders(root: Path = SOURCE_ROOT) -> list[str]:
     )
 
 
+def folders_named_after_a_transport(folders: Iterable[str]) -> list[str]:
+    """The technology folders named after the library they talk through instead of the system they integrate."""
+    return sorted(folder for folder in folders if folder.rsplit("/", 1)[-1] in TRANSPORT_LIBRARIES)
+
+
 def folders_without_a_rule(folders: Iterable[str], rule_paths: Iterable[str]) -> list[str]:
     """The technology folders that no technology rule in the index of CLAUDE.md covers with its paths."""
     covered = set(rule_paths)

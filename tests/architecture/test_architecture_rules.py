@@ -147,7 +147,7 @@ VIOLATING = [
         "adapters/inbound/api/app.py",
         "api.openapi = openapi  # type: ignore[method-assign]\n",
     ),
-    Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/httpx/x.py", "import os\nTOKEN = os.environ['T']\n"),
+    Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/telegram/x.py", "import os\nTOKEN = os.environ['T']\n"),
     Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/sqlalchemy/x.py", "from os import getenv\n"),
     Case(Rule.CONFIGURATION_THROUGH_SOURCE, "bootstrap.py", "def f():\n    return os.getenv('X')\n"),
     Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/json/x.py", "import tomllib\n"),
@@ -158,7 +158,7 @@ VIOLATING = [
     ),
     Case(
         Rule.SETTINGS_IN_THEIR_FOLDER,
-        "adapters/outbound/httpx/composition.py",
+        "adapters/outbound/telegram/composition.py",
         "from autotrading.adapters.outbound.sqlalchemy.configuration import _SqlAlchemySettings\n",
     ),
     Case(
