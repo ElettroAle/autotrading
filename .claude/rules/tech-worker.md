@@ -16,3 +16,5 @@ paths:
 - Il worker non raggiungibile o uno stato inatteso si traduce nell'errore del contratto della porta; una
   notifica non consegnata si registra e non fa fallire il chiamante (R1.8.2).
 - Il token non compare in log, errori o repr. Nessun import da altre cartelle di adapter.
+- `composition.py` espone `worker_adapters(url, token)`: un client per l'installazione e, per ogni
+  richiesta, gli adapter legati al tenant; `configuration.py` la dataclass privata `_WorkerSettings`.
