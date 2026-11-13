@@ -14,6 +14,7 @@ from autotrading.adapters.inbound.api.worker import (
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
+from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
@@ -179,6 +180,7 @@ from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
     MarketDataPort,
     NewsPort,
+    PriceForecasterPort,
     PriceHistoryPort,
     SampleRepositoryPort,
     SentimentPort,
@@ -448,7 +450,8 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     ports_of = cycle_ports(engine, opener, environment, slippage, messenger)
     models: ModelGateways = {**litellm_adapters(source), **openrouter_adapters()}
-    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, models))
+    forecaster = forecaster_adapters(source)
+    cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, models, forecaster))
     return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
 
 
@@ -456,6 +459,7 @@ def cycle_services(
     environment: str,
     provider_key_opener: SodiumProviderKeyOpenerAdapter,
     models: ModelGateways,
+    forecaster: PriceForecasterPort,
 ) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
@@ -470,6 +474,7 @@ def cycle_services(
         },
         news=rss_adapters(),
         prices=prices,
+        forecaster=forecaster,
         market=market,
         exchange_limits=markets,
     )
@@ -524,6 +529,7 @@ class CycleServices:
     sentiments: Mapping[str, SentimentPort]
     news: NewsPort
     prices: PriceHistoryPort
+    forecaster: PriceForecasterPort
     market: MarketDataPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
@@ -550,7 +556,9 @@ def run_cycle_for(
         sources=ReadCycleSourceUseCase(
             CollectCycleSourceUseCase(
                 SOURCE_CATALOG,
-                SourceSystems(services.sentiments, services.news, services.prices, services.market),
+                SourceSystems(
+                    services.sentiments, services.news, services.prices, services.forecaster, services.market
+                ),
                 ports.forecasts,
                 ports.samples,
             ),

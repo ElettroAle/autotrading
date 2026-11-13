@@ -45,5 +45,6 @@ def worker_configuration(secrets: Path, **overrides: str) -> dict[str, str]:
     key = base64.b64encode(bytes(PrivateKey.generate())).decode()
     configuration = _database(secrets) | {
         "CREDENTIALS_PRIVATE_KEY_FILE": _secret(secrets, "credentials_private_key_v1", key),
+        "FORECASTER_URL": "http://forecaster:8000",
     }
     return configuration | overrides

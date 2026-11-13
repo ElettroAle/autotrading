@@ -264,6 +264,7 @@ def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
         "DATABASE_PASSWORD_FILE",
         "LITELLM_URL",
         "LITELLM_MASTER_KEY_FILE",
+        "FORECASTER_URL",
     ],
 )
 def test_the_worker_refuses_to_start_without_its_configuration(tmp_path: Path, name: str) -> None:
