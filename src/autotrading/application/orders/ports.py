@@ -59,6 +59,36 @@ class ExchangePort(Protocol):
         """The execution of an order looked up by its client order id, or None if the exchange has none."""
 
 
+class VerificationAssetPort(Protocol):
+    """An asset of an account, as the procedure of verification asks about it (R0.4.1)."""
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def coin(self) -> str: ...
+
+
+class VerificationClosingPort(VerificationAssetPort, Protocol):
+    """The position the procedure of verification closes, with the user who launched it (R0.4.1, ADR 0024)."""
+
+    @property
+    def user_id(self) -> UserId: ...
+
+
+class VerificationOpeningPort(VerificationClosingPort, Protocol):
+    """The position the procedure of verification opens, with the user who launched it (R0.4.1, ADR 0024)."""
+
+    @property
+    def side(self) -> str: ...
+
+    @property
+    def leverage(self) -> int: ...
+
+    @property
+    def value(self) -> Decimal: ...
+
+
 class FlowPositionToClosePort(Protocol):
     """A position a flow asks to close: the whole position of its account on one asset (R1.1.5)."""
 

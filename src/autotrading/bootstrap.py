@@ -1,8 +1,6 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from decimal import Decimal
 from functools import partial
-from uuid import UUID
 
 from autotrading.adapters.configuration.source import PROCESS_ENVIRONMENT, ConfigurationSource
 from autotrading.adapters.inbound.api.app import ApiApplication
@@ -160,20 +158,22 @@ from autotrading.application.notifications.ports import (
 )
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import (
-    CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
+from autotrading.application.orders.close_verification_position import CloseVerificationPositionUseCase
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import (
     FlowOrderFollowers,
     FollowFlowOrdersUseCase,
 )
-from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
+from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
-from autotrading.application.orders.order_failures import answered_or_named
-from autotrading.application.orders.read_market import ReadMarketCommand, ReadMarketUseCase
+from autotrading.application.orders.open_verification_position import OpenVerificationPositionUseCase
+from autotrading.application.orders.order_failures import FailureNames
+from autotrading.application.orders.read_market import ReadMarketUseCase
+from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
@@ -187,6 +187,7 @@ from autotrading.application.sources.record_actual_prices import RecordActualPri
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
+from autotrading.application.verification.ports import ProcedureOrders
 from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
@@ -196,63 +197,10 @@ from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.source_data import SourceData
-from autotrading.domain.orders.direction import Direction
-from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
-from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
-from autotrading.domain.tenancy.user_id import UserId
-from autotrading.domain.verification.order_result import OrderResult
-from autotrading.domain.verification.procedure import Opening
-
-
-class OrderExecutionFromOrders:
-    """Bridges the orders context to the verification context in the worker (ADR 0024).
-
-    Both orders carry the origin "procedura di verifica" and the user who launched it; a failure becomes a failed
-    step with its message, and an order the exchange did not execute is a failed step with the reason.
-    """
-
-    def __init__(
-        self, opening: OpenPositionUseCase, closing: CloseExchangePositionUseCase, market: ReadMarketUseCase
-    ) -> None:
-        self._opening = opening
-        self._closing = closing
-        self._market = market
-
-    def minimum_value(self, account_id: UUID, coin: str) -> Decimal:
-        return _result_of(lambda: self._market.execute(ReadMarketCommand(account_id, coin))).min_order_value
-
-    def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult:
-        command = OpenPositionCommand(
-            account_id=account_id,
-            coin=opening.coin,
-            direction=Direction(opening.side),
-            leverage=opening.leverage,
-            value=opening.value,
-            source=_verification_source(user_id),
-        )
-        return _order_result(_result_of(lambda: self._opening.execute(command)))
-
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderResult:
-        command = CloseExchangePositionCommand(account_id, coin, _verification_source(user_id))
-        return _order_result(_result_of(lambda: self._closing.execute(command)))
-
-
-def _verification_source(user_id: UserId) -> OrderSource:
-    return OrderSource(OrderOrigin.VERIFICATION, user_id.value)
-
-
-def _result_of[T](send: Callable[[], T]) -> T:
-    """What the orders context answers, its failures as the verification context names them."""
-    return answered_or_named(send, VerificationAccountNotFoundError, VerificationStepError)
-
-
-def _order_result(order: Order) -> OrderResult:
-    outcome = OrderOutcome.of(order)
-    return OrderResult.reported(outcome.fee, outcome.realized_pnl, outcome.exchange_message, outcome.status.value)
 
 
 def tenant_use_cases(
@@ -339,6 +287,8 @@ def worker_use_cases(
         ExchangeNetwork.of_installation(environment)
     )
 
+    verification_failures = FailureNames(VerificationAccountNotFoundError, VerificationStepError)
+
     def for_tenant(tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
@@ -355,7 +305,11 @@ def worker_use_cases(
                     ReadAccountForVerificationUseCase(accounts, opener, exchanges),
                     SqlAlchemyFlowRepositoryAdapter(engine, tenant_id),
                 ),
-                OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
+                ProcedureOrders(
+                    ReadMinimumValueUseCase(read_market, verification_failures),
+                    OpenVerificationPositionUseCase(open_position, verification_failures),
+                    CloseVerificationPositionUseCase(close_exchange_position, verification_failures),
+                ),
                 SqlAlchemyVerificationRunRepositoryAdapter(engine, tenant_id),
                 environment,
                 system_clock_adapters().now,

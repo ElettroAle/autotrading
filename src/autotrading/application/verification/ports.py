@@ -1,11 +1,10 @@
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
 from autotrading.domain.tenancy.user_id import UserId
-from autotrading.domain.verification.order_result import OrderResult
-from autotrading.domain.verification.procedure import Opening
 from autotrading.domain.verification.reading import AccountReading
 from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 from autotrading.domain.verification.verification_run import VerificationRun
@@ -53,18 +52,84 @@ class FlowsOnAccountPort(Protocol):
         ...
 
 
-class OrderExecutionPort(Protocol):
-    """Sends the orders of the procedure, recorded with its origin and the user who launched it, by the rules the
-    exchange of the account sets."""
+@dataclass(frozen=True, slots=True)
+class ProcedureAsset:
+    """The asset of the account the procedure trades on."""
 
-    def minimum_value(self, account_id: UUID, coin: str) -> Decimal:
+    account_id: UUID
+    coin: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProcedureClosing:
+    """The position the procedure closes, with the user who launched it."""
+
+    account_id: UUID
+    coin: str
+    user_id: UserId
+
+
+@dataclass(frozen=True, slots=True)
+class ProcedureOpening:
+    """The position the procedure opens, with the user who launched it."""
+
+    account_id: UUID
+    coin: str
+    user_id: UserId
+    side: str
+    leverage: int
+    value: Decimal
+
+
+class OrderAnswerPort(Protocol):
+    """What the exchange did with an order of the procedure: its fee and PnL when executed, else why not."""
+
+    @property
+    def fee(self) -> Decimal | None: ...
+
+    @property
+    def realized_pnl(self) -> Decimal | None: ...
+
+    @property
+    def exchange_message(self) -> str | None: ...
+
+    @property
+    def status(self) -> str: ...
+
+
+class MinimumValuePort(Protocol):
+    """It is ReadMinimumValueUseCase of the orders context, built with the failures of this context."""
+
+    def execute(self, asset: ProcedureAsset) -> Decimal:
         """The smallest value of an order the exchange of the account accepts on the asset, read from it.
-        Raises VerificationStepError when the exchange cannot be read."""
+        Raises VerificationAccountNotFoundError, or VerificationStepError when the exchange cannot be read."""
         ...
 
-    def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult: ...
 
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderResult: ...
+class OpeningOrderPort(Protocol):
+    """It is OpenVerificationPositionUseCase of the orders context, built with the failures of this context."""
+
+    def execute(self, opening: ProcedureOpening) -> OrderAnswerPort:
+        """Raises VerificationAccountNotFoundError, or VerificationStepError when the order cannot be sent."""
+        ...
+
+
+class ClosingOrderPort(Protocol):
+    """It is CloseVerificationPositionUseCase of the orders context, built with the failures of this context."""
+
+    def execute(self, closing: ProcedureClosing) -> OrderAnswerPort:
+        """Raises VerificationAccountNotFoundError, or VerificationStepError when the order cannot be sent."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ProcedureOrders:
+    """The orders of the procedure, recorded with its origin and the user who launched it, by the rules the exchange
+    of the account sets (ADR 0024)."""
+
+    minimum: MinimumValuePort
+    opening: OpeningOrderPort
+    closing: ClosingOrderPort
 
 
 class VerificationRunRepositoryPort(Protocol):

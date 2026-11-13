@@ -1,7 +1,16 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.domain.errors import AutotradingError
+
+
+@dataclass(frozen=True, slots=True)
+class FailureNames:
+    """How the context that asked names the failures of the orders context (ADR 0086)."""
+
+    account_missing: Callable[[], AutotradingError]
+    failed: Callable[[str], AutotradingError]
 
 
 def answered_or_named[T](
