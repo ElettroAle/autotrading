@@ -11,10 +11,8 @@ from pathlib import Path
 from uuid import UUID
 
 import httpx
-from fastapi import FastAPI
-from sqlalchemy import Engine
 
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
+from autotrading.adapters.inbound.api.app import ApiApplication, Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
@@ -46,8 +44,8 @@ from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyA
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.composition import SqlAlchemyEngine, sqlalchemy_adapters
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.database import SqlAlchemyDatabaseAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
@@ -234,7 +232,6 @@ from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 
 SUPPORTED_ENVIRONMENTS = ("dev", "prod")
-DEFAULT_DATABASE_PORT = "5432"
 DEFAULT_CREDENTIALS_KEY_VERSION = "1"
 SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
 PROVIDER_TIMEOUT_SECONDS = 10.0
@@ -387,7 +384,7 @@ class WorkerSettings:
 
 
 def tenant_use_cases(
-    engine: Engine,
+    engine: SqlAlchemyEngine,
     public_key: PublicCredentialsKey,
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
@@ -458,7 +455,7 @@ def tenant_use_cases(
 
 
 def worker_use_cases(
-    engine: Engine,
+    engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
     settings: WorkerSettings,
     messenger: MessengerPort,
@@ -498,7 +495,7 @@ def worker_use_cases(
 
 
 def cycle_ports(
-    engine: Engine,
+    engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
     settings: WorkerSettings,
     messenger: MessengerPort,
@@ -582,18 +579,18 @@ def cycle_ports(
     return cycle_ports_for
 
 
-def notify_for(engine: Engine, messenger: MessengerPort, tenant_id: TenantId) -> NotifyUseCase:
+def notify_for(engine: SqlAlchemyEngine, messenger: MessengerPort, tenant_id: TenantId) -> NotifyUseCase:
     return NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id), messenger)
 
 
-def link_stores_for(engine: Engine, tenant_id: TenantId) -> LinkStores:
+def link_stores_for(engine: SqlAlchemyEngine, tenant_id: TenantId) -> LinkStores:
     return LinkStores(
         SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
         SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
     )
 
 
-def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
+def create_application(configuration: Mapping[str, str] = os.environ) -> ApiApplication:
     health = HealthReport(
         version=_required(configuration, "APP_VERSION"),
         environment=_environment(configuration),
@@ -610,7 +607,7 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
     return create_api(health, resolve_tenant, for_tenant, _authentication(configuration))
 
 
-def create_worker_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
+def create_worker_application(configuration: Mapping[str, str] = os.environ) -> ApiApplication:
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
     environment = _environment(configuration)
     private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
@@ -645,7 +642,7 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
     )
 
 
-def telegram_bot(engine: Engine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
+def telegram_bot(engine: SqlAlchemyEngine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
     link_chat = LinkChatUseCase(
         SqlAlchemyLinkCodeLookupAdapter(engine),
@@ -694,16 +691,15 @@ def _credentials_key_version(configuration: Mapping[str, str]) -> int:
     return int(configuration.get("CREDENTIALS_KEY_VERSION", DEFAULT_CREDENTIALS_KEY_VERSION))
 
 
-def _database(configuration: Mapping[str, str]) -> Engine:
-    database = SqlAlchemyDatabaseAdapter(
-        host=_required(configuration, "DATABASE_HOST"),
-        port=int(configuration.get("DATABASE_PORT", DEFAULT_DATABASE_PORT)),
-        name=_required(configuration, "DATABASE_NAME"),
-        user=_required(configuration, "DATABASE_USER"),
+def _database(configuration: Mapping[str, str]) -> SqlAlchemyEngine:
+    return sqlalchemy_adapters(
+        _required(configuration, "DATABASE_HOST"),
+        configuration.get("DATABASE_PORT"),
+        _required(configuration, "DATABASE_NAME"),
+        _required(configuration, "DATABASE_USER"),
         # A secret is a mounted read-only file, never an environment variable (ADR 0015).
-        password=_secret(configuration, "DATABASE_PASSWORD_FILE"),
+        _secret(configuration, "DATABASE_PASSWORD_FILE"),
     )
-    return database.engine()
 
 
 def _authentication(configuration: Mapping[str, str]) -> Authentication | None:
@@ -878,7 +874,7 @@ def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, serv
     record.execute(RecordActualPricesCommand(services.clock.now()))
 
 
-def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
+def worker_cycles(engine: SqlAlchemyEngine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
     planned = ThreadsPlannedFlowsAdapter()
     cycles_of = partial(SqlAlchemyCycleRepositoryAdapter, engine)
     run_cycle_of = partial(run_cycle_for, ports_of, services, cycles_of, SqlAlchemyFlowLockAdapter(engine))
