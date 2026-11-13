@@ -331,5 +331,5 @@ class RecordedCycleFailuresAdapter:
     def __init__(self) -> None:
         self.told: list[tuple[UUID, str]] = []
 
-    def failed(self, flow_id: UUID, reason: str) -> None:
+    def execute(self, flow_id: UUID, reason: str) -> None:
         self.told.append((flow_id, reason))

@@ -40,6 +40,7 @@ from tests.fakes.closed_position_repository import ClosedPositionStore, InMemory
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -98,6 +99,7 @@ class Flows:
         self.accounts.add(self.account_id, Decimal(1000))
         self.openings = ScriptedOpenings()
         self.closed = ClosedPositionStore()
+        self.notices = FakePositionClosedNoticeAdapter()
         self.stop = StopFlowUseCase(
             self.repository,
             StopPorts(
@@ -105,6 +107,7 @@ class Flows:
                 self.positions,
                 self.openings,
                 InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
+                self.notices,
             ),
         )
         self.activity = FakeAccountActivityAdapter()
@@ -343,6 +346,8 @@ def test_each_position_closed_enters_the_history_with_the_reason_of_the_stop(flo
             reason=reason,
         )
     ]
+    (position,) = flows.closed.positions
+    assert flows.notices.told == [(flow.name.value, "BTC", position.pnl)]
 
 
 def test_a_stop_closes_for_the_stop_of_the_flow_unless_told_otherwise(flows: Flows) -> None:

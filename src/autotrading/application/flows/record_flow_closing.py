@@ -1,43 +1,44 @@
-from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
+from uuid import UUID
 
-from autotrading.application.flows.ports import ClosedPositionRepositoryPort, ClosingNoticePort, FlowOpeningsPort
+from autotrading.application.flows.ports import (
+    ClosedPositionRepositoryPort,
+    ExecutedFillPort,
+    FlowOpeningsPort,
+    FlowRepositoryPort,
+    PositionClosedNoticePort,
+)
 from autotrading.domain.flows.closed_position import CloseReason
-from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.stop_outcome import ClosingFill
 
 
-@dataclass(frozen=True, slots=True)
-class RecordFlowClosingCommand:
-    flow: Flow
-    asset: str
-    price: Decimal
-    at: datetime
-    fee: Decimal
-    realized_pnl: Decimal
-    cycle: datetime
-
-
 class RecordFlowClosingUseCase:
-    """A closing a cycle of the flow executed enters its history, which tells it (R1.7.2, R1.8.2, ADR 0070).
+    """A closing a cycle of the flow executed enters its history, then is told (R1.7.2, R1.8.2, ADR 0070).
 
     The history shows a position with both its ends: one the flow never opened has no history to enter, so the
-    closing is told on its own.
+    closing is told on its own, with the PnL the exchange reported.
     """
 
     def __init__(
-        self, openings: FlowOpeningsPort, closed_positions: ClosedPositionRepositoryPort, notice: ClosingNoticePort
+        self,
+        flows: FlowRepositoryPort,
+        openings: FlowOpeningsPort,
+        closed_positions: ClosedPositionRepositoryPort,
+        notice: PositionClosedNoticePort,
     ) -> None:
+        self._flows = flows
         self._openings = openings
         self._closed_positions = closed_positions
         self._notice = notice
 
-    def execute(self, command: RecordFlowClosingCommand) -> None:
-        flow = command.flow
-        opening = self._openings.last_opening(flow.id, command.asset)
+    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: ExecutedFillPort) -> None:
+        flow = self._flows.get(FlowId(flow_id))
+        opening = self._openings.last_opening(flow.id, asset)
         if opening is None:
-            self._notice.tell(flow, command.asset, command.realized_pnl)
+            self._notice.execute(flow.name.value, asset, fill.realized_pnl)
             return
-        fill = ClosingFill(command.price, command.at, command.fee, command.realized_pnl)
-        self._closed_positions.add(opening.closed(flow, command.asset, fill, CloseReason.AGENT, cycle=command.cycle))
+        closing = ClosingFill(fill.average_price, fill.executed_at, fill.fee, fill.realized_pnl)
+        position = opening.closed(flow, asset, closing, CloseReason.AGENT, cycle=cycle)
+        self._closed_positions.add(position)
+        self._notice.execute(flow.name.value, asset, position.pnl)
