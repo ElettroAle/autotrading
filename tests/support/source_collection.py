@@ -9,8 +9,8 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
-from autotrading.bootstrap import SOURCE_CATALOG, agent_sources_of
-from autotrading.domain.agent.agent_context import AgentContext, FlowStateView
+from autotrading.bootstrap import SOURCE_CATALOG, cycle_sources_of
+from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, SourceData
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
 from autotrading.domain.sources.source_sample import CycleReference, SourceValue
 from tests.fakes.source_readers import FakeSourceReaderAdapter, InMemorySampleRepositoryAdapter
@@ -53,7 +53,17 @@ class SourceCycle:
             for selection in self.selections
         ]
         self.context = AgentContext(
-            "istruzioni", self.assets, 10, STARTED_AT, collected_at, STATE, agent_sources_of(self.collected), ()
+            "istruzioni",
+            self.assets,
+            10,
+            STARTED_AT,
+            collected_at,
+            STATE,
+            tuple(
+                SourceData(data.source, data.weight, data.asset, data.values)
+                for data in cycle_sources_of(self.collected)
+            ),
+            (),
         )
         return reference
 

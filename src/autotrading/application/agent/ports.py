@@ -1,5 +1,7 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from typing import Protocol
 
 from autotrading.domain.agent.agent_context import ModelMessage
@@ -87,3 +89,103 @@ class ModelCallPort(Protocol):
     ) -> ModelReply:
         """Raises ModelKeyRejectedError or ModelCreditExhaustedError (permanent), or ModelUnavailableError."""
         ...
+
+
+class QuestionPositionPort(Protocol):
+    """An open position of the flow, as the cycle of the flow hands it to the agent."""
+
+    @property
+    def asset(self) -> str: ...
+
+    @property
+    def direction(self) -> str: ...
+
+    @property
+    def size(self) -> Decimal: ...
+
+    @property
+    def leverage(self) -> int: ...
+
+    @property
+    def entry_price(self) -> Decimal: ...
+
+    @property
+    def unrealized_pnl(self) -> Decimal: ...
+
+    @property
+    def liquidation_price(self) -> Decimal | None: ...
+
+
+class QuestionStatePort(Protocol):
+    """The state of the flow alone, as the cycle of the flow hands it to the agent (R1.4.3)."""
+
+    @property
+    def currency(self) -> str: ...
+
+    @property
+    def allocated_capital(self) -> Decimal: ...
+
+    @property
+    def funds(self) -> Decimal: ...
+
+    @property
+    def available_liquidity(self) -> Decimal: ...
+
+    @property
+    def total_value(self) -> Decimal: ...
+
+    @property
+    def return_percent(self) -> Decimal: ...
+
+    @property
+    def positions(self) -> Sequence[QuestionPositionPort]: ...
+
+
+class QuestionSourcePort(Protocol):
+    """The values of one active source in the cycle, with its weight (R1.3.2)."""
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def weight(self) -> int: ...
+
+    @property
+    def asset(self) -> str | None: ...
+
+    @property
+    def values(self) -> Mapping[str, str]: ...
+
+
+class AgentQuestionPort(Protocol):
+    """What the cycle of a flow asks the agent: the model of the flow and everything the agent receives (R1.4.3)."""
+
+    @property
+    def model(self) -> str: ...
+
+    @property
+    def settings(self) -> Mapping[str, ParameterValue]: ...
+
+    @property
+    def instructions(self) -> str: ...
+
+    @property
+    def assets(self) -> Sequence[str]: ...
+
+    @property
+    def max_leverage(self) -> int: ...
+
+    @property
+    def started_at(self) -> datetime: ...
+
+    @property
+    def now(self) -> datetime: ...
+
+    @property
+    def state(self) -> QuestionStatePort: ...
+
+    @property
+    def sources(self) -> Sequence[QuestionSourcePort]: ...
+
+    @property
+    def missing(self) -> Sequence[str]: ...

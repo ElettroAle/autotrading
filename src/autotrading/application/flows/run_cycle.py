@@ -152,11 +152,11 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         )
         progress.absent = tuple(absent)
         context = progress.run(
-            CycleStep.COMPOSE_CONTEXT, lambda: steps.context.compose(flow_id, snapshot, readings, absent)
+            CycleStep.COMPOSE_CONTEXT, lambda: steps.context.execute(flow_id, snapshot, readings, absent)
         )
-        decisions = progress.run(CycleStep.AGENT_DECISION, lambda: steps.agent.decide(flow_id, context))
+        decisions = progress.run(CycleStep.AGENT_DECISION, lambda: steps.agent.execute(flow_id, context))
         progress.cost = steps.journal.call_cost(decisions)
-        review = progress.run(CycleStep.RISK_CHECK, lambda: steps.risk.check(flow_id, snapshot, decisions))
+        review = progress.run(CycleStep.RISK_CHECK, lambda: steps.risk.execute(flow_id, snapshot, decisions))
         executions = progress.run(
             CycleStep.ORDER_EXECUTION, lambda: steps.orders.execute(flow_id, planned_at, review.orders)
         )

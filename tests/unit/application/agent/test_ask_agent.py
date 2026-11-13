@@ -1,11 +1,15 @@
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
 from autotrading.application.agent.ask_agent import AskAgentCommand, AskAgentUseCase
+from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
+from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
 from autotrading.application.agent.errors import ModelKeyMissingError, ModelUnavailableError, ProviderKeyNotOpenedError
-from autotrading.domain.agent.agent_context import AgentContext, FlowStateView
+from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, SourceData
 from autotrading.domain.agent.decision import TradeAction
 from autotrading.domain.agent.errors import ModelNotAvailableError
 from autotrading.domain.agent.model_catalog import ModelCatalog
@@ -156,3 +160,29 @@ def test_a_failing_call_fails_the_cycle_as_it_is(world: World) -> None:
 
     with pytest.raises(ModelUnavailableError):
         world.ask()
+
+
+@dataclass(frozen=True, slots=True)
+class Question:
+    """A question as a cycle of a flow asks it: the model of the flow and the data of the context."""
+
+    model: str = "openrouter/deepseek-chat"
+    settings: Mapping[str, Decimal | str] = field(default_factory=dict)
+    instructions: str = CONTEXT.instructions
+    assets: tuple[str, ...] = CONTEXT.assets
+    max_leverage: int = CONTEXT.max_leverage
+    started_at: datetime = NOW
+    now: datetime = NOW
+    state: FlowStateView = CONTEXT.state
+    sources: tuple[SourceData, ...] = ()
+    missing: tuple[str, ...] = ()
+
+
+def test_the_question_of_a_flow_asks_its_model_with_the_composed_context() -> None:
+    world = World()
+    world.register("openrouter", TENANT_KEY)
+
+    answer = AskFlowAgentUseCase(ComposeAgentContextUseCase(), world.use_case).execute(Question())
+
+    assert world.model.calls[-1].messages == CONTEXT.messages()
+    assert [decision.action for decision in answer.response.decisions] == [TradeAction.OPEN]

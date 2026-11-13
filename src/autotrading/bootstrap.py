@@ -37,7 +37,7 @@ from autotrading.adapters.outbound.hyperliquid.market_data import (
 )
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
-from autotrading.adapters.outbound.json.json_document import json_document
+from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
@@ -101,10 +101,14 @@ from autotrading.application.accounts.ports import (
     ExchangePort,
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
-from autotrading.application.agent.ask_agent import AgentAnswer, AskAgentCommand, AskAgentUseCase
+from autotrading.application.agent.ask_agent import AskAgentUseCase
+from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
+from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
 from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
-from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
+from autotrading.application.flows.check_risk import CheckRiskUseCase
+from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
@@ -120,6 +124,8 @@ from autotrading.application.flows.ports import (
     ClockPort,
     ClosedPositionRepositoryPort,
     CycleAccountReaderPort,
+    CycleContext,
+    CycleDecisions,
     CycleRepositoryPort,
     ExchangeLimitsPort,
     ExecutionsReaderPort,
@@ -127,13 +133,10 @@ from autotrading.application.flows.ports import (
     FlowLockPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
-    FlowSnapshot,
     FlowSummary,
     FlowTimingPort,
     MarketsPort,
     PlannedFlowsPort,
-    RiskReview,
-    SourceReading,
     SourceRequest,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
@@ -152,6 +155,7 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
+from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
@@ -224,21 +228,15 @@ from autotrading.application.verification.run_exchange_verification import (
     VerificationReadings,
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
-from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
-from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.errors import AutotradingError
-from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
-from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
-from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
-from autotrading.domain.flows.risk_outcome import approved_of
+from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
@@ -357,8 +355,8 @@ class FlowPositionsFromOrders:
         return PositionClosing.reported(asset, found=report.found, fill=fill, refusal=report.refusal)
 
 
-def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
-    """Bridges the sources context to the agent context: each collected value with the weight of its source (R1.3.2)."""
+def cycle_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
+    """The data of the cycle: each collected value with the weight of its source (R1.3.2)."""
     return tuple(
         SourceData(source.source, source.weight, asset, values)
         for source in collected
@@ -908,7 +906,7 @@ class SourcesFromSources:
         )
         readers = self._readers_of(configuration.cycle_interval.minutes)
         collected = CollectSourceUseCase(SOURCE_CATALOG, readers, self._ports.samples).execute(command)
-        return agent_sources_of([collected])
+        return cycle_sources_of([collected])
 
     def _readers_of(self, cycle_minutes: int) -> dict[str, SourceReaderPort]:
         services = self._services
@@ -923,178 +921,6 @@ class SourcesFromSources:
 
 
 type SourcesData = tuple[SourceData, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class CycleContext:
-    flow: CycleFlow
-    agent_context: AgentContext
-
-
-class ContextFromAgent:
-    """Bridges the state of the flow and the sources to the agent context: the flow alone, never the account
-    nor another flow (R1.4.3, ADR 0042).
-    """
-
-    def __init__(self, clock: ClockPort) -> None:
-        self._clock = clock
-
-    def compose(
-        self,
-        flow_id: UUID,  # noqa: ARG002 - the signature of the port
-        snapshot: FlowSnapshot[CycleFlow],
-        readings: Sequence[SourceReading[SourcesData]],
-        absent: Sequence[AbsentSource],
-    ) -> CycleContext:
-        cycle_flow = snapshot.state
-        configuration = cycle_flow.configuration
-        agent_context = AgentContext(
-            instructions=configuration.instructions,
-            assets=configuration.assets,
-            max_leverage=configuration.risk_limits.max_leverage,
-            started_at=cycle_flow.started_at,
-            now=self._clock.now(),
-            state=_state_view(cycle_flow),
-            sources=tuple(data for reading in readings for data in reading.data),
-            missing=tuple(f"{source.source}: {source.reason}" for source in absent),
-        )
-        return CycleContext(cycle_flow, agent_context)
-
-
-def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
-    return FlowStateView(
-        currency=cycle_flow.account.currency,
-        allocated_capital=cycle_flow.configuration.allocated_capital,
-        funds=cycle_flow.attributed.funds,
-        available_liquidity=cycle_flow.available_liquidity,
-        total_value=cycle_flow.total_value,
-        return_percent=cycle_flow.return_percent,
-        positions=tuple(
-            PositionView(
-                position.asset,
-                TradeDirection(position.side.value),
-                position.size,
-                position.leverage,
-                position.entry_price,
-                position.unrealized_pnl,
-                position.liquidation_price,
-            )
-            for position in cycle_flow.positions
-        ),
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class CycleDecisions:
-    flow: CycleFlow
-    answer: AgentAnswer
-
-
-class AgentFromAgent:
-    """Bridges the agent context to the cycles context: the model of the flow with the key of its tenant (R1.4.4)."""
-
-    def __init__(self, ports: TenantCyclePorts, services: CycleServices) -> None:
-        self._ports = ports
-        self._services = services
-
-    def decide(self, flow_id: UUID, context: CycleContext) -> CycleDecisions:  # noqa: ARG002 - the signature of the port
-        services = self._services
-        model = context.flow.configuration.model
-        use_case = AskAgentUseCase(
-            services.catalog, self._ports.provider_keys, services.provider_key_opener, services.model_call
-        )
-        answer = use_case.execute(AskAgentCommand(model.name, model.parameters, context.agent_context))
-        return CycleDecisions(context.flow, answer)
-
-
-class RiskFromFlows:
-    """Bridges the decisions of the agent to the risk check of the flows context (R1.5.1-R1.5.4, ADR 0042)."""
-
-    def __init__(self, exchange_limits: Mapping[str, ExchangeLimitsPort]) -> None:
-        self._exchange_limits = exchange_limits
-
-    def check(
-        self,
-        flow_id: UUID,  # noqa: ARG002 - the signature of the port
-        snapshot: FlowSnapshot[CycleFlow],  # noqa: ARG002 - the signature of the port
-        decisions: CycleDecisions,
-    ) -> RiskReview[CycleOrder]:
-        cycle_flow = decisions.flow
-        configuration = cycle_flow.configuration
-        command = CheckRiskCommand(
-            tuple(
-                decision.intent_with(OpenIntent.of, CloseIntent, HoldIntent)
-                for decision in decisions.answer.response.decisions
-            ),
-            configuration.risk_policy,
-            cycle_flow.risk_state(),
-        )
-        outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
-        orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
-        return RiskReview(orders, tuple(outcomes))
-
-
-class CycleJournalFromContexts:
-    """Describes for the record what each step produced, with the data of the context behind it (R1.7.1, ADR 0042).
-
-    Only the types of the cycle travel here: none of them carries a credential or a provider key.
-    """
-
-    def __init__(self, environment: str) -> None:
-        self._environment = environment
-
-    def describe(self, step: CycleStep, result: object) -> Mapping[str, object]:
-        if isinstance(result, CycleFlow):
-            return self._flow_of(result) if step is CycleStep.READ_FLOW_STATE else {"stato": _state_document(result)}
-        if isinstance(result, CycleContext):
-            messages = result.agent_context.messages()
-            return {"messaggi": [{"ruolo": message.role.value, "contenuto": message.content} for message in messages]}
-        if isinstance(result, CycleDecisions):
-            return _decisions_document(result.answer)
-        if isinstance(result, RiskReview):
-            return {"esiti": json_document(result.outcomes), "ordini_approvati": len(result.orders)}
-        if step is CycleStep.COLLECT_SOURCES and isinstance(result, list):
-            return {"fonti": [_reading_document(reading) for reading in result if isinstance(reading, SourceReading)]}
-        return {"risultato": json_document(result)}
-
-    def call_cost(self, decision: object) -> CallCost | None:
-        if not isinstance(decision, CycleDecisions):
-            return None
-        usage = decision.answer.usage
-        return CallCost(usage.input_tokens, usage.output_tokens, decision.answer.cost_usd)
-
-    def _flow_of(self, cycle_flow: CycleFlow) -> dict[str, object]:
-        configuration = cycle_flow.configuration
-        return {
-            "utente": str(cycle_flow.tenant_id.value),
-            "flusso": cycle_flow.flow.name.value,
-            "conto": cycle_flow.account_name,
-            "exchange": cycle_flow.exchange,
-            "ambiente": self._environment,
-            "versione": configuration.version,
-            "fornitore": configuration.model.name.partition("/")[0],
-            "modello": configuration.model.name,
-            "pesi_fonti": {source.name: source.weight for source in configuration.sources},
-            "stato": _state_document(cycle_flow),
-        }
-
-
-def _state_document(cycle_flow: CycleFlow) -> object:
-    return json_document(_state_view(cycle_flow))
-
-
-def _reading_document(reading: SourceReading) -> dict[str, object]:
-    return {"fonte": reading.source, "dati": json_document(reading.data)}
-
-
-def _decisions_document(answer: AgentAnswer) -> dict[str, object]:
-    response = answer.response
-    return {
-        "risposta": response.raw,
-        "decisioni": json_document(response.decisions),
-        "scartate": json_document(response.discarded),
-        "mancanti": list(response.missing),
-    }
 
 
 type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, object]
@@ -1113,12 +939,19 @@ def run_cycle_for(
     steps = CycleSteps(
         start=ports.start_cycle,
         sources=SourceCollector(SourcesFromSources(ports, services), ThreadPoolConcurrentCallsAdapter()),
-        context=ContextFromAgent(services.clock),
-        agent=AgentFromAgent(ports, services),
-        risk=RiskFromFlows(services.exchange_limits),
+        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), services.clock),
+        agent=DecideCycleUseCase(
+            AskFlowAgentUseCase(
+                ComposeAgentContextUseCase(),
+                AskAgentUseCase(
+                    services.catalog, ports.provider_keys, services.provider_key_opener, services.model_call
+                ),
+            )
+        ),
+        risk=ReviewCycleRiskUseCase(CheckRiskUseCase(services.exchange_limits)),
         orders=ports.send_orders,
         end=ports.end_cycle,
-        journal=CycleJournalFromContexts(services.environment),
+        journal=JsonCycleJournalAdapter(services.environment),
     )
     guards = CycleGuards(
         cycles=cycles_of(tenant_id),

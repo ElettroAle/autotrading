@@ -295,7 +295,7 @@ class FakeContextAdapter:
         self.composed: dict[UUID, ComposedContext] = {}
         self._failures = failures
 
-    def compose(
+    def execute(
         self, flow_id: UUID, snapshot: FlowSnapshot, readings: Sequence[SourceReading], absent: Sequence[AbsentSource]
     ) -> object:
         self._failures.raise_if_failing(flow_id, CycleStep.COMPOSE_CONTEXT)
@@ -316,7 +316,7 @@ class FakeAgentAdapter:
         self.released = threading.Event()
         self._failures = failures
 
-    def decide(self, flow_id: UUID, context: object) -> object:
+    def execute(self, flow_id: UUID, context: object) -> object:
         self.calls.append(flow_id)
         self.contexts.append(context)
         if flow_id in self.holding:
@@ -333,7 +333,7 @@ class FakeRiskAdapter:
         self.snapshots: list[FlowSnapshot] = []
         self._failures = failures
 
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:
+    def execute(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:
         self._failures.raise_if_failing(flow_id, CycleStep.RISK_CHECK)
         self.snapshots.append(snapshot)
         assert isinstance(decisions, list)
