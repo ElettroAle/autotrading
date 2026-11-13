@@ -29,6 +29,7 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
+from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
@@ -42,6 +43,7 @@ from autotrading.application.notifications.notify_unattributable_movement import
 from autotrading.application.notifications.notify_unattributable_position import (
     NotifyUnattributablePositionUseCase,
 )
+from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
@@ -190,6 +192,16 @@ class FlowCycles:
             ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
             ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, platform.ledger), reconcile_for_cycle),
         )
+        execute_flow_orders = ExecuteFlowOrdersUseCase(
+            access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
+        )
+        follow_flow_orders = FollowFlowOrdersUseCase(
+            FlowOrderFollowers(
+                NotifyOrderRejectedUseCase(notify),
+                NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+            )
+        )
         return TenantCyclePorts(
             flows=flows,
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
@@ -198,18 +210,10 @@ class FlowCycles:
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),
-            execute_flow_orders=ExecuteFlowOrdersUseCase(
-                access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
-            ),
+            send_orders=SendCycleOrdersUseCase(ExecuteCycleOrdersUseCase(execute_flow_orders, follow_flow_orders)),
             openings=openings,
             closed_positions=closed_positions,
-            follow_flow_orders=FollowFlowOrdersUseCase(
-                FlowOrderFollowers(
-                    NotifyOrderRejectedUseCase(notify),
-                    NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                    RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
-                )
-            ),
+            follow_flow_orders=follow_flow_orders,
             flow_paused_notice=NotifyFlowPausedUseCase(notify),
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             notify=notify,
