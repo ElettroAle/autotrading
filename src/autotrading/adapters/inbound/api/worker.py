@@ -18,7 +18,7 @@ from autotrading.adapters.inbound.api.verification_run import VerificationRunRes
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.notifications.ports import BotIdentityPort
+from autotrading.application.notifications.ports import BotIdentityPort, BotInboxPort
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -90,6 +90,11 @@ class BotPolling:
             except AutotradingError:
                 bot_log.warning("giro del bot Telegram fallito", exc_info=True)
                 stopping.wait(self._pause_seconds)
+
+
+def bot_polling(inbox: BotInboxPort | None, answering: Callable[[BotInboxPort], BotPolling]) -> BotPolling | None:
+    """The bot answers only when the installation has one: without its inbox no loop starts (ADR 0035)."""
+    return None if inbox is None else answering(inbox)
 
 
 class CyclePolling:

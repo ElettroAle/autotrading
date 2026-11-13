@@ -1,37 +1,25 @@
 """The bridges bootstrap builds between the flows context and the accounts, agent and sources contexts (ADR 0031)."""
 
 from decimal import Decimal
-from uuid import uuid4
 
 import pytest
 
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.application.flows.errors import (
-    FlowAccountNotFoundError,
-    FlowExchangeUnavailableError,
     InvalidFlowSettingError,
 )
-from autotrading.application.flows.ports import FlowAccount
 from autotrading.bootstrap import (
     SOURCE_CATALOG,
-    FlowAccountsFromAccounts,
     ModelSettingsFromAgent,
-    ProviderKeyUsageFromFlows,
     SourceSettingsFromSources,
 )
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter
-from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.errors import ModelRequiredError
-from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.selections import SourceSelection
-from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
-from tests.fakes.account_state import FakeAccountStateAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter
-from tests.support.flows import TEMPERATURE, a_configuration, a_flow, account_id_of
+from tests.support.flows import TEMPERATURE
 from tests.support.platform import Platform
 
 REASONING = ChoiceParameter("reasoning_effort", ("basso", "alto"), "basso")
@@ -41,57 +29,6 @@ CATALOG = ModelCatalog(
         ModelDefinition("anthropic/claude-sonnet", (TEMPERATURE, REASONING)),
     )
 )
-
-
-def test_a_key_is_used_only_by_flows_active_or_paused_on_a_model_of_its_provider() -> None:
-    tenant_id, store = TenantId.new(), FlowStore()
-    anthropic = a_configuration(model="anthropic/claude-sonnet")
-    store.flows += [
-        a_flow(tenant_id, name="beta", status=FlowStatus.PAUSED),
-        a_flow(tenant_id, name="alfa", status=FlowStatus.ACTIVE),
-        a_flow(tenant_id, name="fermo", status=FlowStatus.STOPPED),
-        a_flow(tenant_id, name="archiviato", status=FlowStatus.ARCHIVED),
-        a_flow(tenant_id, name="altro", status=FlowStatus.ACTIVE, configuration=anthropic),
-        a_flow(TenantId.new(), name="estraneo", status=FlowStatus.ACTIVE),
-    ]
-    usage = ProviderKeyUsageFromFlows(InMemoryFlowRepositoryAdapter(store, tenant_id))
-
-    assert usage.flows_using(ProviderName("openrouter")) == ["beta", "alfa"]
-    assert usage.flows_using(ProviderName("openai")) == []
-
-
-class Accounts:
-    def __init__(self) -> None:
-        self.platform = Platform()
-        self.tenant_id = self.platform.tenant_of("anna")
-        self.state = FakeAccountStateAdapter(lambda: self.platform.worker_for(self.tenant_id).read_exchange_state)
-        repository = InMemoryAccountRepositoryAdapter(self.platform.accounts, self.tenant_id)
-        self.bridge = FlowAccountsFromAccounts(repository, self.state)
-
-
-def test_the_account_of_a_flow_carries_its_exchange_and_the_balance_read_now() -> None:
-    accounts = Accounts()
-    account_id = account_id_of(accounts.platform, "anna", balance=Decimal("750.25"))
-
-    assert accounts.bridge.account(account_id) == FlowAccount("Hyperliquid", Decimal("750.25"), "USDC")
-
-
-def test_an_account_the_tenant_does_not_have_is_not_found() -> None:
-    accounts = Accounts()
-    other = account_id_of(accounts.platform, "bruno")
-
-    for account_id in (uuid4(), other):
-        with pytest.raises(FlowAccountNotFoundError, match=r"^conto non trovato$"):
-            accounts.bridge.account(account_id)
-
-
-def test_a_balance_that_cannot_be_read_makes_the_exchange_unavailable() -> None:
-    accounts = Accounts()
-    account_id = account_id_of(accounts.platform, "anna")
-    accounts.state.reachable = False
-
-    with pytest.raises(FlowExchangeUnavailableError):
-        accounts.bridge.account(account_id)
 
 
 class Models:

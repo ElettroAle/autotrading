@@ -7,7 +7,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from autotrading.application.flows.archive_account_flows import ArchiveAccountFlowsUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.list_account_flows import ListAccountFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.errors import (
@@ -167,7 +169,11 @@ class AccountFlows:
         stop = StopFlowUseCase(
             repository, StopPorts(self.cycles, self.positions, OpeningOfEveryAsset(), closed_positions)
         )
-        self.bridge = AccountFlowsFromFlows(repository, stop, ArchiveFlowUseCase(repository))
+        self.bridge = AccountFlowsFromFlows(
+            ListAccountFlowsUseCase(repository),
+            stop,
+            ArchiveAccountFlowsUseCase(repository, ArchiveFlowUseCase(repository)),
+        )
 
     def add(self, name: str, status: FlowStatus, asset: str, account_id: UUID = ACCOUNT) -> FlowId:
         configuration = a_configuration(assets=(asset,))

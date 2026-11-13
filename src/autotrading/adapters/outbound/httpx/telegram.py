@@ -9,6 +9,8 @@ from autotrading.application.notifications.ports import BotMessage
 from autotrading.domain.notifications.chat_id import ChatId
 
 TELEGRAM_URL = "https://api.telegram.org"
+# Telegram opens the chat with the bot and sends it the start command followed by this parameter.
+START_LINK = "https://t.me/{bot}?start={code}"
 SEND_TIMEOUT_SECONDS = 10.0
 # Long polling: Telegram holds the request until a message arrives or this many seconds pass.
 POLL_SECONDS = 30

@@ -111,7 +111,7 @@ class Flows:
         self.ledger = InMemoryFlowLedgerAdapter()
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
-            self.accounts,
+            self.accounts.ports(),
             ReadFlowStateUseCase(self.repository, self.activity, self.ledger),
             lambda: NOW,
         )
