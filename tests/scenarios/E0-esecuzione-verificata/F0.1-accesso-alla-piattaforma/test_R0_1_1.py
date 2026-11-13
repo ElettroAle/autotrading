@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-import httpx
+import httpx2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -47,16 +47,16 @@ def api(identity_provider: IdentityProvider, tenants: InMemoryTenantRepositoryAd
 
 
 @pytest.fixture
-def accesses() -> dict[str, httpx.Response]:
+def accesses() -> dict[str, httpx2.Response]:
     return {}
 
 
 @pytest.fixture
-def access(directory: Directory, identity_provider: IdentityProvider, api: FastAPI) -> Callable[[str], httpx.Response]:
-    def access_as(name: str) -> httpx.Response:
+def access(directory: Directory, identity_provider: IdentityProvider, api: FastAPI) -> Callable[[str], httpx2.Response]:
+    def access_as(name: str) -> httpx2.Response:
         # Every access presents a token freshly issued by the directory, with the roles the person has now.
         token = identity_provider.token_for(directory.person(name))
-        response: httpx.Response = TestClient(api).get("/me", headers={"Authorization": f"Bearer {token}"})
+        response: httpx2.Response = TestClient(api).get("/me", headers={"Authorization": f"Bearer {token}"})
         return response
 
     return access_as
@@ -77,8 +77,8 @@ def person_had_access(
     name: str,
     role: str,
     directory: Directory,
-    access: Callable[[str], httpx.Response],
-    accesses: dict[str, httpx.Response],
+    access: Callable[[str], httpx2.Response],
+    accesses: dict[str, httpx2.Response],
 ) -> None:
     directory.person(name).roles.add(role)
     accesses[name] = access(name)
@@ -92,7 +92,7 @@ def role_revoked(name: str, role: str, directory: Directory) -> None:
 
 @when(parsers.parse('"{name}" accede alla piattaforma'))
 @when(parsers.parse('"{name}" accede di nuovo alla piattaforma con una nuova identità emessa dalla directory'))
-def person_accesses(name: str, access: Callable[[str], httpx.Response], accesses: dict[str, httpx.Response]) -> None:
+def person_accesses(name: str, access: Callable[[str], httpx2.Response], accesses: dict[str, httpx2.Response]) -> None:
     accesses[name] = access(name)
 
 
@@ -113,17 +113,17 @@ def anonymous_request_to_every_function(api: FastAPI) -> dict[str, int]:
 
 
 @then(parsers.parse('l\'accesso di "{name}" è consentito'))
-def access_allowed(name: str, accesses: dict[str, httpx.Response]) -> None:
+def access_allowed(name: str, accesses: dict[str, httpx2.Response]) -> None:
     assert accesses[name].status_code == 200
 
 
 @then(parsers.parse('la piattaforma identifica "{name}" con l\'identificativo che la directory le assegna'))
-def identified_by_directory(name: str, directory: Directory, accesses: dict[str, httpx.Response]) -> None:
+def identified_by_directory(name: str, directory: Directory, accesses: dict[str, httpx2.Response]) -> None:
     assert accesses[name].json()["user_id"] == directory.person(name).object_id
 
 
 @then(parsers.parse('l\'accesso di "{name}" è negato con il motivo "{reason}"'))
-def access_denied(name: str, reason: str, accesses: dict[str, httpx.Response]) -> None:
+def access_denied(name: str, reason: str, accesses: dict[str, httpx2.Response]) -> None:
     assert (accesses[name].status_code, reason_of(accesses[name])) == (403, {"detail": reason})
 
 
