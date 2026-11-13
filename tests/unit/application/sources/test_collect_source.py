@@ -126,3 +126,10 @@ def test_a_silent_source_without_a_meaning_for_its_silence_gives_no_note() -> No
     use_case = CollectSourceUseCase(CATALOG, readers, InMemorySampleRepositoryAdapter())
 
     assert use_case.execute(command("indicatori")).note is None
+
+
+def test_the_entries_are_the_values_with_their_asset_or_the_note_of_the_silence() -> None:
+    sample = SourceSample(CYCLE, "indicatori", "BTC", REFERENCE, COLLECTED, {"prezzo": "100"})
+
+    assert CollectedSource("indicatori", 8, (sample,)).entries == (("BTC", {"prezzo": "100"}),)
+    assert CollectedSource("notizie", 5, (), {"nota": "n"}).entries == ((None, {"nota": "n"}),)

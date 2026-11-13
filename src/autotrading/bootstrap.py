@@ -534,14 +534,11 @@ class SourceSettingsFromSources:
 
 def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
     """Bridges the sources context to the agent context: each collected value with the weight of its source (R1.3.2)."""
-    return tuple(data for source in collected for data in _agent_data_of(source))
-
-
-def _agent_data_of(source: CollectedSource) -> tuple[SourceData, ...]:
-    values = tuple(SourceData(source.source, source.weight, sample.asset, sample.values) for sample in source.samples)
-    if source.note is None:
-        return values
-    return (*values, SourceData(source.source, source.weight, None, source.note))
+    return tuple(
+        SourceData(source.source, source.weight, asset, values)
+        for source in collected
+        for asset, values in source.entries
+    )
 
 
 @dataclass(frozen=True, slots=True)

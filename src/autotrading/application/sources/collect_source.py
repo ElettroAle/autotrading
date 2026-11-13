@@ -33,6 +33,14 @@ class CollectedSource:
     samples: tuple[SourceSample, ...]
     note: Mapping[str, str] | None = None
 
+    @property
+    def entries(self) -> tuple[tuple[str | None, Mapping[str, str]], ...]:
+        """What the agent reads of the source: each value with its asset, or the note of its silence (R1.3.7)."""
+        values = tuple((sample.asset, sample.values) for sample in self.samples)
+        if self.note is None:
+            return values
+        return (*values, (None, self.note))
+
 
 class CollectSourceUseCase:
     """Reads an active source for every asset of the flow, or once for the market, and records what it collected.
