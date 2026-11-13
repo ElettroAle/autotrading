@@ -108,6 +108,7 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/oidc": frozenset({"jwt"}),
     "adapters/outbound/rss": frozenset({"httpx"}),
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy"}),
+    "adapters/outbound/system_clock": frozenset(),
     "adapters/outbound/telegram": frozenset({"httpx"}),
     "adapters/outbound/threads": frozenset(),
     "adapters/outbound/worker": frozenset({"httpx"}),

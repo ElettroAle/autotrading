@@ -76,7 +76,8 @@ src/autotrading/
   adapters/                     livello 3: tecnologie, ognuna incapsulata
     inbound/api/                FastAPI
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
-                                json/, telegram/, worker/, rss/, alternative_me/, coinmarketcap/
+                                json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
+                                alternative_me/, coinmarketcap/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -256,6 +257,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-rss.md` | `adapters/outbound/rss/**` |
 | `tech-alternative-me.md` | `adapters/outbound/alternative_me/**` |
 | `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
+| `tech-system-clock.md` | `adapters/outbound/system_clock/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |

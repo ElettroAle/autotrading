@@ -1,5 +1,4 @@
 import base64
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -17,6 +16,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
     SodiumCredentialOpenerAdapter,
 )
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
+from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.agent.errors import ProviderRejectedKeyError
@@ -46,7 +46,6 @@ from autotrading.bootstrap import (
     PublicCredentialsKey,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
-    WorkerConnection,
     WorkerExchanges,
     WorkerSettings,
     activity_readers_for,
@@ -55,7 +54,6 @@ from autotrading.bootstrap import (
     exchanges_for,
     executions_readers_for,
     markets_for,
-    now,
     order_exchanges_for,
     slippage_from,
     tenant_use_cases,
@@ -192,7 +190,7 @@ def test_application_refuses_to_start_with_a_malformed_credentials_key(tmp_path:
 def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN)
     factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
@@ -220,8 +218,7 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
-    worker = WorkerConnection(client, WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN, httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
@@ -388,12 +385,12 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN, httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
         ApiExchanges({}, {}),
-        WorkerConnection(client, WORKER_TOKEN),
+        worker,
         httpx.Client(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
@@ -416,12 +413,12 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN, httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
         ApiExchanges({}, {}),
-        WorkerConnection(client, WORKER_TOKEN),
+        worker,
         httpx.Client(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
@@ -432,15 +429,6 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     assert [request.url.path for request in asked] == [
         f"/tenants/{tenant_id.value}/accounts/{account_id}/verifications"
     ]
-
-
-def test_the_instant_of_a_run_is_the_current_one_with_its_zone() -> None:
-    before = datetime.now(UTC)
-
-    instant = now()
-
-    assert before <= instant <= datetime.now(UTC)
-    assert instant.tzinfo is UTC
 
 
 def test_every_provider_of_the_catalog_has_a_way_to_verify_its_keys() -> None:
@@ -464,7 +452,7 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN)
     providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
     factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, providers
@@ -506,7 +494,7 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     monkeypatch.setattr(bootstrap, "RecordManualClosingUseCase", manual_closing)
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN)
     factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
