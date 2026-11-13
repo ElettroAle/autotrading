@@ -34,6 +34,7 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.publish.outputs.image }}
+      forecaster-image: ${{ steps.publish-forecaster.outputs.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/image-build
@@ -47,6 +48,21 @@ jobs:
         with:
           local-image: autotrading:candidate
           version: ${{ needs.versione.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # The forecaster has its own image, published beside the other with the same version (ADR 0107).
+      - uses: ./.github/actions/image-build
+        with:
+          tag: autotrading-forecaster:candidate
+          target: forecaster
+      - uses: ./.github/actions/trivy-scan
+        with:
+          image: autotrading-forecaster:candidate
+      - id: publish-forecaster
+        uses: ./.github/actions/ghcr-publish
+        with:
+          local-image: autotrading-forecaster:candidate
+          version: ${{ needs.versione.outputs.version }}
+          variant: forecaster
           token: ${{ secrets.GITHUB_TOKEN }}
 
   dev:
@@ -75,6 +91,7 @@ jobs:
           environment: dev
           version: ${{ needs.versione.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
+          forecaster-image: ${{ needs.artefatto.outputs.forecaster-image }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
           auth-issuer: ${{ vars.AUTH_ISSUER }}
           auth-audience: ${{ vars.AUTH_AUDIENCE }}
@@ -113,6 +130,12 @@ jobs:
           image: ${{ needs.artefatto.outputs.image }}
           version: ${{ steps.release.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/image-promote
+        with:
+          image: ${{ needs.artefatto.outputs.forecaster-image }}
+          version: ${{ steps.release.outputs.version }}
+          variant: forecaster
+          token: ${{ secrets.GITHUB_TOKEN }}
       - id: host
         uses: ./.github/actions/tailscale-connect
         with:
@@ -125,6 +148,7 @@ jobs:
           environment: prod
           version: ${{ steps.release.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
+          forecaster-image: ${{ needs.artefatto.outputs.forecaster-image }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
           auth-issuer: ${{ vars.AUTH_ISSUER }}
           auth-audience: ${{ vars.AUTH_AUDIENCE }}
