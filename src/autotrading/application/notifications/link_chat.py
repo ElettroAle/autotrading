@@ -59,7 +59,7 @@ class LinkChatUseCase:
         if link is None or not link.usable_at(self._clock()) or not stores.codes.use(code.digest):
             return False
         stores.chats.link(LinkedChat(tenant_id, chat_id))
-        operations.info("chat Telegram collegata", extra={"tenant_id": str(tenant_id.value)})
+        operations.info("chat collegata", extra={"tenant_id": str(tenant_id.value)})
         return True
 
     def _answer(self, chat_id: ChatId, text: str) -> None:

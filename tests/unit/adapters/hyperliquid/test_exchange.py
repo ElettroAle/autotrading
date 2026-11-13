@@ -15,6 +15,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     PROBE_COIN,
     TIMEOUT_SECONDS,
     HyperliquidExchangeAdapter,
+    HyperliquidSdkAdapter,
 )
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
 from autotrading.domain.accounts.account_state import AccountState
@@ -46,7 +47,7 @@ LONG_BTC = {
 
 
 @dataclass
-class FakeSdk:
+class FakeSdk(HyperliquidSdkAdapter):
     """Stands in for the official SDK: it records the calls and answers what the test decides."""
 
     cancel_answer: Any = field(default_factory=lambda: ACCEPTED)

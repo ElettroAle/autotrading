@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from autotrading.adapters.outbound.hyperliquid.user_state import UserPosition, UserState, decimal_of, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, _UserState, decimal_of, user_state_of
 
 SHORT_ETH = {
     "coin": "ETH",
@@ -24,11 +24,11 @@ STATE = {
 
 
 def test_the_state_is_read_once_with_every_field_the_adapters_need() -> None:
-    assert user_state_of(STATE) == UserState(
+    assert user_state_of(STATE) == _UserState(
         account_value=Decimal("1012.5"),
         withdrawable=Decimal("862.5"),
         positions=(
-            UserPosition(
+            _UserPosition(
                 coin="ETH",
                 signed_size=Decimal("-1.5"),
                 leverage=3,

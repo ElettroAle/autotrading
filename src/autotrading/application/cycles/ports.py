@@ -11,6 +11,7 @@ from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.cycles.flow_cost import CycleCost
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.tenancy.tenant_id import TenantId
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +20,14 @@ class ScheduledFlow:
 
     flow_id: UUID
     schedule: CycleSchedule
+
+
+@dataclass(frozen=True, slots=True)
+class TenantScheduledFlow:
+    """An active flow with the tenant it belongs to: the worker runs its cycle on adapters bound to that tenant."""
+
+    tenant_id: TenantId
+    flow: ScheduledFlow
 
 
 @dataclass(frozen=True, slots=True)

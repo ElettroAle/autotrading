@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from autotrading.application.flows.ports import FlowRepositoryPort
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 
 operations = logging.getLogger("autotrading.flows")
@@ -12,7 +12,7 @@ operations = logging.getLogger("autotrading.flows")
 @dataclass(frozen=True, slots=True)
 class ChangeFlowStatusCommand:
     flow_id: FlowId
-    command: FlowCommand
+    command: FlowAction
 
 
 class ChangeFlowStatusUseCase:

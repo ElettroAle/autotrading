@@ -2,7 +2,7 @@ import re
 import secrets
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Any, Protocol
+from typing import Any
 
 import requests
 from eth_account import Account as EthereumAccount
@@ -13,7 +13,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
-from autotrading.adapters.outbound.hyperliquid.user_state import UserPosition, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
@@ -29,14 +29,11 @@ INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
 MASK = "***"
 
 
-class HyperliquidSdk(Protocol):
-    def exchange(self, wallet: LocalAccount, base_url: str, account_address: str, timeout: float) -> Any: ...
+class HyperliquidSdkAdapter:
+    """The official Hyperliquid SDK, the only client of the exchange (rule tech-hyperliquid).
 
-    def info(self, base_url: str, timeout: float) -> Any: ...
-
-
-class OfficialSdk:
-    """The official Hyperliquid SDK, the only client of the exchange (rule tech-hyperliquid)."""
+    The adapters of the folder take it in their constructor; a test hands them a subclass that answers for the exchange.
+    """
 
     def exchange(self, wallet: LocalAccount, base_url: str, account_address: str, timeout: float) -> Exchange:
         return Exchange(wallet, base_url, account_address=account_address, timeout=timeout)
@@ -52,9 +49,11 @@ class HyperliquidExchangeAdapter:
     the rejection of the exchange, whose message is kept (R0.2.1, ADR 0018). No retries, 10 seconds of timeout.
     """
 
-    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+    ) -> None:
         self._base_url = base_url
-        self._sdk = sdk or OfficialSdk()
+        self._sdk = sdk or HyperliquidSdkAdapter()
         self._timeout = timeout
 
     @property
@@ -62,7 +61,7 @@ class HyperliquidExchangeAdapter:
         return self._base_url
 
     @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidExchangeAdapter:
+    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidExchangeAdapter:
         # The network is chosen by the installation, never deduced from the credentials.
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
@@ -113,7 +112,7 @@ def _account_state_of(state: Any) -> AccountState:
     )
 
 
-def _position_of(position: UserPosition) -> Position:
+def _position_of(position: _UserPosition) -> Position:
     return Position(
         coin=position.coin,
         side=PositionSide.LONG if position.signed_size > 0 else PositionSide.SHORT,

@@ -22,7 +22,7 @@ from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital
@@ -358,7 +358,7 @@ def flows_router(
     return router
 
 
-COMMANDS = {"start": FlowCommand.START, "pause": FlowCommand.PAUSE, "resume": FlowCommand.RESUME}
+COMMANDS = {"start": FlowAction.START, "pause": FlowAction.PAUSE, "resume": FlowAction.RESUME}
 
 
 def _text(value: Decimal | None) -> str | None:

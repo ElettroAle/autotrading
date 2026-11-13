@@ -7,7 +7,7 @@ import requests
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
-from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdk, OfficialSdk
+from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdkAdapter
 from autotrading.application.sources.errors import SourceUnavailableError, TimeframeNotSupportedError
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.forecast import FORECAST
@@ -50,13 +50,15 @@ UNAVAILABLE = (ClientError, ServerError, requests.RequestException, KeyError, Ty
 class HyperliquidPriceHistoryAdapter:
     """Closing prices of the exchange from its public candles, without credentials (R1.3.5, ADR 0043)."""
 
-    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+    ) -> None:
         self._base_url = base_url
-        self._sdk = sdk or OfficialSdk()
+        self._sdk = sdk or HyperliquidSdkAdapter()
         self._timeout = timeout
 
     @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidPriceHistoryAdapter:
+    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidPriceHistoryAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     def history(self, asset: str, days: int, now: datetime) -> Sequence[PricePoint]:
@@ -113,13 +115,15 @@ class HyperliquidMarketDataAdapter:
     The candle still open is left out: its close and its volume change until it closes.
     """
 
-    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+    ) -> None:
         self._base_url = base_url
-        self._sdk = sdk or OfficialSdk()
+        self._sdk = sdk or HyperliquidSdkAdapter()
         self._timeout = timeout
 
     @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidMarketDataAdapter:
+    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidMarketDataAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     def timeframes(self) -> Sequence[Timeframe]:

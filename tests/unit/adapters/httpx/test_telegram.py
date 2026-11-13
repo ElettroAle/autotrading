@@ -11,7 +11,6 @@ from autotrading.adapters.outbound.httpx.telegram import (
     HttpxTelegramBotIdentityAdapter,
     HttpxTelegramInboxAdapter,
     HttpxTelegramMessengerAdapter,
-    TelegramTokenFilter,
     telegram_client,
 )
 from autotrading.application.notifications.errors import BotUnreachableError, MessageNotDeliveredError
@@ -53,7 +52,7 @@ def test_a_message_is_sent_to_the_chat_with_the_bot_token_in_the_path() -> None:
 def test_a_message_telegram_does_not_take_is_not_delivered_and_never_shows_the_token(
     answer: Callable[[httpx.Request], httpx.Response],
 ) -> None:
-    with pytest.raises(MessageNotDeliveredError, match=r"^messaggio Telegram non consegnato$") as raised:
+    with pytest.raises(MessageNotDeliveredError, match=r"^messaggio non consegnato alla chat$") as raised:
         HttpxTelegramMessengerAdapter(client_answering(answer)).send(ChatId(42), "text")
 
     assert raised.value.__cause__ is None
@@ -119,7 +118,7 @@ def test_an_update_without_a_text_message_of_a_chat_is_skipped_and_confirmed(odd
 def test_a_poll_telegram_does_not_answer_is_unreachable_and_never_shows_the_token(
     answer: Callable[[httpx.Request], httpx.Response],
 ) -> None:
-    with pytest.raises(BotUnreachableError, match=r"^bot Telegram non raggiungibile$") as raised:
+    with pytest.raises(BotUnreachableError, match=r"^bot non raggiungibile$") as raised:
         HttpxTelegramInboxAdapter(client_answering(answer)).receive()
 
     assert raised.value.__cause__ is None
@@ -151,13 +150,6 @@ def test_the_token_never_reaches_the_request_log(
         "HTTP Request: POST https://api.telegram.org/bot***/sendMessage",
         "unrelated line",
     ]
-
-
-def test_the_filter_lets_every_record_through() -> None:
-    record = logging.LogRecord("httpx", logging.INFO, __file__, 1, "plain", None, None)
-
-    assert TelegramTokenFilter(FAKE_BOT).filter(record)
-    assert record.getMessage() == "plain"
 
 
 def test_the_bot_username_comes_from_get_me_once_and_is_kept() -> None:

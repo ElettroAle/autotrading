@@ -2,7 +2,7 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
@@ -42,7 +42,7 @@ def active_flow_with_positions(
 
 @given(quoted('che il flusso "{name}" è in pausa'))
 def flow_paused(platform: Platform, lifecycle: Lifecycle, name: str) -> None:
-    command = ChangeFlowStatusCommand(flow_named(platform, lifecycle.user, name).id, FlowCommand.PAUSE)
+    command = ChangeFlowStatusCommand(flow_named(platform, lifecycle.user, name).id, FlowAction.PAUSE)
     platform.use_cases_of(lifecycle.user).change_flow_status.execute(command)
 
 
@@ -64,7 +64,7 @@ def user_stops(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -
 
 @when(quoted('"{user}" avvia il flusso "{name}"'))
 def user_starts(platform: Platform, user: str, name: str) -> None:
-    command = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowCommand.START)
+    command = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction.START)
     platform.use_cases_of(user).change_flow_status.execute(command)
 
 
