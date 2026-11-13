@@ -18,7 +18,8 @@ Le regole di dettaglio per percorso sono in `.claude/rules/` (indice in fondo).
 ## Stack
 
 Python 3.15, uv, ruff, mypy (strict), pytest + pytest-bdd, import-linter. FastAPI, SQLAlchemy 2 +
-Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, LangGraph (ciclo decisionale), Entra ID.
+Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, LangGraph (ciclo decisionale), APScheduler 3
+(pianificazione dei cicli), Entra ID.
 Dettagli e motivazioni in `docs/architecture.md`.
 
 ## Architettura target
@@ -77,7 +78,7 @@ src/autotrading/
     inbound/api/                FastAPI
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
-                                alternative_me/, coinmarketcap/, litellm/, openrouter/
+                                alternative_me/, coinmarketcap/, litellm/, openrouter/, apscheduler/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -287,6 +288,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-litellm.md` | `adapters/outbound/litellm/**` |
 | `tech-oidc.md` | `adapters/outbound/oidc/**` |
 | `tech-threads.md` | `adapters/outbound/threads/**` |
+| `tech-apscheduler.md` | `adapters/outbound/apscheduler/**` |
 | `tech-openrouter.md` | `adapters/outbound/openrouter/**` |
 | `tech-forecaster.md` | `forecaster/**`, `adapters/outbound/forecaster/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
