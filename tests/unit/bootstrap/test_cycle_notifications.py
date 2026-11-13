@@ -21,19 +21,23 @@ from autotrading.application.flows.errors import (
     FlowPositionMismatchError,
 )
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
+from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
+from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersCommand, FollowFlowOrdersUseCase
 from autotrading.bootstrap import (
-    ClosedPositionsFromOpenings,
+    ClosingNoticeByNotification,
     CycleFlow,
+    FlowOrderEvents,
     FlowPauseFromFlows,
     FlowStateFromFlows,
     NotifiedClosedPositions,
     NotifiedCycles,
+    OutsideClosingsInHistory,
     TenantCyclePorts,
     WorkerExchanges,
     WorkerSettings,
     WorkerUseCaseFactory,
-    _follow_order,
     activity_readers_for,
     exchanges_for,
     executions_readers_for,
@@ -105,12 +109,16 @@ class World:
     def ports_of(self, tenant_id: object) -> TenantCyclePorts:
         assert tenant_id == self.tenant_id
         ports = self.cycles.ports_of(self.tenant_id)
-        return replace(ports, openings=self.openings, closed_positions=self.history(ports.notify))
+        history = self.history(ports.notify)
+        record_closing = RecordFlowClosingUseCase(
+            self.openings, history, ClosingNoticeByNotification(ports.notify, "USDC")
+        )
+        return replace(ports, openings=self.openings, closed_positions=history, record_closing=record_closing)
 
     def history(self, notify: NotifyUseCase) -> NotifiedClosedPositions:
         flows = InMemoryFlowRepositoryAdapter(self.cycles.platform.flows, self.tenant_id)
         return NotifiedClosedPositions(
-            InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id), flows, notify
+            InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id), flows, notify, "USDC"
         )
 
     @property
@@ -145,11 +153,16 @@ def an_execution(*, price: str = "100.4", pnl: str = "4.20") -> Execution:
     return Execution(Decimal("0.5"), Decimal(price), Decimal("0.3"), Decimal(pnl), CLOSED_AT)
 
 
-# _follow_order
+# FlowOrderEvents
+
+
+def follow(world: World, order: Order) -> None:
+    events = FlowOrderEvents(world.ports, world.flow, PLANNED_AT)
+    FollowFlowOrdersUseCase(events).execute(FollowFlowOrdersCommand((order,)))
 
 
 def test_an_executed_opening_is_notified_with_its_value_in_whole_units(world: World) -> None:
-    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=False, execution=an_execution()))
+    follow(world, an_order(reduce_only=False, execution=an_execution()))
 
     assert world.received == ["alfa: aperta long BTC, leva 3, 50 USDC"]
     assert world.closed.positions == []
@@ -158,21 +171,21 @@ def test_an_executed_opening_is_notified_with_its_value_in_whole_units(world: Wo
 def test_a_rejected_order_is_notified_with_the_message_of_the_exchange(world: World) -> None:
     rejection = Rejection.of("Insufficient margin to place order.")
 
-    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=True, rejection=rejection))
+    follow(world, an_order(reduce_only=True, rejection=rejection))
 
     assert world.received == ["alfa: ordine rifiutato, Insufficient margin to place order."]
     assert world.closed.positions == []
 
 
 def test_an_order_without_an_answer_leaves_nothing_behind(world: World) -> None:
-    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=False))
+    follow(world, an_order(reduce_only=False))
 
     assert world.received == []
     assert world.closed.positions == []
 
 
 def test_an_executed_closing_enters_the_history_with_its_cycle_and_is_notified(world: World) -> None:
-    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=True, execution=an_execution()))
+    follow(world, an_order(reduce_only=True, execution=an_execution()))
 
     [closed] = world.closed.positions
     assert (closed.flow_id, closed.asset, closed.reason) == (world.flow.id, "BTC", CloseReason.AGENT)
@@ -187,23 +200,24 @@ def test_an_executed_closing_enters_the_history_with_its_cycle_and_is_notified(w
 def test_a_closing_without_an_opening_of_the_flow_is_notified_but_has_no_history(world: World) -> None:
     world.openings.opening = None
 
-    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=True, execution=an_execution()))
+    follow(world, an_order(reduce_only=True, execution=an_execution()))
 
     assert world.closed.positions == []
     assert world.received == ["alfa: chiusa BTC, PnL 4,20 USDC"]
 
 
-# ClosedPositionsFromOpenings
+# OutsideClosingsInHistory
 
 
 def outside(world: World, pnl: str) -> OutsideClosing:
     return OutsideClosing(world.flow.id, "BTC", Decimal(pnl), Decimal("0.5"), CLOSED_AT)
 
 
-def closed_positions(world: World) -> ClosedPositionsFromOpenings:
+def closed_positions(world: World) -> OutsideClosingsInHistory:
     flows = InMemoryFlowRepositoryAdapter(world.cycles.platform.flows, world.tenant_id)
     notify = world.ports.notify
-    return ClosedPositionsFromOpenings(flows, world.openings, world.history(notify), notify)
+    notice = ClosingNoticeByNotification(notify, "USDC")
+    return OutsideClosingsInHistory(RecordOutsideClosingUseCase(flows, world.openings, world.history(notify), notice))
 
 
 def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_flow(world: World) -> None:
@@ -225,7 +239,7 @@ def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_fl
 def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: pytest.LogCaptureFixture) -> None:
     world.openings.opening = None
 
-    with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
+    with caplog.at_level(logging.WARNING, logger="autotrading.flows"):
         closed_positions(world).add_closed_outside(outside(world, "-10"))
 
     assert world.closed.positions == []
@@ -237,7 +251,7 @@ def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: p
 def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
     world: World, caplog: pytest.LogCaptureFixture
 ) -> None:
-    with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
+    with caplog.at_level(logging.WARNING, logger="autotrading.flows"):
         closed_positions(world).add_closed_outside(outside(world, "-100"))
 
     assert world.closed.positions == []
@@ -356,7 +370,7 @@ def test_a_flow_not_stamped_yet_began_at_the_anchor_of_its_cycles(world: World) 
 
 
 def test_the_history_reads_back_what_it_told(world: World) -> None:
-    _follow_order(world.ports, world.flow, PLANNED_AT, an_order(reduce_only=True, execution=an_execution()))
+    follow(world, an_order(reduce_only=True, execution=an_execution()))
 
     assert world.ports.closed_positions.of_flow(world.flow.id) == world.closed.positions
     assert len(world.closed.positions) == 1
@@ -481,7 +495,7 @@ def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the
     world.cycles.platform.activity_reader.reachable = False
 
     # Without the activity no state can be attributed to the flow: the cycle fails and the next one reads again.
-    with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"), pytest.raises(FlowExchangeUnavailableError):
+    with caplog.at_level(logging.WARNING, logger="autotrading.flows"), pytest.raises(FlowExchangeUnavailableError):
         update(world)
 
     assert world.received == []

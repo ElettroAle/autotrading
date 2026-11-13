@@ -4,6 +4,9 @@ from decimal import Decimal
 from autotrading.domain.italian_text import money_text
 from autotrading.domain.notifications.errors import InvalidNotificationError
 
+# An opening is told by the value it put on the market, in whole units: the cents add nothing to the event.
+WHOLE_UNIT = Decimal(1)
+
 
 @dataclass(frozen=True, slots=True)
 class Amount:
@@ -35,7 +38,8 @@ class Notification:
 
     @classmethod
     def position_opened(cls, flow: str, asset: str, direction: str, leverage: int, value: Amount) -> Notification:
-        return cls(flow, f"aperta {direction} {asset}, leva {leverage}, {value}")
+        whole = Amount(value.value.quantize(WHOLE_UNIT), value.currency)
+        return cls(flow, f"aperta {direction} {asset}, leva {leverage}, {whole}")
 
     @classmethod
     def position_closed(cls, flow: str, asset: str, pnl: Amount) -> Notification:

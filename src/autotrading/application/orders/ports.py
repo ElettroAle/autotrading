@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
@@ -56,3 +57,13 @@ class OrderRepositoryPort(Protocol):
     """The orders of the tenant, bound to it like every port of owned data."""
 
     def add(self, order: Order) -> None: ...
+
+
+class FlowOrderEventsPort(Protocol):
+    """What the orders of one cycle of a flow left behind, told to the flow that sent them (R1.7.2, R1.8.2)."""
+
+    def rejected(self, message: str) -> None: ...
+
+    def opened(self, coin: str, direction: str, leverage: int, value: Decimal) -> None: ...
+
+    def closed(self, coin: str, execution: Execution) -> None: ...

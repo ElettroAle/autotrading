@@ -113,3 +113,12 @@ def test_a_position_the_flow_never_opened_has_no_history(bench: Bench, caplog: p
     (record,) = caplog.records
     assert record.getMessage() == "posizione chiusa a mano senza apertura del flusso"
     assert (record.__dict__["flow_id"], record.__dict__["asset"]) == (str(flow.id.value), "BTC")
+
+
+def test_a_closing_not_confirmed_by_the_exchange_enters_no_history(bench: Bench) -> None:
+    flow = bench.flow()
+    bench.openings.openings[flow.id, "BTC"] = OPENING
+
+    bench.use_case.execute(RecordManualClosingCommand(ACCOUNT, "BTC", None))
+
+    assert bench.history.positions == []

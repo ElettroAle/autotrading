@@ -71,11 +71,11 @@ def test_an_executed_closing_is_recorded_with_its_fill_and_the_outcome_goes_back
         OrderOutcome(uuid4(), OrderStatus.FILLED, "BTC", fee=Decimal(0), executed_at=EXECUTED_AT),
     ],
 )
-def test_a_closing_not_executed_or_not_confirmed_enters_no_history(outcome: OrderOutcome) -> None:
+def test_a_closing_not_executed_or_not_confirmed_is_passed_on_without_a_fill(outcome: OrderOutcome) -> None:
     history = RecordedClosings()
 
     assert ManualClosingsRecordedInFlows(ScriptedClosing(outcome), history).close(ACCOUNT, "BTC", USER) == outcome
-    assert history.commands == []
+    assert history.commands == [RecordManualClosingCommand(ACCOUNT, "BTC", None)]
 
 
 def test_a_closing_that_fails_enters_no_history() -> None:
