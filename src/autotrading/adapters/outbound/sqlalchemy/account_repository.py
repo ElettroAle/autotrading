@@ -80,6 +80,13 @@ class SqlAlchemyAccountRepositoryAdapter:
             account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
         )
 
+    def exchange_of(self, account_id: UUID) -> str:
+        """The exchange of an account as a flow sees it (ADR 0087): one the tenant does not have is not found."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.exchange.value
+
     def add(self, account: Account) -> None:
         self._require_own(account)
         try:

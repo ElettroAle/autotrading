@@ -47,7 +47,3 @@ def test_the_code_never_shows_in_its_representation() -> None:
 def test_the_alphabet_leaves_out_the_characters_a_reader_confuses() -> None:
     assert not set(ALPHABET) & set("01IO")
     assert len(set(ALPHABET)) == len(ALPHABET) == 32
-
-
-def test_the_start_link_opens_the_bot_with_the_code() -> None:
-    assert LinkCode("ABCD2345").start_link("autotrading_bot") == "https://t.me/autotrading_bot?start=ABCD2345"

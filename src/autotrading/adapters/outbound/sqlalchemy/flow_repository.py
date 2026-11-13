@@ -8,6 +8,7 @@ from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, sel
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_capital_changes, flow_versions, flows
+from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowNameInUseError,
@@ -46,6 +47,14 @@ class SqlAlchemyFlowRepositoryAdapter:
     def list(self) -> list[Flow]:
         with self._transaction() as connection:
             return [_flow_of(row) for row in connection.execute(_in_force().order_by(flows.c.name)).mappings()]
+
+    def exists(self, flow_id: UUID) -> bool:
+        """For the cycles (ADR 0046): the flow belongs to the tenant of the request."""
+        return any(flow.id.value == flow_id for flow in self.list())
+
+    def model_uses(self) -> tuple[ModelUse, ...]:
+        """For the agent (R1.4.1, ADR 0087): every flow with the provider of its model and whether it runs."""
+        return tuple(ModelUse(flow.name.value, flow.model_provider, flow.status.not_stopped) for flow in self.list())
 
     def get(self, flow_id: FlowId) -> Flow:
         with self._transaction() as connection:

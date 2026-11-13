@@ -4,6 +4,7 @@ from typing import Protocol
 
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
+from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.notifications.pending_link import PendingLink
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -75,4 +76,16 @@ class LinkStores:
 class BotIdentityPort(Protocol):
     def username(self) -> str | None:
         """The username of the platform bot; none when no bot is active or it cannot be reached now."""
+        ...
+
+
+class NotifierPort(Protocol):
+    def execute(self, notification: Notification) -> None:
+        """Delivers the notification to the chats of the tenant; a delivery that fails is recorded, never raised."""
+        ...
+
+
+class BotStartLinkPort(Protocol):
+    def start_link(self, code: str) -> str | None:
+        """The link that opens the chat with the platform bot and sends it the code; none without an active bot."""
         ...

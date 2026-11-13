@@ -9,8 +9,11 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.flows.archive_account_flows import ArchiveAccountFlowsUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.list_account_flows import ListAccountFlowsUseCase
+from autotrading.application.flows.ports import FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -34,15 +37,12 @@ from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
     AccountFlowsFromFlows,
-    FlowAccountsFromAccounts,
-    FlowDirectoryFromFlows,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
     ManualClosingsRecordedInFlows,
     ModelSettingsFromAgent,
     NotifiedClosedPositions,
     OrderExecutionFromOrders,
-    ProviderKeyUsageFromFlows,
     SourceSettingsFromSources,
 )
 from autotrading.domain.accounts.account import Account
@@ -186,26 +186,30 @@ class Platform:
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=ManualClosingsRecordedInFlows(
-                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings)
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings).execute
             ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_verifier=self.providers,
-            provider_key_usage=ProviderKeyUsageFromFlows(flows),
+            provider_key_usage=flows,
             model_catalog=self.model_catalog,
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountsFromAccounts(accounts, account_state),
+                accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
                 models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
-            account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
+            account_flows=AccountFlowsFromFlows(
+                ListAccountFlowsUseCase(flows),
+                StopFlowUseCase(flows, stop_ports),
+                ArchiveAccountFlowsUseCase(flows, ArchiveFlowUseCase(flows)),
+            ),
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
             flow_operations=InMemoryFlowOperationsAdapter(
@@ -219,7 +223,7 @@ class Platform:
             clock=lambda: self.now,
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
-            flow_directory=FlowDirectoryFromFlows(flows),
+            flow_directory=flows,
             flow_summaries=FlowSummariesFromFlows(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             environment="dev",
         )

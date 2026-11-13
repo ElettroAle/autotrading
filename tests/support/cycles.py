@@ -4,6 +4,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleCommand, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.cycles.source_collector import SourceCollector
@@ -59,7 +60,9 @@ class Cycles:
         self.executors = [self._executor()]
 
     def run_cycle(self) -> RunCycleUseCase:
-        collector = SourceCollector(self.sources, lambda wait: wait.total_seconds() * SECOND)
+        collector = SourceCollector(
+            self.sources, ThreadPoolConcurrentCallsAdapter(), lambda wait: wait.total_seconds() * SECOND
+        )
         steps = CycleSteps(self.flows, collector, self.context, self.agent, self.risk, self.orders, self.journal)
         return RunCycleUseCase(
             steps, CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices)

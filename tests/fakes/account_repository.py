@@ -80,6 +80,12 @@ class InMemoryAccountRepositoryAdapter:
             account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
         )
 
+    def exchange_of(self, account_id: UUID) -> str:
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.exchange.value
+
     def replace(self, account: Account) -> None:
         current = self.get(account.id)
         if current is None or account.tenant_id != self._tenant_id:

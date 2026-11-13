@@ -46,6 +46,14 @@ class Flow(TenantOwned):
         """
         return self.account_id == account_id and self.status.not_stopped and self.configuration.covers(asset)
 
+    def runs_on(self, account_id: UUID) -> bool:
+        """An active or paused flow runs on its account: removing the account stops it first (R1.1.8)."""
+        return self.account_id == account_id and self.status.not_stopped
+
+    def archivable_on(self, account_id: UUID) -> bool:
+        """A stopped flow of the account is archived with the account (R1.1.8)."""
+        return self.account_id == account_id and self.status == FlowStatus.STOPPED
+
     def after(self, command: FlowAction) -> Flow:
         """The flow in the status the command leads to, when the command starts from its status (R1.1.4, R1.1.5)."""
         if self.status not in command.starts_from:

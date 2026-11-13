@@ -54,11 +54,20 @@ class ProviderKeyRepositoryPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ModelUse:
+    """A flow of the tenant and the provider of its model; a running flow is one not stopped (ADR 0087)."""
+
+    flow_name: str
+    provider: str
+    running: bool
+
+
 class ProviderKeyUsagePort(Protocol):
     """Bound to the tenant of the request."""
 
-    def flows_using(self, provider: ProviderName) -> list[str]:
-        """The names of the active or paused flows whose model belongs to the provider."""
+    def model_uses(self) -> tuple[ModelUse, ...]:
+        """Every flow of the tenant with the provider of its model."""
         ...
 
 
