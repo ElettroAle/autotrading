@@ -23,7 +23,6 @@ from autotrading.adapters.inbound.api.worker import (
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
-from autotrading.adapters.outbound.httpx.model_call import HttpxModelCallAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
@@ -36,6 +35,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
+from autotrading.adapters.outbound.litellm.model_call import litellm_model_call
 from autotrading.adapters.outbound.oidc.access_token_verifier import OidcAccessTokenVerifierAdapter
 from autotrading.adapters.outbound.oidc.login_endpoints import OidcLoginEndpointsAdapter
 from autotrading.adapters.outbound.rss.composition import rss_adapters
@@ -618,11 +618,14 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     for_tenant = worker_use_cases(engine, opener, settings, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     ports_of = cycle_ports(engine, opener, settings, messenger)
-    cycles = worker_cycles(engine, ports_of, cycle_services(environment, private_keys))
+    model_call = litellm_model_call(
+        _required(configuration, "LITELLM_URL"), _secret(configuration, "LITELLM_MASTER_KEY_FILE")
+    )
+    cycles = worker_cycles(engine, ports_of, cycle_services(environment, private_keys, model_call))
     return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), for_tenant, bot, cycles, start_link)
 
 
-def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
+def cycle_services(environment: str, private_keys: Mapping[int, bytes], model_call: ModelCallPort) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     return CycleServices(
@@ -630,7 +633,7 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
         clock=system_clock_adapters(),
         catalog=load_model_catalog(),
         provider_key_opener=SodiumProviderKeyOpenerAdapter(private_keys),
-        model_call=HttpxModelCallAdapter(httpx.Client()),
+        model_call=model_call,
         sentiments={
             SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
             SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),

@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.worker.account_activity import WorkerAccountActivityAdapter
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.activity import a_movement, a_position, an_activity
+from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 REFUSED = "connection refused"
@@ -24,7 +24,7 @@ def worker() -> Worker:
 
 
 def adapter_on(worker: Worker, token: str = TOKEN, tenant_id: TenantId = TENANT) -> WorkerAccountActivityAdapter:
-    return WorkerAccountActivityAdapter(TestClient(create_worker_api(TOKEN, worker.for_tenant)), token, tenant_id)
+    return WorkerAccountActivityAdapter(served_in_memory(create_worker_api(TOKEN, worker.for_tenant)), token, tenant_id)
 
 
 def answering(status: int, body: object) -> WorkerAccountActivityAdapter:

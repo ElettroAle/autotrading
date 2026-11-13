@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.120",
     "httpx>=0.28",
     "hyperliquid-python-sdk>=0.24.0",
+    "openai>=3.50,<4",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
     "pynacl>=1.6.2",
@@ -114,6 +115,7 @@ forbidden_modules = [
     "eth_account",
     "requests",
     "httpx",
+    "openai",
 ]
 
 [[tool.importlinter.contracts]]
@@ -157,6 +159,7 @@ modules = [
     "autotrading.adapters.outbound.telegram",
     "autotrading.adapters.outbound.worker",
     "autotrading.adapters.outbound.json",
+    "autotrading.adapters.outbound.litellm",
     "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",

@@ -9,7 +9,6 @@ from secrets import token_hex
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.worker.notifications import TIMEOUT_SECONDS, WorkerNotificationAdapter
@@ -17,6 +16,7 @@ from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Amount, Notification
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 CHAT = ChatId(4242)
@@ -32,7 +32,7 @@ def worker() -> Worker:
 
 
 def adapter_on(worker: Worker, token: str = TOKEN, tenant_id: TenantId = TENANT) -> WorkerNotificationAdapter:
-    return WorkerNotificationAdapter(TestClient(create_worker_api(TOKEN, worker.for_tenant)), token, tenant_id)
+    return WorkerNotificationAdapter(served_in_memory(create_worker_api(TOKEN, worker.for_tenant)), token, tenant_id)
 
 
 def test_the_worker_delivers_the_notification_to_the_chat_of_the_tenant(worker: Worker) -> None:

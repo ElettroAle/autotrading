@@ -1,6 +1,6 @@
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
@@ -33,8 +33,8 @@ def client(platform: Platform) -> TestClient:
     return TestClient(api, headers={"Authorization": f"Bearer {token}"})
 
 
-def register(client: TestClient, **body: Any) -> httpx.Response:
-    response: httpx.Response = client.post("/accounts", json=body)
+def register(client: TestClient, **body: Any) -> httpx2.Response:
+    response: httpx2.Response = client.post("/accounts", json=body)
     return response
 
 
