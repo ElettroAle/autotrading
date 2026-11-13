@@ -3,17 +3,19 @@ from dataclasses import dataclass
 
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
+    ClosingAnswerPort,
     FlowOpeningsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
     PositionClosedNoticePort,
+    PositionToClose,
     RunningCyclePort,
 )
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.stop_outcome import ClosingFill, PositionLeftOpen, StopOutcome
+from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing, PositionLeftOpen, StopOutcome
 from autotrading.domain.tenancy.user_id import UserId
 
 operations = logging.getLogger("autotrading.flows")
@@ -62,7 +64,9 @@ class StopFlowUseCase:
         return StopOutcome(flow, left_open)
 
     def _close(self, flow: Flow, asset: str, command: StopFlowCommand) -> PositionLeftOpen | None:
-        closing = self._ports.positions.close(flow.account_id, asset, command.user_id)
+        closing = _closing_of(
+            asset, self._ports.positions.execute(PositionToClose(flow.account_id, asset, command.user_id))
+        )
         if closing is None:
             return None
         if closing.fill is None:
@@ -81,3 +85,8 @@ class StopFlowUseCase:
         position = opening.closed(flow, asset, fill, reason)
         self._ports.closed_positions.add(position)
         self._ports.closing_notice.execute(flow.name.value, asset, position.pnl)
+
+
+def _closing_of(asset: str, answer: ClosingAnswerPort) -> PositionClosing | None:
+    fill = ClosingFill.reported(answer.average_price, answer.executed_at, answer.fee, answer.realized_pnl)
+    return PositionClosing.reported(asset, found=answer.found, fill=fill, refusal=answer.refusal)

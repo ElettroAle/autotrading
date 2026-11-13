@@ -62,6 +62,25 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Previsioni dei prezzi con Prophet (docs/architecture.md §10, ADR 0107): immagine propria, solo sulla rete
+  # dell'installazione, nessuna porta pubblicata e nessun segreto. Il limite di memoria protegge gli altri servizi della
+  # macchina da un addestramento pesante.
+  forecaster:
+    image: ${FORECASTER_IMAGE:-}
+    environment:
+      FORECASTER_RETRAIN_MINUTES: "15"
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
   # Il worker è l'unico servizio che riceve la chiave privata delle credenziali (ADR 0007, ADR 0021).
   # Nessuna porta pubblicata: lo raggiunge solo l'API sulla rete dell'installazione, con il token generato sulla macchina.
   worker:

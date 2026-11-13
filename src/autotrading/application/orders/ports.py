@@ -59,6 +59,19 @@ class ExchangePort(Protocol):
         """The execution of an order looked up by its client order id, or None if the exchange has none."""
 
 
+class FlowPositionToClosePort(Protocol):
+    """A position a flow asks to close: the whole position of its account on one asset (R1.1.5)."""
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def asset(self) -> str: ...
+
+    @property
+    def user_id(self) -> UserId: ...
+
+
 class PositionClosingPort(Protocol):
     """Asks the worker, the only service holding the private key, to close a position of the tenant (ADR 0023).
 
