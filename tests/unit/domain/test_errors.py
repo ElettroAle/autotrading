@@ -1,4 +1,4 @@
-from autotrading.domain.errors import AutotradingError, DomainError
+from autotrading.domain.errors import AutotradingError, DomainError, ErrorScope
 
 
 def test_domain_error_is_a_platform_error() -> None:
@@ -19,3 +19,7 @@ def test_a_platform_error_is_transient_unless_it_says_otherwise() -> None:
 
 def test_a_platform_error_adds_nothing_to_its_reason_unless_it_says_otherwise() -> None:
     assert AutotradingError("motivo").details == {}
+
+
+def test_a_platform_error_concerns_only_the_flow_of_its_cycle_unless_it_says_otherwise() -> None:
+    assert AutotradingError("motivo").scope == ErrorScope()

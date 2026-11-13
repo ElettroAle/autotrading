@@ -1,6 +1,9 @@
 from uuid import UUID, uuid4
 
+from autotrading.application.agent.errors import ModelCreditExhaustedError
+from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowLedgerIncompleteError
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
+from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -91,3 +94,15 @@ def test_without_account_nor_provider_no_other_flow_is_involved() -> None:
     world.use_case.execute(PauseAffectedFlowsCommand(alfa.id.value, REASON))
 
     assert world.status_of("beta") is FlowStatus.ACTIVE
+
+
+def test_the_command_takes_the_reason_and_the_scope_the_error_declares() -> None:
+    flow_id = uuid4()
+
+    by_account = PauseAffectedFlowsCommand.of_error(flow_id, FlowLedgerIncompleteError(ACCOUNT))
+    by_provider = PauseAffectedFlowsCommand.of_error(flow_id, ModelCreditExhaustedError(ProviderName("openrouter")))
+    alone = PauseAffectedFlowsCommand.of_error(flow_id, FlowExchangeUnavailableError())
+
+    assert by_account == PauseAffectedFlowsCommand(flow_id, "registro delle esecuzioni incompleto", account_id=ACCOUNT)
+    assert by_provider == PauseAffectedFlowsCommand(flow_id, REASON, provider="openrouter")
+    assert alone == PauseAffectedFlowsCommand(flow_id, "exchange non raggiungibile, riprovare")

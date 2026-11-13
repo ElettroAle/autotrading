@@ -22,18 +22,19 @@ class ScheduledFlow:
 
 
 @dataclass(frozen=True, slots=True)
-class FlowSnapshot:
+class FlowSnapshot[S = object]:
     """The state of the flow read at the start of the cycle; the cycle only needs the names of its active sources.
 
-    The state itself belongs to the flow and travels to the context and the risk check as it is (ADR 0041).
+    The state itself belongs to the flow and travels to the context and the risk check as it is (ADR 0041): its type
+    is the one the composition root binds, never known to the cycles context (ADR 0082).
     """
 
     sources: tuple[str, ...]
-    state: object
+    state: S
 
 
 @dataclass(frozen=True, slots=True)
-class SourceRequest:
+class SourceRequest[S = object]:
     """The cycle that asks its sources: the flow, its planned instant and the state read at its start.
 
     Every source reads the configuration of the snapshot, so a change made during the cycle waits for the next one
@@ -42,23 +43,23 @@ class SourceRequest:
 
     flow_id: UUID
     planned_at: datetime
-    snapshot: FlowSnapshot
+    snapshot: FlowSnapshot[S]
 
 
 @dataclass(frozen=True, slots=True)
-class SourceReading:
+class SourceReading[D = object]:
     source: str
-    data: object
+    data: D
 
 
 @dataclass(frozen=True, slots=True)
-class RiskReview:
+class RiskReview[O = object]:
     """The orders the risk check approved, and the outcome of every decision; the execution orders them (R1.5.5).
 
     The outcomes travel only to the record: approved, reduced, blocked or discarded (R1.7.1).
     """
 
-    orders: tuple[object, ...]
+    orders: tuple[O, ...]
     outcomes: object
 
 
@@ -92,42 +93,42 @@ class CycleLauncherPort(Protocol):
         ...
 
 
-class FlowStatePort(Protocol):
-    def read(self, flow_id: UUID) -> FlowSnapshot: ...
+class FlowStatePort[S = object, E = object](Protocol):
+    def read(self, flow_id: UUID) -> FlowSnapshot[S]: ...
 
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:
+    def update(self, flow_id: UUID, executions: Sequence[E]) -> object:
         """Applies the executions of the cycle and gives back the state of the flow at the end of it."""
         ...
 
 
-class SourcePort(Protocol):
-    def collect(self, request: SourceRequest, source: str) -> object:
+class SourcePort[S = object, D = object](Protocol):
+    def collect(self, request: SourceRequest[S], source: str) -> D:
         """The data of one active source; any typed error makes the source absent for the cycle (R1.2.5)."""
         ...
 
 
-class ContextPort(Protocol):
+class ContextPort[S = object, D = object, C = object](Protocol):
     def compose(
         self,
         flow_id: UUID,
-        snapshot: FlowSnapshot,
-        readings: Sequence[SourceReading],
+        snapshot: FlowSnapshot[S],
+        readings: Sequence[SourceReading[D]],
         absent: Sequence[AbsentSource],
-    ) -> object:
+    ) -> C:
         """The context of the agent, declaring the missing data."""
         ...
 
 
-class AgentPort(Protocol):
-    def decide(self, flow_id: UUID, context: object) -> object: ...
+class AgentPort[C = object, A = object](Protocol):
+    def decide(self, flow_id: UUID, context: C) -> A: ...
 
 
-class RiskPort(Protocol):
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview: ...
+class RiskPort[S = object, A = object, O = object](Protocol):
+    def check(self, flow_id: UUID, snapshot: FlowSnapshot[S], decisions: A) -> RiskReview[O]: ...
 
 
-class OrderPort(Protocol):
-    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
+class OrderPort[O = object, E = object](Protocol):
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[O]) -> Sequence[E]:
         """Sends the approved orders of the cycle, closings first, and gives back their real outcomes (R1.5.5)."""
         ...
 
