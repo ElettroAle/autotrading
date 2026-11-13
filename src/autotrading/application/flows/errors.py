@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from autotrading.application.errors import ApplicationError
+from autotrading.domain.errors import ErrorScope
 from autotrading.domain.flows.flow_state import PositionMismatch
 from autotrading.domain.italian_text import number_text
 
@@ -54,9 +55,14 @@ class FlowCredentialsRejectedError(ApplicationError):
     status_code = 422
     permanent = True
 
-    def __init__(self, account: str) -> None:
+    def __init__(self, account: str, account_id: UUID) -> None:
         super().__init__(f"credenziali del conto non valide: {account}")
         self.account = account
+        self.account_id = account_id
+
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(account_id=self.account_id)
 
 
 class FlowNotFoundError(ApplicationError):
@@ -122,3 +128,7 @@ class FlowLedgerIncompleteError(ApplicationError):
     def __init__(self, account_id: UUID) -> None:
         super().__init__("registro delle esecuzioni incompleto")
         self.account_id = account_id
+
+    @property
+    def scope(self) -> ErrorScope:
+        return ErrorScope(account_id=self.account_id)

@@ -4,14 +4,18 @@ from autotrading.application.cycles.ports import ClockPort, CycleLauncherPort, S
 from autotrading.application.cycles.run_cycle import RunCycleCommand, RunCycleUseCase
 
 
-class RunDueCyclesUseCase:
+class RunDueCyclesUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:
     """Launches, for every active flow, the cycle planned at the latest instant not after now (R1.2.1, R1.2.2).
 
     Called again and again by the worker: a planned instant already taken by an executor is not run twice.
     """
 
     def __init__(
-        self, flows: ScheduledFlowsPort, run_cycle: RunCycleUseCase, launcher: CycleLauncherPort, clock: ClockPort
+        self,
+        flows: ScheduledFlowsPort,
+        run_cycle: RunCycleUseCase[S, D, C, A, O, E],
+        launcher: CycleLauncherPort,
+        clock: ClockPort,
     ) -> None:
         self._flows = flows
         self._run_cycle = run_cycle
