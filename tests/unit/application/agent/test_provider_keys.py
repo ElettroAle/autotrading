@@ -26,6 +26,7 @@ from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     FakeProviderKeyUsageAdapter,
@@ -55,7 +56,7 @@ class Keys:
         self.repository = InMemoryProviderKeyRepositoryAdapter(self.store, self.tenant_id)
         self.usage = FakeProviderKeyUsageAdapter()
         self.services = ProviderKeyServices(
-            InMemoryModelCatalogAdapter(CATALOG),
+            {"models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(CATALOG))},
             FakeProviderKeySealerAdapter(self.tenant_id, self.vault),
         )
 
@@ -179,7 +180,9 @@ def test_the_list_names_the_providers_and_never_the_keys(keys: Keys) -> None:
 def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys: Keys) -> None:
     keys.register("openrouter", "K-OR")
 
-    listing = ListModelsUseCase(InMemoryModelCatalogAdapter(CATALOG), keys.repository).execute()
+    listing = ListModelsUseCase(
+        {"models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(CATALOG))}, keys.repository
+    ).execute()
 
     assert listing.models == CATALOG.models
     assert listing.providers == (

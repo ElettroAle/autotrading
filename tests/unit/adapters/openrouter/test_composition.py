@@ -6,9 +6,11 @@ from autotrading.adapters.outbound.openrouter.model_call import TIMEOUT_SECONDS,
 from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterModelCatalogAdapter
 
 
-def test_the_gateway_makes_the_call_and_the_catalog_of_openrouter_always_the_same() -> None:
-    gateway = openrouter_adapters()
+def test_the_gateway_of_openrouter_is_offered_by_its_name_and_makes_always_the_same_products() -> None:
+    gateways = openrouter_adapters()
 
+    assert list(gateways) == ["openrouter"]
+    gateway = gateways["openrouter"]
     assert isinstance(gateway.model_call(), OpenRouterModelCallAdapter)
     assert isinstance(gateway.model_catalog(), OpenRouterModelCatalogAdapter)
     assert gateway.model_call() is gateway.model_call()

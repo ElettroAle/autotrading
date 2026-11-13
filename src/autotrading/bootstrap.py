@@ -27,7 +27,10 @@ from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumPr
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
+from autotrading.adapters.outbound.litellm.model_gateway import LiteLlmModelGatewayAdapter
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
+from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
+from autotrading.adapters.outbound.openrouter.model_gateway import OpenRouterModelGatewayAdapter
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -76,9 +79,8 @@ from autotrading.application.accounts.read_exchange_state import ReadExchangeSta
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
+from autotrading.application.agent.model_gateways import ModelGateways
 from autotrading.application.agent.ports import (
-    ModelCallPort,
-    ModelCatalogPort,
     ProviderKeyOpenerPort,
     ProviderKeyRepositoryPort,
 )
@@ -260,10 +262,10 @@ def tenant_use_cases(
     ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
-    providers: tuple[ModelCatalogPort, FlowModelsPort],
+    models: tuple[ModelGateways, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
-    model_catalog, flow_models = providers
+    model_gateways, flow_models = models
     credential_sealer, provider_key_sealer = sealers
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
@@ -295,7 +297,7 @@ def tenant_use_cases(
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_usage=flows,
-            model_catalog=model_catalog,
+            model_gateways=model_gateways,
             flows=flows,
             running_verifications=SqlAlchemyRunningVerificationsAdapter(engine),
             flow_checks=FlowChecks(
@@ -466,13 +468,16 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     source = ConfigurationSource(configuration)
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
-    _, catalog = litellm_adapters(source)
+    gateways: dict[str, LiteLlmModelGatewayAdapter | OpenRouterModelGatewayAdapter] = {
+        **litellm_adapters(source),
+        **openrouter_adapters(),
+    }
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
         source.environment(),
         worker_adapters(source),
-        (catalog, catalog),
+        (gateways, {name: gateway.model_catalog() for name, gateway in gateways.items()}),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
@@ -488,7 +493,7 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     ports_of = cycle_ports(engine, opener, environment, slippage, messenger)
-    models = litellm_adapters(source)
+    models: ModelGateways = {**litellm_adapters(source), **openrouter_adapters()}
     cycles = worker_cycles(engine, ports_of, cycle_services(environment, provider_key_opener, models))
     return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
 
@@ -496,16 +501,15 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
 def cycle_services(
     environment: str,
     provider_key_opener: SodiumProviderKeyOpenerAdapter,
-    models: tuple[ModelCallPort, ModelCatalogPort],
+    models: ModelGateways,
 ) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     return CycleServices(
         environment=environment,
         clock=system_clock_adapters(),
-        catalog=models[1],
+        model_gateways=models,
         provider_key_opener=provider_key_opener,
-        model_call=models[0],
         sentiments={
             SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
             SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
@@ -561,9 +565,8 @@ class CycleServices:
     """What every cycle shares, whatever the tenant: the clock, the models, the sources, the exchanges."""
 
     clock: ClockPort
-    catalog: ModelCatalogPort
+    model_gateways: ModelGateways
     provider_key_opener: ProviderKeyOpenerPort
-    model_call: ModelCallPort
     sentiments: Mapping[str, SentimentPort]
     news: NewsPort
     prices: PriceHistoryPort
@@ -604,9 +607,7 @@ def run_cycle_for(
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
                 ComposeAgentContextUseCase(),
-                AskAgentUseCase(
-                    services.catalog, ports.provider_keys, services.provider_key_opener, services.model_call
-                ),
+                AskAgentUseCase(services.model_gateways, ports.provider_keys, services.provider_key_opener),
             )
         ),
         risk=ReviewCycleRiskUseCase(CheckRiskUseCase(services.exchange_limits)),
