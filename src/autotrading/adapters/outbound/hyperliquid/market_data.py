@@ -8,7 +8,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdk, OfficialSdk
-from autotrading.application.sources.errors import SourceUnavailableError
+from autotrading.application.sources.errors import SourceUnavailableError, TimeframeNotSupportedError
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
@@ -16,14 +16,32 @@ from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import PricePoint
 from autotrading.domain.sources.timeframe import Timeframe
 
-MINUTES_PER_DAY = 24 * 60
+MINUTES_PER_HOUR = 60
+MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 # Hyperliquid keeps only the most recent 5000 candles of each interval (info endpoint, candleSnapshot).
 KEPT_CANDLES = 5000
-INTERVALS = ((1, "1m"), (3, "3m"), (5, "5m"), (15, "15m"), (30, "30m"), (60, "1h"))
+# The candle intervals of candleSnapshot by their span in minutes; the monthly one (1M) has no fixed span.
+CANDLE_INTERVALS = {
+    1: "1m",
+    3: "3m",
+    5: "5m",
+    15: "15m",
+    30: "30m",
+    60: "1h",
+    120: "2h",
+    240: "4h",
+    480: "8h",
+    720: "12h",
+    MINUTES_PER_DAY: "1d",
+    3 * MINUTES_PER_DAY: "3d",
+    7 * MINUTES_PER_DAY: "1w",
+}
 # A time range answers in pages: the next page starts after the last candle received.
 MAX_PAGES = 20
 MILLISECONDS = 1000
-DAY = "1d"
+DAY = CANDLE_INTERVALS[MINUTES_PER_DAY]
+# Never coarser than one hour: the 15-minute forecast would become a fraction of a step (ADR 0043).
+INTERVALS = tuple((minutes, name) for minutes, name in CANDLE_INTERVALS.items() if minutes <= MINUTES_PER_HOUR)
 MARKET_DATA = "dati di mercato di Hyperliquid"
 # An exchange that refuses, does not answer or answers in another shape: the source is absent from the cycle.
 UNAVAILABLE = (ClientError, ServerError, requests.RequestException, KeyError, TypeError, InvalidOperation)
@@ -104,11 +122,17 @@ class HyperliquidMarketDataAdapter:
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidMarketDataAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
+    def timeframes(self) -> Sequence[Timeframe]:
+        return tuple(Timeframe(minutes) for minutes in CANDLE_INTERVALS)
+
     def candles(self, asset: str, timeframe: Timeframe, count: int, now: datetime) -> Sequence[Candle]:
+        interval = CANDLE_INTERVALS.get(timeframe.minutes)
+        if interval is None:
+            raise TimeframeNotSupportedError(timeframe.minutes)
         end = _milliseconds(now)
         start = _milliseconds(now - timedelta(minutes=timeframe.minutes * (count + 1)))
         try:
-            page = self._info().candles_snapshot(asset, timeframe.label, start, end)
+            page = self._info().candles_snapshot(asset, interval, start, end)
             closed = [_candle_of(candle) for candle in page if int(candle["T"]) < end]
         except (*UNAVAILABLE, ValueError) as error:
             raise SourceUnavailableError(MARKET_DATA) from error
