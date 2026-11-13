@@ -14,6 +14,8 @@ Funzionalità: R1.8.1 Collegamento di Telegram
   che non rivela se il codice è esistito.
   Il codice si può inviare da solo o dopo il comando di avvio del bot, come fa il link t.me/<bot>?start=<codice>
   che la piattaforma restituisce insieme al codice quando il bot è attivo: un tocco apre la chat e collega.
+  Dalla chat collegata il comando /prova fa arrivare una notifica di prova per la stessa strada delle notifiche
+  dei flussi, così l'utente vede che la consegna funziona senza attendere un evento di un flusso.
   Un messaggio senza codice, come il solo comando di avvio o un altro comando, riceve le istruzioni per il
   collegamento.
 
@@ -76,3 +78,12 @@ Funzionalità: R1.8.1 Collegamento di Telegram
     Dato che la chat "chat-anna" è collegata al tenant di "anna"
     Quando "anna" scollega la chat Telegram
     Allora la chat "chat-anna" non riceve più le notifiche di "anna"
+
+  Scenario: Prova dalla chat collegata
+    Dato che la chat "chat-anna" è collegata al tenant di "anna"
+    Quando la chat "chat-anna" invia "/prova" al bot
+    Allora il bot invia alla chat "chat-anna" "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
+
+  Scenario: Prova da una chat non collegata
+    Quando la chat "chat-x" invia "/prova" al bot
+    Allora il bot risponde alla chat "chat-x" con le istruzioni per il collegamento
