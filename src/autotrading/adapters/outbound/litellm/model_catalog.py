@@ -19,9 +19,9 @@ REFRESH_SECONDS = 300.0
 CATALOG_TIMEOUT_SECONDS = 10.0
 CHAT_MODE = "chat"
 WILDCARD = "*"
-# LiteLLM tells whether a model takes a temperature, not its range: the range is the one of the provider's API.
-TEMPERATURE_MAXIMUM: Mapping[str, Decimal] = {"anthropic": Decimal(1)}
-DEFAULT_TEMPERATURE_MAXIMUM = Decimal(2)
+# LiteLLM tells whether a model takes a temperature, not its range: the range is the one of the OpenAI API it speaks,
+# and a provider that takes less refuses the call with its own reason.
+TEMPERATURE_MAXIMUM = Decimal(2)
 DEFAULT_TEMPERATURE = Decimal(1)
 DEFAULT_MAX_TOKENS = Decimal(4096)
 REASONING_LEVELS = ("basso", "medio", "alto")
@@ -89,20 +89,19 @@ def _definitions(groups: list[Group]) -> Iterator[ModelDefinition]:
 
 def _definition_of(group: Group) -> ModelDefinition | None:
     name = str(group["model_group"])
-    provider, separator, _ = name.partition(PROVIDER_SEPARATOR)
+    _, separator, _ = name.partition(PROVIDER_SEPARATOR)
     if not separator or WILDCARD in name or group.get("mode") != CHAT_MODE:
         return None
     longest = group.get("max_output_tokens")
     if longest is None:
         return None
-    return ModelDefinition(name, tuple(_parameters(provider, group, _number(longest))), _prices(group))
+    return ModelDefinition(name, tuple(_parameters(group, _number(longest))), _prices(group))
 
 
-def _parameters(provider: str, group: Group, longest: Decimal) -> Iterator[ModelParameter]:
+def _parameters(group: Group, longest: Decimal) -> Iterator[ModelParameter]:
     supported = group.get("supported_openai_params")
     if isinstance(supported, list) and "temperature" in supported:
-        maximum = TEMPERATURE_MAXIMUM.get(provider, DEFAULT_TEMPERATURE_MAXIMUM)
-        yield RangeParameter("temperature", Decimal(0), maximum, DEFAULT_TEMPERATURE)
+        yield RangeParameter("temperature", Decimal(0), TEMPERATURE_MAXIMUM, DEFAULT_TEMPERATURE)
     whole = longest.to_integral_value()
     yield RangeParameter("max_tokens", Decimal(1), whole, min(DEFAULT_MAX_TOKENS, whole), whole=True)
     if group.get("supports_reasoning") is True:
