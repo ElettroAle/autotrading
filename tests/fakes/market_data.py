@@ -12,6 +12,7 @@ from autotrading.domain.sources.timeframe import Timeframe
 DEFAULT_CLOSES = tuple(Decimal(100) + Decimal(index % 9) - 4 + Decimal(index) / 100 for index in range(400))
 DEFAULT_SNAPSHOT = MarketSnapshot(Decimal(100), Decimal("100.5"), Decimal(1000), Decimal("0.0001"))
 DEFAULT_DAY = DailyRange(high=Decimal(110), low=Decimal(90), close=Decimal(100))
+STANDARD_INTERVALS = tuple(Timeframe(minutes) for minutes in (1, 3, 5, 15, 30, 60, 120, 240, 480, 720, 1440))
 
 
 @dataclass
@@ -22,6 +23,10 @@ class FakeMarketDataAdapter:
     snapshots: dict[str, MarketSnapshot] = field(default_factory=dict)
     days: dict[str, DailyRange] = field(default_factory=dict)
     requests: list[tuple[str, str, int]] = field(default_factory=list)
+    published: Sequence[Timeframe] = STANDARD_INTERVALS
+
+    def timeframes(self) -> Sequence[Timeframe]:
+        return self.published
 
     def candles(self, asset: str, timeframe: Timeframe, count: int, now: datetime) -> Sequence[Candle]:
         self.requests.append((asset, timeframe.label, count))

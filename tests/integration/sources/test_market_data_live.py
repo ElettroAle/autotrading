@@ -13,7 +13,7 @@ pytestmark = pytest.mark.sources
 MARKET = HyperliquidMarketDataAdapter.for_network(testnet=True)
 
 
-@pytest.mark.parametrize("timeframe", [Timeframe(15, "15m"), LONG_TIMEFRAME])
+@pytest.mark.parametrize("timeframe", [Timeframe(15), LONG_TIMEFRAME])
 def test_the_testnet_gives_the_closed_candles_asked(timeframe: Timeframe) -> None:
     now = datetime.now(UTC)
 

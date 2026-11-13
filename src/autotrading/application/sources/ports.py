@@ -49,10 +49,14 @@ class PriceHistoryPort(Protocol):
 class MarketDataPort(Protocol):
     """The public market data of the exchange for an asset, without credentials (R1.3.3, R1.3.4)."""
 
+    def timeframes(self) -> Sequence[Timeframe]:
+        """The candle intervals the exchange publishes."""
+        ...
+
     def candles(self, asset: str, timeframe: Timeframe, count: int, now: datetime) -> Sequence[Candle]:
         """The last `count` closed candles of the timeframe, oldest first; fewer when the exchange has less.
 
-        Raises SourceUnavailableError.
+        Raises TimeframeNotSupportedError for an interval outside `timeframes()`, SourceUnavailableError.
         """
         ...
 

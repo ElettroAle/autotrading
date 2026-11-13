@@ -1,36 +1,34 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 
+from autotrading.domain.sources.errors import TimeframeNotAvailableError
+
 MINUTES_PER_HOUR = 60
+MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 
 
 @dataclass(frozen=True, slots=True)
 class Timeframe:
-    """The span of one candle, as the exchanges name it (R1.3.3)."""
+    """The span of one candle in minutes (R1.3.3); which spans exist is up to the exchange."""
 
     minutes: int
-    label: str
+
+    @property
+    def label(self) -> str:
+        """The name the agent reads in its context, by the largest whole unit: 15m, 4h, 1d."""
+        if self.minutes % MINUTES_PER_DAY == 0:
+            return f"{self.minutes // MINUTES_PER_DAY}d"
+        if self.minutes % MINUTES_PER_HOUR == 0:
+            return f"{self.minutes // MINUTES_PER_HOUR}h"
+        return f"{self.minutes}m"
 
 
-# The candle intervals the exchanges publish, from the finest: a cycle interval in between takes the one below it.
-TIMEFRAMES = tuple(
-    Timeframe(minutes, label)
-    for minutes, label in (
-        (1, "1m"),
-        (3, "3m"),
-        (5, "5m"),
-        (15, "15m"),
-        (30, "30m"),
-        (60, "1h"),
-        (120, "2h"),
-        (240, "4h"),
-        (480, "8h"),
-        (720, "12h"),
-        (1440, "1d"),
-    )
-)
-LONG_TIMEFRAME = Timeframe(240, "4h")
+LONG_TIMEFRAME = Timeframe(4 * MINUTES_PER_HOUR)
 
 
-def short_timeframe_of(cycle_minutes: int) -> Timeframe:
-    """The timeframe of the cycle interval; between two intervals of the exchange, the finer one (ADR 0057)."""
-    return [timeframe for timeframe in TIMEFRAMES if timeframe.minutes <= cycle_minutes][-1]
+def short_timeframe_of(cycle_minutes: int, available: Sequence[Timeframe]) -> Timeframe:
+    """The available timeframe of the cycle interval; between two of them, the finer one (ADR 0057, ADR 0083)."""
+    finer = [timeframe for timeframe in available if timeframe.minutes <= cycle_minutes]
+    if not finer:
+        raise TimeframeNotAvailableError(cycle_minutes)
+    return max(finer, key=lambda timeframe: timeframe.minutes)
