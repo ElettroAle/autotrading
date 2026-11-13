@@ -17,9 +17,6 @@ from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
     VerificationReadings,
 )
-from autotrading.bootstrap import (
-    OrderExecutionFromOrders,
-)
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -36,6 +33,7 @@ from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.platform import HYPERLIQUID, new_credentials
+from tests.support.procedure_orders import procedure_orders
 
 TOKEN = token_hex(16)
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -73,7 +71,7 @@ class Worker:
                     ReadAccountForVerificationUseCase(accounts, opener, {HYPERLIQUID: self.exchange}),
                     InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
                 ),
-                OrderExecutionFromOrders(opening, closing, ReadMarketUseCase(access, order_exchanges)),
+                procedure_orders(opening, closing, ReadMarketUseCase(access, order_exchanges)),
                 self.runs,
                 "dev",
                 lambda: STARTED_AT,
