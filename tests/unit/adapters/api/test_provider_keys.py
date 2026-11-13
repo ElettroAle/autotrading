@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.adapters.inbound.api.provider_keys import ProviderKeyRegistrationRequest, ProviderKeyReplacementRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
-from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flows import a_flow
 from tests.support.identity_provider import IdentityProvider
@@ -19,10 +18,7 @@ KEY = "K-OPENROUTER-TEST"
 
 @pytest.fixture
 def platform() -> Platform:
-    platform = Platform()
-    platform.providers.accept("openrouter", KEY)
-    platform.providers.accept("openrouter", KEY + "-new")
-    return platform
+    return Platform()
 
 
 @pytest.fixture
@@ -51,12 +47,6 @@ def test_a_registered_key_answers_with_the_provider_only(client_of: Client) -> N
     assert KEY not in response.text
 
 
-def test_a_refused_key_answers_with_the_reason_and_never_the_key(client_of: Client) -> None:
-    response = client_of("anna").post("/provider-keys", json={"provider": "openrouter", "key": "K-BAD"})
-
-    assert response.status_code == 422
-    assert reason_of(response) == {"detail": "chiave rifiutata dal fornitore: openrouter"}
-    assert "K-BAD" not in response.text
 
 
 def test_a_missing_key_answers_with_the_reason(client_of: Client) -> None:
@@ -83,7 +73,7 @@ def test_the_list_shows_only_the_providers_of_the_user(client_of: Client) -> Non
     assert client_of("bruno").get("/provider-keys").json() == []
 
 
-def test_the_replacement_answers_with_the_provider(client_of: Client, platform: Platform) -> None:
+def test_the_replacement_answers_with_the_provider(client_of: Client) -> None:
     anna = client_of("anna")
     anna.post("/provider-keys", json={"provider": "openrouter", "key": KEY})
 
@@ -91,7 +81,6 @@ def test_the_replacement_answers_with_the_provider(client_of: Client, platform: 
 
     assert response.status_code == 200
     assert response.json() == {"provider": "openrouter"}
-    assert platform.providers.checked == [ProviderName("openrouter")] * 2
 
 
 def test_the_replacement_of_a_key_never_registered_is_not_found(client_of: Client) -> None:

@@ -21,7 +21,6 @@ KEY = "K-OPENROUTER-TEST"
 def platform() -> Platform:
     platform = Platform()
     platform.model_catalog = scenario_catalog()
-    platform.providers.accept("openrouter", KEY)
     return platform
 
 

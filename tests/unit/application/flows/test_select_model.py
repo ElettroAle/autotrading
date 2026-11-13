@@ -33,7 +33,6 @@ class Models:
         self.use_case = SelectModelUseCase(InMemoryModelCatalogAdapter(CATALOG), self.keys)
 
     def register(self, provider: str) -> None:
-        self.platform.providers.accept(provider, "K-TEST")
         self.platform.use_cases_of("anna").register_provider_key.execute(RegisterProviderKeyCommand(provider, "K-TEST"))
 
 
