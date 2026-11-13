@@ -48,12 +48,11 @@ class FlowState:
 
     @classmethod
     def attributed(cls, flow: Flow, activity: AccountActivity, totals: FlowTotals) -> FlowState:
-        assets = frozenset(flow.configuration.assets)
         return cls(
             flow_id=flow.id,
             currency=activity.currency,
             allocated_capital=flow.configuration.allocated_capital,
-            positions=tuple(position for position in activity.positions if position.asset in assets),
+            positions=tuple(position for position in activity.positions if flow.configuration.covers(position.asset)),
             realized_pnl=totals.realized_pnl,
             fees=totals.fees,
             funding=totals.funding,
@@ -78,8 +77,16 @@ class FlowState:
         return sum((position.unrealized_pnl for position in self.positions), Decimal(0))
 
     @property
+    def funds(self) -> Decimal:
+        """The money of the flow: the capital allocated plus what its closed trades earned, net of fees and funding.
+
+        Quotas and percentage risk limits are measured on it (ADR 0078).
+        """
+        return self.allocated_capital + self.realized_pnl - self.fees + self.funding
+
+    @property
     def available_liquidity(self) -> Decimal:
-        return self.allocated_capital + self.realized_pnl - self.fees + self.funding - self.margin
+        return self.funds - self.margin
 
     @property
     def total_value(self) -> Decimal:

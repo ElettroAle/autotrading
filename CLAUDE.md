@@ -105,6 +105,30 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
 Verificato da import-linter (contratti in `pyproject.toml`), eseguito da `tests/architecture/`.
 Un contratto non si allenta e non si aggiunge un `ignore_imports` senza approvazione del proprietario.
 
+## Test di architettura
+
+`tests/architecture/` verifica la separazione dei layer a ogni esecuzione della suite; una regola
+violata è un test rosso con file, riga, regola e dove va il codice.
+
+- Import: i contratti di import-linter; ogni cartella di tecnologia e ogni contesto (tenancy esclusa)
+  stanno nel proprio contratto di indipendenza.
+- Porte: un `Protocol` o un `*Port` si definisce solo in `application/<contesto>/ports.py`.
+- `bootstrap.py` collega soltanto: nessuna decisione (`if`, cicli, confronti, operatori booleani,
+  aritmetica, `try`, comprehension con filtro) fuori dalle funzioni nominate che leggono la
+  configurazione, e a livello di modulo solo nomi e valori di configurazione nominati.
+- Domain e application non usano librerie standard tecniche (rete, processi, thread, ambiente:
+  `os`, `threading`, `concurrent`, `asyncio`, `socket`, `http`, `urllib`, `ssl`, `subprocess`, ...).
+- Domain e application non nominano tecnologie, exchange, fornitori IA o valute di regolamento nei
+  testi del codice (docstring escluse).
+- Si solleva solo un errore del progetto; nessun `except` generico (`Exception`, `BaseException`, nudo).
+- Un caso d'uso per modulo, con il solo metodo pubblico `execute`; un `*Command` è una dataclass frozen.
+- Una classe pubblica di `adapters/outbound/<tecnologia>/` è un `*Adapter` o un `*Error`.
+
+Le violazioni esistenti sono elencate per nome in `tests/architecture/known_violations.py`, ciascuna
+con il Bug che la elimina. L'elenco può solo diminuire: una violazione nuova e una voce non più
+violata sono entrambe test rossi. Una regola non si allenta e l'elenco non cresce senza
+approvazione del proprietario.
+
 ## Nomenclatura
 
 | Cosa | Forma | Esempio |

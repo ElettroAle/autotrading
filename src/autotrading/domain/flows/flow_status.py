@@ -13,3 +13,7 @@ class FlowStatus(StrEnum):
     def not_stopped(self) -> bool:
         """Active or paused: the flow still counts on its key and its positions (R1.4.1)."""
         return self in {FlowStatus.ACTIVE, FlowStatus.PAUSED}
+
+    @property
+    def runs_cycles(self) -> bool:
+        return self is FlowStatus.ACTIVE

@@ -42,6 +42,10 @@ class FlowConfiguration:
         if not self.allocated_capital.is_finite() or self.allocated_capital <= 0:
             raise AllocatedCapitalNotPositiveError
 
+    def covers(self, asset: str) -> bool:
+        """The flow trades only its own assets: a position on another asset belongs to someone else."""
+        return asset in self.assets
+
     @property
     def risk_policy(self) -> RiskPolicy:
         return RiskPolicy(self.risk_limits, self.bring_to_minimum)

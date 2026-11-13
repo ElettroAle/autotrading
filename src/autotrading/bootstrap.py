@@ -117,11 +117,7 @@ from autotrading.application.accounts.ports import (
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AgentAnswer, AskAgentCommand, AskAgentUseCase
 from autotrading.application.agent.errors import (
-    ModelCreditExhaustedError,
-    ModelKeyMissingError,
-    ModelKeyRejectedError,
     ProviderKeyNotFoundError,
-    ProviderKeyNotOpenedError,
 )
 from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
@@ -146,8 +142,6 @@ from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
-    FlowLedgerIncompleteError,
-    FlowPositionMismatchError,
     InvalidFlowSettingError,
 )
 from autotrading.application.flows.list_flows import ListFlowsUseCase
@@ -163,11 +157,14 @@ from autotrading.application.flows.ports import (
     MarketsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
-from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
+from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateCommand, ReadCycleFlowStateUseCase
+from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
-    ReconcileAccountCommand,
     ReconcileAccountUseCase,
-    ReconciliationOutcome,
+)
+from autotrading.application.flows.reconcile_account_for_cycle import (
+    ReconcileAccountForCycleCommand,
+    ReconcileAccountForCycleUseCase,
 )
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingCommand, RecordManualClosingUseCase
@@ -208,7 +205,7 @@ from autotrading.application.sources.ports import (
 )
 from autotrading.application.sources.read_forecast import ReadForecastUseCase
 from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase
-from autotrading.application.sources.read_news import MAX_AGE_HOURS, ReadNewsUseCase
+from autotrading.application.sources.read_news import ReadNewsUseCase
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand, RecordActualPricesUseCase
@@ -237,13 +234,14 @@ from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
+from autotrading.domain.flows.cycle_funds import CycleFunds
 from autotrading.domain.flows.errors import InvalidClosedPositionError, ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.flow_timing import FlowTiming
+from autotrading.domain.flows.flow_timing import FlowTiming, flow_beginning
 from autotrading.domain.flows.ledger import ExecutionsWindow
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
@@ -288,8 +286,6 @@ SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNAT
 MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
-ZERO = Decimal(0)
-PERCENT = Decimal("0.01")
 
 operations = logging.getLogger("autotrading.bootstrap")
 # The notifications show the values of Hyperliquid, settled in USDC, and an opening by its value in whole units.
@@ -388,9 +384,7 @@ class FlowSummariesFromFlows:
 def _summary_of(flow: Flow, account: str, timing: FlowTiming | None) -> FlowSummary:
     configuration = flow.configuration
     anchor = None if timing is None else timing.anchor
-    schedule = None
-    if flow.status is FlowStatus.ACTIVE and anchor is not None:
-        schedule = CycleSchedule(anchor, timedelta(minutes=configuration.cycle_interval.minutes))
+    interval = timedelta(minutes=configuration.cycle_interval.minutes)
     return FlowSummary(
         flow_id=flow.id.value,
         name=flow.name.value,
@@ -398,7 +392,7 @@ def _summary_of(flow: Flow, account: str, timing: FlowTiming | None) -> FlowSumm
         status=flow.status.value,
         pause_reason=None if timing is None else timing.pause_reason,
         model=configuration.model.name,
-        schedule=schedule,
+        schedule=CycleSchedule.planned(flow.status.runs_cycles, anchor, interval),
     )
 
 
@@ -545,11 +539,14 @@ class SourceSettingsFromSources:
 
 def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
     """Bridges the sources context to the agent context: each collected value with the weight of its source (R1.3.2)."""
-    return tuple(
-        SourceData(source.source, source.weight, sample.asset, sample.values)
-        for source in collected
-        for sample in source.samples
-    )
+    return tuple(data for source in collected for data in _agent_data_of(source))
+
+
+def _agent_data_of(source: CollectedSource) -> tuple[SourceData, ...]:
+    values = tuple(SourceData(source.source, source.weight, sample.asset, sample.values) for sample in source.samples)
+    if source.note is None:
+        return values
+    return (*values, SourceData(source.source, source.weight, None, source.note))
 
 
 @dataclass(frozen=True, slots=True)
@@ -681,14 +678,7 @@ class AccountReadingFromAccounts:
         )
 
     def flow_on(self, account_id: UUID, asset: str) -> str | None:
-        trading = (
-            flow
-            for flow in self._flows.list()
-            if flow.account_id == account_id
-            and flow.status in (FlowStatus.ACTIVE, FlowStatus.PAUSED)
-            and asset in flow.configuration.assets
-        )
-        return next((flow.name.value for flow in trading), None)
+        return next((flow.name.value for flow in self._flows.list() if flow.holds(account_id, asset)), None)
 
 
 class OrderExecutionFromOrders:
@@ -1262,20 +1252,31 @@ class CycleFlow:
 
     @property
     def positions(self) -> tuple[Position, ...]:
-        return tuple(position for position in self.account.positions if position.coin in self.configuration.assets)
+        return tuple(position for position in self.account.positions if self.configuration.covers(position.coin))
 
     @property
     def available_liquidity(self) -> Decimal:
-        free = min(self.attributed.available_liquidity, self.account.available_margin.amount)
-        return max(free, ZERO)
+        return self._funds.available_liquidity
 
     @property
     def total_value(self) -> Decimal:
-        return self.attributed.total_value
+        return self._funds.total_value
 
     @property
     def return_percent(self) -> Decimal:
-        return self.attributed.return_percent.quantize(PERCENT)
+        return self._funds.return_percent
+
+    @property
+    def _funds(self) -> CycleFunds:
+        return CycleFunds(self.attributed, self.account.available_margin.amount)
+
+    def risk_state(self) -> RiskState:
+        return RiskState(
+            currency=self.account.balance.currency,
+            funds=self.attributed.funds,
+            available_liquidity=self.available_liquidity,
+            open_assets=frozenset(position.coin for position in self.positions),
+        )
 
 
 def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
@@ -1289,25 +1290,26 @@ class FlowStateFromFlows:
     """Bridges the flows and accounts contexts to the cycles context in the worker (ADR 0042).
 
     The state is read from the exchange at every cycle; a refusal of the credentials is a permanent error of the
-    account, so every flow of the account pauses (R1.2.4).
+    account, so every flow of the account pauses (R1.2.4). The account is reconciled first, so the ledger holds every
+    execution the state counts (ReadCycleFlowStateUseCase).
     """
 
     def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
-    def read(self, flow_id: UUID) -> FlowSnapshot:
-        """The account of the flow is reconciled first, so the ledger holds every execution the state counts.
+    def read(self, flow_id: UUID) -> FlowSnapshot[CycleFlow]:
+        ports = self._ports_of(self._directory.tenant_of(flow_id))
+        reconciled = _reconcile_for_cycle(ports).execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
+        return self._snapshot(flow_id, reconciled=reconciled)
 
-        A flow whose position on the exchange is not the one its ledger expects sends no order: the cycle stops and
-        the flow pauses with the reason (Bug 155, ADR 0064), once the executions published meanwhile are recorded too
-        (Bug 165, ADR 0075). Without a reconciliation the ledger may lag behind the
-        exchange, so the comparison waits for the next cycle.
-        """
-        reconciled = self._reconcile(flow_id)
-        return self._snapshot(flow_id, compared=reconciled)
+    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
+        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
+        ports = self._ports_of(self._directory.tenant_of(flow_id))
+        _reconcile_for_cycle(ports).execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
+        return self._snapshot(flow_id, reconciled=False).state
 
-    def _snapshot(self, flow_id: UUID, *, compared: bool) -> FlowSnapshot:
+    def _snapshot(self, flow_id: UUID, *, reconciled: bool) -> FlowSnapshot[CycleFlow]:
         tenant_id = self._directory.tenant_of(flow_id)
         ports = self._ports_of(tenant_id)
         flow = flow_of_cycle(ports, flow_id)
@@ -1315,67 +1317,30 @@ class FlowStateFromFlows:
         try:
             state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
         except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
-            raise FlowCredentialsRejectedError(account.name.value) from error
-        attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
-        if compared and attributed.position_mismatch() is not None:
-            attributed = self._compared_again(ports, flow)
+            raise FlowCredentialsRejectedError(account.name.value, account.id.value) from error
+        read_cycle_state = ReadCycleFlowStateUseCase(ports.read_flow_state, _reconcile_for_cycle(ports))
+        attributed = read_cycle_state.execute(ReadCycleFlowStateCommand(flow.id, reconciled))
+        started_at = flow_beginning(ports.timing.timings().get(flow.id), self._directory.anchor_of(flow_id))
         cycle_flow = CycleFlow(
-            tenant_id,
-            flow,
-            account.name.value,
-            account.exchange.value,
-            self._started_at(ports, flow),
-            state,
-            attributed,
+            tenant_id, flow, account.name.value, account.exchange.value, started_at, state, attributed
         )
         return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 
-    def _compared_again(self, ports: TenantCyclePorts, flow: Flow) -> FlowState:
-        """The flow pauses only for a difference the executions published meanwhile do not explain (Bug 165).
 
-        The exchange may publish an execution after the reading of the executions and before that of the positions:
-        the account is reconciled once more and the positions compared again. If the executions cannot be read again
-        the cycle fails without pausing the flow, and the next cycle compares them.
-        """
-        if not self._reconcile(flow.id.value):
-            raise FlowExchangeUnavailableError
-        attributed = ports.read_flow_state.execute(ReadFlowStateCommand(flow.id))
-        mismatch = attributed.position_mismatch()
-        if mismatch is not None:
-            raise FlowPositionMismatchError(mismatch)
-        return attributed
-
-    def _started_at(self, ports: TenantCyclePorts, flow: Flow) -> datetime:
-        """The first start of the flow, the same beginning its return counts from (ADR 0069).
-
-        A flow the database has not stamped yet started at the anchor of its cycles.
-        """
-        timing = ports.timing.timings().get(flow.id)
-        first_start = None if timing is None else timing.first_start
-        return self._directory.anchor_of(flow.id.value) if first_start is None else first_start
-
-    def update(self, flow_id: UUID, executions: Sequence[object]) -> object:  # noqa: ARG002 - the signature of the port
-        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
-        self._reconcile(flow_id)
-        return self._snapshot(flow_id, compared=False).state
-
-    def _reconcile(self, flow_id: UUID) -> bool:
-        """What no flow explains is recorded once and notified (R1.6.2); the new executions enter the ledger."""
-        ports = self._ports_of(self._directory.tenant_of(flow_id))
-        try:
-            outcome = ports.reconcile_account.execute(ReconcileAccountCommand(FlowId(flow_id)))
-        except FlowExchangeUnavailableError:
-            # The flows keep operating: the next cycle reads the account again (R1.6.2).
-            operations.warning("riconciliazione del conto non riuscita", extra={"flow_id": str(flow_id)})
-            return False
-        for notification in _reconciliation_notifications(ports, outcome):
-            ports.notify.execute(notification)
-        return True
+def _reconcile_for_cycle(ports: TenantCyclePorts) -> ReconcileAccountForCycleUseCase:
+    return ReconcileAccountForCycleUseCase(ports.reconcile_account, UnattributableNotices(ports))
 
 
-def _reconciliation_notifications(ports: TenantCyclePorts, outcome: ReconciliationOutcome) -> list[Notification]:
-    # A position closed outside is told by the history it enters (ADR 0070): only the new cases remain.
-    return [_unattributable_notification(ports, item) for item in outcome.new_items]
+class UnattributableNotices:
+    """Bridges the cases no flow explains to the notifications of the tenant (R1.6.2)."""
+
+    def __init__(self, ports: TenantCyclePorts) -> None:
+        self._ports = ports
+
+    def notice(self, items: Sequence[UnattributableItem]) -> None:
+        # A position closed outside is told by the history it enters (ADR 0070): only the new cases remain.
+        for item in items:
+            self._ports.notify.execute(_unattributable_notification(self._ports, item))
 
 
 def _unattributable_notification(ports: TenantCyclePorts, item: UnattributableItem) -> Notification:
@@ -1388,12 +1353,9 @@ def _unattributable_notification(ports: TenantCyclePorts, item: UnattributableIt
     return Notification.unattributable_movement(account, Amount(item.amount, USDC))
 
 
-PROVIDER_ERRORS = (ModelKeyRejectedError, ModelCreditExhaustedError, ModelKeyMissingError, ProviderKeyNotOpenedError)
-
-
 class FlowPauseFromFlows:
-    """Bridges a permanent error of a cycle to the flows context: the account or the provider it concerns tells
-    which other flows pause with the flow of the cycle (R1.2.4).
+    """Bridges a permanent error of a cycle to the flows context: the error declares the account or the provider it
+    concerns, and the flows context pauses the flows involved (R1.2.4, ADR 0082).
     """
 
     def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
@@ -1402,13 +1364,7 @@ class FlowPauseFromFlows:
 
     def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
         ports = self._ports_of(self._directory.tenant_of(flow_id))
-        account_id = None
-        if isinstance(error, FlowCredentialsRejectedError):
-            account_id = flow_of_cycle(ports, flow_id).account_id
-        if isinstance(error, FlowLedgerIncompleteError):
-            account_id = error.account_id
-        provider = error.provider.value if isinstance(error, PROVIDER_ERRORS) else None
-        command = PauseAffectedFlowsCommand(flow_id, str(error), account_id=account_id, provider=provider)
+        command = PauseAffectedFlowsCommand.of_error(flow_id, error)
         for paused in PauseAffectedFlowsUseCase(ports.flows, ports.pause).execute(command):
             ports.notify.execute(Notification.flow_paused(paused.name.value, str(error)))
 
@@ -1422,8 +1378,8 @@ class SourcesFromSources:
         self._ports_of = ports_of
         self._services = services
 
-    def collect(self, request: SourceRequest, source: str) -> object:
-        cycle_flow = _cycle_flow_of(request.snapshot.state)
+    def collect(self, request: SourceRequest[CycleFlow], source: str) -> SourcesData:
+        cycle_flow = request.snapshot.state
         ports = self._ports_of(cycle_flow.tenant_id)
         configuration = cycle_flow.configuration
         selection = next((selected for selected in configuration.sources if selected.name == source), None)
@@ -1439,7 +1395,7 @@ class SourcesFromSources:
         )
         readers = self._readers_of(ports, configuration.cycle_interval.minutes)
         collected = CollectSourceUseCase(SOURCE_CATALOG, readers, ports.samples).execute(command)
-        return agent_sources_of([collected]) or _nothing_collected(selection)
+        return agent_sources_of([collected])
 
     def _readers_of(self, ports: TenantCyclePorts, cycle_minutes: int) -> dict[str, SourceReaderPort]:
         services = self._services
@@ -1453,13 +1409,7 @@ class SourcesFromSources:
         return readers
 
 
-def _nothing_collected(selection: SourceSelection) -> tuple[SourceData, ...]:
-    """An empty source still speaks to the agent: no recent news is itself a datum (R1.3.7)."""
-    if selection.name != NEWS.name:
-        return ()
-    hours = NEWS.settings(selection.parameters)[MAX_AGE_HOURS]
-    window = "nell'ultima ora" if hours == 1 else f"nelle ultime {hours} ore"
-    return (SourceData(selection.name, selection.weight, None, {"nota": f"nessuna notizia {window}"}),)
+type SourcesData = tuple[SourceData, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1479,11 +1429,11 @@ class ContextFromAgent:
     def compose(
         self,
         flow_id: UUID,  # noqa: ARG002 - the signature of the port
-        snapshot: FlowSnapshot,
-        readings: Sequence[SourceReading],
+        snapshot: FlowSnapshot[CycleFlow],
+        readings: Sequence[SourceReading[SourcesData]],
         absent: Sequence[AbsentSource],
-    ) -> object:
-        cycle_flow = _cycle_flow_of(snapshot.state)
+    ) -> CycleContext:
+        cycle_flow = snapshot.state
         configuration = cycle_flow.configuration
         agent_context = AgentContext(
             instructions=configuration.instructions,
@@ -1492,7 +1442,7 @@ class ContextFromAgent:
             started_at=cycle_flow.started_at,
             now=self._clock.now(),
             state=_state_view(cycle_flow),
-            sources=tuple(data for reading in readings for data in _source_data_of(reading.data)),
+            sources=tuple(data for reading in readings for data in reading.data),
             missing=tuple(f"{source.source}: {source.reason}" for source in absent),
         )
         return CycleContext(cycle_flow, agent_context)
@@ -1502,6 +1452,7 @@ def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
     return FlowStateView(
         currency=cycle_flow.account.balance.currency,
         allocated_capital=cycle_flow.configuration.allocated_capital,
+        funds=cycle_flow.attributed.funds,
         available_liquidity=cycle_flow.available_liquidity,
         total_value=cycle_flow.total_value,
         return_percent=cycle_flow.return_percent,
@@ -1520,18 +1471,6 @@ def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
     )
 
 
-def _cycle_flow_of(state: object) -> CycleFlow:
-    if not isinstance(state, CycleFlow):
-        raise FlowOfCycleNotFoundError
-    return state
-
-
-def _source_data_of(data: object) -> tuple[SourceData, ...]:
-    if not isinstance(data, tuple):
-        return ()
-    return tuple(item for item in data if isinstance(item, SourceData))
-
-
 @dataclass(frozen=True, slots=True)
 class CycleDecisions:
     flow: CycleFlow
@@ -1545,9 +1484,7 @@ class AgentFromAgent:
         self._ports_of = ports_of
         self._services = services
 
-    def decide(self, flow_id: UUID, context: object) -> object:  # noqa: ARG002 - the signature of the port
-        if not isinstance(context, CycleContext):
-            raise FlowOfCycleNotFoundError
+    def decide(self, flow_id: UUID, context: CycleContext) -> CycleDecisions:  # noqa: ARG002 - the signature of the port
         ports = self._ports_of(context.flow.tenant_id)
         services = self._services
         model = context.flow.configuration.model
@@ -1570,21 +1507,18 @@ class RiskFromFlows:
     def __init__(self, exchange_limits: Mapping[str, ExchangeLimitsPort]) -> None:
         self._exchange_limits = exchange_limits
 
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:  # noqa: ARG002 - the signature of the port
-        if not isinstance(decisions, CycleDecisions):
-            raise FlowOfCycleNotFoundError
+    def check(
+        self,
+        flow_id: UUID,  # noqa: ARG002 - the signature of the port
+        snapshot: FlowSnapshot[CycleFlow],  # noqa: ARG002 - the signature of the port
+        decisions: CycleDecisions,
+    ) -> RiskReview[CycleOrder]:
         cycle_flow = decisions.flow
         configuration = cycle_flow.configuration
-        state = RiskState(
-            currency=cycle_flow.account.balance.currency,
-            allocated_capital=configuration.allocated_capital,
-            available_liquidity=cycle_flow.available_liquidity,
-            open_assets=frozenset(position.coin for position in cycle_flow.positions),
-        )
         command = CheckRiskCommand(
             tuple(_intent_of(decision) for decision in decisions.answer.response.decisions),
             configuration.risk_policy,
-            state,
+            cycle_flow.risk_state(),
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
         orders = tuple(
@@ -1610,8 +1544,8 @@ class OrdersFromOrders:
     def __init__(self, ports_of: CyclePortsOf) -> None:
         self._ports_of = ports_of
 
-    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
-        approved = [order for order in orders if isinstance(order, CycleOrder)]
+    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[CycleOrder]) -> Sequence[Order]:
+        approved = list(orders)
         if not approved:
             return ()
         cycle_flow = approved[0].flow
@@ -1871,9 +1805,12 @@ class CycleRuntime:
     launcher: CycleLauncherPort
 
 
+type WorkerCycles = RunDueCyclesUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, Order]
+
+
 def run_due_cycles(
     directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
-) -> RunDueCyclesUseCase:
+) -> WorkerCycles:
     """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
     steps = CycleSteps(
         flow_state=FlowStateFromFlows(directory, ports_of),

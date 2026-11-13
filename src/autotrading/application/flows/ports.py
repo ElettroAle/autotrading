@@ -175,6 +175,12 @@ class AccountActivityPort(Protocol):
         ...
 
 
+class UnattributableNoticePort(Protocol):
+    def notice(self, items: Sequence[UnattributableItem]) -> None:
+        """Tells the user what the account shows that no flow explains, each case the first time found (R1.6.2)."""
+        ...
+
+
 class AccountExecutionsPort(Protocol):
     """In the worker: the executions and the funding the exchange still holds of an account since a moment (ADR 0063).
 

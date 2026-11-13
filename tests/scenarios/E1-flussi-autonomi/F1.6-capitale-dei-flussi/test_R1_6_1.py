@@ -13,6 +13,7 @@ from autotrading.application.flows.list_account_operations import (
     ListAccountOperationsUseCase,
 )
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand, ListFlowOperationsUseCase
+from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import ExecutionKind, FlowTotals
 from autotrading.domain.flows.operations import FUNDING, AccountScope, OperationsPage, OperationsQuery
@@ -288,6 +289,16 @@ def agent_receives_liquidity(flow_cycles: FlowCycles, a: str) -> None:
 def opening_blocked(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
     assert flow_cycles.platform.order_exchange.sent == []
     assert reason in str(flow_cycles.last_record(flow).documents)
+
+
+@then(step(r'l\'apertura del flusso "{flow}" è approvata per un valore di {a} USDC'))
+def opening_approved(flow_cycles: FlowCycles, flow: str, a: str) -> None:
+    documents = flow_cycles.last_record(flow).documents
+    [risk] = [document.content for document in documents if document.step is CycleStep.RISK_CHECK]
+    outcomes = risk["esiti"]
+    assert isinstance(outcomes, list)
+    [outcome] = outcomes
+    assert (outcome["tipo"], Decimal(outcome["value"])) == ("ApprovedOpening", amount(a))
 
 
 @when(step(r'si ricalcolano dallo storico i totali del flusso "{flow}"'))

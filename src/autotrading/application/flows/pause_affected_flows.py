@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from autotrading.application.flows.ports import AutomaticPausePort, FlowRepositoryPort
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 
@@ -14,6 +15,12 @@ class PauseAffectedFlowsCommand:
     reason: str
     account_id: UUID | None = None
     provider: str | None = None
+
+    @classmethod
+    def of_error(cls, flow_id: UUID, error: AutotradingError) -> PauseAffectedFlowsCommand:
+        """The error declares what it concerns beyond the flow of its cycle; its message is the reason (ADR 0082)."""
+        scope = error.scope
+        return cls(flow_id, str(error), account_id=scope.account_id, provider=scope.provider)
 
 
 class PauseAffectedFlowsUseCase:

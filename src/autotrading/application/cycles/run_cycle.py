@@ -41,15 +41,19 @@ class RunCycleCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class CycleSteps:
-    """The other contexts behind the steps of the cycle, each through a port of its own (ADR 0041)."""
+class CycleSteps[S = object, D = object, C = object, A = object, O = object, E = object]:
+    """The other contexts behind the steps of the cycle, each through a port of its own (ADR 0041).
 
-    flow_state: FlowStatePort
-    sources: SourceCollector
-    context: ContextPort
-    agent: AgentPort
-    risk: RiskPort
-    orders: OrderPort
+    What one step hands to the next has the type the composition root binds: the state of the flow, the data of the
+    sources, the context, the decisions, the approved orders and their executions (ADR 0082).
+    """
+
+    flow_state: FlowStatePort[S, E]
+    sources: SourceCollector[S, D]
+    context: ContextPort[S, D, C]
+    agent: AgentPort[C, A]
+    risk: RiskPort[S, A, O]
+    orders: OrderPort[O, E]
     journal: CycleJournalPort
 
 
@@ -98,14 +102,14 @@ class _Progress:
         )
 
 
-class RunCycleUseCase:
+class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:
     """Runs one planned cycle of a flow, step by step, stopping at the first failure (R1.2.1-R1.2.5).
 
     Fail fast: no retry and no step after the failing one. The only handler of the errors of the cycle records the
     failed cycle and, for a permanent error, pauses the flows involved and raises the error anyway (R1.2.4).
     """
 
-    def __init__(self, steps: CycleSteps, guards: CycleGuards) -> None:
+    def __init__(self, steps: CycleSteps[S, D, C, A, O, E], guards: CycleGuards) -> None:
         self._steps = steps
         self._guards = guards
 

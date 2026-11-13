@@ -32,6 +32,8 @@ Decisioni in `docs/adr/0001`-`0013`. Requisiti in `specs/E0-esecuzione-verificat
   Telegram) arrivano dal segreto dell'environment via stdin di Tailscale SSH e diventano file 0400 (ADR 0071).
 - Permessi minimi per job (`contents: read` salvo necessità dichiarata).
 - I nomi dei job di `reusable-quality.yml` sono i controlli obbligatori del ruleset di `main`.
+- Ogni pull request verso `main` collega i suoi work item con `AB#<id>` nella descrizione (`quality / work item`,
+  ADR 0084); esente solo `dependabot[bot]`.
 - Il deploy usa sempre il digest dell'immagine; la promozione non ricostruisce.
 - `tools/` contiene gli script Python della pipeline: fuori dall'esagono, stessi principi di codice,
   unit test in `tests/unit/tools/`. Ogni errore discende da `tools.errors.PipelineError`.
