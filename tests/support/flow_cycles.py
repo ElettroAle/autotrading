@@ -24,8 +24,7 @@ from autotrading.application.flows.reconcile_account_for_cycle import ReconcileA
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
-from autotrading.application.flows.run_cycle import CycleGuards
-from autotrading.application.flows.tell_cycle_failure import TellCycleFailureUseCase
+from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
@@ -44,12 +43,11 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
-    CycleRuntime,
     CycleServices,
-    FlowPauseFromFlows,
     TenantCyclePorts,
+    WorkerCycle,
     record_actual_prices,
-    run_due_cycles,
+    run_cycle_for,
 )
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.agent_context import MessageRole
@@ -332,16 +330,12 @@ class FlowCycles:
                     if flow.status is FlowStatus.ACTIVE
                 ]
 
-        guards = CycleGuards(
-            self.records,
-            InMemoryFlowLockAdapter(),
-            FlowPauseFromFlows(self.directory, self.ports_of),
-            self.clock,
-            TellCycleFailureUseCase(self.directory, lambda tenant_id: self.ports_of(tenant_id).cycle_failure),
-        )
-        runtime = CycleRuntime(Scheduled(), guards, self.launcher)
-        run_due_cycles(self.directory, self.ports_of, self.services(), runtime).execute()
+        RunDueCyclesUseCase(Scheduled(), self.directory, self.run_cycle_of, self.launcher, self.clock).execute()
         record_actual_prices(self.directory, self.ports_of, self.services())
+
+    def run_cycle_of(self, tenant_id: TenantId) -> WorkerCycle:
+        lock = InMemoryFlowLockAdapter()
+        return run_cycle_for(self.ports_of, self.services(), lambda _tenant: self.records, lock, tenant_id)
 
     def anchor_of(self, flow: Flow) -> datetime:
         """As the trigger of the database: a flow is anchored at the instant it is first seen active (ADR 0042)."""

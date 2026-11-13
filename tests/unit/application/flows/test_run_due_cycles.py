@@ -3,6 +3,7 @@ from collections.abc import Iterator
 import pytest
 
 from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.cycles import Cycles, at
 
 
@@ -67,3 +68,15 @@ def test_a_slow_flow_does_not_hold_the_others(cycles: Cycles) -> None:
 
     assert cycles.record_at("beta", "10:15:00").outcome is CycleOutcome.COMPLETED
     assert cycles.records_of("alfa") == []
+
+
+def test_each_cycle_runs_on_the_ports_of_the_tenant_of_its_flow(cycles: Cycles) -> None:
+    anna, bruno = TenantId.new(), TenantId.new()
+    cycles.add_flow("alfa", tenant_id=anna)
+    cycles.add_flow("beta", tenant_id=bruno)
+    cycles.add_flow("gamma", anchor="11:00:00", tenant_id=bruno)
+
+    cycles.tick("10:15:00")
+
+    assert sorted(cycles.cycle_tenants, key=str) == sorted([anna, bruno], key=str)
+    assert cycles.planned.tenants() == {anna, bruno}
