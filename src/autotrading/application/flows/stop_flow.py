@@ -10,7 +10,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionLeftOpen, StopOutcome
 from autotrading.domain.tenancy.user_id import UserId
@@ -48,7 +48,7 @@ class StopFlowUseCase:
         self._ports = ports
 
     def execute(self, command: StopFlowCommand) -> StopOutcome:
-        flow = self._flows.get(command.flow_id).after(FlowCommand.STOP)
+        flow = self._flows.get(command.flow_id).after(FlowAction.STOP)
         self._flows.change_status(flow)
         self._ports.cycles.wait_until_finished(flow.id)
         closings = [self._close(flow, asset, command) for asset in flow.configuration.assets]

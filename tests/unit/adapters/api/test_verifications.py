@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -74,7 +75,7 @@ def test_the_steps_carry_what_was_read_and_what_the_orders_did(client_of: Client
     assert opening["order"]["succeeded"]
     assert opening["order"]["realized_pnl"] == "0"
     assert after_opening["order"] is None
-    assert after_opening["reading"]["positions"] == [{"coin": "BTC", "side": "long", "size": "0.00012", "leverage": 2}]
+    assert after_opening["reading"]["positions"] == [{"coin": "BTC", "side": "long", "size": "0.00010", "leverage": 2}]
     assert (after_opening["reading"]["balance"], after_opening["reading"]["currency"]) == ("1000.00", "USDC")
     assert after_closing["reading"]["positions"] == []
 
@@ -136,3 +137,36 @@ def test_an_unreachable_worker_asks_to_retry_the_procedure(
         503,
         "servizio di esecuzione non raggiungibile, riprovare",
     )
+
+
+def test_the_chosen_amount_is_the_value_of_the_opening(platform: Platform, client_of: Client, account_id: str) -> None:
+    response = client_of("anna").post(f"/accounts/{account_id}/verifications", json={"amount": "25"})
+
+    assert response.status_code == 200
+    opening = platform.order_exchange.sent[0]
+    assert opening.size * platform.order_exchange.markets["BTC"].mid_price == Decimal(25)
+
+
+@pytest.mark.parametrize("amount", ["0", "-5", "dieci"])
+def test_an_amount_that_is_not_a_positive_number_is_refused_before_the_worker(
+    platform: Platform, client_of: Client, account_id: str, amount: str
+) -> None:
+    # The worker out of reach would answer 503: a 422 says the API refused the amount on its own.
+    platform.worker_reachable = False
+
+    response = client_of("anna").post(f"/accounts/{account_id}/verifications", json={"amount": amount})
+
+    assert response.status_code == 422
+    assert platform.runs_of(platform.tenant_of("anna")).runs == []
+    assert platform.order_exchange.sent == []
+
+
+def test_a_procedure_already_in_progress_on_the_account_does_not_start_another(
+    platform: Platform, client_of: Client, account_id: str
+) -> None:
+    platform.running_verifications.add((UUID(account_id), "BTC"))
+
+    response = client_of("anna").post(f"/accounts/{account_id}/verifications")
+
+    assert (response.status_code, response.json()["detail"]) == (409, "procedura di verifica già in corso su BTC")
+    assert platform.order_exchange.sent == []

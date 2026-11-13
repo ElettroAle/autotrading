@@ -1,5 +1,6 @@
 """The API side and the worker side of the procedure of verification, run against each other in memory (ADR 0024)."""
 
+import json
 from decimal import Decimal
 from secrets import token_hex
 from uuid import UUID, uuid4
@@ -52,17 +53,44 @@ def access_of(worker: Worker, account: Account) -> TradingAccess:
 def test_the_run_of_the_worker_arrives_unchanged(worker: Worker) -> None:
     account = worker.saved_account()
 
-    run = adapter_on(worker).run(account.id.value, ANNA)
+    run = adapter_on(worker).run(account.id.value, ANNA, None)
 
     assert worker.runs.runs == [run]
     assert (run.outcome, run.user_id) == ("superata", "oid-anna")
+
+
+def test_the_chosen_amount_reaches_the_worker(worker: Worker) -> None:
+    account = worker.saved_account()
+
+    adapter_on(worker).run(account.id.value, ANNA, Decimal(31))
+
+    opening = worker.order_exchange.sent[0]
+    assert opening.size * worker.order_exchange.markets["BTC"].mid_price == Decimal(31)
+
+
+def test_the_request_carries_the_amount_as_text_and_none_when_not_chosen() -> None:
+    bodies: list[bytes] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(request.content)
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://worker")
+    for amount in (Decimal("0.1"), None):
+        with pytest.raises(VerificationAccountNotFoundError):
+            HttpxVerificationAdapter(client, TOKEN, TENANT).run(uuid4(), ANNA, amount)
+
+    assert [json.loads(body) for body in bodies] == [
+        {"user_id": "oid-anna", "amount": "0.1"},
+        {"user_id": "oid-anna", "amount": None},
+    ]
 
 
 def test_a_failed_run_arrives_with_its_steps_and_warning(worker: Worker) -> None:
     account = worker.saved_account()
     worker.order_exchange.closing_rejection = REFUSED
 
-    run = adapter_on(worker).run(account.id.value, ANNA)
+    run = adapter_on(worker).run(account.id.value, ANNA, None)
 
     assert worker.runs.runs == [run]
     assert run.warning == "sul conto resta aperta una posizione long su BTC"
@@ -74,7 +102,7 @@ def test_an_account_not_ready_does_not_start_with_the_reason(worker: Worker) -> 
     worker.order_exchange.hold(access_of(worker, account), HeldPosition("BTC", Direction.LONG, Decimal(1), 2))
 
     with pytest.raises(VerificationNotStartedError) as raised:
-        adapter_on(worker).run(account.id.value, ANNA)
+        adapter_on(worker).run(account.id.value, ANNA, None)
 
     assert raised.value.reason == "posizione già aperta su BTC"
     assert worker.runs.runs == []
@@ -85,7 +113,7 @@ def test_an_account_that_cannot_be_read_before_starting_keeps_the_reason(worker:
     worker.exchange.reachable = False
 
     with pytest.raises(VerificationStepError) as raised:
-        adapter_on(worker).run(account.id.value, ANNA)
+        adapter_on(worker).run(account.id.value, ANNA, None)
 
     assert raised.value.message == "exchange non raggiungibile, riprovare"
 
@@ -94,7 +122,7 @@ def test_an_account_of_another_tenant_is_not_found_by_the_worker(worker: Worker)
     theirs = worker.saved_account(TenantId.new())
 
     with pytest.raises(VerificationAccountNotFoundError):
-        adapter_on(worker).run(theirs.id.value, ANNA)
+        adapter_on(worker).run(theirs.id.value, ANNA, None)
 
     assert worker.order_exchange.sent == []
 
@@ -103,7 +131,7 @@ def test_a_caller_without_the_token_is_refused_and_reads_as_an_unavailable_worke
     account = worker.saved_account()
 
     with pytest.raises(VerificationWorkerUnavailableError):
-        adapter_on(worker, token=token_hex(16)).run(account.id.value, ANNA)
+        adapter_on(worker, token=token_hex(16)).run(account.id.value, ANNA, None)
 
     assert worker.order_exchange.sent == []
 
@@ -115,7 +143,7 @@ def test_a_worker_that_does_not_answer_is_unavailable() -> None:
     client = httpx.Client(transport=httpx.MockTransport(refuse), base_url="http://worker")
 
     with pytest.raises(VerificationWorkerUnavailableError):
-        HttpxVerificationAdapter(client, TOKEN, TENANT).run(uuid4(), ANNA)
+        HttpxVerificationAdapter(client, TOKEN, TENANT).run(uuid4(), ANNA, None)
 
 
 @pytest.mark.parametrize(
@@ -151,7 +179,7 @@ def test_a_worker_that_does_not_answer_is_unavailable() -> None:
 )
 def test_an_answer_the_api_cannot_use_is_an_unavailable_worker(status: int, body: object) -> None:
     with pytest.raises(VerificationWorkerUnavailableError):
-        answering(status, body).run(uuid4(), ANNA)
+        answering(status, body).run(uuid4(), ANNA, None)
 
 
 def test_an_answer_that_is_not_json_is_an_unavailable_worker() -> None:
@@ -159,7 +187,7 @@ def test_an_answer_that_is_not_json_is_an_unavailable_worker() -> None:
     client = httpx.Client(transport=transport, base_url="http://worker")
 
     with pytest.raises(VerificationWorkerUnavailableError):
-        HttpxVerificationAdapter(client, TOKEN, TENANT).run(uuid4(), ANNA)
+        HttpxVerificationAdapter(client, TOKEN, TENANT).run(uuid4(), ANNA, None)
 
 
 def test_the_request_names_tenant_account_user_and_token() -> None:
@@ -173,12 +201,12 @@ def test_the_request_names_tenant_account_user_and_token() -> None:
     client = httpx.Client(transport=httpx.MockTransport(record), base_url="http://worker")
 
     with pytest.raises(VerificationAccountNotFoundError):
-        HttpxVerificationAdapter(client, TOKEN, TENANT).run(account_id, ANNA)
+        HttpxVerificationAdapter(client, TOKEN, TENANT).run(account_id, ANNA, None)
 
     (request,) = seen
     assert request.url.path == f"/tenants/{TENANT.value}/accounts/{account_id}/verifications"
     assert request.headers["Authorization"] == f"Bearer {TOKEN}"
-    assert request.content == b'{"user_id":"oid-anna"}'
+    assert json.loads(request.content) == {"user_id": "oid-anna", "amount": None}
     assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS
 
 

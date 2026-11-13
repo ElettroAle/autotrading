@@ -1,14 +1,15 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, override
 
 import pytest
 import requests
+from eth_account.signers.local import LocalAccount
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
-from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS
+from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdkAdapter
 from autotrading.adapters.outbound.hyperliquid.market_data import (
     MAX_PAGES,
     HyperliquidPriceHistoryAdapter,
@@ -27,7 +28,7 @@ def candle(open_ms: int, close: str, minutes: int = 1) -> dict[str, Any]:
 
 
 @dataclass
-class FakeSdk:
+class FakeSdk(HyperliquidSdkAdapter):
     """Stands in for the info client of the official SDK: it answers the pages and prices the test decides."""
 
     pages: list[list[dict[str, Any]]] = field(default_factory=list)
@@ -35,7 +36,8 @@ class FakeSdk:
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
-    def exchange(self, *_: object) -> FakeSdk:
+    @override
+    def exchange(self, wallet: LocalAccount, base_url: str, account_address: str, timeout: float) -> FakeSdk:
         return self
 
     def info(self, base_url: str, timeout: float) -> FakeSdk:

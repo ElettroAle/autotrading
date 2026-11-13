@@ -26,26 +26,26 @@ def _anthropic(key: ProviderKey) -> dict[str, str]:
 
 
 @dataclass(frozen=True, slots=True)
-class KeyCheck:
+class _KeyCheck:
     """A free request of the provider that needs a valid key and spends no credit (ADR 0029)."""
 
     url: str
     headers: Callable[[ProviderKey], dict[str, str]]
 
 
-KEY_CHECKS: Mapping[str, KeyCheck] = {
-    "anthropic": KeyCheck("https://api.anthropic.com/v1/models", _anthropic),
-    "openai": KeyCheck("https://api.openai.com/v1/models", _bearer),
-    "deepseek": KeyCheck("https://api.deepseek.com/models", _bearer),
+KEY_CHECKS: Mapping[str, _KeyCheck] = {
+    "anthropic": _KeyCheck("https://api.anthropic.com/v1/models", _anthropic),
+    "openai": _KeyCheck("https://api.openai.com/v1/models", _bearer),
+    "deepseek": _KeyCheck("https://api.deepseek.com/models", _bearer),
     # OpenRouter lists its models without a key: the key endpoint is the one that needs it.
-    "openrouter": KeyCheck("https://openrouter.ai/api/v1/key", _bearer),
+    "openrouter": _KeyCheck("https://openrouter.ai/api/v1/key", _bearer),
 }
 
 
 class HttpxProviderKeyVerifierAdapter:
     """Asks the provider whether it accepts a key. Neither the key nor the answer of the provider reach an error."""
 
-    def __init__(self, client: httpx.Client, checks: Mapping[str, KeyCheck] = KEY_CHECKS) -> None:
+    def __init__(self, client: httpx.Client, checks: Mapping[str, _KeyCheck] = KEY_CHECKS) -> None:
         self._client = client
         self._checks = checks
 
@@ -59,7 +59,7 @@ class HttpxProviderKeyVerifierAdapter:
         if status != ACCEPTED:
             raise ProviderUnavailableError(provider)
 
-    def _status_of(self, provider: ProviderName, check: KeyCheck, key: ProviderKey) -> int:
+    def _status_of(self, provider: ProviderName, check: _KeyCheck, key: ProviderKey) -> int:
         try:
             return self._client.get(check.url, headers=check.headers(key), timeout=TIMEOUT_SECONDS).status_code
         except httpx.HTTPError:

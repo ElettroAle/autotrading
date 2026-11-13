@@ -68,7 +68,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.database import SqlAlchemyDatabaseAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
@@ -92,9 +92,9 @@ from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchem
 from autotrading.adapters.outbound.sqlalchemy.scheduling import (
     SqlAlchemyFlowLockAdapter,
     SqlAlchemyScheduledFlowsAdapter,
-    TenantScheduledFlow,
 )
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlchemyRunningVerificationsAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
@@ -129,6 +129,7 @@ from autotrading.application.cycles.ports import (
     ScheduledFlow,
     SourceReading,
     SourceRequest,
+    TenantScheduledFlow,
 )
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
@@ -188,6 +189,7 @@ from autotrading.application.orders.open_position import OpenPositionCommand, Op
 from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.application.orders.read_market import ReadMarketCommand, ReadMarketUseCase
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
 from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
 from autotrading.application.sources.ports import (
@@ -680,9 +682,15 @@ class OrderExecutionFromOrders:
     step with its message, and an order the exchange did not execute is a failed step with the reason.
     """
 
-    def __init__(self, opening: OpenPositionUseCase, closing: CloseExchangePositionUseCase) -> None:
+    def __init__(
+        self, opening: OpenPositionUseCase, closing: CloseExchangePositionUseCase, market: ReadMarketUseCase
+    ) -> None:
         self._opening = opening
         self._closing = closing
+        self._market = market
+
+    def minimum_value(self, account_id: UUID, coin: str) -> Decimal:
+        return _result_of(lambda: self._market.execute(ReadMarketCommand(account_id, coin))).min_order_value
 
     def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult:
         command = OpenPositionCommand(
@@ -693,29 +701,30 @@ class OrderExecutionFromOrders:
             value=opening.value,
             source=_verification_source(user_id),
         )
-        return _result_of(lambda: self._opening.execute(command))
+        return _order_result(_result_of(lambda: self._opening.execute(command)))
 
     def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderResult:
         command = CloseExchangePositionCommand(account_id, coin, _verification_source(user_id))
-        return _result_of(lambda: self._closing.execute(command))
+        return _order_result(_result_of(lambda: self._closing.execute(command)))
 
 
 def _verification_source(user_id: UserId) -> OrderSource:
     return OrderSource(OrderOrigin.VERIFICATION, user_id.value)
 
 
-def _result_of(send: Callable[[], Order]) -> OrderResult:
+def _result_of[T](send: Callable[[], T]) -> T:
+    """What the orders context answers, its failures as the verification context names them."""
     try:
-        order = send()
+        return send()
     except OrderAccountNotFoundError as error:
         raise VerificationAccountNotFoundError from error
     except AutotradingError as error:
         raise VerificationStepError(str(error)) from error
-    execution, rejection = order.execution, order.rejection
-    if execution is None:
-        message = order.status.value if rejection is None else rejection.exchange_message
-        return OrderResult(succeeded=False, message=message)
-    return OrderResult(succeeded=True, fee=execution.fee, realized_pnl=execution.realized_pnl)
+
+
+def _order_result(order: Order) -> OrderResult:
+    outcome = OrderOutcome.of(order)
+    return OrderResult.reported(outcome.fee, outcome.realized_pnl, outcome.exchange_message, outcome.status.value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -779,6 +788,7 @@ class TenantUseCaseFactory:
             provider_key_usage=ProviderKeyUsageFromFlows(flows),
             model_catalog=MODEL_CATALOG,
             flows=flows,
+            running_verifications=SqlAlchemyRunningVerificationsAdapter(self._engine),
             flow_checks=FlowChecks(
                 accounts=FlowAccountsFromAccounts(accounts, account_state),
                 markets=self._exchanges.markets,
@@ -831,6 +841,7 @@ class WorkerUseCaseFactory:
         read_exchange_state = ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts)
         close_exchange_position = CloseExchangePositionUseCase(access, self._exchanges.orders, orders, slippage)
         open_position = OpenPositionUseCase(access, self._exchanges.orders, orders, slippage)
+        read_market = ReadMarketUseCase(access, self._exchanges.orders)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
@@ -838,7 +849,7 @@ class WorkerUseCaseFactory:
                 AccountReadingFromAccounts(
                     read_exchange_state, SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
                 ),
-                OrderExecutionFromOrders(open_position, close_exchange_position),
+                OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
                 SqlAlchemyVerificationRunRepositoryAdapter(self._engine, tenant_id),
                 self._settings.environment,
                 now,
@@ -1052,7 +1063,7 @@ def _credentials_key_version(configuration: Mapping[str, str]) -> int:
 
 
 def _database(configuration: Mapping[str, str]) -> Engine:
-    settings = DatabaseSettings(
+    database = SqlAlchemyDatabaseAdapter(
         host=_required(configuration, "DATABASE_HOST"),
         port=int(configuration.get("DATABASE_PORT", DEFAULT_DATABASE_PORT)),
         name=_required(configuration, "DATABASE_NAME"),
@@ -1060,7 +1071,7 @@ def _database(configuration: Mapping[str, str]) -> Engine:
         # A secret is a mounted read-only file, never an environment variable (ADR 0015).
         password=_secret(configuration, "DATABASE_PASSWORD_FILE"),
     )
-    return create_database_engine(settings)
+    return database.engine()
 
 
 def _authentication(configuration: Mapping[str, str]) -> Authentication | None:

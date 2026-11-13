@@ -39,12 +39,14 @@ class HttpxVerificationAdapter:
     def __repr__(self) -> str:
         return f"HttpxVerificationAdapter(tenant_id={self._tenant_id.value})"
 
-    def run(self, account_id: UUID, user_id: UserId) -> VerificationRun:
+    def run(self, account_id: UUID, user_id: UserId, amount: Decimal | None) -> VerificationRun:
         path = f"/tenants/{self._tenant_id.value}/accounts/{account_id}/verifications"
+        # The amount travels as text, so no precision is lost in the JSON.
+        body = {"user_id": user_id.value, "amount": None if amount is None else str(amount)}
         try:
             response = self._client.post(
                 path,
-                json={"user_id": user_id.value},
+                json=body,
                 headers={"Authorization": f"Bearer {self._token}"},
                 timeout=TIMEOUT_SECONDS,
             )

@@ -4,11 +4,11 @@ import threading
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import Protocol
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.account_activity import AccountActivityResponse
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
@@ -63,6 +63,11 @@ class UserRequest(BaseModel):
     user_id: str
 
 
+class VerificationRequest(UserRequest):
+    # None leaves the value to the minimum of the exchange of the account.
+    amount: Decimal | None = Field(default=None, gt=0)
+
+
 class NotificationRequest(BaseModel):
     # Built by the API from its own events: the worker only delivers it to the chat of the tenant.
     subject: str
@@ -112,10 +117,7 @@ class CyclePolling:
             stopping.wait(self._pause_seconds)
 
 
-class BackgroundLoop(Protocol):
-    thread_name: str
-
-    def run(self, stopping: threading.Event) -> None: ...
+type BackgroundLoop = BotPolling | CyclePolling
 
 
 def background(loops: Sequence[BackgroundLoop]) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
@@ -188,8 +190,8 @@ def create_worker_api(
         return {"status": "ok"}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])
-    def run_verification(tenant_id: UUID, account_id: UUID, request: UserRequest) -> VerificationRunResponse:
-        command = RunExchangeVerificationCommand(account_id, UserId(request.user_id))
+    def run_verification(tenant_id: UUID, account_id: UUID, request: VerificationRequest) -> VerificationRunResponse:
+        command = RunExchangeVerificationCommand(account_id, UserId(request.user_id), request.amount)
         run = for_tenant(TenantId(tenant_id)).run_exchange_verification.execute(command)
         return VerificationRunResponse.of(run)
 

@@ -36,7 +36,7 @@ type Document = Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
-class ProviderApi:
+class _ProviderApi:
     """How one provider takes a request and gives back the answer and its usage (ADR 0039)."""
 
     url: str
@@ -51,7 +51,7 @@ class HttpxModelCallAdapter:
     The key travels only in the headers of the request: it never reaches an error, a log or the context.
     """
 
-    def __init__(self, client: httpx.Client, apis: Mapping[str, ProviderApi] | None = None) -> None:
+    def __init__(self, client: httpx.Client, apis: Mapping[str, _ProviderApi] | None = None) -> None:
         self._client = client
         self._apis = PROVIDER_APIS if apis is None else apis
 
@@ -69,7 +69,7 @@ class HttpxModelCallAdapter:
             raise ModelUnavailableError(provider, "risposta del fornitore inattesa") from error
 
     def _post(
-        self, provider: ProviderName, api: ProviderApi, key: ProviderKey, body: dict[str, object]
+        self, provider: ProviderName, api: _ProviderApi, key: ProviderKey, body: dict[str, object]
     ) -> httpx.Response:
         try:
             return self._client.post(api.url, headers=api.headers(key), json=body, timeout=TIMEOUT_SECONDS)
@@ -208,12 +208,12 @@ def _cost_of(reported: object) -> Decimal | None:
     return Decimal(str(reported))
 
 
-PROVIDER_APIS: Mapping[str, ProviderApi] = {
-    "anthropic": ProviderApi(
+PROVIDER_APIS: Mapping[str, _ProviderApi] = {
+    "anthropic": _ProviderApi(
         "https://api.anthropic.com/v1/messages", _anthropic_headers, _anthropic_body, _anthropic_reply
     ),
-    "openai": ProviderApi("https://api.openai.com/v1/chat/completions", _bearer, _openai_body, _chat_reply),
-    "deepseek": ProviderApi("https://api.deepseek.com/chat/completions", _bearer, _deepseek_body, _chat_reply),
+    "openai": _ProviderApi("https://api.openai.com/v1/chat/completions", _bearer, _openai_body, _chat_reply),
+    "deepseek": _ProviderApi("https://api.deepseek.com/chat/completions", _bearer, _deepseek_body, _chat_reply),
     # OpenRouter reports the cost of every call in its usage (R1.4.6).
-    "openrouter": ProviderApi("https://openrouter.ai/api/v1/chat/completions", _bearer, _openrouter_body, _chat_reply),
+    "openrouter": _ProviderApi("https://openrouter.ai/api/v1/chat/completions", _bearer, _openrouter_body, _chat_reply),
 }

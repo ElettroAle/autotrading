@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from autotrading.domain.errors import DomainError
+from autotrading.domain.italian_text import money_text
 
 
 class VerificationNotStartedError(DomainError):
@@ -29,6 +30,31 @@ class AssetOfFlowError(VerificationNotStartedError):
 
 
 class InsufficientMarginError(VerificationNotStartedError):
-    def __init__(self, required: Decimal) -> None:
-        super().__init__(f"margine insufficiente: servono almeno {required} USDC")
+    """The margin the opening of the procedure needs: its value over its leverage."""
+
+    def __init__(self, required: Decimal, currency: str) -> None:
+        super().__init__(f"margine disponibile insufficiente: servono {money_text(required)} {currency}")
         self.required = required
+
+
+class AmountBelowMinimumError(VerificationNotStartedError):
+    """The exchange would refuse the opening: its minimum is read from it, never assumed."""
+
+    def __init__(self, minimum: Decimal, currency: str) -> None:
+        super().__init__(f"importo sotto il minimo dell'exchange: {money_text(minimum)} {currency}")
+        self.minimum = minimum
+
+
+class VerificationAmountNotPositiveError(DomainError):
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("l'importo della procedura deve essere maggiore di zero")
+
+
+class VerificationInProgressError(VerificationNotStartedError):
+    """Another procedure runs on the asset of the account: two would mix their orders on the same position."""
+
+    def __init__(self, coin: str) -> None:
+        super().__init__(f"procedura di verifica già in corso su {coin}")
+        self.coin = coin

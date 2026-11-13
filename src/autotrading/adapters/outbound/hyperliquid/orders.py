@@ -15,8 +15,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     INVALID_KEY_MESSAGE,
     MIN_ORDER_VALUE,
     TIMEOUT_SECONDS,
-    HyperliquidSdk,
-    OfficialSdk,
+    HyperliquidSdkAdapter,
 )
 from autotrading.application.orders.errors import (
     ExchangeRejectedOrderError,
@@ -41,13 +40,15 @@ class HyperliquidOrderExchangeAdapter:
     the exchange does not confirm in 10 seconds is reported as not acknowledged, and looked up by `cloid` (R0.3.3).
     """
 
-    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+    ) -> None:
         self._base_url = base_url
-        self._sdk = sdk or OfficialSdk()
+        self._sdk = sdk or HyperliquidSdkAdapter()
         self._timeout = timeout
 
     @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidOrderExchangeAdapter:
+    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidOrderExchangeAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     @property

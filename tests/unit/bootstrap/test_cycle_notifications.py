@@ -12,9 +12,8 @@ from sqlalchemy import create_engine
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
-from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
 from autotrading.application.agent.errors import ModelCreditExhaustedError
-from autotrading.application.cycles.ports import ScheduledFlow
+from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,

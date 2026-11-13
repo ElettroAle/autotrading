@@ -1,6 +1,5 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID
 
@@ -8,7 +7,7 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.exc import DBAPIError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
-from autotrading.application.cycles.ports import ScheduledFlow
+from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -21,14 +20,6 @@ class SchedulerDatabaseUnavailableError(AutotradingError):
 
     def __init__(self) -> None:
         super().__init__("database non raggiungibile dalla pianificazione dei cicli")
-
-
-@dataclass(frozen=True, slots=True)
-class TenantScheduledFlow:
-    """An active flow with the tenant it belongs to: the worker runs its cycle on adapters bound to that tenant."""
-
-    tenant_id: TenantId
-    flow: ScheduledFlow
 
 
 class SqlAlchemyScheduledFlowsAdapter:

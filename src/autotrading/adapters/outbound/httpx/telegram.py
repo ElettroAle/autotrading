@@ -16,7 +16,7 @@ POLL_TIMEOUT_SECONDS = POLL_SECONDS + 10.0
 REDACTED = "bot***"
 
 
-class TelegramTokenFilter(logging.Filter):
+class _TokenFilter(logging.Filter):
     """The token travels in the path of every request: httpx would write it in its request log otherwise."""
 
     def __init__(self, token: str) -> None:
@@ -31,7 +31,7 @@ class TelegramTokenFilter(logging.Filter):
 
 
 def telegram_client(token: str) -> httpx.Client:
-    logging.getLogger("httpx").addFilter(TelegramTokenFilter(token))
+    logging.getLogger("httpx").addFilter(_TokenFilter(token))
     return httpx.Client(base_url=f"{TELEGRAM_URL}/bot{token}")
 
 
