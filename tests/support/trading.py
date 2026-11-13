@@ -39,10 +39,10 @@ class Trading:
         return self.accounts[name]
 
     def access_of(self, name: str) -> TradingAccess:
-        return self.accesses.access(self.accounts[name])
+        return self.accesses.accesses[self.accounts[name]]
 
     def open_position(self, command: OpenPositionCommand) -> None:
-        use_case = OpenPositionUseCase(self.accesses, {HYPERLIQUID: self.exchange}, self.orders, self.slippage)
+        use_case = OpenPositionUseCase(self.accesses.use_case, {HYPERLIQUID: self.exchange}, self.orders, self.slippage)
         try:
             self.outcome = use_case.execute(command)
         except AutotradingError as error:

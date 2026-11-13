@@ -2,11 +2,13 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from decimal import Decimal
 from typing import NotRequired, TypedDict, cast
+from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_capital_changes, flow_versions, flows
+from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowNameInUseError,
@@ -16,7 +18,7 @@ from autotrading.application.flows.errors import (
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cycle_interval import CycleInterval
-from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
@@ -68,9 +70,21 @@ class SqlAlchemyFlowRepositoryAdapter:
         self._engine = engine
         self._tenant_id = tenant_id
 
+    def flow_on(self, account_id: UUID, asset: str) -> str | None:
+        """The flow the verification procedure keeps off the asset of the account (ADR 0075)."""
+        return holder_of(self.list(), account_id, asset)
+
     def list(self) -> list[Flow]:
         with self._transaction() as connection:
             return [_flow_of(row) for row in connection.execute(_in_force().order_by(flows.c.name)).mappings()]
+
+    def exists(self, flow_id: UUID) -> bool:
+        """For the cycles (ADR 0046): the flow belongs to the tenant of the request."""
+        return any(flow.id.value == flow_id for flow in self.list())
+
+    def model_uses(self) -> tuple[ModelUse, ...]:
+        """For the agent (R1.4.1, ADR 0087): every flow with the provider of its model and whether it runs."""
+        return tuple(ModelUse(flow.name.value, flow.model_provider, flow.status.not_stopped) for flow in self.list())
 
     def get(self, flow_id: FlowId) -> Flow:
         with self._transaction() as connection:

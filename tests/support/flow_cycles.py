@@ -11,17 +11,18 @@ from uuid import UUID
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
-    AccountActivityFromAccounts,
-    AccountExecutionsFromAccounts,
     ClosingNoticeByNotification,
     CycleFailureNotices,
     CycleRuntime,
@@ -31,7 +32,6 @@ from autotrading.bootstrap import (
     NotifiedClosedPositions,
     OutsideClosingsInHistory,
     TenantCyclePorts,
-    TradingAccessFromAccounts,
     record_actual_prices,
     run_due_cycles,
 )
@@ -135,7 +135,7 @@ class FlowCycles:
         worker = platform.worker_for(tenant_id)
         accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(platform.vault)
-        access = TradingAccessFromAccounts(accounts, opener)
+        access = OpenTradingAccessUseCase(accounts, opener)
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         notify = platform.worker_for(tenant_id).notify
@@ -146,10 +146,10 @@ class FlowCycles:
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         closing_notice = ClosingNoticeByNotification(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        activity = AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader})
+        activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         record_executions = RecordAccountExecutionsUseCase(
             flows,
-            AccountExecutionsFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
             platform.platform_orders,
             platform.ledger,
         )

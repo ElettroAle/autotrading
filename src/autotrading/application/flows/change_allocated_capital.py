@@ -4,7 +4,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 
-from autotrading.application.flows.ports import FlowAccountPort, FlowRepositoryPort
+from autotrading.application.flows.flow_account import read_flow_account
+from autotrading.application.flows.ports import FlowAccountPorts, FlowRepositoryPort
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, require_increase_within, require_reduction_within
 from autotrading.domain.flows.flow import Flow
@@ -33,7 +34,7 @@ class ChangeAllocatedCapitalUseCase:
     def __init__(
         self,
         flows: FlowRepositoryPort,
-        accounts: FlowAccountPort,
+        accounts: FlowAccountPorts,
         flow_state: ReadFlowStateUseCase,
         clock: Callable[[], datetime],
     ) -> None:
@@ -60,7 +61,7 @@ class ChangeAllocatedCapitalUseCase:
     def _require_admitted(self, flow: Flow, capital: Decimal) -> None:
         current = flow.configuration.allocated_capital
         if capital > current:
-            account = self._accounts.account(flow.account_id)
+            account = read_flow_account(self._accounts, flow.account_id)
             free_capital = FreeCapital.of_account(
                 account.balance, account.currency, flow.account_id, self._flows.list()
             )

@@ -5,8 +5,9 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.errors import FlowNameInUseError
+from autotrading.application.flows.flow_account import read_flow_account
 from autotrading.application.flows.ports import (
-    FlowAccountPort,
+    FlowAccountPorts,
     FlowRepositoryPort,
     MarketsPort,
     ModelSettingsPort,
@@ -54,7 +55,7 @@ class CreateFlowCommand:
 class FlowChecks:
     """What the other contexts say about a configuration: the account, the exchange, the model, the sources."""
 
-    accounts: FlowAccountPort
+    accounts: FlowAccountPorts
     markets: Mapping[str, MarketsPort]
     models: ModelSettingsPort
     sources: SourceSettingsPort
@@ -72,7 +73,7 @@ class CreateFlowUseCase:
         name = FlowName(command.name)
         self._require_free(name)
         configuration = self._configuration(command)
-        account = self._checks.accounts.account(command.account_id)
+        account = read_flow_account(self._checks.accounts, command.account_id)
         require_tradable(self._checks.markets, account.exchange, configuration.assets)
         existing = self._flows.list()
         require_assets_free(command.account_id, configuration.assets, existing)

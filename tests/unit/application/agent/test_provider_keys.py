@@ -12,6 +12,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.list_models import ListModelsUseCase, ProviderListing
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
+from autotrading.application.agent.ports import ModelUse
 from autotrading.application.agent.register_provider_key import (
     ProviderKeyServices,
     RegisterProviderKeyCommand,
@@ -184,12 +185,27 @@ def test_the_removal_deletes_the_key(keys: Keys) -> None:
 def test_the_removal_is_refused_while_flows_that_are_not_stopped_use_the_provider(keys: Keys) -> None:
     keys.verifier.accept("openrouter", "K-OR")
     keys.register("openrouter", "K-OR")
-    keys.usage.flows[OPENROUTER] = ["beta", "alfa"]
+    keys.usage.uses = [
+        ModelUse("beta", "openrouter", running=True),
+        ModelUse("fermo", "openrouter", running=False),
+        ModelUse("altro", "anthropic", running=True),
+        ModelUse("alfa", "openrouter", running=True),
+    ]
 
     with pytest.raises(ProviderKeyInUseError, match=r"^chiave usata da flussi attivi o in pausa: alfa, beta$"):
         keys.remove("openrouter")
 
     assert len(keys.store.keys) == 1
+
+
+def test_flows_stopped_or_on_another_provider_leave_the_key_removable(keys: Keys) -> None:
+    keys.verifier.accept("openrouter", "K-OR")
+    keys.register("openrouter", "K-OR")
+    keys.usage.uses = [ModelUse("fermo", "openrouter", running=False), ModelUse("altro", "anthropic", running=True)]
+
+    keys.remove("openrouter")
+
+    assert keys.store.keys == []
 
 
 def test_the_removal_of_a_key_never_registered_is_refused(keys: Keys) -> None:

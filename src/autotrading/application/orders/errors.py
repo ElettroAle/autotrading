@@ -60,3 +60,12 @@ class OrderWorkerUnavailableError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("servizio di esecuzione non raggiungibile, riprovare")
+
+
+class OrderCredentialsNotOpenedError(ApplicationError):
+    """The worker cannot open the sealed credentials of the account: they repeat until the user registers them again."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto non leggibili")

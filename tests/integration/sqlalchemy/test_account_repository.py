@@ -8,14 +8,20 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.flows.errors import FlowAccountNotFoundError
+from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.application.verification.errors import VerificationAccountNotFoundError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.sealed_address import SealedAddress
+from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
+from autotrading.domain.verification.verification_access import SealedVerificationAccess
 from tests.support.accounts import an_account
 
 pytestmark = pytest.mark.integration
@@ -143,6 +149,17 @@ def test_an_account_of_another_tenant_reads_as_missing(database: Engine) -> None
     assert (bruno_accounts.get(account.id), bruno_accounts.get(AccountId.new())) == (None, None)
 
 
+def test_a_flow_learns_the_exchange_of_an_account_of_its_tenant_only(database: Engine) -> None:
+    anna, bruno = new_tenant(database), new_tenant(database)
+    account = account_of(anna)
+    SqlAlchemyAccountRepositoryAdapter(database, anna).add(account)
+
+    assert SqlAlchemyAccountRepositoryAdapter(database, anna).exchange_of(account.id.value) == account.exchange.value
+    for tenant_id, account_id in ((bruno, account.id), (anna, AccountId.new())):
+        with pytest.raises(FlowAccountNotFoundError):
+            SqlAlchemyAccountRepositoryAdapter(database, tenant_id).exchange_of(account_id.value)
+
+
 def test_replaced_credentials_leave_no_trace_of_the_previous_ones(database: Engine) -> None:
     anna = new_tenant(database)
     repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
@@ -174,3 +191,41 @@ def ciphertexts(database: Engine, tenant_id: TenantId) -> list[bytes]:
     with database.begin() as connection:
         connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
         return list(connection.execute(select(accounts.c.credentials_ciphertext)).scalars())
+
+
+def test_the_sealed_access_of_an_account_is_read_for_its_tenant_only(database: Engine) -> None:
+    tenant_a, tenant_b = new_tenant(database), new_tenant(database)
+    account = account_of(tenant_a)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant_a).add(account)
+
+    sealed = SqlAlchemyAccountRepositoryAdapter(database, tenant_a).sealed_access(account.id.value)
+
+    assert sealed == SealedAccess(tenant_a, account.id.value, account.exchange.value, 1, b"\x00sealed\xff")
+    with pytest.raises(OrderAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, tenant_b).sealed_access(account.id.value)
+
+
+def test_the_sealed_address_of_an_account_is_read_for_its_tenant_only(database: Engine) -> None:
+    tenant_a, tenant_b = new_tenant(database), new_tenant(database)
+    account = account_of(tenant_a)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant_a).add(account)
+
+    sealed = SqlAlchemyAccountRepositoryAdapter(database, tenant_a).sealed_address(account.id.value)
+
+    assert sealed == SealedAddress(tenant_a, account.id.value, account.exchange.value, 1, b"\x00sealed\xff")
+    with pytest.raises(FlowAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, tenant_b).sealed_address(account.id.value)
+
+
+def test_the_sealed_verification_access_of_an_account_is_read_for_its_tenant_only(database: Engine) -> None:
+    tenant_a, tenant_b = new_tenant(database), new_tenant(database)
+    account = account_of(tenant_a)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant_a).add(account)
+
+    sealed = SqlAlchemyAccountRepositoryAdapter(database, tenant_a).sealed_verification(account.id.value)
+
+    assert sealed == SealedVerificationAccess(
+        tenant_a, account.id.value, account.exchange.value, 1, account.credentials.ciphertext
+    )
+    with pytest.raises(VerificationAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, tenant_b).sealed_verification(account.id.value)

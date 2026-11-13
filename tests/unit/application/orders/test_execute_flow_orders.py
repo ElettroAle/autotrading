@@ -50,7 +50,7 @@ def account_id(accesses: FakeTradingAccessAdapter) -> UUID:
 def use_case(
     accesses: FakeTradingAccessAdapter, exchange: FakeOrderExchangeAdapter, orders: InMemoryOrderRepositoryAdapter
 ) -> ExecuteFlowOrdersUseCase:
-    return ExecuteFlowOrdersUseCase(accesses, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
+    return ExecuteFlowOrdersUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
 
 
 def command(account_id: UUID, *orders: FlowOrder) -> ExecuteFlowOrdersCommand:
@@ -58,7 +58,7 @@ def command(account_id: UUID, *orders: FlowOrder) -> ExecuteFlowOrdersCommand:
 
 
 def hold_eth(exchange: FakeOrderExchangeAdapter, accesses: FakeTradingAccessAdapter, account_id: UUID) -> None:
-    exchange.hold(accesses.access(account_id), HeldPosition("ETH", Direction.LONG, Decimal("0.5"), 4))
+    exchange.hold(accesses.accesses[account_id], HeldPosition("ETH", Direction.LONG, Decimal("0.5"), 4))
 
 
 def test_an_opening_is_sized_at_the_market_with_its_leverage_and_slippage(
@@ -77,7 +77,7 @@ def test_an_opening_is_sized_at_the_market_with_its_leverage_and_slippage(
         SLIPPAGE,
         False,
     )
-    assert exchange.leverages[accesses.access(account_id).account_address, "BTC"] == 3
+    assert exchange.leverages[accesses.accesses[account_id].account_address, "BTC"] == 3
     assert (order.request.leverage, order.request.account_id, order.status) == (3, account_id, OrderStatus.FILLED)
 
 
@@ -203,7 +203,7 @@ def test_an_exchange_the_platform_does_not_support_sends_nothing(
 ) -> None:
     account_id = uuid4()
     accesses.accesses[account_id] = new_access("Binance")
-    use_case = ExecuteFlowOrdersUseCase(accesses, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
+    use_case = ExecuteFlowOrdersUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
 
     with pytest.raises(UnsupportedOrderExchangeError):
         use_case.execute(command(account_id, BTC))

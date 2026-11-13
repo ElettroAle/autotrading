@@ -43,7 +43,7 @@ class FlowExecution:
     def execute(self, flow: str, cycle: str) -> None:
         trading = self.trading
         use_case = ExecuteFlowOrdersUseCase(
-            trading.accesses, {HYPERLIQUID: trading.exchange}, trading.orders, trading.slippage
+            trading.accesses.use_case, {HYPERLIQUID: trading.exchange}, trading.orders, trading.slippage
         )
         command = ExecuteFlowOrdersCommand(
             trading.accounts[self.account], self.flows[flow], self.cycle(cycle), tuple(self.approved)

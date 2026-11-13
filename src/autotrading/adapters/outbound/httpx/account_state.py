@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import TypedDict, cast
+from uuid import UUID
 
 import httpx
 
@@ -11,6 +12,8 @@ from autotrading.application.accounts.errors import (
     ExchangeUnavailableError,
     WorkerUnavailableError,
 )
+from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
+from autotrading.application.flows.ports import FlowBalance
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
@@ -66,6 +69,16 @@ class HttpxAccountStateAdapter:
         except httpx.HTTPError as error:
             raise WorkerUnavailableError from error
         return _state_of(_body_of(response), response.status_code)
+
+    def balance_of(self, account_id: UUID) -> FlowBalance:
+        """The balance of an account as a flow reads it (ADR 0087), with the errors of the flows context."""
+        try:
+            balance = self.read_state(AccountId(account_id)).balance
+        except AccountNotFoundError as error:
+            raise FlowAccountNotFoundError from error
+        except (ExchangeUnavailableError, WorkerUnavailableError) as error:
+            raise FlowExchangeUnavailableError from error
+        return FlowBalance(balance.amount, balance.currency)
 
 
 def _body_of(response: httpx.Response) -> Mapping[str, object]:

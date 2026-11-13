@@ -16,12 +16,9 @@ from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
-from autotrading.application.flows.read_account_activity import (
-    ReadAccountActivityCommand,
-    ReadAccountActivityUseCase,
-)
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.notifications.ports import BotIdentityPort
+from autotrading.application.notifications.ports import BotIdentityPort, BotInboxPort
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -94,6 +91,11 @@ class BotPolling:
             except AutotradingError:
                 bot_log.warning("giro del bot Telegram fallito", exc_info=True)
                 stopping.wait(self._pause_seconds)
+
+
+def bot_polling(inbox: BotInboxPort | None, answering: Callable[[BotInboxPort], BotPolling]) -> BotPolling | None:
+    """The bot answers only when the installation has one: without its inbox no loop starts (ADR 0035)."""
+    return None if inbox is None else answering(inbox)
 
 
 class CyclePolling:
@@ -176,7 +178,7 @@ def create_worker_api(
 
     @api.get("/tenants/{tenant_id}/accounts/{account_id}/activity", dependencies=[Depends(require_api)])
     def read_activity(tenant_id: UUID, account_id: UUID) -> AccountActivityResponse:
-        command = ReadAccountActivityCommand(account_id)
+        command = account_id
         return AccountActivityResponse.of(for_tenant(TenantId(tenant_id)).read_account_activity.execute(command))
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])

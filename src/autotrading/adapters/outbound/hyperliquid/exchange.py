@@ -14,10 +14,16 @@ from hyperliquid.utils.types import Cloid
 
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.verification.errors import (
+    VerificationCredentialsRejectedError,
+    VerificationExchangeUnavailableError,
+)
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.verification.reading import AccountReading, PositionReading
+from autotrading.domain.verification.verification_access import VerificationAccess
 
 # The exchange refuses any order below 10 USDC of value ("Order must have minimum value of $10").
 MIN_ORDER_VALUE = Decimal(10)
@@ -75,6 +81,24 @@ class HyperliquidExchangeAdapter:
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
         return _account_state_of(state)
+
+    def verification_reading(self, access: VerificationAccess) -> AccountReading:
+        """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
+        try:
+            state = self.read_state(Credentials(access.account_address, access.secret_key))
+        except ExchangeRejectedCredentialsError as error:
+            raise VerificationCredentialsRejectedError from error
+        except ExchangeUnavailableError as error:
+            raise VerificationExchangeUnavailableError from error
+        return AccountReading(
+            balance=state.balance.amount,
+            available_margin=state.available_margin.amount,
+            currency=state.balance.currency,
+            positions=tuple(
+                PositionReading(position.coin, position.side.value, position.size, position.leverage)
+                for position in state.positions
+            ),
+        )
 
 
 def _wallet_of(credentials: Credentials) -> LocalAccount:

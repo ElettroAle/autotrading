@@ -9,8 +9,11 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.flows.archive_account_flows import ArchiveAccountFlowsUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.list_account_flows import ListAccountFlowsUseCase
+from autotrading.application.flows.ports import FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -22,26 +25,25 @@ from autotrading.application.notifications.send_test_notification import SendTes
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
-from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
+from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
+from autotrading.application.verification.run_exchange_verification import (
+    RunExchangeVerificationUseCase,
+    VerificationReadings,
+)
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
-    AccountActivityFromAccounts,
     AccountFlowsFromFlows,
-    AccountReadingFromAccounts,
-    FlowAccountsFromAccounts,
-    FlowDirectoryFromFlows,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
     ManualClosingsRecordedInFlows,
     ModelSettingsFromAgent,
     NotifiedClosedPositions,
     OrderExecutionFromOrders,
-    ProviderKeyUsageFromFlows,
     SourceSettingsFromSources,
-    TradingAccessFromAccounts,
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
@@ -184,26 +186,30 @@ class Platform:
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=ManualClosingsRecordedInFlows(
-                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings)
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings).execute
             ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_verifier=self.providers,
-            provider_key_usage=ProviderKeyUsageFromFlows(flows),
+            provider_key_usage=flows,
             model_catalog=self.model_catalog,
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountsFromAccounts(accounts, account_state),
+                accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
                 models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
-            account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
+            account_flows=AccountFlowsFromFlows(
+                ListAccountFlowsUseCase(flows),
+                StopFlowUseCase(flows, stop_ports),
+                ArchiveAccountFlowsUseCase(flows, ArchiveFlowUseCase(flows)),
+            ),
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
             flow_operations=InMemoryFlowOperationsAdapter(
@@ -217,7 +223,7 @@ class Platform:
             clock=lambda: self.now,
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
-            flow_directory=FlowDirectoryFromFlows(flows),
+            flow_directory=flows,
             flow_summaries=FlowSummariesFromFlows(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             environment="dev",
         )
@@ -227,7 +233,7 @@ class Platform:
         """What the worker builds for a request of the API, with the opener only it holds."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(self.vault)
-        access = TradingAccessFromAccounts(accounts, opener)
+        access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
         close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, self.slippage)
@@ -236,7 +242,10 @@ class Platform:
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
+                VerificationReadings(
+                    ReadAccountForVerificationUseCase(accounts, opener, self.exchanges),
+                    InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ),
                 OrderExecutionFromOrders(
                     open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)
                 ),
@@ -245,9 +254,7 @@ class Platform:
                 lambda: STARTED_AT,
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
-            read_account_activity=ReadAccountActivityUseCase(
-                AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: self.activity_reader})
-            ),
+            read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 
     def link_chat(self) -> LinkChatUseCase:

@@ -25,6 +25,16 @@ def test_the_worker_gives_the_username_of_its_bot() -> None:
     assert adapter_on(FakeBotIdentityAdapter("autotrading_bot")).username() == "autotrading_bot"
 
 
+def test_the_start_link_opens_the_bot_of_the_worker_with_the_code() -> None:
+    link = adapter_on(FakeBotIdentityAdapter("autotrading_bot")).start_link("ABCD2345")
+
+    assert link == "https://t.me/autotrading_bot?start=ABCD2345"
+
+
+def test_without_a_bot_there_is_no_start_link() -> None:
+    assert adapter_on(None).start_link("ABCD2345") is None
+
+
 def test_a_worker_without_a_bot_gives_none() -> None:
     assert adapter_on(None).username() is None
 

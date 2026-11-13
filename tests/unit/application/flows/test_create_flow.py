@@ -48,7 +48,7 @@ class Flows:
         self.markets = FakeMarketsAdapter()
         self.models = FakeModelSettingsAdapter(MODEL)
         checks = FlowChecks(
-            self.accounts, {"Hyperliquid": self.markets}, self.models, FakeSourceSettingsAdapter("notizie")
+            self.accounts.ports(), {"Hyperliquid": self.markets}, self.models, FakeSourceSettingsAdapter("notizie")
         )
         self.create = CreateFlowUseCase(self.tenant_id, self.repository, checks)
 
@@ -196,14 +196,16 @@ def test_the_free_capital_of_an_account_is_its_balance_less_its_flows(flows: Flo
     flows.create.execute(flows.command(allocated_capital=Decimal(400)))
     flows.store.flows.append(a_flow(flows.tenant_id, name="altro", configuration=a_configuration()))
 
-    free = ReadFreeCapitalUseCase(flows.repository, flows.accounts).execute(ReadFreeCapitalCommand(flows.account_id))
+    free = ReadFreeCapitalUseCase(flows.repository, flows.accounts.ports()).execute(
+        ReadFreeCapitalCommand(flows.account_id)
+    )
 
     assert free == FreeCapital(Decimal(600), "USDC")
 
 
 def test_the_free_capital_of_an_unknown_account_is_not_found(flows: Flows) -> None:
     with pytest.raises(FlowAccountNotFoundError):
-        ReadFreeCapitalUseCase(flows.repository, flows.accounts).execute(ReadFreeCapitalCommand(uuid4()))
+        ReadFreeCapitalUseCase(flows.repository, flows.accounts.ports()).execute(ReadFreeCapitalCommand(uuid4()))
 
 
 def test_the_flows_are_listed_by_name(flows: Flows) -> None:

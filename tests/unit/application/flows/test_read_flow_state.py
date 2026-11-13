@@ -4,7 +4,6 @@ from uuid import uuid4
 import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
-from autotrading.application.flows.read_account_activity import ReadAccountActivityCommand, ReadAccountActivityUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
@@ -87,9 +86,3 @@ def test_an_exchange_out_of_reach_is_reported(bench: Bench) -> None:
 
     with pytest.raises(FlowExchangeUnavailableError):
         bench.use_case.execute(ReadFlowStateCommand(flow.id))
-
-
-def test_the_worker_reads_the_activity_of_an_account(bench: Bench) -> None:
-    bench.activity.activities[ACCOUNT] = activity = an_activity(balance=Decimal(7))
-
-    assert ReadAccountActivityUseCase(bench.activity).execute(ReadAccountActivityCommand(ACCOUNT)) == activity

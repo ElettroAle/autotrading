@@ -3,6 +3,8 @@ from collections.abc import Mapping
 
 import httpx
 
+from autotrading.adapters.outbound.httpx.telegram import START_LINK
+
 TIMEOUT_SECONDS = 5.0
 
 operations = logging.getLogger("autotrading.notifications")
@@ -23,6 +25,10 @@ class HttpxWorkerBotIdentityAdapter:
         if self._username is None:
             self._username = self._read()
         return self._username
+
+    def start_link(self, code: str) -> str | None:
+        username = self.username()
+        return None if username is None else START_LINK.format(bot=username, code=code)
 
     def _read(self) -> str | None:
         try:

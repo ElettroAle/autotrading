@@ -15,7 +15,7 @@ from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
-from autotrading.bootstrap import TradingAccessFromAccounts
+from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
@@ -106,7 +106,9 @@ def hold_position(platform: Platform, user: str, account: str, asset: str, margi
     account_id = account_id_of(platform, user, account)
     tenant_id = platform.tenant_of(user)
     accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
-    access = TradingAccessFromAccounts(accounts, FakeCredentialOpenerAdapter(platform.vault)).access(account_id)
+    access = OpenTradingAccessUseCase(accounts, FakeCredentialOpenerAdapter(platform.vault)).execute(
+        OpenTradingAccessCommand(account_id)
+    )
     size = margin / platform.order_exchange.markets[asset].mid_price
     platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, size, 1))
     reading = platform.account_activity.activities.get(account_id, an_activity())

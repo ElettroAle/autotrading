@@ -53,7 +53,7 @@ class HttpxAccountActivityAdapter:
     def __repr__(self) -> str:
         return f"HttpxAccountActivityAdapter(tenant_id={self._tenant_id.value})"
 
-    def activity(self, account_id: UUID) -> AccountActivity:
+    def execute(self, account_id: UUID) -> AccountActivity:
         path = f"/tenants/{self._tenant_id.value}/accounts/{account_id}/activity"
         try:
             response = self._client.get(path, headers={"Authorization": f"Bearer {self._token}"})
