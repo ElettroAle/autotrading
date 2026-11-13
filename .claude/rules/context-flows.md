@@ -154,5 +154,7 @@ Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa n
 ### Porte del ciclo
 
 Repository dei cicli; orologio; esclusione per flusso; i passi del ciclo verso `sources`, `agent`, `orders`
-e `notifications`, ciascuno con una porta di `flows` (ADR 0094).
+e `notifications`, ciascuno con una porta di `flows` (ADR 0094). Il ciclo si compone per il tenant del suo
+flusso (ADR 0096). Il conto del flusso si legge con `CycleAccessOpenerPort` e `CycleAccountReaderPort`, realizzate
+dagli adapter di libsodium e Hyperliquid; la sequenza è in `ReadCycleAccountUseCase` (ADR 0097).
 `FlowSummaryPort` dà i flussi in uso già riassunti per l'elenco con ultimo e prossimo ciclo (ADR 0052).

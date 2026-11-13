@@ -21,7 +21,9 @@ from tests.fakes.cycles import (
     FakeAgentAdapter,
     FakeClockAdapter,
     FakeContextAdapter,
+    FakeCycleEndAdapter,
     FakeCycleJournalAdapter,
+    FakeCycleStartAdapter,
     FakeFlow,
     FakeFlowsAdapter,
     FakeOrderAdapter,
@@ -68,7 +70,16 @@ class Cycles:
         collector = SourceCollector(
             self.sources, ThreadPoolConcurrentCallsAdapter(), lambda wait: wait.total_seconds() * SECOND
         )
-        steps = CycleSteps(self.flows, collector, self.context, self.agent, self.risk, self.orders, self.journal)
+        steps = CycleSteps(
+            FakeCycleStartAdapter(self.flows),
+            collector,
+            self.context,
+            self.agent,
+            self.risk,
+            self.orders,
+            FakeCycleEndAdapter(self.flows),
+            self.journal,
+        )
         return RunCycleUseCase(
             steps, CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices)
         )

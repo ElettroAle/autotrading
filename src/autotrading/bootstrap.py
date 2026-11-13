@@ -96,23 +96,16 @@ from autotrading.adapters.outbound.worker.bot_identity import WorkerBotIdentityA
 from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
 from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
 from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
-from autotrading.application.accounts.errors import (
-    CredentialsNotOpenedError,
-    ExchangeRejectedCredentialsError,
-)
-from autotrading.application.accounts.get_account import find_account
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
     ExchangePort,
 )
-from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
+from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AgentAnswer, AskAgentCommand, AskAgentUseCase
 from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
 from autotrading.application.flows.create_flow import FlowChecks
-from autotrading.application.flows.errors import (
-    FlowCredentialsRejectedError,
-)
+from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.notify_unattributable import (
@@ -126,6 +119,7 @@ from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ClockPort,
     ClosedPositionRepositoryPort,
+    CycleAccountReaderPort,
     CycleRepositoryPort,
     ExchangeLimitsPort,
     ExecutionsReaderPort,
@@ -144,13 +138,14 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
-from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateCommand, ReadCycleFlowStateUseCase
+from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
+from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
+from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
 )
 from autotrading.application.flows.reconcile_account_for_cycle import (
-    ReconcileAccountForCycleCommand,
     ReconcileAccountForCycleUseCase,
 )
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
@@ -162,6 +157,7 @@ from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.source_collector import SourceCollector
+from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -226,25 +222,18 @@ from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
     VerificationReadings,
 )
-from autotrading.domain.accounts.account_id import AccountId
-from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
-from autotrading.domain.accounts.position import Position
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
 from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_funds import CycleFunds
+from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_configuration import FlowConfiguration
-from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
-from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
@@ -394,6 +383,7 @@ class WorkerExchanges:
     activity: Mapping[str, ActivityReaderPort]
     executions: Mapping[str, ExecutionsReaderPort]
     readings: Mapping[str, AccountReaderPort]
+    cycles: Mapping[str, CycleAccountReaderPort]
 
 
 class OrderExecutionFromOrders:
@@ -595,27 +585,32 @@ def cycle_ports(
             RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
             record_executions,
         )
+        reconcile_for_cycle = ReconcileAccountForCycleUseCase(
+            reconcile_account,
+            NotifyUnattributableUseCase(
+                accounts,
+                UnattributableNotices(
+                    NotifyUnattributablePositionUseCase(notify),
+                    NotifyUnattributableFillUseCase(notify),
+                    NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                ),
+            ),
+        )
+        read_cycle_flow = ReadCycleFlowUseCase(
+            flows,
+            SqlAlchemyFlowTimingAdapter(engine, tenant_id),
+            ReadCycleAccountUseCase(accounts, accounts, opener, exchanges.cycles),
+            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger), reconcile_for_cycle),
+        )
         return TenantCyclePorts(
             flows=flows,
             pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
-            accounts=accounts,
-            read_exchange_state=ReadExchangeStateUseCase(accounts, opener, exchanges.accounts),
-            read_flow_state=ReadFlowStateUseCase(flows, activity, ledger),
+            start_cycle=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            end_cycle=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
             execute_flow_orders=ExecuteFlowOrdersUseCase(access, exchanges.orders, orders, slippage),
-            reconcile_for_cycle=ReconcileAccountForCycleUseCase(
-                reconcile_account,
-                NotifyUnattributableUseCase(
-                    accounts,
-                    UnattributableNotices(
-                        NotifyUnattributablePositionUseCase(notify),
-                        NotifyUnattributableFillUseCase(notify),
-                        NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                    ),
-                ),
-            ),
             openings=openings,
             closed_positions=closed_positions,
             follow_flow_orders=FollowFlowOrdersUseCase(
@@ -629,7 +624,6 @@ def cycle_ports(
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             notify=notify,
-            timing=SqlAlchemyFlowTimingAdapter(engine, tenant_id),
         )
 
     return cycle_ports_for
@@ -680,6 +674,7 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
         order_exchanges_for(network),
         activity_readers_for(network),
         executions_readers_for(network),
+        accounts,
         accounts,
     )
     settings = WorkerSettings(environment, slippage_from(configuration))
@@ -853,14 +848,12 @@ class TenantCyclePorts:
 
     flows: FlowRepositoryPort
     pause: AutomaticPausePort
-    accounts: AccountRepositoryPort
-    read_exchange_state: ReadExchangeStateUseCase
-    read_flow_state: ReadFlowStateUseCase
+    start_cycle: StartCycleFlowUseCase
+    end_cycle: EndCycleFlowUseCase
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
     execute_flow_orders: ExecuteFlowOrdersUseCase
-    reconcile_for_cycle: ReconcileAccountForCycleUseCase
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
     follow_flow_orders: FollowFlowOrdersUseCase
@@ -868,7 +861,6 @@ class TenantCyclePorts:
     cycle_failure: NotifyCycleFailureUseCase
     notify: NotifyUseCase
     settlement_currency: str
-    timing: FlowTimingPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -885,97 +877,6 @@ class CycleServices:
     market: MarketDataPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
-
-
-@dataclass(frozen=True, slots=True)
-class CycleFlow:
-    """The flow of a cycle as read at its start: whose it is, its configuration in force, its state now.
-
-    The amounts are the state attributed to the flow, the same the user consults (R1.6.1, ADR 0062); the account
-    gives only the details of the positions and the margin it has free, which no flow may go beyond.
-    """
-
-    tenant_id: TenantId
-    flow: Flow
-    account_name: str
-    exchange: str
-    started_at: datetime
-    account: AccountState
-    attributed: FlowState
-
-    @property
-    def configuration(self) -> FlowConfiguration:
-        return self.flow.configuration
-
-    @property
-    def positions(self) -> tuple[Position, ...]:
-        return self.configuration.held(self.account.positions, lambda position: position.coin)
-
-    @property
-    def available_liquidity(self) -> Decimal:
-        return self._funds.available_liquidity
-
-    @property
-    def total_value(self) -> Decimal:
-        return self._funds.total_value
-
-    @property
-    def return_percent(self) -> Decimal:
-        return self._funds.return_percent
-
-    @property
-    def _funds(self) -> CycleFunds:
-        return CycleFunds(self.attributed, self.account.available_margin.amount)
-
-    def risk_state(self) -> RiskState:
-        return RiskState(
-            currency=self.account.balance.currency,
-            funds=self.attributed.funds,
-            available_liquidity=self.available_liquidity,
-            open_assets=frozenset(position.coin for position in self.positions),
-        )
-
-
-class FlowStateFromFlows:
-    """Bridges the flows and accounts contexts to the cycles context in the worker (ADR 0042).
-
-    The state is read from the exchange at every cycle; a refusal of the credentials is a permanent error of the
-    account, so every flow of the account pauses (R1.2.4). The account is reconciled first, so the ledger holds every
-    execution the state counts (ReadCycleFlowStateUseCase).
-    """
-
-    def __init__(self, ports: TenantCyclePorts) -> None:
-        self._ports = ports
-
-    def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot[CycleFlow]:
-        reconciled = self._ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
-        return self._snapshot(flow_id, anchor, reconciled=reconciled)
-
-    def update(
-        self,
-        flow_id: UUID,
-        anchor: datetime,
-        executions: Sequence[object],  # noqa: ARG002 - the signature of the port
-    ) -> object:
-        """The state of the flow at the end of the cycle, read again from the exchange after the orders (R1.7.1)."""
-        self._ports.reconcile_for_cycle.execute(ReconcileAccountForCycleCommand(FlowId(flow_id)))
-        return self._snapshot(flow_id, anchor, reconciled=False).state
-
-    def _snapshot(self, flow_id: UUID, anchor: datetime, *, reconciled: bool) -> FlowSnapshot[CycleFlow]:
-        ports = self._ports
-        flow = ports.flows.get(FlowId(flow_id))
-        started_at = ports.timing.timings().get(flow.id, UNSTAMPED).beginning(anchor)
-        account = find_account(ports.accounts, AccountId(flow.account_id))
-        try:
-            state = ports.read_exchange_state.execute(ReadExchangeStateCommand(account.id))
-        except (ExchangeRejectedCredentialsError, CredentialsNotOpenedError) as error:
-            raise FlowCredentialsRejectedError(account.name.value, account.id.value) from error
-        read_cycle_state = ReadCycleFlowStateUseCase(ports.read_flow_state, ports.reconcile_for_cycle)
-        attributed = read_cycle_state.execute(ReadCycleFlowStateCommand(flow.id, reconciled))
-        cycle_flow = CycleFlow(
-            flow.tenant_id, flow, account.name.value, account.exchange.value, started_at, state, attributed
-        )
-        return FlowSnapshot(tuple(source.name for source in flow.configuration.sources), cycle_flow)
 
 
 class SourcesFromSources:
@@ -1056,7 +957,7 @@ class ContextFromAgent:
 
 def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
     return FlowStateView(
-        currency=cycle_flow.account.balance.currency,
+        currency=cycle_flow.account.currency,
         allocated_capital=cycle_flow.configuration.allocated_capital,
         funds=cycle_flow.attributed.funds,
         available_liquidity=cycle_flow.available_liquidity,
@@ -1064,7 +965,7 @@ def _state_view(cycle_flow: CycleFlow) -> FlowStateView:
         return_percent=cycle_flow.return_percent,
         positions=tuple(
             PositionView(
-                position.coin,
+                position.asset,
                 TradeDirection(position.side.value),
                 position.size,
                 position.leverage,
@@ -1240,12 +1141,13 @@ def run_cycle_for(
     """The cycle of a flow of the tenant, every step on the adapters of that tenant (ADR 0041, ADR 0042)."""
     ports = ports_of(tenant_id)
     steps = CycleSteps(
-        flow_state=FlowStateFromFlows(ports),
+        start=ports.start_cycle,
         sources=SourceCollector(SourcesFromSources(ports, services), ThreadPoolConcurrentCallsAdapter()),
         context=ContextFromAgent(services.clock),
         agent=AgentFromAgent(ports, services),
         risk=RiskFromFlows(services.exchange_limits),
         orders=OrdersFromOrders(ports),
+        end=ports.end_cycle,
         journal=CycleJournalFromContexts(services.environment),
     )
     guards = CycleGuards(
