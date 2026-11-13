@@ -34,6 +34,33 @@ if [ ! -e secrets/telegram_bot_token ]; then
         && chown 65532:65532 /secrets/telegram_bot_token && chmod 0400 /secrets/telegram_bot_token"
 fi
 
+# The master key of the LiteLLM proxy (ADR 0098): only the worker and the API present it, on the network of the
+# installation. The proxy requires the sk- prefix.
+if [ ! -s secrets/litellm_master_key ]; then
+  docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets --entrypoint sh "$postgres_image" \
+    -c 'umask 077 && printf "sk-%s" "$(tr -dc A-Za-z0-9 </dev/urandom | head -c 48)" > /secrets/litellm_master_key \
+        && chown 65532:65532 /secrets/litellm_master_key && chmod 0400 /secrets/litellm_master_key'
+fi
+
+# The configuration of the proxy: the template of the repository plus the master key, readable only by the user of
+# the proxy image (65534). A changed configuration recreates the proxy alone after the compose starts.
+status=0
+docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets \
+  -v /opt/autotrading/litellm/config.yaml:/template.yaml:ro --entrypoint sh "$postgres_image" \
+  -c 'umask 077
+      new=/secrets/.litellm_config.new
+      current=/secrets/litellm_config
+      { cat /template.yaml; printf "\ngeneral_settings:\n  master_key: %s\n" "$(cat /secrets/litellm_master_key)"; } > "$new"
+      if [ -f "$current" ] && cmp -s "$new" "$current"; then rm -f "$new"; exit 0; fi
+      chown 65534:65534 "$new" && chmod 0400 "$new" && mv -f "$new" "$current"
+      exit 3' || status=$?
+case "$status" in
+  0) ;;
+  # The marker survives a failed release: the next one recreates the proxy anyway.
+  3) touch .litellm_config_changed ;;
+  *) exit "$status" ;;
+esac
+
 # The key pair of the account credentials (ADR 0007, ADR 0018): generated once, never replaced by a release.
 # The API receives only the public key; the private one is mounted in the worker alone.
 private_key=secrets/credentials_private_key_v1

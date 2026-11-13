@@ -1,0 +1,30 @@
+# Configurazione del proxy LiteLLM (ADR 0098), senza segreti: prepare-installation.sh vi aggiunge sulla macchina la
+# chiave master e la monta nel container come file in sola lettura.
+#
+# Abilitare un fornitore = una rotta qui. Nessuna chiave dei fornitori: ogni richiesta del worker porta la chiave
+# dell'utente del flusso, valida solo per quella richiesta (RF-01.05, ADR 0029).
+model_list:
+  - model_name: "anthropic/*"
+    litellm_params:
+      model: "anthropic/*"
+  - model_name: "deepseek/*"
+    litellm_params:
+      model: "deepseek/*"
+  - model_name: "openai/*"
+    litellm_params:
+      model: "openai/*"
+  - model_name: "openrouter/*"
+    litellm_params:
+      model: "openrouter/*"
+
+litellm_settings:
+  # Un parametro che il modello non accetta si toglie invece di far fallire il ciclo.
+  drop_params: true
+  # Né i messaggi né le risposte finiscono nei log del proxy.
+  turn_off_message_logging: true
+
+router_settings:
+  # Il ciclo successivo è il nuovo tentativo; un tentativo del proxy spenderebbe di nuovo il credito dell'utente.
+  num_retries: 0
+  # Le rotte sono condivise da tutti i tenant: il rifiuto della chiave di un utente non deve fermare quella degli altri.
+  disable_cooldowns: true
