@@ -459,165 +459,160 @@ class WorkerSettings:
     slippage: Slippage
 
 
-class TenantUseCaseFactory:
+def tenant_use_cases(
+    engine: Engine,
+    public_key: PublicCredentialsKey,
+    exchanges: ApiExchanges,
+    worker: WorkerConnection,
+    providers: httpx.Client,
+) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
+    provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
+    # One per installation: the username, once known, is kept across requests.
+    bot_identity = HttpxWorkerBotIdentityAdapter(worker.client, worker.token)
 
-    def __init__(
-        self,
-        engine: Engine,
-        public_key: PublicCredentialsKey,
-        exchanges: ApiExchanges,
-        worker: WorkerConnection,
-        providers: httpx.Client,
-    ) -> None:
-        self._engine = engine
-        self._public_key = public_key
-        self._exchanges = exchanges
-        self._worker = worker
-        self._provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
-        # One per installation: the username, once known, is kept across requests.
-        self._bot_identity = HttpxWorkerBotIdentityAdapter(worker.client, worker.token)
-
-    def for_tenant(self, tenant_id: TenantId) -> TenantUseCases:
-        accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
-        sealer = SodiumCredentialSealerAdapter(self._public_key.key, self._public_key.version, tenant_id)
-        account_state = HttpxAccountStateAdapter(self._worker.client, self._worker.token, tenant_id)
-        provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id)
-        flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
-        position_closing = HttpxPositionClosingAdapter(self._worker.client, self._worker.token, tenant_id)
+    def for_tenant(tenant_id: TenantId) -> TenantUseCases:
+        accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
+        sealer = SodiumCredentialSealerAdapter(public_key.key, public_key.version, tenant_id)
+        account_state = HttpxAccountStateAdapter(worker.client, worker.token, tenant_id)
+        provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
+        flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
+        position_closing = HttpxPositionClosingAdapter(worker.client, worker.token, tenant_id)
         flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
-        closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
+        closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(
-            HttpxNotificationAdapter(self._worker.client, self._worker.token, tenant_id),
+            HttpxNotificationAdapter(worker.client, worker.token, tenant_id),
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
-        flow_openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
+        flow_openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
         stop_ports = StopPorts(
-            SqlAlchemyRunningCycleAdapter(self._engine), flow_positions, flow_openings, closed_positions, closing_notice
+            SqlAlchemyRunningCycleAdapter(engine), flow_positions, flow_openings, closed_positions, closing_notice
         )
         ports = TenantPorts(
             accounts=accounts,
             sealer=sealer,
-            exchanges=self._exchanges.accounts,
+            exchanges=exchanges.accounts,
             account_state=account_state,
             position_closing=position_closing,
             manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
-            verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
+            verification=HttpxVerificationAdapter(worker.client, worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
-            provider_key_sealer=SodiumProviderKeySealerAdapter(
-                self._public_key.key, self._public_key.version, tenant_id
-            ),
-            provider_key_verifier=self._provider_key_verifier,
+            provider_key_sealer=SodiumProviderKeySealerAdapter(public_key.key, public_key.version, tenant_id),
+            provider_key_verifier=provider_key_verifier,
             provider_key_usage=flows,
             model_catalog=MODEL_CATALOG,
             flows=flows,
-            running_verifications=SqlAlchemyRunningVerificationsAdapter(self._engine),
+            running_verifications=SqlAlchemyRunningVerificationsAdapter(engine),
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
-                markets=self._exchanges.markets,
+                markets=exchanges.markets,
                 models=SelectModelUseCase(MODEL_CATALOG, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
-            account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
-            flow_ledger=SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id),
-            flow_operations=SqlAlchemyFlowOperationsAdapter(self._engine, tenant_id),
-            link_codes=SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
-            bot_identity=self._bot_identity,
-            linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
+            account_activity=HttpxAccountActivityAdapter(worker.client, worker.token, tenant_id),
+            flow_ledger=SqlAlchemyFlowLedgerAdapter(engine, tenant_id),
+            flow_operations=SqlAlchemyFlowOperationsAdapter(engine, tenant_id),
+            link_codes=SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
+            bot_identity=bot_identity,
+            linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
             clock=now,
             closed_positions=closed_positions,
-            cycle_history=SqlAlchemyCycleRepositoryAdapter(self._engine, tenant_id),
+            cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
             flow_directory=flows,
-            flow_summaries=FlowSummariesFromFlows(
-                flows, accounts, SqlAlchemyFlowTimingAdapter(self._engine, tenant_id)
-            ),
-            environment=self._exchanges.environment,
+            flow_summaries=FlowSummariesFromFlows(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
+            environment=exchanges.environment,
         )
         return TenantUseCases.on(tenant_id, ports)
 
+    return for_tenant
 
-class WorkerUseCaseFactory:
+
+def worker_use_cases(
+    engine: Engine,
+    opener: SodiumCredentialOpenerAdapter,
+    exchanges: WorkerExchanges,
+    settings: WorkerSettings,
+    messenger: MessengerPort,
+) -> Callable[[TenantId], WorkerUseCases]:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
 
-    def __init__(
-        self,
-        engine: Engine,
-        opener: SodiumCredentialOpenerAdapter,
-        exchanges: WorkerExchanges,
-        settings: WorkerSettings,
-        messenger: MessengerPort,
-    ) -> None:
-        self._engine = engine
-        self._opener = opener
-        self._exchanges = exchanges
-        self._settings = settings
-        self._messenger = messenger
-
-    def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
-        accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
-        orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
-        access = OpenTradingAccessUseCase(accounts, self._opener)
-        slippage = self._settings.slippage
-        read_exchange_state = ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts)
-        close_exchange_position = CloseExchangePositionUseCase(access, self._exchanges.orders, orders, slippage)
-        open_position = OpenPositionUseCase(access, self._exchanges.orders, orders, slippage)
-        read_market = ReadMarketUseCase(access, self._exchanges.orders)
+    def for_tenant(tenant_id: TenantId) -> WorkerUseCases:
+        accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
+        orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
+        access = OpenTradingAccessUseCase(accounts, opener)
+        slippage = settings.slippage
+        read_exchange_state = ReadExchangeStateUseCase(accounts, opener, exchanges.accounts)
+        close_exchange_position = CloseExchangePositionUseCase(access, exchanges.orders, orders, slippage)
+        open_position = OpenPositionUseCase(access, exchanges.orders, orders, slippage)
+        read_market = ReadMarketUseCase(access, exchanges.orders)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
                 VerificationReadings(
-                    ReadAccountForVerificationUseCase(accounts, self._opener, self._exchanges.readings),
-                    SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id),
+                    ReadAccountForVerificationUseCase(accounts, opener, exchanges.readings),
+                    SqlAlchemyFlowRepositoryAdapter(engine, tenant_id),
                 ),
                 OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
-                SqlAlchemyVerificationRunRepositoryAdapter(self._engine, tenant_id),
-                self._settings.environment,
+                SqlAlchemyVerificationRunRepositoryAdapter(engine, tenant_id),
+                settings.environment,
                 now,
             ),
-            notify=self.notify_for(tenant_id),
-            read_account_activity=ReadAccountActivityUseCase(accounts, self._opener, self._exchanges.activity),
+            notify=notify_for(engine, messenger, tenant_id),
+            read_account_activity=ReadAccountActivityUseCase(accounts, opener, exchanges.activity),
         )
 
-    def cycle_ports_for(self, tenant_id: TenantId) -> TenantCyclePorts:
-        accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
-        orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
-        access = OpenTradingAccessUseCase(accounts, self._opener)
-        slippage = self._settings.slippage
-        flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
-        openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)
-        notify = self.notify_for(tenant_id)
-        closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(self._engine, tenant_id)
+    return for_tenant
+
+
+def cycle_ports(
+    engine: Engine,
+    opener: SodiumCredentialOpenerAdapter,
+    exchanges: WorkerExchanges,
+    settings: WorkerSettings,
+    messenger: MessengerPort,
+) -> Callable[[TenantId], TenantCyclePorts]:
+    """Builds, for each cycle, the adapters and use cases bound to the tenant of its flow."""
+
+    def cycle_ports_for(tenant_id: TenantId) -> TenantCyclePorts:
+        accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
+        orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
+        access = OpenTradingAccessUseCase(accounts, opener)
+        slippage = settings.slippage
+        flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
+        openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
+        notify = notify_for(engine, messenger, tenant_id)
+        closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        activity = ReadAccountActivityUseCase(accounts, self._opener, self._exchanges.activity)
-        ledger = SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id)
+        activity = ReadAccountActivityUseCase(accounts, opener, exchanges.activity)
+        ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
-            ReadAccountExecutionsUseCase(accounts, self._opener, self._exchanges.executions),
-            SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
+            ReadAccountExecutionsUseCase(accounts, opener, exchanges.executions),
+            SqlAlchemyPlatformOrdersAdapter(engine, tenant_id),
             ledger,
         )
         reconcile_account = ReconcileAccountUseCase(
             flows,
             activity,
-            SqlAlchemyReconciliationRepositoryAdapter(self._engine, tenant_id),
+            SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id),
             RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
             record_executions,
         )
         return TenantCyclePorts(
             flows=flows,
-            pause=SqlAlchemyAutomaticPauseAdapter(self._engine, tenant_id),
+            pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
             accounts=accounts,
-            read_exchange_state=ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts),
+            read_exchange_state=ReadExchangeStateUseCase(accounts, opener, exchanges.accounts),
             read_flow_state=ReadFlowStateUseCase(flows, activity, ledger),
-            provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(self._engine, tenant_id),
-            forecasts=SqlAlchemyForecastRepositoryAdapter(self._engine, tenant_id),
-            samples=SqlAlchemySampleRepositoryAdapter(self._engine, tenant_id),
-            execute_flow_orders=ExecuteFlowOrdersUseCase(access, self._exchanges.orders, orders, slippage),
+            provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id),
+            forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
+            samples=SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
+            execute_flow_orders=ExecuteFlowOrdersUseCase(access, exchanges.orders, orders, slippage),
             reconcile_for_cycle=ReconcileAccountForCycleUseCase(
                 reconcile_account,
                 NotifyUnattributableUseCase(
@@ -642,17 +637,21 @@ class WorkerUseCaseFactory:
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             notify=notify,
-            timing=SqlAlchemyFlowTimingAdapter(self._engine, tenant_id),
+            timing=SqlAlchemyFlowTimingAdapter(engine, tenant_id),
         )
 
-    def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
-        return NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id), self._messenger)
+    return cycle_ports_for
 
-    def link_stores_for(self, tenant_id: TenantId) -> LinkStores:
-        return LinkStores(
-            SqlAlchemyLinkCodeRepositoryAdapter(self._engine, tenant_id),
-            SqlAlchemyLinkedChatRepositoryAdapter(self._engine, tenant_id),
-        )
+
+def notify_for(engine: Engine, messenger: MessengerPort, tenant_id: TenantId) -> NotifyUseCase:
+    return NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id), messenger)
+
+
+def link_stores_for(engine: Engine, tenant_id: TenantId) -> LinkStores:
+    return LinkStores(
+        SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
+        SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
+    )
 
 
 class UnconfiguredMessenger:
@@ -676,14 +675,14 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
     network = ExchangeNetwork.of_installation(health.environment)
     engine = _database(configuration)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
-    tenants = TenantUseCaseFactory(
+    for_tenant = tenant_use_cases(
         engine,
         PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
         ApiExchanges(exchanges_for(network), markets_for(network), health.environment),
         _worker_connection(configuration),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
-    return create_api(health, resolve_tenant, tenants.for_tenant, _authentication(configuration))
+    return create_api(health, resolve_tenant, for_tenant, _authentication(configuration))
 
 
 def create_worker_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
@@ -705,10 +704,11 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     messenger, inbox, identity = telegram_channel(
         _optional_secret(configuration, TELEGRAM_BOT_SETTING), UnconfiguredMessenger()
     )
-    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, messenger)
-    bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, worker, bot_inbox, messenger))
-    cycles = worker_cycles(engine, worker.cycle_ports_for, cycle_services(environment, private_keys))
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles, identity)
+    for_tenant = worker_use_cases(engine, opener, exchanges, settings, messenger)
+    bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
+    ports_of = cycle_ports(engine, opener, exchanges, settings, messenger)
+    cycles = worker_cycles(engine, ports_of, cycle_services(environment, private_keys))
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), for_tenant, bot, cycles, identity)
 
 
 def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
@@ -732,13 +732,13 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
     )
 
 
-def telegram_bot(
-    engine: Engine, worker: WorkerUseCaseFactory, inbox: BotInboxPort, messenger: MessengerPort
-) -> BotPolling:
+def telegram_bot(engine: Engine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
-    link_chat = LinkChatUseCase(SqlAlchemyLinkCodeLookupAdapter(engine), worker.link_stores_for, messenger, now)
+    link_chat = LinkChatUseCase(
+        SqlAlchemyLinkCodeLookupAdapter(engine), partial(link_stores_for, engine), messenger, now
+    )
     test_notification = SendTestNotificationUseCase(
-        SqlAlchemyLinkedChatLookupAdapter(engine), worker.notify_for, messenger
+        SqlAlchemyLinkedChatLookupAdapter(engine), partial(notify_for, engine, messenger), messenger
     )
     return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
 

@@ -44,13 +44,11 @@ from autotrading.bootstrap import (
     InvalidConfigurationError,
     MissingConfigurationError,
     PublicCredentialsKey,
-    TenantUseCaseFactory,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
     WorkerConnection,
     WorkerExchanges,
     WorkerSettings,
-    WorkerUseCaseFactory,
     activity_readers_for,
     create_application,
     create_worker_application,
@@ -60,6 +58,8 @@ from autotrading.bootstrap import (
     now,
     order_exchanges_for,
     slippage_from,
+    tenant_use_cases,
+    worker_use_cases,
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.errors import AutotradingError
@@ -193,11 +193,11 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
-    factory = TenantUseCaseFactory(
+    factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
 
-    first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
+    first, second = factory(TenantId.new()), factory(TenantId.new())
 
     assert first.register_account is not second.register_account
     assert first.read_account_state is not second.read_account_state
@@ -222,12 +222,12 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
     worker = WorkerConnection(client, WORKER_TOKEN)
-    factory = TenantUseCaseFactory(
+    factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
 
     with pytest.raises(ExchangeUnavailableError):
-        factory.for_tenant(tenant_id).read_account_state.execute(ReadAccountStateCommand(account.id))
+        factory(tenant_id).read_account_state.execute(ReadAccountStateCommand(account.id))
 
     assert [request.url.path for request in asked] == [f"/tenants/{tenant_id.value}/accounts/{account.id.value}/state"]
     assert asked[0].headers["Authorization"] == f"Bearer {WORKER_TOKEN}"
@@ -370,9 +370,9 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     )
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())
-    factory = WorkerUseCaseFactory(create_engine("sqlite://"), opener, exchanges, settings, FakeMessengerAdapter())
+    factory = worker_use_cases(create_engine("sqlite://"), opener, exchanges, settings, FakeMessengerAdapter())
 
-    first, second = factory.for_tenant(TenantId.new()), factory.for_tenant(TenantId.new())
+    first, second = factory(TenantId.new()), factory(TenantId.new())
 
     assert first.close_exchange_position is not second.close_exchange_position
     assert first.read_exchange_state is not second.read_exchange_state
@@ -389,7 +389,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
-    factory = TenantUseCaseFactory(
+    factory = tenant_use_cases(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
         ApiExchanges({}, {}),
@@ -399,9 +399,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     tenant_id, account_id = TenantId.new(), uuid4()
 
     with pytest.raises(OrderExchangeUnavailableError):
-        factory.for_tenant(tenant_id).close_position.execute(
-            ClosePositionCommand(account_id, "BTC", UserId("oid-anna"))
-        )
+        factory(tenant_id).close_position.execute(ClosePositionCommand(account_id, "BTC", UserId("oid-anna")))
 
     assert [request.url.path for request in asked] == [
         f"/tenants/{tenant_id.value}/accounts/{account_id}/positions/BTC/close"
@@ -419,7 +417,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
-    factory = TenantUseCaseFactory(
+    factory = tenant_use_cases(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
         ApiExchanges({}, {}),
@@ -429,7 +427,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     tenant_id, account_id = TenantId.new(), uuid4()
 
     with pytest.raises(VerificationAccountNotFoundError):
-        factory.for_tenant(tenant_id).run_verification.execute(RunVerificationCommand(account_id, UserId("oid-anna")))
+        factory(tenant_id).run_verification.execute(RunVerificationCommand(account_id, UserId("oid-anna")))
 
     assert [request.url.path for request in asked] == [
         f"/tenants/{tenant_id.value}/accounts/{account_id}/verifications"
@@ -468,14 +466,12 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
     providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
-    factory = TenantUseCaseFactory(
+    factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, providers
     )
 
     with pytest.raises(ProviderRejectedKeyError):
-        factory.for_tenant(TenantId.new()).register_provider_key.execute(
-            RegisterProviderKeyCommand("openrouter", "K-MADE-UP")
-        )
+        factory(TenantId.new()).register_provider_key.execute(RegisterProviderKeyCommand("openrouter", "K-MADE-UP"))
 
     assert [str(request.url) for request in asked] == ["https://openrouter.ai/api/v1/key"]
     assert store.keys == []
@@ -511,11 +507,11 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
-    factory = TenantUseCaseFactory(
+    factory = tenant_use_cases(
         create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
     )
 
-    factory.for_tenant(TenantId.new())
+    factory(TenantId.new())
 
     assert len(notices) == 2
     assert all(isinstance(notice, NotifyPositionClosedUseCase) for notice in notices)

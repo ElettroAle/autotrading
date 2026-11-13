@@ -2,14 +2,15 @@
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 
 from autotrading import bootstrap
-from autotrading.adapters.inbound.api.worker import BotPolling
+from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases
 from autotrading.adapters.outbound.httpx.telegram import HttpxTelegramInboxAdapter, HttpxTelegramMessengerAdapter
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import SqlAlchemyLinkCodeRepositoryAdapter
@@ -21,13 +22,15 @@ from autotrading.bootstrap import (
     UnconfiguredMessenger,
     WorkerExchanges,
     WorkerSettings,
-    WorkerUseCaseFactory,
     activity_readers_for,
     create_worker_application,
     exchanges_for,
     executions_readers_for,
+    link_stores_for,
+    notify_for,
     order_exchanges_for,
     telegram_bot,
+    worker_use_cases,
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.notifications.chat_id import ChatId
@@ -40,7 +43,7 @@ FAKE_BOT = "BOT-FAKE_BOT-FAKE"
 DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
-def factory(messenger: MessengerPort) -> WorkerUseCaseFactory:
+def factory(engine: Engine, messenger: MessengerPort) -> Callable[[TenantId], WorkerUseCases]:
     accounts = exchanges_for(ExchangeNetwork.TEST)
     exchanges = WorkerExchanges(
         accounts,
@@ -50,9 +53,7 @@ def factory(messenger: MessengerPort) -> WorkerUseCaseFactory:
         accounts,
     )
     settings = WorkerSettings("dev", Slippage.default())
-    return WorkerUseCaseFactory(
-        create_engine("sqlite://"), SodiumCredentialOpenerAdapter({}), exchanges, settings, messenger
-    )
+    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), exchanges, settings, messenger)
 
 
 def token_file(tmp_path: Path, content: str) -> str:
@@ -81,7 +82,7 @@ def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
 ) -> None:
     started: list[tuple[BotInboxPort, MessengerPort]] = []
 
-    def start(_engine: object, _worker: object, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
+    def start(_engine: object, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
         started.append((inbox, messenger))
         return BotPolling(lambda: None)
 
@@ -113,7 +114,7 @@ def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
 
     client = httpx.Client(base_url=f"https://api.telegram.org/bot{FAKE_BOT}", transport=httpx.MockTransport(answer))
     inbox = HttpxTelegramInboxAdapter(client)
-    bot = telegram_bot(create_engine("sqlite://"), factory(FakeMessengerAdapter()), inbox, FakeMessengerAdapter())
+    bot = telegram_bot(create_engine("sqlite://"), inbox, FakeMessengerAdapter())
 
     bot.run(polled)
 
@@ -121,12 +122,13 @@ def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
 
 
 def test_the_link_stores_and_the_notifications_are_bound_to_the_tenant() -> None:
-    worker = factory(FakeMessengerAdapter())
+    engine, messenger = create_engine("sqlite://"), FakeMessengerAdapter()
+    worker = factory(engine, messenger)
     tenant = TenantId.new()
 
-    stores = worker.link_stores_for(tenant)
+    stores = link_stores_for(engine, tenant)
 
     assert isinstance(stores.codes, SqlAlchemyLinkCodeRepositoryAdapter)
     assert isinstance(stores.chats, SqlAlchemyLinkedChatRepositoryAdapter)
-    assert worker.for_tenant(tenant).notify is not worker.for_tenant(tenant).notify
-    assert worker.notify_for(tenant) is not worker.notify_for(tenant)
+    assert worker(tenant).notify is not worker(tenant).notify
+    assert notify_for(engine, messenger, tenant) is not notify_for(engine, messenger, tenant)
