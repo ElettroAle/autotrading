@@ -50,12 +50,13 @@ di una chiave virtuale per tenant: qui vincono i requisiti.
 - La chiave dell'utente viaggia nel corpo della richiesta (`api_key`), che LiteLLM usa al posto della chiave della
   rotta solo per quella richiesta: nessuna chiave dei fornitori resta nel proxy.
 - Parametri: `max_tokens` (4096 se il flusso non lo indica), `temperature`; risposta JSON obbligata solo per OpenAI e
-  DeepSeek, come prima. Livello di ragionamento (basso, medio, alto in low, medium, high):
-  - OpenAI: `reasoning_effort`;
+  DeepSeek, come prima. Livello di ragionamento (basso, medio, alto in low, medium, high), solo se il flusso lo
+  imposta, cioè solo se il catalogo dichiara che il modello lo supporta:
   - Anthropic: `output_config.effort`, passato al fornitore. `reasoning_effort` non va bene: LiteLLM lo traduce in un
     budget di thinking di 4096 token per i modelli che non riconosce, maggiore del limite del flusso;
   - OpenRouter: `reasoning.effort`, passato al fornitore (`reasoning_effort` verrebbe tolto da `drop_params`);
-  - DeepSeek: nessuno.
+  - ogni altro fornitore, compreso uno abilitato in seguito nella configurazione: `reasoning_effort`, tradotto da
+    LiteLLM. Nessun elenco di fornitori nell'adapter: lo decide la configurazione del proxy.
 - Costo: solo quello che il fornitore dichiara (`usage.cost` di OpenRouter, che LiteLLM conserva nella risposta);
   la stima di LiteLLM non si usa, così i prezzi del catalogo restano l'unica fonte per gli altri fornitori (R1.4.6).
 - Errori, invariati per l'utente (R1.2.3, R1.2.4):
@@ -95,7 +96,8 @@ di una chiave virtuale per tenant: qui vincono i requisiti.
 
 ## Conseguenze
 
-- Un fornitore nuovo è una rotta in `deploy/litellm/config.yaml` più la sua verifica delle chiavi (scostamento 3).
+- Un fornitore nuovo è una rotta in `deploy/litellm/config.yaml` più la sua verifica delle chiavi (scostamento 3);
+  un test confronta le rotte della configurazione con le verifiche disponibili.
 - Il `worker` e l'`api` dipendono dal proxy solo a richiesta: se il proxy è giù fallisce la chiamata (ciclo
   transitorio), non l'avvio dei servizi.
 - Il proxy aggiunge circa 350 MB di memoria all'installazione `dev` (misurato in locale); con `d2-2` va osservato.
