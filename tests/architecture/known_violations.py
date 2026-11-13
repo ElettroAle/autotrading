@@ -17,8 +17,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows._snapshot": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders.execute": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:_scalar_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:json_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_authentication": BUG_STRICTER_RULES,
         "bootstrap.py:_credentials_private_key": BUG_STRICTER_RULES,
         "bootstrap.py:_credentials_public_key": BUG_STRICTER_RULES,
