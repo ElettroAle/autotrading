@@ -59,3 +59,7 @@ def test_a_linked_chat_belongs_to_its_tenant() -> None:
 
     assert (chat.tenant_id, chat.chat_id.value) == (tenant, -100123)
     assert isinstance(chat, TenantOwned)
+
+
+def test_the_test_notification_says_where_the_notifications_arrive() -> None:
+    assert Notification.test().text == "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
