@@ -9,6 +9,8 @@ dependencies = [
     "fastapi>=0.120",
     "httpx>=0.28",
     "hyperliquid-python-sdk>=0.24.0",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.0",
     "openai>=3.50,<4",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
@@ -115,6 +117,7 @@ forbidden_modules = [
     "eth_account",
     "requests",
     "httpx",
+    "langgraph",
     "openai",
 ]
 
@@ -169,4 +172,10 @@ modules = [
     "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
+]
+
+[tool.uv]
+override-dependencies = [
+    # Without a wheel for Python 3.15; only the tracing of langsmith uses it, never enabled (ADR 0104).
+    "zstandard; sys_platform == 'never'",
 ]
