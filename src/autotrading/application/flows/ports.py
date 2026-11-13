@@ -638,8 +638,43 @@ class CycleEndPort[E = object](Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class SourceAsk:
+    """An active source of the flow as the cycle asks it: with the parameters, the assets and the interval of the flow
+    (R1.3.2, R1.3.3).
+    """
+
+    flow_id: UUID
+    planned_at: datetime
+    source: str
+    weight: int
+    parameters: Mapping[str, int]
+    assets: tuple[str, ...]
+    cycle_minutes: int
+    asked_at: datetime
+
+
+class CollectedValuesPort(Protocol):
+    """What an active source collected in the cycle: each value with its asset, or the note of its silence."""
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def weight(self) -> int: ...
+
+    @property
+    def entries(self) -> tuple[tuple[str | None, Mapping[str, str]], ...]: ...
+
+
+class SourceCollectionPort(Protocol):
+    def execute(self, ask: SourceAsk) -> CollectedValuesPort:
+        """Collects and records the source for the cycle; a typed error makes the source absent (R1.2.5)."""
+        ...
+
+
 class SourcePort[S = object, D = object](Protocol):
-    def collect(self, request: SourceRequest[S], source: str) -> D:
+    def execute(self, request: SourceRequest[S], source: str) -> D:
         """The data of one active source; any typed error makes the source absent for the cycle (R1.2.5)."""
         ...
 
