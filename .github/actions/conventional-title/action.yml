@@ -9,6 +9,4 @@ runs:
   steps:
     - name: Titolo Conventional Commits
       shell: bash
-      env:
-        TITLE: ${{ inputs.title }}
-      run: uv run python -m tools.release_version title "$TITLE"
+      run: uv run python -m tools.release_version title "${{ inputs.title }}"
