@@ -53,6 +53,9 @@ class Identity(BaseModel):
     tenant_id: str
 
 
+type ApiApplication = FastAPI
+
+
 def create_api(
     health: HealthReport,
     resolve_tenant: ResolveTenantUseCase,

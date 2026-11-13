@@ -1,9 +1,7 @@
 from collections.abc import Callable
 
-from fastapi import FastAPI
-
 from autotrading.adapters.configuration.source import ConfigurationSource
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
+from autotrading.adapters.inbound.api.app import ApiApplication, Authentication, HealthReport, create_api
 from autotrading.adapters.inbound.api.configuration import (
     _api_settings_of,
     _login_settings_of,
@@ -22,7 +20,7 @@ def api_adapters(
     resolve_tenant: ResolveTenantUseCase,
     for_tenant: Callable[[TenantId], TenantUseCases],
     login: tuple[AccessTokenVerifierPort, LoginEndpointsPort] | None,
-) -> FastAPI:
+) -> ApiApplication:
     """The public API of the installation, with the login only if the installation declares one."""
     settings = _api_settings_of(source)
     health = HealthReport(version=settings.version, environment=settings.environment)
@@ -35,7 +33,7 @@ def worker_api_adapters(
     bot: BotPolling | None,
     cycles: CyclePolling | None,
     bot_start_link: BotStartLinkPort | None,
-) -> FastAPI:
+) -> ApiApplication:
     """The internal service of the worker, open only to the caller that holds the token of the machine."""
     return create_worker_api(_worker_api_settings_of(source).token, for_tenant, bot, cycles, bot_start_link)
 

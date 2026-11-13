@@ -7,10 +7,9 @@ from functools import partial
 from uuid import UUID
 
 import httpx
-from fastapi import FastAPI
-from sqlalchemy import Engine
 
 from autotrading.adapters.configuration.source import PROCESS_ENVIRONMENT, ConfigurationSource
+from autotrading.adapters.inbound.api.app import ApiApplication
 from autotrading.adapters.inbound.api.composition import api_adapters, worker_api_adapters
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import (
@@ -41,7 +40,7 @@ from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyA
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
-from autotrading.adapters.outbound.sqlalchemy.composition import sqlalchemy_adapters
+from autotrading.adapters.outbound.sqlalchemy.composition import SqlAlchemyEngine, sqlalchemy_adapters
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
@@ -339,7 +338,7 @@ def _order_result(order: Order) -> OrderResult:
 
 
 def tenant_use_cases(
-    engine: Engine,
+    engine: SqlAlchemyEngine,
     sealers: tuple[
         Callable[[TenantId], SodiumCredentialSealerAdapter], Callable[[TenantId], SodiumProviderKeySealerAdapter]
     ],
@@ -413,7 +412,7 @@ def tenant_use_cases(
 
 
 def worker_use_cases(
-    engine: Engine,
+    engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
     environment: str,
     slippage: Slippage,
@@ -453,7 +452,7 @@ def worker_use_cases(
 
 
 def cycle_ports(
-    engine: Engine,
+    engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
     environment: str,
     slippage: Slippage,
@@ -537,18 +536,18 @@ def cycle_ports(
     return cycle_ports_for
 
 
-def notify_for(engine: Engine, messenger: MessengerPort, tenant_id: TenantId) -> NotifyUseCase:
+def notify_for(engine: SqlAlchemyEngine, messenger: MessengerPort, tenant_id: TenantId) -> NotifyUseCase:
     return NotifyUseCase(SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id), messenger)
 
 
-def link_stores_for(engine: Engine, tenant_id: TenantId) -> LinkStores:
+def link_stores_for(engine: SqlAlchemyEngine, tenant_id: TenantId) -> LinkStores:
     return LinkStores(
         SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
         SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
     )
 
 
-def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> FastAPI:
+def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
     source = ConfigurationSource(configuration)
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
@@ -562,7 +561,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
 
-def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> FastAPI:
+def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
     source = ConfigurationSource(configuration)
     environment = source.environment()
@@ -597,7 +596,7 @@ def cycle_services(environment: str, provider_key_opener: SodiumProviderKeyOpene
     )
 
 
-def telegram_bot(engine: Engine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
+def telegram_bot(engine: SqlAlchemyEngine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
     link_chat = LinkChatUseCase(
         SqlAlchemyLinkCodeLookupAdapter(engine),
@@ -739,7 +738,7 @@ def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, serv
     record.execute(RecordActualPricesCommand(services.clock.now()))
 
 
-def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
+def worker_cycles(engine: SqlAlchemyEngine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
     planned = ThreadsPlannedFlowsAdapter()
     cycles_of = partial(SqlAlchemyCycleRepositoryAdapter, engine)
     run_cycle_of = partial(run_cycle_for, ports_of, services, cycles_of, SqlAlchemyFlowLockAdapter(engine))

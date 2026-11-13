@@ -31,9 +31,7 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
     },
     Rule.LIBRARIES_IN_THEIR_FOLDER: {
-        "bootstrap.py:fastapi": BUG_STRICTER_RULES,
         "bootstrap.py:httpx": BUG_STRICTER_RULES,
-        "bootstrap.py:sqlalchemy": BUG_STRICTER_RULES,
     },
     Rule.ADAPTERS_DO_NOT_ORCHESTRATE: {},
     Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {},
