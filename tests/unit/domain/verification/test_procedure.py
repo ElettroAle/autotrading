@@ -3,28 +3,72 @@ from decimal import Decimal
 import pytest
 
 from autotrading.domain.verification.errors import (
+    AmountBelowMinimumError,
     AssetOfFlowError,
     InsufficientMarginError,
     PositionAlreadyOpenError,
+    VerificationAmountNotPositiveError,
     VerificationNotStartedError,
 )
 from autotrading.domain.verification.procedure import (
-    PROCEDURE_OPENING,
-    REQUIRED_MARGIN,
     Opening,
     Step,
     missing_opening,
+    procedure_opening,
     remaining_position,
     require_free_of_flows,
     require_startable,
 )
-from autotrading.domain.verification.reading import PositionReading
+from autotrading.domain.verification.reading import AccountReading, PositionReading
 from tests.support.verification import LONG_BTC, SHORT_ETH, a_reading
 
+MINIMUM = Decimal(10)
 
-def test_the_procedure_always_opens_long_btc_with_leverage_2_for_12_usdc() -> None:
-    assert Opening(coin="BTC", side="long", leverage=2, value=Decimal(12)) == PROCEDURE_OPENING
-    assert Decimal(12) == REQUIRED_MARGIN
+
+def an_opening(value: Decimal) -> Opening:
+    return Opening(coin="BTC", side="long", leverage=2, value=value)
+
+
+@pytest.mark.parametrize("chosen", [Decimal(10), Decimal("10.01"), Decimal(20)])
+def test_the_procedure_opens_long_btc_with_leverage_2_for_the_chosen_amount(chosen: Decimal) -> None:
+    assert procedure_opening(chosen, MINIMUM, "USDC") == an_opening(chosen)
+
+
+@pytest.mark.parametrize("minimum", [Decimal(10), Decimal("1.5")])
+def test_without_an_amount_the_procedure_opens_the_minimum_of_the_exchange(minimum: Decimal) -> None:
+    assert procedure_opening(None, minimum, "USDC") == an_opening(minimum)
+
+
+@pytest.mark.parametrize("chosen", [Decimal("9.99"), Decimal(5)])
+def test_an_amount_below_the_minimum_of_the_exchange_stops_the_procedure(chosen: Decimal) -> None:
+    with pytest.raises(AmountBelowMinimumError) as raised:
+        procedure_opening(chosen, Decimal("10.5"), "USDC")
+
+    assert (raised.value.reason, raised.value.minimum) == (
+        "importo sotto il minimo dell'exchange: 10,50 USDC",
+        Decimal("10.5"),
+    )
+    assert isinstance(raised.value, VerificationNotStartedError)
+
+
+@pytest.mark.parametrize("chosen", [Decimal(0), Decimal(-5)])
+def test_an_amount_not_above_zero_is_invalid_whatever_the_minimum(chosen: Decimal) -> None:
+    with pytest.raises(VerificationAmountNotPositiveError) as raised:
+        procedure_opening(chosen, Decimal(0), "USDC")
+
+    assert (str(raised.value), raised.value.status_code) == (
+        "l'importo della procedura deve essere maggiore di zero",
+        422,
+    )
+
+
+def test_a_minimum_of_zero_without_an_amount_is_invalid() -> None:
+    with pytest.raises(VerificationAmountNotPositiveError):
+        procedure_opening(None, Decimal(0), "USDC")
+
+
+def test_the_margin_the_opening_needs_is_its_value_over_its_leverage() -> None:
+    assert an_opening(Decimal(25)).required_margin == Decimal("12.5")
 
 
 def test_the_steps_run_in_their_order() -> None:
@@ -49,31 +93,43 @@ def test_the_outcome_names_each_step_without_its_details(step: Step, short_name:
     assert step.short_name == short_name
 
 
-@pytest.mark.parametrize("margin", [Decimal(12), Decimal("12.01"), Decimal(1000)])
-def test_an_account_without_btc_and_with_enough_margin_starts(margin: Decimal) -> None:
-    require_startable(a_reading(SHORT_ETH, margin=margin))
+@pytest.mark.parametrize("margin", [Decimal(10), Decimal("10.01"), Decimal(1000)])
+def test_an_account_without_btc_and_with_the_margin_of_the_opening_starts(margin: Decimal) -> None:
+    require_startable(a_reading(SHORT_ETH, margin=margin), an_opening(Decimal(20)))
 
 
 @pytest.mark.parametrize("held", [LONG_BTC, PositionReading("BTC", "short", Decimal("0.1"), 5)])
 def test_any_position_on_btc_stops_the_procedure_before_it_starts(held: PositionReading) -> None:
     with pytest.raises(PositionAlreadyOpenError) as raised:
-        require_startable(a_reading(held))
+        require_startable(a_reading(held), an_opening(MINIMUM))
 
     assert str(raised.value) == "posizione già aperta su BTC"
     assert isinstance(raised.value, VerificationNotStartedError)
 
 
-@pytest.mark.parametrize("margin", [Decimal("11.99"), Decimal(5), Decimal(0)])
-def test_less_than_12_usdc_of_margin_stops_the_procedure_before_it_starts(margin: Decimal) -> None:
+@pytest.mark.parametrize("margin", [Decimal("9.99"), Decimal(8), Decimal(0)])
+def test_less_margin_than_the_opening_needs_stops_the_procedure_before_it_starts(margin: Decimal) -> None:
     with pytest.raises(InsufficientMarginError) as raised:
-        require_startable(a_reading(margin=margin))
+        require_startable(a_reading(margin=margin), an_opening(Decimal(20)))
 
-    assert raised.value.reason == "margine insufficiente: servono almeno 12 USDC"
+    assert (raised.value.reason, raised.value.required) == (
+        "margine disponibile insufficiente: servono 10 USDC",
+        Decimal(10),
+    )
+
+
+def test_the_margin_needed_is_said_in_the_currency_of_the_account_with_its_cents() -> None:
+    reading = AccountReading(Decimal(100), Decimal(1), "USDT", ())
+
+    with pytest.raises(InsufficientMarginError) as raised:
+        require_startable(reading, an_opening(Decimal("10.5")))
+
+    assert raised.value.reason == "margine disponibile insufficiente: servono 5,25 USDT"
 
 
 def test_the_open_position_is_said_before_the_missing_margin() -> None:
     with pytest.raises(PositionAlreadyOpenError):
-        require_startable(a_reading(LONG_BTC, margin=Decimal(5)))
+        require_startable(a_reading(LONG_BTC, margin=Decimal(5)), an_opening(Decimal(20)))
 
 
 def test_the_reading_after_the_opening_holds_long_btc_with_leverage_2() -> None:

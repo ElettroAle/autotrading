@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.verification.ports import VerificationPort
@@ -10,6 +11,8 @@ from autotrading.domain.verification.verification_run import VerificationRun
 class RunVerificationCommand:
     account_id: UUID
     user_id: UserId
+    # None leaves the value to the minimum of the exchange of the account.
+    amount: Decimal | None = None
 
 
 class RunVerificationUseCase:
@@ -22,4 +25,4 @@ class RunVerificationUseCase:
         self._verification = verification
 
     def execute(self, command: RunVerificationCommand) -> VerificationRun:
-        return self._verification.run(command.account_id, command.user_id)
+        return self._verification.run(command.account_id, command.user_id, command.amount)
