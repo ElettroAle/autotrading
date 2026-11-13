@@ -226,7 +226,7 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.position import Position
 from autotrading.domain.accounts.removal import FlowPositionLeftOpen
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
-from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection
+from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.errors import (
     ModelNotAvailableError,
     ParameterNotSupportedError,
@@ -254,7 +254,7 @@ from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.notification import Amount, Notification
@@ -1363,22 +1363,16 @@ class RiskFromFlows:
         cycle_flow = decisions.flow
         configuration = cycle_flow.configuration
         command = CheckRiskCommand(
-            tuple(_intent_of(decision) for decision in decisions.answer.response.decisions),
+            tuple(
+                decision.intent_with(OpenIntent.of, CloseIntent, HoldIntent)
+                for decision in decisions.answer.response.decisions
+            ),
             configuration.risk_policy,
             cycle_flow.risk_state(),
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
         orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
         return RiskReview(orders, tuple(outcomes))
-
-
-def _intent_of(decision: Decision) -> TradeIntent:
-    opening = decision.opening
-    if decision.action is TradeAction.CLOSE:
-        return CloseIntent(decision.asset)
-    if decision.action is TradeAction.OPEN and opening is not None:
-        return OpenIntent(decision.asset, TradeSide(opening.direction.value), opening.margin_fraction, opening.leverage)
-    return HoldIntent(decision.asset)
 
 
 class OrdersFromOrders:

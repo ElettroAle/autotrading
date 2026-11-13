@@ -17,6 +17,10 @@ class OpenIntent:
     margin_fraction: Decimal
     leverage: int
 
+    @classmethod
+    def of(cls, asset: str, side: str, margin_fraction: Decimal, leverage: int) -> OpenIntent:
+        return cls(asset, TradeSide(side), margin_fraction, leverage)
+
 
 @dataclass(frozen=True, slots=True)
 class CloseIntent:
