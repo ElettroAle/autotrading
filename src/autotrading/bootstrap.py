@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from functools import partial
 from pathlib import Path
