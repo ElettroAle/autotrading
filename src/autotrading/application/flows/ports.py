@@ -281,8 +281,36 @@ class CycleFailedNoticePort(Protocol):
 
 
 class UnattributableNoticePort(Protocol):
-    def notice(self, items: Sequence[UnattributableItem]) -> None:
+    """In the worker: NotifyUnattributableUseCase (R1.6.2)."""
+
+    def execute(self, items: Sequence[UnattributableItem]) -> None:
         """Tells the user what the account shows that no flow explains, each case the first time found (R1.6.2)."""
+        ...
+
+
+class FlowAccountNamePort(Protocol):
+    """Bound to the tenant of the request: the name the user gave an account, to tell it in a notification."""
+
+    def account_name(self, account_id: UUID) -> str:
+        """Raises FlowAccountNotFoundError for an account that does not exist or belongs to another tenant."""
+        ...
+
+
+class UnattributablePositionNoticePort(Protocol):
+    def execute(self, account_name: str, asset: str) -> None:
+        """Tells the user the account holds a position no flow opened (R1.6.2)."""
+        ...
+
+
+class UnattributableFillNoticePort(Protocol):
+    def execute(self, account_name: str, asset: str) -> None:
+        """Tells the user the account shows an execution no flow ordered (R1.6.2)."""
+        ...
+
+
+class UnattributableMovementNoticePort(Protocol):
+    def execute(self, account_name: str, amount: Decimal) -> None:
+        """Tells the user the balance of the account changed with no flow behind it (R1.6.2)."""
         ...
 
 

@@ -14,10 +14,15 @@ from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledF
 from autotrading.application.cycles.run_cycle import CycleGuards
 from autotrading.application.cycles.tell_cycle_failure import TellCycleFailureUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
+from autotrading.application.flows.notify_unattributable import (
+    NotifyUnattributableUseCase,
+    UnattributableNotices,
+)
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
@@ -26,6 +31,13 @@ from autotrading.application.notifications.notify_flow_paused import NotifyFlowP
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
+from autotrading.application.notifications.notify_unattributable_movement import (
+    NotifyUnattributableMovementUseCase,
+)
+from autotrading.application.notifications.notify_unattributable_position import (
+    NotifyUnattributablePositionUseCase,
+)
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
@@ -171,7 +183,17 @@ class FlowCycles:
             execute_flow_orders=ExecuteFlowOrdersUseCase(
                 access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
             ),
-            reconcile_account=reconcile_account,
+            reconcile_for_cycle=ReconcileAccountForCycleUseCase(
+                reconcile_account,
+                NotifyUnattributableUseCase(
+                    accounts,
+                    UnattributableNotices(
+                        NotifyUnattributablePositionUseCase(notify),
+                        NotifyUnattributableFillUseCase(notify),
+                        NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                    ),
+                ),
+            ),
             openings=openings,
             closed_positions=closed_positions,
             follow_flow_orders=FollowFlowOrdersUseCase(

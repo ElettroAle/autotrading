@@ -31,5 +31,5 @@ class ReconcileAccountForCycleUseCase:
         except FlowExchangeUnavailableError:
             operations.warning("riconciliazione del conto non riuscita", extra={"flow_id": str(command.flow_id.value)})
             return False
-        self._notices.notice(outcome.new_items)
+        self._notices.execute(outcome.new_items)
         return True

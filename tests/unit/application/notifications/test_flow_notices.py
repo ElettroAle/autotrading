@@ -7,7 +7,10 @@ from autotrading.application.notifications.notify_flow_paused import NotifyFlowP
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
-from autotrading.domain.notifications.notification import Notification
+from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
+from autotrading.application.notifications.notify_unattributable_movement import NotifyUnattributableMovementUseCase
+from autotrading.application.notifications.notify_unattributable_position import NotifyUnattributablePositionUseCase
+from autotrading.domain.notifications.notification import Amount, Notification
 
 
 class Notifier:
@@ -56,3 +59,17 @@ def test_a_closing_is_told_with_its_pnl_in_the_settlement_currency() -> None:
     NotifyPositionClosedUseCase(notifier, "USDC").execute("alfa", "BTC", Decimal("1.5"))
 
     assert [notification.text for notification in notifier.sent] == ["alfa: chiusa BTC, PnL 1,50 USDC"]
+
+
+def test_the_cases_no_flow_explains_are_told_by_the_name_of_the_account() -> None:
+    notifier = Notifier()
+
+    NotifyUnattributablePositionUseCase(notifier).execute("principale", "BTC")
+    NotifyUnattributableFillUseCase(notifier).execute("principale", "ETH")
+    NotifyUnattributableMovementUseCase(notifier, "USDC").execute("principale", Decimal(-15))
+
+    assert notifier.sent == [
+        Notification.unattributable_position("principale", "BTC"),
+        Notification.unattributable_fill("principale", "ETH"),
+        Notification.unattributable_movement("principale", Amount(Decimal(-15), "USDC")),
+    ]
