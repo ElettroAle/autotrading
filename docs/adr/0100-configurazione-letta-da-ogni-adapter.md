@@ -1,4 +1,4 @@
-# ADR 0099 — La configurazione la legge ogni adapter dalla sua sorgente
+# ADR 0100 — La configurazione la legge ogni adapter dalla sua sorgente
 
 - Stato: accettata (13 novembre 2026)
 - Requisiti: R0.1.4, R0.2.1 (ambiente e rete dell'installazione); Bug B0.0.3 (177), categoria D

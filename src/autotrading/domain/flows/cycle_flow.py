@@ -7,6 +7,7 @@ from autotrading.domain.flows.cycle_funds import CycleFunds
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -63,3 +64,26 @@ class CycleFlow:
     def sources(self) -> tuple[str, ...]:
         """The active sources of the configuration in force at the start: a change waits for the next cycle."""
         return tuple(source.name for source in self.configuration.sources)
+
+    def state_view(self) -> FlowStateView:
+        """The state of the flow alone, as the agent and the record of the cycle see it (R1.4.3)."""
+        return FlowStateView(
+            currency=self.account.currency,
+            allocated_capital=self.configuration.allocated_capital,
+            funds=self.attributed.funds,
+            available_liquidity=self.available_liquidity,
+            total_value=self.total_value,
+            return_percent=self.return_percent,
+            positions=tuple(
+                PositionView(
+                    position.asset,
+                    position.side,
+                    position.size,
+                    position.leverage,
+                    position.entry_price,
+                    position.unrealized_pnl,
+                    position.liquidation_price,
+                )
+                for position in self.positions
+            ),
+        )

@@ -119,6 +119,8 @@ Invio degli ordini attraverso `orders` nasce con i requisiti che lo usano.
 ## Ciclo decisionale
 
 Il ciclo decisionale appartiene a `flows` (ADR 0094), che dichiara le porte verso gli altri contesti.
+Contesto, decisione dell'agente e controllo del rischio sono casi d'uso di `flows` sulle sue porte del consumatore;
+il registro del ciclo è `JsonCycleJournalAdapter` (ADR 0099).
 
 Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa ne resta.
 
