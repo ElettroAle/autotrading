@@ -197,7 +197,9 @@ class Platform:
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
             flow_operations=InMemoryFlowOperationsAdapter(
-                self.ledger, lambda: [account.id.value for account in accounts.list()]
+                self.ledger,
+                lambda: [account.id.value for account in accounts.list()],
+                lambda: {flow.id: flow.name.value for flow in self.flows.flows},
             ),
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             bot_identity=FakeBotIdentityAdapter(self.bot_username),

@@ -15,7 +15,7 @@ from autotrading.application.flows.list_account_operations import (
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand, ListFlowOperationsUseCase
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import ExecutionKind, FlowTotals
-from autotrading.domain.flows.operations import FUNDING, OperationsPage, OperationsQuery
+from autotrading.domain.flows.operations import FUNDING, AccountScope, OperationsPage, OperationsQuery
 from autotrading.domain.flows.risk_limits import RiskLimits
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
@@ -391,23 +391,26 @@ def outside_purchases(bench: AttributionBench, account: str, purchases: str) -> 
 @when(step(r'"anna" consulta le operazioni del flusso "{flow}"'))
 def consult_operations(bench: AttributionBench, pages: list[OperationsPage], flow: str) -> None:
     flow_id = bench.flow(flow).id.value
-    first = flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, OperationsQuery()))
+    first = flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, OperationsQuery())).page
     pages.append(first)
     if first.next is not None:
         following = OperationsQuery(after=first.next)
-        pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, following)))
+        pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, following)).page)
 
 
 @when(step(r'"anna" consulta le operazioni del flusso "{flow}" dalle ' + clock("since") + " alle " + clock("until")))
 def consult_period(bench: AttributionBench, pages: list[OperationsPage], flow: str, since: str, until: str) -> None:
     query = OperationsQuery(since=at(since), until=at(until))
-    pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow(flow).id.value, query)))
+    pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow(flow).id.value, query)).page)
 
 
 @when(step(r'"anna" consulta le operazioni del conto "{account}" senza flusso sull\'asset "{asset}"'))
 def consult_account(bench: AttributionBench, pages: list[OperationsPage], account: str, asset: str) -> None:
     use_case = ListAccountOperationsUseCase(operations_of(bench))
-    pages.append(use_case.execute(ListAccountOperationsCommand(bench.account(account), OperationsQuery(asset=asset))))
+    command = ListAccountOperationsCommand(
+        bench.account(account), OperationsQuery(asset=asset), AccountScope.UNATTRIBUTED
+    )
+    pages.append(use_case.execute(command).page)
 
 
 @then(step(r"vede {a} operazioni, dalla più recente"))
@@ -444,7 +447,7 @@ def executions_newest_first(pages: list[OperationsPage], later: str, earlier: st
 )
 def funding_first(bench: AttributionBench, since: str, until: str, paid: str) -> None:
     query = OperationsQuery(since=at(since), until=at(until))
-    page = flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow("alfa").id.value, query))
+    page = flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow("alfa").id.value, query)).page
     first = page.operations[0]
     assert (first.kind, first.occurred_at, first.funding, first.size) == (FUNDING, at(paid), Decimal(2), None)
     assert len(page.operations) == 3
