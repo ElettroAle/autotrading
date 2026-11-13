@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -72,3 +72,8 @@ class HeldPosition:
 
 
 type RiskOutcome = ApprovedOpening | ApprovedClose | BlockedDecision | HeldPosition
+
+
+def approved_of(outcomes: Iterable[RiskOutcome]) -> tuple[ApprovedOpening | ApprovedClose, ...]:
+    """Only the approved decisions become orders (R1.5.5)."""
+    return tuple(outcome for outcome in outcomes if isinstance(outcome, (ApprovedOpening, ApprovedClose)))

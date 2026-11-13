@@ -323,3 +323,13 @@ class FakeCycleJournalAdapter:
 
     def call_cost(self, decision: object) -> CallCost | None:  # noqa: ARG002 - the same cost for every call
         return self.cost
+
+
+class RecordedCycleFailuresAdapter:
+    """The failed cycles told to the user, flow and reason."""
+
+    def __init__(self) -> None:
+        self.told: list[tuple[UUID, str]] = []
+
+    def failed(self, flow_id: UUID, reason: str) -> None:
+        self.told.append((flow_id, reason))

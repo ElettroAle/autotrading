@@ -23,12 +23,12 @@ from autotrading.bootstrap import (
     AccountActivityFromAccounts,
     AccountExecutionsFromAccounts,
     ClosingNoticeByNotification,
+    CycleFailureNotices,
     CycleRuntime,
     CycleServices,
     FlowDirectory,
     FlowPauseFromFlows,
     NotifiedClosedPositions,
-    NotifiedCycles,
     OutsideClosingsInHistory,
     TenantCyclePorts,
     TradingAccessFromAccounts,
@@ -304,10 +304,11 @@ class FlowCycles:
                 ]
 
         guards = CycleGuards(
-            NotifiedCycles(self.records, self.directory, self.ports_of),
+            self.records,
             InMemoryFlowLockAdapter(),
             FlowPauseFromFlows(self.directory, self.ports_of),
             self.clock,
+            CycleFailureNotices(self.directory, self.ports_of),
         )
         runtime = CycleRuntime(Scheduled(), guards, self.launcher)
         run_due_cycles(self.directory, self.ports_of, self.services(), runtime).execute()
