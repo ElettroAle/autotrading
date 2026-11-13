@@ -7,6 +7,7 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order, OrderRequest, OrderSource
 from autotrading.domain.orders.slippage import Slippage
@@ -49,7 +50,7 @@ class OpenPositionUseCase:
         market_order = MarketOrder.opening(
             command.coin, command.direction, market.size_for(command.value), self._slippage
         )
-        exchange.set_leverage(access, command.coin, command.leverage)
+        exchange.set_leverage(access, command.coin, command.leverage, MarginMode.per_position())
         order = send_order(
             exchange, access, OrderRequest(command.account_id, command.source, command.leverage, market_order)
         )

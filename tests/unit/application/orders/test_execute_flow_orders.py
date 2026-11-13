@@ -11,6 +11,7 @@ from autotrading.domain.orders.errors import LeverageAboveMaximumError
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.order import OrderOrigin, OrderSource, OrderStatus
 from autotrading.domain.orders.slippage import Slippage
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -78,6 +79,7 @@ def test_an_opening_is_sized_at_the_market_with_its_leverage_and_slippage(
         False,
     )
     assert exchange.leverages[accesses.accesses[account_id].account_address, "BTC"] == 3
+    assert exchange.margins[accesses.accesses[account_id].account_address, "BTC"] is MarginMode.ISOLATED
     assert (order.request.leverage, order.request.account_id, order.status) == (3, account_id, OrderStatus.FILLED)
 
 

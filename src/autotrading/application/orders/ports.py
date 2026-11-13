@@ -5,6 +5,7 @@ from uuid import UUID
 
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
@@ -40,8 +41,11 @@ class ExchangePort(Protocol):
     def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
         """The position open on the asset, or None when there is none."""
 
-    def set_leverage(self, access: TradingAccess, coin: str, leverage: int) -> None:
-        """Raises ExchangeRejectedOrderError when the exchange refuses the leverage."""
+    def set_leverage(self, access: TradingAccess, coin: str, leverage: int, margin: MarginMode) -> None:
+        """Sets the leverage of the asset with the given margin mode.
+
+        Raises ExchangeRejectedOrderError when the exchange refuses the leverage or the margin mode.
+        """
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
         """What the exchange executed, read from its fills.

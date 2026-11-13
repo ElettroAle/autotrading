@@ -10,6 +10,7 @@ from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPo
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, in_sending_order
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderRequest, OrderSource
 from autotrading.domain.orders.rejection import Rejection
@@ -90,7 +91,7 @@ class ExecuteFlowOrdersUseCase:
         )
         request = sending.request(opening, opening.leverage, market_order)
         try:
-            sending.exchange.set_leverage(sending.access, opening.asset, opening.leverage)
+            sending.exchange.set_leverage(sending.access, opening.asset, opening.leverage, MarginMode.per_position())
         except ExchangeRejectedOrderError as error:
             return Order.rejected(request, Rejection.of(error.exchange_message))
         return send_order(sending.exchange, sending.access, request)

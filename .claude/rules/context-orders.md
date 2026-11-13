@@ -24,6 +24,8 @@ paths:
   di arrotondamento stanno nel domain. La quantità si arrotonda per difetto, ma per eccesso di un passo quando un
   valore che rispetta il minimo dell'exchange scenderebbe sotto di esso (ADR 0066).
 - Nessun nuovo tentativo automatico di un ordine fallito (R0.3.3).
+- Ogni posizione si apre con margine isolato (`MarginMode.per_position()`, ADR 0095): il caso d'uso lo passa
+  alla porta con la leva.
 
 ## Porte del contesto
 
