@@ -9,7 +9,7 @@ def answered_or_named[T](
     account_missing: Callable[[], AutotradingError],
     failed: Callable[[str], AutotradingError],
 ) -> T:
-    """The answer of the orders context, its failures named by the context that asked (ADR 0085).
+    """The answer of the orders context, its failures named by the context that asked (ADR 0086).
 
     The orders context knows which of its failures means an account it cannot find; the caller only says how its
     own context names that one and every other, keeping the cause.
