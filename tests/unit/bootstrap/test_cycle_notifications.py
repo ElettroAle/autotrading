@@ -23,11 +23,10 @@ from autotrading.application.flows.errors import (
     FlowPositionMismatchError,
 )
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
-from autotrading.application.flows.ports import ScheduledFlow, TenantScheduledFlow
+from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
-from autotrading.application.flows.tell_cycle_failure import TellCycleFailureUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -39,7 +38,6 @@ from autotrading.application.orders.follow_flow_orders import (
 )
 from autotrading.bootstrap import (
     CycleFlow,
-    FlowPauseFromFlows,
     FlowStateFromFlows,
     TenantCyclePorts,
     WorkerExchanges,
@@ -52,9 +50,9 @@ from autotrading.bootstrap import (
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
-from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import PositionOpening
@@ -79,6 +77,7 @@ CHAT = ChatId(4242)
 PLANNED_AT = at("10:15")
 OPENED_AT = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
 CLOSED_AT = datetime(2026, 11, 12, 10, 5, tzinfo=UTC)
+ANCHOR = at("10:00")
 OPENING = PositionOpening(TradeSide.LONG, 2, Decimal(50), PositionEnd(Decimal(100), OPENED_AT, at("09:00")), Decimal(1))
 
 
@@ -104,13 +103,15 @@ class World:
         self.cycles.platform.chats[self.tenant_id] = LinkedChat(self.tenant_id, CHAT)
         self.openings = ScriptedOpenings(OPENING)
         self.closed = ClosedPositionStore()
-        self.cycles.directory.remember(
-            [
-                TenantScheduledFlow(
-                    self.tenant_id, ScheduledFlow(self.flow.id.value, CycleSchedule(at("10:00"), timedelta(minutes=15)))
-                )
-            ]
-        )
+
+    def flow_state(self) -> FlowStateFromFlows:
+        return FlowStateFromFlows(self.ports_of(self.tenant_id))
+
+    def pause(self, error: AutotradingError) -> None:
+        """As the cycle of the worker pauses the flows a permanent error involves (bootstrap.run_cycle_for)."""
+        ports = self.ports_of(self.tenant_id)
+        pause = PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice)
+        pause.execute(PauseAffectedFlowsCommand.of_error(self.flow.id.value, error))
 
     def ports_of(self, tenant_id: object) -> TenantCyclePorts:
         assert tenant_id == self.tenant_id
@@ -275,25 +276,23 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
     assert world.received == ["alfa: chiusa BTC, PnL -100 USDC"]
 
 
-# TellCycleFailureUseCase
+# NotifyCycleFailureUseCase
 
 
 def test_a_failed_cycle_is_told_with_the_name_of_its_flow_and_its_message(world: World) -> None:
-    tell = TellCycleFailureUseCase(world.cycles.directory, lambda tenant_id: world.ports_of(tenant_id).cycle_failure)
-
-    tell.execute(world.flow.id.value, "timeout")
+    world.ports_of(world.tenant_id).cycle_failure.execute(world.flow.id.value, "timeout")
 
     assert world.received == ["alfa: ciclo fallito, timeout"]
 
 
-# FlowPauseFromFlows
+# PauseAffectedFlowsUseCase
 
 
 def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None:
     other = world.cycles.add_flow(USER, "beta")
     error = ModelCreditExhaustedError(ProviderName("openrouter"))
 
-    FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
+    world.pause(error)
 
     assert {flow.name.value: flow.status for flow in world.cycles.platform.flows.flows} == {
         "alfa": FlowStatus.PAUSED,
@@ -305,7 +304,7 @@ def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None
 def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: World) -> None:
     error = FlowCredentialsRejectedError("test-1", world.flow.account_id)
 
-    FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
+    world.pause(error)
 
     assert world.received == [f"alfa: in pausa, {error}"]
 
@@ -316,7 +315,7 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
     elsewhere = replace(beta, account_id=uuid4())
     world.cycles.platform.flows.flows[world.cycles.platform.flows.flows.index(beta)] = elsewhere
 
-    FlowPauseFromFlows(world.cycles.directory, world.ports_of).pause_affected_by(world.flow.id.value, error)
+    world.pause(error)
 
     assert {flow.name.value: flow.status for flow in world.cycles.platform.flows.flows} == {
         "alfa": FlowStatus.PAUSED,
@@ -329,7 +328,7 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
 
 
 def started_at(world: World) -> datetime:
-    snapshot = FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+    snapshot = world.flow_state().read(world.flow.id.value, ANCHOR)
     assert isinstance(snapshot.state, CycleFlow)
     return snapshot.state.started_at
 
@@ -356,7 +355,7 @@ def test_a_position_the_flow_does_not_expect_stops_the_cycle_at_its_start(world:
     world.cycles.platform.ledger.expect(world.flow.id, "BTC", Decimal("0.1"))
 
     with pytest.raises(FlowPositionMismatchError) as raised:
-        FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+        world.flow_state().read(world.flow.id.value, ANCHOR)
 
     assert str(raised.value) == "posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
     assert raised.value.permanent
@@ -365,7 +364,7 @@ def test_a_position_the_flow_does_not_expect_stops_the_cycle_at_its_start(world:
 def test_the_state_at_the_end_of_the_cycle_is_read_whatever_the_position(world: World) -> None:
     world.cycles.platform.activity_reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
 
-    state = FlowStateFromFlows(world.cycles.directory, world.ports_of).update(world.flow.id.value, ())
+    state = world.flow_state().update(world.flow.id.value, ANCHOR, ())
 
     assert isinstance(state, CycleFlow)
 
@@ -374,7 +373,7 @@ def test_without_the_new_executions_the_positions_are_compared_at_the_next_cycle
     world.cycles.platform.activity_reader.activities[world.address] = an_activity(positions=(a_position("BTC"),))
     world.cycles.platform.activity_reader.executions_reachable = False
 
-    snapshot = FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+    snapshot = world.flow_state().read(world.flow.id.value, ANCHOR)
 
     assert isinstance(snapshot.state, CycleFlow)
 
@@ -389,7 +388,7 @@ def test_an_execution_published_after_the_first_reading_does_not_stop_the_cycle(
         a_fill("BTC", order, size=Decimal("0.1"), start_position=Decimal("0.1"), executed_at=CLOSED_AT)
     ]
 
-    snapshot = FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+    snapshot = world.flow_state().read(world.flow.id.value, ANCHOR)
 
     assert isinstance(snapshot.state, CycleFlow)
 
@@ -405,7 +404,7 @@ def test_a_difference_the_new_executions_do_not_explain_still_stops_the_cycle(wo
     ]
 
     with pytest.raises(FlowPositionMismatchError, match="attesa 0,2, sul conto 0,3"):
-        FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+        world.flow_state().read(world.flow.id.value, ANCHOR)
 
 
 def test_a_difference_is_not_a_pause_when_the_new_executions_cannot_be_read_again(world: World) -> None:
@@ -415,14 +414,14 @@ def test_a_difference_is_not_a_pause_when_the_new_executions_cannot_be_read_agai
     reader.unreachable_after_first_reading = True
 
     with pytest.raises(FlowExchangeUnavailableError):
-        FlowStateFromFlows(world.cycles.directory, world.ports_of).read(world.flow.id.value)
+        world.flow_state().read(world.flow.id.value, ANCHOR)
 
 
 # FlowStateFromFlows.update: the reconciliation of the account
 
 
 def update(world: World) -> object:
-    return FlowStateFromFlows(world.cycles.directory, world.ports_of).update(world.flow.id.value, ())
+    return world.flow_state().update(world.flow.id.value, ANCHOR, ())
 
 
 def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: World) -> None:
@@ -473,9 +472,9 @@ def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the
 
 
 def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world: World) -> None:
-    bridge = FlowStateFromFlows(world.cycles.directory, world.ports_of)
+    bridge = world.flow_state()
 
-    assert bridge.update(world.flow.id.value, ()) == bridge.read(world.flow.id.value).state
+    assert bridge.update(world.flow.id.value, ANCHOR, ()) == bridge.read(world.flow.id.value, ANCHOR).state
 
 
 # cycle_ports

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 from autotrading.application.flows.ports import (
     AgentPort,
     ClockPort,
@@ -61,7 +62,7 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
 @dataclass(frozen=True, slots=True)
 class CycleGuards:
     """What keeps a planned cycle unique and alone, what pauses the flows on a permanent error and tells the user of
-    a failed cycle.
+    a failed cycle: everything but the lock bound to the tenant of the flow.
     """
 
     cycles: CycleRepositoryPort
@@ -135,9 +136,10 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
 
     def _steps_of(self, progress: _Progress) -> None:
         flow_id, planned_at = progress.command.flow_id, progress.command.planned_at
+        anchor = progress.command.schedule.anchor
         steps = self._steps
         snapshot = progress.run(
-            CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id), lambda read: read.state
+            CycleStep.READ_FLOW_STATE, lambda: steps.flow_state.read(flow_id, anchor), lambda read: read.state
         )
         readings, absent = progress.run(
             CycleStep.COLLECT_SOURCES,
@@ -156,7 +158,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         executions = progress.run(
             CycleStep.ORDER_EXECUTION, lambda: steps.orders.execute(flow_id, planned_at, review.orders)
         )
-        progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.flow_state.update(flow_id, executions))
+        progress.run(CycleStep.UPDATE_FLOW_STATE, lambda: steps.flow_state.update(flow_id, anchor, executions))
 
     def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:
         failure = CycleFailure(progress.current, type(error).__name__, str(error))
@@ -164,7 +166,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         self._guards.failures.execute(progress.command.flow_id, failure.message)
         if not error.permanent:
             return record
-        self._guards.pause.pause_affected_by(progress.command.flow_id, error)
+        self._guards.pause.execute(PauseAffectedFlowsCommand.of_error(progress.command.flow_id, error))
         raise error
 
     def _recorded(self, record: CycleRecord) -> CycleRecord:
