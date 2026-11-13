@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from autotrading.application.verification.errors import VerificationStepError
@@ -12,9 +13,11 @@ from autotrading.application.verification.ports import (
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import (
-    PROCEDURE_OPENING,
+    PROCEDURE_COIN,
+    Opening,
     Step,
     missing_opening,
+    procedure_opening,
     remaining_position,
     require_free_of_flows,
     require_startable,
@@ -28,14 +31,17 @@ from autotrading.domain.verification.verification_run import VerificationRun
 class RunExchangeVerificationCommand:
     account_id: UUID
     user_id: UserId
+    # None leaves the value to the minimum of the exchange of the account.
+    amount: Decimal | None = None
 
 
 class RunExchangeVerificationUseCase:
     """In the worker: opens, reads, closes and reads again a position, and records each step (R0.4.1, ADR 0024).
 
-    An account with a flow on the asset, a position on it, or without enough margin, does not start: nothing is sent
-    or recorded. A flow on the asset would pause at its next cycle for the position the procedure changes (ADR 0075).
-    Once started, the first step that fails stops the procedure; the steps already executed stay recorded.
+    An account with a flow on the asset, a position on it, an amount below the minimum of its exchange or without the
+    margin for it, does not start: nothing is sent or recorded. A flow on the asset would pause at its next cycle for
+    the position the procedure changes (ADR 0075), so while the procedure runs no flow on the asset starts or resumes
+    (ADR 0079). Once started, the first step that fails stops the procedure; the executed steps stay recorded.
     """
 
     def __init__(
@@ -54,29 +60,42 @@ class RunExchangeVerificationUseCase:
 
     def execute(self, command: RunExchangeVerificationCommand) -> VerificationRun:
         started_at = self._clock()
-        require_free_of_flows(self._readings.flow_on(command.account_id, PROCEDURE_OPENING.coin))
-        require_startable(self._readings.read(command.account_id))
-        steps = self._steps_until_one_fails(command)
-        run = VerificationRun(uuid4(), command.account_id, command.user_id.value, self._environment, started_at, steps)
-        self._runs.add(run)
+        with self._runs.running(command.account_id, PROCEDURE_COIN):
+            opening = self._startable_opening(command)
+            steps = self._steps_until_one_fails(command, opening)
+            run = VerificationRun(
+                uuid4(), command.account_id, command.user_id.value, self._environment, started_at, steps
+            )
+            self._runs.add(run)
         return run
 
-    def _steps_until_one_fails(self, command: RunExchangeVerificationCommand) -> tuple[StepOutcome, ...]:
+    def _startable_opening(self, command: RunExchangeVerificationCommand) -> Opening:
+        account_id = command.account_id
+        require_free_of_flows(self._readings.flow_on(account_id, PROCEDURE_COIN))
+        reading = self._readings.read(account_id)
+        minimum = self._orders.minimum_value(account_id, PROCEDURE_COIN)
+        opening = procedure_opening(command.amount, minimum, reading.currency)
+        require_startable(reading, opening)
+        return opening
+
+    def _steps_until_one_fails(
+        self, command: RunExchangeVerificationCommand, opening: Opening
+    ) -> tuple[StepOutcome, ...]:
         executed: list[StepOutcome] = []
         for step in Step:
-            executed.append(self._step(step, command))
+            executed.append(self._step(step, command, opening))
             if not executed[-1].succeeded:
                 break
         return tuple(executed)
 
-    def _step(self, step: Step, command: RunExchangeVerificationCommand) -> StepOutcome:
+    def _step(self, step: Step, command: RunExchangeVerificationCommand, opening: Opening) -> StepOutcome:
         account_id, user_id = command.account_id, command.user_id
         if step is Step.OPENING:
-            return _order_step(step, lambda: self._orders.open(account_id, PROCEDURE_OPENING, user_id))
+            return _order_step(step, lambda: self._orders.open(account_id, opening, user_id))
         if step is Step.READING_AFTER_OPENING:
             return _reading_step(step, lambda: self._readings.read(account_id), missing_opening)
         if step is Step.CLOSING:
-            return _order_step(step, lambda: self._orders.close(account_id, PROCEDURE_OPENING.coin, user_id))
+            return _order_step(step, lambda: self._orders.close(account_id, opening.coin, user_id))
         return _reading_step(step, lambda: self._readings.read(account_id), remaining_position)
 
 

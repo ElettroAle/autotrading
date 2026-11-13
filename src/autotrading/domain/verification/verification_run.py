@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.domain.verification.procedure import PROCEDURE_OPENING, Step
+from autotrading.domain.verification.procedure import PROCEDURE_COIN, PROCEDURE_SIDE, Step
 from autotrading.domain.verification.step_outcome import StepOutcome
 
 PASSED = "superata"
@@ -41,7 +41,7 @@ class VerificationRun:
     def warning(self) -> str | None:
         """Said when the procedure opened its position and did not close it: the account still holds it."""
         if self._succeeded(Step.OPENING) and not self._succeeded(Step.CLOSING):
-            return f"sul conto resta aperta una posizione {PROCEDURE_OPENING.side} su {PROCEDURE_OPENING.coin}"
+            return f"sul conto resta aperta una posizione {PROCEDURE_SIDE} su {PROCEDURE_COIN}"
         return None
 
     def _succeeded(self, step: Step) -> bool:
