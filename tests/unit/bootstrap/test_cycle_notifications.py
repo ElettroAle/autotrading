@@ -10,23 +10,18 @@ import pytest
 from sqlalchemy import create_engine
 
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
-from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
-    SqlAlchemyClosedPositionRepositoryAdapter,
-)
-from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
+from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.application.agent.errors import ModelCreditExhaustedError
-from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
     FlowLedgerIncompleteError,
     FlowPositionMismatchError,
 )
-from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
-from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
+from autotrading.application.flows.run_cycle import RunCycleUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -36,10 +31,7 @@ from autotrading.application.orders.follow_flow_orders import (
     FollowFlowOrdersCommand,
     FollowFlowOrdersUseCase,
 )
-from autotrading.bootstrap import (
-    TenantCyclePorts,
-    cycle_ports,
-)
+from autotrading.bootstrap import cycle_of
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
@@ -61,8 +53,12 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.model_call import FakeModelCallAdapter
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.support.activity import a_fill, a_movement, a_position, an_activity
+from tests.support.cycle_composition import TenantCyclePorts
 from tests.support.flow_cycles import FlowCycles, at
+from tests.support.flows import scenario_catalog
 
 USER = "oid-anna"
 CHAT = ChatId(4242)
@@ -97,7 +93,7 @@ class World:
         self.closed = ClosedPositionStore()
 
     def pause(self, error: AutotradingError) -> None:
-        """As the cycle of the worker pauses the flows a permanent error involves (bootstrap.run_cycle_for)."""
+        """As the cycle of the worker pauses the flows a permanent error involves (bootstrap.cycle_of)."""
         ports = self.ports_of(self.tenant_id)
         pause = PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice)
         pause.execute(PauseAffectedFlowsCommand.of_error(self.flow.id.value, error))
@@ -469,25 +465,17 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
     )
 
 
-# cycle_ports
+# cycle_of
 
 
-def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
-    messenger = FakeMessengerAdapter()
-    worker = cycle_ports(
+def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
+    catalog = InMemoryModelCatalogAdapter(scenario_catalog())
+    worker = cycle_of(
         create_engine("sqlite://"),
-        SodiumCredentialOpenerAdapter({}),
-        "dev",
-        Slippage.default(),
-        messenger,
+        (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({})),
+        ("dev", Slippage.default()),
+        FakeMessengerAdapter(),
+        (FakeModelCallAdapter(), catalog),
     )
 
-    ports = worker(TenantId.new())
-
-    assert isinstance(ports.start_cycle, StartCycleFlowUseCase)
-    assert isinstance(ports.end_cycle, EndCycleFlowUseCase)
-    assert isinstance(ports.openings, SqlAlchemyFlowOpeningsAdapter)
-    assert isinstance(ports.closed_positions, SqlAlchemyClosedPositionRepositoryAdapter)
-    assert isinstance(ports.follow_flow_orders, FollowFlowOrdersUseCase)
-    assert isinstance(ports.cycle_failure, NotifyCycleFailureUseCase)
-    assert isinstance(ports.notify, NotifyUseCase)
+    assert isinstance(worker(TenantId.new()), RunCycleUseCase)
