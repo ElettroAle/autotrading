@@ -164,5 +164,6 @@ modules = [
     "autotrading.adapters.outbound.worker",
     "autotrading.adapters.outbound.json",
     "autotrading.adapters.outbound.oidc",
+    "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
 ]

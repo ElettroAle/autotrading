@@ -35,9 +35,7 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:OrderExecutionFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:RiskFromFlows": BUG_STRICTER_RULES,
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
-        "bootstrap.py:SystemClock": BUG_STRICTER_RULES,
         "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
-        "bootstrap.py:WorkerConnection": BUG_STRICTER_RULES,
         "bootstrap.py:WorkerExchanges": BUG_STRICTER_RULES,
     },
     Rule.NO_BRIDGES: {

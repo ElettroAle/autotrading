@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from functools import partial
 from uuid import UUID
@@ -81,17 +81,12 @@ from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
+from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
-from autotrading.adapters.outbound.worker.account_activity import WorkerAccountActivityAdapter
-from autotrading.adapters.outbound.worker.account_state import WorkerAccountStateAdapter
-from autotrading.adapters.outbound.worker.bot_identity import WorkerBotIdentityAdapter
-from autotrading.adapters.outbound.worker.composition import worker_adapters
-from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
-from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
-from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
+from autotrading.adapters.outbound.worker.composition import WorkerAdaptersOfTenant, worker_adapters
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
     ExchangePort,
@@ -259,14 +254,6 @@ PROVIDER_TIMEOUT_SECONDS = 10.0
 operations = logging.getLogger("autotrading.bootstrap")
 
 
-@dataclass(frozen=True, slots=True)
-class WorkerConnection:
-    """How the API reaches the worker: its internal address and the token generated on the machine (ADR 0021)."""
-
-    client: httpx.Client
-    token: str = field(repr=False)
-
-
 class FlowSummariesFromFlows:
     """Bridges the flows and accounts contexts to the consultation of the cycles (R1.7.3, ADR 0042).
 
@@ -401,26 +388,23 @@ def tenant_use_cases(
         Callable[[TenantId], SodiumCredentialSealerAdapter], Callable[[TenantId], SodiumProviderKeySealerAdapter]
     ],
     exchanges: ApiExchanges,
-    worker: WorkerConnection,
+    worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
     providers: httpx.Client,
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
     credential_sealer, provider_key_sealer = sealers
-    # One per installation: the username, once known, is kept across requests.
-    bot_identity = WorkerBotIdentityAdapter(worker.client, worker.token)
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         sealer = credential_sealer(tenant_id)
-        account_state = WorkerAccountStateAdapter(worker.client, worker.token, tenant_id)
+        bot_identity, account_state, account_activity, position_closing, verification, notifier = worker_of(tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
-        position_closing = WorkerPositionClosingAdapter(worker.client, worker.token, tenant_id)
         flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(
-            WorkerNotificationAdapter(worker.client, worker.token, tenant_id),
+            notifier,
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         flow_openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
@@ -434,7 +418,7 @@ def tenant_use_cases(
             account_state=account_state,
             position_closing=position_closing,
             manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
-            verification=WorkerVerificationAdapter(worker.client, worker.token, tenant_id),
+            verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
@@ -452,13 +436,13 @@ def tenant_use_cases(
             flow_positions=flow_positions,
             stop_ports=stop_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
-            account_activity=WorkerAccountActivityAdapter(worker.client, worker.token, tenant_id),
+            account_activity=account_activity,
             flow_ledger=SqlAlchemyFlowLedgerAdapter(engine, tenant_id),
             flow_operations=SqlAlchemyFlowOperationsAdapter(engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
             bot_identity=bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
-            clock=now,
+            clock=system_clock_adapters().now,
             closed_positions=closed_positions,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
             flow_directory=flows,
@@ -499,7 +483,7 @@ def worker_use_cases(
                 OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
                 SqlAlchemyVerificationRunRepositoryAdapter(engine, tenant_id),
                 environment,
-                now,
+                system_clock_adapters().now,
             ),
             notify=notify_for(engine, messenger, tenant_id),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, exchanges.activity),
@@ -601,10 +585,6 @@ def link_stores_for(engine: Engine, tenant_id: TenantId) -> LinkStores:
     )
 
 
-def now() -> datetime:
-    return datetime.now(UTC)
-
-
 def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> FastAPI:
     source = ConfigurationSource(configuration)
     environment = source.environment()
@@ -615,7 +595,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
         engine,
         libsodium_sealing_adapters(source),
         ApiExchanges(exchanges_for(network), markets_for(network), environment),
-        WorkerConnection(*worker_adapters(source)),
+        worker_adapters(source),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
@@ -652,7 +632,7 @@ def cycle_services(environment: str, provider_key_opener: SodiumProviderKeyOpene
     network = ExchangeNetwork.of_installation(environment)
     return CycleServices(
         environment=environment,
-        clock=SystemClock(),
+        clock=system_clock_adapters(),
         catalog=MODEL_CATALOG,
         provider_key_opener=provider_key_opener,
         model_call=HttpxModelCallAdapter(httpx.Client()),
@@ -670,7 +650,10 @@ def cycle_services(environment: str, provider_key_opener: SodiumProviderKeyOpene
 def telegram_bot(engine: Engine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
     link_chat = LinkChatUseCase(
-        SqlAlchemyLinkCodeLookupAdapter(engine), partial(link_stores_for, engine), messenger, now
+        SqlAlchemyLinkCodeLookupAdapter(engine),
+        partial(link_stores_for, engine),
+        messenger,
+        system_clock_adapters().now,
     )
     test_notification = SendTestNotificationUseCase(
         SqlAlchemyLinkedChatLookupAdapter(engine), partial(notify_for, engine, messenger), messenger
@@ -694,9 +677,7 @@ def executions_readers_for(network: ExchangeNetwork) -> dict[str, HyperliquidAcc
     return {HYPERLIQUID: HyperliquidAccountExecutionsAdapter.for_network(testnet=network.is_test)}
 
 
-class SystemClock:
-    def now(self) -> datetime:
-        return now()
+# The cycles of the flows in the worker (ADR 0041, ADR 0042): each cycle runs on the ports of the tenant of its flow.
 
 
 @dataclass(frozen=True, slots=True)
