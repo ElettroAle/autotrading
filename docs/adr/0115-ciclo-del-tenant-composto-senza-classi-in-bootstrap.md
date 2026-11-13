@@ -1,4 +1,4 @@
-# ADR 0114 — Il ciclo di ogni tenant si compone senza classi in bootstrap
+# ADR 0115 — Il ciclo di ogni tenant si compone senza classi in bootstrap
 
 - Stato: accettata (13 novembre 2026)
 - Requisiti: R1.2.1-R1.2.5, R1.3.5; Bug B0.0.3 (177)
