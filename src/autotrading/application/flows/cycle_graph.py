@@ -197,7 +197,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         request = SourceRequest(cycle.flow_id, cycle.planned_at, task["snapshot"])
         wait = cycle.schedule.source_wait
         outcomes = self._steps.calls.call_all(
-            {source: lambda: self._steps.sources.collect(request, source)}, self._seconds_of(wait)
+            {source: lambda: self._steps.sources.execute(request, source)}, self._seconds_of(wait)
         )
         result = _result_of(source, outcomes[source], wait)
         if isinstance(result, AbsentSource):
