@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -22,7 +22,7 @@ from autotrading.domain.flows.ledger import (
     LedgerKeys,
     PlatformOrders,
 )
-from autotrading.domain.flows.operations import OperationsPage, OperationsQuery
+from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
@@ -205,18 +205,18 @@ class FlowLedgerPort(Protocol):
 
 
 class FlowOperationsPort(Protocol):
-    """Bound to the tenant of the request: the ledger as its owner reads it, newest first, a page at a time
-    (ADR 0074).
+    """Bound to the tenant of the request: the ledger as its owner reads it (ADR 0074, ADR 0080).
+
+    For an account the tenant does not have, both methods raise FlowAccountNotFoundError; the export raises it before
+    returning, never while its rows are read.
     """
 
-    def of_flow(self, flow_id: FlowId, query: OperationsQuery) -> OperationsPage:
-        """The executions and funding payments of the flow."""
+    def report(self, owner: OperationsOwner, query: OperationsQuery) -> OperationsReport:
+        """The page of the query, newest first, and the totals of every row the query admits, whatever the page."""
         ...
 
-    def unattributed_of_account(self, account_id: UUID, query: OperationsQuery) -> OperationsPage:
-        """The executions and funding payments of the account that belong to no flow; raises FlowAccountNotFoundError
-        for an account the tenant does not have.
-        """
+    def export(self, owner: OperationsOwner, query: OperationsQuery) -> Iterator[Operation]:
+        """Every row the query admits, whatever the page, oldest first, read as it is consumed."""
         ...
 
 

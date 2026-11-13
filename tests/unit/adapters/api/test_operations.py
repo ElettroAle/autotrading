@@ -30,6 +30,7 @@ from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
 NOON = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
+CRLF = "\r\n"
 
 
 @pytest.fixture
@@ -112,6 +113,7 @@ def test_the_operations_of_a_flow_answer_executions_and_funding_newest_first(
         "operations": [
             {
                 "occurred_at": "2026-11-12T12:02:00Z",
+                "flow": "alfa",
                 "asset": "BTC",
                 "kind": "funding",
                 "side": None,
@@ -123,6 +125,7 @@ def test_the_operations_of_a_flow_answer_executions_and_funding_newest_first(
             },
             {
                 "occurred_at": "2026-11-12T12:01:00Z",
+                "flow": "alfa",
                 "asset": "BTC",
                 "kind": ExecutionKind.FLOW_ORDER.value,
                 "side": "vendita",
@@ -134,6 +137,7 @@ def test_the_operations_of_a_flow_answer_executions_and_funding_newest_first(
             },
             {
                 "occurred_at": "2026-11-12T12:00:00Z",
+                "flow": "alfa",
                 "asset": "BTC",
                 "kind": ExecutionKind.FLOW_ORDER.value,
                 "side": "acquisto",
@@ -145,6 +149,7 @@ def test_the_operations_of_a_flow_answer_executions_and_funding_newest_first(
             },
         ],
         "next": None,
+        "totals": {"count": 3, "realized_pnl": "6", "fees": "0.2", "funding": "-0.25"},
     }
 
 
@@ -202,8 +207,81 @@ def test_the_operations_of_an_account_are_those_of_no_flow(client_of: Client, pl
     response = anna.get(f"/accounts/{flow.account_id}/operations")
 
     assert response.status_code == 200
-    rows = [(row["asset"], row["kind"], row["size"]) for row in response.json()["operations"]]
-    assert rows == [("SOL", ExecutionKind.UNATTRIBUTED.value, "3")]
+    rows = [(row["asset"], row["kind"], row["size"], row["flow"]) for row in response.json()["operations"]]
+    assert rows == [("SOL", ExecutionKind.UNATTRIBUTED.value, "3", None)]
+
+
+def test_all_the_operations_of_an_account_name_their_flow(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    record(platform, flow.account_id, flow.id, an_execution("del-flusso", Decimal(1), NOON))
+    record(platform, flow.account_id, None, an_execution("fuori", Decimal(3), NOON + timedelta(minutes=1), "SOL"))
+
+    response = anna.get(f"/accounts/{flow.account_id}/operations", params={"scope": "all"})
+
+    body = response.json()
+    assert [(row["asset"], row["flow"]) for row in body["operations"]] == [("SOL", None), ("BTC", "alfa")]
+    assert body["totals"] == {"count": 2, "realized_pnl": "6", "fees": "0.2", "funding": "0"}
+
+
+def test_an_unknown_scope_of_an_account_is_refused(client_of: Client, platform: Platform) -> None:
+    flow = flow_of(platform, "anna")
+
+    response = client_of("anna").get(f"/accounts/{flow.account_id}/operations", params={"scope": "qualcuna"})
+
+    assert response.status_code == 422
+
+
+def test_the_export_of_a_flow_is_csv_of_every_row_of_the_filter_oldest_first(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    executions = [an_execution(f"f-{minute}", Decimal(1), NOON + timedelta(minutes=minute)) for minute in range(51)]
+    funding = (FundingPayment("BTC", Decimal("-0.25"), NOON + timedelta(seconds=30)),)
+    record(platform, flow.account_id, flow.id, an_execution("vendita", Decimal("-0.5"), NOON - timedelta(hours=1)))
+    record(platform, flow.account_id, flow.id, *executions, funding=funding)
+
+    response = anna.get(f"/flows/{flow.id.value}/operations.csv", params={"from": "2026-11-12T12:00:00Z"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert response.headers["content-disposition"] == 'attachment; filename="operazioni.csv"'
+    lines = response.text.split(CRLF)
+    assert lines[0] == "istante,flusso,asset,tipo,lato,quantità,prezzo,commissione,PnL realizzato,funding"
+    assert lines[1] == f"2026-11-12T12:00:00+00:00,alfa,BTC,{ExecutionKind.FLOW_ORDER.value},acquisto,1,100.5,0.1,3,0"
+    assert lines[2] == "2026-11-12T12:00:30+00:00,alfa,BTC,funding,,,,0,0,-0.25"
+    assert len(lines) == 1 + 52 + 1
+    assert lines[-1] == ""
+
+
+def test_the_export_of_an_account_names_the_rows_of_no_flow(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    record(platform, flow.account_id, None, an_execution("fuori", Decimal("-2"), NOON, "SOL"))
+
+    response = anna.get(f"/accounts/{flow.account_id}/operations.csv", params={"scope": "all"})
+
+    sold = f"2026-11-12T12:00:00+00:00,nessun flusso,SOL,{ExecutionKind.UNATTRIBUTED.value},vendita,2,100.5,0.1,3,0"
+    assert response.text.split(CRLF)[1] == sold
+
+
+def test_the_export_of_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:
+    theirs = flow_of(platform, "bruno")
+
+    response = client_of("anna").get(f"/flows/{theirs.id.value}/operations.csv")
+
+    assert response.status_code == 404
+    assert reason_of(response) == {"detail": "flusso non trovato"}
+
+
+def test_the_export_of_an_account_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:
+    theirs = account_id_of(platform, "bruno")
+
+    response = client_of("anna").get(f"/accounts/{theirs}/operations.csv")
+
+    assert response.status_code == 404
+    assert reason_of(response) == {"detail": "conto non trovato"}
 
 
 def test_the_operations_of_an_account_of_another_tenant_are_not_found(client_of: Client, platform: Platform) -> None:
