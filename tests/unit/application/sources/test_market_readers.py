@@ -12,6 +12,7 @@ from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.domain.sources.errors import InsufficientHistoryError
 from autotrading.domain.sources.indicator_series import WARM_UP
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
+from autotrading.domain.sources.timeframe import Timeframe
 from tests.fakes.market_data import DEFAULT_CLOSES, FakeMarketDataAdapter
 
 NOW = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
@@ -45,6 +46,15 @@ def test_the_short_timeframe_follows_the_cycle_interval() -> None:
     assert value.values["breve.timeframe"] == "1h"
     assert value.values["lungo.timeframe"] == "4h"
     assert market.requests[0][1] == "1h"
+
+
+def test_the_short_timeframe_is_chosen_among_the_intervals_the_market_publishes() -> None:
+    market = FakeMarketDataAdapter(published=(Timeframe(1), Timeframe(5), Timeframe(240)))
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(command())
+
+    assert value.values["breve.timeframe"] == "5m"
+    assert market.requests[0][1] == "5m"
 
 
 def test_the_data_refers_to_the_close_of_the_last_short_candle() -> None:

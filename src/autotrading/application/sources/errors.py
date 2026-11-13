@@ -18,3 +18,13 @@ class AssetRequiredError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("la fonte va interrogata per un asset")
+
+
+class TimeframeNotSupportedError(ApplicationError):
+    """Candles asked on an interval the exchange does not publish: a defect of the caller, never of the user."""
+
+    status_code = 500
+
+    def __init__(self, minutes: int) -> None:
+        super().__init__(f"intervallo di candela non pubblicato dall'exchange: {minutes} minuti")
+        self.minutes = minutes
