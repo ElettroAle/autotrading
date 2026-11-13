@@ -10,6 +10,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY a
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
@@ -35,7 +36,6 @@ from autotrading.application.verification.run_exchange_verification import (
 )
 from autotrading.bootstrap import (
     FlowPositionsFromOrders,
-    FlowSummariesFromFlows,
     OrderExecutionFromOrders,
 )
 from autotrading.domain.accounts.account import Account
@@ -213,7 +213,7 @@ class Platform:
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
-            flow_summaries=FlowSummariesFromFlows(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
+            flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             environment="dev",
         )
         return TenantUseCases.on(tenant_id, ports)

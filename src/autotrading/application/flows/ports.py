@@ -858,9 +858,15 @@ class FlowSummary:
 
 
 class FlowSummaryPort(Protocol):
-    """Bound to the tenant of the request: its flows in use, never another tenant's."""
+    """It is ListFlowSummariesUseCase: the flows in use of the tenant of the request, never another tenant's."""
 
-    def in_use(self) -> list[FlowSummary]: ...
+    def execute(self) -> list[FlowSummary]: ...
+
+
+class FlowAccountNamesPort(Protocol):
+    """Bound to the tenant of the request: the name of each of its accounts, as the consultation shows it."""
+
+    def account_names(self) -> Mapping[UUID, str]: ...
 
 
 class FlowDirectoryPort(Protocol):
