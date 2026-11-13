@@ -3,7 +3,7 @@
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from autotrading.bootstrap import MODEL_CATALOG
+from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import RangeParameter
@@ -31,7 +31,7 @@ def scenario_catalog(*models: ModelDefinition) -> ModelCatalog:
         ModelDefinition(OPENROUTER_MODEL, (TEMPERATURE,)),
         ModelDefinition(ANTHROPIC_MODEL, (TEMPERATURE,)),
     )
-    return ModelCatalog((*MODEL_CATALOG.models, *named))
+    return ModelCatalog((*load_model_catalog().models, *named))
 
 
 def a_configuration(

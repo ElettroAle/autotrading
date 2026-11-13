@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.adapters.outbound.hyperliquid.composition import EXCHANGE_NAME as HYPERLIQUID
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
@@ -49,7 +48,6 @@ from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrders
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.bootstrap import (
-    SOURCE_CATALOG,
     CycleServices,
     TenantCyclePorts,
     WorkerCycle,
@@ -73,6 +71,7 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
@@ -98,7 +97,7 @@ from tests.fakes.reconciliation_repository import InMemoryReconciliationReposito
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
-from tests.support.platform import Platform, new_credentials, registration
+from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 ACCOUNT = "test-1"

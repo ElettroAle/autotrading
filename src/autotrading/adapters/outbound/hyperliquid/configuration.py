@@ -11,23 +11,35 @@ SLIPPAGE = "ORDER_MAX_SLIPPAGE_PERCENT"
 
 @dataclass(frozen=True, slots=True)
 class _HyperliquidSettings:
+    """The network chosen by the installation, never deduced from the credentials (ADR 0087).
+
+    The name is the exchange an account declares at registration: the use cases pick the adapter by it.
+    """
+
     network: ExchangeNetwork
+    name: str = "Hyperliquid"
+
+    @property
+    def testnet(self) -> bool:
+        return self.network.is_test
+
+
+@dataclass(frozen=True, slots=True)
+class _HyperliquidOrderSettings:
+    """How far from the current price a market order sent to the exchange may be filled."""
+
     slippage: Slippage
 
 
-def _settings_of(source: ConfigurationSource) -> _HyperliquidSettings:
-    return _HyperliquidSettings(ExchangeNetwork.of_installation(source.environment()), _slippage_of(source))
-
-
-def _slippage_of(source: ConfigurationSource) -> Slippage:
-    """The largest slippage of the market orders: five percent unless the installation declares it."""
+def _order_settings_of(source: ConfigurationSource) -> _HyperliquidOrderSettings:
+    """Five percent unless the installation declares it; the range is a rule of the domain (Slippage)."""
     text = source.optional(SLIPPAGE)
     if text is None:
-        return Slippage.default()
+        return _HyperliquidOrderSettings(Slippage.default())
     try:
         percent = Decimal(text)
     except InvalidOperation as error:
         raise InvalidConfigurationError(SLIPPAGE) from error
     if not percent.is_finite():
         raise InvalidConfigurationError(SLIPPAGE)
-    return Slippage.percent(percent)
+    return _HyperliquidOrderSettings(Slippage.percent(percent))

@@ -7,7 +7,6 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.adapters.outbound.hyperliquid.composition import EXCHANGE_NAME as HYPERLIQUID
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
@@ -23,6 +22,7 @@ from tests.fakes.cycles import FakeTransientError
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import FlowCycles
 from tests.support.notifications import chat_named
+from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.8-notifiche/R1.8.2-notifiche-essenziali.feature")

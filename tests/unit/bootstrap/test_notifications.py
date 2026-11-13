@@ -11,24 +11,18 @@ from sqlalchemy import Engine, create_engine
 
 from autotrading import bootstrap
 from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases
-from autotrading.adapters.outbound.hyperliquid.composition import order_exchanges_for
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import SqlAlchemyLinkCodeRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.telegram.bot_api import TelegramInboxAdapter, TelegramMessengerAdapter
 from autotrading.application.notifications.ports import BotInboxPort, MessengerPort
 from autotrading.bootstrap import (
-    WorkerExchanges,
-    activity_readers_for,
     create_worker_application,
-    exchanges_for,
-    executions_readers_for,
     link_stores_for,
     notify_for,
     telegram_bot,
     worker_use_cases,
 )
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.messenger import FakeMessengerAdapter
@@ -39,17 +33,7 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
 def factory(engine: Engine, messenger: MessengerPort) -> Callable[[TenantId], WorkerUseCases]:
-    accounts = exchanges_for(ExchangeNetwork.TEST)
-    exchanges = WorkerExchanges(
-        accounts,
-        order_exchanges_for(ExchangeNetwork.TEST),
-        activity_readers_for(ExchangeNetwork.TEST),
-        executions_readers_for(ExchangeNetwork.TEST),
-        accounts,
-        accounts,
-        Slippage.default(),
-    )
-    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), exchanges, "dev", messenger)
+    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), "dev", Slippage.default(), messenger)
 
 
 def token_file(tmp_path: Path, content: str) -> str:

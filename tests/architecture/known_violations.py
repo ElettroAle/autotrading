@@ -17,15 +17,12 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
     },
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {
-        "bootstrap.py:MODEL_CATALOG": BUG_STRICTER_RULES,
         "bootstrap.py:PROVIDER_TIMEOUT_SECONDS": BUG_STRICTER_RULES,
-        "bootstrap.py:SOURCE_CATALOG": BUG_STRICTER_RULES,
         "bootstrap.py:operations": BUG_STRICTER_RULES,
     },
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
-        "bootstrap.py:ApiExchanges": BUG_STRICTER_RULES,
         "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:CycleContext": BUG_STRICTER_RULES,
         "bootstrap.py:CycleDecisions": BUG_STRICTER_RULES,
@@ -36,7 +33,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:RiskFromFlows": BUG_STRICTER_RULES,
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
         "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
-        "bootstrap.py:WorkerExchanges": BUG_STRICTER_RULES,
     },
     Rule.NO_BRIDGES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,

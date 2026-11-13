@@ -7,6 +7,7 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
+from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
@@ -34,8 +35,6 @@ from autotrading.application.verification.run_exchange_verification import (
     VerificationReadings,
 )
 from autotrading.bootstrap import (
-    MODEL_CATALOG,
-    SOURCE_CATALOG,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
     OrderExecutionFromOrders,
@@ -45,6 +44,7 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
@@ -119,7 +119,7 @@ class Platform:
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
         self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
-        self.model_catalog: ModelCatalog = MODEL_CATALOG
+        self.model_catalog: ModelCatalog = load_model_catalog()
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
