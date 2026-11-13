@@ -66,7 +66,7 @@ services:
   # Nessuna porta pubblicata: lo raggiunge solo l'API sulla rete dell'installazione, con il token generato sulla macchina.
   worker:
     image: ${API_IMAGE:-}
-    command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/logging.json"]
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
       DATABASE_HOST: postgres

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "application": {
+      "()": "autotrading.adapters.inbound.api.logging_setup.UtcFormatter",
+      "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s",
+      "datefmt": "%Y-%m-%dT%H:%M:%SZ"
+    },
+    "access": {
+      "()": "uvicorn.logging.AccessFormatter",
+      "fmt": "%(levelprefix)s %(client_addr)s - \"%(request_line)s\" %(status_code)s",
+      "use_colors": false
+    }
+  },
+  "handlers": {
+    "output": {"class": "logging.StreamHandler", "formatter": "application", "stream": "ext://sys.stdout"},
+    "access": {"class": "logging.StreamHandler", "formatter": "access", "stream": "ext://sys.stdout"}
+  },
+  "loggers": {
+    "uvicorn": {"handlers": ["output"], "level": "INFO", "propagate": false},
+    "uvicorn.error": {"level": "INFO"},
+    "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": false},
+    "httpx": {"level": "WARNING"},
+    "httpcore": {"level": "WARNING"}
+  },
+  "root": {"handlers": ["output"], "level": "INFO"}
+}

@@ -17,7 +17,8 @@ LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading
 COPY --from=build /app/.venv /app/.venv
 # The migrate service of the compose runs Alembic from the same image (ADR 0015).
 COPY migrations /app/migrations
+COPY deploy/logging.json /app/logging.json
 ENV PATH="/app/.venv/bin:${PATH}" PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
-CMD ["autotrading.bootstrap:create_application", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["autotrading.bootstrap:create_application", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/logging.json"]

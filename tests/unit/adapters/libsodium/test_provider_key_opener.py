@@ -1,4 +1,5 @@
 import json
+import logging
 
 import pytest
 from nacl.public import PrivateKey, SealedBox
@@ -98,3 +99,38 @@ def test_the_representation_shows_only_the_key_versions(private_key: PrivateKey)
     opener = SodiumProviderKeyOpenerAdapter({2: bytes(private_key), 1: bytes(PrivateKey.generate())})
 
     assert repr(opener) == "SodiumProviderKeyOpenerAdapter(key_versions=[1, 2])"
+
+
+def _decryption_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if record.name == "autotrading.credentials"]
+
+
+def test_every_opening_of_a_key_records_tenant_provider_and_outcome_never_the_key(
+    private_key: PrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    opener = SodiumProviderKeyOpenerAdapter({1: bytes(private_key)})
+
+    with caplog.at_level(logging.INFO, logger="autotrading.credentials"):
+        opener.open(registered(private_key))
+
+    (record,) = _decryption_records(caplog)
+    message = record.getMessage()
+    assert record.levelno == logging.INFO
+    assert str(TENANT.value) in message
+    assert "openrouter" in message
+    assert "versione 1" in message
+    assert "riuscita" in message
+    assert KEY.secret not in message
+
+
+def test_a_refused_opening_of_a_key_is_recorded_as_refused(
+    private_key: PrivateKey, caplog: pytest.LogCaptureFixture
+) -> None:
+    opener = SodiumProviderKeyOpenerAdapter({1: bytes(private_key)})
+
+    with caplog.at_level(logging.INFO, logger="autotrading.credentials"), pytest.raises(ProviderKeyNotOpenedError):
+        opener.open(with_plaintext(private_key, b"not a sealed key"))
+
+    (record,) = _decryption_records(caplog)
+    assert record.levelno == logging.WARNING
+    assert "rifiutata" in record.getMessage()

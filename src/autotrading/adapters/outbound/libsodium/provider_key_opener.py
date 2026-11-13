@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from nacl.exceptions import CryptoError
 from nacl.public import SealedBox
 
-from autotrading.adapters.outbound.libsodium.opener import private_key_of
+from autotrading.adapters.outbound.libsodium.opener import private_key_of, record_opening
 from autotrading.application.agent.errors import ProviderKeyNotOpenedError
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -24,6 +24,19 @@ class SodiumProviderKeyOpenerAdapter:
         return f"SodiumProviderKeyOpenerAdapter(key_versions={sorted(self._boxes)})"
 
     def open(self, key: RegisteredProviderKey) -> ProviderKey:
+        try:
+            secret = self._secret_of(key)
+        except ProviderKeyNotOpenedError:
+            self._record(key, opened=False)
+            raise
+        self._record(key, opened=True)
+        return secret
+
+    def _record(self, key: RegisteredProviderKey, *, opened: bool) -> None:
+        subject = f"chiave {key.provider.value}"
+        record_opening("modello", subject, key.tenant_id, key.sealed.key_version, opened=opened)
+
+    def _secret_of(self, key: RegisteredProviderKey) -> ProviderKey:
         document = self._document_of(key)
         expected = (str(key.tenant_id.value), key.provider.value)
         secret = document.get("key")
