@@ -27,6 +27,7 @@ from autotrading.application.orders.errors import (
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -116,9 +117,9 @@ class HyperliquidOrderExchangeAdapter:
             state = self._sdk.info(self._base_url, self._timeout).user_state(access.account_address)
         return _held_position_of(state, coin)
 
-    def set_leverage(self, access: TradingAccess, coin: str, leverage: int) -> None:
+    def set_leverage(self, access: TradingAccess, coin: str, leverage: int, margin: MarginMode) -> None:
         with _translated(access):
-            response = self._exchange(access).update_leverage(leverage, coin, True)
+            response = self._exchange(access).update_leverage(leverage, coin, margin is MarginMode.CROSS)
         _require_ok(response, access)
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:

@@ -6,6 +6,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from autotrading.application.orders.open_position import OpenPositionCommand
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.order import OrderStatus
 from autotrading.domain.orders.slippage import Slippage
 from tests.support.steps import quoted
@@ -88,6 +89,12 @@ def exchange_has_position(trading: Trading, account: str, direction: str, coin: 
 def position_has_leverage(trading: Trading, coin: str, leverage: str) -> None:
     (position,) = [position for (_, held), position in trading.exchange.positions.items() if held == coin]
     assert position.leverage == int(leverage)
+
+
+@then(quoted('la posizione su "{coin}" ha margine isolato'))
+def position_has_isolated_margin(trading: Trading, coin: str) -> None:
+    (margin,) = [margin for (_, held), margin in trading.exchange.margins.items() if held == coin]
+    assert margin is MarginMode.ISOLATED
 
 
 @then("l'ordine inviato porta un identificativo della piattaforma")

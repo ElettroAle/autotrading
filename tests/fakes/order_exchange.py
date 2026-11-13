@@ -10,6 +10,7 @@ from autotrading.application.orders.errors import (
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -36,6 +37,7 @@ class FakeOrderExchangeAdapter:
     def __init__(self) -> None:
         self.markets = default_markets()
         self.leverages: dict[tuple[str, str], int] = {}
+        self.margins: dict[tuple[str, str], MarginMode] = {}
         self.positions: dict[tuple[str, str], HeldPosition] = {}
         self.sent: list[MarketOrder] = []
         self.signers: list[TradingAccess] = []
@@ -75,11 +77,12 @@ class FakeOrderExchangeAdapter:
             raise ExchangeRejectedOrderError(UNKNOWN_ASSET)
         return market
 
-    def set_leverage(self, access: TradingAccess, coin: str, leverage: int) -> None:
+    def set_leverage(self, access: TradingAccess, coin: str, leverage: int, margin: MarginMode) -> None:
         self._require_reachable()
         if self.leverage_rejection is not None:
             raise ExchangeRejectedOrderError(self.leverage_rejection)
         self.leverages[access.account_address, coin] = leverage
+        self.margins[access.account_address, coin] = margin
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
         self.sent.append(order)

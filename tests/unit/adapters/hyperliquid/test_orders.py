@@ -24,6 +24,7 @@ from autotrading.application.orders.errors import (
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.slippage import Slippage
@@ -170,20 +171,28 @@ def test_metadata_of_unexpected_shape_are_unavailable() -> None:
         adapter(sdk).market(ACCESS, "BTC")
 
 
-def test_the_leverage_is_set_in_cross_with_the_wallet_of_the_access() -> None:
+def test_the_leverage_is_set_with_isolated_margin_and_the_wallet_of_the_access() -> None:
     sdk = FakeSdk()
 
-    adapter(sdk).set_leverage(ACCESS, "BTC", 3)
+    adapter(sdk).set_leverage(ACCESS, "BTC", 3, MarginMode.ISOLATED)
+
+    assert calls_named(sdk, "update_leverage") == [(3, "BTC", False)]
+    assert calls_named(sdk, "exchange") == [(WALLET.address, BASE_URL, ADDRESS, TIMEOUT_SECONDS)]
+
+
+def test_cross_margin_is_asked_to_the_exchange_as_cross() -> None:
+    sdk = FakeSdk()
+
+    adapter(sdk).set_leverage(ACCESS, "BTC", 3, MarginMode.CROSS)
 
     assert calls_named(sdk, "update_leverage") == [(3, "BTC", True)]
-    assert calls_named(sdk, "exchange") == [(WALLET.address, BASE_URL, ADDRESS, TIMEOUT_SECONDS)]
 
 
 def test_a_refused_leverage_keeps_the_message_of_the_exchange_without_the_address() -> None:
     sdk = FakeSdk(leverage_answer={"status": "err", "response": f"Invalid leverage for {ADDRESS.lower()}"})
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(sdk).set_leverage(ACCESS, "BTC", 99)
+        adapter(sdk).set_leverage(ACCESS, "BTC", 99, MarginMode.ISOLATED)
 
     assert raised.value.exchange_message == "Invalid leverage for ***"
 

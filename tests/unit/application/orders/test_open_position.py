@@ -11,6 +11,7 @@ from autotrading.application.orders.errors import (
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.errors import LeverageAboveMaximumError, OrderSizeBelowStepError
+from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.order import OrderStatus
 from autotrading.domain.orders.rejection import RejectionReason
 from autotrading.domain.orders.slippage import Slippage
@@ -72,6 +73,7 @@ def test_opens_with_the_leverage_the_size_and_the_slippage_asked(
         False,
     )
     assert exchange.leverages[accesses.accesses[account_id].account_address, "BTC"] == 3
+    assert exchange.margins[accesses.accesses[account_id].account_address, "BTC"] is MarginMode.ISOLATED
     assert order.status is OrderStatus.FILLED
 
 
