@@ -15,6 +15,7 @@ from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_order import CycleOrders
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -643,6 +644,14 @@ class RiskPort[S = object, A = object, O = object](Protocol):
 class OrderPort[O = object, E = object](Protocol):
     def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[O]) -> Sequence[E]:
         """Sends the approved orders of the cycle, closings first, and gives back their real outcomes (R1.5.5)."""
+        ...
+
+
+class CycleOrderExecutionPort(Protocol):
+    def execute(self, cycle: CycleOrders) -> Sequence[object]:
+        """Sends the approved orders, closings first, and gives back the orders as recorded with their outcomes; they
+        travel only to the record of the cycle (R1.5.5, R1.7.1).
+        """
         ...
 
 

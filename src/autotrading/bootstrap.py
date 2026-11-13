@@ -156,6 +156,7 @@ from autotrading.application.flows.run_cycle import CycleGuards, CycleSteps, Run
 from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
+from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.source_collector import SourceCollector
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.flows.stop_flow import StopPorts
@@ -185,10 +186,10 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionUseCase,
 )
 from autotrading.application.orders.close_flow_position import CloseFlowPositionCommand, CloseFlowPositionUseCase
-from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
+from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
+from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import (
     FlowOrderFollowers,
-    FollowFlowOrdersCommand,
     FollowFlowOrdersUseCase,
 )
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
@@ -229,16 +230,16 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
+from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
-from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
+from autotrading.domain.flows.risk_outcome import approved_of
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
 from autotrading.domain.orders.direction import Direction
-from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.slippage import Slippage
@@ -602,6 +603,13 @@ def cycle_ports(
             ReadCycleAccountUseCase(accounts, accounts, opener, exchanges.cycles),
             ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger), reconcile_for_cycle),
         )
+        follow_flow_orders = FollowFlowOrdersUseCase(
+            FlowOrderFollowers(
+                NotifyOrderRejectedUseCase(notify),
+                NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+            )
+        )
         return TenantCyclePorts(
             flows=flows,
             pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
@@ -610,16 +618,14 @@ def cycle_ports(
             provider_keys=SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id),
             forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
             samples=SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
-            execute_flow_orders=ExecuteFlowOrdersUseCase(access, exchanges.orders, orders, slippage),
-            openings=openings,
-            closed_positions=closed_positions,
-            follow_flow_orders=FollowFlowOrdersUseCase(
-                FlowOrderFollowers(
-                    NotifyOrderRejectedUseCase(notify),
-                    NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                    RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+            send_orders=SendCycleOrdersUseCase(
+                ExecuteCycleOrdersUseCase(
+                    ExecuteFlowOrdersUseCase(access, exchanges.orders, orders, slippage), follow_flow_orders
                 )
             ),
+            openings=openings,
+            closed_positions=closed_positions,
+            follow_flow_orders=follow_flow_orders,
             flow_paused_notice=NotifyFlowPausedUseCase(notify),
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
@@ -853,7 +859,7 @@ class TenantCyclePorts:
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
-    execute_flow_orders: ExecuteFlowOrdersUseCase
+    send_orders: SendCycleOrdersUseCase
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
     follow_flow_orders: FollowFlowOrdersUseCase
@@ -1001,12 +1007,6 @@ class AgentFromAgent:
         return CycleDecisions(context.flow, answer)
 
 
-@dataclass(frozen=True, slots=True)
-class CycleOrder:
-    flow: CycleFlow
-    outcome: ApprovedOpening | ApprovedClose
-
-
 class RiskFromFlows:
     """Bridges the decisions of the agent to the risk check of the flows context (R1.5.1-R1.5.4, ADR 0042)."""
 
@@ -1032,36 +1032,6 @@ class RiskFromFlows:
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
         orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
         return RiskReview(orders, tuple(outcomes))
-
-
-class OrdersFromOrders:
-    """Bridges the approved decisions of a cycle to the orders context, on the account of the flow (R1.5.5)."""
-
-    def __init__(self, ports: TenantCyclePorts) -> None:
-        self._ports = ports
-
-    def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[CycleOrder]) -> Sequence[Order]:
-        approved = list(orders)
-        if not approved:
-            return ()
-        cycle_flow = approved[0].flow
-        command = ExecuteFlowOrdersCommand(
-            cycle_flow.flow.account_id, flow_id, planned_at, tuple(_flow_order_of(order.outcome) for order in approved)
-        )
-        sent = self._ports.execute_flow_orders.execute(command)
-        flow = cycle_flow.flow
-        self._ports.follow_flow_orders.execute(
-            FollowFlowOrdersCommand(flow.id.value, flow.name.value, planned_at, tuple(sent))
-        )
-        return sent
-
-
-def _flow_order_of(outcome: ApprovedOpening | ApprovedClose) -> FlowOrder:
-    return outcome.order_with(_flow_opening_of, FlowClosing)
-
-
-def _flow_opening_of(asset: str, side: str, value: Decimal, leverage: int) -> FlowOrder:
-    return FlowOpening(asset, Direction(side), value, leverage)
 
 
 class CycleJournalFromContexts:
@@ -1127,7 +1097,7 @@ def _decisions_document(answer: AgentAnswer) -> dict[str, object]:
     }
 
 
-type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, Order]
+type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, object]
 type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
 
 
@@ -1146,7 +1116,7 @@ def run_cycle_for(
         context=ContextFromAgent(services.clock),
         agent=AgentFromAgent(ports, services),
         risk=RiskFromFlows(services.exchange_limits),
-        orders=OrdersFromOrders(ports),
+        orders=ports.send_orders,
         end=ports.end_cycle,
         journal=CycleJournalFromContexts(services.environment),
     )
