@@ -4,13 +4,12 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from autotrading.adapters.inbound.api.app import Authentication, HealthReport, create_api
-from autotrading.adapters.inbound.api.authentication import AccessTokenVerifier, OidcSigningKeys
+from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.link_code import ALPHABET
-from tests.support.identity_provider import SETTINGS, IdentityProvider
+from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
@@ -26,12 +25,11 @@ def platform() -> Platform:
 @pytest.fixture
 def client_of(platform: Platform) -> Client:
     provider = IdentityProvider()
-    verifier = AccessTokenVerifier(SETTINGS, OidcSigningKeys(SETTINGS.discovery_url, provider.fetch))
     api = create_api(
         HealthReport("1.0.0", "dev"),
         ResolveTenantUseCase(platform.tenants),
         platform.for_tenant,
-        Authentication(SETTINGS, verifier, provider.login()),
+        provider.authentication(),
     )
 
     def client(user: str) -> TestClient:

@@ -2,11 +2,12 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import TypedDict, cast
 
 import requests
 from eth_account import Account as EthereumAccount
 from eth_account.signers.local import LocalAccount
+from hyperliquid.exchange import Exchange
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
@@ -17,6 +18,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
 )
+from autotrading.adapters.outbound.hyperliquid.user_state import _ClearinghouseState
 from autotrading.application.orders.errors import (
     ExchangeRejectedOrderError,
     OrderExchangeUnavailableError,
@@ -31,6 +33,54 @@ from autotrading.domain.orders.trading_access import TradingAccess
 
 UNKNOWN_ASSET = "Unknown asset"
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, ArithmeticError)
+
+
+class _Filled(TypedDict):
+    oid: int
+
+
+class _PlacedStatus(TypedDict, total=False):
+    error: str
+    filled: _Filled
+
+
+class _PlacedData(TypedDict):
+    statuses: list[_PlacedStatus]
+
+
+class _PlacedPayload(TypedDict):
+    data: _PlacedData
+
+
+class _PlacedResponse(TypedDict):
+    """The answer to a placed order as Hyperliquid gives it; a wrong shape fails while it is read."""
+
+    status: str
+    response: _PlacedPayload
+
+
+class _QueriedOrderId(TypedDict):
+    oid: int
+
+
+class _QueriedOrder(TypedDict):
+    order: _QueriedOrderId
+
+
+class _QueriedStatus(TypedDict):
+    """The answer to an order looked up by client order id."""
+
+    status: str
+    order: _QueriedOrder
+
+
+class _OrderFill(TypedDict):
+    oid: int
+    sz: str
+    px: str
+    fee: str
+    closedPnl: str
+    time: int
 
 
 class HyperliquidOrderExchangeAdapter:
@@ -88,11 +138,11 @@ class HyperliquidOrderExchangeAdapter:
         oid = _oid_of(status)
         return None if oid is None else self._execution(access, oid)
 
-    def _exchange(self, access: TradingAccess) -> Any:
+    def _exchange(self, access: TradingAccess) -> Exchange:
         return self._sdk.exchange(_wallet_of(access), self._base_url, access.account_address, self._timeout)
 
     @staticmethod
-    def _send(exchange: Any, order: MarketOrder) -> Any:
+    def _send(exchange: Exchange, order: MarketOrder) -> object:
         size, slippage, cloid = float(order.size), float(order.slippage.fraction), _cloid_of(order)
         if order.reduce_only:
             return exchange.market_close(order.coin, size, None, slippage, cloid)
@@ -129,18 +179,20 @@ def _cloid_of(order: MarketOrder) -> Cloid:
     return Cloid.from_str(order.id.hex)
 
 
-def _market_of(coin: str, universe: Sequence[Mapping[str, Any]], mids: Mapping[str, Any]) -> Market:
+def _market_of(coin: str, universe: Sequence[Mapping[str, object]], mids: Mapping[str, object]) -> Market:
     asset = next((asset for asset in universe if asset.get("name") == coin), None)
     if asset is None or coin not in mids:
         message = f"{UNKNOWN_ASSET} {coin}"
         raise ExchangeRejectedOrderError(message)
     try:
-        return Market(coin, int(asset["maxLeverage"]), int(asset["szDecimals"]), _decimal(mids[coin]), MIN_ORDER_VALUE)
+        leverage, decimals = int(str(asset["maxLeverage"])), int(str(asset["szDecimals"]))
+        return Market(coin, leverage, decimals, _decimal(mids[coin]), MIN_ORDER_VALUE)
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error
 
 
-def _held_position_of(state: Any, coin: str) -> HeldPosition | None:
+def _held_position_of(answer: object, coin: str) -> HeldPosition | None:
+    state = cast("_ClearinghouseState", answer)
     try:
         held = [entry["position"] for entry in state["assetPositions"] if entry["position"]["coin"] == coin]
         if not held or _decimal(held[0]["szi"]) == 0:
@@ -152,17 +204,18 @@ def _held_position_of(state: Any, coin: str) -> HeldPosition | None:
         raise OrderExchangeUnavailableError from error
 
 
-def _require_ok(response: Any, access: TradingAccess) -> None:
+def _require_ok(response: object, access: TradingAccess) -> None:
     if isinstance(response, Mapping) and response.get("status") == "ok":
         return
     message = response.get("response") if isinstance(response, Mapping) else response
     raise ExchangeRejectedOrderError(access.redact(str(message)))
 
 
-def _filled_oid(response: Any, access: TradingAccess) -> int:
+def _filled_oid(response: object, access: TradingAccess) -> int:
     _require_ok(response, access)
+    placed = cast("_PlacedResponse", response)
     try:
-        status = response["response"]["data"]["statuses"][0]
+        status = placed["response"]["data"]["statuses"][0]
         if "error" in status:
             raise ExchangeRejectedOrderError(access.redact(str(status["error"])))
         return int(status["filled"]["oid"])
@@ -171,7 +224,8 @@ def _filled_oid(response: Any, access: TradingAccess) -> int:
         raise OrderExchangeUnavailableError from error
 
 
-def _oid_of(status: Any) -> int | None:
+def _oid_of(answer: object) -> int | None:
+    status = cast("_QueriedStatus", answer)
     try:
         if status["status"] != "order":
             return None
@@ -180,7 +234,8 @@ def _oid_of(status: Any) -> int | None:
         raise OrderExchangeUnavailableError from error
 
 
-def _execution_of(fills: Any, oid: int) -> Execution | None:
+def _execution_of(answer: object, oid: int) -> Execution | None:
+    fills = cast("list[_OrderFill]", answer)
     try:
         own = [fill for fill in fills if int(fill["oid"]) == oid]
         if not own:
@@ -197,5 +252,5 @@ def _execution_of(fills: Any, oid: int) -> Execution | None:
         raise OrderExchangeUnavailableError from error
 
 
-def _decimal(value: Any) -> Decimal:
+def _decimal(value: object) -> Decimal:
     return Decimal(str(value))

@@ -79,6 +79,12 @@ def test_a_cost_nobody_knows_reads_back_empty_with_its_tokens() -> None:
     assert record_of(row_of(record, TENANT)).cost == CallCost(10, 5, None)
 
 
+def test_a_cost_with_only_part_of_its_tokens_reads_back_as_no_cost() -> None:
+    record = CycleRecord(uuid4(), PLANNED, CycleOutcome.COMPLETED, cost=CallCost(10, 5, None))
+
+    assert record_of(row_of(record, TENANT) | {"output_tokens": None}).cost is None
+
+
 def test_amounts_identifiers_and_instants_become_text_in_a_document() -> None:
     flow_id = uuid4()
 

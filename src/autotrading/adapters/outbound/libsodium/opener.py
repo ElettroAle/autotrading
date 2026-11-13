@@ -1,6 +1,5 @@
 import json
 from collections.abc import Mapping
-from typing import Any
 from uuid import UUID
 
 from nacl.exceptions import CryptoError
@@ -77,7 +76,7 @@ class SodiumCredentialOpenerAdapter:
             return None
         return _credentials_of(document)
 
-    def _document_of(self, key_version: int, ciphertext: bytes) -> Mapping[str, Any] | None:
+    def _document_of(self, key_version: int, ciphertext: bytes) -> Mapping[str, object] | None:
         box = self._boxes.get(key_version)
         if box is None:
             return None
@@ -97,7 +96,7 @@ def private_key_of(raw: bytes) -> PrivateKey:
     return PrivateKey(raw)
 
 
-def _credentials_of(document: Mapping[str, Any]) -> Credentials | None:
+def _credentials_of(document: Mapping[str, object]) -> Credentials | None:
     address, secret = document.get("account_address"), document.get("secret_key")
     if not isinstance(address, str) or not isinstance(secret, str):
         return None

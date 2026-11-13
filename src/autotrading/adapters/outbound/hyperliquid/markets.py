@@ -1,4 +1,4 @@
-from typing import Any
+from collections.abc import Mapping
 
 import requests
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
@@ -42,11 +42,11 @@ class HyperliquidMarketsAdapter:
         if entry is None:
             return None
         try:
-            return AssetLimits(int(entry["maxLeverage"]), MIN_ORDER_VALUE)
+            return AssetLimits(int(str(entry["maxLeverage"])), MIN_ORDER_VALUE)
         except (*SHAPE_ERRORS, ValueError) as error:
             raise FlowExchangeUnavailableError from error
 
-    def _listed(self) -> dict[str, Any]:
+    def _listed(self) -> dict[str, Mapping[str, object]]:
         """The assets not delisted, by name."""
         try:
             universe = self._sdk.info(self._base_url, self._timeout).meta()["universe"]
@@ -55,6 +55,5 @@ class HyperliquidMarketsAdapter:
             raise FlowExchangeUnavailableError from error
 
 
-def _name(asset: Any) -> str:
-    name: str = asset["name"]
-    return name
+def _name(asset: Mapping[str, object]) -> str:
+    return str(asset["name"])

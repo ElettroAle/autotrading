@@ -2,7 +2,6 @@ import re
 import secrets
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Any
 
 import requests
 from eth_account import Account as EthereumAccount
@@ -115,14 +114,14 @@ def _unused_cloid() -> Cloid:
     return Cloid.from_int(secrets.randbits(128))
 
 
-def _require_accepted(response: Any, credentials: Credentials) -> None:
+def _require_accepted(response: object, credentials: Credentials) -> None:
     if isinstance(response, Mapping) and response.get("status") == "ok":
         return
     message = response.get("response") if isinstance(response, Mapping) else response
     raise ExchangeRejectedCredentialsError(_masked(str(message), credentials))
 
 
-def _account_state_of(state: Any) -> AccountState:
+def _account_state_of(state: object) -> AccountState:
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
         read = user_state_of(state)
@@ -148,7 +147,7 @@ def _position_of(position: _UserPosition) -> Position:
     )
 
 
-def _decimal(value: Any) -> Decimal:
+def _decimal(value: object) -> Decimal:
     return Decimal(str(value))
 
 

@@ -161,7 +161,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     def _failed(self, progress: _Progress, error: AutotradingError) -> CycleRecord:
         failure = CycleFailure(progress.current, type(error).__name__, str(error))
         record = self._recorded(progress.record(CycleOutcome.FAILED, failure))
-        self._guards.failures.failed(progress.command.flow_id, failure.message)
+        self._guards.failures.execute(progress.command.flow_id, failure.message)
         if not error.permanent:
             return record
         self._guards.pause.pause_affected_by(progress.command.flow_id, error)

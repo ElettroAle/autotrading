@@ -7,7 +7,7 @@ import pytest
 
 from autotrading.application.sources.errors import AssetRequiredError, SourceUnavailableError
 from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
-from autotrading.application.sources.ports import ReadSourceCommand
+from autotrading.application.sources.ports import SourceRequest
 from autotrading.application.sources.read_forecast import ReadForecastUseCase
 from autotrading.application.sources.read_news import ReadNewsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
@@ -37,8 +37,8 @@ class FixedNews:
         return self._items
 
 
-def market(settings: dict[str, int] | None = None) -> ReadSourceCommand:
-    return ReadSourceCommand(FLOW, None, settings or {}, NOW)
+def market(settings: dict[str, int] | None = None) -> SourceRequest:
+    return SourceRequest(FLOW, None, settings or {}, NOW)
 
 
 def test_the_sentiment_refers_to_the_update_of_the_provider() -> None:
@@ -89,7 +89,7 @@ def forecast_reader(prices: FakePriceHistoryAdapter) -> ReadForecastUseCase:
 def test_the_forecast_refers_to_the_instant_it_is_made() -> None:
     prices = FakePriceHistoryAdapter(prices={"BTC": Decimal(100)})
 
-    values = forecast_reader(prices).execute(ReadSourceCommand(FLOW, "BTC", {"profondita_storico_giorni": 5}, NOW))
+    values = forecast_reader(prices).execute(SourceRequest(FLOW, "BTC", {"profondita_storico_giorni": 5}, NOW))
 
     assert values == (
         SourceValue(
@@ -110,7 +110,7 @@ def test_the_forecast_refers_to_the_instant_it_is_made() -> None:
 def test_a_shorter_history_is_declared_in_the_forecast() -> None:
     prices = FakePriceHistoryAdapter(available_days=3)
 
-    (value,) = forecast_reader(prices).execute(ReadSourceCommand(FLOW, "BTC", {"profondita_storico_giorni": 30}, NOW))
+    (value,) = forecast_reader(prices).execute(SourceRequest(FLOW, "BTC", {"profondita_storico_giorni": 30}, NOW))
 
     assert value.values["profondita_storico_giorni"] == "3"
     assert value.values["storico_ridotto"] == "lo storico dell'exchange è più corto di quello richiesto"
@@ -126,5 +126,5 @@ def test_the_forecast_without_asset_is_a_defect_of_the_caller() -> None:
 def test_a_forecast_without_prices_leaves_the_source_unavailable() -> None:
     with pytest.raises(SourceUnavailableError):
         forecast_reader(FakePriceHistoryAdapter(missing={"BTC"})).execute(
-            ReadSourceCommand(FLOW, "BTC", {"profondita_storico_giorni": 7}, NOW)
+            SourceRequest(FLOW, "BTC", {"profondita_storico_giorni": 7}, NOW)
         )

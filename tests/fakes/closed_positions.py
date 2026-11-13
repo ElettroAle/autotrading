@@ -7,5 +7,5 @@ class InMemoryClosedPositionsAdapter:
     def __init__(self) -> None:
         self.closed: list[OutsideClosing] = []
 
-    def add_closed_outside(self, closing: OutsideClosing) -> None:
+    def execute(self, closing: OutsideClosing) -> None:
         self.closed.append(closing)

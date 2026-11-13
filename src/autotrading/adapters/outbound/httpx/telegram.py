@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any
 
 import httpx
 
@@ -95,18 +94,20 @@ class HttpxTelegramInboxAdapter:
     def receive(self) -> Sequence[BotMessage]:
         return [message for update in self._updates() if (message := _message_of(update)) is not None]
 
-    def _updates(self) -> list[Mapping[str, Any]]:
-        document = self._poll()
+    def _updates(self) -> list[Mapping[str, object]]:
+        result = self._poll().get("result")
+        if not isinstance(result, list):
+            raise BotUnreachableError
+        updates = [_update_of(update) for update in result if isinstance(update, Mapping)]
         try:
-            updates = [update for update in document["result"] if isinstance(update, Mapping)]
-            identifiers = [int(update["update_id"]) for update in updates]
+            identifiers = [int(str(update["update_id"])) for update in updates]
         except (KeyError, TypeError, ValueError) as error:
             raise BotUnreachableError from error
         if identifiers:
             self._next_update = max(identifiers) + 1
         return updates
 
-    def _poll(self) -> Mapping[str, Any]:
+    def _poll(self) -> Mapping[str, object]:
         parameters: dict[str, str | int] = {
             "offset": self._next_update,
             "timeout": POLL_SECONDS,
@@ -115,18 +116,27 @@ class HttpxTelegramInboxAdapter:
         try:
             response = self._client.get("/getUpdates", params=parameters, timeout=POLL_TIMEOUT_SECONDS)
             response.raise_for_status()
-            document: Mapping[str, Any] = response.json()
+            document: object = response.json()
         except httpx.HTTPError, ValueError:
             # Without the cause: its text names the URL, and the URL carries the token.
             raise BotUnreachableError from None
-        return document
+        if not isinstance(document, Mapping):
+            raise BotUnreachableError
+        return _update_of(document)
 
 
-def _message_of(update: Mapping[str, Any]) -> BotMessage | None:
+def _update_of(document: Mapping[object, object]) -> Mapping[str, object]:
+    return {str(name): value for name, value in document.items()}
+
+
+def _message_of(update: Mapping[str, object]) -> BotMessage | None:
     message = update.get("message")
-    if not isinstance(message, Mapping) or not isinstance(message.get("text"), str):
+    if not isinstance(message, Mapping):
         return None
-    chat = message.get("chat")
-    if not isinstance(chat, Mapping) or not isinstance(chat.get("id"), int):
+    text, chat = message.get("text"), message.get("chat")
+    if not isinstance(text, str) or not isinstance(chat, Mapping):
         return None
-    return BotMessage(ChatId(chat["id"]), message["text"])
+    chat_id = chat.get("id")
+    if not isinstance(chat_id, int):
+        return None
+    return BotMessage(ChatId(chat_id), text)

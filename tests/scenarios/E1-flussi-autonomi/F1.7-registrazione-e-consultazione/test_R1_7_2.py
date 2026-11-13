@@ -12,8 +12,8 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
+from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.orders.close_position import ClosePositionCommand
-from autotrading.bootstrap import ClosingNoticeByNotification, OutsideClosingsInHistory
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
@@ -124,13 +124,11 @@ class History:
         )
         flows = InMemoryFlowRepositoryAdapter(self.platform.flows, operating.tenant_id)
         notify = self.platform.worker_for(operating.tenant_id).notify
-        history = OutsideClosingsInHistory(
-            RecordOutsideClosingUseCase(
-                flows,
-                InMemoryFlowOpeningsAdapter(self.platform.orders_of(operating.tenant_id)),
-                InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
-                ClosingNoticeByNotification(notify, "USDC"),
-            )
+        history = RecordOutsideClosingUseCase(
+            flows,
+            InMemoryFlowOpeningsAdapter(self.platform.orders_of(operating.tenant_id)),
+            InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
+            NotifyPositionClosedUseCase(notify, "USDC"),
         )
         record = RecordAccountExecutionsUseCase(
             flows, self.platform.account_activity, self.platform.platform_orders, self.platform.ledger

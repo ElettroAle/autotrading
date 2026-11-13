@@ -26,10 +26,12 @@ from autotrading.application.flows.ports import (
     FlowOpeningsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
+    PositionClosedNoticePort,
     RunningCyclePort,
 )
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopPorts
+from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
@@ -41,7 +43,6 @@ from autotrading.bootstrap import (
     ApiExchanges,
     InvalidConfigurationError,
     MissingConfigurationError,
-    NotifiedClosedPositions,
     PublicCredentialsKey,
     TenantUseCaseFactory,
     UndeclaredEnvironmentError,
@@ -480,10 +481,10 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
     assert store.keys == []
 
 
-def test_the_api_records_stops_and_manual_closings_in_the_history_that_notifies(
+def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    histories: list[ClosedPositionRepositoryPort] = []
+    notices: list[PositionClosedNoticePort] = []
     real_stop_ports, real_manual_closing = StopPorts, RecordManualClosingUseCase
 
     def stop_ports(
@@ -491,15 +492,19 @@ def test_the_api_records_stops_and_manual_closings_in_the_history_that_notifies(
         positions: FlowPositionsPort,
         openings: FlowOpeningsPort,
         closed_positions: ClosedPositionRepositoryPort,
+        closing_notice: PositionClosedNoticePort,
     ) -> StopPorts:
-        histories.append(closed_positions)
-        return real_stop_ports(cycles, positions, openings, closed_positions)
+        notices.append(closing_notice)
+        return real_stop_ports(cycles, positions, openings, closed_positions, closing_notice)
 
     def manual_closing(
-        flows: FlowRepositoryPort, openings: FlowOpeningsPort, closed_positions: ClosedPositionRepositoryPort
+        flows: FlowRepositoryPort,
+        openings: FlowOpeningsPort,
+        closed_positions: ClosedPositionRepositoryPort,
+        notice: PositionClosedNoticePort,
     ) -> RecordManualClosingUseCase:
-        histories.append(closed_positions)
-        return real_manual_closing(flows, openings, closed_positions)
+        notices.append(notice)
+        return real_manual_closing(flows, openings, closed_positions, notice)
 
     monkeypatch.setattr(bootstrap, "StopPorts", stop_ports)
     monkeypatch.setattr(bootstrap, "RecordManualClosingUseCase", manual_closing)
@@ -512,5 +517,6 @@ def test_the_api_records_stops_and_manual_closings_in_the_history_that_notifies(
 
     factory.for_tenant(TenantId.new())
 
-    assert len(histories) == 2
-    assert all(isinstance(history, NotifiedClosedPositions) for history in histories)
+    assert len(notices) == 2
+    assert all(isinstance(notice, NotifyPositionClosedUseCase) for notice in notices)
+    assert notices[0] is notices[1]

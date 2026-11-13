@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from autotrading.application.sources.errors import AssetRequiredError
-from autotrading.application.sources.ports import ReadSourceCommand
+from autotrading.application.sources.ports import SourceRequest
 from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase, text_of
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.domain.sources.errors import InsufficientHistoryError
@@ -18,8 +18,8 @@ from tests.fakes.market_data import DEFAULT_CLOSES, FakeMarketDataAdapter
 NOW = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
 
 
-def command(asset: str | None = "BTC", length: int = 10) -> ReadSourceCommand:
-    return ReadSourceCommand(uuid4(), asset, {"lunghezza_serie": length}, NOW)
+def command(asset: str | None = "BTC", length: int = 10) -> SourceRequest:
+    return SourceRequest(uuid4(), asset, {"lunghezza_serie": length}, NOW)
 
 
 def priced(market: FakeMarketDataAdapter, price: str) -> FakeMarketDataAdapter:

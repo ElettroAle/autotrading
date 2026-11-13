@@ -11,7 +11,7 @@ from pytest_bdd import given, then, when
 
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
-from autotrading.application.flows.free_capital import ReadFreeCapitalCommand
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from tests.support.flows import OPENROUTER_MODEL, account_id_of

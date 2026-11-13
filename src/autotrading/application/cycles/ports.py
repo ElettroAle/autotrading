@@ -198,8 +198,14 @@ class FlowPausePort(Protocol):
 
 
 class CycleFailureNoticePort(Protocol):
-    def failed(self, flow_id: UUID, reason: str) -> None:
+    def execute(self, flow_id: UUID, reason: str) -> None:
         """Tells the user the cycle of the flow failed, with the message of its error (R1.8.2)."""
+        ...
+
+
+class FlowTenantPort(Protocol):
+    def tenant_of(self, flow_id: UUID) -> TenantId:
+        """The tenant of a flow the worker planned."""
         ...
 
 

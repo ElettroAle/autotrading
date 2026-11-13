@@ -1,4 +1,4 @@
-from autotrading.application.sources.ports import ReadSourceCommand, SentimentPort
+from autotrading.application.sources.ports import SentimentPort, SourceRequest
 from autotrading.domain.sources.source_sample import SourceValue
 
 
@@ -8,7 +8,7 @@ class ReadSentimentUseCase:
     def __init__(self, sentiment: SentimentPort) -> None:
         self._sentiment = sentiment
 
-    def execute(self, command: ReadSourceCommand) -> tuple[SourceValue]:  # noqa: ARG002 - the index is of the whole market
+    def execute(self, command: SourceRequest) -> tuple[SourceValue]:  # noqa: ARG002 - the index is of the whole market
         index = self._sentiment.read_index()
         values = {
             "valore": str(index.value),

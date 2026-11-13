@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.domain.orders.order import Order, OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.rejection import RejectionReason
 from tests.support.orders import EXECUTION, a_rejected_order, a_request, an_executed_order
 

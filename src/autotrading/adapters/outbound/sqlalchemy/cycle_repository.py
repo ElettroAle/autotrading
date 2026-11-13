@@ -3,7 +3,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import TypedDict, cast
 from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, func, select
@@ -25,6 +25,31 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]
 RECORDED = cycles.c.outcome.is_not(None)
+
+
+class _AbsentSourceColumn(TypedDict):
+    source: str
+    reason: str
+
+
+class _DocumentColumn(TypedDict):
+    step: str
+    content: Mapping[str, object]
+
+
+class _CycleRow(TypedDict):
+    flow_id: UUID
+    planned_at: datetime
+    outcome: str
+    started_at: datetime | None
+    delay_seconds: int | None
+    steps: list[str] | None
+    absent_sources: list[_AbsentSourceColumn] | None
+    failure: Mapping[str, str] | None
+    documents: list[_DocumentColumn] | None
+    input_tokens: int | None
+    output_tokens: int | None
+    cost_usd: Decimal | None
 
 
 class SqlAlchemyCycleRepositoryAdapter:
@@ -109,7 +134,8 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
     }
 
 
-def record_of(row: RowMapping | Mapping[str, Any]) -> CycleRecord:
+def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
+    row = cast("_CycleRow", columns)
     return CycleRecord(
         flow_id=row["flow_id"],
         planned_at=row["planned_at"],
@@ -126,7 +152,7 @@ def record_of(row: RowMapping | Mapping[str, Any]) -> CycleRecord:
     )
 
 
-def plain(content: Mapping[str, object]) -> Any:
+def plain(content: Mapping[str, object]) -> object:
     """The document as plain JSON: amounts as text, so no number is rounded, and instants in ISO 8601."""
     return json.loads(json.dumps(content, default=_plain_value))
 
@@ -152,10 +178,11 @@ def _failure_of(failure: Mapping[str, str] | None) -> CycleFailure | None:
     return CycleFailure(_step(failure["step"]), failure["error_type"], failure["message"])
 
 
-def _cost_of(row: RowMapping | Mapping[str, Any]) -> CallCost | None:
-    if row["input_tokens"] is None:
+def _cost_of(row: _CycleRow) -> CallCost | None:
+    input_tokens, output_tokens = row["input_tokens"], row["output_tokens"]
+    if input_tokens is None or output_tokens is None:
         return None
-    return CallCost(row["input_tokens"], row["output_tokens"], row["cost_usd"])
+    return CallCost(input_tokens, output_tokens, row["cost_usd"])
 
 
 def _step(name: str) -> CycleStep:

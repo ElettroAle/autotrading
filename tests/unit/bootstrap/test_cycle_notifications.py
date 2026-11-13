@@ -1,4 +1,4 @@
-"""The bridges the worker's cycle leaves its notifications and closed positions through (ADR 0056)."""
+"""The worker's cycle notifies and records its closed positions through use cases (ADR 0056, ADR 0092)."""
 
 import logging
 from dataclasses import replace
@@ -10,30 +10,37 @@ import pytest
 from sqlalchemy import create_engine
 
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
+from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
+    SqlAlchemyClosedPositionRepositoryAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
+from autotrading.application.cycles.tell_cycle_failure import TellCycleFailureUseCase
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     FlowExchangeUnavailableError,
     FlowLedgerIncompleteError,
     FlowPositionMismatchError,
 )
+from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersCommand, FollowFlowOrdersUseCase
+from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
+from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
+from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.orders.follow_flow_orders import (
+    FlowOrderFollowers,
+    FollowFlowOrdersCommand,
+    FollowFlowOrdersUseCase,
+)
 from autotrading.bootstrap import (
-    ClosingNoticeByNotification,
-    CycleFailureNotices,
     CycleFlow,
-    FlowOrderEvents,
     FlowPauseFromFlows,
     FlowStateFromFlows,
-    NotifiedClosedPositions,
-    OutsideClosingsInHistory,
     TenantCyclePorts,
     WorkerExchanges,
     WorkerSettings,
@@ -108,17 +115,29 @@ class World:
     def ports_of(self, tenant_id: object) -> TenantCyclePorts:
         assert tenant_id == self.tenant_id
         ports = self.cycles.ports_of(self.tenant_id)
-        history = self.history(ports.notify)
-        record_closing = RecordFlowClosingUseCase(
-            self.openings, history, ClosingNoticeByNotification(ports.notify, "USDC")
+        followers = FlowOrderFollowers(
+            NotifyOrderRejectedUseCase(ports.notify),
+            NotifyPositionOpenedUseCase(ports.notify, "USDC"),
+            RecordFlowClosingUseCase(self.flows, self.openings, self.history, self.closing_notice(ports.notify)),
         )
-        return replace(ports, openings=self.openings, closed_positions=history, record_closing=record_closing)
+        return replace(
+            ports,
+            openings=self.openings,
+            closed_positions=self.history,
+            follow_flow_orders=FollowFlowOrdersUseCase(followers),
+        )
 
-    def history(self, notify: NotifyUseCase) -> NotifiedClosedPositions:
-        flows = InMemoryFlowRepositoryAdapter(self.cycles.platform.flows, self.tenant_id)
-        return NotifiedClosedPositions(
-            InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id), flows, notify, "USDC"
-        )
+    @property
+    def flows(self) -> InMemoryFlowRepositoryAdapter:
+        return InMemoryFlowRepositoryAdapter(self.cycles.platform.flows, self.tenant_id)
+
+    @property
+    def history(self) -> InMemoryClosedPositionRepositoryAdapter:
+        return InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id)
+
+    @staticmethod
+    def closing_notice(notify: NotifyUseCase) -> NotifyPositionClosedUseCase:
+        return NotifyPositionClosedUseCase(notify, "USDC")
 
     @property
     def ports(self) -> TenantCyclePorts:
@@ -152,12 +171,12 @@ def an_execution(*, price: str = "100.4", pnl: str = "4.20") -> Execution:
     return Execution(Decimal("0.5"), Decimal(price), Decimal("0.3"), Decimal(pnl), CLOSED_AT)
 
 
-# FlowOrderEvents
+# FollowFlowOrdersUseCase
 
 
 def follow(world: World, order: Order) -> None:
-    events = FlowOrderEvents(world.ports, world.flow, PLANNED_AT)
-    FollowFlowOrdersUseCase(events).execute(FollowFlowOrdersCommand((order,)))
+    command = FollowFlowOrdersCommand(world.flow.id.value, world.flow.name.value, PLANNED_AT, (order,))
+    world.ports.follow_flow_orders.execute(command)
 
 
 def test_an_executed_opening_is_notified_with_its_value_in_whole_units(world: World) -> None:
@@ -205,22 +224,20 @@ def test_a_closing_without_an_opening_of_the_flow_is_notified_but_has_no_history
     assert world.received == ["alfa: chiusa BTC, PnL 4,20 USDC"]
 
 
-# OutsideClosingsInHistory
+# RecordOutsideClosingUseCase
 
 
 def outside(world: World, pnl: str) -> OutsideClosing:
     return OutsideClosing(world.flow.id, "BTC", Decimal(pnl), Decimal("0.5"), CLOSED_AT)
 
 
-def closed_positions(world: World) -> OutsideClosingsInHistory:
-    flows = InMemoryFlowRepositoryAdapter(world.cycles.platform.flows, world.tenant_id)
-    notify = world.ports.notify
-    notice = ClosingNoticeByNotification(notify, "USDC")
-    return OutsideClosingsInHistory(RecordOutsideClosingUseCase(flows, world.openings, world.history(notify), notice))
+def closed_positions(world: World) -> RecordOutsideClosingUseCase:
+    notice = World.closing_notice(world.ports.notify)
+    return RecordOutsideClosingUseCase(world.flows, world.openings, world.history, notice)
 
 
 def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_flow(world: World) -> None:
-    closed_positions(world).add_closed_outside(outside(world, "-10"))
+    closed_positions(world).execute(outside(world, "-10"))
 
     [closed] = world.closed.positions
     assert (closed.flow_id, closed.reason, closed.side, closed.leverage) == (
@@ -239,7 +256,7 @@ def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: p
     world.openings.opening = None
 
     with caplog.at_level(logging.WARNING, logger="autotrading.flows"):
-        closed_positions(world).add_closed_outside(outside(world, "-10"))
+        closed_positions(world).execute(outside(world, "-10"))
 
     assert world.closed.positions == []
     assert [record.getMessage() for record in caplog.records] == ["posizione chiusa fuori senza apertura del flusso"]
@@ -251,18 +268,20 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
     world: World, caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level(logging.WARNING, logger="autotrading.flows"):
-        closed_positions(world).add_closed_outside(outside(world, "-100"))
+        closed_positions(world).execute(outside(world, "-100"))
 
     assert world.closed.positions == []
     assert [record.getMessage() for record in caplog.records] == ["esito della chiusura fuori non rappresentabile"]
     assert world.received == ["alfa: chiusa BTC, PnL -100 USDC"]
 
 
-# CycleFailureNotices
+# TellCycleFailureUseCase
 
 
 def test_a_failed_cycle_is_told_with_the_name_of_its_flow_and_its_message(world: World) -> None:
-    CycleFailureNotices(world.cycles.directory, world.ports_of).failed(world.flow.id.value, "timeout")
+    tell = TellCycleFailureUseCase(world.cycles.directory, lambda tenant_id: world.ports_of(tenant_id).cycle_failure)
+
+    tell.execute(world.flow.id.value, "timeout")
 
     assert world.received == ["alfa: ciclo fallito, timeout"]
 
@@ -325,16 +344,6 @@ def test_a_flow_not_stamped_yet_began_at_the_anchor_of_its_cycles(world: World) 
     del world.cycles.platform.flows.first_starts[world.flow.id]
 
     assert started_at(world) == at("10:00")
-
-
-# NotifiedClosedPositions
-
-
-def test_the_history_reads_back_what_it_told(world: World) -> None:
-    follow(world, an_order(reduce_only=True, execution=an_execution()))
-
-    assert world.ports.closed_positions.of_flow(world.flow.id) == world.closed.positions
-    assert len(world.closed.positions) == 1
 
 
 # FlowStateFromFlows.read: the position the flow expects (Bug 155)
@@ -494,6 +503,8 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
 
     assert isinstance(ports.reconcile_for_cycle, ReconcileAccountForCycleUseCase)
     assert isinstance(ports.openings, SqlAlchemyFlowOpeningsAdapter)
-    assert isinstance(ports.closed_positions, NotifiedClosedPositions)
+    assert isinstance(ports.closed_positions, SqlAlchemyClosedPositionRepositoryAdapter)
+    assert isinstance(ports.follow_flow_orders, FollowFlowOrdersUseCase)
+    assert isinstance(ports.cycle_failure, NotifyCycleFailureUseCase)
     assert isinstance(ports.notify, NotifyUseCase)
     assert isinstance(ports.timing, SqlAlchemyFlowTimingAdapter)
