@@ -3,6 +3,8 @@ name: quality
 on:
   pull_request:
     branches: [main]
+    # edited: correcting the description re-runs the work item check.
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
@@ -16,5 +18,7 @@ jobs:
     uses: ./.github/workflows/reusable-quality.yml
     with:
       title: ${{ github.event.pull_request.title }}
+      body: ${{ github.event.pull_request.body }}
+      author: ${{ github.event.pull_request.user.login }}
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

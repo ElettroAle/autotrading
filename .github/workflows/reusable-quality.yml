@@ -9,6 +9,15 @@ on:
         description: Titolo della pull request
         type: string
         required: true
+      body:
+        description: Descrizione della pull request
+        type: string
+        required: false
+        default: ""
+      author:
+        description: Autore della pull request
+        type: string
+        required: true
     secrets:
       SONAR_TOKEN:
         required: true
@@ -37,6 +46,17 @@ jobs:
       - uses: ./.github/actions/conventional-title
         with:
           title: ${{ inputs.title }}
+
+  work-item:
+    name: work item
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/work-item-link
+        with:
+          body: ${{ inputs.body }}
+          author: ${{ inputs.author }}
 
   stile:
     name: stile
