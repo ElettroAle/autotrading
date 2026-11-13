@@ -29,13 +29,13 @@ che legge la sua sezione e registra i servizi pronti.
 - **Impostazioni per cartella** (l'equivalente di `{Tech}Configurations`): `configuration.py` di ogni cartella
   adapter con configurazione definisce una dataclass frozen privata `_<Tecnologia>Settings` e la funzione privata
   che la legge, applica i default e valida forma e presenza. Cartelle toccate: `sqlalchemy` (database),
-  `libsodium` (chiave pubblica o privata e versione), `oidc` (issuer e audience), `httpx` (indirizzo e token del
-  worker, token del bot), `hyperliquid` (rete e slippage), `inbound/api` (versione, client del login, token del
+  `libsodium` (chiave pubblica o privata e versione), `oidc` (issuer e audience), `worker` (indirizzo e token del
+  worker), `telegram` (token del bot, che c'era già come impostazione privata), `hyperliquid` (rete e slippage), `inbound/api` (versione, client del login, token del
   worker).
 - **Composizione per cartella** (l'equivalente di `Add{X}`): `composition.py` espone `<tecnologia>_adapters(source,
   ...)`, che restituisce adapter pronti: `sqlalchemy_adapters` (engine), `libsodium_sealing_adapters` (sigillatori
   legati al tenant), `libsodium_opening_adapters`, `oidc_adapters` (o `None` senza issuer),
-  `httpx_worker_adapters`, `telegram_adapters`, `hyperliquid_order_adapters` (exchange degli ordini e slippage),
+  `worker_adapters`, `telegram_adapters` (ora riceve la sorgente invece del token), `hyperliquid_order_adapters` (exchange degli ordini e slippage),
   `api_adapters`, `worker_api_adapters`.
 - **Regole di business nel domain**: gli ambienti ammessi diventano `InstallationEnvironment` in
   `domain/accounts/installation_environment.py`, accanto a `ExchangeNetwork.of_installation`, con
@@ -81,8 +81,9 @@ che legge la sua sezione e registra i servizi pronti.
 - **Gli adapter legati al tenant si costruiscono ancora in `bootstrap.py`** (`for_tenant`): «bootstrap chiama
   solo le funzioni `*_adapters`» è applicato alla configurazione, cioè la sorgente va solo a quelle funzioni.
   Spostare la costruzione per tenant nelle cartelle è il lavoro della categoria E del Bug 177.
-- **`telegram_adapters` e `httpx_worker_adapters` stanno in `httpx/`** finché la categoria E non sposta Telegram e
-  il worker nelle loro cartelle; i file `configuration.py` e `composition.py` si spostano con loro.
+- **Cartelle senza configurazione d'installazione** (`alternative_me`, `coinmarketcap`, `rss`): le loro funzioni
+  `*_adapters` non ricevono la sorgente, perché non leggono nulla dall'installazione; i loro `configuration.py`
+  tengono solo i valori fissi della tecnologia.
 
 ## Conseguenze
 

@@ -343,6 +343,7 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
         accounts,
+        accounts,
         Slippage.default(),
     )
     opener = SodiumCredentialOpenerAdapter({})

@@ -73,12 +73,6 @@ class LinkStores:
     chats: LinkedChatRepositoryPort
 
 
-class BotIdentityPort(Protocol):
-    def username(self) -> str | None:
-        """The username of the platform bot; none when no bot is active or it cannot be reached now."""
-        ...
-
-
 class NotifierPort(Protocol):
     def execute(self, notification: Notification) -> None:
         """Delivers the notification to the chats of the tenant; a delivery that fails is recorded, never raised."""

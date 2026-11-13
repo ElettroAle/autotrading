@@ -11,7 +11,7 @@ from autotrading.adapters.inbound.api.configuration import (
 )
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.adapters.inbound.api.worker import BotPolling, CyclePolling, WorkerUseCases, create_worker_api
-from autotrading.application.notifications.ports import BotIdentityPort
+from autotrading.application.notifications.ports import BotStartLinkPort
 from autotrading.application.tenancy.ports import AccessTokenVerifierPort, LoginEndpointsPort
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -34,10 +34,10 @@ def worker_api_adapters(
     for_tenant: Callable[[TenantId], WorkerUseCases],
     bot: BotPolling | None,
     cycles: CyclePolling | None,
-    bot_identity: BotIdentityPort | None,
+    bot_start_link: BotStartLinkPort | None,
 ) -> FastAPI:
     """The internal service of the worker, open only to the caller that holds the token of the machine."""
-    return create_worker_api(_worker_api_settings_of(source).token, for_tenant, bot, cycles, bot_identity)
+    return create_worker_api(_worker_api_settings_of(source).token, for_tenant, bot, cycles, bot_start_link)
 
 
 def _authentication(

@@ -6,10 +6,8 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
-from autotrading.adapters.outbound.httpx.sentiment import (
-    HttpxAlternativeMeSentimentAdapter,
-    HttpxCoinMarketCapSentimentAdapter,
-)
+from autotrading.adapters.outbound.alternative_me.sentiment import AlternativeMeSentimentAdapter
+from autotrading.adapters.outbound.coinmarketcap.sentiment import CoinMarketCapSentimentAdapter
 
 pytestmark = pytest.mark.sources
 
@@ -17,9 +15,9 @@ pytestmark = pytest.mark.sources
 FRESHNESS = timedelta(days=2)
 
 
-@pytest.mark.parametrize("adapter_type", [HttpxAlternativeMeSentimentAdapter, HttpxCoinMarketCapSentimentAdapter])
+@pytest.mark.parametrize("adapter_type", [AlternativeMeSentimentAdapter, CoinMarketCapSentimentAdapter])
 def test_the_public_endpoint_answers_with_a_recent_index(
-    adapter_type: Callable[[httpx.Client], HttpxAlternativeMeSentimentAdapter | HttpxCoinMarketCapSentimentAdapter],
+    adapter_type: Callable[[httpx.Client], AlternativeMeSentimentAdapter | CoinMarketCapSentimentAdapter],
 ) -> None:
     with httpx.Client() as client:
         index = adapter_type(client).read_index()

@@ -1,3 +1,4 @@
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
@@ -96,3 +97,30 @@ class ManualClosingRecorderPort(Protocol):
     def execute(self, account_id: UUID, asset: str, fill: OrderOutcome) -> None:
         """Records in the history of the flow that trades the asset a position a user closed by hand (ADR 0061)."""
         ...
+
+
+class ApprovedOrderPort(Protocol):
+    """An order a cycle of a flow got through the risk check, as the flows context hands it over."""
+
+    def order_with[T](self, opening: Callable[[str, str, Decimal, int], T], closing: Callable[[str], T]) -> T:
+        """Builds the order with the opening (asset, side, value, leverage) or the closing (asset) it needs."""
+        ...
+
+
+class CycleOrdersPort(Protocol):
+    """The approved orders of one cycle of a flow, for the account of the flow."""
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def flow_id(self) -> UUID: ...
+
+    @property
+    def flow_name(self) -> str: ...
+
+    @property
+    def planned_at(self) -> datetime: ...
+
+    @property
+    def orders(self) -> Sequence[ApprovedOrderPort]: ...

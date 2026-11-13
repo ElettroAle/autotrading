@@ -14,6 +14,7 @@ from hyperliquid.utils.types import Cloid
 
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.flows.errors import FlowCredentialsRefusedError, FlowExchangeUnavailableError
 from autotrading.application.verification.errors import (
     VerificationCredentialsRejectedError,
     VerificationExchangeUnavailableError,
@@ -22,6 +23,9 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
+from autotrading.domain.flows.cycle_access import CycleAccess
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
+from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
 
@@ -96,6 +100,31 @@ class HyperliquidExchangeAdapter:
             currency=state.balance.currency,
             positions=tuple(
                 PositionReading(position.coin, position.side.value, position.size, position.leverage)
+                for position in state.positions
+            ),
+        )
+
+    def cycle_reading(self, access: CycleAccess) -> CycleAccount:
+        """The same reading for the cycle of a flow: a refusal pauses the flows of the account (R1.2.4)."""
+        try:
+            state = self.read_state(Credentials(access.account_address, access.secret_key))
+        except ExchangeRejectedCredentialsError as error:
+            raise FlowCredentialsRefusedError from error
+        except ExchangeUnavailableError as error:
+            raise FlowExchangeUnavailableError from error
+        return CycleAccount(
+            currency=state.balance.currency,
+            available_margin=state.available_margin.amount,
+            positions=tuple(
+                CyclePosition(
+                    position.coin,
+                    TradeSide(position.side.value),
+                    position.size,
+                    position.leverage,
+                    position.entry_price,
+                    position.unrealized_pnl,
+                    position.liquidation_price,
+                )
                 for position in state.positions
             ),
         )
