@@ -5,7 +5,6 @@ from secrets import token_hex
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.worker.account_state import WorkerAccountStateAdapter
@@ -22,6 +21,7 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.exchange import REDACTED_REJECTION
+from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 REFUSED = "connection refused"
@@ -34,7 +34,7 @@ def worker() -> Worker:
 
 
 def adapter_on(worker: Worker, token: str = TOKEN, tenant_id: TenantId = TENANT) -> WorkerAccountStateAdapter:
-    return WorkerAccountStateAdapter(TestClient(create_worker_api(TOKEN, worker.for_tenant)), token, tenant_id)
+    return WorkerAccountStateAdapter(served_in_memory(create_worker_api(TOKEN, worker.for_tenant)), token, tenant_id)
 
 
 def answering(status: int, body: object) -> WorkerAccountStateAdapter:

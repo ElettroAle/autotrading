@@ -1,4 +1,6 @@
 import logging
+import re
+from pathlib import Path
 
 import httpx
 import pytest
@@ -13,6 +15,7 @@ from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 
 KEY = ProviderKey("K-SECRET-TEST")
+PROXY_CONFIGURATION = Path(__file__).parents[4] / "deploy" / "litellm" / "config.yaml"
 
 
 def verifier_answering(status: int, asked: list[httpx.Request] | None = None) -> HttpxProviderKeyVerifierAdapter:
@@ -93,3 +96,10 @@ def test_a_provider_without_a_check_cannot_be_verified() -> None:
 
 def test_the_checks_cover_the_providers_the_adr_names() -> None:
     assert sorted(KEY_CHECKS) == ["anthropic", "deepseek", "openai", "openrouter"]
+
+
+def test_every_provider_the_proxy_routes_has_a_way_to_verify_its_keys() -> None:
+    routes = re.findall(r'model_name: "([a-z]+)/\*"', PROXY_CONFIGURATION.read_text(encoding="utf-8"))
+
+    assert routes
+    assert set(routes) <= set(KEY_CHECKS)

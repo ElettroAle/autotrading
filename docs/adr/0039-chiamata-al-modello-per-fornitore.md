@@ -1,6 +1,6 @@
 # ADR 0039 — Chiamata al modello con un adapter httpx per fornitore
 
-- Stato: accettata (12 novembre 2026)
+- Stato: superata da ADR 0101 (13 novembre 2026)
 - Requisiti: R1.4.4, R1.4.6, R1.2.3, R1.2.4 (Task T1.4.4.1, T1.4.6.1)
 
 ## Contesto
