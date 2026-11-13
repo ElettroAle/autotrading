@@ -13,6 +13,9 @@ inputs:
   image:
     description: Riferimento repository@sha256
     required: true
+  forecaster-image:
+    description: Riferimento repository@sha256 dell'immagine del forecaster
+    required: true
   registry-token:
     description: Token di sola lettura del registro, valido solo per questa esecuzione
     required: true
@@ -46,6 +49,7 @@ runs:
         APP_ENVIRONMENT: ${{ inputs.environment }}
         APP_VERSION: ${{ inputs.version }}
         API_IMAGE: ${{ inputs.image }}
+        FORECASTER_IMAGE: ${{ inputs.forecaster-image }}
         REGISTRY_TOKEN: ${{ inputs.registry-token }}
         AUTH_ISSUER: ${{ inputs.auth-issuer }}
         AUTH_AUDIENCE: ${{ inputs.auth-audience }}
@@ -61,9 +65,13 @@ runs:
         # Public configuration only: issuer, audience, client id and scope are not secrets (ADR 0016).
         {
           printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION"
+          printf 'FORECASTER_IMAGE=%s\n' "$FORECASTER_IMAGE"
           printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
+        # Every release pulls new images and the old ones stay on the small disk of the machine: the images no container
+        # uses are removed before the pull, the running ones are kept (Bug 186: disk full at the first forecaster pull).
+        ssh "${ssh_options[@]}" "$target" 'docker image prune --all --force > /dev/null'
         # Il token di registro vale solo per questa esecuzione e viene rimosso subito dopo il pull.
         printf '%s' "$REGISTRY_TOKEN" | ssh "${ssh_options[@]}" "$target" \
           "docker login ghcr.io -u '${GITHUB_ACTOR}' --password-stdin"
@@ -83,12 +91,13 @@ runs:
           printf '%s' "$TELEGRAM_BOT_TOKEN" | ssh "${ssh_options[@]}" "$target" \
             'bash /opt/autotrading/install-telegram-token.sh'
         fi
+        # The release succeeds only when every service is healthy, or completed for migrate, not just the api (Bug 189).
         # On failure the container state and logs explain why; lines naming a password are dropped.
-        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans \
-          || { docker compose ps -a; docker compose logs --no-color --tail 60 postgres migrate litellm worker | grep -vi password; exit 1; }'
+        ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && docker compose up -d --remove-orphans --wait --wait-timeout 300 \
+          || { docker compose ps -a; docker compose logs --no-color --tail 60 | grep -vi password; exit 1; }'
         # The worker reads the token only when it starts: a changed token recreates the worker alone.
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && if [ -e .telegram_bot_token_changed ]; then
-          docker compose up -d --no-deps --force-recreate worker && rm -f .telegram_bot_token_changed; fi'
+          docker compose up -d --no-deps --force-recreate --wait --wait-timeout 300 worker && rm -f .telegram_bot_token_changed; fi'
         # The proxy reads its configuration only when it starts: a changed configuration recreates the proxy alone.
         ssh "${ssh_options[@]}" "$target" 'cd /opt/autotrading && if [ -e .litellm_config_changed ]; then
-          docker compose up -d --no-deps --force-recreate litellm && rm -f .litellm_config_changed; fi'
+          docker compose up -d --no-deps --force-recreate --wait --wait-timeout 300 litellm && rm -f .litellm_config_changed; fi'

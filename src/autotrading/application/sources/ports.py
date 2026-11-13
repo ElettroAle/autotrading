@@ -9,7 +9,7 @@ from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.pivot_levels import DailyRange
-from autotrading.domain.sources.price_forecast import PriceForecast, PricePoint
+from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, PricePoint
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.timeframe import Timeframe
@@ -69,6 +69,16 @@ class MarketDataPort(Protocol):
         ...
 
 
+class PriceForecasterPort(Protocol):
+    """The model that forecasts the price of an asset from its history (R1.3.5, ADR 0107)."""
+
+    def predict(
+        self, asset: str, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]
+    ) -> Mapping[ForecastHorizon, Decimal]:
+        """The predicted price at every horizon after the last point; SourceUnavailableError when it does not answer."""
+        ...
+
+
 class ForecastRepositoryPort(Protocol):
     """Bound to the tenant of the request: the forecasts of its flows (R1.3.5)."""
 
@@ -105,3 +115,31 @@ class SampleRepositoryPort(Protocol):
     """Bound to the tenant of the flow: the values its cycles collected (R1.3.8)."""
 
     def add(self, samples: Sequence[SourceSample]) -> None: ...
+
+
+class CycleSourceAskPort(Protocol):
+    """An active source of a flow, as the cycle of the flow asks it (R1.3.2): who asks, for what and with what."""
+
+    @property
+    def flow_id(self) -> UUID: ...
+
+    @property
+    def planned_at(self) -> datetime: ...
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def weight(self) -> int: ...
+
+    @property
+    def parameters(self) -> Mapping[str, int]: ...
+
+    @property
+    def assets(self) -> tuple[str, ...]: ...
+
+    @property
+    def cycle_minutes(self) -> int: ...
+
+    @property
+    def asked_at(self) -> datetime: ...

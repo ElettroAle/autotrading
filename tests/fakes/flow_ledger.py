@@ -4,7 +4,6 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
-from types import MappingProxyType
 from uuid import UUID
 
 from autotrading.domain.flows.flow_id import FlowId
@@ -69,7 +68,7 @@ class InMemoryFlowLedgerAdapter:
     def expect(self, flow_id: FlowId, asset: str, size: Decimal) -> None:
         """The position of the flow on the asset as its past executions left it in the totals."""
         totals = self._of(flow_id)
-        self.totals[flow_id] = replace(totals, positions=MappingProxyType({**totals.positions, asset: size}))
+        self.totals[flow_id] = replace(totals, positions=frozendict({**totals.positions, asset: size}))
 
     def entries_of(self, flow_id: FlowId) -> list[LedgerEntry]:
         return [entry for entries in self.entries.values() for entry in entries if entry.flow_id == flow_id]

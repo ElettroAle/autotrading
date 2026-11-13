@@ -40,8 +40,11 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   chiave non valida e 402 (o quota OpenAI esaurita) credito esaurito sono permanenti, ogni altro errore è
   transitorio con il messaggio originale.
 
-- Una chiave si verifica presso il fornitore con un endpoint gratuito che la richiede (ADR 0029); il
-  catalogo dei modelli è `adapters/outbound/json/models.json` (ADR 0030).
+- La chiave non si verifica presso il fornitore alla registrazione né alla sostituzione: una chiave non valida
+  emerge al primo ciclo come `ModelKeyRejectedError`, permanente (R1.2.4, ADR 0108).
+- Il catalogo dei modelli lo descrive il proxy LiteLLM (`/model_group/info`, ADR 0103): i modelli di chat dei
+  fornitori con una rotta in `deploy/litellm/config.yaml`, con parametri e prezzi della mappa dei modelli di
+  LiteLLM. Abilitare un fornitore è solo una rotta; nessun catalogo scritto a mano.
 
 ## Porte del contesto
 

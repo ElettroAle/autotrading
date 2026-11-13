@@ -2,7 +2,7 @@
 
 import json
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -16,7 +16,8 @@ from autotrading.application.flows.notify_unattributable import (
     NotifyUnattributableUseCase,
     UnattributableNotices,
 )
-from autotrading.application.flows.ports import ScheduledFlow, TenantScheduledFlow
+from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
+from autotrading.application.flows.ports import CycleJob, ScheduledFlow, TenantScheduledFlow
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
@@ -28,7 +29,6 @@ from autotrading.application.flows.reconcile_account_for_cycle import ReconcileA
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
-from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
@@ -76,7 +76,12 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
-from tests.fakes.cycles import FakeClockAdapter, InMemoryCycleRepositoryAdapter, InMemoryFlowLockAdapter
+from tests.fakes.cycles import (
+    FakeClockAdapter,
+    InMemoryCycleCheckpointsAdapter,
+    InMemoryCycleRepositoryAdapter,
+    InMemoryFlowLockAdapter,
+)
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import (
@@ -87,6 +92,9 @@ from tests.fakes.flow_repository import (
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,
@@ -110,17 +118,18 @@ def at(clock: str) -> datetime:
     return DAY.replace(hour=hours, minute=minutes)
 
 
-class ImmediateCycleLauncher:
-    """Runs the cycle at once in the thread of the test; a permanent error is kept for the test to read."""
+class ImmediateCycleScheduler:
+    """Runs every job it keeps at once in the thread of the test; a permanent error is kept for the test to read."""
 
     def __init__(self) -> None:
         self.raised: list[AutotradingError] = []
 
-    def launch(self, task: Callable[[], object]) -> None:
-        try:
-            task()
-        except AutotradingError as error:
-            self.raised.append(error)
+    def keep(self, jobs: Sequence[CycleJob]) -> None:
+        for job in jobs:
+            try:
+                job.run()
+            except AutotradingError as error:
+                self.raised.append(error)
 
 
 class FlowCycles:
@@ -130,6 +139,7 @@ class FlowCycles:
         self.platform = Platform()
         self.platform.model_catalog = scenario_catalog()
         self.clock = FakeClockAdapter(at("10:00"))
+        self.checkpoints = InMemoryCycleCheckpointsAdapter()
         self.records = InMemoryCycleRepositoryAdapter()
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
@@ -138,11 +148,12 @@ class FlowCycles:
         }
         self.news = FakeNewsAdapter()
         self.prices = FakePriceHistoryAdapter()
+        self.forecaster = FakePriceForecasterAdapter()
         self.market = FakeMarketDataAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
         self.samples: dict[TenantId, InMemorySampleRepositoryAdapter] = {}
         self.limits = FakeExchangeLimitsAdapter()
-        self.launcher = ImmediateCycleLauncher()
+        self.scheduler = ImmediateCycleScheduler()
         self.credentials: dict[tuple[TenantId, str], Credentials] = {}
         self.users: dict[str, str] = {}
         self.running: threading.Thread | None = None
@@ -217,18 +228,21 @@ class FlowCycles:
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
+            checkpoints=self.checkpoints,
         )
 
     def services(self) -> CycleServices:
         return CycleServices(
             environment="dev",
             clock=self.clock,
-            catalog=self.platform.model_catalog,
+            model_gateways={
+                "models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(self.platform.model_catalog), self.model)
+            },
             provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),
-            model_call=self.model,
             sentiments=self.sentiments,
             news=self.news,
             prices=self.prices,
+            forecaster=self.forecaster,
             market=self.market,
             exchange_limits={HYPERLIQUID: self.limits},
         )
@@ -341,7 +355,7 @@ class FlowCycles:
                     if flow.status is FlowStatus.ACTIVE
                 ]
 
-        RunDueCyclesUseCase(Scheduled(), self.directory, self.run_cycle_of, self.launcher, self.clock).execute()
+        PlanFlowCyclesUseCase(Scheduled(), self.directory, self.run_cycle_of, self.scheduler, self.clock).execute()
         record_actual_prices(self.directory, self.ports_of, self.services())
 
     def run_cycle_of(self, tenant_id: TenantId) -> WorkerCycle:

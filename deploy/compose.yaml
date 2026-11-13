@@ -62,11 +62,30 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Previsioni dei prezzi con Prophet (docs/architecture.md §10, ADR 0107): immagine propria, solo sulla rete
+  # dell'installazione, nessuna porta pubblicata e nessun segreto. Il limite di memoria protegge gli altri servizi della
+  # macchina da un addestramento pesante.
+  forecaster:
+    image: ${FORECASTER_IMAGE:-}
+    environment:
+      FORECASTER_RETRAIN_MINUTES: "15"
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
   # Il worker è l'unico servizio che riceve la chiave privata delle credenziali (ADR 0007, ADR 0021).
   # Nessuna porta pubblicata: lo raggiunge solo l'API sulla rete dell'installazione, con il token generato sulla macchina.
   worker:
     image: ${API_IMAGE:-}
-    command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/logging.json"]
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
       DATABASE_HOST: postgres
@@ -80,6 +99,7 @@ services:
       TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
       LITELLM_URL: http://litellm:4000
       LITELLM_MASTER_KEY_FILE: /run/secrets/litellm_master_key
+      FORECASTER_URL: http://forecaster:8000
     secrets:
       - postgres_app_password
       - credentials_private_key_v1
@@ -87,12 +107,21 @@ services:
       - telegram_bot_token
       - litellm_master_key
     read_only: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
       # Senza il proxy fallisce solo la chiamata al modello del ciclo, non il worker.
       litellm:
+        condition: service_started
+      # Senza il forecaster manca solo la fonte forecast del ciclo, non il worker.
+      forecaster:
         condition: service_started
 
   api:
@@ -121,6 +150,12 @@ services:
       - worker_token
       - litellm_master_key
     read_only: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
     depends_on:
       migrate:

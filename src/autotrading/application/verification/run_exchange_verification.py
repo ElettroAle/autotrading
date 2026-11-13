@@ -8,7 +8,11 @@ from autotrading.application.verification.errors import VerificationStepError
 from autotrading.application.verification.ports import (
     AccountReadingPort,
     FlowsOnAccountPort,
-    OrderExecutionPort,
+    OrderAnswerPort,
+    ProcedureAsset,
+    ProcedureClosing,
+    ProcedureOpening,
+    ProcedureOrders,
     VerificationRunRepositoryPort,
 )
 from autotrading.domain.tenancy.user_id import UserId
@@ -56,7 +60,7 @@ class RunExchangeVerificationUseCase:
     def __init__(
         self,
         readings: VerificationReadings,
-        orders: OrderExecutionPort,
+        orders: ProcedureOrders,
         runs: VerificationRunRepositoryPort,
         environment: str,
         clock: Callable[[], datetime],
@@ -82,7 +86,7 @@ class RunExchangeVerificationUseCase:
         account_id = command.account_id
         require_free_of_flows(self._readings.flows.flow_on(account_id, PROCEDURE_COIN))
         reading = self._read(account_id)
-        minimum = self._orders.minimum_value(account_id, PROCEDURE_COIN)
+        minimum = self._orders.minimum.execute(ProcedureAsset(account_id, PROCEDURE_COIN))
         opening = procedure_opening(command.amount, minimum, reading.currency)
         require_startable(reading, opening)
         return opening
@@ -100,15 +104,21 @@ class RunExchangeVerificationUseCase:
     def _step(self, step: Step, command: RunExchangeVerificationCommand, opening: Opening) -> StepOutcome:
         account_id, user_id = command.account_id, command.user_id
         if step is Step.OPENING:
-            return _order_step(step, lambda: self._orders.open(account_id, opening, user_id))
+            asked = ProcedureOpening(account_id, opening.coin, user_id, opening.side, opening.leverage, opening.value)
+            return _order_step(step, lambda: _result_of(self._orders.opening.execute(asked)))
         if step is Step.READING_AFTER_OPENING:
             return _reading_step(step, lambda: self._read(account_id), missing_opening)
         if step is Step.CLOSING:
-            return _order_step(step, lambda: self._orders.close(account_id, opening.coin, user_id))
+            closing = ProcedureClosing(account_id, opening.coin, user_id)
+            return _order_step(step, lambda: _result_of(self._orders.closing.execute(closing)))
         return _reading_step(step, lambda: self._read(account_id), remaining_position)
 
     def _read(self, account_id: UUID) -> AccountReading:
         return self._readings.account.execute(account_id)
+
+
+def _result_of(answer: OrderAnswerPort) -> OrderResult:
+    return OrderResult.reported(answer.fee, answer.realized_pnl, answer.exchange_message, answer.status)
 
 
 def _order_step(step: Step, send: Callable[[], OrderResult]) -> StepOutcome:

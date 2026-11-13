@@ -15,11 +15,11 @@ from autotrading.application.accounts.register_account import RegisterAccountUse
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
 from autotrading.application.agent.list_models import ListModelsUseCase
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
+from autotrading.application.agent.model_gateways import ModelGateways
 from autotrading.application.agent.ports import (
     ProviderKeyRepositoryPort,
     ProviderKeySealerPort,
     ProviderKeyUsagePort,
-    ProviderKeyVerifierPort,
 )
 from autotrading.application.agent.register_provider_key import ProviderKeyServices, RegisterProviderKeyUseCase
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
@@ -73,7 +73,6 @@ from autotrading.application.sources.get_source import GetSourceUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.verification.ports import VerificationPort
 from autotrading.application.verification.run_verification import RunVerificationUseCase
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -92,9 +91,8 @@ class TenantPorts:
     source_catalog: SourceCatalog
     provider_keys: ProviderKeyRepositoryPort
     provider_key_sealer: ProviderKeySealerPort
-    provider_key_verifier: ProviderKeyVerifierPort
     provider_key_usage: ProviderKeyUsagePort
-    model_catalog: ModelCatalog
+    model_gateways: ModelGateways
     flows: FlowRepositoryPort
     running_verifications: RunningVerificationsPort
     flow_checks: FlowChecks
@@ -163,7 +161,7 @@ class TenantUseCases:
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
         accounts, sealer, exchanges = ports.accounts, ports.sealer, ports.exchanges
         keys = ports.provider_keys
-        key_services = ProviderKeyServices(ports.model_catalog, ports.provider_key_verifier, ports.provider_key_sealer)
+        key_services = ProviderKeyServices(ports.model_gateways, ports.provider_key_sealer)
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
             list_accounts=ListAccountsUseCase(accounts),
@@ -184,7 +182,7 @@ class TenantUseCases:
             replace_provider_key=ReplaceProviderKeyUseCase(keys, key_services),
             remove_provider_key=RemoveProviderKeyUseCase(keys, ports.provider_key_usage),
             list_provider_keys=ListProviderKeysUseCase(keys),
-            list_models=ListModelsUseCase(ports.model_catalog, keys),
+            list_models=ListModelsUseCase(ports.model_gateways, keys),
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),

@@ -1,14 +1,14 @@
 from sqlalchemy import Engine
 
-from autotrading.adapters.outbound.sqlalchemy.configuration import DEFAULT_PORT, _SqlAlchemySettings
+from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.outbound.sqlalchemy.configuration import _settings_of
 from autotrading.adapters.outbound.sqlalchemy.database import SqlAlchemyDatabaseAdapter
 
 type SqlAlchemyEngine = Engine
 
 
-def sqlalchemy_adapters(host: str, port: str | None, name: str, user: str, password: str) -> SqlAlchemyEngine:
-    """The engine every SQLAlchemy adapter of the installation runs on; the port is PostgreSQL's unless declared."""
-    settings = _SqlAlchemySettings(host, name, user, password, DEFAULT_PORT if port is None else int(port))
-    return SqlAlchemyDatabaseAdapter(
-        settings.host, settings.port, settings.name, settings.user, settings.password
-    ).engine()
+def sqlalchemy_adapters(source: ConfigurationSource) -> SqlAlchemyEngine:
+    """The engine of the database of the installation, on which every repository of the service is built."""
+    settings = _settings_of(source)
+    database = SqlAlchemyDatabaseAdapter(settings.host, settings.port, settings.name, settings.user, settings.password)
+    return database.engine()

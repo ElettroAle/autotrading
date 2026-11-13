@@ -1,13 +1,9 @@
 from dataclasses import dataclass, field
 
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError
-from autotrading.application.agent.ports import (
-    ProviderKeyRepositoryPort,
-    ProviderKeySealerPort,
-    ProviderKeyVerifierPort,
-)
+from autotrading.application.agent.model_gateways import ModelGateways
+from autotrading.application.agent.ports import ProviderKeyRepositoryPort, ProviderKeySealerPort
 from autotrading.application.agent.provider_keys import operations, supported_provider
-from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -22,15 +18,17 @@ class RegisterProviderKeyCommand:
 
 @dataclass(frozen=True, slots=True)
 class ProviderKeyServices:
-    """What a use case needs to accept a key: the models offered, the provider that checks it, the seal."""
+    """What a use case needs to accept a key: the models offered and the seal.
 
-    catalog: ModelCatalog
-    verifier: ProviderKeyVerifierPort
+    The provider is not asked about the key: a key it refuses comes out at the first cycle (R1.2.4).
+    """
+
+    gateways: ModelGateways
     sealer: ProviderKeySealerPort
 
 
 class RegisterProviderKeyUseCase:
-    """Saves the key of a provider for the tenant after the provider has accepted it (R1.4.1)."""
+    """Saves the key of a provider for the tenant, sealed (R1.4.1)."""
 
     def __init__(self, tenant_id: TenantId, keys: ProviderKeyRepositoryPort, services: ProviderKeyServices) -> None:
         self._tenant_id = tenant_id
@@ -38,10 +36,9 @@ class RegisterProviderKeyUseCase:
         self._services = services
 
     def execute(self, command: RegisterProviderKeyCommand) -> ProviderName:
-        provider = supported_provider(self._services.catalog, command.provider)
+        provider = supported_provider(self._services.gateways, command.provider)
         key = ProviderKey(command.key)
         self._require_none_for(provider)
-        self._services.verifier.verify(provider, key)
         self._keys.add(RegisteredProviderKey(self._tenant_id, provider, self._services.sealer.seal(provider, key)))
         operations.info("chiave del fornitore registrata", extra={"provider": provider.value})
         return provider

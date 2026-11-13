@@ -10,6 +10,10 @@ inputs:
   token:
     description: Token con permesso packages:write
     required: true
+  variant:
+    description: Suffisso del tag per un'immagine diversa da quella di api e worker (forecaster)
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -24,4 +28,5 @@ runs:
       env:
         IMAGE: ${{ inputs.image }}
         VERSION: ${{ inputs.version }}
-      run: docker buildx imagetools create --tag "${IMAGE%@*}:${VERSION}" "$IMAGE"
+        VARIANT: ${{ inputs.variant }}
+      run: docker buildx imagetools create --tag "${IMAGE%@*}:${VERSION}${VARIANT:+-${VARIANT}}" "$IMAGE"

@@ -21,3 +21,4 @@ paths:
 - `SodiumProviderKeySealerAdapter` sigilla le chiavi dei fornitori IA con la stessa chiave pubblica; il testo
   in chiaro contiene tenant, fornitore e chiave (ADR 0029).
 - Le credenziali in chiaro e le chiavi non compaiono in log, errori o repr.
+- Ogni apertura, riuscita o rifiutata, si registra nel logger `autotrading.credentials` con scopo, tenant, conto o fornitore, versione della chiave ed esito; mai il segreto (ADR 0102).

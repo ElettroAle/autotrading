@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
+from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
@@ -39,7 +40,7 @@ from autotrading.domain.flows.operations import Operation, OperationsOwner, Oper
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
-from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
+from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -164,15 +165,44 @@ class AccountRemovalPorts:
     removal: FlowAccountRemovalPort
 
 
+@dataclass(frozen=True, slots=True)
+class PositionToClose:
+    """The position of a flow to close: the whole position of its account on one of its assets (R1.1.2)."""
+
+    account_id: UUID
+    asset: str
+    user_id: UserId
+
+
+class ClosingAnswerPort(Protocol):
+    """What closing a position gave, as data: found or not, the fill confirmed in time, or the reason it was not."""
+
+    @property
+    def found(self) -> bool: ...
+
+    @property
+    def refusal(self) -> str | None: ...
+
+    @property
+    def average_price(self) -> Decimal | None: ...
+
+    @property
+    def executed_at(self) -> datetime | None: ...
+
+    @property
+    def fee(self) -> Decimal | None: ...
+
+    @property
+    def realized_pnl(self) -> Decimal | None: ...
+
+
 class FlowPositionsPort(Protocol):
-    """Bound to the tenant of the request: the positions of a flow are those of its account on its assets (R1.1.2)."""
+    """It is CloseFlowPositionUseCase of the orders context, bound to the tenant of the request (ADR 0023, ADR 0055).
 
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
-        """Closes the whole position on the asset, through the worker that holds the key (ADR 0023).
+    The position is closed through the worker, the only service that holds the key; the answer never raises.
+    """
 
-        None when there was no position; otherwise the fill, or the reason the exchange or the worker gave.
-        """
-        ...
+    def execute(self, position: PositionToClose) -> ClosingAnswerPort: ...
 
 
 class FlowOpeningsPort(Protocol):
@@ -208,6 +238,14 @@ class SourceSettingsPort(Protocol):
 
     def execute(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         """The source with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
+        ...
+
+
+class FlowModelsPort(Protocol):
+    """The models a flow can choose, as the catalog of the platform describes them now (R1.4.2)."""
+
+    def definition_of(self, model: str) -> ModelDefinition:
+        """Raises ModelNotAvailableError or FlowModelCatalogUnavailableError."""
         ...
 
 
@@ -599,9 +637,35 @@ class FlowLockPort(Protocol):
         ...
 
 
-class CycleLauncherPort(Protocol):
-    def launch(self, task: Callable[[], object]) -> None:
-        """Runs the cycle apart from the others, so a slow flow never delays another (R1.2.1)."""
+class CycleCheckpointsPort[K = object](Protocol):
+    """Where the graph of a cycle keeps its checkpoints, to resume from the last node done and to debug (ADR 0104)."""
+
+    def thread(self, flow_id: UUID, planned_at: datetime) -> str:
+        """The thread of the checkpoints of one planned cycle of a flow of the tenant."""
+        ...
+
+    def opened(self) -> AbstractContextManager[K]:
+        """The checkpointer of the cycles of the tenant, open for one cycle."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class CycleJob:
+    """The cycles of one active flow: run at every instant of its schedule (R1.2.1).
+
+    The key changes with the tenant, the flow, the anchor and the interval: a resumed flow or a new interval is a new
+    job, and the job of a flow no longer active disappears.
+    """
+
+    key: str
+    schedule: CycleSchedule
+    run: Callable[[], object]
+
+
+class CycleSchedulerPort(Protocol):
+    def keep(self, jobs: Sequence[CycleJob]) -> None:
+        """Runs each job at the instants of its schedule, at once when it is new, each apart from the others so a
+        slow flow never delays another; drops the jobs not given."""
         ...
 
 
@@ -617,8 +681,43 @@ class CycleEndPort[E = object](Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class SourceAsk:
+    """An active source of the flow as the cycle asks it: with the parameters, the assets and the interval of the flow
+    (R1.3.2, R1.3.3).
+    """
+
+    flow_id: UUID
+    planned_at: datetime
+    source: str
+    weight: int
+    parameters: Mapping[str, int]
+    assets: tuple[str, ...]
+    cycle_minutes: int
+    asked_at: datetime
+
+
+class CollectedValuesPort(Protocol):
+    """What an active source collected in the cycle: each value with its asset, or the note of its silence."""
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def weight(self) -> int: ...
+
+    @property
+    def entries(self) -> tuple[tuple[str | None, Mapping[str, str]], ...]: ...
+
+
+class SourceCollectionPort(Protocol):
+    def execute(self, ask: SourceAsk) -> CollectedValuesPort:
+        """Collects and records the source for the cycle; a typed error makes the source absent (R1.2.5)."""
+        ...
+
+
 class SourcePort[S = object, D = object](Protocol):
-    def collect(self, request: SourceRequest[S], source: str) -> D:
+    def execute(self, request: SourceRequest[S], source: str) -> D:
         """The data of one active source; any typed error makes the source absent for the cycle (R1.2.5)."""
         ...
 
@@ -802,9 +901,15 @@ class FlowSummary:
 
 
 class FlowSummaryPort(Protocol):
-    """Bound to the tenant of the request: its flows in use, never another tenant's."""
+    """It is ListFlowSummariesUseCase: the flows in use of the tenant of the request, never another tenant's."""
 
-    def in_use(self) -> list[FlowSummary]: ...
+    def execute(self) -> list[FlowSummary]: ...
+
+
+class FlowAccountNamesPort(Protocol):
+    """Bound to the tenant of the request: the name of each of its accounts, as the consultation shows it."""
+
+    def account_names(self) -> Mapping[UUID, str]: ...
 
 
 class FlowDirectoryPort(Protocol):

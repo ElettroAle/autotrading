@@ -1,6 +1,6 @@
 # ADR 0043 — Previsione del prezzo con lo smorzamento di Holt nel domain
 
-- Stato: accettata (12 novembre 2026)
+- Stato: superata da ADR 0107 (13 novembre 2026)
 - Requisiti: R1.3.5 (Task T1.3.5.1, T1.3.5.2)
 
 ## Contesto

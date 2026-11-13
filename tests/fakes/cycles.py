@@ -9,8 +9,12 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
+
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 from autotrading.application.flows.ports import (
+    CycleJob,
     FlowSnapshot,
     RiskReview,
     ScheduledFlow,
@@ -152,17 +156,24 @@ class InMemoryFlowLockAdapter:
                 lock.release()
 
 
-class ThreadCycleLauncherAdapter:
-    """Every cycle in a thread of its own, as the worker will run them; errors are kept for the test to read."""
+class FakeCycleSchedulerAdapter:
+    """Runs every job it keeps at once, each in a thread of its own, as the scheduler does at the instant of the tick.
+
+    The tests tick only at planned instants or check that nothing new runs: a job run again takes no instant twice.
+    Errors are kept for the test to read.
+    """
 
     def __init__(self) -> None:
         self.threads: list[threading.Thread] = []
         self.errors: list[AutotradingError] = []
+        self.kept: list[CycleJob] = []
 
-    def launch(self, task: Callable[[], object]) -> None:
-        thread = threading.Thread(target=self._run, args=(task,), daemon=True)
-        self.threads.append(thread)
-        thread.start()
+    def keep(self, jobs: Sequence[CycleJob]) -> None:
+        self.kept = list(jobs)
+        for job in jobs:
+            thread = threading.Thread(target=self._run, args=(job.run,), daemon=True)
+            self.threads.append(thread)
+            thread.start()
 
     def _run(self, task: Callable[[], object]) -> None:
         try:
@@ -271,7 +282,7 @@ class FakeSourcesAdapter:
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
 
-    def collect(self, request: SourceRequest, source: str) -> object:
+    def execute(self, request: SourceRequest, source: str) -> object:
         flow_id = request.flow_id
         if source in self.silent:
             self.released.wait(LONGEST_HOLD)
@@ -379,3 +390,17 @@ class RecordedCycleFailuresAdapter:
 
     def execute(self, flow_id: UUID, reason: str) -> None:
         self.told.append((flow_id, reason))
+
+
+class InMemoryCycleCheckpointsAdapter:
+    """The checkpoints of the cycles kept in memory, serialized as the checkpointer in PostgreSQL serializes them."""
+
+    def __init__(self) -> None:
+        self.saver = InMemorySaver()
+
+    def thread(self, flow_id: UUID, planned_at: datetime) -> str:
+        return f"{flow_id}/{planned_at.isoformat()}"
+
+    @contextmanager
+    def opened(self) -> Iterator[BaseCheckpointSaver[str]]:
+        yield self.saver

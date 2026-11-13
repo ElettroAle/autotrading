@@ -40,18 +40,9 @@ UNEXPECTED_ANSWER = "risposta del fornitore inattesa"
 
 type Settings = Mapping[str, ParameterValue]
 type Effort = Literal["low", "medium", "high"]
-type Options = dict[str, object]
 
 EFFORTS: Mapping[str, Effort] = {"basso": "low", "medio": "medium", "alto": "high"}
 JSON_ANSWER: ResponseFormatJSONObject = {"type": "json_object"}
-
-
-# Where a provider takes the level of reasoning in a field of its own; every other provider takes reasoning_effort,
-# as LiteLLM translates it. Anthropic: LiteLLM turns reasoning_effort into a thinking budget larger than the length
-# the flow allows for the models it does not know. OpenRouter: drop_params would remove reasoning_effort.
-OWN_EFFORT_FIELDS: Mapping[str, str] = {"anthropic": "output_config", "openrouter": "reasoning"}
-# Not every model routed by OpenRouter, nor Anthropic, takes a JSON response format: the system message asks it.
-JSON_PROVIDERS = frozenset({"openai", "deepseek"})
 
 
 class LiteLlmModelCallAdapter:
@@ -81,15 +72,17 @@ class LiteLlmModelCallAdapter:
         settings: Settings,
         messages: tuple[ModelMessage, ...],
     ) -> ChatCompletion:
-        temperature = settings.get("temperature")
+        temperature, effort = settings.get("temperature"), settings.get("reasoning_effort")
         try:
             return self._client.chat.completions.create(
                 model=model,
                 messages=[_message(message) for message in messages],
                 max_tokens=int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS))),
                 temperature=omit if temperature is None else float(Decimal(temperature)),
-                response_format=JSON_ANSWER if provider.value in JSON_PROVIDERS else omit,
-                extra_body={"api_key": key.secret, **_effort_options(provider, settings)},
+                # LiteLLM translates both for every provider and drops them where the model does not take them.
+                response_format=JSON_ANSWER,
+                reasoning_effort=omit if effort is None else EFFORTS[str(effort)],
+                extra_body={"api_key": key.secret},
                 timeout=TIMEOUT_SECONDS,
             )
         # The errors of the SDK carry the request, and with it the key in its body: they never travel as a cause.
@@ -101,26 +94,10 @@ class LiteLlmModelCallAdapter:
             raise _refusal(provider, key, error) from None
 
 
-def litellm_model_call(url: str, master_key: str) -> LiteLlmModelCallAdapter:
-    """The adapter of the installation: the proxy at its internal address, no retries (the next cycle retries)."""
-    return LiteLlmModelCallAdapter(OpenAI(api_key=master_key, base_url=url, timeout=TIMEOUT_SECONDS, max_retries=0))
-
-
 def _message(message: ModelMessage) -> ChatCompletionMessageParam:
     if message.role is MessageRole.SYSTEM:
         return ChatCompletionSystemMessageParam(role="system", content=message.content)
     return ChatCompletionUserMessageParam(role="user", content=message.content)
-
-
-def _effort_options(provider: ProviderName, settings: Settings) -> Options:
-    effort = settings.get("reasoning_effort")
-    if effort is None:
-        return {}
-    level = EFFORTS[str(effort)]
-    field = OWN_EFFORT_FIELDS.get(provider.value)
-    if field is None:
-        return {"reasoning_effort": level}
-    return {field: {"effort": level}}
 
 
 def _refusal(provider: ProviderName, key: ProviderKey, error: APIStatusError) -> Exception:
@@ -155,7 +132,7 @@ def _reply_of(completion: ChatCompletion) -> ModelReply:
 
 
 def _reported_cost(extra: Mapping[str, object] | None) -> Decimal | None:
-    """Only a cost the provider reports itself (OpenRouter): otherwise the prices of the catalog apply (R1.4.6)."""
+    """Only a cost the provider reports itself: otherwise the prices of the catalog apply (R1.4.6)."""
     reported = None if extra is None else extra.get("cost")
     if reported is None:
         return None

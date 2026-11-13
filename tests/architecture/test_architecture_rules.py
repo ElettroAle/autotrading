@@ -36,6 +36,15 @@ DECORATOR = (
 )
 UNDECLARED_DECORATOR = "class HttpxRetryingAdapter:\n    def __init__(self, inner: ExchangePort) -> None: ...\n"
 CONFIGURATION_READER = "def _required(c, n):\n    if not c.get(n):\n        raise MissingConfigurationError(n)\n"
+SOURCE_IN_A_CONSTRUCTOR = (
+    "class SqlAlchemyDatabaseAdapter:\n    def __init__(self, source: ConfigurationSource) -> None: ...\n"
+)
+BOOTSTRAP_COMPOSITION = (
+    "def create_application(configuration):\n"
+    "    source = ConfigurationSource(configuration)\n"
+    "    environment = source.environment()\n"
+    "    return api_adapters(source, sqlalchemy_adapters(source), environment)\n"
+)
 
 VIOLATING = [
     Case(Rule.PORTS_IN_PORTS_MODULES, "bootstrap.py", "from typing import Protocol\nclass Reader(Protocol): ...\n"),
@@ -138,6 +147,44 @@ VIOLATING = [
         "adapters/inbound/api/app.py",
         "api.openapi = openapi  # type: ignore[method-assign]\n",
     ),
+    Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/telegram/x.py", "import os\nTOKEN = os.environ['T']\n"),
+    Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/sqlalchemy/x.py", "from os import getenv\n"),
+    Case(Rule.CONFIGURATION_THROUGH_SOURCE, "bootstrap.py", "def f():\n    return os.getenv('X')\n"),
+    Case(Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/json/x.py", "import tomllib\n"),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "bootstrap.py",
+        "from autotrading.adapters.outbound.sqlalchemy.configuration import _settings_of\n",
+    ),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "adapters/outbound/telegram/composition.py",
+        "from autotrading.adapters.outbound.sqlalchemy.configuration import _SqlAlchemySettings\n",
+    ),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "adapters/outbound/sqlalchemy/tables.py",
+        "from autotrading.adapters.outbound.sqlalchemy.configuration import _settings_of\n",
+    ),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "adapters/outbound/sqlalchemy/database.py",
+        "from autotrading.adapters.configuration.source import ConfigurationSource\n",
+    ),
+    Case(Rule.SETTINGS_IN_THEIR_FOLDER, "adapters/outbound/sqlalchemy/database.py", SOURCE_IN_A_CONSTRUCTOR),
+    Case(
+        Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS,
+        "bootstrap.py",
+        "def wire(source: ConfigurationSource):\n    return SqlAlchemyDatabaseAdapter(source)\n",
+    ),
+    Case(
+        Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS,
+        "bootstrap.py",
+        "def wire(configuration):\n    source = ConfigurationSource(configuration)\n    return source.value('X')\n",
+    ),
+    Case(
+        Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS, "bootstrap.py", "def wire(c):\n    return c['DATABASE_HOST']\n"
+    ),
 ]
 
 CLEAN = [
@@ -201,6 +248,32 @@ CLEAN = [
         "adapters/inbound/api/app.py",
         "api.openapi = openapi  # type: ignore[method-assign]  # FastAPI documents this override\n",
     ),
+    Case(
+        Rule.CONFIGURATION_THROUGH_SOURCE,
+        "adapters/configuration/source.py",
+        "import os\nPROCESS_ENVIRONMENT = os.environ\n",
+    ),
+    Case(
+        Rule.CONFIGURATION_THROUGH_SOURCE, "adapters/outbound/json/x.py", "import os\nPATH = os.path.join('a', 'b')\n"
+    ),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "adapters/outbound/sqlalchemy/composition.py",
+        "from autotrading.adapters.configuration.source import ConfigurationSource\n"
+        "from autotrading.adapters.outbound.sqlalchemy.configuration import _settings_of\n",
+    ),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "adapters/outbound/sqlalchemy/configuration.py",
+        "from autotrading.adapters.configuration.errors import InvalidConfigurationError\n"
+        "from autotrading.adapters.configuration.source import ConfigurationSource\n",
+    ),
+    Case(
+        Rule.SETTINGS_IN_THEIR_FOLDER,
+        "adapters/outbound/sqlalchemy/database.py",
+        "class SqlAlchemyDatabaseAdapter:\n    def __init__(self, host: str, port: int) -> None: ...\n",
+    ),
+    Case(Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS, "bootstrap.py", BOOTSTRAP_COMPOSITION),
 ]
 
 

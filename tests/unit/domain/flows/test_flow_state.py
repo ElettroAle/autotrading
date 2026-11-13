@@ -1,5 +1,4 @@
 from decimal import Decimal
-from types import MappingProxyType
 from uuid import uuid4
 
 import pytest
@@ -97,7 +96,7 @@ def test_a_flow_without_operations_keeps_its_capital_in_the_currency_of_the_acco
 
 
 def expecting(flow: Flow, **positions: Decimal) -> FlowTotals:
-    return FlowTotals(flow.id, positions=MappingProxyType(positions))
+    return FlowTotals(flow.id, positions=frozendict(positions))
 
 
 def test_the_positions_the_flow_expects_match_those_on_the_account() -> None:

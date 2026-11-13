@@ -1,0 +1,26 @@
+name: forecaster-start
+description: Avvia il container del forecaster appena costruito, come nel compose, per i test di integrazione.
+inputs:
+  image:
+    description: Riferimento locale dell'immagine del forecaster
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Avvia il forecaster
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+      # Read-only filesystem and tmpfs on /tmp, as in deploy/compose.yaml: cmdstan must work there (ADR 0107).
+      run: |
+        docker run --detach --name forecaster --read-only --tmpfs /tmp --publish 127.0.0.1:8100:8000 "$IMAGE"
+        for attempt in $(seq 1 30); do
+          if curl -fsS --max-time 2 http://127.0.0.1:8100/health > /dev/null; then
+            echo "TEST_FORECASTER_URL=http://127.0.0.1:8100" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          sleep 2
+        done
+        docker logs forecaster
+        echo "::error::il forecaster non ha risposto entro 60 secondi"
+        exit 1

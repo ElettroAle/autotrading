@@ -7,10 +7,10 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
@@ -33,11 +33,6 @@ from autotrading.application.verification.read_account_for_verification import R
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
     VerificationReadings,
-)
-from autotrading.bootstrap import (
-    FlowPositionsFromOrders,
-    FlowSummariesFromFlows,
-    OrderExecutionFromOrders,
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
@@ -74,13 +69,14 @@ from tests.fakes.linked_chat_repository import (
 )
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
-    FakeProviderKeyVerifierAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
     ProviderKeyVault,
@@ -91,6 +87,8 @@ from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.directory import Directory
+from tests.support.model_catalog import PLATFORM_MODELS
+from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -114,12 +112,11 @@ class Platform:
         self.runs: dict[TenantId, InMemoryVerificationRunRepositoryAdapter] = {}
         self.provider_keys = ProviderKeyStore()
         self.key_vault: ProviderKeyVault = {}
-        self.providers = FakeProviderKeyVerifierAdapter()
         self.flows = FlowStore()
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
         self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
-        self.model_catalog: ModelCatalog = load_model_catalog()
+        self.model_catalog: ModelCatalog = PLATFORM_MODELS
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
@@ -167,7 +164,7 @@ class Platform:
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
-        flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
+        flow_positions = CloseFlowPositionUseCase(position_closing)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
@@ -184,15 +181,14 @@ class Platform:
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
-            provider_key_verifier=self.providers,
             provider_key_usage=flows,
-            model_catalog=self.model_catalog,
+            model_gateways={"models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(self.model_catalog))},
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
-                models=SelectModelUseCase(self.model_catalog, provider_keys),
+                models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
@@ -212,7 +208,7 @@ class Platform:
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
-            flow_summaries=FlowSummariesFromFlows(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
+            flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             environment="dev",
         )
         return TenantUseCases.on(tenant_id, ports)
@@ -234,9 +230,7 @@ class Platform:
                     ReadAccountForVerificationUseCase(accounts, opener, self.exchanges),
                     InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
                 ),
-                OrderExecutionFromOrders(
-                    open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)
-                ),
+                procedure_orders(open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)),
                 self.runs_of(tenant_id),
                 "dev",
                 lambda: STARTED_AT,

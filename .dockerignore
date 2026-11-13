@@ -3,3 +3,5 @@
 !uv.lock
 !src/
 !migrations/
+!deploy/logging.json
+!forecaster/

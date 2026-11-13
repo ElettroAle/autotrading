@@ -5,10 +5,13 @@ description = "Piattaforma personale di trading automatico multi-tenant"
 requires-python = ">=3.15,<3.16"
 dependencies = [
     "alembic>=1.16",
+    "apscheduler>=3.11,<4",
     "eth-account>=0.10,<0.11",
     "fastapi>=0.120",
     "httpx>=0.28",
     "hyperliquid-python-sdk>=0.24.0",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.0",
     "openai>=3.50,<4",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
@@ -28,6 +31,11 @@ dev = [
     "pytest-bdd>=8.1",
     "pytest-cov>=7.0",
     "ruff>=0.14",
+]
+forecaster = [
+    "fastapi>=0.120",
+    "prophet>=1.5",
+    "uvicorn>=0.38",
 ]
 
 [build-system]
@@ -49,7 +57,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/autotrading", "tools"]
+source = ["src/autotrading", "tools", "forecaster"]
 branch = true
 
 [tool.coverage.report]
@@ -59,14 +67,14 @@ exclude_also = ['if __name__ == "__main__":']
 [tool.ruff]
 line-length = 120
 target-version = "py315"
-src = ["src", "tests", "tools"]
+src = ["src", "tests", "tools", "forecaster"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "B", "UP", "SIM", "RET", "ARG", "PT", "TRY", "EM", "S", "RUF", "PL"]
 ignore = ["PLR2004"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["autotrading", "tools", "tests"]
+known-first-party = ["autotrading", "tools", "tests", "forecaster"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S603", "S607", "PLR0913"]
@@ -75,12 +83,12 @@ known-first-party = ["autotrading", "tools", "tests"]
 [tool.mypy]
 python_version = "3.15"
 strict = true
-files = ["src", "tests", "tools"]
+files = ["src", "tests", "tools", "forecaster"]
 mypy_path = ["src", "."]
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["pytest_bdd.*", "hyperliquid.*"]
+module = ["pytest_bdd.*", "hyperliquid.*", "pandas.*", "apscheduler.*"]
 ignore_missing_imports = true
 
 [tool.importlinter]
@@ -115,8 +123,12 @@ forbidden_modules = [
     "eth_account",
     "requests",
     "httpx",
+    "langgraph",
     "openai",
+    "apscheduler",
 ]
+# The owner's named architectural exception (ADR 0104): LangGraph orchestrates the decision cycle, only here.
+ignore_imports = ["autotrading.application.flows.cycle_graph -> langgraph"]
 
 [[tool.importlinter.contracts]]
 name = "I contesti di domain non si importano a vicenda (tenancy esclusa)"
@@ -145,22 +157,36 @@ modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "La sorgente della configurazione non importa le cartelle di tecnologia"
+type = "forbidden"
+source_modules = ["autotrading.adapters.configuration"]
+forbidden_modules = ["autotrading.adapters.inbound", "autotrading.adapters.outbound", "autotrading.application"]
+
+[[tool.importlinter.contracts]]
 name = "Una cartella di tecnologia non importa un'altra"
 type = "independence"
 modules = [
     "autotrading.adapters.inbound.api",
+    "autotrading.adapters.outbound.apscheduler",
     "autotrading.adapters.outbound.sqlalchemy",
     "autotrading.adapters.outbound.libsodium",
     "autotrading.adapters.outbound.hyperliquid",
     "autotrading.adapters.outbound.alternative_me",
     "autotrading.adapters.outbound.coinmarketcap",
-    "autotrading.adapters.outbound.httpx",
+    "autotrading.adapters.outbound.forecaster",
     "autotrading.adapters.outbound.rss",
     "autotrading.adapters.outbound.telegram",
     "autotrading.adapters.outbound.worker",
     "autotrading.adapters.outbound.json",
     "autotrading.adapters.outbound.litellm",
     "autotrading.adapters.outbound.oidc",
+    "autotrading.adapters.outbound.openrouter",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
+]
+
+[tool.uv]
+override-dependencies = [
+    # Without a wheel for Python 3.15; only the tracing of langsmith uses it, never enabled (ADR 0104).
+    "zstandard; sys_platform == 'never'",
 ]

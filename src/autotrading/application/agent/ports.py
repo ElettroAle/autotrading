@@ -5,21 +5,13 @@ from decimal import Decimal
 from typing import Protocol
 
 from autotrading.domain.agent.agent_context import ModelMessage
+from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
-
-
-class ProviderKeyVerifierPort(Protocol):
-    def verify(self, provider: ProviderName, key: ProviderKey) -> None:
-        """Asks the provider whether it accepts the key, without spending any credit of the user.
-
-        Raises ProviderRejectedKeyError, ProviderUnavailableError, or ProviderNotVerifiableError.
-        """
-        ...
 
 
 class ProviderKeySealerPort(Protocol):
@@ -81,6 +73,14 @@ class ModelReply:
     usage: ModelUsage
 
 
+class ModelCatalogPort(Protocol):
+    """The models the platform offers now, with their parameters and prices, from the model gateway (R1.4.2)."""
+
+    def catalog(self) -> ModelCatalog:
+        """Raises ModelCatalogUnavailableError."""
+        ...
+
+
 class ModelCallPort(Protocol):
     """Calls a model of the catalog with the key of the user, from the worker only (ADR 0007)."""
 
@@ -89,6 +89,18 @@ class ModelCallPort(Protocol):
     ) -> ModelReply:
         """Raises ModelKeyRejectedError or ModelCreditExhaustedError (permanent), or ModelUnavailableError."""
         ...
+
+
+class ModelGatewayPort(Protocol):
+    """Abstract factory of one model gateway: the call and the catalog of the same models, one family (ADR 0109).
+
+    Each gateway serves the models of its own catalog; the use case uses the one whose catalog holds the model the
+    flow chose.
+    """
+
+    def model_call(self) -> ModelCallPort: ...
+
+    def model_catalog(self) -> ModelCatalogPort: ...
 
 
 class QuestionPositionPort(Protocol):

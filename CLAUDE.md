@@ -18,8 +18,9 @@ Le regole di dettaglio per percorso sono in `.claude/rules/` (indice in fondo).
 ## Stack
 
 Python 3.15, uv, ruff, mypy (strict), pytest + pytest-bdd, import-linter. FastAPI, SQLAlchemy 2 +
-Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, Entra ID. Dettagli e motivazioni in
-`docs/architecture.md`.
+Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, LangGraph (ciclo decisionale), APScheduler 3
+(pianificazione dei cicli), Entra ID.
+Dettagli e motivazioni in `docs/architecture.md`.
 
 ## Architettura target
 
@@ -29,8 +30,8 @@ Alembic, PostgreSQL 16, PyNaCl (libsodium), SDK ufficiale Hyperliquid, Entra ID.
 Utente (tailnet) ──HTTPS──> Tailscale Serve ──> api (FastAPI) ──┬──> PostgreSQL (credenziali cifrate, chiave pubblica)
                                             ├──> Hyperliquid (internet)
                                             └──> Entra ID (validazione token)
-worker (chiave privata) ──> PostgreSQL, Hyperliquid
-fasi successive: forecaster (Prophet), litellm, dashboard
+worker (chiave privata) ──> PostgreSQL, Hyperliquid, litellm, forecaster (Prophet)
+fasi successive: dashboard
 ```
 
 ### Esagono dentro un servizio
@@ -77,11 +78,13 @@ src/autotrading/
     inbound/api/                FastAPI
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
-                                alternative_me/, coinmarketcap/
+                                alternative_me/, coinmarketcap/, litellm/, openrouter/, forecaster/,
+                                apscheduler/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
 tools/                          script Python della pipeline, fuori dall'esagono (.claude/rules/ci.md)
+forecaster/                     servizio Prophet in un container proprio, fuori dall'esagono (tech-forecaster.md)
 deploy/                         cloud-init, compose e policy Tailscale delle installazioni
 .github/                        workflow e action della pipeline TrunkFlow
 docs/adr/                       decisioni tecniche, una per file
@@ -100,6 +103,11 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
 
 - `domain` non importa nulla di `application`, `adapters`, `bootstrap`, né librerie esterne.
 - `application` importa solo `domain` e la libreria standard.
+- **Eccezione architetturale nominale, decisa dal proprietario** (vincolo di campo, ADR 0104): LangGraph
+  orchestra il ciclo decisionale come grafo. `langgraph` si importa solo in
+  `application/flows/cycle_graph.py` (il grafo: nodi che chiamano le porte dei passi) e in
+  `adapters/outbound/sqlalchemy/cycle_checkpoints.py` (il checkpointer su PostgreSQL). Nessun altro modulo, e
+  nessun'altra libreria per analogia.
 - Le librerie tecnologiche si importano solo nella cartella del loro adapter, `bootstrap.py` compreso.
 - **Un adapter = una e una sola tecnologia**: virtualmente una libreria a sé, staccabile. Tecnologia =
   sistema integrato (Hyperliquid, Telegram, l'API interna del worker, un feed RSS, alternative.me,
@@ -116,7 +124,20 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
   errori, nel proprio `ports.py`; l'adapter della tecnologia che ha il dato le realizza nella sua cartella
   (un adapter può realizzare più porte); la sequenza sta nel caso d'uso.
 - `bootstrap.py` istanzia e collega, come un `Program.cs`: nessuna classe, costante, decisione o
-  tecnologia. Configurazione letta e validata da un adapter.
+  tecnologia.
+- **Configurazione per adapter, come `IConfiguration` in .NET.** L'ambiente del processo e i file dei
+  segreti si leggono solo in `adapters/configuration/source.py` (`ConfigurationSource`: `value`,
+  `optional`, `secret`, `optional_secret`, `environment`); un segreto è sempre il file indicato da
+  `<NOME>_FILE`. Ogni cartella adapter ha `configuration.py`, con le sue impostazioni in una dataclass
+  frozen privata `_<Tecnologia>Settings` e la funzione privata che le legge e ne valida forma e presenza,
+  e `composition.py`, con le funzioni `<tecnologia>_adapters(source, ...)` che leggono le impostazioni e
+  restituiscono adapter pronti (l'equivalente dei metodi di estensione `Add<X>(IConfiguration)`). Il
+  costruttore di un adapter riceve impostazioni tipizzate o client, mai la `ConfigurationSource`. Le
+  regole di business sui valori restano nel domain. `bootstrap.py` crea la `ConfigurationSource` e la passa
+  solo alle funzioni `*_adapters`: nessun nome di variabile, nessun default.
+- `adapters/configuration` è l'**unica eccezione per nome** alla separazione delle cartelle adapter: la
+  importano solo i `configuration.py` e `composition.py` delle cartelle adapter e `bootstrap.py`, e lei
+  non importa alcuna cartella di tecnologia.
 - `domain/tenancy` è l'unico contesto che tutti gli altri contesti possono importare.
 
 Verificato da import-linter (contratti in `pyproject.toml`), eseguito da `tests/architecture/`.
@@ -132,7 +153,8 @@ regola ha eccezioni per nome**.
   stanno nel proprio contratto di indipendenza.
 - Librerie: ogni cartella di tecnologia dichiara le sue librerie esterne e importa solo quelle; una
   libreria appartiene a una sola cartella, salvo le librerie di trasporto (`httpx`); `domain`,
-  `application` e `bootstrap.py` non importano librerie esterne.
+  `application` e `bootstrap.py` non importano librerie esterne. Unica eccezione `langgraph`, solo nei due moduli
+  che la regola delle dipendenze nomina.
 - Adapter: non riceve porte né casi d'uso nel costruttore (salvo il decorator della stessa porta,
   dichiarata tra le basi) e da `application` importa solo `ports.py` ed `errors.py`.
 - Nessun ponte: nessuna classe `*Bridge*` o `<X>From<Y>`.
@@ -151,6 +173,12 @@ regola ha eccezioni per nome**.
 - Una classe pubblica di `adapters/outbound/<tecnologia>/` è un `*Adapter` o un `*Error`.
 - Nessuna cartella `common`/`utils`/`shared`; nessun `typing.Any`; un `type: ignore` nomina il codice
   e ha un commento col motivo.
+- Configurazione: `os.environ`, `os.getenv` e le librerie di file di configurazione solo in
+  `adapters/configuration/`; il `configuration.py` di una cartella lo importa solo il suo
+  `composition.py`; `adapters/configuration` lo importano solo `configuration.py`, `composition.py` e
+  `bootstrap.py` (eccezione per nome, anche nei contratti di import-linter); nessun costruttore riceve la
+  `ConfigurationSource`; in `bootstrap.py` la sorgente va solo alle funzioni `*_adapters` (se ne legge al
+  più `environment()`) e nessun testo ha la forma di un nome di variabile.
 
 Ogni regola ha un esempio che la viola e uno conforme. Le violazioni esistenti sono elencate per nome in
 `tests/architecture/known_violations.py`, ciascuna con il Bug che la elimina. L'elenco può solo
@@ -258,6 +286,12 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-alternative-me.md` | `adapters/outbound/alternative_me/**` |
 | `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
 | `tech-system-clock.md` | `adapters/outbound/system_clock/**` |
+| `tech-litellm.md` | `adapters/outbound/litellm/**` |
+| `tech-oidc.md` | `adapters/outbound/oidc/**` |
+| `tech-threads.md` | `adapters/outbound/threads/**` |
+| `tech-apscheduler.md` | `adapters/outbound/apscheduler/**` |
+| `tech-openrouter.md` | `adapters/outbound/openrouter/**` |
+| `tech-forecaster.md` | `forecaster/**`, `adapters/outbound/forecaster/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |

@@ -9,7 +9,7 @@ import pytest
 
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.errors import AccountToRemoveNotFoundError, FlowExchangeUnavailableError
-from autotrading.application.flows.ports import AccountRemovalPorts
+from autotrading.application.flows.ports import AccountRemovalPorts, PositionToClose
 from autotrading.application.flows.remove_account_with_flows import (
     RemoveAccountWithFlowsCommand,
     RemoveAccountWithFlowsUseCase,
@@ -25,7 +25,7 @@ from autotrading.domain.flows.errors import (
 )
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing, PositionOpening
+from autotrading.domain.flows.stop_outcome import ClosingFill, PositionOpening
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -35,6 +35,7 @@ from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.accounts import an_account
 from tests.support.flows import a_configuration, a_flow
+from tests.support.position_closings import ClosingAnswer, closed_by, refused
 
 TENANT = TenantId.new()
 USER = UserId("oid-anna")
@@ -61,11 +62,12 @@ class ScriptedClosings:
         self.refusals: dict[str, str] = {}
         self.closed: list[tuple[UUID, str, UserId]] = []
 
-    def close(self, account_id: UUID, asset: str, user_id: UserId) -> PositionClosing | None:
+    def execute(self, position: PositionToClose) -> ClosingAnswer:
+        account_id, asset, user_id = position.account_id, position.asset, position.user_id
         self.closed.append((account_id, asset, user_id))
         if asset in self.refusals:
-            return PositionClosing(asset, refusal=self.refusals[asset])
-        return PositionClosing(asset, ClosingFill(Decimal(102000), EXECUTED, Decimal("0.05")))
+            return refused(self.refusals[asset])
+        return closed_by(ClosingFill(Decimal(102000), EXECUTED, Decimal("0.05")))
 
 
 class RecordingCycles:

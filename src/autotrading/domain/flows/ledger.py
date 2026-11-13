@@ -3,7 +3,6 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from types import MappingProxyType
 from uuid import UUID
 
 from autotrading.domain.flows.flow import Flow
@@ -118,7 +117,7 @@ class FlowTotals:
     realized_pnl: Decimal = ZERO
     fees: Decimal = ZERO
     funding: Decimal = ZERO
-    positions: Mapping[str, Decimal] = field(default_factory=lambda: MappingProxyType({}))
+    positions: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
 
     def expected(self, asset: str) -> Decimal:
         return self.positions.get(asset, ZERO)
@@ -129,7 +128,7 @@ class FlowTotals:
             self,
             realized_pnl=self.realized_pnl + execution.realized_pnl,
             fees=self.fees + execution.fee,
-            positions=MappingProxyType(positions),
+            positions=frozendict(positions),
         )
 
     def with_funding(self, payment: FundingPayment) -> FlowTotals:

@@ -3,7 +3,6 @@
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import RangeParameter
@@ -16,6 +15,7 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 
 OPENROUTER_MODEL = "openrouter/deepseek-chat"
@@ -31,7 +31,7 @@ def scenario_catalog(*models: ModelDefinition) -> ModelCatalog:
         ModelDefinition(OPENROUTER_MODEL, (TEMPERATURE,)),
         ModelDefinition(ANTHROPIC_MODEL, (TEMPERATURE,)),
     )
-    return ModelCatalog((*load_model_catalog().models, *named))
+    return ModelCatalog((*PLATFORM_MODELS.models, *named))
 
 
 def a_configuration(
