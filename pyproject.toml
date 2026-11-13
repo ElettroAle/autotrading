@@ -170,6 +170,7 @@ modules = [
     "autotrading.adapters.outbound.hyperliquid",
     "autotrading.adapters.outbound.alternative_me",
     "autotrading.adapters.outbound.coinmarketcap",
+    "autotrading.adapters.outbound.forecaster",
     "autotrading.adapters.outbound.rss",
     "autotrading.adapters.outbound.telegram",
     "autotrading.adapters.outbound.worker",

@@ -8,6 +8,7 @@ from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
     MarketDataPort,
     NewsPort,
+    PriceForecasterPort,
     PriceHistoryPort,
     SampleRepositoryPort,
     SentimentPort,
@@ -33,6 +34,7 @@ class SourceSystems:
     sentiments: Mapping[str, SentimentPort]
     news: NewsPort
     prices: PriceHistoryPort
+    forecaster: PriceForecasterPort
     market: MarketDataPort
 
 
@@ -71,7 +73,9 @@ class CollectCycleSourceUseCase:
             name: ReadSentimentUseCase(sentiment) for name, sentiment in systems.sentiments.items()
         }
         readers[NEWS.name] = ReadNewsUseCase(systems.news)
-        readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(systems.prices, self._forecasts))
+        readers[FORECAST.name] = ReadForecastUseCase(
+            ForecastAssetUseCase(systems.prices, systems.forecaster, self._forecasts)
+        )
         readers[INDICATORS.name] = ReadIndicatorsUseCase(systems.market, cycle_minutes)
         readers[PIVOTS.name] = ReadPivotsUseCase(systems.market)
         return readers

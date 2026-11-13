@@ -9,6 +9,7 @@ from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.sources.source_sample import CycleReference
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
+from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
@@ -37,6 +38,7 @@ class World:
             {SENTIMENT_ALTERNATIVE_ME.name: FakeSentimentAdapter(SENTIMENT_ALTERNATIVE_ME.name)},
             FakeNewsAdapter(),
             FakePriceHistoryAdapter(),
+            FakePriceForecasterAdapter(),
             self.market,
         )
         self.collect = CollectCycleSourceUseCase(

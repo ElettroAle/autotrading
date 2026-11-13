@@ -7,9 +7,10 @@ from enum import Enum
 from uuid import UUID
 
 from autotrading.domain.sources.errors import InsufficientHistoryError, InvalidPriceForecastError
-from autotrading.domain.sources.holt_forecast import MINIMUM_POINTS, holt_forecast
 
 DAY = timedelta(days=1)
+# A trend and a change of it: fewer points describe no series.
+MINIMUM_POINTS = 3
 HUNDRED = Decimal(100)
 PERCENT_PLACES = Decimal("0.01")
 # The forecast keeps two more decimals than the exchange gives: enough to see a change, not a false precision.
@@ -90,9 +91,10 @@ class PriceForecast:
             raise InvalidPriceForecastError
 
     @classmethod
-    def of(cls, flow_id: UUID, asset: str, history: PriceHistory, horizon: ForecastHorizon) -> PriceForecast:
-        steps = Decimal(horizon.length / history.spacing)
-        predicted = holt_forecast([point.price for point in history.points], steps)
+    def of(
+        cls, flow_id: UUID, asset: str, history: PriceHistory, horizon: ForecastHorizon, predicted: Decimal
+    ) -> PriceForecast:
+        """The forecast of the model for the horizon, with the history it was made on."""
         return cls(
             flow_id,
             asset,
