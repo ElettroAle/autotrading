@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, scenarios
 
-from autotrading.bootstrap import SOURCE_CATALOG
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.flows import account_id_of, scenario_catalog
 from tests.support.platform import Platform

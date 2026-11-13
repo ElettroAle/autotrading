@@ -1,5 +1,4 @@
 import base64
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -7,16 +6,17 @@ from uuid import uuid4
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from sqlalchemy import create_engine
 
 from autotrading import bootstrap
 from autotrading.adapters.outbound.httpx.provider_key_verifier import KEY_CHECKS
+from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
 )
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
+from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.agent.errors import ProviderRejectedKeyError
@@ -38,30 +38,19 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
 from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.bootstrap import (
-    MODEL_CATALOG,
     SLIPPAGE_SETTING,
-    ApiExchanges,
     InvalidConfigurationError,
     MissingConfigurationError,
     PublicCredentialsKey,
     UndeclaredEnvironmentError,
     UnsupportedEnvironmentError,
-    WorkerConnection,
-    WorkerExchanges,
     WorkerSettings,
-    activity_readers_for,
     create_application,
     create_worker_application,
-    exchanges_for,
-    executions_readers_for,
-    markets_for,
-    now,
-    order_exchanges_for,
     slippage_from,
     tenant_use_cases,
     worker_use_cases,
 )
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.errors import InvalidSlippageError
 from autotrading.domain.orders.slippage import Slippage
@@ -192,9 +181,9 @@ def test_application_refuses_to_start_with_a_malformed_credentials_key(tmp_path:
 def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN)
     factory = tenant_use_cases(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), "dev", worker, httpx.Client()
     )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
@@ -220,10 +209,9 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
-    worker = WorkerConnection(client, WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN, httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), "dev", worker, httpx.Client()
     )
 
     with pytest.raises(ExchangeUnavailableError):
@@ -272,36 +260,6 @@ def test_the_worker_refuses_to_start_with_a_malformed_private_key(tmp_path: Path
 
     with pytest.raises(InvalidPrivateCredentialsKeyError):
         create_worker_application(configuration)
-
-
-@pytest.mark.parametrize(
-    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
-)
-def test_the_exchange_network_follows_the_installation(network: ExchangeNetwork, url: str) -> None:
-    assert {name: exchange.base_url for name, exchange in exchanges_for(network).items()} == {"Hyperliquid": url}
-
-
-@pytest.mark.parametrize(
-    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
-)
-def test_the_tradable_assets_are_read_on_the_network_of_the_installation(network: ExchangeNetwork, url: str) -> None:
-    assert {name: markets.base_url for name, markets in markets_for(network).items()} == {"Hyperliquid": url}
-
-
-@pytest.mark.parametrize(
-    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
-)
-def test_the_orders_go_to_the_network_of_the_installation(network: ExchangeNetwork, url: str) -> None:
-    assert {name: exchange.base_url for name, exchange in order_exchanges_for(network).items()} == {"Hyperliquid": url}
-
-
-@pytest.mark.parametrize(
-    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
-)
-def test_the_activity_of_the_accounts_is_read_on_the_network_of_the_installation(
-    network: ExchangeNetwork, url: str
-) -> None:
-    assert {name: reader.base_url for name, reader in activity_readers_for(network).items()} == {"Hyperliquid": url}
 
 
 @pytest.mark.parametrize(
@@ -360,18 +318,9 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
-    accounts = exchanges_for(ExchangeNetwork.TEST)
-    exchanges = WorkerExchanges(
-        accounts,
-        order_exchanges_for(ExchangeNetwork.TEST),
-        activity_readers_for(ExchangeNetwork.TEST),
-        executions_readers_for(ExchangeNetwork.TEST),
-        accounts,
-        accounts,
-    )
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())
-    factory = worker_use_cases(create_engine("sqlite://"), opener, exchanges, settings, FakeMessengerAdapter())
+    factory = worker_use_cases(create_engine("sqlite://"), opener, settings, FakeMessengerAdapter())
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
 
@@ -389,12 +338,12 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN, httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
-        ApiExchanges({}, {}),
-        WorkerConnection(client, WORKER_TOKEN),
+        "dev",
+        worker,
         httpx.Client(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
@@ -417,12 +366,12 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    client = httpx.Client(base_url="http://worker:8000", transport=httpx.MockTransport(worker_answer))
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN, httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         PublicCredentialsKey(public_key, 1),
-        ApiExchanges({}, {}),
-        WorkerConnection(client, WORKER_TOKEN),
+        "dev",
+        worker,
         httpx.Client(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
@@ -435,17 +384,8 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     ]
 
 
-def test_the_instant_of_a_run_is_the_current_one_with_its_zone() -> None:
-    before = datetime.now(UTC)
-
-    instant = now()
-
-    assert before <= instant <= datetime.now(UTC)
-    assert instant.tzinfo is UTC
-
-
 def test_every_provider_of_the_catalog_has_a_way_to_verify_its_keys() -> None:
-    assert {provider.value for provider in MODEL_CATALOG.providers} <= set(KEY_CHECKS)
+    assert {provider.value for provider in load_model_catalog().providers} <= set(KEY_CHECKS)
 
 
 def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
@@ -465,10 +405,10 @@ def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
 
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN)
     providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, providers
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), "dev", worker, providers
     )
 
     with pytest.raises(ProviderRejectedKeyError):
@@ -507,9 +447,9 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     monkeypatch.setattr(bootstrap, "RecordManualClosingUseCase", manual_closing)
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = WorkerConnection(httpx.Client(base_url="http://worker:8000"), WORKER_TOKEN)
+    worker = worker_adapters("http://worker:8000", WORKER_TOKEN)
     factory = tenant_use_cases(
-        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), ApiExchanges({}, {}), worker, httpx.Client()
+        create_engine("sqlite://"), PublicCredentialsKey(public_key, 1), "dev", worker, httpx.Client()
     )
 
     factory(TenantId.new())

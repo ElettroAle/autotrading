@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from functools import partial
 from pathlib import Path
@@ -27,16 +27,8 @@ from autotrading.adapters.outbound.alternative_me.composition import alternative
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.httpx.model_call import HttpxModelCallAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
-from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
+from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
-from autotrading.adapters.outbound.hyperliquid.executions import HyperliquidAccountExecutionsAdapter
-from autotrading.adapters.outbound.hyperliquid.market_data import (
-    HyperliquidMarketDataAdapter,
-    HyperliquidPriceHistoryAdapter,
-)
-from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
-from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
@@ -85,20 +77,14 @@ from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
+from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
-from autotrading.adapters.outbound.worker.account_activity import WorkerAccountActivityAdapter
-from autotrading.adapters.outbound.worker.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
-from autotrading.adapters.outbound.worker.account_state import WorkerAccountStateAdapter
-from autotrading.adapters.outbound.worker.bot_identity import WorkerBotIdentityAdapter
-from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
-from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
-from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
+from autotrading.adapters.outbound.worker.composition import WorkerAdaptersOfTenant, worker_adapters
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
-    ExchangePort,
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AskAgentUseCase
@@ -119,23 +105,19 @@ from autotrading.application.flows.notify_unattributable import (
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
-    ActivityReaderPort,
     AutomaticPausePort,
     ClockPort,
     ClosedPositionRepositoryPort,
-    CycleAccountReaderPort,
     CycleContext,
     CycleDecisions,
     CycleRepositoryPort,
     ExchangeLimitsPort,
-    ExecutionsReaderPort,
     FlowAccountPorts,
     FlowLockPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
     FlowSummary,
     FlowTimingPort,
-    MarketsPort,
     PlannedFlowsPort,
     SourceRequest,
 )
@@ -199,7 +181,6 @@ from autotrading.application.orders.follow_flow_orders import (
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.order_failures import answered_or_named
-from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.read_market import ReadMarketCommand, ReadMarketUseCase
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
 from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
@@ -221,7 +202,6 @@ from autotrading.application.sources.record_actual_prices import RecordActualPri
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
-from autotrading.application.verification.ports import AccountReaderPort
 from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
@@ -246,7 +226,7 @@ from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
-from autotrading.domain.sources.source_catalog import SourceCatalog
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.sources.source_sample import CycleReference
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -256,12 +236,7 @@ from autotrading.domain.verification.procedure import Opening
 SUPPORTED_ENVIRONMENTS = ("dev", "prod")
 DEFAULT_DATABASE_PORT = "5432"
 DEFAULT_CREDENTIALS_KEY_VERSION = "1"
-HYPERLIQUID = "Hyperliquid"
 SLIPPAGE_SETTING = "ORDER_MAX_SLIPPAGE_PERCENT"
-# The sources of the platform (R1.3.1): one added here becomes selectable in every flow.
-SOURCE_CATALOG = SourceCatalog((INDICATORS, PIVOTS, FORECAST, SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP, NEWS))
-# The models of the platform (R1.4.2): one added to the configuration file becomes selectable in every flow.
-MODEL_CATALOG = load_model_catalog()
 PROVIDER_TIMEOUT_SECONDS = 10.0
 TELEGRAM_BOT_SETTING = "TELEGRAM_BOT_TOKEN_FILE"
 
@@ -295,14 +270,6 @@ class UnsupportedEnvironmentError(AutotradingError):
 class PublicCredentialsKey:
     key: bytes = field(repr=False)
     version: int
-
-
-@dataclass(frozen=True, slots=True)
-class WorkerConnection:
-    """How the API reaches the worker: its internal address and the token generated on the machine (ADR 0021)."""
-
-    client: httpx.Client
-    token: str = field(repr=False)
 
 
 class FlowSummariesFromFlows:
@@ -364,27 +331,6 @@ def cycle_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, 
     )
 
 
-@dataclass(frozen=True, slots=True)
-class ApiExchanges:
-    """The exchanges the API checks credentials and tradable assets on, on the network of the installation."""
-
-    accounts: Mapping[str, ExchangePort]
-    markets: Mapping[str, MarketsPort]
-    environment: str = "dev"
-
-
-@dataclass(frozen=True, slots=True)
-class WorkerExchanges:
-    """The exchanges the worker reads accounts from and sends orders to, on the network of the installation."""
-
-    accounts: Mapping[str, ExchangePort]
-    orders: Mapping[str, OrderExchangePort]
-    activity: Mapping[str, ActivityReaderPort]
-    executions: Mapping[str, ExecutionsReaderPort]
-    readings: Mapping[str, AccountReaderPort]
-    cycles: Mapping[str, CycleAccountReaderPort]
-
-
 class OrderExecutionFromOrders:
     """Bridges the orders context to the verification context in the worker (ADR 0024).
 
@@ -443,26 +389,25 @@ class WorkerSettings:
 def tenant_use_cases(
     engine: Engine,
     public_key: PublicCredentialsKey,
-    exchanges: ApiExchanges,
-    worker: WorkerConnection,
+    environment: str,
+    worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
     providers: httpx.Client,
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
-    # One per installation: the username, once known, is kept across requests.
-    bot_identity = WorkerBotIdentityAdapter(worker.client, worker.token)
+    model_catalog = load_model_catalog()
+    exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         sealer = SodiumCredentialSealerAdapter(public_key.key, public_key.version, tenant_id)
-        account_state = WorkerAccountStateAdapter(worker.client, worker.token, tenant_id)
+        bot_identity, account_state, account_activity, position_closing, verification, notifier = worker_of(tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
-        position_closing = WorkerPositionClosingAdapter(worker.client, worker.token, tenant_id)
         flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(
-            WorkerNotificationAdapter(worker.client, worker.token, tenant_id),
+            notifier,
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         flow_openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
@@ -472,40 +417,40 @@ def tenant_use_cases(
         ports = TenantPorts(
             accounts=accounts,
             sealer=sealer,
-            exchanges=exchanges.accounts,
+            exchanges=exchanges,
             account_state=account_state,
             position_closing=position_closing,
             manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
-            verification=WorkerVerificationAdapter(worker.client, worker.token, tenant_id),
+            verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=SodiumProviderKeySealerAdapter(public_key.key, public_key.version, tenant_id),
             provider_key_verifier=provider_key_verifier,
             provider_key_usage=flows,
-            model_catalog=MODEL_CATALOG,
+            model_catalog=model_catalog,
             flows=flows,
             running_verifications=SqlAlchemyRunningVerificationsAdapter(engine),
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
-                markets=exchanges.markets,
-                models=SelectModelUseCase(MODEL_CATALOG, provider_keys),
+                markets=markets,
+                models=SelectModelUseCase(model_catalog, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
-            account_activity=WorkerAccountActivityAdapter(worker.client, worker.token, tenant_id),
+            account_activity=account_activity,
             flow_ledger=SqlAlchemyFlowLedgerAdapter(engine, tenant_id),
             flow_operations=SqlAlchemyFlowOperationsAdapter(engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
             bot_identity=bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
-            clock=now,
+            clock=system_clock_adapters().now,
             closed_positions=closed_positions,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
             flow_directory=flows,
             flow_summaries=FlowSummariesFromFlows(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
-            environment=exchanges.environment,
+            environment=environment,
         )
         return TenantUseCases.on(tenant_id, ports)
 
@@ -515,36 +460,38 @@ def tenant_use_cases(
 def worker_use_cases(
     engine: Engine,
     opener: SodiumCredentialOpenerAdapter,
-    exchanges: WorkerExchanges,
     settings: WorkerSettings,
     messenger: MessengerPort,
 ) -> Callable[[TenantId], WorkerUseCases]:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
+    exchanges, _, order_exchanges, activity_readers, *_ = hyperliquid_adapters(
+        ExchangeNetwork.of_installation(settings.environment)
+    )
 
     def for_tenant(tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(engine, tenant_id)
         access = OpenTradingAccessUseCase(accounts, opener)
         slippage = settings.slippage
-        read_exchange_state = ReadExchangeStateUseCase(accounts, opener, exchanges.accounts)
-        close_exchange_position = CloseExchangePositionUseCase(access, exchanges.orders, orders, slippage)
-        open_position = OpenPositionUseCase(access, exchanges.orders, orders, slippage)
-        read_market = ReadMarketUseCase(access, exchanges.orders)
+        read_exchange_state = ReadExchangeStateUseCase(accounts, opener, exchanges)
+        close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, slippage)
+        open_position = OpenPositionUseCase(access, order_exchanges, orders, slippage)
+        read_market = ReadMarketUseCase(access, order_exchanges)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
                 VerificationReadings(
-                    ReadAccountForVerificationUseCase(accounts, opener, exchanges.readings),
+                    ReadAccountForVerificationUseCase(accounts, opener, exchanges),
                     SqlAlchemyFlowRepositoryAdapter(engine, tenant_id),
                 ),
                 OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
                 SqlAlchemyVerificationRunRepositoryAdapter(engine, tenant_id),
                 settings.environment,
-                now,
+                system_clock_adapters().now,
             ),
             notify=notify_for(engine, messenger, tenant_id),
-            read_account_activity=ReadAccountActivityUseCase(accounts, opener, exchanges.activity),
+            read_account_activity=ReadAccountActivityUseCase(accounts, opener, activity_readers),
         )
 
     return for_tenant
@@ -553,11 +500,13 @@ def worker_use_cases(
 def cycle_ports(
     engine: Engine,
     opener: SodiumCredentialOpenerAdapter,
-    exchanges: WorkerExchanges,
     settings: WorkerSettings,
     messenger: MessengerPort,
 ) -> Callable[[TenantId], TenantCyclePorts]:
     """Builds, for each cycle, the adapters and use cases bound to the tenant of its flow."""
+    exchanges, _, order_exchanges, activity_readers, executions_readers, *_ = hyperliquid_adapters(
+        ExchangeNetwork.of_installation(settings.environment)
+    )
 
     def cycle_ports_for(tenant_id: TenantId) -> TenantCyclePorts:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
@@ -569,11 +518,11 @@ def cycle_ports(
         notify = notify_for(engine, messenger, tenant_id)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        activity = ReadAccountActivityUseCase(accounts, opener, exchanges.activity)
+        activity = ReadAccountActivityUseCase(accounts, opener, activity_readers)
         ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
-            ReadAccountExecutionsUseCase(accounts, opener, exchanges.executions),
+            ReadAccountExecutionsUseCase(accounts, opener, executions_readers),
             SqlAlchemyPlatformOrdersAdapter(engine, tenant_id),
             ledger,
         )
@@ -598,7 +547,7 @@ def cycle_ports(
         read_cycle_flow = ReadCycleFlowUseCase(
             flows,
             SqlAlchemyFlowTimingAdapter(engine, tenant_id),
-            ReadCycleAccountUseCase(accounts, accounts, opener, exchanges.cycles),
+            ReadCycleAccountUseCase(accounts, accounts, opener, exchanges),
             ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger), reconcile_for_cycle),
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
@@ -618,7 +567,7 @@ def cycle_ports(
             samples=SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
             send_orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(
-                    ExecuteFlowOrdersUseCase(access, exchanges.orders, orders, slippage), follow_flow_orders
+                    ExecuteFlowOrdersUseCase(access, order_exchanges, orders, slippage), follow_flow_orders
                 )
             ),
             openings=openings,
@@ -644,23 +593,18 @@ def link_stores_for(engine: Engine, tenant_id: TenantId) -> LinkStores:
     )
 
 
-def now() -> datetime:
-    return datetime.now(UTC)
-
-
 def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI:
     health = HealthReport(
         version=_required(configuration, "APP_VERSION"),
         environment=_environment(configuration),
     )
-    network = ExchangeNetwork.of_installation(health.environment)
     engine = _database(configuration)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
     for_tenant = tenant_use_cases(
         engine,
         PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
-        ApiExchanges(exchanges_for(network), markets_for(network), health.environment),
-        _worker_connection(configuration),
+        health.environment,
+        worker_adapters(_required(configuration, "WORKER_URL"), _secret(configuration, "WORKER_TOKEN_FILE")),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
     return create_api(health, resolve_tenant, for_tenant, _authentication(configuration))
@@ -671,33 +615,23 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     environment = _environment(configuration)
     private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     opener = SodiumCredentialOpenerAdapter(private_keys)
-    network = ExchangeNetwork.of_installation(environment)
-    accounts = exchanges_for(network)
-    exchanges = WorkerExchanges(
-        accounts,
-        order_exchanges_for(network),
-        activity_readers_for(network),
-        executions_readers_for(network),
-        accounts,
-        accounts,
-    )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)
     messenger, inbox, start_link = telegram_adapters(_optional_secret(configuration, TELEGRAM_BOT_SETTING))
-    for_tenant = worker_use_cases(engine, opener, exchanges, settings, messenger)
+    for_tenant = worker_use_cases(engine, opener, settings, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
-    ports_of = cycle_ports(engine, opener, exchanges, settings, messenger)
+    ports_of = cycle_ports(engine, opener, settings, messenger)
     cycles = worker_cycles(engine, ports_of, cycle_services(environment, private_keys))
     return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), for_tenant, bot, cycles, start_link)
 
 
 def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
-    network = ExchangeNetwork.of_installation(environment)
+    _, markets, _, _, _, prices, market = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
     return CycleServices(
         environment=environment,
-        clock=SystemClock(),
-        catalog=MODEL_CATALOG,
+        clock=system_clock_adapters(),
+        catalog=load_model_catalog(),
         provider_key_opener=SodiumProviderKeyOpenerAdapter(private_keys),
         model_call=HttpxModelCallAdapter(httpx.Client()),
         sentiments={
@@ -705,41 +639,24 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
             SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
         },
         news=rss_adapters(),
-        prices=HyperliquidPriceHistoryAdapter.for_network(testnet=network.is_test),
-        market=HyperliquidMarketDataAdapter.for_network(testnet=network.is_test),
-        exchange_limits=markets_for(network),
+        prices=prices,
+        market=market,
+        exchange_limits=markets,
     )
 
 
 def telegram_bot(engine: Engine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
     link_chat = LinkChatUseCase(
-        SqlAlchemyLinkCodeLookupAdapter(engine), partial(link_stores_for, engine), messenger, now
+        SqlAlchemyLinkCodeLookupAdapter(engine),
+        partial(link_stores_for, engine),
+        messenger,
+        system_clock_adapters().now,
     )
     test_notification = SendTestNotificationUseCase(
         SqlAlchemyLinkedChatLookupAdapter(engine), partial(notify_for, engine, messenger), messenger
     )
     return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
-
-
-def exchanges_for(network: ExchangeNetwork) -> dict[str, HyperliquidExchangeAdapter]:
-    return {HYPERLIQUID: HyperliquidExchangeAdapter.for_network(testnet=network.is_test)}
-
-
-def markets_for(network: ExchangeNetwork) -> dict[str, HyperliquidMarketsAdapter]:
-    return {HYPERLIQUID: HyperliquidMarketsAdapter.for_network(testnet=network.is_test)}
-
-
-def order_exchanges_for(network: ExchangeNetwork) -> dict[str, HyperliquidOrderExchangeAdapter]:
-    return {HYPERLIQUID: HyperliquidOrderExchangeAdapter.for_network(testnet=network.is_test)}
-
-
-def activity_readers_for(network: ExchangeNetwork) -> dict[str, HyperliquidAccountActivityAdapter]:
-    return {HYPERLIQUID: HyperliquidAccountActivityAdapter.for_network(testnet=network.is_test)}
-
-
-def executions_readers_for(network: ExchangeNetwork) -> dict[str, HyperliquidAccountExecutionsAdapter]:
-    return {HYPERLIQUID: HyperliquidAccountExecutionsAdapter.for_network(testnet=network.is_test)}
 
 
 def slippage_from(configuration: Mapping[str, str]) -> Slippage:
@@ -771,11 +688,6 @@ def _credentials_private_key(configuration: Mapping[str, str]) -> bytes:
         return base64.b64decode(_secret(configuration, "CREDENTIALS_PRIVATE_KEY_FILE"), validate=True)
     except binascii.Error as error:
         raise InvalidPrivateCredentialsKeyError from error
-
-
-def _worker_connection(configuration: Mapping[str, str]) -> WorkerConnection:
-    client = httpx.Client(base_url=_required(configuration, "WORKER_URL"), timeout=WORKER_TIMEOUT_SECONDS)
-    return WorkerConnection(client, _secret(configuration, "WORKER_TOKEN_FILE"))
 
 
 def _credentials_key_version(configuration: Mapping[str, str]) -> int:
@@ -839,11 +751,6 @@ def _environment(configuration: Mapping[str, str]) -> str:
 
 
 # The cycles of the flows in the worker (ADR 0041, ADR 0042): each cycle runs on the ports of the tenant of its flow.
-
-
-class SystemClock:
-    def now(self) -> datetime:
-        return now()
 
 
 @dataclass(frozen=True, slots=True)
