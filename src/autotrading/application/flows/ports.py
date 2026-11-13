@@ -15,7 +15,9 @@ from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrders
+from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -622,7 +624,7 @@ class SourcePort[S = object, D = object](Protocol):
 
 
 class ContextPort[S = object, D = object, C = object](Protocol):
-    def compose(
+    def execute(
         self,
         flow_id: UUID,
         snapshot: FlowSnapshot[S],
@@ -634,17 +636,110 @@ class ContextPort[S = object, D = object, C = object](Protocol):
 
 
 class AgentPort[C = object, A = object](Protocol):
-    def decide(self, flow_id: UUID, context: C) -> A: ...
+    def execute(self, flow_id: UUID, context: C) -> A: ...
 
 
 class RiskPort[S = object, A = object, O = object](Protocol):
-    def check(self, flow_id: UUID, snapshot: FlowSnapshot[S], decisions: A) -> RiskReview[O]: ...
+    def execute(self, flow_id: UUID, snapshot: FlowSnapshot[S], decisions: A) -> RiskReview[O]: ...
 
 
 class OrderPort[O = object, E = object](Protocol):
     def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[O]) -> Sequence[E]:
         """Sends the approved orders of the cycle, closings first, and gives back their real outcomes (R1.5.5)."""
         ...
+
+
+class PromptMessagePort(Protocol):
+    """A message the agent receives, as the record of the cycle keeps it."""
+
+    @property
+    def role(self) -> str: ...
+
+    @property
+    def content(self) -> str: ...
+
+
+class AgentPromptPort(Protocol):
+    """What the agent receives for the question of a cycle, as messages (R1.4.3, R1.7.1)."""
+
+    def messages(self) -> Sequence[PromptMessagePort]: ...
+
+
+class AgentPromptComposerPort(Protocol):
+    def execute(self, question: CycleQuestion) -> AgentPromptPort:
+        """Composes what the agent receives; raises an error of the agent when the question cannot be composed."""
+        ...
+
+
+class AgentDecisionPort(Protocol):
+    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4)."""
+
+    def intent_with[O, C, H](
+        self,
+        opening: Callable[[str, str, Decimal, int], O],
+        closing: Callable[[str], C],
+        holding: Callable[[str], H],
+    ) -> O | C | H: ...
+
+
+class AgentResponsePort(Protocol):
+    """The answer of the model as the cycle keeps it: the raw text, the decisions, the discarded and the missing."""
+
+    @property
+    def raw(self) -> str: ...
+
+    @property
+    def decisions(self) -> Sequence[AgentDecisionPort]: ...
+
+    @property
+    def discarded(self) -> Sequence[object]: ...
+
+    @property
+    def missing(self) -> Sequence[str]: ...
+
+
+class ModelUsagePort(Protocol):
+    @property
+    def input_tokens(self) -> int: ...
+
+    @property
+    def output_tokens(self) -> int: ...
+
+
+class AgentReplyPort(Protocol):
+    """The answer of the agent to a cycle, with what the call consumed and cost (R1.4.4-R1.4.6)."""
+
+    @property
+    def response(self) -> AgentResponsePort: ...
+
+    @property
+    def usage(self) -> ModelUsagePort: ...
+
+    @property
+    def cost_usd(self) -> Decimal | None: ...
+
+
+class FlowAgentPort(Protocol):
+    def execute(self, question: CycleQuestion) -> AgentReplyPort:
+        """Asks the model of the flow, with the key of the tenant; one call per cycle, never retried (R1.4.5)."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class CycleContext:
+    """The context the agent receives in a cycle: the question of the flow and the messages composed from it."""
+
+    flow: CycleFlow
+    question: CycleQuestion
+    prompt: AgentPromptPort
+
+
+@dataclass(frozen=True, slots=True)
+class CycleDecisions:
+    """The answer of the agent to the cycle of the flow."""
+
+    flow: CycleFlow
+    reply: AgentReplyPort
 
 
 class CycleOrderExecutionPort(Protocol):

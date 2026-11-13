@@ -8,6 +8,7 @@ from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -69,3 +70,17 @@ def test_the_risk_measures_quotas_and_limits_on_the_money_of_the_flow() -> None:
     flow = cycle_flow(attributed(realized_pnl=Decimal(-100), fees=Decimal(2), margin=Decimal(50)), Decimal(300))
 
     assert flow.risk_state() == RiskState("USDC", Decimal(398), Decimal(300), frozenset({"BTC"}))
+
+
+def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
+    flow = cycle_flow(attributed(realized_pnl=Decimal(-100), fees=Decimal(2), margin=Decimal(50)), Decimal(300))
+
+    assert flow.state_view() == FlowStateView(
+        "USDC",
+        Decimal(500),
+        Decimal(398),
+        Decimal(300),
+        Decimal(410),
+        Decimal("-18.00"),
+        (PositionView("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(5), Decimal(60)),),
+    )
