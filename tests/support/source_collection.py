@@ -9,9 +9,10 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
-from autotrading.bootstrap import SOURCE_CATALOG, agent_sources_of
+from autotrading.bootstrap import agent_sources_of
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.sources.source_sample import CycleReference, SourceValue
 from tests.fakes.source_readers import FakeSourceReaderAdapter, InMemorySampleRepositoryAdapter
 

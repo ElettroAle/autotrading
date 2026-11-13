@@ -4,8 +4,8 @@ import pytest
 
 from autotrading.application.flows.errors import InvalidFlowSettingError
 from autotrading.application.flows.select_source import SelectSourceUseCase
-from autotrading.bootstrap import SOURCE_CATALOG
 from autotrading.domain.flows.selections import SourceSelection
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 
 
 def test_a_source_gets_its_weight_and_its_parameters_with_the_defaults() -> None:
