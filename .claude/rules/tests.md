@@ -9,6 +9,9 @@ paths:
 ```text
 tests/
   architecture/test_import_contracts.py           esegue import-linter sui contratti di pyproject.toml
+  architecture/test_layer_separation.py           regole statiche sui layer (CLAUDE.md, Test di architettura)
+  architecture/test_architecture_rules.py         ogni regola rossa su un esempio che la viola
+  architecture/known_violations.py                violazioni note, ciascuna col suo Bug: solo in calo
   unit/
     domain/<contesto>/test_<modulo>.py            domain puro
     application/<contesto>/test_<caso_d_uso>.py   casi d'uso con adapter finti
@@ -34,7 +37,8 @@ tests/
   (`tests/scenarios/conftest.py`). Consegnare una User Story significa togliere `@wip`.
 - **Integrazione**: marker `integration`. PostgreSQL in container. Hyperliquid solo con il
   marker `testnet`, fuori dalla suite di default.
-- **Test architetturale**: fa parte della suite di default; un contratto rotto è un test rosso.
+- **Test architetturale**: fa parte della suite di default; un contratto rotto o una regola dei
+  layer violata è un test rosso. Le regole vivono in `tests/support/architecture.py`.
 - **Adapter finti**: implementano la porta per intero, sono deterministici e vivono solo in
   `tests/fakes/`. Mai mock generici al posto di un finto quando la porta è del progetto.
 - **Rosso prima del verde**: ogni prova si osserva fallire per il motivo giusto prima di passare.
