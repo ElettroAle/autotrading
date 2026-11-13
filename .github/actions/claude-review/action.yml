@@ -49,8 +49,8 @@ runs:
 
           1. Leggi per intero CLAUDE.md del commit head e ogni sua rule i cui `paths` coprono un file modificato.
           2. Leggi i thread di review della pull request con `gh api graphql` (reviewThreads con id, isResolved,
-             path, line e i commenti con autore e corpo). I tuoi thread sono quelli il cui primo commento contiene
-             `<!-- revisione-ai`.
+             path, line e i commenti con autore e corpo). I tuoi thread sono quelli il cui primo commento è
+             dell'autore `github-actions`, con o senza il marcatore `<!-- revisione-ai -->`.
           3. Per ogni tuo thread aperto (isResolved falso): se nel commit head la violazione non c'è più, o se non
              è una violazione secondo il punto 4, rispondi nel thread con `addPullRequestReviewThreadReply` dicendo in una riga che è corretta (salvo che una tua risposta lo
              dica già) e poi chiama sempre `resolveReviewThread` con l'id del thread: un thread corretto non resta mai
