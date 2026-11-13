@@ -133,7 +133,8 @@ from autotrading.application.cycles.ports import (
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.cycles.source_collector import SourceCollector
-from autotrading.application.flows.archive_flow import ArchiveFlowCommand, ArchiveFlowUseCase
+from autotrading.application.flows.archive_account_flows import ArchiveAccountFlowsCommand, ArchiveAccountFlowsUseCase
+from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import (
@@ -142,6 +143,7 @@ from autotrading.application.flows.errors import (
     FlowExchangeUnavailableError,
     InvalidFlowSettingError,
 )
+from autotrading.application.flows.list_account_flows import ListAccountFlowsCommand, ListAccountFlowsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
@@ -230,7 +232,6 @@ from autotrading.domain.agent.errors import (
     UnknownParameterError,
 )
 from autotrading.domain.agent.model_catalog import ModelCatalog
-from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
@@ -245,7 +246,6 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming, flow_beginning
 from autotrading.domain.flows.ledger import ExecutionsWindow
 from autotrading.domain.flows.risk_check import RiskState
@@ -336,33 +336,6 @@ MODEL_REFUSALS = (ModelNotAvailableError, ParameterOutOfRangeError, ParameterNot
 SOURCE_REFUSALS = (SourceNotAvailableError, SourceParameterOutOfRangeError, UnknownSourceParameterError)
 
 
-class ProviderKeyUsageFromFlows:
-    """Bridges the flows context to the agent context in the API (ADR 0031).
-
-    A key is in use while a flow active or paused runs on a model of its provider; a stopped flow runs no cycle.
-    """
-
-    def __init__(self, flows: FlowRepositoryPort) -> None:
-        self._flows = flows
-
-    def flows_using(self, provider: ProviderName) -> list[str]:
-        return [
-            flow.name.value
-            for flow in self._flows.list()
-            if flow.status.not_stopped and flow.model_provider == provider.value
-        ]
-
-
-class FlowDirectoryFromFlows:
-    """Bridges the flows context to the cycles context (ADR 0046): the flows of the tenant are those it can consult."""
-
-    def __init__(self, flows: FlowRepositoryPort) -> None:
-        self._flows = flows
-
-    def exists(self, flow_id: UUID) -> bool:
-        return any(flow.id.value == flow_id for flow in self._flows.list())
-
-
 class FlowSummariesFromFlows:
     """Bridges the flows and accounts contexts to the consultation of the cycles (R1.7.3, ADR 0042).
 
@@ -435,8 +408,10 @@ class ManualClosingsRecordedInFlows:
 class AccountFlowsFromFlows:
     """Bridges the flows context to the accounts context in the API (ADR 0054): the flows that run on an account."""
 
-    def __init__(self, flows: FlowRepositoryPort, stop: StopFlowUseCase, archive: ArchiveFlowUseCase) -> None:
-        self._flows = flows
+    def __init__(
+        self, operating: ListAccountFlowsUseCase, stop: StopFlowUseCase, archive: ArchiveAccountFlowsUseCase
+    ) -> None:
+        self._operating = operating
         self._stop = stop
         self._archive = archive
 
@@ -455,12 +430,10 @@ class AccountFlowsFromFlows:
         )
 
     def archive(self, account_id: AccountId) -> None:
-        for flow in self._flows.list():
-            if flow.account_id == account_id.value and flow.status == FlowStatus.STOPPED:
-                self._archive.execute(ArchiveFlowCommand(flow.id))
+        self._archive.execute(ArchiveAccountFlowsCommand(account_id.value))
 
     def _operating_on(self, account_id: AccountId) -> list[Flow]:
-        return [flow for flow in self._flows.list() if flow.account_id == account_id.value and flow.status.not_stopped]
+        return self._operating.execute(ListAccountFlowsCommand(account_id.value))
 
 
 class ModelSettingsFromAgent:
@@ -741,7 +714,7 @@ class TenantUseCaseFactory:
                 self._public_key.key, self._public_key.version, tenant_id
             ),
             provider_key_verifier=self._provider_key_verifier,
-            provider_key_usage=ProviderKeyUsageFromFlows(flows),
+            provider_key_usage=flows,
             model_catalog=MODEL_CATALOG,
             flows=flows,
             running_verifications=SqlAlchemyRunningVerificationsAdapter(self._engine),
@@ -753,7 +726,11 @@ class TenantUseCaseFactory:
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
-            account_flows=AccountFlowsFromFlows(flows, StopFlowUseCase(flows, stop_ports), ArchiveFlowUseCase(flows)),
+            account_flows=AccountFlowsFromFlows(
+                ListAccountFlowsUseCase(flows),
+                StopFlowUseCase(flows, stop_ports),
+                ArchiveAccountFlowsUseCase(flows, ArchiveFlowUseCase(flows)),
+            ),
             account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
             flow_ledger=SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id),
             flow_operations=SqlAlchemyFlowOperationsAdapter(self._engine, tenant_id),
@@ -763,7 +740,7 @@ class TenantUseCaseFactory:
             clock=now,
             closed_positions=closed_positions,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(self._engine, tenant_id),
-            flow_directory=FlowDirectoryFromFlows(flows),
+            flow_directory=flows,
             flow_summaries=FlowSummariesFromFlows(
                 flows, accounts, SqlAlchemyFlowTimingAdapter(self._engine, tenant_id)
             ),

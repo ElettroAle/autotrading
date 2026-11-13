@@ -3,7 +3,9 @@
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
+from uuid import UUID
 
+from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -52,6 +54,12 @@ class InMemoryFlowRepositoryAdapter:
             raise FlowNameInUseError
         self._store.flows.append(flow)
         self._store.versions[flow.id] = [flow.configuration]
+
+    def exists(self, flow_id: UUID) -> bool:
+        return any(flow.id.value == flow_id for flow in self.list())
+
+    def model_uses(self) -> tuple[ModelUse, ...]:
+        return tuple(ModelUse(flow.name.value, flow.model_provider, flow.status.not_stopped) for flow in self.list())
 
     def get(self, flow_id: FlowId) -> Flow:
         flow = next((flow for flow in self.list() if flow.id == flow_id), None)

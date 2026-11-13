@@ -11,20 +11,15 @@ from autotrading.application.flows.errors import (
 from autotrading.bootstrap import (
     SOURCE_CATALOG,
     ModelSettingsFromAgent,
-    ProviderKeyUsageFromFlows,
     SourceSettingsFromSources,
 )
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter
-from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.errors import ModelRequiredError
-from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.selections import SourceSelection
-from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter
-from tests.support.flows import TEMPERATURE, a_configuration, a_flow
+from tests.support.flows import TEMPERATURE
 from tests.support.platform import Platform
 
 REASONING = ChoiceParameter("reasoning_effort", ("basso", "alto"), "basso")
@@ -34,23 +29,6 @@ CATALOG = ModelCatalog(
         ModelDefinition("anthropic/claude-sonnet", (TEMPERATURE, REASONING)),
     )
 )
-
-
-def test_a_key_is_used_only_by_flows_active_or_paused_on_a_model_of_its_provider() -> None:
-    tenant_id, store = TenantId.new(), FlowStore()
-    anthropic = a_configuration(model="anthropic/claude-sonnet")
-    store.flows += [
-        a_flow(tenant_id, name="beta", status=FlowStatus.PAUSED),
-        a_flow(tenant_id, name="alfa", status=FlowStatus.ACTIVE),
-        a_flow(tenant_id, name="fermo", status=FlowStatus.STOPPED),
-        a_flow(tenant_id, name="archiviato", status=FlowStatus.ARCHIVED),
-        a_flow(tenant_id, name="altro", status=FlowStatus.ACTIVE, configuration=anthropic),
-        a_flow(TenantId.new(), name="estraneo", status=FlowStatus.ACTIVE),
-    ]
-    usage = ProviderKeyUsageFromFlows(InMemoryFlowRepositoryAdapter(store, tenant_id))
-
-    assert usage.flows_using(ProviderName("openrouter")) == ["beta", "alfa"]
-    assert usage.flows_using(ProviderName("openai")) == []
 
 
 class Models:
