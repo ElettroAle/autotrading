@@ -14,15 +14,6 @@ from autotrading.domain.agent.registered_provider_key import RegisteredProviderK
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 
 
-class ProviderKeyVerifierPort(Protocol):
-    def verify(self, provider: ProviderName, key: ProviderKey) -> None:
-        """Asks the provider whether it accepts the key, without spending any credit of the user.
-
-        Raises ProviderRejectedKeyError, ProviderUnavailableError, or ProviderNotVerifiableError.
-        """
-        ...
-
-
 class ProviderKeySealerPort(Protocol):
     """Bound to the tenant of the request: the sealed text names tenant and provider (ADR 0029)."""
 
@@ -98,6 +89,18 @@ class ModelCallPort(Protocol):
     ) -> ModelReply:
         """Raises ModelKeyRejectedError or ModelCreditExhaustedError (permanent), or ModelUnavailableError."""
         ...
+
+
+class ModelGatewayPort(Protocol):
+    """Abstract factory of one model gateway: the call and the catalog of the same models, one family (ADR 0109).
+
+    Each gateway serves the models of its own catalog; the use case uses the one whose catalog holds the model the
+    flow chose.
+    """
+
+    def model_call(self) -> ModelCallPort: ...
+
+    def model_catalog(self) -> ModelCatalogPort: ...
 
 
 class QuestionPositionPort(Protocol):

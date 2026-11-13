@@ -1,4 +1,4 @@
-"""Fakes of the ports on provider keys: the provider that checks them, the seal, the database, the flows using them."""
+"""Fakes of the ports on provider keys: the seal, the database, the flows using them."""
 
 import hashlib
 
@@ -6,8 +6,6 @@ from autotrading.application.agent.errors import (
     ProviderKeyAlreadyRegisteredError,
     ProviderKeyNotFoundError,
     ProviderKeyNotOpenedError,
-    ProviderRejectedKeyError,
-    ProviderUnavailableError,
 )
 from autotrading.application.agent.ports import ModelUse
 from autotrading.application.tenancy.errors import CrossTenantAccessError
@@ -21,28 +19,6 @@ KEY_VERSION = 1
 
 # What the private key would recover from each sealed text: only the worker would read it.
 type ProviderKeyVault = dict[bytes, tuple[TenantId, ProviderName, ProviderKey]]
-
-
-class FakeProviderKeyVerifierAdapter:
-    """The providers: each accepts the keys it was told to, and may be out of reach."""
-
-    def __init__(self) -> None:
-        self._accepted: dict[ProviderName, set[str]] = {}
-        self.unreachable: set[ProviderName] = set()
-        self.checked: list[ProviderName] = []
-
-    def accept(self, provider: str, key: str) -> None:
-        self._accepted.setdefault(ProviderName(provider), set()).add(key)
-
-    def refuse(self, provider: str, key: str) -> None:
-        self._accepted.get(ProviderName(provider), set()).discard(key)
-
-    def verify(self, provider: ProviderName, key: ProviderKey) -> None:
-        self.checked.append(provider)
-        if provider in self.unreachable:
-            raise ProviderUnavailableError(provider)
-        if key.secret not in self._accepted.get(provider, set()):
-            raise ProviderRejectedKeyError(provider)
 
 
 class FakeProviderKeySealerAdapter:

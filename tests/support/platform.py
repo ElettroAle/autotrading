@@ -34,9 +34,6 @@ from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
     VerificationReadings,
 )
-from autotrading.bootstrap import (
-    OrderExecutionFromOrders,
-)
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
@@ -79,7 +76,6 @@ from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
-    FakeProviderKeyVerifierAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
     ProviderKeyVault,
@@ -91,6 +87,7 @@ from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.directory import Directory
 from tests.support.model_catalog import PLATFORM_MODELS
+from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -114,7 +111,6 @@ class Platform:
         self.runs: dict[TenantId, InMemoryVerificationRunRepositoryAdapter] = {}
         self.provider_keys = ProviderKeyStore()
         self.key_vault: ProviderKeyVault = {}
-        self.providers = FakeProviderKeyVerifierAdapter()
         self.flows = FlowStore()
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
@@ -184,7 +180,6 @@ class Platform:
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
-            provider_key_verifier=self.providers,
             provider_key_usage=flows,
             model_catalog=InMemoryModelCatalogAdapter(self.model_catalog),
             flows=flows,
@@ -234,9 +229,7 @@ class Platform:
                     ReadAccountForVerificationUseCase(accounts, opener, self.exchanges),
                     InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
                 ),
-                OrderExecutionFromOrders(
-                    open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)
-                ),
+                procedure_orders(open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)),
                 self.runs_of(tenant_id),
                 "dev",
                 lambda: STARTED_AT,

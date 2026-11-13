@@ -1,7 +1,7 @@
 # Configurazione del proxy LiteLLM (ADR 0101), senza segreti: prepare-installation.sh vi aggiunge sulla macchina la
 # chiave master e la monta nel container come file in sola lettura.
 #
-# Abilitare un fornitore = una rotta qui (e il controllo della sua chiave, ADR 0103); i suoi modelli di chat entrano
+# Abilitare un fornitore = una rotta qui (ADR 0103, ADR 0108); i suoi modelli di chat entrano
 # nel catalogo da soli. Nessuna chiave dei fornitori: ogni richiesta del worker porta la chiave
 # dell'utente del flusso, valida solo per quella richiesta (RF-01.05, ADR 0029).
 model_list:

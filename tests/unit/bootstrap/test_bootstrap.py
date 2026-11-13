@@ -21,8 +21,6 @@ from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKey
 from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
-from autotrading.application.agent.errors import ProviderRejectedKeyError
-from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
     FlowOpeningsPort,
@@ -55,7 +53,6 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
-from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter, ProviderKeyStore
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
 from tests.support.model_catalog import PLATFORM_MODELS
@@ -70,12 +67,10 @@ AUTHENTICATION = {
 }
 
 
-def providers_of(
-    verification: httpx.Client | None = None,
-) -> tuple[httpx.Client, InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
-    """The providers of the API: the client that verifies the keys and the catalog of the test models."""
+def providers_of() -> tuple[InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
+    """The models of the API: the catalog of the test models, for the agent and for the flows."""
     catalog = InMemoryModelCatalogAdapter(PLATFORM_MODELS)
-    return verification or httpx.Client(), catalog, catalog
+    return catalog, catalog
 
 
 def _sealers(
@@ -379,34 +374,6 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     assert [request.url.path for request in asked] == [
         f"/tenants/{tenant_id.value}/accounts/{account_id}/verifications"
     ]
-
-
-def test_the_key_of_a_provider_is_verified_at_the_provider_for_the_tenant(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    store = ProviderKeyStore()
-    monkeypatch.setattr(
-        bootstrap,
-        "SqlAlchemyProviderKeyRepositoryAdapter",
-        lambda _, tenant: InMemoryProviderKeyRepositoryAdapter(store, tenant),
-    )
-    asked: list[httpx.Request] = []
-
-    def provider_answer(request: httpx.Request) -> httpx.Response:
-        asked.append(request)
-        return httpx.Response(401, json={"error": {"message": "invalid key"}})
-
-    configuration = installation_configuration(tmp_path)
-    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
-    worker = worker_adapters(ConfigurationSource(configuration))
-    providers = httpx.Client(transport=httpx.MockTransport(provider_answer))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of(providers))
-
-    with pytest.raises(ProviderRejectedKeyError):
-        factory(TenantId.new()).register_provider_key.execute(RegisterProviderKeyCommand("openrouter", "K-MADE-UP"))
-
-    assert [str(request.url) for request in asked] == ["https://openrouter.ai/api/v1/key"]
-    assert store.keys == []
 
 
 def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(

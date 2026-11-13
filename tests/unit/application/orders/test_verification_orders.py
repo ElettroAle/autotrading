@@ -1,21 +1,26 @@
-"""The bridge bootstrap builds between the verification context and the orders context (ADR 0024)."""
+"""The orders of the procedure of verification, as the orders context sends them for it (ADR 0024, ADR 0086)."""
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
+from autotrading.application.orders.close_verification_position import CloseVerificationPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.open_verification_position import OpenVerificationPositionUseCase
+from autotrading.application.orders.order_failures import FailureNames
 from autotrading.application.orders.read_market import ReadMarketUseCase
+from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
-from autotrading.bootstrap import OrderExecutionFromOrders
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import OrderOrigin, OrderSource, OrderStatus
+from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.user_id import UserId
+from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
@@ -27,6 +32,45 @@ VERIFICATION = OrderSource(OrderOrigin.VERIFICATION, "oid-anna")
 PROCEDURE_OPENING = Opening(coin="BTC", side="long", leverage=2, value=Decimal(12))
 
 
+NAMES = FailureNames(VerificationAccountNotFoundError, VerificationStepError)
+
+
+@dataclass(frozen=True, slots=True)
+class Asked:
+    """What the procedure asks, as the verification context describes it."""
+
+    account_id: UUID
+    coin: str
+    user_id: UserId = ANNA
+    side: str = PROCEDURE_OPENING.side
+    leverage: int = PROCEDURE_OPENING.leverage
+    value: Decimal = PROCEDURE_OPENING.value
+
+
+def result_of(outcome: OrderOutcome) -> OrderResult:
+    return OrderResult.reported(outcome.fee, outcome.realized_pnl, outcome.exchange_message, outcome.status)
+
+
+class Execution:
+    def __init__(
+        self,
+        minimum: ReadMinimumValueUseCase,
+        opening: OpenVerificationPositionUseCase,
+        closing: CloseVerificationPositionUseCase,
+    ) -> None:
+        self._minimum, self._opening, self._closing = minimum, opening, closing
+
+    def minimum_value(self, account_id: UUID, coin: str) -> Decimal:
+        return self._minimum.execute(Asked(account_id, coin))
+
+    def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult:
+        asked = Asked(account_id, opening.coin, user_id, opening.side, opening.leverage, opening.value)
+        return result_of(self._opening.execute(asked))
+
+    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderResult:
+        return result_of(self._closing.execute(Asked(account_id, coin, user_id)))
+
+
 class Orders:
     def __init__(self) -> None:
         self.exchange = FakeOrderExchangeAdapter()
@@ -35,10 +79,14 @@ class Orders:
         self.account_id = uuid4()
         self.accesses.accesses[self.account_id] = new_access()
         exchanges, slippage = {HYPERLIQUID: self.exchange}, Slippage.default()
-        self.execution = OrderExecutionFromOrders(
-            OpenPositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage),
-            CloseExchangePositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage),
-            ReadMarketUseCase(self.accesses.use_case, exchanges),
+        self.execution = Execution(
+            ReadMinimumValueUseCase(ReadMarketUseCase(self.accesses.use_case, exchanges), NAMES),
+            OpenVerificationPositionUseCase(
+                OpenPositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage), NAMES
+            ),
+            CloseVerificationPositionUseCase(
+                CloseExchangePositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage), NAMES
+            ),
         )
 
     def hold_btc(self) -> None:
