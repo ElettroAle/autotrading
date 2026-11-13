@@ -15,7 +15,7 @@ from autotrading.domain.flows.errors import (
     CapitalBelowFlowMinimumError,
     FlowCommandNotAllowedError,
 )
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
@@ -33,13 +33,13 @@ CLOSED_AT = datetime(2026, 11, 12, 12, 30, tzinfo=UTC)
 def test_an_active_or_paused_flow_stops(status: FlowStatus) -> None:
     flow = a_flow(TENANT, status=status)
 
-    assert flow.after(FlowCommand.STOP) == replace(flow, status=FlowStatus.STOPPED)
+    assert flow.after(FlowAction.STOP) == replace(flow, status=FlowStatus.STOPPED)
 
 
 @pytest.mark.parametrize("status", [FlowStatus.STOPPED, FlowStatus.ARCHIVED])
 def test_a_stopped_or_archived_flow_does_not_stop_again(status: FlowStatus) -> None:
     with pytest.raises(FlowCommandNotAllowedError) as raised:
-        a_flow(TENANT, status=status).after(FlowCommand.STOP)
+        a_flow(TENANT, status=status).after(FlowAction.STOP)
 
     assert str(raised.value) == f"comando ferma non ammesso per un flusso {status.value}"
 

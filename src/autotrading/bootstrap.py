@@ -69,7 +69,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.database import SqlAlchemyDatabaseAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
@@ -93,7 +93,6 @@ from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchem
 from autotrading.adapters.outbound.sqlalchemy.scheduling import (
     SqlAlchemyFlowLockAdapter,
     SqlAlchemyScheduledFlowsAdapter,
-    TenantScheduledFlow,
 )
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlchemyRunningVerificationsAdapter
@@ -132,6 +131,7 @@ from autotrading.application.cycles.ports import (
     ScheduledFlow,
     SourceReading,
     SourceRequest,
+    TenantScheduledFlow,
 )
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
@@ -1063,7 +1063,7 @@ def _credentials_key_version(configuration: Mapping[str, str]) -> int:
 
 
 def _database(configuration: Mapping[str, str]) -> Engine:
-    settings = DatabaseSettings(
+    database = SqlAlchemyDatabaseAdapter(
         host=_required(configuration, "DATABASE_HOST"),
         port=int(configuration.get("DATABASE_PORT", DEFAULT_DATABASE_PORT)),
         name=_required(configuration, "DATABASE_NAME"),
@@ -1071,7 +1071,7 @@ def _database(configuration: Mapping[str, str]) -> Engine:
         # A secret is a mounted read-only file, never an environment variable (ADR 0015).
         password=_secret(configuration, "DATABASE_PASSWORD_FILE"),
     )
-    return create_database_engine(settings)
+    return database.engine()
 
 
 def _authentication(configuration: Mapping[str, str]) -> Authentication | None:

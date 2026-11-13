@@ -18,7 +18,7 @@ from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.bootstrap import TradingAccessFromAccounts
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import StopOutcome
 from autotrading.domain.orders.direction import Direction
@@ -34,8 +34,8 @@ from tests.support.steps import quoted
 # The commands that bring a stopped flow to each status, the way the user would.
 COMMANDS_TO = {
     FlowStatus.STOPPED: (),
-    FlowStatus.ACTIVE: (FlowCommand.START,),
-    FlowStatus.PAUSED: (FlowCommand.START, FlowCommand.PAUSE),
+    FlowStatus.ACTIVE: (FlowAction.START,),
+    FlowStatus.PAUSED: (FlowAction.START, FlowAction.PAUSE),
 }
 
 

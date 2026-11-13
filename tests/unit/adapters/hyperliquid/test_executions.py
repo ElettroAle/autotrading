@@ -10,6 +10,7 @@ from eth_account.signers.local import LocalAccount
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
+from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAdapter
 from autotrading.adapters.outbound.hyperliquid.executions import (
     FILLS_KEPT,
     FILLS_PAGE,
@@ -47,7 +48,7 @@ def a_payment(time: int, coin: str = "BTC", usdc: str = "-0.3") -> dict[str, Any
 
 
 @dataclass
-class FakeSdk:
+class FakeSdk(HyperliquidSdkAdapter):
     fill_pages: list[list[dict[str, Any]]] = field(default_factory=lambda: [[a_fill(7, 1762941500000)]])
     funding_pages: list[list[dict[str, Any]]] = field(default_factory=lambda: [[a_payment(1762941600000)]])
     failure: Exception | None = None

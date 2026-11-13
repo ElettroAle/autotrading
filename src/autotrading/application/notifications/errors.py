@@ -5,7 +5,7 @@ class ChatNotLinkedError(ApplicationError):
     status_code = 404
 
     def __init__(self) -> None:
-        super().__init__("nessuna chat Telegram collegata")
+        super().__init__("nessuna chat collegata")
 
 
 class MessageNotDeliveredError(ApplicationError):
@@ -14,7 +14,7 @@ class MessageNotDeliveredError(ApplicationError):
     status_code = 503
 
     def __init__(self) -> None:
-        super().__init__("messaggio Telegram non consegnato")
+        super().__init__("messaggio non consegnato alla chat")
 
 
 class BotUnreachableError(ApplicationError):
@@ -23,4 +23,4 @@ class BotUnreachableError(ApplicationError):
     status_code = 503
 
     def __init__(self) -> None:
-        super().__init__("bot Telegram non raggiungibile")
+        super().__init__("bot non raggiungibile")

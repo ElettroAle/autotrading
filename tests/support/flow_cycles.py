@@ -9,8 +9,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.adapters.outbound.sqlalchemy.scheduling import TenantScheduledFlow
-from autotrading.application.cycles.ports import ScheduledFlow
+from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase

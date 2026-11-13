@@ -6,7 +6,9 @@ APPLICATION_ROLE = "autotrading_app"
 
 
 @dataclass(frozen=True, slots=True)
-class DatabaseSettings:
+class SqlAlchemyDatabaseAdapter:
+    """Where the database is and who connects: the engine it builds never shows the password."""
+
     host: str
     port: int
     name: str
@@ -23,6 +25,5 @@ class DatabaseSettings:
             database=self.name,
         )
 
-
-def create_database_engine(settings: DatabaseSettings) -> Engine:
-    return create_engine(settings.url(), pool_pre_ping=True)
+    def engine(self) -> Engine:
+        return create_engine(self.url(), pool_pre_ping=True)

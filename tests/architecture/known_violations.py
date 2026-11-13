@@ -8,7 +8,6 @@ from tests.support.architecture import Rule
 
 BUG_CYCLE_RULES_IN_BOOTSTRAP = 170
 BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON = 173
-BUG_MISPLACED_TYPES_AND_TEXTS = 175
 
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.PORTS_IN_PORTS_MODULES: {
@@ -17,9 +16,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:ManualClosingRecorder": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:Notifier": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:ScheduledFlowsSource": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "adapters/inbound/api/worker.py:BackgroundLoop": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/hyperliquid/exchange.py:HyperliquidSdk": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "domain/agent/model_parameter.py:ModelParameter": BUG_MISPLACED_TYPES_AND_TEXTS,
     },
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
         "bootstrap.py:AccountActivityFromAccounts.activity": BUG_CYCLE_RULES_IN_BOOTSTRAP,
@@ -70,26 +66,10 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     },
     Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {
         "domain/notifications/link_code.py:<modulo>": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "application/notifications/errors.py:BotUnreachableError.__init__": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "application/notifications/errors.py:ChatNotLinkedError.__init__": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "application/notifications/errors.py:MessageNotDeliveredError.__init__": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "application/notifications/link_chat.py:LinkChatUseCase._redeem": BUG_MISPLACED_TYPES_AND_TEXTS,
     },
     Rule.ONLY_PROJECT_EXCEPTIONS_RAISED: {},
     Rule.NO_GENERIC_EXCEPT: {},
     Rule.USE_CASE_SHAPE: {},
-    Rule.COMMAND_SHAPE: {
-        "domain/flows/flow_command.py:FlowCommand": BUG_MISPLACED_TYPES_AND_TEXTS,
-    },
-    Rule.ADAPTER_NAMES: {
-        "adapters/outbound/httpx/model_call.py:ProviderApi": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/httpx/provider_key_verifier.py:KeyCheck": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/httpx/telegram.py:TelegramTokenFilter": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/hyperliquid/exchange.py:HyperliquidSdk": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/hyperliquid/exchange.py:OfficialSdk": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/hyperliquid/user_state.py:UserPosition": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/hyperliquid/user_state.py:UserState": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/sqlalchemy/database.py:DatabaseSettings": BUG_MISPLACED_TYPES_AND_TEXTS,
-        "adapters/outbound/sqlalchemy/scheduling.py:TenantScheduledFlow": BUG_MISPLACED_TYPES_AND_TEXTS,
-    },
+    Rule.COMMAND_SHAPE: {},
+    Rule.ADAPTER_NAMES: {},
 }

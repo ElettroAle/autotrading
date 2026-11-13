@@ -14,7 +14,7 @@ from autotrading.domain.flows.errors import (
     FlowCommandNotAllowedError,
 )
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -28,13 +28,13 @@ ACCOUNT = uuid4()
 @pytest.mark.parametrize(
     ("status", "command", "after"),
     [
-        (FlowStatus.STOPPED, FlowCommand.START, FlowStatus.ACTIVE),
-        (FlowStatus.ACTIVE, FlowCommand.PAUSE, FlowStatus.PAUSED),
-        (FlowStatus.PAUSED, FlowCommand.RESUME, FlowStatus.ACTIVE),
+        (FlowStatus.STOPPED, FlowAction.START, FlowStatus.ACTIVE),
+        (FlowStatus.ACTIVE, FlowAction.PAUSE, FlowStatus.PAUSED),
+        (FlowStatus.PAUSED, FlowAction.RESUME, FlowStatus.ACTIVE),
     ],
 )
 def test_a_command_moves_the_flow_from_its_one_starting_status(
-    status: FlowStatus, command: FlowCommand, after: FlowStatus
+    status: FlowStatus, command: FlowAction, after: FlowStatus
 ) -> None:
     flow = a_flow(TENANT, status=status)
 
@@ -46,18 +46,18 @@ def test_a_command_moves_the_flow_from_its_one_starting_status(
 @pytest.mark.parametrize(
     ("status", "command"),
     [
-        (FlowStatus.ACTIVE, FlowCommand.START),
-        (FlowStatus.PAUSED, FlowCommand.START),
-        (FlowStatus.ARCHIVED, FlowCommand.START),
-        (FlowStatus.STOPPED, FlowCommand.PAUSE),
-        (FlowStatus.PAUSED, FlowCommand.PAUSE),
-        (FlowStatus.ARCHIVED, FlowCommand.PAUSE),
-        (FlowStatus.STOPPED, FlowCommand.RESUME),
-        (FlowStatus.ACTIVE, FlowCommand.RESUME),
-        (FlowStatus.ARCHIVED, FlowCommand.RESUME),
+        (FlowStatus.ACTIVE, FlowAction.START),
+        (FlowStatus.PAUSED, FlowAction.START),
+        (FlowStatus.ARCHIVED, FlowAction.START),
+        (FlowStatus.STOPPED, FlowAction.PAUSE),
+        (FlowStatus.PAUSED, FlowAction.PAUSE),
+        (FlowStatus.ARCHIVED, FlowAction.PAUSE),
+        (FlowStatus.STOPPED, FlowAction.RESUME),
+        (FlowStatus.ACTIVE, FlowAction.RESUME),
+        (FlowStatus.ARCHIVED, FlowAction.RESUME),
     ],
 )
-def test_a_command_from_another_status_is_refused(status: FlowStatus, command: FlowCommand) -> None:
+def test_a_command_from_another_status_is_refused(status: FlowStatus, command: FlowAction) -> None:
     expected = rf"^comando {command.value} non ammesso per un flusso {status.value}$"
 
     with pytest.raises(FlowCommandNotAllowedError, match=expected) as refused:

@@ -90,7 +90,7 @@ def test_unlinking_without_a_chat_is_not_found(client_of: Client) -> None:
     response = client_of("anna").delete("/telegram/chat")
 
     assert response.status_code == 404
-    assert reason_of(response) == {"detail": "nessuna chat Telegram collegata"}
+    assert reason_of(response) == {"detail": "nessuna chat collegata"}
 
 
 def test_the_telegram_functions_need_a_login(platform: Platform, client_of: Client) -> None:

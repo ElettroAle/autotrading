@@ -286,7 +286,7 @@ def test_unlinking_removes_the_chat(telegram: Telegram) -> None:
 
 
 def test_unlinking_without_a_linked_chat_is_not_found(telegram: Telegram) -> None:
-    with pytest.raises(ChatNotLinkedError, match=r"^nessuna chat Telegram collegata$") as raised:
+    with pytest.raises(ChatNotLinkedError, match=r"^nessuna chat collegata$") as raised:
         UnlinkChatUseCase(InMemoryLinkedChatRepositoryAdapter(telegram.chats, ANNA)).execute()
 
     assert raised.value.status_code == 404
@@ -340,7 +340,7 @@ def test_a_bot_round_without_telegram_fails_for_the_next_round_to_retry(telegram
     inbox = FakeBotInboxAdapter()
     inbox.reachable = False
 
-    with pytest.raises(BotUnreachableError, match=r"^bot Telegram non raggiungibile$"):
+    with pytest.raises(BotUnreachableError, match=r"^bot non raggiungibile$"):
         telegram.answering_bot(inbox).execute()
 
 

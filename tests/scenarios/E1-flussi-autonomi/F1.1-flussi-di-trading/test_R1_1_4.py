@@ -6,7 +6,7 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.domain.cycles.cycle_record import CycleOutcome
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flow_cycles import ACCOUNT, FlowCycles
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
@@ -43,7 +43,7 @@ def flow_of_user(platform: Platform, lifecycle: Lifecycle, user: str, name: str)
 
 @when(quoted('"{user}" esegue sul flusso "{name}" il comando "{command}"'))
 def run_command(platform: Platform, lifecycle: Lifecycle, user: str, name: str, command: str) -> None:
-    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowCommand(command))
+    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction(command))
     attempt(lifecycle, lambda: platform.use_cases_of(user).change_flow_status.execute(change))
 
 
@@ -54,7 +54,7 @@ def command_refused(lifecycle: Lifecycle, reason: str) -> None:
 
 @when(quoted('"{user}" avvia il flusso "{name}"'))
 def start(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
-    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowCommand.START)
+    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction.START)
     attempt(lifecycle, lambda: platform.use_cases_of(user).change_flow_status.execute(change))
 
 
@@ -87,13 +87,13 @@ def paused_with_position(platform: Platform, lifecycle: Lifecycle, name: str, as
 
 @when(quoted('"{user}" mette in pausa il flusso "{name}"'))
 def pause(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
-    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowCommand.PAUSE)
+    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction.PAUSE)
     attempt(lifecycle, lambda: platform.use_cases_of(user).change_flow_status.execute(change))
 
 
 @when(quoted('"{user}" riprende il flusso "{name}"'))
 def resume(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
-    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowCommand.RESUME)
+    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction.RESUME)
     attempt(lifecycle, lambda: platform.use_cases_of(user).change_flow_status.execute(change))
 
 

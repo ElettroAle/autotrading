@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Protocol
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
@@ -118,10 +117,7 @@ class CyclePolling:
             stopping.wait(self._pause_seconds)
 
 
-class BackgroundLoop(Protocol):
-    thread_name: str
-
-    def run(self, stopping: threading.Event) -> None: ...
+type BackgroundLoop = BotPolling | CyclePolling
 
 
 def background(loops: Sequence[BackgroundLoop]) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:

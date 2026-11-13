@@ -11,10 +11,9 @@ from hyperliquid.utils.error import ClientError, ServerError
 from autotrading.adapters.outbound.hyperliquid.exchange import (
     MARGIN_CURRENCY,
     TIMEOUT_SECONDS,
-    HyperliquidSdk,
-    OfficialSdk,
+    HyperliquidSdkAdapter,
 )
-from autotrading.adapters.outbound.hyperliquid.user_state import UserPosition, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -30,13 +29,17 @@ class HyperliquidAccountActivityAdapter:
     are read apart, only the new ones, for the ledger (ADR 0063). Funding payments are not movements.
     """
 
-    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+    ) -> None:
         self._base_url = base_url
-        self._sdk = sdk or OfficialSdk()
+        self._sdk = sdk or HyperliquidSdkAdapter()
         self._timeout = timeout
 
     @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidAccountActivityAdapter:
+    def for_network(
+        cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None
+    ) -> HyperliquidAccountActivityAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     @property
@@ -67,7 +70,7 @@ def translated() -> Iterator[None]:
         raise FlowExchangeUnavailableError from error
 
 
-def _position_of(position: UserPosition) -> AccountPosition:
+def _position_of(position: _UserPosition) -> AccountPosition:
     return AccountPosition(
         asset=position.coin,
         side=TradeSide.LONG if position.signed_size > 0 else TradeSide.SHORT,

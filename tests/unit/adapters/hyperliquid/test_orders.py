@@ -10,7 +10,11 @@ from eth_account.signers.local import LocalAccount
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
-from autotrading.adapters.outbound.hyperliquid.exchange import INVALID_KEY_MESSAGE, TIMEOUT_SECONDS
+from autotrading.adapters.outbound.hyperliquid.exchange import (
+    INVALID_KEY_MESSAGE,
+    TIMEOUT_SECONDS,
+    HyperliquidSdkAdapter,
+)
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
 from autotrading.application.orders.errors import (
     ExchangeRejectedOrderError,
@@ -81,7 +85,7 @@ def answer(statuses: list[Any]) -> Any:
 
 
 @dataclass
-class FakeSdk:
+class FakeSdk(HyperliquidSdkAdapter):
     """Stands in for the official SDK: it records the calls and answers what the test decides."""
 
     order_answer: Any = field(default_factory=lambda: FILLED)

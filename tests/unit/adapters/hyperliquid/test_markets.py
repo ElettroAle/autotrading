@@ -8,6 +8,7 @@ from eth_account.signers.local import LocalAccount
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
+from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAdapter
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.risk_check import AssetLimits
@@ -22,7 +23,7 @@ META = {
 
 
 @dataclass
-class FakeSdk:
+class FakeSdk(HyperliquidSdkAdapter):
     """Stands in for the official SDK: it answers the metadata the test decides, or fails as the test decides."""
 
     meta_answer: Any = field(default_factory=lambda: META)

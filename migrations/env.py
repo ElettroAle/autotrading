@@ -5,12 +5,12 @@ from pathlib import Path
 
 from alembic import context
 
-from autotrading.adapters.outbound.sqlalchemy.database import DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.database import SqlAlchemyDatabaseAdapter
 from autotrading.adapters.outbound.sqlalchemy.tables import metadata
 
 
-def owner_settings() -> DatabaseSettings:
-    return DatabaseSettings(
+def owner_database() -> SqlAlchemyDatabaseAdapter:
+    return SqlAlchemyDatabaseAdapter(
         host=os.environ["DATABASE_HOST"],
         port=int(os.environ.get("DATABASE_PORT", "5432")),
         name=os.environ["DATABASE_NAME"],
@@ -21,7 +21,7 @@ def owner_settings() -> DatabaseSettings:
 
 
 def run_migrations() -> None:
-    engine = create_database_engine(owner_settings())
+    engine = owner_database().engine()
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=metadata)
         with context.begin_transaction():
