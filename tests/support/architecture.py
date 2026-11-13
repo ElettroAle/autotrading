@@ -63,7 +63,8 @@ REMEDIES = {
     ),
     Rule.LIBRARIES_IN_THEIR_FOLDER: (
         "un adapter usa una e una sola tecnologia: la libreria si importa solo nella cartella "
-        "adapters/<verso>/<tecnologia>/ che la dichiara"
+        "adapters/<verso>/<tecnologia>/ che la dichiara; un'eccezione architetturale del proprietario (langgraph) "
+        "solo nei moduli che nomina"
     ),
     Rule.ADAPTERS_DO_NOT_ORCHESTRATE: (
         "un adapter realizza una porta con la sua sola tecnologia: non riceve porte né casi d'uso e da application "
@@ -125,11 +126,18 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/litellm": frozenset({"openai"}),
     "adapters/outbound/oidc": frozenset({"jwt"}),
     "adapters/outbound/rss": frozenset({"httpx"}),
-    "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy"}),
+    # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle.
+    "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy", "psycopg"}),
     "adapters/outbound/system_clock": frozenset(),
     "adapters/outbound/telegram": frozenset({"httpx"}),
     "adapters/outbound/threads": frozenset(),
     "adapters/outbound/worker": frozenset({"httpx"}),
+}
+
+# The architectural exceptions the owner names (ADR 0104): the library, and the only modules that may import it.
+# LangGraph orchestrates the decision cycle as a graph and keeps its checkpoints in PostgreSQL, and nothing else.
+ARCHITECTURAL_LIBRARIES: dict[str, frozenset[str]] = {
+    "langgraph": frozenset({"application/flows/cycle_graph.py", "adapters/outbound/sqlalchemy/cycle_checkpoints.py"}),
 }
 
 TECHNICAL_STANDARD_LIBRARY = frozenset(
@@ -423,6 +431,8 @@ def _libraries_outside_their_folder(module: SourceModule) -> Iterator[Violation]
     for scoped, imported in _imports(module):
         library = imported.split(".")[0]
         if library in STANDARD_LIBRARY or library == "autotrading" or library in allowed:
+            continue
+        if module.path in ARCHITECTURAL_LIBRARIES.get(library, frozenset()):
             continue
         yield _violation(Rule.LIBRARIES_IN_THEIR_FOLDER, module, scoped, f"libreria {library} in {place}")
 

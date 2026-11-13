@@ -5,6 +5,7 @@ import pytest
 
 from tests.architecture.known_violations import KNOWN_VIOLATIONS
 from tests.support.architecture import (
+    ARCHITECTURAL_LIBRARIES,
     SOURCE_ROOT,
     TECHNOLOGY_LIBRARIES,
     TRANSPORT_LIBRARIES,
@@ -85,3 +86,9 @@ def test_every_library_belongs_to_one_technology_folder() -> None:
     ]
 
     assert len(libraries) == len(set(libraries))
+
+
+def test_an_architectural_exception_belongs_to_no_technology_folder() -> None:
+    owned = {library for libraries in TECHNOLOGY_LIBRARIES.values() for library in libraries}
+
+    assert not owned & set(ARCHITECTURAL_LIBRARIES)
