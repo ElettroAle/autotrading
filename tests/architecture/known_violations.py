@@ -60,7 +60,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
         "bootstrap.py:SystemClock": BUG_STRICTER_RULES,
         "bootstrap.py:TenantCyclePorts": BUG_STRICTER_RULES,
-        "bootstrap.py:UnconfiguredMessenger": BUG_STRICTER_RULES,
         "bootstrap.py:UndeclaredEnvironmentError": BUG_STRICTER_RULES,
         "bootstrap.py:UnsupportedEnvironmentError": BUG_STRICTER_RULES,
         "bootstrap.py:WorkerConnection": BUG_STRICTER_RULES,

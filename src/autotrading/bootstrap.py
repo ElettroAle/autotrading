@@ -23,21 +23,10 @@ from autotrading.adapters.inbound.api.worker import (
     bot_polling,
     create_worker_api,
 )
-from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
-from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
-from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
-from autotrading.adapters.outbound.httpx.bot_identity import HttpxWorkerBotIdentityAdapter
+from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
+from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.httpx.model_call import HttpxModelCallAdapter
-from autotrading.adapters.outbound.httpx.news import HttpxRssNewsAdapter
-from autotrading.adapters.outbound.httpx.notifications import HttpxNotificationAdapter
-from autotrading.adapters.outbound.httpx.position_closing import HttpxPositionClosingAdapter
 from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
-from autotrading.adapters.outbound.httpx.sentiment import (
-    HttpxAlternativeMeSentimentAdapter,
-    HttpxCoinMarketCapSentimentAdapter,
-)
-from autotrading.adapters.outbound.httpx.telegram_channel import telegram_channel
-from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
@@ -59,6 +48,7 @@ from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumPr
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.oidc.access_token_verifier import OidcAccessTokenVerifierAdapter
 from autotrading.adapters.outbound.oidc.login_endpoints import OidcLoginEndpointsAdapter
+from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
@@ -95,9 +85,17 @@ from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
+from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
+from autotrading.adapters.outbound.worker.account_activity import WorkerAccountActivityAdapter
+from autotrading.adapters.outbound.worker.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
+from autotrading.adapters.outbound.worker.account_state import WorkerAccountStateAdapter
+from autotrading.adapters.outbound.worker.bot_identity import WorkerBotIdentityAdapter
+from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
+from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
+from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
 from autotrading.application.accounts.errors import (
     CredentialsNotOpenedError,
     ExchangeRejectedCredentialsError,
@@ -166,7 +164,6 @@ from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.source_collector import SourceCollector
 from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
-from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
@@ -251,7 +248,6 @@ from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
-from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
@@ -465,19 +461,19 @@ def tenant_use_cases(
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     provider_key_verifier = HttpxProviderKeyVerifierAdapter(providers)
     # One per installation: the username, once known, is kept across requests.
-    bot_identity = HttpxWorkerBotIdentityAdapter(worker.client, worker.token)
+    bot_identity = WorkerBotIdentityAdapter(worker.client, worker.token)
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         sealer = SodiumCredentialSealerAdapter(public_key.key, public_key.version, tenant_id)
-        account_state = HttpxAccountStateAdapter(worker.client, worker.token, tenant_id)
+        account_state = WorkerAccountStateAdapter(worker.client, worker.token, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
-        position_closing = HttpxPositionClosingAdapter(worker.client, worker.token, tenant_id)
+        position_closing = WorkerPositionClosingAdapter(worker.client, worker.token, tenant_id)
         flow_positions = FlowPositionsFromOrders(CloseFlowPositionUseCase(position_closing))
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(
-            HttpxNotificationAdapter(worker.client, worker.token, tenant_id),
+            WorkerNotificationAdapter(worker.client, worker.token, tenant_id),
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         flow_openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
@@ -491,7 +487,7 @@ def tenant_use_cases(
             account_state=account_state,
             position_closing=position_closing,
             manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
-            verification=HttpxVerificationAdapter(worker.client, worker.token, tenant_id),
+            verification=WorkerVerificationAdapter(worker.client, worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=SodiumProviderKeySealerAdapter(public_key.key, public_key.version, tenant_id),
@@ -509,7 +505,7 @@ def tenant_use_cases(
             flow_positions=flow_positions,
             stop_ports=stop_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
-            account_activity=HttpxAccountActivityAdapter(worker.client, worker.token, tenant_id),
+            account_activity=WorkerAccountActivityAdapter(worker.client, worker.token, tenant_id),
             flow_ledger=SqlAlchemyFlowLedgerAdapter(engine, tenant_id),
             flow_operations=SqlAlchemyFlowOperationsAdapter(engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
@@ -650,15 +646,6 @@ def link_stores_for(engine: Engine, tenant_id: TenantId) -> LinkStores:
     )
 
 
-class UnconfiguredMessenger:
-    """Stands for Telegram until the installation has the token of the bot: every notification is a recorded
-    failure, and the flows go on (ADR 0035).
-    """
-
-    def send(self, chat_id: ChatId, text: str) -> None:  # noqa: ARG002 - the signature of the port
-        raise MessageNotDeliveredError
-
-
 def now() -> datetime:
     return datetime.now(UTC)
 
@@ -697,19 +684,16 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)
-    messenger, inbox, identity = telegram_channel(
-        _optional_secret(configuration, TELEGRAM_BOT_SETTING), UnconfiguredMessenger()
-    )
+    messenger, inbox, start_link = telegram_adapters(_optional_secret(configuration, TELEGRAM_BOT_SETTING))
     for_tenant = worker_use_cases(engine, opener, exchanges, settings, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     ports_of = cycle_ports(engine, opener, exchanges, settings, messenger)
     cycles = worker_cycles(engine, ports_of, cycle_services(environment, private_keys))
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), for_tenant, bot, cycles, identity)
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), for_tenant, bot, cycles, start_link)
 
 
 def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
-    public = httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS)
     network = ExchangeNetwork.of_installation(environment)
     return CycleServices(
         environment=environment,
@@ -718,10 +702,10 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
         provider_key_opener=SodiumProviderKeyOpenerAdapter(private_keys),
         model_call=HttpxModelCallAdapter(httpx.Client()),
         sentiments={
-            SENTIMENT_ALTERNATIVE_ME.name: HttpxAlternativeMeSentimentAdapter(public),
-            SENTIMENT_COINMARKETCAP.name: HttpxCoinMarketCapSentimentAdapter(public),
+            SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
+            SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
         },
-        news=HttpxRssNewsAdapter(public),
+        news=rss_adapters(),
         prices=HyperliquidPriceHistoryAdapter.for_network(testnet=network.is_test),
         market=HyperliquidMarketDataAdapter.for_network(testnet=network.is_test),
         exchange_limits=markets_for(network),

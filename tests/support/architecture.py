@@ -91,17 +91,26 @@ REMEDIES = {
     ),
 }
 
-# The external libraries each technology folder may import: one technology per folder, each library in one folder.
+# A technology is the system an adapter integrates with, not the library it talks through: a transport library serves
+# every folder that talks to its system over that transport, every other library belongs to one folder.
+TRANSPORT_LIBRARIES = frozenset({"httpx"})
+
+# The external libraries each technology folder may import: one system per folder.
 TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/inbound/api": frozenset({"fastapi", "pydantic", "starlette"}),
+    "adapters/outbound/alternative_me": frozenset({"httpx"}),
+    "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
     "adapters/outbound/httpx": frozenset({"httpx"}),
     # eth_account and requests are the signing and transport libraries of the official Hyperliquid SDK.
     "adapters/outbound/hyperliquid": frozenset({"hyperliquid", "eth_account", "requests"}),
     "adapters/outbound/json": frozenset(),
     "adapters/outbound/libsodium": frozenset({"nacl"}),
     "adapters/outbound/oidc": frozenset({"jwt"}),
+    "adapters/outbound/rss": frozenset({"httpx"}),
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy"}),
+    "adapters/outbound/telegram": frozenset({"httpx"}),
     "adapters/outbound/threads": frozenset(),
+    "adapters/outbound/worker": frozenset({"httpx"}),
 }
 
 TECHNICAL_STANDARD_LIBRARY = frozenset(
