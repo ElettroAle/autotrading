@@ -15,6 +15,7 @@ from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_sample import SourceValue
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
+from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 
 NOW = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
@@ -83,7 +84,9 @@ def test_no_recent_story_gives_no_value() -> None:
 
 
 def forecast_reader(prices: FakePriceHistoryAdapter) -> ReadForecastUseCase:
-    return ReadForecastUseCase(ForecastAssetUseCase(prices, InMemoryForecastRepositoryAdapter()))
+    return ReadForecastUseCase(
+        ForecastAssetUseCase(prices, FakePriceForecasterAdapter(), InMemoryForecastRepositoryAdapter())
+    )
 
 
 def test_the_forecast_refers_to_the_instant_it_is_made() -> None:
@@ -97,10 +100,10 @@ def test_the_forecast_refers_to_the_instant_it_is_made() -> None:
             {
                 "prezzo_attuale": "100",
                 "profondita_storico_giorni": "5",
-                "prezzo_previsto_15 minuti": "100.00",
-                "variazione_percentuale_15 minuti": "0.00",
-                "prezzo_previsto_1 ora": "100.00",
-                "variazione_percentuale_1 ora": "0.00",
+                "prezzo_previsto_15 minuti": "100.15",
+                "variazione_percentuale_15 minuti": "0.15",
+                "prezzo_previsto_1 ora": "100.60",
+                "variazione_percentuale_1 ora": "0.60",
             },
         ),
     )
