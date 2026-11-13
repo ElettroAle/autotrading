@@ -80,9 +80,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "application/cycles/source_collector.py:concurrent.futures": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
     },
     Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {
-        "domain/verification/errors.py:InsufficientMarginError.__init__": (
-            BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP
-        ),
         "domain/notifications/link_code.py:<modulo>": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "application/notifications/errors.py:BotUnreachableError.__init__": BUG_MISPLACED_TYPES_AND_TEXTS,
         "application/notifications/errors.py:ChatNotLinkedError.__init__": BUG_MISPLACED_TYPES_AND_TEXTS,

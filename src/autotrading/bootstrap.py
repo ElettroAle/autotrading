@@ -696,13 +696,7 @@ class OrderExecutionFromOrders:
         self._market = market
 
     def minimum_value(self, account_id: UUID, coin: str) -> Decimal:
-        try:
-            market = self._market.execute(ReadMarketCommand(account_id, coin))
-        except OrderAccountNotFoundError as error:
-            raise VerificationAccountNotFoundError from error
-        except AutotradingError as error:
-            raise VerificationStepError(str(error)) from error
-        return market.min_order_value
+        return _result_of(lambda: self._market.execute(ReadMarketCommand(account_id, coin))).min_order_value
 
     def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult:
         command = OpenPositionCommand(
@@ -713,29 +707,30 @@ class OrderExecutionFromOrders:
             value=opening.value,
             source=_verification_source(user_id),
         )
-        return _result_of(lambda: self._opening.execute(command))
+        return _order_result(_result_of(lambda: self._opening.execute(command)))
 
     def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderResult:
         command = CloseExchangePositionCommand(account_id, coin, _verification_source(user_id))
-        return _result_of(lambda: self._closing.execute(command))
+        return _order_result(_result_of(lambda: self._closing.execute(command)))
 
 
 def _verification_source(user_id: UserId) -> OrderSource:
     return OrderSource(OrderOrigin.VERIFICATION, user_id.value)
 
 
-def _result_of(send: Callable[[], Order]) -> OrderResult:
+def _result_of[T](send: Callable[[], T]) -> T:
+    """What the orders context answers, its failures as the verification context names them."""
     try:
-        order = send()
+        return send()
     except OrderAccountNotFoundError as error:
         raise VerificationAccountNotFoundError from error
     except AutotradingError as error:
         raise VerificationStepError(str(error)) from error
-    execution, rejection = order.execution, order.rejection
-    if execution is None:
-        message = order.status.value if rejection is None else rejection.exchange_message
-        return OrderResult(succeeded=False, message=message)
-    return OrderResult(succeeded=True, fee=execution.fee, realized_pnl=execution.realized_pnl)
+
+
+def _order_result(order: Order) -> OrderResult:
+    outcome = OrderOutcome.of(order)
+    return OrderResult.reported(outcome.fee, outcome.realized_pnl, outcome.exchange_message, outcome.status.value)
 
 
 @dataclass(frozen=True, slots=True)
