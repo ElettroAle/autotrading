@@ -93,7 +93,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-24.04
-    # Integration tests of the SQLAlchemy adapters run against a real PostgreSQL (rule tests.md).
+    # Integration tests run against a real PostgreSQL and a real forecaster container (rule tests.md).
     services:
       postgres:
         image: postgres:16.15-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
@@ -111,6 +111,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/python-setup
+      # The integration tests of the forecaster adapter run against the image this change builds (ADR 0107).
+      - uses: ./.github/actions/image-build
+        with:
+          tag: autotrading-forecaster:candidate
+          target: forecaster
+      - uses: ./.github/actions/forecaster-start
+        with:
+          image: autotrading-forecaster:candidate
       - uses: ./.github/actions/pytest-run
 
   copertura-codice:
@@ -144,6 +152,13 @@ jobs:
       - uses: ./.github/actions/trivy-scan
         with:
           image: autotrading:candidate
+      - uses: ./.github/actions/image-build
+        with:
+          tag: autotrading-forecaster:candidate
+          target: forecaster
+      - uses: ./.github/actions/trivy-scan
+        with:
+          image: autotrading-forecaster:candidate
 
   analisi-statica:
     name: analisi statica

@@ -20,7 +20,6 @@ from autotrading.application.agent.ports import (
     ProviderKeyRepositoryPort,
     ProviderKeySealerPort,
     ProviderKeyUsagePort,
-    ProviderKeyVerifierPort,
 )
 from autotrading.application.agent.register_provider_key import ProviderKeyServices, RegisterProviderKeyUseCase
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
@@ -92,7 +91,6 @@ class TenantPorts:
     source_catalog: SourceCatalog
     provider_keys: ProviderKeyRepositoryPort
     provider_key_sealer: ProviderKeySealerPort
-    provider_key_verifier: ProviderKeyVerifierPort
     provider_key_usage: ProviderKeyUsagePort
     model_catalog: ModelCatalogPort
     flows: FlowRepositoryPort
@@ -163,7 +161,7 @@ class TenantUseCases:
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
         accounts, sealer, exchanges = ports.accounts, ports.sealer, ports.exchanges
         keys = ports.provider_keys
-        key_services = ProviderKeyServices(ports.model_catalog, ports.provider_key_verifier, ports.provider_key_sealer)
+        key_services = ProviderKeyServices(ports.model_catalog, ports.provider_key_sealer)
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
             list_accounts=ListAccountsUseCase(accounts),

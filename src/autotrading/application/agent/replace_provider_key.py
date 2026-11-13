@@ -15,7 +15,7 @@ class ReplaceProviderKeyCommand:
 
 
 class ReplaceProviderKeyUseCase:
-    """Puts a new key in place of the one of a provider, once the provider accepts it (R1.4.1).
+    """Puts a new key in place of the one of a provider (R1.4.1).
 
     The next cycles of the flows use the new key: the worker opens the key at every cycle.
     """
@@ -28,7 +28,6 @@ class ReplaceProviderKeyUseCase:
         provider = supported_provider(self._services.catalog, command.provider)
         key = ProviderKey(command.key)
         current = registered_key(self._keys, provider)
-        self._services.verifier.verify(provider, key)
         sealed = self._services.sealer.seal(provider, key)
         self._keys.replace(RegisteredProviderKey(current.tenant_id, provider, sealed))
         operations.info("chiave del fornitore sostituita", extra={"provider": provider.value})

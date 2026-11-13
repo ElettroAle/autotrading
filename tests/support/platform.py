@@ -76,7 +76,6 @@ from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
-    FakeProviderKeyVerifierAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
     ProviderKeyVault,
@@ -112,7 +111,6 @@ class Platform:
         self.runs: dict[TenantId, InMemoryVerificationRunRepositoryAdapter] = {}
         self.provider_keys = ProviderKeyStore()
         self.key_vault: ProviderKeyVault = {}
-        self.providers = FakeProviderKeyVerifierAdapter()
         self.flows = FlowStore()
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
@@ -182,7 +180,6 @@ class Platform:
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
-            provider_key_verifier=self.providers,
             provider_key_usage=flows,
             model_catalog=InMemoryModelCatalogAdapter(self.model_catalog),
             flows=flows,
