@@ -11,12 +11,17 @@ from tests.support.architecture import (
     TRANSPORT_LIBRARIES,
     Rule,
     Violation,
+    folders_without_a_rule,
+    indexed_technology_rules,
+    paths_of_rule,
     source_modules,
     technology_folders,
     violations_of,
 )
 
 PYPROJECT = SOURCE_ROOT.parents[1] / "pyproject.toml"
+CONTRACT = SOURCE_ROOT.parents[1] / "CLAUDE.md"
+RULES = SOURCE_ROOT.parents[1] / ".claude" / "rules"
 
 
 @pytest.fixture(scope="module")
@@ -98,3 +103,42 @@ def test_every_module_an_architectural_exception_names_exists() -> None:
     named = {module for modules in ARCHITECTURAL_LIBRARIES.values() for module in modules}
 
     assert {module for module in named if not (SOURCE_ROOT / module).is_file()} == set()
+
+
+def test_every_technology_folder_has_its_rule_in_the_index() -> None:
+    rules = indexed_technology_rules(CONTRACT.read_text(encoding="utf-8"))
+    paths = [path for rule in rules for path in paths_of_rule((RULES / rule).read_text(encoding="utf-8"))]
+
+    uncovered = folders_without_a_rule(technology_folders(), paths)
+
+    assert not uncovered, (
+        "ogni cartella di tecnologia ha una rule .claude/rules/tech-*.md che la copre nei suoi paths, elencata "
+        "nell'indice delle rule di CLAUDE.md: " + ", ".join(uncovered)
+    )
+
+
+def test_every_rule_in_the_index_exists() -> None:
+    rules = indexed_technology_rules(CONTRACT.read_text(encoding="utf-8"))
+
+    assert rules
+    assert [rule for rule in rules if not (RULES / rule).is_file()] == []
+
+
+@pytest.mark.parametrize(
+    ("paths", "uncovered"),
+    [
+        (["src/autotrading/adapters/outbound/telegram/**"], []),
+        (["src/autotrading/adapters/outbound/rss/**"], ["adapters/outbound/telegram"]),
+        ([], ["adapters/outbound/telegram"]),
+    ],
+)
+def test_a_folder_no_rule_covers_is_found(paths: list[str], uncovered: list[str]) -> None:
+    assert folders_without_a_rule(["adapters/outbound/telegram"], paths) == uncovered
+
+
+def test_the_index_and_the_paths_of_a_rule_are_read() -> None:
+    contract = "| Rule | Copre |\n|---|---|\n| `tech-rss.md` | `adapters/outbound/rss/**` |\n| `ci.md` | x |\n"
+    rule = '---\npaths:\n  - "src/autotrading/adapters/outbound/rss/**"\n---\n\n# RSS\n- "not/a/path"\n'
+
+    assert indexed_technology_rules(contract) == ["tech-rss.md"]
+    assert paths_of_rule(rule) == ["src/autotrading/adapters/outbound/rss/**"]

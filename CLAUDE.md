@@ -284,6 +284,8 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
 | `tech-system-clock.md` | `adapters/outbound/system_clock/**` |
 | `tech-litellm.md` | `adapters/outbound/litellm/**` |
+| `tech-oidc.md` | `adapters/outbound/oidc/**` |
+| `tech-threads.md` | `adapters/outbound/threads/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |
