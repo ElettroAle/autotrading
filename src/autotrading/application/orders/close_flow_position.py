@@ -35,7 +35,7 @@ class ClosingReport:
 
 
 class CloseFlowPositionUseCase:
-    """Closes a position of a flow through the worker and reports the outcome instead of raising (ADR 0085)."""
+    """Closes a position of a flow through the worker and reports the outcome instead of raising (ADR 0086)."""
 
     def __init__(self, closing: PositionClosingPort) -> None:
         self._closing = closing
