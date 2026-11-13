@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
+from autotrading.application.flows.errors import FlowAccountNotFoundError
 from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
@@ -15,6 +16,7 @@ from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -53,6 +55,16 @@ class SqlAlchemyAccountRepositoryAdapter:
             raise OrderAccountNotFoundError
         sealed = account.credentials
         return SealedAccess(
+            account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
+        )
+
+    def sealed_address(self, account_id: UUID) -> SealedAddress:
+        """The account as the flows context opens it to read it on its exchange (ADR 0044)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        sealed = account.credentials
+        return SealedAddress(
             account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
         )
 

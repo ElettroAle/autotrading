@@ -25,6 +25,7 @@ from autotrading.domain.flows.ledger import (
 )
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.risk_check import AssetLimits
+from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionClosing, PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
@@ -167,11 +168,43 @@ class FlowTimingPort(Protocol):
     def timings(self) -> Mapping[FlowId, FlowTiming]: ...
 
 
-class AccountActivityPort(Protocol):
-    """Bound to the tenant of the request: what the exchange shows of one of its accounts now (R1.6.1)."""
+@dataclass(frozen=True, slots=True)
+class ReadAccountActivityCommand:
+    account_id: UUID
 
-    def activity(self, account_id: UUID) -> AccountActivity:
+
+class AccountActivityPort(Protocol):
+    """Bound to the tenant of the request: what the exchange shows of one of its accounts now (R1.6.1).
+
+    In the worker it is ReadAccountActivityUseCase; in the API, the client that asks the worker for it.
+    """
+
+    def execute(self, command: ReadAccountActivityCommand) -> AccountActivity:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
+        ...
+
+
+class SealedAddressPort(Protocol):
+    """Bound to the tenant of the request: the account as the worker opens it to read it on its exchange."""
+
+    def sealed_address(self, account_id: UUID) -> SealedAddress:
+        """Raises FlowAccountNotFoundError for an account missing or of another tenant (R0.1.3)."""
+        ...
+
+
+class AddressOpenerPort(Protocol):
+    """In the worker: opens the sealed credentials of an account only to learn its address (ADR 0007)."""
+
+    def open_address(self, sealed: SealedAddress) -> str:
+        """Raises FlowCredentialsNotOpenedError when the sealed text is of another account or no key opens it."""
+        ...
+
+
+class ActivityReaderPort(Protocol):
+    """What an exchange shows of an address: positions, balance and movements (R1.6.1)."""
+
+    def activity(self, address: str) -> AccountActivity:
+        """Raises FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
 
 
@@ -187,14 +220,30 @@ class UnattributableNoticePort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ReadAccountExecutionsCommand:
+    """Without a moment, everything the exchange still holds of the account."""
+
+    account_id: UUID
+    since: datetime | None
+
+
 class AccountExecutionsPort(Protocol):
     """In the worker: the executions and the funding the exchange still holds of an account since a moment (ADR 0063).
 
-    Without a moment, everything the exchange still holds; the window says when part of it is gone already.
+    It is ReadAccountExecutionsUseCase; the window says when part of what was asked is gone already.
     """
 
-    def since(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
+    def execute(self, command: ReadAccountExecutionsCommand) -> ExecutionsWindow:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
+        ...
+
+
+class ExecutionsReaderPort(Protocol):
+    """The executions and the funding an exchange still holds of an address since a moment (ADR 0063)."""
+
+    def since(self, address: str, since: datetime | None) -> ExecutionsWindow:
+        """Raises FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
 
 

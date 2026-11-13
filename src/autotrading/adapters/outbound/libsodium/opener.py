@@ -7,10 +7,12 @@ from nacl.exceptions import CryptoError
 from nacl.public import PrivateKey, SealedBox
 
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
+from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -49,6 +51,13 @@ class SodiumCredentialOpenerAdapter:
         if credentials is None:
             raise OrderCredentialsNotOpenedError
         return TradingAccess(sealed.exchange, credentials.account_address, credentials.secret_key)
+
+    def open_address(self, sealed: SealedAddress) -> str:
+        """The same opening for the flows context, which only reads the account on its exchange (ADR 0044)."""
+        credentials = self._opened(sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
+        if credentials is None:
+            raise FlowCredentialsNotOpenedError
+        return credentials.account_address
 
     def _opened(self, key_version: int, ciphertext: bytes, tenant_id: TenantId, account_id: UUID) -> Credentials | None:
         document = self._document_of(key_version, ciphertext)

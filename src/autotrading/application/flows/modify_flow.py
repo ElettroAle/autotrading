@@ -6,7 +6,7 @@ from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
 from autotrading.application.flows.errors import AssetWithOpenPositionError
-from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
+from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort, ReadAccountActivityCommand
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -107,7 +107,7 @@ class ModifyFlowUseCase:
         if not removed:
             return
         # What the exchange shows of the account decides, as for the state of the flow (R1.6.1, ADR 0067).
-        open_assets = self._activity.activity(flow.account_id).open_assets
+        open_assets = self._activity.execute(ReadAccountActivityCommand(flow.account_id)).open_assets
         held = tuple(asset for asset in removed if asset in open_assets)
         if held:
             raise AssetWithOpenPositionError(held)

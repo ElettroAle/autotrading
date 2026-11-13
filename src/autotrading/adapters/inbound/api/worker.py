@@ -16,10 +16,8 @@ from autotrading.adapters.inbound.api.errors import NotAuthenticatedError, insta
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
-from autotrading.application.flows.read_account_activity import (
-    ReadAccountActivityCommand,
-    ReadAccountActivityUseCase,
-)
+from autotrading.application.flows.ports import ReadAccountActivityCommand
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotIdentityPort
 from autotrading.application.orders.close_exchange_position import (

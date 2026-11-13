@@ -11,15 +11,11 @@ BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON = 173
 
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.PORTS_IN_PORTS_MODULES: {
-        "bootstrap.py:ActivityReaderPort": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:ExecutionsReaderPort": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:ManualClosingRecorder": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:Notifier": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:ScheduledFlowsSource": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
     },
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
-        "bootstrap.py:AccountActivityFromAccounts.activity": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:AccountExecutionsFromAccounts.since": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AccountReadingFromAccounts.read": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.call_cost": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,

@@ -14,7 +14,6 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.bootstrap import (
-    AccountActivityFromAccounts,
     AccountReadingFromAccounts,
     OrderExecutionFromOrders,
 )
@@ -74,9 +73,7 @@ class Worker:
                 lambda: STARTED_AT,
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
-            read_account_activity=ReadAccountActivityUseCase(
-                AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: self.activity_reader})
-            ),
+            read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 
     def saved_account(self, tenant_id: TenantId = TENANT) -> Account:

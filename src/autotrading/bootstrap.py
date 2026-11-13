@@ -111,7 +111,6 @@ from autotrading.application.accounts.get_account import find_account
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
     AccountStatePort,
-    CredentialOpenerPort,
     ExchangePort,
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
@@ -147,9 +146,11 @@ from autotrading.application.flows.errors import (
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
+    ActivityReaderPort,
     AutomaticPausePort,
     ClosedPositionRepositoryPort,
     ExchangeLimitsPort,
+    ExecutionsReaderPort,
     FlowAccount,
     FlowOpeningsPort,
     FlowRepositoryPort,
@@ -157,6 +158,7 @@ from autotrading.application.flows.ports import (
     MarketsPort,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateCommand, ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
@@ -233,7 +235,6 @@ from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
-from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_funds import CycleFunds
@@ -244,7 +245,6 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
-from autotrading.domain.flows.ledger import ExecutionsWindow
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
@@ -549,67 +549,6 @@ class WorkerExchanges:
     executions: Mapping[str, ExecutionsReaderPort]
 
 
-class ActivityReaderPort(Protocol):
-    """What an exchange shows of an address: the adapter of the exchange behind the activity of the flows."""
-
-    def activity(self, address: str) -> AccountActivity: ...
-
-
-class AccountActivityFromAccounts:
-    """Bridges the accounts context to the flows context in the worker (ADR 0044).
-
-    The account is looked up for the tenant under row level security, then opened only to learn its address: the
-    readings of the exchange are public and sign nothing.
-    """
-
-    def __init__(
-        self, accounts: AccountRepositoryPort, opener: CredentialOpenerPort, readers: Mapping[str, ActivityReaderPort]
-    ) -> None:
-        self._accounts = accounts
-        self._opener = opener
-        self._readers = readers
-
-    def activity(self, account_id: UUID) -> AccountActivity:
-        try:
-            account = find_account(self._accounts, AccountId(account_id))
-        except AccountNotFoundError as error:
-            raise FlowAccountNotFoundError from error
-        reader = self._readers.get(account.exchange.value)
-        if reader is None:
-            raise FlowExchangeUnavailableError
-        return reader.activity(self._opener.open(account).account_address)
-
-
-class ExecutionsReaderPort(Protocol):
-    """The executions an exchange still holds of an address: the adapter of the exchange behind the ledger."""
-
-    def since(self, address: str, since: datetime | None) -> ExecutionsWindow: ...
-
-
-class AccountExecutionsFromAccounts:
-    """Bridges the accounts context to the ledger of the flows in the worker (ADR 0063).
-
-    The account is opened only to learn its address: the executions of the exchange are public and sign nothing.
-    """
-
-    def __init__(
-        self, accounts: AccountRepositoryPort, opener: CredentialOpenerPort, readers: Mapping[str, ExecutionsReaderPort]
-    ) -> None:
-        self._accounts = accounts
-        self._opener = opener
-        self._readers = readers
-
-    def since(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
-        try:
-            account = find_account(self._accounts, AccountId(account_id))
-        except AccountNotFoundError as error:
-            raise FlowAccountNotFoundError from error
-        reader = self._readers.get(account.exchange.value)
-        if reader is None:
-            raise FlowExchangeUnavailableError
-        return reader.since(self._opener.open(account).account_address, since)
-
-
 class AccountReadingFromAccounts:
     """Bridges the accounts and flows contexts to the verification context in the worker (ADR 0024, ADR 0075).
 
@@ -820,9 +759,7 @@ class WorkerUseCaseFactory:
                 now,
             ),
             notify=self.notify_for(tenant_id),
-            read_account_activity=ReadAccountActivityUseCase(
-                AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
-            ),
+            read_account_activity=ReadAccountActivityUseCase(accounts, self._opener, self._exchanges.activity),
         )
 
     def cycle_ports_for(self, tenant_id: TenantId) -> TenantCyclePorts:
@@ -840,11 +777,11 @@ class WorkerUseCaseFactory:
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         closing_notice = ClosingNoticeByNotification(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        activity = AccountActivityFromAccounts(accounts, self._opener, self._exchanges.activity)
+        activity = ReadAccountActivityUseCase(accounts, self._opener, self._exchanges.activity)
         ledger = SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
-            AccountExecutionsFromAccounts(accounts, self._opener, self._exchanges.executions),
+            ReadAccountExecutionsUseCase(accounts, self._opener, self._exchanges.executions),
             SqlAlchemyPlatformOrdersAdapter(self._engine, tenant_id),
             ledger,
         )

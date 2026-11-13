@@ -11,6 +11,8 @@ from uuid import UUID
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.application.cycles.ports import ScheduledFlow, TenantScheduledFlow
 from autotrading.application.cycles.run_cycle import CycleGuards
+from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
@@ -21,8 +23,6 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
-    AccountActivityFromAccounts,
-    AccountExecutionsFromAccounts,
     ClosingNoticeByNotification,
     CycleFailureNotices,
     CycleRuntime,
@@ -146,10 +146,10 @@ class FlowCycles:
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         closing_notice = ClosingNoticeByNotification(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        activity = AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader})
+        activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         record_executions = RecordAccountExecutionsUseCase(
             flows,
-            AccountExecutionsFromAccounts(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
             platform.platform_orders,
             platform.ledger,
         )

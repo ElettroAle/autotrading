@@ -8,12 +8,14 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.flows.errors import FlowAccountNotFoundError
 from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -188,3 +190,15 @@ def test_the_sealed_access_of_an_account_is_read_for_its_tenant_only(database: E
     assert sealed == SealedAccess(tenant_a, account.id.value, account.exchange.value, 1, b"\x00sealed\xff")
     with pytest.raises(OrderAccountNotFoundError):
         SqlAlchemyAccountRepositoryAdapter(database, tenant_b).sealed_access(account.id.value)
+
+
+def test_the_sealed_address_of_an_account_is_read_for_its_tenant_only(database: Engine) -> None:
+    tenant_a, tenant_b = new_tenant(database), new_tenant(database)
+    account = account_of(tenant_a)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant_a).add(account)
+
+    sealed = SqlAlchemyAccountRepositoryAdapter(database, tenant_a).sealed_address(account.id.value)
+
+    assert sealed == SealedAddress(tenant_a, account.id.value, account.exchange.value, 1, b"\x00sealed\xff")
+    with pytest.raises(FlowAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, tenant_b).sealed_address(account.id.value)

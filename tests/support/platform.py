@@ -29,7 +29,6 @@ from autotrading.application.verification.run_exchange_verification import RunEx
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
-    AccountActivityFromAccounts,
     AccountFlowsFromFlows,
     AccountReadingFromAccounts,
     FlowAccountsFromAccounts,
@@ -245,9 +244,7 @@ class Platform:
                 lambda: STARTED_AT,
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
-            read_account_activity=ReadAccountActivityUseCase(
-                AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: self.activity_reader})
-            ),
+            read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 
     def link_chat(self) -> LinkChatUseCase:

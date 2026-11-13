@@ -2,11 +2,11 @@ from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from uuid import UUID
 
 import httpx
 
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
+from autotrading.application.flows.ports import ReadAccountActivityCommand
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -29,8 +29,8 @@ class HttpxAccountActivityAdapter:
     def __repr__(self) -> str:
         return f"HttpxAccountActivityAdapter(tenant_id={self._tenant_id.value})"
 
-    def activity(self, account_id: UUID) -> AccountActivity:
-        path = f"/tenants/{self._tenant_id.value}/accounts/{account_id}/activity"
+    def execute(self, command: ReadAccountActivityCommand) -> AccountActivity:
+        path = f"/tenants/{self._tenant_id.value}/accounts/{command.account_id}/activity"
         try:
             response = self._client.get(path, headers={"Authorization": f"Bearer {self._token}"})
         except httpx.HTTPError as error:
