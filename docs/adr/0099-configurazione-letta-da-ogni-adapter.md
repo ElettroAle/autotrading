@@ -30,13 +30,13 @@ che legge la sua sezione e registra i servizi pronti.
   adapter con configurazione definisce una dataclass frozen privata `_<Tecnologia>Settings` e la funzione privata
   che la legge, applica i default e valida forma e presenza. Cartelle toccate: `sqlalchemy` (database),
   `libsodium` (chiave pubblica o privata e versione), `oidc` (issuer e audience), `worker` (indirizzo e token del
-  worker), `telegram` (token del bot, che c'era già come impostazione privata), `hyperliquid` (rete e slippage), `inbound/api` (versione, client del login, token del
-  worker).
+  worker), `telegram` (token del bot, che c'era già come impostazione privata), `hyperliquid` (slippage degli
+  ordini a mercato, accanto alla rete che c'era già), `inbound/api` (versione, client del login, token del worker).
 - **Composizione per cartella** (l'equivalente di `Add{X}`): `composition.py` espone `<tecnologia>_adapters(source,
   ...)`, che restituisce adapter pronti: `sqlalchemy_adapters` (engine), `libsodium_sealing_adapters` (sigillatori
   legati al tenant), `libsodium_opening_adapters`, `oidc_adapters` (o `None` senza issuer),
-  `worker_adapters`, `telegram_adapters` (ora riceve la sorgente invece del token), `hyperliquid_order_adapters` (exchange degli ordini e slippage),
-  `api_adapters`, `worker_api_adapters`.
+  `worker_adapters` e `telegram_adapters` (ora ricevono la sorgente invece di indirizzo e token),
+  `hyperliquid_slippage_adapters`, `api_adapters`, `worker_api_adapters`.
 - **Regole di business nel domain**: gli ambienti ammessi diventano `InstallationEnvironment` in
   `domain/accounts/installation_environment.py`, accanto a `ExchangeNetwork.of_installation`, con
   `UndeclaredEnvironmentError` e `UnsupportedEnvironmentError` negli errori del contesto; la slippage resta
@@ -44,7 +44,7 @@ che legge la sua sezione e registra i servizi pronti.
 - **bootstrap.py** crea `ConfigurationSource(configuration)` e la passa solo alle funzioni `*_adapters`; le
   firme delle factory di uvicorn restano (`configuration: Mapping[str, str] = PROCESS_ENVIRONMENT`), quindi
   Dockerfile e compose non cambiano. Non contiene più nomi di variabili, default, errori di configurazione,
-  `PublicCredentialsKey` e `WorkerSettings`; la slippage viaggia in `WorkerExchanges`.
+  `PublicCredentialsKey` e `WorkerSettings`: `worker_use_cases` e `cycle_ports` ricevono ambiente e slippage.
 - **Test di architettura** nuovi, ciascuno con esempio violato e conforme: `configurazione-solo-dalla-sorgente`,
   `impostazioni-nella-loro-cartella`, `bootstrap-configura-solo-con-composizioni`. Contratto import-linter: la
   sorgente non importa le cartelle di tecnologia né application.
@@ -75,12 +75,18 @@ che legge la sua sezione e registra i servizi pronti.
 ## Scostamenti
 
 - **`bootstrap.py` legge `source.environment()`**: l'ambiente dell'installazione serve, come valore, a casi d'uso
-  e porte che `bootstrap.py` compone ancora (rete degli exchange, `TenantPorts.environment`, registro del ciclo).
+  e porte che `bootstrap.py` compone ancora (rete degli exchange in `hyperliquid_adapters(network)`,
+  `TenantPorts.environment`, verifica e registro del ciclo).
   È l'equivalente di `IHostEnvironment` in .NET, dato dall'host e non da una libreria; la regola lo ammette per
   nome e nessun'altra lettura.
 - **Gli adapter legati al tenant si costruiscono ancora in `bootstrap.py`** (`for_tenant`): «bootstrap chiama
   solo le funzioni `*_adapters`» è applicato alla configurazione, cioè la sorgente va solo a quelle funzioni.
   Spostare la costruzione per tenant nelle cartelle è il lavoro della categoria E del Bug 177.
+- **`hyperliquid_slippage_adapters` restituisce una `Slippage` di dominio, non un adapter**: la slippage è un
+  parametro degli ordini a mercato verso l'exchange, ma i casi d'uso degli ordini la ricevono già come argomento
+  (`OpenPositionUseCase`, `CloseExchangePositionUseCase`, `ExecuteFlowOrdersUseCase`). Darla in costruzione
+  all'adapter degli ordini cambierebbe il contesto `orders`, fuori dal perimetro della categoria D; il nome
+  segue la convenzione `*_adapters` perché solo queste funzioni ricevono la sorgente.
 - **Cartelle senza configurazione d'installazione** (`alternative_me`, `coinmarketcap`, `rss`): le loro funzioni
   `*_adapters` non ricevono la sorgente, perché non leggono nulla dall'installazione; i loro `configuration.py`
   tengono solo i valori fissi della tecnologia.
