@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort, TradingAccessPort
+from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
+from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.market_order import MarketOrder
@@ -30,7 +31,7 @@ class OpenPositionUseCase:
 
     def __init__(
         self,
-        access: TradingAccessPort,
+        access: OpenTradingAccessUseCase,
         exchanges: Mapping[str, ExchangePort],
         orders: OrderRepositoryPort,
         slippage: Slippage,
@@ -41,7 +42,7 @@ class OpenPositionUseCase:
         self._slippage = slippage
 
     def execute(self, command: OpenPositionCommand) -> Order:
-        access = self._access.access(command.account_id)
+        access = self._access.execute(OpenTradingAccessCommand(command.account_id))
         exchange = supported_exchange(self._exchanges, access.exchange)
         market = exchange.market(access, command.coin)
         market.require_leverage(command.leverage)

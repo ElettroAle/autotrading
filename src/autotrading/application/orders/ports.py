@@ -8,17 +8,27 @@ from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
+from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.user_id import UserId
 
 
-class TradingAccessPort(Protocol):
-    """Opens, for an account of the tenant, what signs its orders.
+class OrderAccountPort(Protocol):
+    """Bound to the tenant of the request: the accounts the orders are sent for."""
 
-    Raises OrderAccountNotFoundError for an account that does not exist or belongs to another tenant.
-    """
+    def sealed_access(self, account_id: UUID) -> SealedAccess:
+        """Raises OrderAccountNotFoundError for an account that does not exist or belongs to another tenant."""
+        ...
 
-    def access(self, account_id: UUID) -> TradingAccess: ...
+
+class AccessOpenerPort(Protocol):
+    """Opens sealed credentials with the private key only the worker holds (ADR 0007)."""
+
+    def open_access(self, sealed: SealedAccess) -> TradingAccess:
+        """Raises OrderCredentialsNotOpenedError when the sealed text names another tenant or account, or no key opens
+        it.
+        """
+        ...
 
 
 class ExchangePort(Protocol):

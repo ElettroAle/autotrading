@@ -1,11 +1,13 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
+from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
@@ -13,6 +15,7 @@ from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 NAME_UNIQUE_IN_TENANT = "accounts_name_unique_in_tenant"
@@ -42,6 +45,16 @@ class SqlAlchemyAccountRepositoryAdapter:
         with self._transaction() as connection:
             row = connection.execute(query).mappings().one_or_none()
         return None if row is None else _account_of(row)
+
+    def sealed_access(self, account_id: UUID) -> SealedAccess:
+        """The account as the orders context opens it to sign its orders (ADR 0023)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise OrderAccountNotFoundError
+        sealed = account.credentials
+        return SealedAccess(
+            account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
+        )
 
     def add(self, account: Account) -> None:
         self._require_own(account)

@@ -1,5 +1,6 @@
 import dataclasses
 import json
+from uuid import uuid4
 
 import pytest
 from nacl.public import PrivateKey, SealedBox
@@ -10,9 +11,12 @@ from autotrading.adapters.outbound.libsodium.opener import (
 )
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
+from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.orders.sealed_access import SealedAccess
+from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.accounts import an_account
 
@@ -114,3 +118,34 @@ def test_the_representation_never_shows_the_keys(private_key: PrivateKey) -> Non
     shown = repr(SodiumCredentialOpenerAdapter({1: bytes(private_key)}))
 
     assert shown == "SodiumCredentialOpenerAdapter(key_versions=[1])"
+
+
+def sealed_access_of(account: Account, exchange: str = "Hyperliquid") -> SealedAccess:
+    sealed = account.credentials
+    return SealedAccess(account.tenant_id, account.id.value, exchange, sealed.key_version, sealed.ciphertext)
+
+
+def test_opens_the_access_of_the_orders_for_the_same_tenant_and_account(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    access = opener.open_access(sealed_access_of(sealed_account(private_key)))
+
+    assert access == TradingAccess("Hyperliquid", CREDENTIALS.account_address, CREDENTIALS.secret_key)
+
+
+def test_the_access_of_another_account_is_not_opened(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    moved = dataclasses.replace(sealed_access_of(sealed_account(private_key)), account_id=uuid4())
+
+    with pytest.raises(OrderCredentialsNotOpenedError, match=r"^credenziali del conto non leggibili$"):
+        opener.open_access(moved)
+
+
+def test_an_access_sealed_with_an_unknown_key_is_not_opened(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    unknown = dataclasses.replace(sealed_access_of(sealed_account(private_key)), key_version=9)
+
+    with pytest.raises(OrderCredentialsNotOpenedError):
+        opener.open_access(unknown)

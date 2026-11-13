@@ -1,6 +1,10 @@
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
+from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.orders.sealed_access import SealedAccess
+from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.credential_sealer import SealedVault
 
 
@@ -10,6 +14,7 @@ class FakeCredentialOpenerAdapter:
     def __init__(self, vault: SealedVault) -> None:
         self._vault = vault
         self.opened: list[Account] = []
+        self.opened_accesses: list[SealedAccess] = []
 
     def open(self, account: Account) -> Credentials:
         self.opened.append(account)
@@ -20,3 +25,13 @@ class FakeCredentialOpenerAdapter:
         if (tenant_id, account_id) != (account.tenant_id, account.id):
             raise CredentialsNotOpenedError
         return credentials
+
+    def open_access(self, sealed: SealedAccess) -> TradingAccess:
+        opened = self._vault.get(sealed.ciphertext)
+        if opened is None:
+            raise OrderCredentialsNotOpenedError
+        tenant_id, account_id, credentials = opened
+        if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
+            raise OrderCredentialsNotOpenedError
+        self.opened_accesses.append(sealed)
+        return TradingAccess(sealed.exchange, credentials.account_address, credentials.secret_key)

@@ -185,12 +185,10 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionUseCase,
 )
 from autotrading.application.orders.close_flow_position import CloseFlowPositionCommand, CloseFlowPositionUseCase
-from autotrading.application.orders.errors import (
-    OrderAccountNotFoundError,
-)
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersCommand, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.order_failures import answered_or_named
 from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
@@ -260,7 +258,6 @@ from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.slippage import Slippage
-from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.sources.errors import (
     SourceNotAvailableError,
     SourceParameterOutOfRangeError,
@@ -552,26 +549,6 @@ class WorkerExchanges:
     executions: Mapping[str, ExecutionsReaderPort]
 
 
-class TradingAccessFromAccounts:
-    """Bridges the accounts context to the orders context in the worker (ADR 0023).
-
-    The account is looked up for the tenant under row level security, then opened with the private key only the
-    worker holds; an account the tenant does not have is not found before anything is opened (R0.1.3).
-    """
-
-    def __init__(self, accounts: AccountRepositoryPort, opener: CredentialOpenerPort) -> None:
-        self._accounts = accounts
-        self._opener = opener
-
-    def access(self, account_id: UUID) -> TradingAccess:
-        try:
-            account = find_account(self._accounts, AccountId(account_id))
-        except AccountNotFoundError as error:
-            raise OrderAccountNotFoundError from error
-        credentials = self._opener.open(account)
-        return TradingAccess(account.exchange.value, credentials.account_address, credentials.secret_key)
-
-
 class ActivityReaderPort(Protocol):
     """What an exchange shows of an address: the adapter of the exchange behind the activity of the flows."""
 
@@ -824,7 +801,7 @@ class WorkerUseCaseFactory:
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
-        access = TradingAccessFromAccounts(accounts, self._opener)
+        access = OpenTradingAccessUseCase(accounts, self._opener)
         slippage = self._settings.slippage
         read_exchange_state = ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts)
         close_exchange_position = CloseExchangePositionUseCase(access, self._exchanges.orders, orders, slippage)
@@ -851,7 +828,7 @@ class WorkerUseCaseFactory:
     def cycle_ports_for(self, tenant_id: TenantId) -> TenantCyclePorts:
         accounts = SqlAlchemyAccountRepositoryAdapter(self._engine, tenant_id)
         orders = SqlAlchemyOrderRepositoryAdapter(self._engine, tenant_id)
-        access = TradingAccessFromAccounts(accounts, self._opener)
+        access = OpenTradingAccessUseCase(accounts, self._opener)
         slippage = self._settings.slippage
         flows = SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
         openings = SqlAlchemyFlowOpeningsAdapter(self._engine, tenant_id)

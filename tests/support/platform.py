@@ -22,6 +22,7 @@ from autotrading.application.notifications.send_test_notification import SendTes
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
@@ -41,7 +42,6 @@ from autotrading.bootstrap import (
     OrderExecutionFromOrders,
     ProviderKeyUsageFromFlows,
     SourceSettingsFromSources,
-    TradingAccessFromAccounts,
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
@@ -227,7 +227,7 @@ class Platform:
         """What the worker builds for a request of the API, with the opener only it holds."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(self.vault)
-        access = TradingAccessFromAccounts(accounts, opener)
+        access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
         close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, self.slippage)

@@ -29,7 +29,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:OrdersFromOrders.execute": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:SourceSettingsFromSources.selection": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:UnattributableNotices.notice": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:TradingAccessFromAccounts.access": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_intent_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_scalar_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_unattributable_notification": BUG_CYCLE_RULES_IN_BOOTSTRAP,

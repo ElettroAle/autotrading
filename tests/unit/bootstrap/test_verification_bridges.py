@@ -47,9 +47,9 @@ class Orders:
         self.accesses.accesses[self.account_id] = new_access()
         exchanges, slippage = {HYPERLIQUID: self.exchange}, Slippage.default()
         self.execution = OrderExecutionFromOrders(
-            OpenPositionUseCase(self.accesses, exchanges, self.recorded, slippage),
-            CloseExchangePositionUseCase(self.accesses, exchanges, self.recorded, slippage),
-            ReadMarketUseCase(self.accesses, exchanges),
+            OpenPositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage),
+            CloseExchangePositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage),
+            ReadMarketUseCase(self.accesses.use_case, exchanges),
         )
 
     def hold_btc(self) -> None:

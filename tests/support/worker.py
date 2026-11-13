@@ -10,13 +10,13 @@ from autotrading.application.flows.read_account_activity import ReadAccountActiv
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.bootstrap import (
     AccountActivityFromAccounts,
     AccountReadingFromAccounts,
     OrderExecutionFromOrders,
-    TradingAccessFromAccounts,
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.orders.slippage import Slippage
@@ -59,7 +59,7 @@ class Worker:
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = InMemoryAccountRepositoryAdapter(self.store, tenant_id)
         opener = FakeCredentialOpenerAdapter(self.vault)
-        access, order_exchanges = TradingAccessFromAccounts(accounts, opener), {HYPERLIQUID: self.order_exchange}
+        access, order_exchanges = OpenTradingAccessUseCase(accounts, opener), {HYPERLIQUID: self.order_exchange}
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: self.exchange})
         closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default())
         opening = OpenPositionUseCase(access, order_exchanges, self.orders, Slippage.default())

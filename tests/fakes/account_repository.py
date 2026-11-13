@@ -1,10 +1,13 @@
 from dataclasses import dataclass
+from uuid import UUID
 
 from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
+from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
+from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -45,6 +48,15 @@ class InMemoryAccountRepositoryAdapter:
 
     def get(self, account_id: AccountId) -> Account | None:
         return next((account for account in self.list() if account.id == account_id), None)
+
+    def sealed_access(self, account_id: UUID) -> SealedAccess:
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise OrderAccountNotFoundError
+        sealed = account.credentials
+        return SealedAccess(
+            account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
+        )
 
     def replace(self, account: Account) -> None:
         current = self.get(account.id)

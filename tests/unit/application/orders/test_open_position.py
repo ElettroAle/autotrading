@@ -48,7 +48,7 @@ def account_id(accesses: FakeTradingAccessAdapter) -> UUID:
 def use_case(
     accesses: FakeTradingAccessAdapter, exchange: FakeOrderExchangeAdapter, orders: InMemoryOrderRepositoryAdapter
 ) -> OpenPositionUseCase:
-    return OpenPositionUseCase(accesses, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
+    return OpenPositionUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
 
 
 def opening(account_id: UUID, leverage: int = 3, value: str = "20") -> OpenPositionCommand:
@@ -71,7 +71,7 @@ def test_opens_with_the_leverage_the_size_and_the_slippage_asked(
         SLIPPAGE,
         False,
     )
-    assert exchange.leverages[accesses.access(account_id).account_address, "BTC"] == 3
+    assert exchange.leverages[accesses.accesses[account_id].account_address, "BTC"] == 3
     assert order.status is OrderStatus.FILLED
 
 
@@ -159,7 +159,7 @@ def test_an_exchange_the_worker_does_not_support_is_refused(
 ) -> None:
     account_id = uuid4()
     accesses.accesses[account_id] = new_access("Binance")
-    use_case = OpenPositionUseCase(accesses, {HYPERLIQUID: FakeOrderExchangeAdapter()}, orders, SLIPPAGE)
+    use_case = OpenPositionUseCase(accesses.use_case, {HYPERLIQUID: FakeOrderExchangeAdapter()}, orders, SLIPPAGE)
 
     with pytest.raises(UnsupportedOrderExchangeError) as raised:
         use_case.execute(opening(account_id))

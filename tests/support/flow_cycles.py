@@ -17,6 +17,7 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.bootstrap import (
     HYPERLIQUID,
     SOURCE_CATALOG,
@@ -31,7 +32,6 @@ from autotrading.bootstrap import (
     NotifiedClosedPositions,
     OutsideClosingsInHistory,
     TenantCyclePorts,
-    TradingAccessFromAccounts,
     record_actual_prices,
     run_due_cycles,
 )
@@ -135,7 +135,7 @@ class FlowCycles:
         worker = platform.worker_for(tenant_id)
         accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(platform.vault)
-        access = TradingAccessFromAccounts(accounts, opener)
+        access = OpenTradingAccessUseCase(accounts, opener)
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         notify = platform.worker_for(tenant_id).notify
