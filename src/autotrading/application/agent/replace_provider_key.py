@@ -28,7 +28,7 @@ class ReplaceProviderKeyUseCase:
         provider = supported_provider(self._services.catalog, command.provider)
         key = ProviderKey(command.key)
         current = registered_key(self._keys, provider)
-        self._services.verifier.verify(provider, key)
+        self._services.verify(provider, key)
         sealed = self._services.sealer.seal(provider, key)
         self._keys.replace(RegisteredProviderKey(current.tenant_id, provider, sealed))
         operations.info("chiave del fornitore sostituita", extra={"provider": provider.value})

@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError
+from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError, ProviderNotVerifiableError
 from autotrading.application.agent.ports import (
     ModelCatalogPort,
     ProviderKeyRepositoryPort,
@@ -22,11 +23,20 @@ class RegisterProviderKeyCommand:
 
 @dataclass(frozen=True, slots=True)
 class ProviderKeyServices:
-    """What a use case needs to accept a key: the models offered, the provider that checks it, the seal."""
+    """What a use case needs to accept a key: the models offered, the providers that check keys, the seal.
+
+    Each provider is a system of its own, so each has its own verifier, by provider name.
+    """
 
     catalog: ModelCatalogPort
-    verifier: ProviderKeyVerifierPort
+    verifiers: Mapping[str, ProviderKeyVerifierPort]
     sealer: ProviderKeySealerPort
+
+    def verify(self, provider: ProviderName, key: ProviderKey) -> None:
+        verifier = self.verifiers.get(provider.value)
+        if verifier is None:
+            raise ProviderNotVerifiableError(provider)
+        verifier.verify(provider, key)
 
 
 class RegisterProviderKeyUseCase:
@@ -41,7 +51,7 @@ class RegisterProviderKeyUseCase:
         provider = supported_provider(self._services.catalog, command.provider)
         key = ProviderKey(command.key)
         self._require_none_for(provider)
-        self._services.verifier.verify(provider, key)
+        self._services.verify(provider, key)
         self._keys.add(RegisteredProviderKey(self._tenant_id, provider, self._services.sealer.seal(provider, key)))
         operations.info("chiave del fornitore registrata", extra={"provider": provider.value})
         return provider

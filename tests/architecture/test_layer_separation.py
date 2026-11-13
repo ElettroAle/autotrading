@@ -11,6 +11,7 @@ from tests.support.architecture import (
     TRANSPORT_LIBRARIES,
     Rule,
     Violation,
+    folders_named_after_a_transport,
     source_modules,
     technology_folders,
     violations_of,
@@ -92,3 +93,20 @@ def test_an_architectural_exception_belongs_to_no_technology_folder() -> None:
     owned = {library for libraries in TECHNOLOGY_LIBRARIES.values() for library in libraries}
 
     assert not owned & set(ARCHITECTURAL_LIBRARIES)
+
+
+def test_no_technology_folder_is_named_after_a_transport_library() -> None:
+    misnamed = folders_named_after_a_transport(technology_folders())
+
+    assert not misnamed, (
+        "una cartella di tecnologia porta il nome del sistema integrato, non della libreria di trasporto: "
+        + ", ".join(misnamed)
+    )
+
+
+@pytest.mark.parametrize(
+    ("folder", "misnamed"),
+    [("adapters/outbound/httpx", True), ("adapters/outbound/telegram", False), ("adapters/inbound/api", False)],
+)
+def test_a_folder_named_after_a_transport_library_is_found(folder: str, misnamed: bool) -> None:
+    assert bool(folders_named_after_a_transport([folder])) is misnamed

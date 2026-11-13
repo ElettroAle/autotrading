@@ -6,6 +6,7 @@ from autotrading.application.agent.errors import (
     ProviderKeyAlreadyRegisteredError,
     ProviderKeyInUseError,
     ProviderKeyNotFoundError,
+    ProviderNotVerifiableError,
     ProviderRejectedKeyError,
     ProviderUnavailableError,
     UnsupportedProviderError,
@@ -60,9 +61,13 @@ class Keys:
         self.usage = FakeProviderKeyUsageAdapter()
         self.services = ProviderKeyServices(
             InMemoryModelCatalogAdapter(CATALOG),
-            self.verifier,
+            {provider.value: self.verifier for provider in CATALOG.providers},
             FakeProviderKeySealerAdapter(self.tenant_id, self.vault),
         )
+
+    def without_verifier_of(self, provider: str) -> None:
+        verifiers = {name: verifier for name, verifier in self.services.verifiers.items() if name != provider}
+        self.services = ProviderKeyServices(self.services.catalog, verifiers, self.services.sealer)
 
     def register(self, provider: str, key: str) -> ProviderName:
         use_case = RegisterProviderKeyUseCase(self.tenant_id, self.repository, self.services)
@@ -144,6 +149,29 @@ def test_a_second_key_for_the_same_provider_is_refused_before_asking_it(keys: Ke
 
     assert keys.verifier.checked == [OPENROUTER]
     assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR")
+
+
+def test_a_provider_of_the_catalog_without_a_verifier_saves_nothing(keys: Keys) -> None:
+    keys.verifier.accept("openrouter", "K-1")
+    keys.without_verifier_of("openrouter")
+
+    with pytest.raises(ProviderNotVerifiableError) as raised:
+        keys.register("openrouter", "K-1")
+
+    assert raised.value.status_code == 500
+    assert keys.repository.get(OPENROUTER) is None
+
+
+def test_a_replacement_for_a_provider_without_a_verifier_keeps_the_old_key(keys: Keys) -> None:
+    keys.verifier.accept("openrouter", "K-1")
+    keys.register("openrouter", "K-1")
+    keys.verifier.accept("openrouter", "K-2")
+    keys.without_verifier_of("openrouter")
+
+    with pytest.raises(ProviderNotVerifiableError):
+        keys.replace("openrouter", "K-2")
+
+    assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-1")
 
 
 def test_the_replacement_puts_the_new_accepted_key_in_place(keys: Keys) -> None:

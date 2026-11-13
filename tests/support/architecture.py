@@ -8,7 +8,7 @@ import ast
 import builtins
 import re
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -116,8 +116,9 @@ TRANSPORT_LIBRARIES = frozenset({"httpx"})
 TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/inbound/api": frozenset({"fastapi", "pydantic", "starlette"}),
     "adapters/outbound/alternative_me": frozenset({"httpx"}),
+    "adapters/outbound/anthropic": frozenset({"httpx"}),
     "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
-    "adapters/outbound/httpx": frozenset({"httpx"}),
+    "adapters/outbound/deepseek": frozenset({"httpx"}),
     # eth_account and requests are the signing and transport libraries of the official Hyperliquid SDK.
     "adapters/outbound/hyperliquid": frozenset({"hyperliquid", "eth_account", "requests"}),
     "adapters/outbound/json": frozenset(),
@@ -125,6 +126,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     # The LiteLLM proxy speaks the OpenAI API: its official SDK is the client (docs/architecture.md:169, ADR 0101).
     "adapters/outbound/litellm": frozenset({"openai"}),
     "adapters/outbound/oidc": frozenset({"jwt"}),
+    "adapters/outbound/openai": frozenset({"httpx"}),
+    "adapters/outbound/openrouter": frozenset({"httpx"}),
     "adapters/outbound/rss": frozenset({"httpx"}),
     # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle.
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy", "psycopg"}),
@@ -288,6 +291,11 @@ def technology_folders(root: Path = SOURCE_ROOT) -> list[str]:
         for folder in direction.iterdir()
         if (folder / "__init__.py").is_file()
     )
+
+
+def folders_named_after_a_transport(folders: Iterable[str]) -> list[str]:
+    """The technology folders named after the library they talk through instead of the system they integrate."""
+    return sorted(folder for folder in folders if folder.rsplit("/", 1)[-1] in TRANSPORT_LIBRARIES)
 
 
 def violations_of(module: SourceModule) -> list[Violation]:

@@ -185,7 +185,7 @@ class Platform:
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
-            provider_key_verifier=self.providers,
+            provider_key_verifiers={provider.value: self.providers for provider in self.model_catalog.providers},
             provider_key_usage=flows,
             model_catalog=InMemoryModelCatalogAdapter(self.model_catalog),
             flows=flows,

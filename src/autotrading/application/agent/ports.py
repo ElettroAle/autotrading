@@ -18,7 +18,7 @@ class ProviderKeyVerifierPort(Protocol):
     def verify(self, provider: ProviderName, key: ProviderKey) -> None:
         """Asks the provider whether it accepts the key, without spending any credit of the user.
 
-        Raises ProviderRejectedKeyError, ProviderUnavailableError, or ProviderNotVerifiableError.
+        Raises ProviderRejectedKeyError or ProviderUnavailableError.
         """
         ...
 

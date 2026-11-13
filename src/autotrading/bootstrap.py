@@ -6,8 +6,6 @@ from decimal import Decimal
 from functools import partial
 from uuid import UUID
 
-import httpx
-
 from autotrading.adapters.configuration.source import PROCESS_ENVIRONMENT, ConfigurationSource
 from autotrading.adapters.inbound.api.app import ApiApplication
 from autotrading.adapters.inbound.api.composition import api_adapters, worker_api_adapters
@@ -19,8 +17,9 @@ from autotrading.adapters.inbound.api.worker import (
     bot_polling,
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
+from autotrading.adapters.outbound.anthropic.composition import anthropic_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
-from autotrading.adapters.outbound.httpx.provider_key_verifier import HttpxProviderKeyVerifierAdapter
+from autotrading.adapters.outbound.deepseek.composition import deepseek_adapters
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
@@ -33,6 +32,8 @@ from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumPr
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
+from autotrading.adapters.outbound.openai.composition import openai_adapters
+from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -88,6 +89,7 @@ from autotrading.application.agent.ports import (
     ModelCatalogPort,
     ProviderKeyOpenerPort,
     ProviderKeyRepositoryPort,
+    ProviderKeyVerifierPort,
 )
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
@@ -230,8 +232,6 @@ from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 
-PROVIDER_TIMEOUT_SECONDS = 10.0
-
 operations = logging.getLogger("autotrading.bootstrap")
 
 
@@ -348,11 +348,10 @@ def tenant_use_cases(
     ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
-    providers: tuple[httpx.Client, ModelCatalogPort, FlowModelsPort],
+    providers: tuple[Mapping[str, ProviderKeyVerifierPort], ModelCatalogPort, FlowModelsPort],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
-    verification_client, model_catalog, flow_models = providers
-    provider_key_verifier = HttpxProviderKeyVerifierAdapter(verification_client)
+    provider_key_verifiers, model_catalog, flow_models = providers
     credential_sealer, provider_key_sealer = sealers
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
@@ -383,7 +382,7 @@ def tenant_use_cases(
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
-            provider_key_verifier=provider_key_verifier,
+            provider_key_verifiers=provider_key_verifiers,
             provider_key_usage=flows,
             model_catalog=model_catalog,
             flows=flows,
@@ -561,7 +560,11 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
         libsodium_sealing_adapters(source),
         source.environment(),
         worker_adapters(source),
-        (httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS), catalog, catalog),
+        (
+            {**anthropic_adapters(), **deepseek_adapters(), **openai_adapters(), **openrouter_adapters()},
+            catalog,
+            catalog,
+        ),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 

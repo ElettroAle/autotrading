@@ -18,10 +18,12 @@ from autotrading.adapters.outbound.libsodium.opener import (
 )
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
+from autotrading.adapters.outbound.openrouter.key_verifier import OpenRouterProviderKeyVerifierAdapter
 from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.agent.errors import ProviderRejectedKeyError
+from autotrading.application.agent.ports import ProviderKeyVerifierPort
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
@@ -72,10 +74,13 @@ AUTHENTICATION = {
 
 def providers_of(
     verification: httpx.Client | None = None,
-) -> tuple[httpx.Client, InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
-    """The providers of the API: the client that verifies the keys and the catalog of the test models."""
+) -> tuple[dict[str, ProviderKeyVerifierPort], InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
+    """The providers of the API: the verifier of OpenRouter keys on the given client and the test models."""
     catalog = InMemoryModelCatalogAdapter(PLATFORM_MODELS)
-    return verification or httpx.Client(), catalog, catalog
+    verifiers: dict[str, ProviderKeyVerifierPort] = {
+        "openrouter": OpenRouterProviderKeyVerifierAdapter(verification or httpx.Client())
+    }
+    return verifiers, catalog, catalog
 
 
 def _sealers(

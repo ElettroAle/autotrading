@@ -13,7 +13,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.PORT_NAMES: {},
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {},
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {
-        "bootstrap.py:PROVIDER_TIMEOUT_SECONDS": BUG_STRICTER_RULES,
         "bootstrap.py:operations": BUG_STRICTER_RULES,
     },
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
@@ -30,9 +29,7 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:OrderExecutionFromOrders": BUG_STRICTER_RULES,
         "bootstrap.py:SourcesFromSources": BUG_STRICTER_RULES,
     },
-    Rule.LIBRARIES_IN_THEIR_FOLDER: {
-        "bootstrap.py:httpx": BUG_STRICTER_RULES,
-    },
+    Rule.LIBRARIES_IN_THEIR_FOLDER: {},
     Rule.ADAPTERS_DO_NOT_ORCHESTRATE: {},
     Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {},
     Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {},
