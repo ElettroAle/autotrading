@@ -151,6 +151,9 @@ def test_the_chosen_amount_is_the_value_of_the_opening(platform: Platform, clien
 def test_an_amount_that_is_not_a_positive_number_is_refused_before_the_worker(
     platform: Platform, client_of: Client, account_id: str, amount: str
 ) -> None:
+    # The worker out of reach would answer 503: a 422 says the API refused the amount on its own.
+    platform.worker_reachable = False
+
     response = client_of("anna").post(f"/accounts/{account_id}/verifications", json={"amount": amount})
 
     assert response.status_code == 422
