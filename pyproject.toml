@@ -143,6 +143,12 @@ modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "La sorgente della configurazione non importa le cartelle di tecnologia"
+type = "forbidden"
+source_modules = ["autotrading.adapters.configuration"]
+forbidden_modules = ["autotrading.adapters.inbound", "autotrading.adapters.outbound", "autotrading.application"]
+
+[[tool.importlinter.contracts]]
 name = "Una cartella di tecnologia non importa un'altra"
 type = "independence"
 modules = [

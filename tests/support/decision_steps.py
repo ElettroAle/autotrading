@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from pytest_bdd import given, parsers, then
 
-from autotrading.bootstrap import HYPERLIQUID
+from autotrading.adapters.outbound.hyperliquid.composition import EXCHANGE_NAME as HYPERLIQUID
 from autotrading.domain.accounts.position import PositionSide
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.orders.direction import Direction

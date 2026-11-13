@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import create_engine
 
+from autotrading.adapters.outbound.hyperliquid.composition import order_exchanges_for
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
     SqlAlchemyClosedPositionRepositoryAdapter,
@@ -41,12 +42,10 @@ from autotrading.bootstrap import (
     FlowStateFromFlows,
     TenantCyclePorts,
     WorkerExchanges,
-    WorkerSettings,
     activity_readers_for,
     cycle_ports,
     exchanges_for,
     executions_readers_for,
-    order_exchanges_for,
 )
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.agent.provider_name import ProviderName
@@ -488,13 +487,13 @@ def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_th
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
         accounts,
+        Slippage.default(),
     )
     messenger = FakeMessengerAdapter()
     worker = cycle_ports(
         create_engine("sqlite://"),
         SodiumCredentialOpenerAdapter({}),
         exchanges,
-        WorkerSettings("dev", Slippage.default()),
         messenger,
     )
 

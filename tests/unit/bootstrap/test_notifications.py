@@ -12,23 +12,21 @@ from sqlalchemy import Engine, create_engine
 from autotrading import bootstrap
 from autotrading.adapters.inbound.api.worker import BotPolling, WorkerUseCases
 from autotrading.adapters.outbound.httpx.telegram import HttpxTelegramInboxAdapter, HttpxTelegramMessengerAdapter
+from autotrading.adapters.outbound.hyperliquid.composition import order_exchanges_for
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import SqlAlchemyLinkCodeRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.ports import BotInboxPort, MessengerPort
 from autotrading.bootstrap import (
-    TELEGRAM_BOT_SETTING,
     UnconfiguredMessenger,
     WorkerExchanges,
-    WorkerSettings,
     activity_readers_for,
     create_worker_application,
     exchanges_for,
     executions_readers_for,
     link_stores_for,
     notify_for,
-    order_exchanges_for,
     telegram_bot,
     worker_use_cases,
 )
@@ -51,9 +49,9 @@ def factory(engine: Engine, messenger: MessengerPort) -> Callable[[TenantId], Wo
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
         accounts,
+        Slippage.default(),
     )
-    settings = WorkerSettings("dev", Slippage.default())
-    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), exchanges, settings, messenger)
+    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), exchanges, "dev", messenger)
 
 
 def token_file(tmp_path: Path, content: str) -> str:
@@ -71,7 +69,7 @@ def test_without_the_bot_token_the_worker_starts_with_notifications_off(
     settings = {"missing": str(tmp_path / "absent"), "empty": token_file(tmp_path, " \n"), "": ""}
 
     with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
-        create_worker_application(worker_configuration(tmp_path, **{TELEGRAM_BOT_SETTING: settings[location]}))
+        create_worker_application(worker_configuration(tmp_path, **{"TELEGRAM_BOT_TOKEN_FILE": settings[location]}))
 
     assert started == []
     assert [record.getMessage() for record in caplog.records] == [DISABLED]
@@ -90,7 +88,7 @@ def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
 
     with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
         create_worker_application(
-            worker_configuration(tmp_path, **{TELEGRAM_BOT_SETTING: token_file(tmp_path, FAKE_BOT)})
+            worker_configuration(tmp_path, **{"TELEGRAM_BOT_TOKEN_FILE": token_file(tmp_path, FAKE_BOT)})
         )
 
     [(inbox, messenger)] = started

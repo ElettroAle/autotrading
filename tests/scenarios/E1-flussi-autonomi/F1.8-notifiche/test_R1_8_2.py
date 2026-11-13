@@ -7,13 +7,13 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.adapters.outbound.hyperliquid.composition import EXCHANGE_NAME as HYPERLIQUID
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
-from autotrading.bootstrap import HYPERLIQUID
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.orders.direction import Direction
