@@ -192,6 +192,7 @@ from autotrading.application.orders.errors import (
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersCommand, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_position import OpenPositionCommand, OpenPositionUseCase
+from autotrading.application.orders.order_failures import answered_or_named
 from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
@@ -709,12 +710,7 @@ def _verification_source(user_id: UserId) -> OrderSource:
 
 def _result_of[T](send: Callable[[], T]) -> T:
     """What the orders context answers, its failures as the verification context names them."""
-    try:
-        return send()
-    except OrderAccountNotFoundError as error:
-        raise VerificationAccountNotFoundError from error
-    except AutotradingError as error:
-        raise VerificationStepError(str(error)) from error
+    return answered_or_named(send, VerificationAccountNotFoundError, VerificationStepError)
 
 
 def _order_result(order: Order) -> OrderResult:

@@ -7,7 +7,6 @@ until it is removed. An entry never exists without its Bug on the board.
 from tests.support.architecture import Rule
 
 BUG_CYCLE_RULES_IN_BOOTSTRAP = 170
-BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP = 171
 BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON = 173
 BUG_MISPLACED_TYPES_AND_TEXTS = 175
 
@@ -48,7 +47,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:_unattributable_notification": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:flow_of_cycle": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:json_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:_result_of": BUG_HISTORY_NOTIFICATIONS_CURRENCY_IN_BOOTSTRAP,
         "bootstrap.py:AccountFlowsFromFlows._operating_on": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:AccountFlowsFromFlows.archive": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:FlowAccountsFromAccounts.account": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
