@@ -3,10 +3,9 @@ import binascii
 import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from enum import Enum
 from pathlib import Path
 from uuid import UUID
 
@@ -48,6 +47,7 @@ from autotrading.adapters.outbound.hyperliquid.market_data import (
 )
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
+from autotrading.adapters.outbound.json.json_document import json_document
 from autotrading.adapters.outbound.json.model_catalog import load_model_catalog
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
@@ -1238,10 +1238,10 @@ class CycleJournalFromContexts:
         if isinstance(result, CycleDecisions):
             return _decisions_document(result.answer)
         if isinstance(result, RiskReview):
-            return {"esiti": json_of(result.outcomes), "ordini_approvati": len(result.orders)}
+            return {"esiti": json_document(result.outcomes), "ordini_approvati": len(result.orders)}
         if step is CycleStep.COLLECT_SOURCES and isinstance(result, list):
             return {"fonti": [_reading_document(reading) for reading in result if isinstance(reading, SourceReading)]}
-        return {"risultato": json_of(result)}
+        return {"risultato": json_document(result)}
 
     def call_cost(self, decision: object) -> CallCost | None:
         if not isinstance(decision, CycleDecisions):
@@ -1266,46 +1266,21 @@ class CycleJournalFromContexts:
 
 
 def _state_document(cycle_flow: CycleFlow) -> object:
-    return json_of(_state_view(cycle_flow))
+    return json_document(_state_view(cycle_flow))
 
 
 def _reading_document(reading: SourceReading) -> dict[str, object]:
-    return {"fonte": reading.source, "dati": json_of(reading.data)}
+    return {"fonte": reading.source, "dati": json_document(reading.data)}
 
 
 def _decisions_document(answer: AgentAnswer) -> dict[str, object]:
     response = answer.response
     return {
         "risposta": response.raw,
-        "decisioni": json_of(response.decisions),
-        "scartate": json_of(response.discarded),
+        "decisioni": json_document(response.decisions),
+        "scartate": json_document(response.discarded),
         "mancanti": list(response.missing),
     }
-
-
-def json_of(value: object) -> object:
-    """The value as JSON data: the record of a cycle keeps what each step produced as it was (R1.7.1)."""
-    if value is None or isinstance(value, (bool, int, str, Decimal, UUID, datetime, Enum)):
-        return _scalar_of(value)
-    if isinstance(value, Mapping):
-        return {str(key): json_of(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, frozenset, set)):
-        return [json_of(item) for item in value]
-    if is_dataclass(value) and not isinstance(value, type):
-        document: dict[str, object] = {"tipo": type(value).__name__}
-        document.update({each.name: json_of(getattr(value, each.name)) for each in fields(value)})
-        return document
-    return str(value)
-
-
-def _scalar_of(value: object) -> object:
-    if isinstance(value, Enum):
-        return json_of(value.value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, (Decimal, UUID)):
-        return str(value)
-    return value
 
 
 class CyclesOfTenants:
