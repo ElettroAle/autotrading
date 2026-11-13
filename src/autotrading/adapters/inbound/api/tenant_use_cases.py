@@ -59,7 +59,7 @@ from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import (
-    BotIdentityPort,
+    BotStartLinkPort,
     LinkCodeRepositoryPort,
     LinkedChatRepositoryPort,
 )
@@ -102,7 +102,7 @@ class TenantPorts:
     flow_ledger: FlowLedgerPort
     flow_operations: FlowOperationsPort
     link_codes: LinkCodeRepositoryPort
-    bot_identity: BotIdentityPort
+    bot_identity: BotStartLinkPort
     linked_chats: LinkedChatRepositoryPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort

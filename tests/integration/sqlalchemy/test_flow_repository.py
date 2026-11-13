@@ -10,6 +10,7 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter, document_of
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_versions, flows
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
+from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowNameInUseError,
@@ -96,6 +97,31 @@ def test_the_list_carries_the_latest_version_of_each_flow(database: Engine) -> N
         )
 
     assert [listed.configuration for listed in repository.list()] == [second]
+
+
+def test_the_cycles_find_only_the_flows_of_the_tenant(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    other_tenant, other_account = new_account(database)
+    flow = a_flow(tenant_id, account_id=account_id)
+    foreign = a_flow(other_tenant, account_id=other_account)
+    SqlAlchemyFlowRepositoryAdapter(database, tenant_id).add(flow)
+    SqlAlchemyFlowRepositoryAdapter(database, other_tenant).add(foreign)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+
+    assert (repository.exists(flow.id.value), repository.exists(foreign.id.value)) == (True, False)
+    assert not repository.exists(uuid4())
+
+
+def test_the_agent_sees_each_flow_with_the_provider_of_its_model_and_whether_it_runs(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    for name, status in (("alfa", FlowStatus.ACTIVE), ("beta", FlowStatus.STOPPED)):
+        repository.add(a_flow(tenant_id, name=name, status=status, account_id=account_id))
+
+    assert repository.model_uses() == (
+        ModelUse("alfa", "openrouter", running=True),
+        ModelUse("beta", "openrouter", running=False),
+    )
 
 
 def test_a_name_is_in_use_only_by_a_flow_not_archived(database: Engine) -> None:

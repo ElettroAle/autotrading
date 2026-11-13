@@ -1,11 +1,13 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
+from autotrading.application.flows.errors import FlowAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
@@ -42,6 +44,13 @@ class SqlAlchemyAccountRepositoryAdapter:
         with self._transaction() as connection:
             row = connection.execute(query).mappings().one_or_none()
         return None if row is None else _account_of(row)
+
+    def exchange_of(self, account_id: UUID) -> str:
+        """The exchange of an account as a flow sees it (ADR 0087): one the tenant does not have is not found."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.exchange.value
 
     def add(self, account: Account) -> None:
         self._require_own(account)

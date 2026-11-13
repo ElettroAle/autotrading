@@ -10,12 +10,12 @@ from sqlalchemy import create_engine
 
 from autotrading import bootstrap
 from autotrading.adapters.inbound.api.worker import BotPolling
-from autotrading.adapters.outbound.httpx.telegram import HttpxTelegramMessengerAdapter
+from autotrading.adapters.outbound.httpx.telegram import HttpxTelegramInboxAdapter, HttpxTelegramMessengerAdapter
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import SqlAlchemyLinkCodeRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.application.notifications.errors import MessageNotDeliveredError
-from autotrading.application.notifications.ports import MessengerPort
+from autotrading.application.notifications.ports import BotInboxPort, MessengerPort
 from autotrading.bootstrap import (
     TELEGRAM_BOT_SETTING,
     UnconfiguredMessenger,
@@ -29,6 +29,7 @@ from autotrading.bootstrap import (
     order_exchanges_for,
     telegram_bot,
 )
+from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -41,7 +42,10 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 def factory(messenger: MessengerPort) -> WorkerUseCaseFactory:
     exchanges = WorkerExchanges(
-        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+        exchanges_for(ExchangeNetwork.TEST),
+        order_exchanges_for(ExchangeNetwork.TEST),
+        activity_readers_for(ExchangeNetwork.TEST),
+        executions_readers_for(ExchangeNetwork.TEST),
     )
     settings = WorkerSettings("dev", Slippage.default())
     return WorkerUseCaseFactory(
@@ -73,10 +77,10 @@ def test_without_the_bot_token_the_worker_starts_with_notifications_off(
 def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    started: list[tuple[httpx.Client, MessengerPort]] = []
+    started: list[tuple[BotInboxPort, MessengerPort]] = []
 
-    def start(_engine: object, _worker: object, client: httpx.Client, messenger: MessengerPort) -> BotPolling:
-        started.append((client, messenger))
+    def start(_engine: object, _worker: object, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:
+        started.append((inbox, messenger))
         return BotPolling(lambda: None)
 
     monkeypatch.setattr(bootstrap, "telegram_bot", start)
@@ -86,8 +90,8 @@ def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
             worker_configuration(tmp_path, **{TELEGRAM_BOT_SETTING: token_file(tmp_path, FAKE_BOT)})
         )
 
-    [(client, messenger)] = started
-    assert str(client.base_url) == f"https://api.telegram.org/bot{FAKE_BOT}/"
+    [(inbox, messenger)] = started
+    assert isinstance(inbox, HttpxTelegramInboxAdapter)
     assert isinstance(messenger, HttpxTelegramMessengerAdapter)
     assert caplog.records == []
 
@@ -106,7 +110,8 @@ def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
         return httpx.Response(200, json={"ok": True, "result": []})
 
     client = httpx.Client(base_url=f"https://api.telegram.org/bot{FAKE_BOT}", transport=httpx.MockTransport(answer))
-    bot = telegram_bot(create_engine("sqlite://"), factory(FakeMessengerAdapter()), client, FakeMessengerAdapter())
+    inbox = HttpxTelegramInboxAdapter(client)
+    bot = telegram_bot(create_engine("sqlite://"), factory(FakeMessengerAdapter()), inbox, FakeMessengerAdapter())
 
     bot.run(polled)
 

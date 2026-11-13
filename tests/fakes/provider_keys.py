@@ -9,6 +9,7 @@ from autotrading.application.agent.errors import (
     ProviderRejectedKeyError,
     ProviderUnavailableError,
 )
+from autotrading.application.agent.ports import ModelUse
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
@@ -106,13 +107,13 @@ class InMemoryProviderKeyRepositoryAdapter:
 
 
 class FakeProviderKeyUsageAdapter:
-    """The active or paused flows of a tenant, by provider of their model."""
+    """The flows of a tenant with the provider of their model, as a test sets them."""
 
     def __init__(self) -> None:
-        self.flows: dict[ProviderName, list[str]] = {}
+        self.uses: list[ModelUse] = []
 
-    def flows_using(self, provider: ProviderName) -> list[str]:
-        return list(self.flows.get(provider, []))
+    def model_uses(self) -> tuple[ModelUse, ...]:
+        return tuple(self.uses)
 
 
 class FakeProviderKeyOpenerAdapter:

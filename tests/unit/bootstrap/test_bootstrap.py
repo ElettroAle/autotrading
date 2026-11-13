@@ -60,6 +60,7 @@ from autotrading.bootstrap import (
     order_exchanges_for,
     slippage_from,
 )
+from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.errors import InvalidSlippageError
 from autotrading.domain.orders.slippage import Slippage
@@ -272,26 +273,34 @@ def test_the_worker_refuses_to_start_with_a_malformed_private_key(tmp_path: Path
         create_worker_application(configuration)
 
 
-@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
-def test_the_exchange_network_follows_the_installation(environment: str, url: str) -> None:
-    assert {name: exchange.base_url for name, exchange in exchanges_for(environment).items()} == {"Hyperliquid": url}
+@pytest.mark.parametrize(
+    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
+)
+def test_the_exchange_network_follows_the_installation(network: ExchangeNetwork, url: str) -> None:
+    assert {name: exchange.base_url for name, exchange in exchanges_for(network).items()} == {"Hyperliquid": url}
 
 
-@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
-def test_the_tradable_assets_are_read_on_the_network_of_the_installation(environment: str, url: str) -> None:
-    assert {name: markets.base_url for name, markets in markets_for(environment).items()} == {"Hyperliquid": url}
+@pytest.mark.parametrize(
+    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
+)
+def test_the_tradable_assets_are_read_on_the_network_of_the_installation(network: ExchangeNetwork, url: str) -> None:
+    assert {name: markets.base_url for name, markets in markets_for(network).items()} == {"Hyperliquid": url}
 
 
-@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
-def test_the_orders_go_to_the_network_of_the_installation(environment: str, url: str) -> None:
-    assert {name: exchange.base_url for name, exchange in order_exchanges_for(environment).items()} == {
-        "Hyperliquid": url
-    }
+@pytest.mark.parametrize(
+    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
+)
+def test_the_orders_go_to_the_network_of_the_installation(network: ExchangeNetwork, url: str) -> None:
+    assert {name: exchange.base_url for name, exchange in order_exchanges_for(network).items()} == {"Hyperliquid": url}
 
 
-@pytest.mark.parametrize(("environment", "url"), [("dev", TESTNET_API_URL), ("prod", MAINNET_API_URL)])
-def test_the_activity_of_the_accounts_is_read_on_the_network_of_the_installation(environment: str, url: str) -> None:
-    assert {name: reader.base_url for name, reader in activity_readers_for(environment).items()} == {"Hyperliquid": url}
+@pytest.mark.parametrize(
+    ("network", "url"), [(ExchangeNetwork.TEST, TESTNET_API_URL), (ExchangeNetwork.REAL, MAINNET_API_URL)]
+)
+def test_the_activity_of_the_accounts_is_read_on_the_network_of_the_installation(
+    network: ExchangeNetwork, url: str
+) -> None:
+    assert {name: reader.base_url for name, reader in activity_readers_for(network).items()} == {"Hyperliquid": url}
 
 
 @pytest.mark.parametrize(
@@ -351,7 +360,10 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     exchanges = WorkerExchanges(
-        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+        exchanges_for(ExchangeNetwork.TEST),
+        order_exchanges_for(ExchangeNetwork.TEST),
+        activity_readers_for(ExchangeNetwork.TEST),
+        executions_readers_for(ExchangeNetwork.TEST),
     )
     opener = SodiumCredentialOpenerAdapter({})
     settings = WorkerSettings("dev", Slippage.default())

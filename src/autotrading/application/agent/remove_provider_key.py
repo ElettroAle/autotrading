@@ -25,6 +25,6 @@ class RemoveProviderKeyUseCase:
         operations.info("chiave del fornitore rimossa", extra={"provider": provider.value})
 
     def _require_unused(self, provider: ProviderName) -> None:
-        flows = self._usage.flows_using(provider)
+        flows = [use.flow_name for use in self._usage.model_uses() if use.running and use.provider == provider.value]
         if flows:
             raise ProviderKeyInUseError(flows)

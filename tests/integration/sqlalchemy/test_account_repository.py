@@ -8,6 +8,7 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.flows.errors import FlowAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
@@ -141,6 +142,17 @@ def test_an_account_of_another_tenant_reads_as_missing(database: Engine) -> None
     bruno_accounts = SqlAlchemyAccountRepositoryAdapter(database, bruno)
 
     assert (bruno_accounts.get(account.id), bruno_accounts.get(AccountId.new())) == (None, None)
+
+
+def test_a_flow_learns_the_exchange_of_an_account_of_its_tenant_only(database: Engine) -> None:
+    anna, bruno = new_tenant(database), new_tenant(database)
+    account = account_of(anna)
+    SqlAlchemyAccountRepositoryAdapter(database, anna).add(account)
+
+    assert SqlAlchemyAccountRepositoryAdapter(database, anna).exchange_of(account.id.value) == account.exchange.value
+    for tenant_id, account_id in ((bruno, account.id), (anna, AccountId.new())):
+        with pytest.raises(FlowAccountNotFoundError):
+            SqlAlchemyAccountRepositoryAdapter(database, tenant_id).exchange_of(account_id.value)
 
 
 def test_replaced_credentials_leave_no_trace_of_the_previous_ones(database: Engine) -> None:
