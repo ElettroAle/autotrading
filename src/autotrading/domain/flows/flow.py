@@ -7,7 +7,7 @@ from autotrading.domain.flows.errors import (
     ArchiveOnlyStoppedError,
     FlowCommandNotAllowedError,
 )
-from autotrading.domain.flows.flow_command import FlowCommand
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
@@ -45,7 +45,7 @@ class Flow(TenantOwned):
         """
         return self.account_id == account_id and self.status.not_stopped and self.configuration.covers(asset)
 
-    def after(self, command: FlowCommand) -> Flow:
+    def after(self, command: FlowAction) -> Flow:
         """The flow in the status the command leads to, when the command starts from its status (R1.1.4, R1.1.5)."""
         if self.status not in command.starts_from:
             raise FlowCommandNotAllowedError(command.value, self.status.value)

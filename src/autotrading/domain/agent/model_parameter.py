@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Protocol
 
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, ParameterOutOfRangeError
 
@@ -12,21 +11,6 @@ PARAMETER_LABELS = {
 }
 
 type ParameterValue = Decimal | str
-
-
-class ModelParameter(Protocol):
-    @property
-    def key(self) -> str: ...
-
-    @property
-    def default(self) -> ParameterValue: ...
-
-    @property
-    def label(self) -> str: ...
-
-    def value_of(self, requested: object) -> ParameterValue:
-        """The requested value as the model takes it; raises ParameterOutOfRangeError when it is not allowed."""
-        ...
 
 
 def label_of(key: str) -> str:
@@ -100,3 +84,6 @@ class ChoiceParameter:
         if not isinstance(requested, str) or requested not in self.choices:
             raise ParameterOutOfRangeError(self.label)
         return requested
+
+
+type ModelParameter = RangeParameter | ChoiceParameter

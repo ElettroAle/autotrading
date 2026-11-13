@@ -14,7 +14,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, text
 
-from autotrading.adapters.outbound.sqlalchemy.database import APPLICATION_ROLE, DatabaseSettings, create_database_engine
+from autotrading.adapters.outbound.sqlalchemy.database import APPLICATION_ROLE, SqlAlchemyDatabaseAdapter
 
 OWNER_ROLE = "autotrading_owner"
 TEST_PASSWORD = "integration-only"  # noqa: S105 - throwaway role of a throwaway database
@@ -32,7 +32,7 @@ def _server() -> tuple[str, int, str, str]:
 
 def _admin_engine(database: str) -> Engine:
     host, port, admin, password = _server()
-    settings = DatabaseSettings(host=host, port=port, name=database, user=admin, password=password)
+    settings = SqlAlchemyDatabaseAdapter(host=host, port=port, name=database, user=admin, password=password)
     return create_engine(settings.url(), isolation_level="AUTOCOMMIT")
 
 
@@ -77,9 +77,9 @@ def migrated_database(workspace: Path) -> Iterator[Engine]:
         connection.execute(text(f"CREATE DATABASE {database} OWNER {OWNER_ROLE}"))
     try:
         _migrate(database, workspace / "owner-password")
-        application = create_database_engine(
-            DatabaseSettings(host=host, port=port, name=database, user=APPLICATION_ROLE, password=TEST_PASSWORD)
-        )
+        application = SqlAlchemyDatabaseAdapter(
+            host=host, port=port, name=database, user=APPLICATION_ROLE, password=TEST_PASSWORD
+        ).engine()
         yield application
         application.dispose()
     finally:

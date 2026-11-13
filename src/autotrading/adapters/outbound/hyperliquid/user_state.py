@@ -6,7 +6,7 @@ from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
-class UserPosition:
+class _UserPosition:
     """One position of the clearinghouse state, as the exchange gives it: the size is signed, long above zero."""
 
     coin: str
@@ -19,18 +19,18 @@ class UserPosition:
 
 
 @dataclass(frozen=True, slots=True)
-class UserState:
+class _UserState:
     """The clearinghouse state of an account, read once for every adapter that needs it."""
 
     account_value: Decimal
     withdrawable: Decimal
-    positions: tuple[UserPosition, ...]
+    positions: tuple[_UserPosition, ...]
     read_at: datetime
 
 
-def user_state_of(state: Any) -> UserState:
+def user_state_of(state: Any) -> _UserState:
     """Raises KeyError, TypeError, ValueError or InvalidOperation on an answer of unexpected shape."""
-    return UserState(
+    return _UserState(
         account_value=decimal_of(state["marginSummary"]["accountValue"]),
         withdrawable=decimal_of(state["withdrawable"]),
         positions=tuple(_position_of(entry["position"]) for entry in state["assetPositions"]),
@@ -42,9 +42,9 @@ def decimal_of(value: Any) -> Decimal:
     return Decimal(str(value))
 
 
-def _position_of(position: Mapping[str, Any]) -> UserPosition:
+def _position_of(position: Mapping[str, Any]) -> _UserPosition:
     liquidation = position.get("liquidationPx")
-    return UserPosition(
+    return _UserPosition(
         coin=str(position["coin"]),
         signed_size=decimal_of(position["szi"]),
         leverage=int(position["leverage"]["value"]),

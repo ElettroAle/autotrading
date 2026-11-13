@@ -7,7 +7,7 @@ from uuid import UUID
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 
 from autotrading.adapters.outbound.hyperliquid.activity import translated
-from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdk, OfficialSdk
+from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdkAdapter
 from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
 
 # The exchange answers at most 2000 fills and 500 funding payments per request, and keeps only the 10000 most recent
@@ -25,13 +25,17 @@ class HyperliquidAccountExecutionsAdapter:
     Public information of the address: no signature. Only what is newer than the moment travels, page by page.
     """
 
-    def __init__(self, base_url: str, sdk: HyperliquidSdk | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+    ) -> None:
         self._base_url = base_url
-        self._sdk = sdk or OfficialSdk()
+        self._sdk = sdk or HyperliquidSdkAdapter()
         self._timeout = timeout
 
     @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdk | None = None) -> HyperliquidAccountExecutionsAdapter:
+    def for_network(
+        cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None
+    ) -> HyperliquidAccountExecutionsAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     @property

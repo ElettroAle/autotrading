@@ -10,6 +10,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
+from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAdapter
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountPosition, BalanceMovement
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -42,7 +43,7 @@ STATE = {
 
 
 @dataclass
-class FakeSdk:
+class FakeSdk(HyperliquidSdkAdapter):
     """Stands in for the official SDK: it answers what the test decides, or fails as the test decides."""
 
     state: Any = field(default_factory=lambda: STATE)
