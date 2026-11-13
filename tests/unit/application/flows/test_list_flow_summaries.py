@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from autotrading.bootstrap import FlowSummariesFromFlows
+from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -14,8 +14,8 @@ TENANT = TenantId(uuid4())
 STARTED = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 
 
-def summaries_of(flows: FlowStore, accounts: AccountStore) -> FlowSummariesFromFlows:
-    return FlowSummariesFromFlows(
+def summaries_of(flows: FlowStore, accounts: AccountStore) -> ListFlowSummariesUseCase:
+    return ListFlowSummariesUseCase(
         InMemoryFlowRepositoryAdapter(flows, TENANT),
         InMemoryAccountRepositoryAdapter(accounts, TENANT),
         InMemoryFlowTimingAdapter(flows, TENANT),
@@ -30,7 +30,7 @@ def test_an_active_flow_is_planned_from_its_anchor_on_its_account() -> None:
     flows.flows.append(flow)
     flows.anchors[flow.id] = STARTED
 
-    [summary] = summaries_of(flows, accounts).in_use()
+    [summary] = summaries_of(flows, accounts).execute()
 
     assert (summary.flow_id, summary.name, summary.account, summary.status) == (
         flow.id.value,
@@ -49,7 +49,7 @@ def test_a_paused_flow_keeps_its_reason_and_plans_nothing() -> None:
     flows.anchors[flow.id] = STARTED
     flows.pause_reasons[flow.id] = "credito esaurito presso openrouter"
 
-    [summary] = summaries_of(flows, AccountStore()).in_use()
+    [summary] = summaries_of(flows, AccountStore()).execute()
 
     assert (summary.pause_reason, summary.schedule, summary.account) == ("credito esaurito presso openrouter", None, "")
 
@@ -58,4 +58,4 @@ def test_an_archived_flow_is_not_in_use() -> None:
     flows = FlowStore()
     flows.flows.append(a_flow(TENANT, status=FlowStatus.ARCHIVED))
 
-    assert summaries_of(flows, AccountStore()).in_use() == []
+    assert summaries_of(flows, AccountStore()).execute() == []

@@ -227,6 +227,17 @@ def test_the_name_of_an_account_is_read_for_its_tenant_only(database: Engine) ->
         SqlAlchemyAccountRepositoryAdapter(database, tenant_b).account_name(account.id.value)
 
 
+def test_the_names_of_the_accounts_are_those_of_the_tenant_only(database: Engine) -> None:
+    tenant_a, tenant_b = new_tenant(database), new_tenant(database)
+    account = account_of(tenant_a)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant_a).add(account)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant_b).add(account_of(tenant_b, "altro"))
+
+    names = SqlAlchemyAccountRepositoryAdapter(database, tenant_a).account_names()
+
+    assert names == {account.id.value: account.name.value}
+
+
 def test_the_sealed_verification_access_of_an_account_is_read_for_its_tenant_only(database: Engine) -> None:
     tenant_a, tenant_b = new_tenant(database), new_tenant(database)
     account = account_of(tenant_a)

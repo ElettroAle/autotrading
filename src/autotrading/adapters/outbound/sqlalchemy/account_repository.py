@@ -60,6 +60,10 @@ class SqlAlchemyAccountRepositoryAdapter:
             account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
         )
 
+    def account_names(self) -> dict[UUID, str]:
+        """The name of each account of the tenant, as the consultation of the cycles shows it (R1.7.3)."""
+        return {account.id.value: account.name.value for account in self.list()}
+
     def account_name(self, account_id: UUID) -> str:
         """The name of the account as the flows context tells it in a notification (R1.6.2)."""
         account = self.get(AccountId(account_id))
