@@ -92,3 +92,9 @@ def test_an_architectural_exception_belongs_to_no_technology_folder() -> None:
     owned = {library for libraries in TECHNOLOGY_LIBRARIES.values() for library in libraries}
 
     assert not owned & set(ARCHITECTURAL_LIBRARIES)
+
+
+def test_every_module_an_architectural_exception_names_exists() -> None:
+    named = {module for modules in ARCHITECTURAL_LIBRARIES.values() for module in modules}
+
+    assert {module for module in named if not (SOURCE_ROOT / module).is_file()} == set()

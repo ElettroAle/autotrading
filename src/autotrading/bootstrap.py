@@ -41,6 +41,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
 from autotrading.adapters.outbound.sqlalchemy.composition import SqlAlchemyEngine, sqlalchemy_adapters
+from autotrading.adapters.outbound.sqlalchemy.cycle_checkpoints import SqlAlchemyCycleCheckpointsAdapter
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
@@ -88,6 +89,7 @@ from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpener
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps, GraphCheckpoints
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
@@ -132,12 +134,11 @@ from autotrading.application.flows.record_flow_closing import RecordFlowClosingU
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
-from autotrading.application.flows.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
+from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
-from autotrading.application.flows.source_collector import SourceCollector
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
@@ -530,6 +531,7 @@ def cycle_ports(
             flow_paused_notice=NotifyFlowPausedUseCase(notify),
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
+            checkpoints=SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id),
             notify=notify,
         )
 
@@ -635,6 +637,7 @@ class TenantCyclePorts:
     cycle_failure: NotifyCycleFailureUseCase
     notify: NotifyUseCase
     settlement_currency: str
+    checkpoints: GraphCheckpoints
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,11 +707,12 @@ def run_cycle_for(
     lock: FlowLockPort,
     tenant_id: TenantId,
 ) -> WorkerCycle:
-    """The cycle of a flow of the tenant, every step on the adapters of that tenant (ADR 0041, ADR 0042)."""
+    """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104)."""
     ports = ports_of(tenant_id)
     steps = CycleSteps(
         start=ports.start_cycle,
-        sources=SourceCollector(SourcesFromSources(ports, services), ThreadPoolConcurrentCallsAdapter()),
+        sources=SourcesFromSources(ports, services),
+        calls=ThreadPoolConcurrentCallsAdapter(),
         context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), services.clock),
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
@@ -723,14 +727,15 @@ def run_cycle_for(
         end=ports.end_cycle,
         journal=JsonCycleJournalAdapter(services.environment),
     )
+    cycles = cycles_of(tenant_id)
     guards = CycleGuards(
-        cycles=cycles_of(tenant_id),
+        cycles=cycles,
         lock=lock,
         pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
         clock=services.clock,
         failures=ports.cycle_failure,
     )
-    return RunCycleUseCase(steps, guards)
+    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards)
 
 
 def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:

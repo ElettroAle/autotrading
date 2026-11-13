@@ -9,6 +9,9 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
+
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 from autotrading.application.flows.ports import (
     FlowSnapshot,
@@ -379,3 +382,17 @@ class RecordedCycleFailuresAdapter:
 
     def execute(self, flow_id: UUID, reason: str) -> None:
         self.told.append((flow_id, reason))
+
+
+class InMemoryCycleCheckpointsAdapter:
+    """The checkpoints of the cycles kept in memory, serialized as the checkpointer in PostgreSQL serializes them."""
+
+    def __init__(self) -> None:
+        self.saver = InMemorySaver()
+
+    def thread(self, flow_id: UUID, planned_at: datetime) -> str:
+        return f"{flow_id}/{planned_at.isoformat()}"
+
+    @contextmanager
+    def opened(self) -> Iterator[BaseCheckpointSaver[str]]:
+        yield self.saver
