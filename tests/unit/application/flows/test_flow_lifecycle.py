@@ -337,11 +337,11 @@ def test_a_refused_command_leaves_the_status(flows: Flows) -> None:
 
 @pytest.mark.parametrize(
     ("status", "command"),
-    [(FlowStatus.STOPPED, FlowCommand.START), (FlowStatus.PAUSED, FlowCommand.RESUME)],
+    [(FlowStatus.STOPPED, FlowAction.START), (FlowStatus.PAUSED, FlowAction.RESUME)],
     ids=["start", "resume"],
 )
 def test_a_flow_does_not_trade_while_the_procedure_runs_on_one_of_its_assets(
-    flows: Flows, status: FlowStatus, command: FlowCommand
+    flows: Flows, status: FlowStatus, command: FlowAction
 ) -> None:
     flow = flows.saved(status=status, assets=("ETH", "BTC"))
     flows.running_verifications.add((flow.account_id, "BTC"))
@@ -357,7 +357,7 @@ def test_the_assets_of_a_flow_that_starts_are_kept_free_of_procedures_while_its_
     flow = flows.saved(assets=("ETH", "BTC"))
     flows.running_verifications.add((uuid4(), "BTC"))
 
-    started = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.START))
+    started = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
 
     assert started.status is FlowStatus.ACTIVE
     assert flows.verifications.kept_free_while == [frozenset({"ETH", "BTC"})]
@@ -365,10 +365,10 @@ def test_the_assets_of_a_flow_that_starts_are_kept_free_of_procedures_while_its_
 
 def test_a_pause_never_waits_for_the_procedure(flows: Flows) -> None:
     flow = flows.saved()
-    flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.START))
+    flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
     flows.running_verifications.add((flow.account_id, "BTC"))
 
-    paused = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.PAUSE))
+    paused = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.PAUSE))
 
     assert paused.status is FlowStatus.PAUSED
     assert len(flows.verifications.kept_free_while) == 1
