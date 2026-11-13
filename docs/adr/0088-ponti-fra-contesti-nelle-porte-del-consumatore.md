@@ -27,6 +27,17 @@ indipendenza vieta che un contesto di application importi gli errori di un altro
 - **Il giornale JSON del ciclo** è un adapter di una porta di `cycles` in `adapters/outbound/json/`.
 - **bootstrap** resta istanziazione e collegamento.
 
+## Applicazione
+
+- **orders**: `OrderAccountPort`, `AccessOpenerPort`; sequenza in `OpenTradingAccessUseCase`.
+- **flows**: `SealedAddressPort`, `AddressOpenerPort`, `ActivityReaderPort`, `ExecutionsReaderPort`; sequenza in
+  `ReadAccountActivityUseCase` e `ReadAccountExecutionsUseCase`. `AccountActivityPort` ha la forma `execute(command)`
+  come `SourceReaderPort`: nel worker è il caso d'uso stesso, nell'API il client HTTP del worker.
+- **verification**: `VerificationAccountPort`, `VerificationOpenerPort`, `AccountReaderPort` (realizzata dall'adapter
+  Hyperliquid che già legge lo stato del conto), `FlowsOnAccountPort` (realizzata dal repository dei flussi);
+  sequenza in `ReadAccountForVerificationUseCase`. Ogni errore di lettura è un `VerificationStepError` con lo stesso
+  messaggio di prima.
+
 ## Alternative scartate
 
 - **Cartella `adapters/bridges/`** per i ponti: scartata dal proprietario, gli adapter si organizzano per
