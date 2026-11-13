@@ -1,4 +1,4 @@
-# ADR 0085 — Storico, notifiche e valuta fuori dai ponti di bootstrap
+# ADR 0086 — Storico, notifiche e valuta fuori dai ponti di bootstrap
 
 - Stato: accettata (13 novembre 2026)
 - Requisiti: R1.1.5, R1.6.2, R1.7.2, R1.8.2, R0.4.1; Bug 171
