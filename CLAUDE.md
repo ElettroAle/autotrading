@@ -75,7 +75,8 @@ src/autotrading/
       <verbo>_<oggetto>.py      un caso d'uso per modulo
   adapters/                     livello 3: tecnologie, ognuna incapsulata
     inbound/api/                FastAPI
-    outbound/<tecnologia>/      hyperliquid/, libsodium/, sqlalchemy/, httpx/, json/
+    outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
+                                json/, telegram/, worker/, rss/, alternative_me/, coinmarketcap/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -99,8 +100,12 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
 - `domain` non importa nulla di `application`, `adapters`, `bootstrap`, né librerie esterne.
 - `application` importa solo `domain` e la libreria standard.
 - Le librerie tecnologiche si importano solo nella cartella del loro adapter, `bootstrap.py` compreso.
-- **Un adapter = una e una sola tecnologia**: virtualmente una libreria a sé, staccabile. Ogni cartella
-  `adapters/<verso>/<tecnologia>/` dichiara le sue librerie e una libreria appartiene a una sola cartella.
+- **Un adapter = una e una sola tecnologia**: virtualmente una libreria a sé, staccabile. Tecnologia =
+  sistema integrato (Hyperliquid, Telegram, l'API interna del worker, un feed RSS, alternative.me,
+  CoinMarketCap, PostgreSQL, libsodium), non la libreria che lo raggiunge: una chiamata HTTP verso
+  Telegram sta in `telegram/`, mai in una cartella `httpx/`. Ogni cartella `adapters/<verso>/<tecnologia>/`
+  dichiara le sue librerie; una libreria specifica di un sistema (SDK Hyperliquid, `sqlalchemy`, `nacl`,
+  `jwt`) appartiene a una sola cartella, una libreria di trasporto (`httpx`) può servire più cartelle.
 - Le cartelle `adapters/<verso>/<tecnologia>` non si importano a vicenda.
 - **Il caso d'uso orchestra gli adapter; un adapter non orchestra.** Un adapter non riceve porte né casi
   d'uso e da `application` importa solo `ports.py` ed `errors.py`. Unica eccezione il decorator: riceve la
@@ -125,8 +130,8 @@ regola ha eccezioni per nome**.
 - Import: i contratti di import-linter; ogni cartella di tecnologia e ogni contesto (tenancy esclusa)
   stanno nel proprio contratto di indipendenza.
 - Librerie: ogni cartella di tecnologia dichiara le sue librerie esterne e importa solo quelle; una
-  libreria appartiene a una sola cartella; `domain`, `application` e `bootstrap.py` non importano
-  librerie esterne.
+  libreria appartiene a una sola cartella, salvo le librerie di trasporto (`httpx`); `domain`,
+  `application` e `bootstrap.py` non importano librerie esterne.
 - Adapter: non riceve porte né casi d'uso nel costruttore (salvo il decorator della stessa porta,
   dichiarata tra le basi) e da `application` importa solo `ports.py` ed `errors.py`.
 - Nessun ponte: nessuna classe `*Bridge*` o `<X>From<Y>`.
@@ -246,6 +251,11 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-hyperliquid.md` | `adapters/outbound/hyperliquid/**` |
 | `tech-libsodium.md` | `adapters/outbound/libsodium/**` |
 | `tech-json.md` | `adapters/outbound/json/**` |
+| `tech-telegram.md` | `adapters/outbound/telegram/**` |
+| `tech-worker.md` | `adapters/outbound/worker/**` |
+| `tech-rss.md` | `adapters/outbound/rss/**` |
+| `tech-alternative-me.md` | `adapters/outbound/alternative_me/**` |
+| `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |
