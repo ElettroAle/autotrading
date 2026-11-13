@@ -4,7 +4,6 @@ from decimal import Decimal, InvalidOperation
 
 from openai import OpenAI, OpenAIError
 
-from autotrading.adapters.outbound.litellm.model_call import TIMEOUT_SECONDS
 from autotrading.application.agent.errors import ModelCatalogUnavailableError
 from autotrading.application.flows.errors import FlowModelCatalogUnavailableError
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, InvalidModelUsageError
@@ -70,11 +69,6 @@ class LiteLlmModelCatalogAdapter:
         if not isinstance(groups, list):
             raise ModelCatalogUnavailableError
         return [entry for entry in groups if isinstance(entry, Mapping)]
-
-
-def litellm_model_catalog(url: str, master_key: str) -> LiteLlmModelCatalogAdapter:
-    """The catalog of the installation: the proxy at its internal address, read with the master key."""
-    return LiteLlmModelCatalogAdapter(OpenAI(api_key=master_key, base_url=url, timeout=TIMEOUT_SECONDS, max_retries=0))
 
 
 def _definitions(groups: list[Group]) -> Iterator[ModelDefinition]:

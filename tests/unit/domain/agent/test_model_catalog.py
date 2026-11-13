@@ -140,3 +140,14 @@ def test_a_model_not_in_the_catalog_is_not_available() -> None:
 def test_a_catalog_with_the_same_model_twice_is_a_defect() -> None:
     with pytest.raises(InvalidModelDefinitionError):
         ModelCatalog((DEEPSEEK, DEEPSEEK))
+
+
+def test_catalogs_joined_offer_the_models_of_each() -> None:
+    joined = ModelCatalog.joined((ModelCatalog((DEEPSEEK,)), ModelCatalog((SONNET,))))
+
+    assert joined.models == (DEEPSEEK, SONNET)
+
+
+def test_catalogs_joined_that_offer_the_same_model_are_a_defect() -> None:
+    with pytest.raises(InvalidModelDefinitionError):
+        ModelCatalog.joined((ModelCatalog((DEEPSEEK,)), ModelCatalog((DEEPSEEK,))))

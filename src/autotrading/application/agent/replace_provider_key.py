@@ -25,7 +25,7 @@ class ReplaceProviderKeyUseCase:
         self._services = services
 
     def execute(self, command: ReplaceProviderKeyCommand) -> ProviderName:
-        provider = supported_provider(self._services.catalog, command.provider)
+        provider = supported_provider(self._services.gateways, command.provider)
         key = ProviderKey(command.key)
         current = registered_key(self._keys, provider)
         sealed = self._services.sealer.seal(provider, key)

@@ -94,11 +94,6 @@ class LiteLlmModelCallAdapter:
             raise _refusal(provider, key, error) from None
 
 
-def litellm_model_call(url: str, master_key: str) -> LiteLlmModelCallAdapter:
-    """The adapter of the installation: the proxy at its internal address, no retries (the next cycle retries)."""
-    return LiteLlmModelCallAdapter(OpenAI(api_key=master_key, base_url=url, timeout=TIMEOUT_SECONDS, max_retries=0))
-
-
 def _message(message: ModelMessage) -> ChatCompletionMessageParam:
     if message.role is MessageRole.SYSTEM:
         return ChatCompletionSystemMessageParam(role="system", content=message.content)
