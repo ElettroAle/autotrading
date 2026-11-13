@@ -473,11 +473,13 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
 
 
 def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
+    accounts = exchanges_for(ExchangeNetwork.TEST)
     exchanges = WorkerExchanges(
-        exchanges_for(ExchangeNetwork.TEST),
+        accounts,
         order_exchanges_for(ExchangeNetwork.TEST),
         activity_readers_for(ExchangeNetwork.TEST),
         executions_readers_for(ExchangeNetwork.TEST),
+        accounts,
     )
     messenger = FakeMessengerAdapter()
     worker = WorkerUseCaseFactory(

@@ -42,14 +42,14 @@ def test_the_activity_read_by_the_worker_arrives_unchanged(worker: Worker) -> No
     )
     worker.activity_reader.activities[address] = activity
 
-    assert adapter_on(worker).activity(account.id.value) == activity
+    assert adapter_on(worker).execute(account.id.value) == activity
 
 
 def test_an_account_of_another_tenant_is_not_found_by_the_worker(worker: Worker) -> None:
     theirs = worker.saved_account(TenantId.new())
 
     with pytest.raises(FlowAccountNotFoundError):
-        adapter_on(worker).activity(theirs.id.value)
+        adapter_on(worker).execute(theirs.id.value)
 
 
 def test_an_exchange_the_worker_cannot_read_is_unavailable(worker: Worker) -> None:
@@ -57,14 +57,14 @@ def test_an_exchange_the_worker_cannot_read_is_unavailable(worker: Worker) -> No
     worker.activity_reader.reachable = False
 
     with pytest.raises(FlowExchangeUnavailableError):
-        adapter_on(worker).activity(account.id.value)
+        adapter_on(worker).execute(account.id.value)
 
 
 def test_a_caller_without_the_token_is_refused_and_nothing_is_read(worker: Worker) -> None:
     account = worker.saved_account()
 
     with pytest.raises(FlowExchangeUnavailableError):
-        adapter_on(worker, token=token_hex(16)).activity(account.id.value)
+        adapter_on(worker, token=token_hex(16)).execute(account.id.value)
 
 
 def test_a_worker_out_of_reach_is_an_exchange_that_cannot_be_read() -> None:
@@ -74,7 +74,7 @@ def test_a_worker_out_of_reach_is_an_exchange_that_cannot_be_read() -> None:
     client = httpx.Client(transport=httpx.MockTransport(refuse), base_url="http://worker")
 
     with pytest.raises(FlowExchangeUnavailableError):
-        HttpxAccountActivityAdapter(client, TOKEN, TENANT).activity(uuid4())
+        HttpxAccountActivityAdapter(client, TOKEN, TENANT).execute(uuid4())
 
 
 @pytest.mark.parametrize(
@@ -84,7 +84,7 @@ def test_a_worker_out_of_reach_is_an_exchange_that_cannot_be_read() -> None:
 )
 def test_an_answer_of_unexpected_shape_is_an_exchange_that_cannot_be_read(body: object) -> None:
     with pytest.raises(FlowExchangeUnavailableError):
-        answering(200, body).activity(uuid4())
+        answering(200, body).execute(uuid4())
 
 
 def test_an_answer_that_is_not_json_is_an_exchange_that_cannot_be_read() -> None:
@@ -92,7 +92,7 @@ def test_an_answer_that_is_not_json_is_an_exchange_that_cannot_be_read() -> None
     client = httpx.Client(transport=transport, base_url="http://worker")
 
     with pytest.raises(FlowExchangeUnavailableError):
-        HttpxAccountActivityAdapter(client, TOKEN, TENANT).activity(uuid4())
+        HttpxAccountActivityAdapter(client, TOKEN, TENANT).execute(uuid4())
 
 
 def test_the_adapter_never_shows_its_token() -> None:
@@ -110,4 +110,4 @@ def test_a_refusal_of_the_worker_is_never_read_as_an_activity() -> None:
     }
 
     with pytest.raises(FlowExchangeUnavailableError):
-        answering(503, body).activity(uuid4())
+        answering(503, body).execute(uuid4())

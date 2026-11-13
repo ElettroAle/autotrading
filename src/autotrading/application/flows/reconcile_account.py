@@ -56,7 +56,7 @@ class ReconcileAccountUseCase:
         reconciliation = AccountReconciliation.of(
             account_id,
             (flow for flow in self._flows.list() if flow.account_id == account_id),
-            self._activity.activity(account_id),
+            self._activity.execute(account_id),
             self._readings.last_reading(account_id),
             recorded,
         )

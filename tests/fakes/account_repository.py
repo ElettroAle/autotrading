@@ -3,11 +3,16 @@ from uuid import UUID
 
 from autotrading.application.accounts.errors import AccountNameInUseError
 from autotrading.application.flows.errors import AccountToRemoveNotFoundError, FlowAccountNotFoundError
+from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.application.verification.errors import VerificationAccountNotFoundError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
+from autotrading.domain.flows.sealed_address import SealedAddress
+from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.verification.verification_access import SealedVerificationAccess
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +52,33 @@ class InMemoryAccountRepositoryAdapter:
 
     def get(self, account_id: AccountId) -> Account | None:
         return next((account for account in self.list() if account.id == account_id), None)
+
+    def sealed_access(self, account_id: UUID) -> SealedAccess:
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise OrderAccountNotFoundError
+        sealed = account.credentials
+        return SealedAccess(
+            account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
+        )
+
+    def sealed_address(self, account_id: UUID) -> SealedAddress:
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        sealed = account.credentials
+        return SealedAddress(
+            account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
+        )
+
+    def sealed_verification(self, account_id: UUID) -> SealedVerificationAccess:
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise VerificationAccountNotFoundError
+        sealed = account.credentials
+        return SealedVerificationAccess(
+            account.tenant_id, account_id, account.exchange.value, sealed.key_version, sealed.ciphertext
+        )
 
     def exchange_of(self, account_id: UUID) -> str:
         account = self.get(AccountId(account_id))

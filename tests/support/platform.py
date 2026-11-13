@@ -22,14 +22,17 @@ from autotrading.application.notifications.send_test_notification import SendTes
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
-from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
+from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
+from autotrading.application.verification.run_exchange_verification import (
+    RunExchangeVerificationUseCase,
+    VerificationReadings,
+)
 from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
-    AccountActivityFromAccounts,
-    AccountReadingFromAccounts,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
     ManualClosingsRecordedInFlows,
@@ -37,7 +40,6 @@ from autotrading.bootstrap import (
     NotifiedClosedPositions,
     OrderExecutionFromOrders,
     SourceSettingsFromSources,
-    TradingAccessFromAccounts,
 )
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
@@ -223,7 +225,7 @@ class Platform:
         """What the worker builds for a request of the API, with the opener only it holds."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(self.vault)
-        access = TradingAccessFromAccounts(accounts, opener)
+        access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
         close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, self.slippage)
@@ -232,7 +234,10 @@ class Platform:
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
-                AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
+                VerificationReadings(
+                    ReadAccountForVerificationUseCase(accounts, opener, self.exchanges),
+                    InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ),
                 OrderExecutionFromOrders(
                     open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)
                 ),
@@ -241,9 +246,7 @@ class Platform:
                 lambda: STARTED_AT,
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
-            read_account_activity=ReadAccountActivityUseCase(
-                AccountActivityFromAccounts(accounts, opener, {HYPERLIQUID: self.activity_reader})
-            ),
+            read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 
     def link_chat(self) -> LinkChatUseCase:
