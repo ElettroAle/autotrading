@@ -10,6 +10,10 @@ inputs:
   token:
     description: Token con permesso packages:write
     required: true
+  variant:
+    description: Suffisso del tag per un'immagine diversa da quella di api e worker (forecaster)
+    required: false
+    default: ""
 outputs:
   image:
     description: Riferimento immutabile repository@sha256
@@ -28,8 +32,10 @@ runs:
       env:
         LOCAL_IMAGE: ${{ inputs.local-image }}
         VERSION: ${{ inputs.version }}
+        VARIANT: ${{ inputs.variant }}
       run: |
         repository="ghcr.io/${GITHUB_REPOSITORY,,}"
-        docker tag "$LOCAL_IMAGE" "${repository}:${VERSION}"
-        docker push "${repository}:${VERSION}"
-        echo "image=$(docker inspect --format '{{index .RepoDigests 0}}' "${repository}:${VERSION}")" >> "$GITHUB_OUTPUT"
+        tag="${VERSION}${VARIANT:+-${VARIANT}}"
+        docker tag "$LOCAL_IMAGE" "${repository}:${tag}"
+        docker push "${repository}:${tag}"
+        echo "image=$(docker inspect --format '{{index .RepoDigests 0}}' "${repository}:${tag}")" >> "$GITHUB_OUTPUT"

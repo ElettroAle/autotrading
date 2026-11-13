@@ -29,8 +29,8 @@ Dettagli e motivazioni in `docs/architecture.md`.
 Utente (tailnet) ──HTTPS──> Tailscale Serve ──> api (FastAPI) ──┬──> PostgreSQL (credenziali cifrate, chiave pubblica)
                                             ├──> Hyperliquid (internet)
                                             └──> Entra ID (validazione token)
-worker (chiave privata) ──> PostgreSQL, Hyperliquid
-fasi successive: forecaster (Prophet), litellm, dashboard
+worker (chiave privata) ──> PostgreSQL, Hyperliquid, litellm, forecaster (Prophet)
+fasi successive: dashboard
 ```
 
 ### Esagono dentro un servizio
@@ -82,6 +82,7 @@ src/autotrading/
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
 tools/                          script Python della pipeline, fuori dall'esagono (.claude/rules/ci.md)
+forecaster/                     servizio Prophet in un container proprio, fuori dall'esagono (tech-forecaster.md)
 deploy/                         cloud-init, compose e policy Tailscale delle installazioni
 .github/                        workflow e action della pipeline TrunkFlow
 docs/adr/                       decisioni tecniche, una per file
@@ -284,6 +285,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
 | `tech-system-clock.md` | `adapters/outbound/system_clock/**` |
 | `tech-litellm.md` | `adapters/outbound/litellm/**` |
+| `tech-forecaster.md` | `forecaster/**`, `adapters/outbound/forecaster/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |

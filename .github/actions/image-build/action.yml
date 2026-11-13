@@ -1,9 +1,13 @@
 name: image-build
-description: Costruisce l'immagine del servizio una sola volta e la carica nel daemon locale.
+description: Costruisce un'immagine dei servizi una sola volta e la carica nel daemon locale.
 inputs:
   tag:
     description: Riferimento locale dell'immagine
     required: true
+  target:
+    description: Stadio del Dockerfile da costruire; vuoto costruisce l'immagine di api e worker
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -14,4 +18,5 @@ runs:
         load: true
         push: false
         tags: ${{ inputs.tag }}
+        target: ${{ inputs.target }}
         build-args: REVISION=${{ github.sha }}
