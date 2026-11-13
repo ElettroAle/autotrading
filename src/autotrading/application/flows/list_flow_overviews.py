@@ -32,7 +32,7 @@ class ListFlowOverviewsUseCase:
 
     def execute(self) -> list[FlowOverview]:
         now = self._clock()
-        return [self._overview_of(summary, now) for summary in self._summaries.in_use()]
+        return [self._overview_of(summary, now) for summary in self._summaries.execute()]
 
     def _overview_of(self, summary: FlowSummary, now: datetime) -> FlowOverview:
         newest = self._history.newest(summary.flow_id, 0, 1)
