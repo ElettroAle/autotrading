@@ -77,7 +77,7 @@ src/autotrading/
     inbound/api/                FastAPI
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
-                                alternative_me/, coinmarketcap/
+                                alternative_me/, coinmarketcap/, litellm/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -283,6 +283,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-alternative-me.md` | `adapters/outbound/alternative_me/**` |
 | `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
 | `tech-system-clock.md` | `adapters/outbound/system_clock/**` |
+| `tech-litellm.md` | `adapters/outbound/litellm/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |
