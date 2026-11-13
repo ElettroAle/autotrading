@@ -1,4 +1,4 @@
-# Orchestratore della revisione AI obbligatoria (R0.5.1, ADR 0099). Il job è il controllo obbligatorio
+# Orchestratore della revisione AI obbligatoria (R0.5.1, ADR 0113). Il job è il controllo obbligatorio
 # "review / revisione" del ruleset di main; le violazioni diventano thread, che il ruleset chiede di risolvere.
 name: reusable-review
 
@@ -39,7 +39,7 @@ jobs:
     # required check, and the owner integrates them by hand.
     if: inputs.head-repository == github.repository && inputs.author != 'dependabot[bot]'
     runs-on: ubuntu-24.04
-    # resolveReviewThread is refused to the job token without contents: write (ADR 0099).
+    # resolveReviewThread is refused to the job token without contents: write (ADR 0113).
     permissions:
       contents: write
       pull-requests: write

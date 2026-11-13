@@ -3,7 +3,7 @@ name: review
 on:
   pull_request:
     branches: [main]
-    # Not on edited: correcting the description must not spend the subscription quota on a new review (ADR 0099).
+    # Not on edited: correcting the description must not spend the subscription quota on a new review (ADR 0113).
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:

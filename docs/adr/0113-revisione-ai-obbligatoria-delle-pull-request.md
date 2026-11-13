@@ -1,4 +1,4 @@
-# ADR 0099 — Revisione AI obbligatoria delle pull request
+# ADR 0113 — Revisione AI obbligatoria delle pull request
 
 - Stato: accettata (13 novembre 2026)
 - Requisiti: R0.5.1 (Task T0.5.6)

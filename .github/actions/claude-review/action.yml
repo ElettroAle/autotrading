@@ -1,6 +1,6 @@
 name: claude-review
 description: >-
-  Revisione AI della pull request contro CLAUDE.md e le rule del ramo principale (ADR 0099). Apre un thread per ogni
+  Revisione AI della pull request contro CLAUDE.md e le rule del ramo principale (ADR 0113). Apre un thread per ogni
   violazione, chiude i propri thread corretti; fallisce se la revisione non si completa.
 inputs:
   token:

@@ -10,7 +10,7 @@ paths:
 
 # Pipeline, rilascio e installazioni
 
-Decisioni in `docs/adr/0001`-`0013`, `0084` e `0099`. Requisiti in `specs/E0-esecuzione-verificata/F0.5-*`.
+Decisioni in `docs/adr/0001`-`0013`, `0084` e `0113`. Requisiti in `specs/E0-esecuzione-verificata/F0.5-*`.
 
 ## Struttura a livelli (come Pipelines V3)
 
@@ -32,7 +32,7 @@ Decisioni in `docs/adr/0001`-`0013`, `0084` e `0099`. Requisiti in `specs/E0-ese
   Telegram) arrivano dal segreto dell'environment via stdin di Tailscale SSH e diventano file 0400 (ADR 0071).
 - Permessi minimi per job (`contents: read` salvo necessità dichiarata).
 - I nomi dei job di `reusable-quality.yml` sono i controlli obbligatori del ruleset di `main`.
-- La revisione AI (`review / revisione`, ADR 0099) giudica ogni pull request con `CLAUDE.md` e le rule di
+- La revisione AI (`review / revisione`, ADR 0113) giudica ogni pull request con `CLAUDE.md` e le rule di
   `main` e apre un thread per ogni violazione. Un suo thread lo chiude solo la revisione stessa, quando la
   violazione è corretta, o il proprietario: mai un agente.
 - Ogni pull request verso `main` collega i suoi work item con `AB#<id>` nella descrizione (`quality / work item`,
