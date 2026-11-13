@@ -23,7 +23,13 @@ from autotrading.adapters.inbound.api.authentication import (
     OidcSigningKeys,
 )
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
-from autotrading.adapters.inbound.api.worker import BotPolling, CyclePolling, WorkerUseCases, create_worker_api
+from autotrading.adapters.inbound.api.worker import (
+    BotPolling,
+    CyclePolling,
+    WorkerUseCases,
+    bot_polling,
+    create_worker_api,
+)
 from autotrading.adapters.outbound.httpx.account_activity import HttpxAccountActivityAdapter
 from autotrading.adapters.outbound.httpx.account_state import TIMEOUT_SECONDS as WORKER_TIMEOUT_SECONDS
 from autotrading.adapters.outbound.httpx.account_state import HttpxAccountStateAdapter
@@ -98,6 +104,7 @@ from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
+from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
 from autotrading.application.accounts.errors import (
     AccountNotFoundError,
@@ -180,7 +187,13 @@ from autotrading.application.notifications.answer_bot_messages import AnswerBotM
 from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.notifications.ports import LinkStores, MessengerPort, NotifierPort
+from autotrading.application.notifications.ports import (
+    BotIdentityPort,
+    BotInboxPort,
+    LinkStores,
+    MessengerPort,
+    NotifierPort,
+)
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
@@ -215,12 +228,14 @@ from autotrading.application.sources.read_indicators import ReadIndicatorsUseCas
 from autotrading.application.sources.read_news import ReadNewsUseCase
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
-from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand, RecordActualPricesUseCase
+from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
+from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_state import AccountState
+from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.position import Position
 from autotrading.domain.accounts.removal import FlowPositionLeftOpen
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
@@ -870,12 +885,13 @@ def create_application(configuration: Mapping[str, str] = os.environ) -> FastAPI
         version=_required(configuration, "APP_VERSION"),
         environment=_environment(configuration),
     )
+    network = ExchangeNetwork.of_installation(health.environment)
     engine = _database(configuration)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
     tenants = TenantUseCaseFactory(
         engine,
         PublicCredentialsKey(_credentials_public_key(configuration), _credentials_key_version(configuration)),
-        ApiExchanges(exchanges_for(health.environment), markets_for(health.environment), health.environment),
+        ApiExchanges(exchanges_for(network), markets_for(network), health.environment),
         _worker_connection(configuration),
         httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS),
     )
@@ -887,30 +903,28 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     environment = _environment(configuration)
     private_keys = {_credentials_key_version(configuration): _credentials_private_key(configuration)}
     opener = SodiumCredentialOpenerAdapter(private_keys)
+    network = ExchangeNetwork.of_installation(environment)
     exchanges = WorkerExchanges(
-        exchanges_for(environment),
-        order_exchanges_for(environment),
-        activity_readers_for(environment),
-        executions_readers_for(environment),
+        exchanges_for(network),
+        order_exchanges_for(network),
+        activity_readers_for(network),
+        executions_readers_for(network),
     )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)
-    token = _optional_secret(configuration, TELEGRAM_BOT_SETTING)
-    client = None if token is None else telegram_client(token)
-    messenger: MessengerPort = UnconfiguredMessenger() if client is None else HttpxTelegramMessengerAdapter(client)
-    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, messenger)
-    bot = None if client is None else telegram_bot(engine, worker, client, messenger)
-    if bot is None:
-        operations.warning("bot Telegram non configurato: notifiche disattivate")
+    telegram = _telegram(configuration)
+    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, telegram.messenger)
+    bot = bot_polling(telegram.inbox, lambda inbox: telegram_bot(engine, worker, inbox, telegram.messenger))
     cycles = worker_cycles(engine, worker.cycle_ports_for, cycle_services(environment, private_keys))
-    bot_identity = None if client is None else HttpxTelegramBotIdentityAdapter(client)
-    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles, bot_identity)
+    return create_worker_api(
+        _secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles, telegram.identity
+    )
 
 
 def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
     """The sources, the providers and the exchange of the cycles, on the network of the installation (ADR 0042)."""
     public = httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS)
-    testnet = environment == "dev"
+    network = ExchangeNetwork.of_installation(environment)
     return CycleServices(
         environment=environment,
         clock=SystemClock(),
@@ -922,43 +936,41 @@ def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> Cycle
             SENTIMENT_COINMARKETCAP.name: HttpxCoinMarketCapSentimentAdapter(public),
         },
         news=HttpxRssNewsAdapter(public),
-        prices=HyperliquidPriceHistoryAdapter.for_network(testnet=testnet),
-        market=HyperliquidMarketDataAdapter.for_network(testnet=testnet),
-        exchange_limits=markets_for(environment),
+        prices=HyperliquidPriceHistoryAdapter.for_network(testnet=network.is_test),
+        market=HyperliquidMarketDataAdapter.for_network(testnet=network.is_test),
+        exchange_limits=markets_for(network),
     )
 
 
 def telegram_bot(
-    engine: Engine, worker: WorkerUseCaseFactory, client: httpx.Client, messenger: MessengerPort
+    engine: Engine, worker: WorkerUseCaseFactory, inbox: BotInboxPort, messenger: MessengerPort
 ) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035)."""
     link_chat = LinkChatUseCase(SqlAlchemyLinkCodeLookupAdapter(engine), worker.link_stores_for, messenger, now)
     test_notification = SendTestNotificationUseCase(
         SqlAlchemyLinkedChatLookupAdapter(engine), worker.notify_for, messenger
     )
-    inbox = HttpxTelegramInboxAdapter(client)
     return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
 
 
-def exchanges_for(environment: str) -> dict[str, HyperliquidExchangeAdapter]:
-    # The exchange network follows the installation: test networks in dev, real ones in prod (R0.2.1).
-    return {HYPERLIQUID: HyperliquidExchangeAdapter.for_network(testnet=environment == "dev")}
+def exchanges_for(network: ExchangeNetwork) -> dict[str, HyperliquidExchangeAdapter]:
+    return {HYPERLIQUID: HyperliquidExchangeAdapter.for_network(testnet=network.is_test)}
 
 
-def markets_for(environment: str) -> dict[str, HyperliquidMarketsAdapter]:
-    return {HYPERLIQUID: HyperliquidMarketsAdapter.for_network(testnet=environment == "dev")}
+def markets_for(network: ExchangeNetwork) -> dict[str, HyperliquidMarketsAdapter]:
+    return {HYPERLIQUID: HyperliquidMarketsAdapter.for_network(testnet=network.is_test)}
 
 
-def order_exchanges_for(environment: str) -> dict[str, HyperliquidOrderExchangeAdapter]:
-    return {HYPERLIQUID: HyperliquidOrderExchangeAdapter.for_network(testnet=environment == "dev")}
+def order_exchanges_for(network: ExchangeNetwork) -> dict[str, HyperliquidOrderExchangeAdapter]:
+    return {HYPERLIQUID: HyperliquidOrderExchangeAdapter.for_network(testnet=network.is_test)}
 
 
-def activity_readers_for(environment: str) -> dict[str, HyperliquidAccountActivityAdapter]:
-    return {HYPERLIQUID: HyperliquidAccountActivityAdapter.for_network(testnet=environment == "dev")}
+def activity_readers_for(network: ExchangeNetwork) -> dict[str, HyperliquidAccountActivityAdapter]:
+    return {HYPERLIQUID: HyperliquidAccountActivityAdapter.for_network(testnet=network.is_test)}
 
 
-def executions_readers_for(environment: str) -> dict[str, HyperliquidAccountExecutionsAdapter]:
-    return {HYPERLIQUID: HyperliquidAccountExecutionsAdapter.for_network(testnet=environment == "dev")}
+def executions_readers_for(network: ExchangeNetwork) -> dict[str, HyperliquidAccountExecutionsAdapter]:
+    return {HYPERLIQUID: HyperliquidAccountExecutionsAdapter.for_network(testnet=network.is_test)}
 
 
 def slippage_from(configuration: Mapping[str, str]) -> Slippage:
@@ -1050,6 +1062,28 @@ def _optional_secret(configuration: Mapping[str, str], name: str) -> str | None:
     if not location or not Path(location).is_file():
         return None
     return Path(location).read_text(encoding="utf-8").strip() or None
+
+
+@dataclass(frozen=True, slots=True)
+class TelegramChannel:
+    """The bot of the installation: without its token the notifications are off and no bot answers (ADR 0035)."""
+
+    messenger: MessengerPort
+    inbox: BotInboxPort | None
+    identity: BotIdentityPort | None
+
+
+def _telegram(configuration: Mapping[str, str]) -> TelegramChannel:
+    token = _optional_secret(configuration, TELEGRAM_BOT_SETTING)
+    if token is None:
+        operations.warning("bot Telegram non configurato: notifiche disattivate")
+        return TelegramChannel(UnconfiguredMessenger(), None, None)
+    client = telegram_client(token)
+    return TelegramChannel(
+        HttpxTelegramMessengerAdapter(client),
+        HttpxTelegramInboxAdapter(client),
+        HttpxTelegramBotIdentityAdapter(client),
+    )
 
 
 def _environment(configuration: Mapping[str, str]) -> str:
@@ -1713,7 +1747,7 @@ def run_due_cycles(
     """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
     steps = CycleSteps(
         flow_state=FlowStateFromFlows(directory, ports_of),
-        sources=SourceCollector(SourcesFromSources(ports_of, services)),
+        sources=SourceCollector(SourcesFromSources(ports_of, services), ThreadPoolConcurrentCallsAdapter()),
         context=ContextFromAgent(services.clock),
         agent=AgentFromAgent(ports_of, services),
         risk=RiskFromFlows(services.exchange_limits),
@@ -1726,9 +1760,10 @@ def run_due_cycles(
 
 def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices) -> None:
     """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
-    command = RecordActualPricesCommand(services.clock.now())
-    for tenant_id in directory.tenants():
-        RecordActualPricesUseCase(services.prices, ports_of(tenant_id).forecasts).execute(command)
+    record = RecordActualPricesOfTenantsUseCase(
+        services.prices, directory.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
+    )
+    record.execute(RecordActualPricesCommand(services.clock.now()))
 
 
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:

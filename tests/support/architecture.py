@@ -58,6 +58,7 @@ CONFIGURATION_READERS = {
     "_credentials_public_key": "rifiuta all'avvio una chiave pubblica malformata",
     "_credentials_private_key": "rifiuta all'avvio una chiave privata malformata",
     "slippage_from": "legge lo slippage dell'installazione, con il default del dominio se assente",
+    "_telegram": "senza il file del token del bot le notifiche sono spente e nessun bot risponde (ADR 0035)",
 }
 
 # The only module-level names bootstrap.py may declare: names and values of the configuration.

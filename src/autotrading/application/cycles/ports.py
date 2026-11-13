@@ -72,6 +72,33 @@ class RiskReview[O = object]:
     outcomes: object
 
 
+@dataclass(frozen=True, slots=True)
+class CallAnswered[R]:
+    value: R
+
+
+@dataclass(frozen=True, slots=True)
+class CallFailed:
+    error: AutotradingError
+
+
+@dataclass(frozen=True, slots=True)
+class CallUnanswered:
+    """The call was still running when the wait ended."""
+
+
+type CallOutcome[R] = CallAnswered[R] | CallFailed | CallUnanswered
+
+
+class ConcurrentCallsPort(Protocol):
+    def call_all[R](self, calls: Mapping[str, Callable[[], R]], seconds: float) -> dict[str, CallOutcome[R]]:
+        """Runs every call at once and waits for them only up to the seconds; a call still running is abandoned.
+
+        A call that fails with an error of the project ends with it; any other error is raised.
+        """
+        ...
+
+
 class ClockPort(Protocol):
     def now(self) -> datetime: ...
 

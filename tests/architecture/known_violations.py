@@ -7,7 +7,6 @@ until it is removed. An entry never exists without its Bug on the board.
 from tests.support.architecture import Rule
 
 BUG_CYCLE_RULES_IN_BOOTSTRAP = 170
-BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON = 173
 
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.PORTS_IN_PORTS_MODULES: {},

@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.application.cycles.ports import FlowSnapshot, SourceReading, SourceRequest
 from autotrading.application.cycles.source_collector import SourceCollector, real_seconds
 from autotrading.domain.cycles.cycle_record import AbsentSource
@@ -33,7 +34,7 @@ def sources() -> Iterator[FakeSourcesAdapter]:
 
 
 def compressed(sources: FakeSourcesAdapter | BrokenSourceAdapter) -> SourceCollector:
-    return SourceCollector(sources, lambda wait: wait.total_seconds() * SECOND)
+    return SourceCollector(sources, ThreadPoolConcurrentCallsAdapter(), lambda wait: wait.total_seconds() * SECOND)
 
 
 def test_the_real_wait_lasts_the_seconds_of_the_cycle() -> None:

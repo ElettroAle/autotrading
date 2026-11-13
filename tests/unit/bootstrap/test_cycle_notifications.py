@@ -43,6 +43,7 @@ from autotrading.bootstrap import (
     executions_readers_for,
     order_exchanges_for,
 )
+from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.cycle_record import CycleFailure, CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
@@ -513,7 +514,10 @@ def test_the_state_at_the_end_of_the_cycle_is_read_again_from_the_exchange(world
 
 def test_the_worker_gives_every_tenant_the_ports_its_cycles_notify_and_record_through() -> None:
     exchanges = WorkerExchanges(
-        exchanges_for("dev"), order_exchanges_for("dev"), activity_readers_for("dev"), executions_readers_for("dev")
+        exchanges_for(ExchangeNetwork.TEST),
+        order_exchanges_for(ExchangeNetwork.TEST),
+        activity_readers_for(ExchangeNetwork.TEST),
+        executions_readers_for(ExchangeNetwork.TEST),
     )
     messenger = FakeMessengerAdapter()
     worker = WorkerUseCaseFactory(
