@@ -38,6 +38,7 @@ def test_a_saved_key_reads_back_as_it_was_sealed(database: Engine) -> None:
     assert keys.get(OPENROUTER) == a_key(anna, OPENROUTER)
     assert keys.list() == [a_key(anna, ANTHROPIC, b"other"), a_key(anna, OPENROUTER)]
     assert keys.get(ProviderName("openai")) is None
+    assert (keys.has_key(OPENROUTER), keys.has_key(ProviderName("openai"))) == (True, False)
 
 
 def test_a_tenant_never_sees_nor_touches_the_keys_of_another(database: Engine) -> None:
@@ -47,6 +48,7 @@ def test_a_tenant_never_sees_nor_touches_the_keys_of_another(database: Engine) -
 
     assert bruno_keys.list() == []
     assert bruno_keys.get(OPENROUTER) is None
+    assert not bruno_keys.has_key(OPENROUTER)
     with pytest.raises(ProviderKeyNotFoundError):
         bruno_keys.replace(a_key(bruno, OPENROUTER, b"stolen"))
     with pytest.raises(ProviderKeyNotFoundError):

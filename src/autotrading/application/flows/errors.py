@@ -162,3 +162,10 @@ class FlowLedgerIncompleteError(ApplicationError):
     @property
     def scope(self) -> ErrorScope:
         return ErrorScope(account_id=self.account_id)
+
+
+class FlowProviderKeyMissingError(InvalidFlowSettingError):
+    """The model of the flow needs a key of its provider the tenant has not registered (R1.4.1)."""
+
+    def __init__(self, provider: str) -> None:
+        super().__init__(f"nessuna chiave registrata per il fornitore: {provider}")

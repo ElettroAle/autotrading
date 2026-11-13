@@ -27,6 +27,10 @@ class SqlAlchemyProviderKeyRepositoryAdapter:
         with self._transaction() as connection:
             return [_key_of(row) for row in connection.execute(query).mappings()]
 
+    def has_key(self, provider: ProviderName) -> bool:
+        """The flows context asks only whether the tenant can use the provider (R1.4.1)."""
+        return self.get(provider) is not None
+
     def get(self, provider: ProviderName) -> RegisteredProviderKey | None:
         query = select(provider_keys).where(provider_keys.c.provider == provider.value)
         with self._transaction() as connection:

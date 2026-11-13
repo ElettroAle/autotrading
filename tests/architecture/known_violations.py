@@ -15,13 +15,9 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
         "bootstrap.py:CycleJournalFromContexts.call_cost": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:CycleJournalFromContexts.describe": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowDirectory._entry": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows._snapshot": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:ModelSettingsFromAgent.selection": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders.execute": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:SourceSettingsFromSources.selection": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:UnattributableNotices.notice": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:_intent_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_scalar_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:_unattributable_notification": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:json_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
@@ -35,8 +31,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:slippage_from": BUG_STRICTER_RULES,
     },
     Rule.BOOTSTRAP_WITHOUT_CONSTANTS: {
-        "bootstrap.py:MODEL_REFUSALS": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:SOURCE_REFUSALS": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:DEFAULT_CREDENTIALS_KEY_VERSION": BUG_STRICTER_RULES,
         "bootstrap.py:DEFAULT_DATABASE_PORT": BUG_STRICTER_RULES,
         "bootstrap.py:HYPERLIQUID": BUG_STRICTER_RULES,
@@ -50,11 +44,8 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     },
     Rule.BOOTSTRAP_WITHOUT_CLASSES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:FlowDirectory": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:ModelSettingsFromAgent": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:SourceSettingsFromSources": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:UnattributableNotices": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:ApiExchanges": BUG_STRICTER_RULES,
@@ -90,9 +81,7 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.NO_BRIDGES: {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:ModelSettingsFromAgent": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:SourceSettingsFromSources": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:FlowPauseFromFlows": BUG_STRICTER_RULES,
@@ -111,7 +100,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.ADAPTERS_DO_NOT_ORCHESTRATE: {},
     Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {
         "bootstrap.py:os": BUG_STRICTER_RULES,
-        "bootstrap.py:threading": BUG_STRICTER_RULES,
     },
     Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {},
     Rule.ONLY_PROJECT_EXCEPTIONS_RAISED: {},

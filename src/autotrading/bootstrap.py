@@ -2,8 +2,7 @@ import base64
 import binascii
 import logging
 import os
-import threading
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -97,6 +96,7 @@ from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import
 )
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.cycle_launcher import ThreadCycleLauncherAdapter
+from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.accounts.errors import (
     CredentialsNotOpenedError,
     ExchangeRejectedCredentialsError,
@@ -108,21 +108,17 @@ from autotrading.application.accounts.ports import (
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AgentAnswer, AskAgentCommand, AskAgentUseCase
-from autotrading.application.agent.errors import (
-    ProviderKeyNotFoundError,
-)
 from autotrading.application.agent.ports import ModelCallPort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
-from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
 from autotrading.application.cycles.ports import (
     ClockPort,
     CycleLauncherPort,
     FlowSnapshot,
     FlowSummary,
+    PlannedFlowsPort,
     RiskReview,
     ScheduledFlow,
     SourceReading,
     SourceRequest,
-    TenantScheduledFlow,
     TenantScheduledFlowsPort,
 )
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
@@ -133,7 +129,6 @@ from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRisk
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
-    InvalidFlowSettingError,
 )
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
@@ -166,6 +161,8 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
+from autotrading.application.flows.select_model import SelectModelUseCase
+from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
@@ -229,13 +226,7 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.position import Position
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
-from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection
-from autotrading.domain.agent.errors import (
-    ModelNotAvailableError,
-    ParameterNotSupportedError,
-    ParameterOutOfRangeError,
-    UnknownParameterError,
-)
+from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.cycles.call_cost import CallCost
 from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
@@ -243,7 +234,6 @@ from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_funds import CycleFunds
-from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
@@ -251,9 +241,8 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
-from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.notification import Amount, Notification
@@ -262,11 +251,6 @@ from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowO
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.slippage import Slippage
-from autotrading.domain.sources.errors import (
-    SourceNotAvailableError,
-    SourceParameterOutOfRangeError,
-    UnknownSourceParameterError,
-)
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
@@ -331,10 +315,6 @@ class WorkerConnection:
     token: str = field(repr=False)
 
 
-MODEL_REFUSALS = (ModelNotAvailableError, ParameterOutOfRangeError, ParameterNotSupportedError, UnknownParameterError)
-SOURCE_REFUSALS = (SourceNotAvailableError, SourceParameterOutOfRangeError, UnknownSourceParameterError)
-
-
 class FlowSummariesFromFlows:
     """Bridges the flows and accounts contexts to the consultation of the cycles (R1.7.3, ADR 0042).
 
@@ -383,44 +363,6 @@ class FlowPositionsFromOrders:
         report = self._closing.execute(CloseFlowPositionCommand(account_id, asset, user_id))
         fill = ClosingFill.reported(report.average_price, report.executed_at, report.fee, report.realized_pnl)
         return PositionClosing.reported(asset, found=report.found, fill=fill, refusal=report.refusal)
-
-
-class ModelSettingsFromAgent:
-    """Bridges the agent context to the flows context in the API (ADR 0031).
-
-    A model of the catalog is usable only with a registered key of its provider (R1.4.1), and only with the
-    parameters it admits (R1.4.2); a refusal reaches the flow with the reason the agent context gives.
-    """
-
-    def __init__(self, catalog: ModelCatalog, keys: ProviderKeyRepositoryPort) -> None:
-        self._catalog = catalog
-        self._keys = keys
-
-    def selection(self, model: str, requested: Mapping[str, object]) -> ModelSelection:
-        if not model.strip():
-            raise ModelRequiredError
-        try:
-            definition = self._catalog.find(model)
-            parameters = definition.settings(requested)
-        except MODEL_REFUSALS as error:
-            raise InvalidFlowSettingError(str(error)) from error
-        if self._keys.get(definition.provider) is None:
-            raise InvalidFlowSettingError(str(ProviderKeyNotFoundError(definition.provider)))
-        return ModelSelection(definition.name, parameters)
-
-
-class SourceSettingsFromSources:
-    """Bridges the sources context to the flows context (ADR 0031): a source of the catalog, its parameters checked."""
-
-    def __init__(self, catalog: SourceCatalog) -> None:
-        self._catalog = catalog
-
-    def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
-        try:
-            parameters = self._catalog.find(source).settings(requested)
-        except SOURCE_REFUSALS as error:
-            raise InvalidFlowSettingError(str(error)) from error
-        return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, parameters)
 
 
 def agent_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
@@ -564,8 +506,8 @@ class TenantUseCaseFactory:
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_state),
                 markets=self._exchanges.markets,
-                models=ModelSettingsFromAgent(MODEL_CATALOG, provider_keys),
-                sources=SourceSettingsFromSources(SOURCE_CATALOG),
+                models=SelectModelUseCase(MODEL_CATALOG, provider_keys),
+                sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
@@ -906,42 +848,10 @@ class SystemClock:
         return now()
 
 
-class FlowDirectory:
-    """The tenant and the anchor of every flow the worker planned: the ports of the cycle name only the flow.
-
-    An entry is never forgotten, so a cycle still running finds its flow after the flow is paused.
-    """
-
-    def __init__(self) -> None:
-        self._guard = threading.Lock()
-        self._entries: dict[UUID, TenantScheduledFlow] = {}
-
-    def remember(self, entries: Iterable[TenantScheduledFlow]) -> None:
-        with self._guard:
-            self._entries.update({entry.flow.flow_id: entry for entry in entries})
-
-    def tenant_of(self, flow_id: UUID) -> TenantId:
-        return self._entry(flow_id).tenant_id
-
-    def anchor_of(self, flow_id: UUID) -> datetime:
-        return self._entry(flow_id).flow.schedule.anchor
-
-    def tenants(self) -> set[TenantId]:
-        with self._guard:
-            return {entry.tenant_id for entry in self._entries.values()}
-
-    def _entry(self, flow_id: UUID) -> TenantScheduledFlow:
-        with self._guard:
-            entry = self._entries.get(flow_id)
-        if entry is None:
-            raise FlowOfCycleNotFoundError
-        return entry
-
-
 class ScheduledFlowsFromFlows:
     """Bridges the flows of every tenant to the cycles context in the worker (ADR 0042)."""
 
-    def __init__(self, source: TenantScheduledFlowsPort, directory: FlowDirectory) -> None:
+    def __init__(self, source: TenantScheduledFlowsPort, directory: PlannedFlowsPort) -> None:
         self._source = source
         self._directory = directory
 
@@ -1055,7 +965,7 @@ class FlowStateFromFlows:
     execution the state counts (ReadCycleFlowStateUseCase).
     """
 
-    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
@@ -1119,7 +1029,7 @@ class FlowPauseFromFlows:
     concerns, and the flows context pauses the flows involved (R1.2.4, ADR 0082).
     """
 
-    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
+    def __init__(self, directory: PlannedFlowsPort, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
@@ -1274,22 +1184,16 @@ class RiskFromFlows:
         cycle_flow = decisions.flow
         configuration = cycle_flow.configuration
         command = CheckRiskCommand(
-            tuple(_intent_of(decision) for decision in decisions.answer.response.decisions),
+            tuple(
+                decision.intent_with(OpenIntent.of, CloseIntent, HoldIntent)
+                for decision in decisions.answer.response.decisions
+            ),
             configuration.risk_policy,
             cycle_flow.risk_state(),
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
         orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
         return RiskReview(orders, tuple(outcomes))
-
-
-def _intent_of(decision: Decision) -> TradeIntent:
-    opening = decision.opening
-    if decision.action is TradeAction.CLOSE:
-        return CloseIntent(decision.asset)
-    if decision.action is TradeAction.OPEN and opening is not None:
-        return OpenIntent(decision.asset, TradeSide(opening.direction.value), opening.margin_fraction, opening.leverage)
-    return HoldIntent(decision.asset)
 
 
 class OrdersFromOrders:
@@ -1414,7 +1318,7 @@ def _scalar_of(value: object) -> object:
 class CyclesOfTenants:
     """The cycles of the flows the worker plans, each recorded in the tenant of its flow (ADR 0042, ADR 0046)."""
 
-    def __init__(self, engine: Engine, directory: FlowDirectory) -> None:
+    def __init__(self, engine: Engine, directory: PlannedFlowsPort) -> None:
         self._engine = engine
         self._directory = directory
 
@@ -1441,7 +1345,7 @@ type WorkerCycles = RunDueCyclesUseCase[CycleFlow, SourcesData, CycleContext, Cy
 
 
 def run_due_cycles(
-    directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
+    directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices, runtime: CycleRuntime
 ) -> WorkerCycles:
     """The cycles of every active flow, each step on the ports of the tenant of its flow (ADR 0041, ADR 0042)."""
     steps = CycleSteps(
@@ -1457,7 +1361,7 @@ def run_due_cycles(
     return RunDueCyclesUseCase(flows, RunCycleUseCase(steps, runtime.guards), runtime.launcher, services.clock)
 
 
-def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, services: CycleServices) -> None:
+def record_actual_prices(directory: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
     """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
     record = RecordActualPricesOfTenantsUseCase(
         services.prices, directory.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
@@ -1466,7 +1370,7 @@ def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, servi
 
 
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
-    directory = FlowDirectory()
+    directory = ThreadsPlannedFlowsAdapter()
     guards = CycleGuards(
         cycles=CyclesOfTenants(engine, directory),
         lock=SqlAlchemyFlowLockAdapter(engine),
