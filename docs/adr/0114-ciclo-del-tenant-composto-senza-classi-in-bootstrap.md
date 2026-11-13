@@ -44,4 +44,5 @@ Bug 177.
 
 - `bootstrap.py` non dichiara più classi; nessuna violazione nota resta aperta.
 - La composizione del ciclo esiste due volte, in produzione (`cycle_of`) e nell'harness dei test
-  (`cycle_composition.py`): un passo nuovo del grafo si aggiunge in entrambe, e gli scenari lo segnalano se manca.
+  (`cycle_composition.py`): un passo nuovo del grafo si aggiunge in entrambe. Gli scenari girano sull'harness, quindi
+  un passo dimenticato in `cycle_of` lo rileva solo mypy, attraverso i campi obbligatori di `CycleSteps`.
