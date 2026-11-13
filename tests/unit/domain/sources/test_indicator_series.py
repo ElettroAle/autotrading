@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.domain.sources.candle import Candle
-from autotrading.domain.sources.errors import InsufficientHistoryError
+from autotrading.domain.sources.errors import InsufficientHistoryError, TimeframeNotAvailableError
 from autotrading.domain.sources.indicator_series import indicator_series
 from autotrading.domain.sources.technical_indicators import (
     exponential_moving_average,
@@ -53,13 +53,36 @@ def test_a_history_too_short_for_an_indicator_is_insufficient() -> None:
         indicator_series(CANDLES[:20], 1, with_long_averages=False)
 
 
+# The intervals one exchange publishes, as its market data port declares them.
+PUBLISHED = tuple(Timeframe(minutes) for minutes in (1, 3, 5, 15, 30, 60, 120, 240, 480, 720, 1440))
+
+
 @pytest.mark.parametrize(
     ("minutes", "label"),
     [(1, "1m"), (2, "1m"), (3, "3m"), (10, "5m"), (15, "15m"), (59, "30m"), (60, "1h"), (240, "4h"), (1440, "1d")],
 )
 def test_the_short_timeframe_is_the_cycle_interval_or_the_finer_one_below_it(minutes: int, label: str) -> None:
-    assert short_timeframe_of(minutes).label == label
+    assert short_timeframe_of(minutes, PUBLISHED).label == label
+
+
+def test_the_short_timeframe_does_not_depend_on_the_order_the_intervals_are_declared() -> None:
+    assert short_timeframe_of(45, tuple(reversed(PUBLISHED))) == Timeframe(30)
+
+
+def test_a_cycle_finer_than_every_published_interval_has_no_short_timeframe() -> None:
+    with pytest.raises(TimeframeNotAvailableError) as raised:
+        short_timeframe_of(3, (Timeframe(5), Timeframe(15)))
+
+    assert raised.value.cycle_minutes == 3
+
+
+@pytest.mark.parametrize(
+    ("minutes", "label"),
+    [(1, "1m"), (45, "45m"), (60, "1h"), (90, "90m"), (120, "2h"), (720, "12h"), (1440, "1d"), (4320, "3d")],
+)
+def test_a_timeframe_is_named_by_its_largest_whole_unit(minutes: int, label: str) -> None:
+    assert Timeframe(minutes).label == label
 
 
 def test_the_long_timeframe_is_4_hours() -> None:
-    assert Timeframe(240, "4h") == LONG_TIMEFRAME
+    assert Timeframe(240) == LONG_TIMEFRAME
