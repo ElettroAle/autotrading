@@ -10,9 +10,10 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
   - l'ora corrente e il tempo trascorso dall'avvio del flusso;
   L'avvio è il primo avvio del flusso: una pausa e una ripresa non lo spostano, così tempo e rendimento dall'avvio
   si riferiscono allo stesso inizio.
-  - lo stato del flusso: capitale allocato, liquidità disponibile, valore complessivo, rendimento percentuale
-    dall'avvio, posizioni aperte con asset, direzione, dimensione, leva, prezzo di ingresso, PnL non realizzato
-    e prezzo di liquidazione;
+  - lo stato del flusso: capitale allocato, soldi del flusso (capitale allocato più PnL realizzato, meno
+    commissioni, più funding: la base delle quote, R1.5.1), liquidità disponibile, valore complessivo, rendimento
+    percentuale dall'avvio, posizioni aperte con asset, direzione, dimensione, leva, prezzo di ingresso, PnL non
+    realizzato e prezzo di liquidazione;
   - i dati delle fonti attive per ogni asset e i pesi delle fonti;
   - i dati mancanti, dichiarati (R1.2.5).
   Le regole operative vigenti sono: al massimo una posizione per asset, azioni ammesse apri, chiudi e mantieni,
@@ -46,6 +47,12 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
     Allora il contesto contiene capitale allocato 400 USDC e liquidità disponibile 250 USDC
     E il contesto contiene il rendimento dall'avvio del 2,5%
     E il contesto contiene la posizione long su "BTC" con dimensione, leva 3, prezzo di ingresso, PnL non realizzato e prezzo di liquidazione
+
+  Scenario: Soldi del flusso dopo le perdite
+    Dato che il flusso "alfa" ha capitale allocato 400 USDC, liquidità disponibile 250 USDC e una posizione long su "BTC" con leva 3
+    E che il flusso "alfa" ha perso 100 USDC in posizioni chiuse
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il contesto contiene i soldi del flusso 300 USDC
 
   Scenario: Solo il flusso, mai gli altri
     Dato che il flusso "beta" ha una posizione aperta su "SOL"

@@ -7,8 +7,8 @@ Funzionalità: R1.4.4 Decisione dell'agente per ogni asset
 
   Per ogni asset la decisione è una tra: apri (long o short), chiudi, mantieni. Ogni decisione contiene il
   ragionamento dell'agente, conservato anche per "mantieni".
-  Un'apertura contiene in più: direzione, quota del capitale del flusso da impegnare come margine (frazione da
-  0 a 1) e leva. Per "mantieni" e "chiudi" i campi operativi presenti si ignorano.
+  Un'apertura contiene in più: direzione, quota dei soldi del flusso da impegnare come margine (frazione da
+  0 a 1, R1.5.1) e leva. Per "mantieni" e "chiudi" i campi operativi presenti si ignorano.
   La chiusura è sempre totale.
 
   Fuori ambito: exit plan, confidenza, chiusure parziali; la risposta non conforme (R1.4.5).

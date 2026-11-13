@@ -17,7 +17,7 @@ from tests.fakes.source_readers import FakeSourceReaderAdapter, InMemorySampleRe
 
 STARTED_AT = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
 COLLECTED_AT = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
-STATE = FlowStateView("USDC", Decimal(1000), Decimal(1000), Decimal(1000), Decimal(0), ())
+STATE = FlowStateView("USDC", Decimal(1000), Decimal(1000), Decimal(1000), Decimal(1000), Decimal(0), ())
 
 
 @dataclass

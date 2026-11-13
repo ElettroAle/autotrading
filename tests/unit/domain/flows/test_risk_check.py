@@ -23,13 +23,14 @@ def check(
     margin: str | None = "100",
     value: str | None = None,
     liquidity: str = "1000",
+    funds: str = "1000",
     open_assets: frozenset[str] = frozenset(),
     bring_to_minimum: bool = False,
 ) -> RiskCheck:
     limits = RiskLimits(
         max_leverage, None if margin is None else Decimal(margin), None if value is None else Decimal(value)
     )
-    state = RiskState("USDC", Decimal(1000), Decimal(liquidity), open_assets)
+    state = RiskState("USDC", Decimal(funds), Decimal(liquidity), open_assets)
     return RiskCheck(RiskPolicy(limits, bring_to_minimum), state)
 
 
@@ -250,3 +251,32 @@ def test_an_opening_raised_to_the_minimum_is_compared_with_the_liquidity_left() 
     assert risk.outcome(opening("0.006", 1, asset="ETH"), EXCHANGE) == BlockedDecision(
         "ETH", "liquidità del flusso insufficiente: 8 USDC"
     )
+
+
+def test_the_quota_is_a_fraction_of_the_money_of_the_flow() -> None:
+    outcome = approved(check(funds="600", liquidity="400").outcome(opening("0.4", 1), EXCHANGE))
+
+    assert outcome.margin == Decimal(240)
+
+
+def test_the_margin_exposure_limit_is_a_percent_of_the_money_of_the_flow() -> None:
+    outcome = approved(check(margin="50", funds="600", liquidity="400").outcome(opening("0.6", 1), EXCHANGE))
+
+    assert outcome.margin == Decimal(300)
+    assert outcome.adjustments == (
+        Adjustment(AdjustmentKind.MARGIN, Decimal(360), Decimal(300), "esposizione del margine oltre il 50%"),
+    )
+
+
+def test_the_value_exposure_limit_is_a_percent_of_the_money_of_the_flow() -> None:
+    outcome = approved(
+        check(margin=None, value="50", funds="1200", liquidity="800").outcome(opening("0.5", 2), EXCHANGE)
+    )
+
+    assert outcome.value == Decimal(600)
+
+
+def test_a_flow_without_money_left_opens_nothing() -> None:
+    outcome = check(funds="0", liquidity="0").outcome(opening("0.4", 1), EXCHANGE)
+
+    assert isinstance(outcome, BlockedDecision)

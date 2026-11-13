@@ -77,8 +77,16 @@ class FlowState:
         return sum((position.unrealized_pnl for position in self.positions), Decimal(0))
 
     @property
+    def funds(self) -> Decimal:
+        """The money of the flow: the capital allocated plus what its closed trades earned, net of fees and funding.
+
+        Quotas and percentage risk limits are measured on it (ADR 0078).
+        """
+        return self.allocated_capital + self.realized_pnl - self.fees + self.funding
+
+    @property
     def available_liquidity(self) -> Decimal:
-        return self.allocated_capital + self.realized_pnl - self.fees + self.funding - self.margin
+        return self.funds - self.margin
 
     @property
     def total_value(self) -> Decimal:
