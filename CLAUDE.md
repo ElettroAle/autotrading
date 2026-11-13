@@ -98,8 +98,19 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
 
 - `domain` non importa nulla di `application`, `adapters`, `bootstrap`, né librerie esterne.
 - `application` importa solo `domain` e la libreria standard.
-- Le librerie tecnologiche si importano solo nella cartella del loro adapter.
-- Le cartelle `adapters/outbound/<tecnologia>` non si importano a vicenda.
+- Le librerie tecnologiche si importano solo nella cartella del loro adapter, `bootstrap.py` compreso.
+- **Un adapter = una e una sola tecnologia**: virtualmente una libreria a sé, staccabile. Ogni cartella
+  `adapters/<verso>/<tecnologia>/` dichiara le sue librerie e una libreria appartiene a una sola cartella.
+- Le cartelle `adapters/<verso>/<tecnologia>` non si importano a vicenda.
+- **Il caso d'uso orchestra gli adapter; un adapter non orchestra.** Un adapter non riceve porte né casi
+  d'uso e da `application` importa solo `ports.py` ed `errors.py`. Unica eccezione il decorator: riceve la
+  stessa porta che dichiara di realizzare, per aggiungere un comportamento; prima di un decorator con
+  effetti si valuta l'outbox.
+- **Niente ponti tra contesti.** Il contesto che usa un dato di un altro dichiara le sue porte, con i suoi
+  errori, nel proprio `ports.py`; l'adapter della tecnologia che ha il dato le realizza nella sua cartella
+  (un adapter può realizzare più porte); la sequenza sta nel caso d'uso.
+- `bootstrap.py` istanzia e collega, come un `Program.cs`: nessuna classe, costante, decisione o
+  tecnologia. Configurazione letta e validata da un adapter.
 - `domain/tenancy` è l'unico contesto che tutti gli altri contesti possono importare.
 
 Verificato da import-linter (contratti in `pyproject.toml`), eseguito da `tests/architecture/`.
@@ -108,26 +119,37 @@ Un contratto non si allenta e non si aggiunge un `ignore_imports` senza approvaz
 ## Test di architettura
 
 `tests/architecture/` verifica la separazione dei layer a ogni esecuzione della suite; una regola
-violata è un test rosso con file, riga, regola e dove va il codice.
+violata è un test rosso con file, riga, regola e dove va il codice. I test sono intransigenti: **nessuna
+regola ha eccezioni per nome**.
 
 - Import: i contratti di import-linter; ogni cartella di tecnologia e ogni contesto (tenancy esclusa)
   stanno nel proprio contratto di indipendenza.
-- Porte: un `Protocol` o un `*Port` si definisce solo in `application/<contesto>/ports.py`.
-- `bootstrap.py` collega soltanto: nessuna decisione (`if`, cicli, confronti, operatori booleani,
-  aritmetica, `try`, comprehension con filtro) fuori dalle funzioni nominate che leggono la
-  configurazione, e a livello di modulo solo nomi e valori di configurazione nominati.
-- Domain e application non usano librerie standard tecniche (rete, processi, thread, ambiente:
-  `os`, `threading`, `concurrent`, `asyncio`, `socket`, `http`, `urllib`, `ssl`, `subprocess`, ...).
+- Librerie: ogni cartella di tecnologia dichiara le sue librerie esterne e importa solo quelle; una
+  libreria appartiene a una sola cartella; `domain`, `application` e `bootstrap.py` non importano
+  librerie esterne.
+- Adapter: non riceve porte né casi d'uso nel costruttore (salvo il decorator della stessa porta,
+  dichiarata tra le basi) e da `application` importa solo `ports.py` ed `errors.py`.
+- Nessun ponte: nessuna classe `*Bridge*` o `<X>From<Y>`.
+- Porte: un `Protocol` o un `*Port` si definisce solo in `application/<contesto>/ports.py`; un
+  `Protocol` si chiama `*Port` e un `*Port` è un `Protocol`.
+- `bootstrap.py`: nessuna decisione (`if`, cicli, confronti, operatori booleani, aritmetica, `try`,
+  comprehension con filtro), nessuna classe, nessun nome dichiarato a livello di modulo.
+- Domain, application e `bootstrap.py` non usano librerie standard tecniche (rete, processi, thread,
+  ambiente: `os`, `threading`, `concurrent`, `asyncio`, `socket`, `http`, `urllib`, `ssl`, `subprocess`, ...).
 - Domain e application non nominano tecnologie, exchange, fornitori IA o valute di regolamento nei
   testi del codice (docstring escluse).
-- Si solleva solo un errore del progetto; nessun `except` generico (`Exception`, `BaseException`, nudo).
-- Un caso d'uso per modulo, con il solo metodo pubblico `execute`; un `*Command` è una dataclass frozen.
+- Errori: si solleva solo un errore del progetto; un errore si chiama `*Error` e discende da
+  `AutotradingError`; nessun `except` generico (`Exception`, `BaseException`, nudo).
+- Un caso d'uso per modulo, con il solo metodo pubblico `execute`, nel modulo che porta il suo nome;
+  un `*Command` è una dataclass frozen nel modulo del caso d'uso omonimo.
 - Una classe pubblica di `adapters/outbound/<tecnologia>/` è un `*Adapter` o un `*Error`.
+- Nessuna cartella `common`/`utils`/`shared`; nessun `typing.Any`; un `type: ignore` nomina il codice
+  e ha un commento col motivo.
 
-Le violazioni esistenti sono elencate per nome in `tests/architecture/known_violations.py`, ciascuna
-con il Bug che la elimina. L'elenco può solo diminuire: una violazione nuova e una voce non più
-violata sono entrambe test rossi. Una regola non si allenta e l'elenco non cresce senza
-approvazione del proprietario.
+Ogni regola ha un esempio che la viola e uno conforme. Le violazioni esistenti sono elencate per nome in
+`tests/architecture/known_violations.py`, ciascuna con il Bug che la elimina. L'elenco può solo
+diminuire: una violazione nuova e una voce non più violata sono entrambe test rossi. Una regola non si
+allenta e l'elenco non cresce senza approvazione del proprietario.
 
 ## Nomenclatura
 

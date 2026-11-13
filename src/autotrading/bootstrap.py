@@ -43,12 +43,7 @@ from autotrading.adapters.outbound.httpx.sentiment import (
     HttpxAlternativeMeSentimentAdapter,
     HttpxCoinMarketCapSentimentAdapter,
 )
-from autotrading.adapters.outbound.httpx.telegram import (
-    HttpxTelegramBotIdentityAdapter,
-    HttpxTelegramInboxAdapter,
-    HttpxTelegramMessengerAdapter,
-    telegram_client,
-)
+from autotrading.adapters.outbound.httpx.telegram_channel import telegram_channel
 from autotrading.adapters.outbound.httpx.verification import HttpxVerificationAdapter
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
@@ -187,7 +182,6 @@ from autotrading.application.notifications.errors import MessageNotDeliveredErro
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import (
-    BotIdentityPort,
     BotInboxPort,
     LinkStores,
     MessengerPort,
@@ -906,13 +900,13 @@ def create_worker_application(configuration: Mapping[str, str] = os.environ) -> 
     )
     settings = WorkerSettings(environment, slippage_from(configuration))
     engine = _database(configuration)
-    telegram = _telegram(configuration)
-    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, telegram.messenger)
-    bot = bot_polling(telegram.inbox, lambda inbox: telegram_bot(engine, worker, inbox, telegram.messenger))
-    cycles = worker_cycles(engine, worker.cycle_ports_for, cycle_services(environment, private_keys))
-    return create_worker_api(
-        _secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles, telegram.identity
+    messenger, inbox, identity = telegram_channel(
+        _optional_secret(configuration, TELEGRAM_BOT_SETTING), UnconfiguredMessenger()
     )
+    worker = WorkerUseCaseFactory(engine, opener, exchanges, settings, messenger)
+    bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, worker, bot_inbox, messenger))
+    cycles = worker_cycles(engine, worker.cycle_ports_for, cycle_services(environment, private_keys))
+    return create_worker_api(_secret(configuration, "WORKER_TOKEN_FILE"), worker.for_tenant, bot, cycles, identity)
 
 
 def cycle_services(environment: str, private_keys: Mapping[int, bytes]) -> CycleServices:
@@ -1056,28 +1050,6 @@ def _optional_secret(configuration: Mapping[str, str], name: str) -> str | None:
     if not location or not Path(location).is_file():
         return None
     return Path(location).read_text(encoding="utf-8").strip() or None
-
-
-@dataclass(frozen=True, slots=True)
-class TelegramChannel:
-    """The bot of the installation: without its token the notifications are off and no bot answers (ADR 0035)."""
-
-    messenger: MessengerPort
-    inbox: BotInboxPort | None
-    identity: BotIdentityPort | None
-
-
-def _telegram(configuration: Mapping[str, str]) -> TelegramChannel:
-    token = _optional_secret(configuration, TELEGRAM_BOT_SETTING)
-    if token is None:
-        operations.warning("bot Telegram non configurato: notifiche disattivate")
-        return TelegramChannel(UnconfiguredMessenger(), None, None)
-    client = telegram_client(token)
-    return TelegramChannel(
-        HttpxTelegramMessengerAdapter(client),
-        HttpxTelegramInboxAdapter(client),
-        HttpxTelegramBotIdentityAdapter(client),
-    )
 
 
 def _environment(configuration: Mapping[str, str]) -> str:

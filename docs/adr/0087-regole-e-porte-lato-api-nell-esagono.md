@@ -33,9 +33,8 @@ della tecnologia che ha i dati le realizza, le sequenze stanno nel caso d'uso.
   `ArchiveAccountFlowsUseCase` le applicano. Il ponte in bootstrap resta solo un collegamento senza decisioni.
 - **Rete dell'exchange.** `ExchangeNetwork.of_installation` nel dominio `accounts` esprime R0.2.1 (l'installazione
   `dev` opera solo sulla rete di test). Le funzioni `*_for` di bootstrap ricevono la rete invece di decidere.
-- **Telegram.** `_telegram(configuration)` è un lettore di configurazione (in `CONFIGURATION_READERS`) che sceglie
-  fra canale configurato e `UnconfiguredMessenger`; `bot_polling` dell'adapter in ingresso del worker decide se
-  avviare il polling.
+- **Telegram.** `telegram_channel` (adapter `httpx`) sceglie fra canale configurato e il messaggero non configurato
+  quando manca il token del bot; `bot_polling` dell'adapter in ingresso del worker decide se avviare il polling.
 - **Prezzi effettivi.** `RecordActualPricesOfTenantsUseCase` scorre i tenant al posto di bootstrap.
 - **Chiamate concorrenti.** `ConcurrentCallsPort.call_all` con esito tipizzato (`CallAnswered`, `CallFailed`,
   `CallUnanswered`) è realizzata da `ThreadPoolConcurrentCallsAdapter` in `adapters/outbound/threads/`;
@@ -56,6 +55,10 @@ della tecnologia che ha i dati le realizza, le sequenze stanno nel caso d'uso.
 
 ## Conseguenze
 
-- `tests/architecture/known_violations.py` non contiene più voci del Bug 173.
-- Il ponte dei flussi di un conto e quello delle chiusure manuali restano classi di bootstrap che chiamano casi
-  d'uso senza decisioni: la regola «un adapter non orchestra porte» (ADR 0089) potrà chiederne lo spostamento.
+- In `tests/architecture/known_violations.py` restano del Bug 173 solo le due voci di `AccountFlowsFromFlows`
+  (`bootstrap-senza-classi`, `nessun-ponte`): la classe non decide più nulla, ma collega il contesto `accounts`
+  (rimozione del conto, R1.1.8) a tre casi d'uso di `flows`, fra cui `StopFlowUseCase`, che chiude le posizioni.
+  Fermare un flusso è un comando su un altro contesto, non la lettura di un dato: il contratto di indipendenza vieta
+  ad `application/accounts` di importare `flows`, e un adapter non può ricevere casi d'uso (ADR 0089). Dove stia la
+  sequenza «ferma i flussi, rimuovi il conto, archivia i flussi» resta una decisione del proprietario.
+- Il messaggero non configurato resta in bootstrap con la voce del Bug 177; `telegram_channel` lo riceve.
