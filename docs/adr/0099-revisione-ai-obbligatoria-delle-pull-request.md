@@ -51,11 +51,14 @@ l'integrazione, si discute dove sta il codice, e il proprietario può chiudere a
   App da installare) e modello `claude-opus-5-5`.
 - Il checkout è sul commit base della pull request: Claude Code carica `CLAUDE.md` e le rule di `main`, così una pull
   request non può indebolire le regole con cui viene giudicata. Il codice proposto lo legge dalla storia git
-  (`git diff`, `git show` sul commit head), senza scriverlo nella cartella di lavoro.
+  (`git diff`, `git show` sul commit head), senza scriverlo nella cartella di lavoro. L'action della revisione
+  invece viene dalla pull request, in una cartella a parte (`.review-action/`, checkout parziale): una sua modifica si
+  prova prima dell'integrazione e attende l'approvazione del proprietario come una modifica alle regole.
 - Thread inline solo per violazioni di una regola scritta, citandola; nessun rilievo di stile, design o gusto. A ogni
   push la revisione rilegge i propri thread aperti: chiude quelli corretti, non ripete quelli ancora validi.
-- Una modifica a `CLAUDE.md`, a `.claude/rules/`, ai contratti di import-linter in `pyproject.toml` o a
-  `tests/architecture/known_violations.py` apre un thread che chiede l'approvazione del proprietario: la revisione non
+- Una modifica a `CLAUDE.md`, a `.claude/rules/`, ai contratti di import-linter in `pyproject.toml`, a
+  `tests/architecture/known_violations.py` o ai file della revisione stessa (`review.yml`, `reusable-review.yml`,
+  `.github/actions/claude-review/`) apre un thread che chiede l'approvazione del proprietario: la revisione non
   lo chiude mai, lo chiude il proprietario.
 - Se la revisione non si completa (quota esaurita, token scaduto, errore), il job fallisce e la pull request resta
   bloccata fino a una nuova esecuzione.
@@ -73,6 +76,9 @@ l'integrazione, si discute dove sta il codice, e il proprietario può chiudere a
   con molte pull request può esaurirla e bloccare le pull request fino al ripristino.
 - Il token va rigenerato ogni anno; scaduto, ogni pull request resta bloccata finché il segreto non viene aggiornato.
 - Le pull request di dependabot e da fork si integrano senza revisione AI: le integra il proprietario, a mano.
+- Con l'evento `pull_request` il workflow viene dalla pull request: una pull request può modificarlo e saltare la
+  revisione. Il thread per il proprietario su quei file rende la modifica visibile; il ruleset di un repository personale non può
+  imporre un workflow obbligatorio.
 
 ## Ulteriori informazioni
 

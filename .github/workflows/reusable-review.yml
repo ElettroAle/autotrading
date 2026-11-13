@@ -49,7 +49,13 @@ jobs:
         with:
           ref: ${{ inputs.base }}
           fetch-depth: 0
-      - uses: ./.github/actions/claude-review
+      # The review action itself comes from the pull request, in its own folder, so that a change to it is
+      # exercised before integration; such a change waits for the owner's approval like a change to the rules.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: .review-action
+          sparse-checkout: .github/actions/claude-review
+      - uses: ./.review-action/.github/actions/claude-review
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ github.token }}
