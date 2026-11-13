@@ -72,13 +72,20 @@ class HttpxAccountStateAdapter:
 
     def balance_of(self, account_id: UUID) -> FlowBalance:
         """The balance of an account as a flow reads it (ADR 0087), with the errors of the flows context."""
+        balance = self._state_for_flows(account_id).balance
+        return FlowBalance(balance.amount, balance.currency)
+
+    def open_positions_of(self, account_id: UUID) -> tuple[str, ...]:
+        """The assets open on an account about to be removed (ADR 0090), with the errors of the flows context."""
+        return tuple(position.coin for position in self._state_for_flows(account_id).positions)
+
+    def _state_for_flows(self, account_id: UUID) -> AccountState:
         try:
-            balance = self.read_state(AccountId(account_id)).balance
+            return self.read_state(AccountId(account_id))
         except AccountNotFoundError as error:
             raise FlowAccountNotFoundError from error
         except (ExchangeUnavailableError, WorkerUnavailableError) as error:
             raise FlowExchangeUnavailableError from error
-        return FlowBalance(balance.amount, balance.currency)
 
 
 def _body_of(response: httpx.Response) -> Mapping[str, object]:

@@ -128,18 +128,16 @@ from autotrading.application.cycles.ports import (
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
 from autotrading.application.cycles.source_collector import SourceCollector
-from autotrading.application.flows.archive_account_flows import ArchiveAccountFlowsCommand, ArchiveAccountFlowsUseCase
-from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
     InvalidFlowSettingError,
 )
-from autotrading.application.flows.list_account_flows import ListAccountFlowsCommand, ListAccountFlowsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
+    AccountRemovalPorts,
     ActivityReaderPort,
     AutomaticPausePort,
     ClosedPositionRepositoryPort,
@@ -169,7 +167,7 @@ from autotrading.application.flows.record_outside_closing import (
     RecordOutsideClosingCommand,
     RecordOutsideClosingUseCase,
 )
-from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
+from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -224,7 +222,6 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.position import Position
-from autotrading.domain.accounts.removal import FlowPositionLeftOpen
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
 from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection
 from autotrading.domain.agent.errors import (
@@ -240,7 +237,7 @@ from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
-from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
+from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.cycle_funds import CycleFunds
 from autotrading.domain.flows.errors import ModelRequiredError
 from autotrading.domain.flows.flow import Flow
@@ -401,37 +398,6 @@ class ManualClosingsRecordedInFlows:
         fill = ClosingFill.reported(outcome.average_price, outcome.executed_at, outcome.fee, outcome.realized_pnl)
         self._history(RecordManualClosingCommand(account_id, coin, fill))
         return outcome
-
-
-class AccountFlowsFromFlows:
-    """Bridges the flows context to the accounts context in the API (ADR 0054): the flows that run on an account."""
-
-    def __init__(
-        self, operating: ListAccountFlowsUseCase, stop: StopFlowUseCase, archive: ArchiveAccountFlowsUseCase
-    ) -> None:
-        self._operating = operating
-        self._stop = stop
-        self._archive = archive
-
-    def operating(self, account_id: AccountId) -> tuple[str, ...]:
-        return tuple(flow.name.value for flow in self._operating_on(account_id))
-
-    def stop(self, account_id: AccountId, user_id: UserId) -> tuple[FlowPositionLeftOpen, ...]:
-        outcomes = [
-            self._stop.execute(StopFlowCommand(flow.id, user_id, CloseReason.ACCOUNT_REMOVAL))
-            for flow in self._operating_on(account_id)
-        ]
-        return tuple(
-            FlowPositionLeftOpen(position.asset, position.reason)
-            for outcome in outcomes
-            for position in outcome.left_open
-        )
-
-    def archive(self, account_id: AccountId) -> None:
-        self._archive.execute(ArchiveAccountFlowsCommand(account_id.value))
-
-    def _operating_on(self, account_id: AccountId) -> list[Flow]:
-        return self._operating.execute(ListAccountFlowsCommand(account_id.value))
 
 
 class ModelSettingsFromAgent:
@@ -621,11 +587,7 @@ class TenantUseCaseFactory:
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
-            account_flows=AccountFlowsFromFlows(
-                ListAccountFlowsUseCase(flows),
-                StopFlowUseCase(flows, stop_ports),
-                ArchiveAccountFlowsUseCase(flows, ArchiveFlowUseCase(flows)),
-            ),
+            account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=HttpxAccountActivityAdapter(self._worker.client, self._worker.token, tenant_id),
             flow_ledger=SqlAlchemyFlowLedgerAdapter(self._engine, tenant_id),
             flow_operations=SqlAlchemyFlowOperationsAdapter(self._engine, tenant_id),

@@ -5,7 +5,6 @@ from datetime import datetime
 from autotrading.application.accounts.get_account import GetAccountUseCase
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
 from autotrading.application.accounts.ports import (
-    AccountFlowsPort,
     AccountRepositoryPort,
     AccountStatePort,
     CredentialSealerPort,
@@ -13,7 +12,6 @@ from autotrading.application.accounts.ports import (
 )
 from autotrading.application.accounts.read_account_state import ReadAccountStateUseCase
 from autotrading.application.accounts.register_account import RegisterAccountUseCase
-from autotrading.application.accounts.remove_account import RemoveAccountUseCase
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
 from autotrading.application.agent.list_models import ListModelsUseCase
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
@@ -47,6 +45,7 @@ from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
+    AccountRemovalPorts,
     ClosedPositionRepositoryPort,
     FlowLedgerPort,
     FlowOperationsPort,
@@ -56,6 +55,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import (
@@ -97,7 +97,7 @@ class TenantPorts:
     flow_checks: FlowChecks
     flow_positions: FlowPositionsPort
     stop_ports: StopPorts
-    account_flows: AccountFlowsPort
+    account_removal: AccountRemovalPorts
     account_activity: AccountActivityPort
     flow_ledger: FlowLedgerPort
     flow_operations: FlowOperationsPort
@@ -121,7 +121,7 @@ class TenantUseCases:
     get_account: GetAccountUseCase
     replace_credentials: ReplaceCredentialsUseCase
     read_account_state: ReadAccountStateUseCase
-    remove_account: RemoveAccountUseCase
+    remove_account_with_flows: RemoveAccountWithFlowsUseCase
     close_position: ClosePositionUseCase
     run_verification: RunVerificationUseCase
     list_sources: ListSourcesUseCase
@@ -167,7 +167,12 @@ class TenantUseCases:
             get_account=GetAccountUseCase(accounts),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
-            remove_account=RemoveAccountUseCase(accounts, ports.account_state, ports.account_flows),
+            remove_account_with_flows=RemoveAccountWithFlowsUseCase(
+                ports.flows,
+                ports.account_removal,
+                StopFlowUseCase(ports.flows, ports.stop_ports),
+                ArchiveFlowUseCase(ports.flows),
+            ),
             close_position=ClosePositionUseCase(ports.position_closing),
             run_verification=RunVerificationUseCase(ports.verification),
             list_sources=ListSourcesUseCase(ports.source_catalog),

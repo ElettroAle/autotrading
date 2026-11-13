@@ -42,10 +42,10 @@ from autotrading.domain.accounts.errors import (
     CredentialsOfAnotherAccountError,
     CredentialsRequiredError,
     ExchangeRequiredError,
-    OpenPositionsNeedConfirmationError,
 )
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.errors import OpenPositionsNeedConfirmationError
 from autotrading.domain.orders.errors import InvalidLeverageError, ManualOpeningNotAllowedError
 from autotrading.domain.tenancy.errors import UserRoleMissingError
 from autotrading.domain.verification.errors import InsufficientMarginError, PositionAlreadyOpenError

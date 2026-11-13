@@ -30,6 +30,16 @@ class AssetNotTradableError(ApplicationError):
         self.assets = assets
 
 
+class AccountToRemoveNotFoundError(ApplicationError):
+    """The account to remove is unknown, of another tenant or already removed: the same answer as every account
+    route gives (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("non trovato")
+
+
 class FlowCredentialsNotOpenedError(ApplicationError):
     """The worker cannot open the sealed credentials of the account to learn its address."""
 

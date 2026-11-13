@@ -11,8 +11,8 @@ from autotrading.application.accounts.account_details import AccountDetails
 from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
-from autotrading.application.accounts.remove_account import RemoveAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
+from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -117,8 +117,8 @@ def accounts_router(
         confirmed: bool = False,
     ) -> None:
         # Without confirmation an account with flows operating or open positions is kept (R0.2.5, R1.1.8).
-        command = RemoveAccountCommand(AccountId(account_id), user_id, confirmed=confirmed)
-        use_cases.remove_account.execute(command)
+        command = RemoveAccountWithFlowsCommand(account_id, user_id, confirmed=confirmed)
+        use_cases.remove_account_with_flows.execute(command)
 
     @router.get("/{account_id}/state")
     def read_account_state(
