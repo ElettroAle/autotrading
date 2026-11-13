@@ -86,6 +86,17 @@ class AssetWithOpenPositionError(ApplicationError):
         self.assets = assets
 
 
+class AssetUnderVerificationError(ApplicationError):
+    """The procedure of verification runs on an asset of the flow: a cycle would mix its orders with the procedure's
+    and pause the flow for a position it did not open (R0.4.1, ADR 0079)."""
+
+    status_code = 409
+
+    def __init__(self, asset: str) -> None:
+        super().__init__(f"procedura di verifica in corso su {asset}")
+        self.asset = asset
+
+
 class OperationsCursorInvalidError(ApplicationError):
     """The `after` of a page of operations is not one the platform gave (ADR 0074)."""
 

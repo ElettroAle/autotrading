@@ -1,13 +1,20 @@
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.domain.tenancy.user_id import UserId
+
+
+class VerificationRequest(BaseModel):
+    # Without an amount the procedure opens the minimum the exchange of the account accepts (R0.4.1).
+    amount: Decimal | None = Field(default=None, gt=0)
 
 
 def verifications_router(
@@ -20,9 +27,11 @@ def verifications_router(
         account_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
         user_id: Annotated[UserId, Depends(user_of_request)],
+        request: VerificationRequest | None = None,
     ) -> VerificationRunResponse:
+        amount = None if request is None else request.amount
         # A failed procedure is still the answer: its steps say where it stopped (R0.4.1, ADR 0024).
-        run = use_cases.run_verification.execute(RunVerificationCommand(account_id, user_id))
+        run = use_cases.run_verification.execute(RunVerificationCommand(account_id, user_id, amount))
         return VerificationRunResponse.of(run)
 
     return router

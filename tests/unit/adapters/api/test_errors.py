@@ -87,7 +87,7 @@ def reason_of(problem: dict[str, object]) -> dict[str, object]:
         (NoOpenPositionError("ETH"), 409),
         (VerificationAccountNotFoundError(), 404),
         (PositionAlreadyOpenError("BTC"), 409),
-        (InsufficientMarginError(Decimal(10)), 409),
+        (InsufficientMarginError(Decimal(10), "USDC"), 409),
         (UnsupportedOrderExchangeError("Binance", ["Hyperliquid"]), 422),
         (AccountNameInUseError(AccountName("test-1")), 409),
         (OpenPositionsNeedConfirmationError(), 409),

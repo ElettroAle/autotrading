@@ -1,5 +1,6 @@
 """The bridges bootstrap builds between the verification context and the accounts and orders contexts (ADR 0024)."""
 
+from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid4
 
@@ -8,6 +9,7 @@ import pytest
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.bootstrap import AccountReadingFromAccounts, OrderExecutionFromOrders
 from autotrading.domain.accounts.position import Position, PositionSide
@@ -18,7 +20,7 @@ from autotrading.domain.orders.order import OrderOrigin, OrderSource, OrderStatu
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
-from autotrading.domain.verification.procedure import PROCEDURE_OPENING
+from autotrading.domain.verification.procedure import Opening
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
@@ -32,6 +34,7 @@ from tests.support.worker import Worker
 
 ANNA = UserId("oid-anna")
 VERIFICATION = OrderSource(OrderOrigin.VERIFICATION, "oid-anna")
+PROCEDURE_OPENING = Opening(coin="BTC", side="long", leverage=2, value=Decimal(12))
 SHORT_ETH = Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("-4.2"), None)
 
 
@@ -46,6 +49,7 @@ class Orders:
         self.execution = OrderExecutionFromOrders(
             OpenPositionUseCase(self.accesses, exchanges, self.recorded, slippage),
             CloseExchangePositionUseCase(self.accesses, exchanges, self.recorded, slippage),
+            ReadMarketUseCase(self.accesses, exchanges),
         )
 
     def hold_btc(self) -> None:
@@ -71,6 +75,25 @@ def test_the_opening_is_long_btc_leverage_2_from_the_procedure_and_the_user(orde
         Decimal(0),
         None,
     )
+
+
+def test_the_minimum_value_is_the_one_the_exchange_of_the_account_sets_on_the_asset(orders: Orders) -> None:
+    orders.exchange.markets["BTC"] = replace(orders.exchange.markets["BTC"], min_order_value=Decimal("7.5"))
+
+    assert orders.execution.minimum_value(orders.account_id, "BTC") == Decimal("7.5")
+    assert orders.exchange.sent == []
+
+
+def test_a_minimum_value_that_cannot_be_read_fails_with_the_reason(orders: Orders) -> None:
+    orders.exchange.reachable = False
+
+    with pytest.raises(VerificationStepError):
+        orders.execution.minimum_value(orders.account_id, "BTC")
+
+
+def test_a_minimum_value_on_an_account_the_tenant_does_not_have_is_not_found(orders: Orders) -> None:
+    with pytest.raises(VerificationAccountNotFoundError):
+        orders.execution.minimum_value(uuid4(), "BTC")
 
 
 def test_the_closing_is_from_the_procedure_and_the_user(orders: Orders) -> None:

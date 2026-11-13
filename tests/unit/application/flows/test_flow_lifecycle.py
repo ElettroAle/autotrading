@@ -11,6 +11,7 @@ from autotrading.application.flows.compare_flow_versions import CompareFlowVersi
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
 from autotrading.application.flows.errors import (
     AssetNotTradableError,
+    AssetUnderVerificationError,
     AssetWithOpenPositionError,
     FlowExchangeUnavailableError,
     FlowNotFoundError,
@@ -43,7 +44,9 @@ from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.model_settings import FakeModelSettingsAdapter
+from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
 from tests.fakes.source_settings import FakeSourceSettingsAdapter
+from tests.fakes.verification_run_repository import RunningVerifications
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -68,7 +71,9 @@ class Flows:
         )
         self.activity = FakeAccountActivityAdapter()
         self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)
-        self.change_status = ChangeFlowStatusUseCase(self.repository)
+        self.running_verifications: RunningVerifications = set()
+        self.verifications = InMemoryRunningVerificationsAdapter(self.running_verifications)
+        self.change_status = ChangeFlowStatusUseCase(self.repository, self.verifications)
         self.archive = ArchiveFlowUseCase(self.repository)
         self.get_version = GetFlowVersionUseCase(self.repository)
         self.compare = CompareFlowVersionsUseCase(self.repository)
@@ -328,6 +333,45 @@ def test_a_refused_command_leaves_the_status(flows: Flows) -> None:
         flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.RESUME))
 
     assert flows.current(flow) == flow
+
+
+@pytest.mark.parametrize(
+    ("status", "command"),
+    [(FlowStatus.STOPPED, FlowCommand.START), (FlowStatus.PAUSED, FlowCommand.RESUME)],
+    ids=["start", "resume"],
+)
+def test_a_flow_does_not_trade_while_the_procedure_runs_on_one_of_its_assets(
+    flows: Flows, status: FlowStatus, command: FlowCommand
+) -> None:
+    flow = flows.saved(status=status, assets=("ETH", "BTC"))
+    flows.running_verifications.add((flow.account_id, "BTC"))
+
+    with pytest.raises(AssetUnderVerificationError) as raised:
+        flows.change_status.execute(ChangeFlowStatusCommand(flow.id, command))
+
+    assert (str(raised.value), raised.value.status_code) == ("procedura di verifica in corso su BTC", 409)
+    assert flows.current(flow).status is status
+
+
+def test_the_assets_of_a_flow_that_starts_are_kept_free_of_procedures_while_its_status_changes(flows: Flows) -> None:
+    flow = flows.saved(assets=("ETH", "BTC"))
+    flows.running_verifications.add((uuid4(), "BTC"))
+
+    started = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.START))
+
+    assert started.status is FlowStatus.ACTIVE
+    assert flows.verifications.kept_free_while == [frozenset({"ETH", "BTC"})]
+
+
+def test_a_pause_never_waits_for_the_procedure(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.START))
+    flows.running_verifications.add((flow.account_id, "BTC"))
+
+    paused = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowCommand.PAUSE))
+
+    assert paused.status is FlowStatus.PAUSED
+    assert len(flows.verifications.kept_free_while) == 1
 
 
 def test_an_archived_flow_leaves_the_flows_in_use(flows: Flows, caplog: pytest.LogCaptureFixture) -> None:

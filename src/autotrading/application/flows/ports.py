@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -132,6 +133,15 @@ class ModelSettingsPort(Protocol):
 class SourceSettingsPort(Protocol):
     def selection(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         """The source with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
+        ...
+
+
+class RunningVerificationsPort(Protocol):
+    """The procedures of verification in progress on the assets of an account, shared by the API and the worker."""
+
+    def kept_free(self, account_id: UUID, assets: Iterable[str]) -> AbstractContextManager[None]:
+        """Keeps the assets of the account free of procedures until the context ends, so none starts while the
+        status of a flow on them changes (ADR 0079). Raises AssetUnderVerificationError when one is in progress."""
         ...
 
 

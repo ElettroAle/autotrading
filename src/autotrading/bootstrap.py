@@ -92,6 +92,7 @@ from autotrading.adapters.outbound.sqlalchemy.scheduling import (
     TenantScheduledFlow,
 )
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlchemyRunningVerificationsAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
@@ -188,6 +189,7 @@ from autotrading.application.orders.open_position import OpenPositionCommand, Op
 from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
+from autotrading.application.orders.read_market import ReadMarketCommand, ReadMarketUseCase
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
@@ -692,9 +694,21 @@ class OrderExecutionFromOrders:
     step with its message, and an order the exchange did not execute is a failed step with the reason.
     """
 
-    def __init__(self, opening: OpenPositionUseCase, closing: CloseExchangePositionUseCase) -> None:
+    def __init__(
+        self, opening: OpenPositionUseCase, closing: CloseExchangePositionUseCase, market: ReadMarketUseCase
+    ) -> None:
         self._opening = opening
         self._closing = closing
+        self._market = market
+
+    def minimum_value(self, account_id: UUID, coin: str) -> Decimal:
+        try:
+            market = self._market.execute(ReadMarketCommand(account_id, coin))
+        except OrderAccountNotFoundError as error:
+            raise VerificationAccountNotFoundError from error
+        except AutotradingError as error:
+            raise VerificationStepError(str(error)) from error
+        return market.min_order_value
 
     def open(self, account_id: UUID, opening: Opening, user_id: UserId) -> OrderResult:
         command = OpenPositionCommand(
@@ -791,6 +805,7 @@ class TenantUseCaseFactory:
             provider_key_usage=ProviderKeyUsageFromFlows(flows),
             model_catalog=MODEL_CATALOG,
             flows=flows,
+            running_verifications=SqlAlchemyRunningVerificationsAdapter(self._engine),
             flow_checks=FlowChecks(
                 accounts=FlowAccountsFromAccounts(accounts, account_state),
                 markets=self._exchanges.markets,
@@ -843,6 +858,7 @@ class WorkerUseCaseFactory:
         read_exchange_state = ReadExchangeStateUseCase(accounts, self._opener, self._exchanges.accounts)
         close_exchange_position = CloseExchangePositionUseCase(access, self._exchanges.orders, orders, slippage)
         open_position = OpenPositionUseCase(access, self._exchanges.orders, orders, slippage)
+        read_market = ReadMarketUseCase(access, self._exchanges.orders)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
             close_exchange_position=close_exchange_position,
@@ -850,7 +866,7 @@ class WorkerUseCaseFactory:
                 AccountReadingFromAccounts(
                     read_exchange_state, SqlAlchemyFlowRepositoryAdapter(self._engine, tenant_id)
                 ),
-                OrderExecutionFromOrders(open_position, close_exchange_position),
+                OrderExecutionFromOrders(open_position, close_exchange_position, read_market),
                 SqlAlchemyVerificationRunRepositoryAdapter(self._engine, tenant_id),
                 self._settings.environment,
                 now,

@@ -18,6 +18,7 @@ from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import LinkStores
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
+from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.run_exchange_verification import RunExchangeVerificationUseCase
 from autotrading.bootstrap import (
@@ -78,6 +79,7 @@ from tests.fakes.provider_keys import (
     ProviderKeyVault,
 )
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
+from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
@@ -180,6 +182,7 @@ class Platform:
             provider_key_usage=ProviderKeyUsageFromFlows(flows),
             model_catalog=self.model_catalog,
             flows=flows,
+            running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
                 accounts=FlowAccountsFromAccounts(accounts, account_state),
                 markets=self.markets,
@@ -220,7 +223,9 @@ class Platform:
             close_exchange_position=close_exchange_position,
             run_exchange_verification=RunExchangeVerificationUseCase(
                 AccountReadingFromAccounts(read_exchange_state, InMemoryFlowRepositoryAdapter(self.flows, tenant_id)),
-                OrderExecutionFromOrders(open_position, close_exchange_position),
+                OrderExecutionFromOrders(
+                    open_position, close_exchange_position, ReadMarketUseCase(access, order_exchanges)
+                ),
                 self.runs_of(tenant_id),
                 "dev",
                 lambda: STARTED_AT,
@@ -247,7 +252,7 @@ class Platform:
         return self.orders.setdefault(tenant_id, InMemoryOrderRepositoryAdapter())
 
     def runs_of(self, tenant_id: TenantId) -> InMemoryVerificationRunRepositoryAdapter:
-        return self.runs.setdefault(tenant_id, InMemoryVerificationRunRepositoryAdapter())
+        return self.runs.setdefault(tenant_id, InMemoryVerificationRunRepositoryAdapter(self.running_verifications))
 
     def use_cases_of(self, user: str) -> TenantUseCases:
         return self.for_tenant(self.tenant_of(user))

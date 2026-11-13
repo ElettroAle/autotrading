@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.verification.errors import VerificationWorkerUnavailableError
@@ -17,7 +18,7 @@ class FakeVerificationAdapter:
         self._worker = worker
         self.reachable = True
 
-    def run(self, account_id: UUID, user_id: UserId) -> VerificationRun:
+    def run(self, account_id: UUID, user_id: UserId, amount: Decimal | None) -> VerificationRun:
         if not self.reachable:
             raise VerificationWorkerUnavailableError
-        return self._worker().execute(RunExchangeVerificationCommand(account_id, user_id))
+        return self._worker().execute(RunExchangeVerificationCommand(account_id, user_id, amount))
