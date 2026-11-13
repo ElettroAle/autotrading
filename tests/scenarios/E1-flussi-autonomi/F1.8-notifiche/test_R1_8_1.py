@@ -3,7 +3,7 @@ from datetime import UTC, datetime, time
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.notifications.link_chat import HOW_TO_LINK, INVALID_CODE, LINKED, LinkChatCommand
+from autotrading.application.notifications.link_chat import HOW_TO_LINK, INVALID_CODE, LINKED
 from autotrading.application.notifications.request_link_code import IssuedLinkCode
 from autotrading.domain.notifications.notification import Notification
 from tests.support.notifications import chat_named
@@ -39,7 +39,7 @@ def request_code(platform: Platform, user: str, codes: dict[str, str]) -> None:
 
 
 def send_code(platform: Platform, chat: str, code: str) -> None:
-    platform.link_chat().execute(LinkChatCommand(chat_named(chat), code))
+    platform.bot_receives(chat_named(chat), code)
 
 
 def link(platform: Platform, user: str, chat: str, codes: dict[str, str]) -> None:
@@ -165,3 +165,8 @@ def no_more_notifications(platform: Platform, chat: str, user: str) -> None:
     platform.worker_for(platform.tenant_of(user)).notify.execute(Notification.cycle_failed("alfa", "timeout"))
 
     assert len(platform.messenger.received_by(chat_named(chat))) == before
+
+
+@then(quoted('il bot invia alla chat "{chat}" "{text}"'))
+def bot_sends(platform: Platform, chat: str, text: str) -> None:
+    assert platform.messenger.received_by(chat_named(chat))[-1] == text

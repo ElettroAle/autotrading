@@ -40,6 +40,12 @@ class LinkedChatRepositoryPort(Protocol):
         ...
 
 
+class LinkedChatLookupPort(Protocol):
+    """The only lookup made before the tenant is known from a chat: the tenants it is linked to (ADR 0081)."""
+
+    def tenants_of(self, chat_id: ChatId) -> tuple[TenantId, ...]: ...
+
+
 class MessengerPort(Protocol):
     def send(self, chat_id: ChatId, text: str) -> None:
         """Raises MessageNotDeliveredError when Telegram does not take the message."""

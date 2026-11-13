@@ -47,3 +47,19 @@ class SqlAlchemyLinkedChatRepositoryAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             yield connection
+
+
+class SqlAlchemyLinkedChatLookupAdapter:
+    """Finds the tenants of a chat before the tenant is known: the transaction declares the chat, not a tenant,
+    and row level security lets it read the links of that chat alone (ADR 0081).
+    """
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def tenants_of(self, chat_id: ChatId) -> tuple[TenantId, ...]:
+        query = select(telegram_chats.c.tenant_id).where(telegram_chats.c.chat_id == chat_id.value)
+        with self._engine.begin() as connection:
+            connection.execute(select(func.set_config("app.telegram_chat_id", str(chat_id.value), True)))
+            tenants = connection.execute(query).scalars().all()
+        return tuple(TenantId(tenant) for tenant in tenants)
