@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
@@ -122,13 +122,13 @@ from autotrading.application.flows.ports import (
     FlowSummary,
     FlowTimingPort,
     PlannedFlowsPort,
-    SourceRequest,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
 from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
+from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
@@ -184,8 +184,7 @@ from autotrading.application.orders.open_position import OpenPositionCommand, Op
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.order_failures import answered_or_named
 from autotrading.application.orders.read_market import ReadMarketCommand, ReadMarketUseCase
-from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
-from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
+from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
     MarketDataPort,
@@ -193,13 +192,7 @@ from autotrading.application.sources.ports import (
     PriceHistoryPort,
     SampleRepositoryPort,
     SentimentPort,
-    SourceReaderPort,
 )
-from autotrading.application.sources.read_forecast import ReadForecastUseCase
-from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase
-from autotrading.application.sources.read_news import ReadNewsUseCase
-from autotrading.application.sources.read_pivots import ReadPivotsUseCase
-from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
@@ -221,13 +214,8 @@ from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.slippage import Slippage
-from autotrading.domain.sources.forecast import FORECAST
-from autotrading.domain.sources.indicators import INDICATORS
-from autotrading.domain.sources.news import NEWS
-from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
 from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
-from autotrading.domain.sources.source_sample import CycleReference
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from autotrading.domain.verification.order_result import OrderResult
@@ -284,15 +272,6 @@ class FlowPositionsFromOrders:
         report = self._closing.execute(CloseFlowPositionCommand(account_id, asset, user_id))
         fill = ClosingFill.reported(report.average_price, report.executed_at, report.fee, report.realized_pnl)
         return PositionClosing.reported(asset, found=report.found, fill=fill, refusal=report.refusal)
-
-
-def cycle_sources_of(collected: Sequence[CollectedSource]) -> tuple[SourceData, ...]:
-    """The data of the cycle: each collected value with the weight of its source (R1.3.2)."""
-    return tuple(
-        SourceData(source.source, source.weight, asset, values)
-        for source in collected
-        for asset, values in source.entries
-    )
 
 
 class OrderExecutionFromOrders:
@@ -666,43 +645,6 @@ class CycleServices:
     environment: str
 
 
-class SourcesFromSources:
-    """Bridges the sources context to the cycles context: each active source collected with the parameters of the flow,
-    recorded for the cycle and given to the agent with its weight (R1.3.2-R1.3.8, ADR 0042).
-    """
-
-    def __init__(self, ports: TenantCyclePorts, services: CycleServices) -> None:
-        self._ports = ports
-        self._services = services
-
-    def collect(self, request: SourceRequest[CycleFlow], source: str) -> SourcesData:
-        cycle_flow = request.snapshot.state
-        configuration = cycle_flow.configuration
-        selection = configuration.source(source)
-        command = CollectSourceCommand(
-            CycleReference(request.flow_id, request.planned_at),
-            selection.name,
-            selection.weight,
-            selection.parameters,
-            configuration.assets,
-            self._services.clock.now(),
-        )
-        readers = self._readers_of(configuration.cycle_interval.minutes)
-        collected = CollectSourceUseCase(SOURCE_CATALOG, readers, self._ports.samples).execute(command)
-        return cycle_sources_of([collected])
-
-    def _readers_of(self, cycle_minutes: int) -> dict[str, SourceReaderPort]:
-        services = self._services
-        readers: dict[str, SourceReaderPort] = {
-            name: ReadSentimentUseCase(sentiment) for name, sentiment in services.sentiments.items()
-        }
-        readers[NEWS.name] = ReadNewsUseCase(services.news)
-        readers[FORECAST.name] = ReadForecastUseCase(ForecastAssetUseCase(services.prices, self._ports.forecasts))
-        readers[INDICATORS.name] = ReadIndicatorsUseCase(services.market, cycle_minutes)
-        readers[PIVOTS.name] = ReadPivotsUseCase(services.market)
-        return readers
-
-
 type SourcesData = tuple[SourceData, ...]
 
 
@@ -721,7 +663,15 @@ def run_cycle_for(
     ports = ports_of(tenant_id)
     steps = CycleSteps(
         start=ports.start_cycle,
-        sources=SourcesFromSources(ports, services),
+        sources=ReadCycleSourceUseCase(
+            CollectCycleSourceUseCase(
+                SOURCE_CATALOG,
+                SourceSystems(services.sentiments, services.news, services.prices, services.market),
+                ports.forecasts,
+                ports.samples,
+            ),
+            services.clock,
+        ),
         calls=ThreadPoolConcurrentCallsAdapter(),
         context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), services.clock),
         agent=DecideCycleUseCase(

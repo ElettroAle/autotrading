@@ -274,7 +274,7 @@ class FakeSourcesAdapter:
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
 
-    def collect(self, request: SourceRequest, source: str) -> object:
+    def execute(self, request: SourceRequest, source: str) -> object:
         flow_id = request.flow_id
         if source in self.silent:
             self.released.wait(LONGEST_HOLD)

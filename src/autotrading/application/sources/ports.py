@@ -105,3 +105,31 @@ class SampleRepositoryPort(Protocol):
     """Bound to the tenant of the flow: the values its cycles collected (R1.3.8)."""
 
     def add(self, samples: Sequence[SourceSample]) -> None: ...
+
+
+class CycleSourceAskPort(Protocol):
+    """An active source of a flow, as the cycle of the flow asks it (R1.3.2): who asks, for what and with what."""
+
+    @property
+    def flow_id(self) -> UUID: ...
+
+    @property
+    def planned_at(self) -> datetime: ...
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def weight(self) -> int: ...
+
+    @property
+    def parameters(self) -> Mapping[str, int]: ...
+
+    @property
+    def assets(self) -> tuple[str, ...]: ...
+
+    @property
+    def cycle_minutes(self) -> int: ...
+
+    @property
+    def asked_at(self) -> datetime: ...

@@ -9,7 +9,6 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
-from autotrading.bootstrap import cycle_sources_of
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, SourceData
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
 from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
@@ -61,8 +60,9 @@ class SourceCycle:
             collected_at,
             STATE,
             tuple(
-                SourceData(data.source, data.weight, data.asset, data.values)
-                for data in cycle_sources_of(self.collected)
+                SourceData(collected.source, collected.weight, asset, values)
+                for collected in self.collected
+                for asset, values in collected.entries
             ),
             (),
         )
