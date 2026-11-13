@@ -83,12 +83,34 @@ class FlowRepositoryPort(Protocol):
         ...
 
 
-class FlowAccountPort(Protocol):
-    """Bound to the tenant of the request."""
+@dataclass(frozen=True, slots=True)
+class FlowBalance:
+    amount: Decimal
+    currency: str
 
-    def account(self, account_id: UUID) -> FlowAccount:
+
+class FlowAccountDirectoryPort(Protocol):
+    """Bound to the tenant of the request: the accounts it has, as a flow sees them."""
+
+    def exchange_of(self, account_id: UUID) -> str:
+        """The exchange the account trades on. Raises FlowAccountNotFoundError for an account the tenant lacks."""
+        ...
+
+
+class FlowAccountBalancePort(Protocol):
+    """Bound to the tenant of the request: the balance of an account, read now on its exchange (R0.2.2)."""
+
+    def balance_of(self, account_id: UUID) -> FlowBalance:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the balance cannot be read."""
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class FlowAccountPorts:
+    """Where a flow learns of its account: the accounts of the tenant, then the balance read now (ADR 0087)."""
+
+    directory: FlowAccountDirectoryPort
+    balances: FlowAccountBalancePort
 
 
 class FlowPositionsPort(Protocol):
@@ -173,6 +195,18 @@ class AccountActivityPort(Protocol):
     def activity(self, account_id: UUID) -> AccountActivity:
         """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
+
+
+class ActivityReaderPort(Protocol):
+    """What an exchange shows of an address: the adapter of the exchange behind the activity of the flows."""
+
+    def activity(self, address: str) -> AccountActivity: ...
+
+
+class ExecutionsReaderPort(Protocol):
+    """The executions an exchange still holds of an address: the adapter of the exchange behind the ledger."""
+
+    def since(self, address: str, since: datetime | None) -> ExecutionsWindow: ...
 
 
 class UnattributableNoticePort(Protocol):

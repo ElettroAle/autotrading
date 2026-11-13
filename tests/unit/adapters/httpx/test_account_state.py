@@ -16,6 +16,8 @@ from autotrading.application.accounts.errors import (
     WorkerUnavailableError,
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand
+from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
+from autotrading.application.flows.ports import FlowBalance
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -139,3 +141,30 @@ def test_the_representation_never_shows_the_token() -> None:
     adapter = HttpxAccountStateAdapter(httpx.Client(), TOKEN, TENANT)
 
     assert TOKEN not in repr(adapter)
+
+
+def test_a_flow_reads_the_balance_of_its_account_from_the_worker(worker: Worker) -> None:
+    account = worker.saved_account()
+    state = worker.for_tenant(TENANT).read_exchange_state.execute(ReadExchangeStateCommand(account.id))
+
+    balance = adapter_on(worker).balance_of(account.id.value)
+
+    assert balance == FlowBalance(state.balance.amount, state.balance.currency)
+
+
+def test_the_balance_of_an_account_of_another_tenant_is_not_found_for_the_flow(worker: Worker) -> None:
+    theirs = worker.saved_account(TenantId.new())
+
+    with pytest.raises(FlowAccountNotFoundError):
+        adapter_on(worker).balance_of(theirs.id.value)
+
+
+@pytest.mark.parametrize("token", [TOKEN, token_hex(8)])
+def test_a_balance_the_worker_cannot_read_makes_the_exchange_unavailable_for_the_flow(
+    worker: Worker, token: str
+) -> None:
+    account = worker.saved_account()
+    worker.exchange.reachable = False
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        adapter_on(worker, token).balance_of(account.id.value)

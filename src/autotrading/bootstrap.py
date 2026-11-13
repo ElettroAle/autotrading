@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from pathlib import Path
-from typing import Protocol
 from uuid import UUID
 
 import httpx
@@ -104,13 +103,10 @@ from autotrading.application.accounts.errors import (
     AccountNotFoundError,
     CredentialsNotOpenedError,
     ExchangeRejectedCredentialsError,
-    ExchangeUnavailableError,
-    WorkerUnavailableError,
 )
 from autotrading.application.accounts.get_account import find_account
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
-    AccountStatePort,
     CredentialOpenerPort,
     ExchangePort,
 )
@@ -132,6 +128,7 @@ from autotrading.application.cycles.ports import (
     SourceReading,
     SourceRequest,
     TenantScheduledFlow,
+    TenantScheduledFlowsPort,
 )
 from autotrading.application.cycles.run_cycle import CycleGuards, CycleSteps, RunCycleUseCase
 from autotrading.application.cycles.run_due_cycles import RunDueCyclesUseCase
@@ -148,10 +145,12 @@ from autotrading.application.flows.errors import (
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
 from autotrading.application.flows.ports import (
+    ActivityReaderPort,
     AutomaticPausePort,
     ClosedPositionRepositoryPort,
     ExchangeLimitsPort,
-    FlowAccount,
+    ExecutionsReaderPort,
+    FlowAccountPorts,
     FlowOpeningsPort,
     FlowRepositoryPort,
     FlowTimingPort,
@@ -179,7 +178,7 @@ from autotrading.application.notifications.answer_bot_messages import AnswerBotM
 from autotrading.application.notifications.errors import MessageNotDeliveredError
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.notifications.ports import LinkStores, MessengerPort
+from autotrading.application.notifications.ports import LinkStores, MessengerPort, NotifierPort
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
@@ -399,27 +398,6 @@ def _summary_of(flow: Flow, account: str, timing: FlowTiming | None) -> FlowSumm
     )
 
 
-class FlowAccountsFromAccounts:
-    """Bridges the accounts context to the flows context in the API (ADR 0031).
-
-    The account is looked up for the tenant first, then its balance is read now by the worker (R0.2.2).
-    """
-
-    def __init__(self, accounts: AccountRepositoryPort, account_state: AccountStatePort) -> None:
-        self._accounts = accounts
-        self._account_state = account_state
-
-    def account(self, account_id: UUID) -> FlowAccount:
-        try:
-            account = find_account(self._accounts, AccountId(account_id))
-            balance = self._account_state.read_state(account.id).balance
-        except AccountNotFoundError as error:
-            raise FlowAccountNotFoundError from error
-        except (ExchangeUnavailableError, WorkerUnavailableError) as error:
-            raise FlowExchangeUnavailableError from error
-        return FlowAccount(account.exchange.value, balance.amount, balance.currency)
-
-
 class FlowPositionsFromOrders:
     """Bridges the orders context to the flows context in the API (ADR 0055).
 
@@ -436,10 +414,6 @@ class FlowPositionsFromOrders:
         return PositionClosing.reported(asset, found=report.found, fill=fill, refusal=report.refusal)
 
 
-class ManualClosingRecorder(Protocol):
-    def execute(self, command: RecordManualClosingCommand) -> None: ...
-
-
 class ManualClosingsRecordedInFlows:
     """Bridges the manual closing of the orders context to the history of the flows context in the API (ADR 0061).
 
@@ -447,14 +421,14 @@ class ManualClosingsRecordedInFlows:
     closing refused or not confirmed in time leaves the position as the exchange shows it, so nothing is recorded.
     """
 
-    def __init__(self, closing: PositionClosingPort, history: ManualClosingRecorder) -> None:
+    def __init__(self, closing: PositionClosingPort, history: Callable[[RecordManualClosingCommand], None]) -> None:
         self._closing = closing
         self._history = history
 
     def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
         outcome = self._closing.close(account_id, coin, user_id)
         fill = ClosingFill.reported(outcome.average_price, outcome.executed_at, outcome.fee, outcome.realized_pnl)
-        self._history.execute(RecordManualClosingCommand(account_id, coin, fill))
+        self._history(RecordManualClosingCommand(account_id, coin, fill))
         return outcome
 
 
@@ -578,12 +552,6 @@ class TradingAccessFromAccounts:
         return TradingAccess(account.exchange.value, credentials.account_address, credentials.secret_key)
 
 
-class ActivityReaderPort(Protocol):
-    """What an exchange shows of an address: the adapter of the exchange behind the activity of the flows."""
-
-    def activity(self, address: str) -> AccountActivity: ...
-
-
 class AccountActivityFromAccounts:
     """Bridges the accounts context to the flows context in the worker (ADR 0044).
 
@@ -607,12 +575,6 @@ class AccountActivityFromAccounts:
         if reader is None:
             raise FlowExchangeUnavailableError
         return reader.activity(self._opener.open(account).account_address)
-
-
-class ExecutionsReaderPort(Protocol):
-    """The executions an exchange still holds of an address: the adapter of the exchange behind the ledger."""
-
-    def since(self, address: str, since: datetime | None) -> ExecutionsWindow: ...
 
 
 class AccountExecutionsFromAccounts:
@@ -770,7 +732,7 @@ class TenantUseCaseFactory:
             exchanges=self._exchanges.accounts,
             account_state=account_state,
             position_closing=ManualClosingsRecordedInFlows(
-                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings)
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings).execute
             ),
             verification=HttpxVerificationAdapter(self._worker.client, self._worker.token, tenant_id),
             source_catalog=SOURCE_CATALOG,
@@ -784,7 +746,7 @@ class TenantUseCaseFactory:
             flows=flows,
             running_verifications=SqlAlchemyRunningVerificationsAdapter(self._engine),
             flow_checks=FlowChecks(
-                accounts=FlowAccountsFromAccounts(accounts, account_state),
+                accounts=FlowAccountPorts(accounts, account_state),
                 markets=self._exchanges.markets,
                 models=ModelSettingsFromAgent(MODEL_CATALOG, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),
@@ -1163,14 +1125,10 @@ class FlowDirectory:
         return entry
 
 
-class ScheduledFlowsSource(Protocol):
-    def active_of_every_tenant(self) -> list[TenantScheduledFlow]: ...
-
-
 class ScheduledFlowsFromFlows:
     """Bridges the flows of every tenant to the cycles context in the worker (ADR 0042)."""
 
-    def __init__(self, source: ScheduledFlowsSource, directory: FlowDirectory) -> None:
+    def __init__(self, source: TenantScheduledFlowsPort, directory: FlowDirectory) -> None:
         self._source = source
         self._directory = directory
 
@@ -1689,17 +1647,13 @@ class OutsideClosingsInHistory:
 class ClosingNoticeByNotification:
     """Tells a closing with no history to enter through the notifications, in the currency of the exchange."""
 
-    def __init__(self, notifier: Notifier, currency: str) -> None:
+    def __init__(self, notifier: NotifierPort, currency: str) -> None:
         self._notifier = notifier
         self._currency = currency
 
     def tell(self, flow: Flow, asset: str, realized_pnl: Decimal) -> None:
         pnl = Amount(realized_pnl, self._currency)
         self._notifier.execute(Notification.position_closed(flow.name.value, asset, pnl))
-
-
-class Notifier(Protocol):
-    def execute(self, notification: Notification) -> None: ...
 
 
 class NotifiedClosedPositions:
@@ -1709,7 +1663,7 @@ class NotifiedClosedPositions:
     """
 
     def __init__(
-        self, history: ClosedPositionRepositoryPort, flows: FlowRepositoryPort, notifier: Notifier, currency: str
+        self, history: ClosedPositionRepositoryPort, flows: FlowRepositoryPort, notifier: NotifierPort, currency: str
     ) -> None:
         self._history = history
         self._flows = flows
@@ -1768,7 +1722,7 @@ class CyclesOfTenants:
 class CycleRuntime:
     """Where the worker finds the flows to plan, what keeps each cycle unique and alone, and how a cycle runs."""
 
-    scheduled: ScheduledFlowsSource
+    scheduled: TenantScheduledFlowsPort
     guards: CycleGuards
     launcher: CycleLauncherPort
 

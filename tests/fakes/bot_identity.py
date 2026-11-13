@@ -6,3 +6,6 @@ class FakeBotIdentityAdapter:
 
     def username(self) -> str | None:
         return self.name
+
+    def start_link(self, code: str) -> str | None:
+        return None if self.name is None else f"https://t.me/{self.name}?start={code}"

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from uuid import UUID
 
 from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
+from autotrading.application.flows.errors import FlowAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
@@ -45,6 +47,12 @@ class InMemoryAccountRepositoryAdapter:
 
     def get(self, account_id: AccountId) -> Account | None:
         return next((account for account in self.list() if account.id == account_id), None)
+
+    def exchange_of(self, account_id: UUID) -> str:
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.exchange.value
 
     def replace(self, account: Account) -> None:
         current = self.get(account.id)

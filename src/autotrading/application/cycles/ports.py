@@ -82,6 +82,12 @@ class ScheduledFlowsPort(Protocol):
         ...
 
 
+class TenantScheduledFlowsPort(Protocol):
+    def active_of_every_tenant(self) -> list[TenantScheduledFlow]:
+        """Every active flow of every tenant, with the tenant it belongs to."""
+        ...
+
+
 class CycleRepositoryPort(Protocol):
     def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
         """Takes the planned instant of the flow for this executor; False when another one already took it."""

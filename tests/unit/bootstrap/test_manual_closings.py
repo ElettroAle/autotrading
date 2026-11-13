@@ -53,7 +53,7 @@ class RecordedClosings:
 def test_an_executed_closing_is_recorded_with_its_fill_and_the_outcome_goes_back_unchanged() -> None:
     closing, history = ScriptedClosing(FILLED), RecordedClosings()
 
-    outcome = ManualClosingsRecordedInFlows(closing, history).close(ACCOUNT, "BTC", USER)
+    outcome = ManualClosingsRecordedInFlows(closing, history.execute).close(ACCOUNT, "BTC", USER)
 
     assert outcome == FILLED
     assert closing.calls == [(ACCOUNT, "BTC", USER)]
@@ -74,13 +74,15 @@ def test_an_executed_closing_is_recorded_with_its_fill_and_the_outcome_goes_back
 def test_a_closing_not_executed_or_not_confirmed_is_passed_on_without_a_fill(outcome: OrderOutcome) -> None:
     history = RecordedClosings()
 
-    assert ManualClosingsRecordedInFlows(ScriptedClosing(outcome), history).close(ACCOUNT, "BTC", USER) == outcome
+    assert (
+        ManualClosingsRecordedInFlows(ScriptedClosing(outcome), history.execute).close(ACCOUNT, "BTC", USER) == outcome
+    )
     assert history.commands == [RecordManualClosingCommand(ACCOUNT, "BTC", None)]
 
 
 def test_a_closing_that_fails_enters_no_history() -> None:
     history = RecordedClosings()
-    bridge = ManualClosingsRecordedInFlows(ScriptedClosing(failure=NoOpenPositionError("BTC")), history)
+    bridge = ManualClosingsRecordedInFlows(ScriptedClosing(failure=NoOpenPositionError("BTC")), history.execute)
 
     with pytest.raises(NoOpenPositionError):
         bridge.close(ACCOUNT, "BTC", USER)

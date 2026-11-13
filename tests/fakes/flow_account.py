@@ -4,20 +4,30 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.application.flows.ports import FlowAccount
+from autotrading.application.flows.ports import FlowAccountPorts, FlowBalance
 
 
 class FakeFlowAccountAdapter:
     def __init__(self) -> None:
-        self.accounts: dict[UUID, FlowAccount] = {}
+        self.exchanges: dict[UUID, str] = {}
+        self.balances: dict[UUID, Decimal] = {}
         self.reachable = True
 
     def add(self, account_id: UUID, balance: Decimal, exchange: str = "Hyperliquid") -> None:
-        self.accounts[account_id] = FlowAccount(exchange, balance, "USDC")
+        self.exchanges[account_id] = exchange
+        self.balances[account_id] = balance
 
-    def account(self, account_id: UUID) -> FlowAccount:
-        if account_id not in self.accounts:
+    def ports(self) -> FlowAccountPorts:
+        return FlowAccountPorts(self, self)
+
+    def exchange_of(self, account_id: UUID) -> str:
+        if account_id not in self.exchanges:
+            raise FlowAccountNotFoundError
+        return self.exchanges[account_id]
+
+    def balance_of(self, account_id: UUID) -> FlowBalance:
+        if account_id not in self.balances:
             raise FlowAccountNotFoundError
         if not self.reachable:
             raise FlowExchangeUnavailableError
-        return self.accounts[account_id]
+        return FlowBalance(self.balances[account_id], "USDC")

@@ -67,7 +67,7 @@ class Flows:
         self.markets = FakeMarketsAdapter()
         self.models = FakeModelSettingsAdapter(OPENROUTER, ANTHROPIC)
         checks = FlowChecks(
-            self.accounts, {"Hyperliquid": self.markets}, self.models, FakeSourceSettingsAdapter("notizie")
+            self.accounts.ports(), {"Hyperliquid": self.markets}, self.models, FakeSourceSettingsAdapter("notizie")
         )
         self.activity = FakeAccountActivityAdapter()
         self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)

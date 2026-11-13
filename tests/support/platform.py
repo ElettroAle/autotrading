@@ -11,6 +11,7 @@ from autotrading.application.accounts.read_exchange_state import ReadExchangeSta
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.ports import FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -31,7 +32,6 @@ from autotrading.bootstrap import (
     AccountActivityFromAccounts,
     AccountFlowsFromFlows,
     AccountReadingFromAccounts,
-    FlowAccountsFromAccounts,
     FlowDirectoryFromFlows,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
@@ -184,7 +184,7 @@ class Platform:
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=ManualClosingsRecordedInFlows(
-                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings)
+                position_closing, RecordManualClosingUseCase(flows, flow_openings, notified_closings).execute
             ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
@@ -196,7 +196,7 @@ class Platform:
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountsFromAccounts(accounts, account_state),
+                accounts=FlowAccountPorts(accounts, account_state),
                 markets=self.markets,
                 models=ModelSettingsFromAgent(self.model_catalog, provider_keys),
                 sources=SourceSettingsFromSources(SOURCE_CATALOG),

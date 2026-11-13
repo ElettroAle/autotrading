@@ -10,13 +10,7 @@ BUG_CYCLE_RULES_IN_BOOTSTRAP = 170
 BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON = 173
 
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
-    Rule.PORTS_IN_PORTS_MODULES: {
-        "bootstrap.py:ActivityReaderPort": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:ExecutionsReaderPort": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:ManualClosingRecorder": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:Notifier": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:ScheduledFlowsSource": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-    },
+    Rule.PORTS_IN_PORTS_MODULES: {},
     Rule.BOOTSTRAP_WITHOUT_DECISIONS: {
         "bootstrap.py:AccountActivityFromAccounts.activity": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:AccountExecutionsFromAccounts.since": BUG_CYCLE_RULES_IN_BOOTSTRAP,
@@ -43,30 +37,13 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:_unattributable_notification": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:flow_of_cycle": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:json_of": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:AccountFlowsFromFlows._operating_on": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:AccountFlowsFromFlows.archive": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:FlowAccountsFromAccounts.account": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:FlowDirectoryFromFlows.exists": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:ProviderKeyUsageFromFlows.flows_using": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:activity_readers_for": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:create_worker_application": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:cycle_services": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:exchanges_for": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:executions_readers_for": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:markets_for": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:order_exchanges_for": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-        "bootstrap.py:record_actual_prices": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
     },
     Rule.BOOTSTRAP_WITHOUT_BUSINESS_CONSTANTS: {
         "bootstrap.py:MODEL_REFUSALS": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:SOURCE_REFUSALS": BUG_CYCLE_RULES_IN_BOOTSTRAP,
     },
-    Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {
-        "application/cycles/source_collector.py:concurrent.futures": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-    },
-    Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {
-        "domain/notifications/link_code.py:<modulo>": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
-    },
+    Rule.CORE_WITHOUT_TECHNICAL_STANDARD_LIBRARY: {},
+    Rule.CORE_WITHOUT_TECHNOLOGY_NAMES: {},
     Rule.ONLY_PROJECT_EXCEPTIONS_RAISED: {},
     Rule.NO_GENERIC_EXCEPT: {},
     Rule.USE_CASE_SHAPE: {},
