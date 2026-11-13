@@ -17,7 +17,7 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   prezzi (R1.4.2).
 - **Agent context**: istruzioni del flusso, regole operative, ora, stato del flusso, dati delle fonti con
   i pesi, dati mancanti (R1.4.3). Riguarda solo il flusso.
-- **Decision**: per ogni asset del flusso, `open` (long o short, quota del capitale da 0 a 1, leva),
+- **Decision**: per ogni asset del flusso, `open` (long o short, quota dei soldi del flusso da 0 a 1, leva),
   `close` (sempre totale) o `hold`, con il ragionamento (R1.4.4).
 - **Non-conforming decision**: campo mancante, valore fuori tipo o intervallo, azione non ammessa, asset
   non del flusso; si scarta con il motivo. Un asset senza decisione vale `hold`, registrato come mancante

@@ -25,10 +25,14 @@ class RiskPolicy:
 
 @dataclass(frozen=True, slots=True)
 class RiskState:
-    """The state of the flow read at the start of the cycle (R1.5.3)."""
+    """The state of the flow read at the start of the cycle (R1.5.3).
+
+    Quotas and percentage limits are measured on the money of the flow, not on the capital allocated to it: after
+    losses the openings shrink, after gains they grow (ADR 0078).
+    """
 
     currency: str
-    allocated_capital: Decimal
+    funds: Decimal
     available_liquidity: Decimal
     open_assets: frozenset[str]
 
@@ -106,7 +110,7 @@ class RiskCheck:
 
     def _within_leverage(self, intent: OpenIntent, limits: AssetLimits) -> _Sizing:
         """The margin stays the same: a lower leverage gives a smaller position (R1.5.2)."""
-        margin = intent.margin_fraction * self._state.allocated_capital
+        margin = intent.margin_fraction * self._state.funds
         sizing = _Sizing(margin * intent.leverage, intent.leverage, ())
         flow_maximum = self._policy.limits.max_leverage
         reason = f"leva oltre il massimo del flusso: {flow_maximum}"
@@ -127,14 +131,14 @@ class RiskCheck:
         return sizing.adjusted(limit.value_cap, sizing.leverage, adjustment)
 
     def _binding_limit(self, leverage: int) -> _ExposureLimit:
-        capital = self._state.allocated_capital
+        funds = self._state.funds
         limits = self._policy.limits
         configured = [
-            _ExposureLimit(AdjustmentKind.MARGIN, percent, capital * percent / HUNDRED * leverage)
+            _ExposureLimit(AdjustmentKind.MARGIN, percent, funds * percent / HUNDRED * leverage)
             for percent in (limits.max_margin_exposure_percent,)
             if percent is not None
         ] + [
-            _ExposureLimit(AdjustmentKind.VALUE, percent, capital * percent / HUNDRED)
+            _ExposureLimit(AdjustmentKind.VALUE, percent, funds * percent / HUNDRED)
             for percent in (limits.max_value_exposure_percent,)
             if percent is not None
         ]

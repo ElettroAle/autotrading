@@ -42,6 +42,7 @@ class FlowStateView:
 
     currency: str
     allocated_capital: Decimal
+    funds: Decimal
     available_liquidity: Decimal
     total_value: Decimal
     return_percent: Decimal
@@ -97,7 +98,7 @@ class AgentContext:
                 "",
                 "Rispondi solo con un oggetto JSON in questo formato:",
                 '{"decisioni": [{"asset": "<asset>", "azione": "apri|chiudi|mantieni", "direzione": "long|short",'
-                ' "quota": <frazione del capitale del flusso da impegnare come margine, da 0 a 1>,'
+                ' "quota": <frazione dei soldi del flusso da impegnare come margine, da 0 a 1>,'
                 ' "leva": <intero>, "ragionamento": "<perché>"}]}',
                 "direzione, quota e leva servono solo per apri; il ragionamento serve sempre.",
             )
@@ -141,6 +142,7 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
     return {
         "valuta": state.currency,
         "capitale_allocato": str(state.allocated_capital),
+        "soldi_del_flusso": str(state.funds),
         "liquidita_disponibile": str(state.available_liquidity),
         "valore_complessivo": str(state.total_value),
         "rendimento_dall_avvio_percento": str(state.return_percent),
