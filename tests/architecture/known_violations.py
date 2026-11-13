@@ -7,7 +7,6 @@ until it is removed. An entry never exists without its Bug on the board.
 from tests.support.architecture import Rule
 
 BUG_CYCLE_RULES_IN_BOOTSTRAP = 170
-BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON = 173
 BUG_STRICTER_RULES = 177
 
 KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
@@ -48,7 +47,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:UnattributableNotices": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:AccountFlowsFromFlows": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:ApiExchanges": BUG_STRICTER_RULES,
         "bootstrap.py:ClosingNoticeByNotification": BUG_STRICTER_RULES,
@@ -91,7 +89,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "bootstrap.py:CycleJournalFromContexts": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:FlowStateFromFlows": BUG_CYCLE_RULES_IN_BOOTSTRAP,
         "bootstrap.py:OrdersFromOrders": BUG_CYCLE_RULES_IN_BOOTSTRAP,
-        "bootstrap.py:AccountFlowsFromFlows": BUG_API_RULES_AND_PORTS_OUTSIDE_HEXAGON,
         "bootstrap.py:AgentFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:ContextFromAgent": BUG_STRICTER_RULES,
         "bootstrap.py:FlowPauseFromFlows": BUG_STRICTER_RULES,

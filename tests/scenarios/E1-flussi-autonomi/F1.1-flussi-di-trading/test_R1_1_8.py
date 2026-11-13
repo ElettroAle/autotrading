@@ -1,8 +1,8 @@
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.accounts.remove_account import RemoveAccountCommand
-from autotrading.domain.accounts.errors import FlowPositionsLeftOpenError
+from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
+from autotrading.domain.flows.errors import FlowPositionsLeftOpenError
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.flows import scenario_catalog
@@ -32,8 +32,8 @@ def account_with_active_flow(
 
 def remove(platform: Platform, lifecycle: Lifecycle, user: str, account: str, *, confirmed: bool) -> None:
     account_id = platform.account_named(user, account).id
-    command = RemoveAccountCommand(account_id, platform.user_id_of(user), confirmed=confirmed)
-    attempt(lifecycle, lambda: platform.use_cases_of(user).remove_account.execute(command))
+    command = RemoveAccountWithFlowsCommand(account_id.value, platform.user_id_of(user), confirmed=confirmed)
+    attempt(lifecycle, lambda: platform.use_cases_of(user).remove_account_with_flows.execute(command))
 
 
 @when(quoted('"{user}" rimuove il conto "{account}" senza confermare'))

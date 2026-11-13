@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.accounts.remove_account import RemoveAccountCommand
+from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -27,9 +27,9 @@ class Removal:
 
     def attempt(self, user: str, account: str, *, confirmed: bool) -> None:
         account_id = self.platform.account_named(user, account).id
-        command = RemoveAccountCommand(account_id, self.platform.user_id_of(user), confirmed=confirmed)
+        command = RemoveAccountWithFlowsCommand(account_id.value, self.platform.user_id_of(user), confirmed=confirmed)
         try:
-            self.platform.use_cases_of(user).remove_account.execute(command)
+            self.platform.use_cases_of(user).remove_account_with_flows.execute(command)
         except AutotradingError as error:
             self.failures.append(error)
 

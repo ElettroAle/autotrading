@@ -6,8 +6,8 @@ from sqlalchemy import Connection, Engine, RowMapping, func, insert, select, upd
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
-from autotrading.application.accounts.errors import AccountNameInUseError, AccountNotFoundError
-from autotrading.application.flows.errors import FlowAccountNotFoundError
+from autotrading.application.accounts.errors import AccountNameInUseError
+from autotrading.application.flows.errors import AccountToRemoveNotFoundError, FlowAccountNotFoundError
 from autotrading.application.orders.errors import OrderAccountNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
@@ -105,16 +105,20 @@ class SqlAlchemyAccountRepositoryAdapter:
             if connection.execute(statement).rowcount != 1:
                 raise CrossTenantAccessError
 
-    def remove(self, account_id: AccountId) -> None:
+    def has_account(self, account_id: UUID) -> bool:
+        return self.get(AccountId(account_id)) is not None
+
+    def remove_account(self, account_id: UUID) -> None:
+        """The removal of an account as the flows context asks it (ADR 0090): credentials deleted, history kept."""
         statement = (
             update(accounts)
-            .where(IN_USE, accounts.c.id == account_id.value)
+            .where(IN_USE, accounts.c.id == account_id)
             .values(removed_at=func.now(), credentials_key_version=None, credentials_ciphertext=None)
         )
         with self._transaction() as connection:
             # Row level security hides the rows of other tenants: an account of theirs is not found.
             if connection.execute(statement).rowcount != 1:
-                raise AccountNotFoundError
+                raise AccountToRemoveNotFoundError
 
     def _require_own(self, account: Account) -> None:
         if account.tenant_id != self._tenant_id:
