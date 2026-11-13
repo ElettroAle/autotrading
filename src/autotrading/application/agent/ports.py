@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Protocol
 
 from autotrading.domain.agent.agent_context import ModelMessage
+from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -79,6 +80,14 @@ class ModelReply:
 
     text: str
     usage: ModelUsage
+
+
+class ModelCatalogPort(Protocol):
+    """The models the platform offers now, with their parameters and prices, from the model gateway (R1.4.2)."""
+
+    def catalog(self) -> ModelCatalog:
+        """Raises ModelCatalogUnavailableError."""
+        ...
 
 
 class ModelCallPort(Protocol):

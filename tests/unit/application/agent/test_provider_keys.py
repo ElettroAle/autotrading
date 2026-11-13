@@ -27,6 +27,7 @@ from autotrading.domain.agent.model_parameter import RangeParameter
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     FakeProviderKeyUsageAdapter,
@@ -58,7 +59,9 @@ class Keys:
         self.verifier = FakeProviderKeyVerifierAdapter()
         self.usage = FakeProviderKeyUsageAdapter()
         self.services = ProviderKeyServices(
-            CATALOG, self.verifier, FakeProviderKeySealerAdapter(self.tenant_id, self.vault)
+            InMemoryModelCatalogAdapter(CATALOG),
+            self.verifier,
+            FakeProviderKeySealerAdapter(self.tenant_id, self.vault),
         )
 
     def register(self, provider: str, key: str) -> ProviderName:
@@ -226,7 +229,7 @@ def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys:
     keys.verifier.accept("openrouter", "K-OR")
     keys.register("openrouter", "K-OR")
 
-    listing = ListModelsUseCase(CATALOG, keys.repository).execute()
+    listing = ListModelsUseCase(InMemoryModelCatalogAdapter(CATALOG), keys.repository).execute()
 
     assert listing.models == CATALOG.models
     assert listing.providers == (

@@ -11,6 +11,7 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter
 from autotrading.domain.flows.errors import ModelRequiredError
+from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter
 from tests.support.flows import TEMPERATURE
 from tests.support.platform import Platform
@@ -29,7 +30,7 @@ class Models:
         self.platform = Platform()
         self.tenant_id = self.platform.tenant_of("anna")
         self.keys = InMemoryProviderKeyRepositoryAdapter(self.platform.provider_keys, self.tenant_id)
-        self.use_case = SelectModelUseCase(CATALOG, self.keys)
+        self.use_case = SelectModelUseCase(InMemoryModelCatalogAdapter(CATALOG), self.keys)
 
     def register(self, provider: str) -> None:
         self.platform.providers.accept(provider, "K-TEST")
