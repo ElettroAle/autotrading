@@ -47,7 +47,9 @@ chiave (ADR 0103).
 ## Conseguenze
 
 - Il codice di traduzione degli esiti (200, 401/403, altro) si ripete nelle quattro cartelle: ognuna resta staccabile
-  e le cartelle di tecnologia non si importano a vicenda.
+  e le cartelle di tecnologia non si importano a vicenda. La rilevazione dei duplicati di SonarCloud esclude i soli
+  `adapters/outbound/*/key_verifier.py` (`sonar-project.properties`): la ripetizione è voluta e la regola che la
+  impone è di CLAUDE.md.
 - Un fornitore nuovo richiede la sua cartella, la sua rotta nel proxy e la voce in `bootstrap.py`.
 - Tolte da `known_violations.py`: `bootstrap.py:httpx`, `bootstrap.py:PROVIDER_TIMEOUT_SECONDS`.
 
@@ -61,4 +63,8 @@ chiave (ADR 0103).
   l'import di `httpx`.
 - docs/architecture.md (chiavi dei fornitori dell'utente, verifica alla registrazione, R1.4.1): invariato per
   l'utente.
-- Scostamenti: nessuno.
+- Scostamenti: `sonar.cpd.exclusions` per i quattro `key_verifier.py`. Senza, il quality gate di SonarCloud
+  (duplicazione nel codice nuovo oltre il 3%) blocca la PR: la duplicazione viene da due regole di CLAUDE.md insieme
+  (un adapter = un sistema; le cartelle di tecnologia non si importano a vicenda), e le alternative che la evitano
+  (un adapter con quattro sistemi, una cartella condivisa, la traduzione degli stati HTTP in application) violano
+  CLAUDE.md. L'esclusione copre solo quei quattro file; il resto del quality gate è invariato.
