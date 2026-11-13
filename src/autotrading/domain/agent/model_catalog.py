@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, ModelNotAvailableError
@@ -14,6 +16,11 @@ class ModelCatalog:
         repeated = sorted({name for name in names if names.count(name) > 1})
         if repeated:
             raise InvalidModelDefinitionError(", ".join(repeated))
+
+    @classmethod
+    def joined(cls, catalogs: Iterable[ModelCatalog]) -> ModelCatalog:
+        """One catalog of the models of several: a name offered twice is a definition error."""
+        return cls(model for catalog in catalogs for model in catalog.models)
 
     @property
     def models(self) -> tuple[ModelDefinition, ...]:

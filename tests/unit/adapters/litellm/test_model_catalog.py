@@ -9,7 +9,6 @@ from openai import OpenAI
 from autotrading.adapters.outbound.litellm.model_catalog import (
     REFRESH_SECONDS,
     LiteLlmModelCatalogAdapter,
-    litellm_model_catalog,
 )
 from autotrading.application.agent.errors import ModelCatalogUnavailableError
 from autotrading.application.flows.errors import FlowModelCatalogUnavailableError
@@ -206,11 +205,6 @@ def test_a_flow_is_told_when_its_model_is_not_offered() -> None:
 def test_a_flow_is_told_when_the_catalog_is_unavailable() -> None:
     with pytest.raises(FlowModelCatalogUnavailableError):
         catalog_on(Proxy(status=500, body={"error": {"message": "boom"}})).definition_of("openai/gpt-4.1-mini")
-
-
-def test_the_catalog_of_the_installation_asks_the_proxy_at_its_address() -> None:
-    with pytest.raises(ModelCatalogUnavailableError):
-        litellm_model_catalog("http://127.0.0.1:9", MASTER_KEY).catalog()
 
 
 REFUSED = "connection refused"

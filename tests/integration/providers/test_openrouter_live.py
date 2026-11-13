@@ -15,7 +15,7 @@ SOME_MODELS = 100
 
 
 def test_the_public_list_makes_the_catalog_and_a_made_up_key_is_refused() -> None:
-    gateway = openrouter_adapters()
+    gateway = openrouter_adapters()["openrouter"]
 
     catalog = gateway.model_catalog().catalog()
     free = [model for model in catalog.models if model.name.endswith(":free")]

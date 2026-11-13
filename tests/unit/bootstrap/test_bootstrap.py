@@ -53,6 +53,7 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
 from tests.support.model_catalog import PLATFORM_MODELS
@@ -67,10 +68,10 @@ AUTHENTICATION = {
 }
 
 
-def providers_of() -> tuple[InMemoryModelCatalogAdapter, InMemoryModelCatalogAdapter]:
-    """The models of the API: the catalog of the test models, for the agent and for the flows."""
+def providers_of() -> tuple[dict[str, FakeModelGatewayAdapter], dict[str, InMemoryModelCatalogAdapter]]:
+    """The models of the API: one gateway of the test models, for the agent and for the flows."""
     catalog = InMemoryModelCatalogAdapter(PLATFORM_MODELS)
-    return catalog, catalog
+    return {"models": FakeModelGatewayAdapter(catalog)}, {"models": catalog}
 
 
 def _sealers(

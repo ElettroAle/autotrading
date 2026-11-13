@@ -93,6 +93,7 @@ from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.provider_keys import (
@@ -234,9 +235,10 @@ class FlowCycles:
         return CycleServices(
             environment="dev",
             clock=self.clock,
-            catalog=InMemoryModelCatalogAdapter(self.platform.model_catalog),
+            model_gateways={
+                "models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(self.platform.model_catalog), self.model)
+            },
             provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),
-            model_call=self.model,
             sentiments=self.sentiments,
             news=self.news,
             prices=self.prices,

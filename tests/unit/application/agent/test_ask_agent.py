@@ -22,6 +22,7 @@ from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,
     FakeProviderKeySealerAdapter,
@@ -63,9 +64,8 @@ class World:
         self.store = ProviderKeyStore()
         self.keys = InMemoryProviderKeyRepositoryAdapter(self.store, TENANT)
         self.model = FakeModelCallAdapter(text=ANSWER)
-        self.use_case = AskAgentUseCase(
-            InMemoryModelCatalogAdapter(CATALOG), self.keys, FakeProviderKeyOpenerAdapter(self.vault), self.model
-        )
+        gateway = FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(CATALOG), self.model)
+        self.use_case = AskAgentUseCase({"models": gateway}, self.keys, FakeProviderKeyOpenerAdapter(self.vault))
 
     def register(self, provider: str, secret: str) -> None:
         name = ProviderName(provider)
