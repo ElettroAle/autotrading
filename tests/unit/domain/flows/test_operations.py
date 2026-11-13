@@ -6,6 +6,7 @@ import pytest
 from autotrading.domain.flows.operations import (
     FUNDING,
     PAGE_SIZE,
+    AccountScope,
     Operation,
     OperationCursor,
     OperationSource,
@@ -85,3 +86,18 @@ def test_an_empty_page_has_no_next() -> None:
 
 def test_a_funding_payment_is_named_funding() -> None:
     assert FUNDING == "funding"
+
+
+def test_an_operation_belongs_to_no_flow_unless_named() -> None:
+    assert an_operation().flow is None
+
+
+def test_the_query_without_the_page_keeps_every_filter_but_the_cursor() -> None:
+    after = OperationCursor(NOON, OperationSource.FUNDING, 7)
+    query = OperationsQuery("BTC", NOON, NOON + timedelta(hours=1), after, limit=3)
+
+    assert query.unpaged() == OperationsQuery("BTC", NOON, NOON + timedelta(hours=1), None, limit=3)
+
+
+def test_the_scopes_of_an_account_are_named_as_the_api_reads_them() -> None:
+    assert [scope.value for scope in AccountScope] == ["unattributed", "all"]
