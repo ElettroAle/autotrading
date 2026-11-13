@@ -13,11 +13,14 @@ class FlowTiming:
     pause_reason: str | None
     first_start: datetime | None = None
 
+    def beginning(self, anchor: datetime) -> datetime:
+        """The first start of the flow, the beginning its return counts from (ADR 0069); a flow the database has not
+        stamped yet started at the anchor of its cycles.
+        """
+        if self.first_start is None:
+            return anchor
+        return self.first_start
 
-def flow_beginning(timing: FlowTiming | None, anchor: datetime) -> datetime:
-    """The first start of the flow, the beginning its return counts from (ADR 0069); a flow the database has not
-    stamped yet started at the anchor of its cycles.
-    """
-    if timing is None or timing.first_start is None:
-        return anchor
-    return timing.first_start
+
+# A flow the database has not stamped yet: no anchor, no reason for a pause, no first start.
+UNSTAMPED = FlowTiming(None, None)

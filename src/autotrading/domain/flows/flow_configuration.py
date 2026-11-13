@@ -1,9 +1,14 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
-from autotrading.domain.flows.errors import AllocatedCapitalNotPositiveError, AssetsRequiredError, RepeatedSourceError
+from autotrading.domain.flows.errors import (
+    AllocatedCapitalNotPositiveError,
+    AssetsRequiredError,
+    RepeatedSourceError,
+    SourceNotSelectedError,
+)
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -45,6 +50,17 @@ class FlowConfiguration:
     def covers(self, asset: str) -> bool:
         """The flow trades only its own assets: a position on another asset belongs to someone else."""
         return asset in self.assets
+
+    def held[T](self, positions: Iterable[T], asset_of: Callable[[T], str]) -> tuple[T, ...]:
+        """The positions of the account that belong to the flow: those on its assets."""
+        return tuple(position for position in positions if self.covers(asset_of(position)))
+
+    def source(self, name: str) -> SourceSelection:
+        """The active source of the flow with that name, as the configuration of the cycle selects it (R1.3.2)."""
+        selection = next((selected for selected in self.sources if selected.name == name), None)
+        if selection is None:
+            raise SourceNotSelectedError(name)
+        return selection
 
     @property
     def risk_policy(self) -> RiskPolicy:

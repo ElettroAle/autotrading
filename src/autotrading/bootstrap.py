@@ -123,7 +123,6 @@ from autotrading.application.cycles.errors import FlowOfCycleNotFoundError
 from autotrading.application.cycles.ports import (
     ClockPort,
     CycleLauncherPort,
-    CycleRepositoryPort,
     FlowSnapshot,
     FlowSummary,
     RiskReview,
@@ -190,7 +189,6 @@ from autotrading.application.orders.outcome import OrderOutcome
 from autotrading.application.orders.ports import ExchangePort as OrderExchangePort
 from autotrading.application.orders.ports import PositionClosingPort
 from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
-from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
@@ -225,7 +223,7 @@ from autotrading.domain.agent.errors import (
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.cycles.call_cost import CallCost
-from autotrading.domain.cycles.cycle_record import AbsentSource, CycleOutcome, CycleRecord
+from autotrading.domain.cycles.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
 from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.errors import AutotradingError
@@ -234,15 +232,15 @@ from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_funds import CycleFunds
 from autotrading.domain.flows.errors import InvalidClosedPositionError, ModelRequiredError
-from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.flow_timing import FlowTiming, flow_beginning
+from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
 from autotrading.domain.flows.ledger import ExecutionsWindow
 from autotrading.domain.flows.risk_check import RiskState
-from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
+from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, approved_of
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
@@ -374,23 +372,22 @@ class FlowSummariesFromFlows:
         timings = self._timing.timings()
         names = {account.id.value: account.name.value for account in self._accounts.list()}
         return [
-            _summary_of(flow, names.get(flow.account_id, ""), timings.get(flow.id))
+            _summary_of(flow, names.get(flow.account_id, ""), timings.get(flow.id, UNSTAMPED))
             for flow in ListFlowsUseCase(self._flows).execute()
         ]
 
 
-def _summary_of(flow: Flow, account: str, timing: FlowTiming | None) -> FlowSummary:
+def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
     configuration = flow.configuration
-    anchor = None if timing is None else timing.anchor
     interval = timedelta(minutes=configuration.cycle_interval.minutes)
     return FlowSummary(
         flow_id=flow.id.value,
         name=flow.name.value,
         account=account,
         status=flow.status.value,
-        pause_reason=None if timing is None else timing.pause_reason,
+        pause_reason=timing.pause_reason,
         model=configuration.model.name,
-        schedule=CycleSchedule.planned(flow.status.runs_cycles, anchor, interval),
+        schedule=CycleSchedule.planned(flow.status.runs_cycles, timing.anchor, interval),
     )
 
 
@@ -676,7 +673,7 @@ class AccountReadingFromAccounts:
         )
 
     def flow_on(self, account_id: UUID, asset: str) -> str | None:
-        return next((flow.name.value for flow in self._flows.list() if flow.holds(account_id, asset)), None)
+        return holder_of(self._flows.list(), account_id, asset)
 
 
 class OrderExecutionFromOrders:
@@ -1236,7 +1233,7 @@ class CycleFlow:
 
     @property
     def positions(self) -> tuple[Position, ...]:
-        return tuple(position for position in self.account.positions if self.configuration.covers(position.coin))
+        return self.configuration.held(self.account.positions, lambda position: position.coin)
 
     @property
     def available_liquidity(self) -> Decimal:
@@ -1264,10 +1261,7 @@ class CycleFlow:
 
 
 def flow_of_cycle(ports: TenantCyclePorts, flow_id: UUID) -> Flow:
-    flow = next((flow for flow in ports.flows.list() if flow.id.value == flow_id), None)
-    if flow is None:
-        raise FlowOfCycleNotFoundError
-    return flow
+    return ports.flows.get(FlowId(flow_id))
 
 
 class FlowStateFromFlows:
@@ -1304,7 +1298,7 @@ class FlowStateFromFlows:
             raise FlowCredentialsRejectedError(account.name.value, account.id.value) from error
         read_cycle_state = ReadCycleFlowStateUseCase(ports.read_flow_state, _reconcile_for_cycle(ports))
         attributed = read_cycle_state.execute(ReadCycleFlowStateCommand(flow.id, reconciled))
-        started_at = flow_beginning(ports.timing.timings().get(flow.id), self._directory.anchor_of(flow_id))
+        started_at = ports.timing.timings().get(flow.id, UNSTAMPED).beginning(self._directory.anchor_of(flow_id))
         cycle_flow = CycleFlow(
             tenant_id, flow, account.name.value, account.exchange.value, started_at, state, attributed
         )
@@ -1349,8 +1343,17 @@ class FlowPauseFromFlows:
     def pause_affected_by(self, flow_id: UUID, error: AutotradingError) -> None:
         ports = self._ports_of(self._directory.tenant_of(flow_id))
         command = PauseAffectedFlowsCommand.of_error(flow_id, error)
-        for paused in PauseAffectedFlowsUseCase(ports.flows, ports.pause).execute(command):
-            ports.notify.execute(Notification.flow_paused(paused.name.value, str(error)))
+        PauseAffectedFlowsUseCase(ports.flows, ports.pause, PausedFlowNotices(ports.notify)).execute(command)
+
+
+class PausedFlowNotices:
+    """Bridges the automatic pause of the flows context to the notifications of the tenant (R1.8.2)."""
+
+    def __init__(self, notify: NotifyUseCase) -> None:
+        self._notify = notify
+
+    def paused(self, flow: Flow, reason: str) -> None:
+        self._notify.execute(Notification.flow_paused(flow.name.value, reason))
 
 
 class SourcesFromSources:
@@ -1366,9 +1369,7 @@ class SourcesFromSources:
         cycle_flow = request.snapshot.state
         ports = self._ports_of(cycle_flow.tenant_id)
         configuration = cycle_flow.configuration
-        selection = next((selected for selected in configuration.sources if selected.name == source), None)
-        if selection is None:
-            raise SourceUnavailableError(source)
+        selection = configuration.source(source)
         command = CollectSourceCommand(
             CycleReference(request.flow_id, request.planned_at),
             selection.name,
@@ -1505,11 +1506,7 @@ class RiskFromFlows:
             cycle_flow.risk_state(),
         )
         outcomes = CheckRiskUseCase(self._exchange_limits[cycle_flow.exchange]).execute(command)
-        orders = tuple(
-            CycleOrder(cycle_flow, outcome)
-            for outcome in outcomes
-            if isinstance(outcome, (ApprovedOpening, ApprovedClose))
-        )
+        orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
         return RiskReview(orders, tuple(outcomes))
 
 
@@ -1743,24 +1740,16 @@ class NotifiedClosedPositions:
         return self._history.of_flow(flow_id)
 
 
-class NotifiedCycles:
-    """Records the cycles where the worker keeps them and notifies a failed one to the chat of its tenant (R1.8.2)."""
+class CycleFailureNotices:
+    """Bridges a failed cycle to the notifications of the tenant of its flow (R1.8.2)."""
 
-    def __init__(self, cycles: CycleRepositoryPort, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
-        self._cycles = cycles
+    def __init__(self, directory: FlowDirectory, ports_of: CyclePortsOf) -> None:
         self._directory = directory
         self._ports_of = ports_of
 
-    def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
-        return self._cycles.claim(flow_id, planned_at)
-
-    def record(self, record: CycleRecord) -> None:
-        self._cycles.record(record)
-        if record.outcome is not CycleOutcome.FAILED or record.failure is None:
-            return
-        ports = self._ports_of(self._directory.tenant_of(record.flow_id))
-        flow = flow_of_cycle(ports, record.flow_id)
-        ports.notify.execute(Notification.cycle_failed(flow.name.value, record.failure.message))
+    def failed(self, flow_id: UUID, reason: str) -> None:
+        ports = self._ports_of(self._directory.tenant_of(flow_id))
+        ports.notify.execute(Notification.cycle_failed(flow_of_cycle(ports, flow_id).name.value, reason))
 
 
 class CyclesOfTenants:
@@ -1819,10 +1808,11 @@ def record_actual_prices(directory: FlowDirectory, ports_of: CyclePortsOf, servi
 def worker_cycles(engine: Engine, ports_of: CyclePortsOf, services: CycleServices) -> CyclePolling:
     directory = FlowDirectory()
     guards = CycleGuards(
-        cycles=NotifiedCycles(CyclesOfTenants(engine, directory), directory, ports_of),
+        cycles=CyclesOfTenants(engine, directory),
         lock=SqlAlchemyFlowLockAdapter(engine),
         pause=FlowPauseFromFlows(directory, ports_of),
         clock=services.clock,
+        failures=CycleFailureNotices(directory, ports_of),
     )
     runtime = CycleRuntime(SqlAlchemyScheduledFlowsAdapter(engine), guards, ThreadCycleLauncherAdapter())
     run_due = run_due_cycles(directory, ports_of, services, runtime)

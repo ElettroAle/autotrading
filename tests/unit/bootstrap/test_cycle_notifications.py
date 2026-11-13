@@ -25,11 +25,11 @@ from autotrading.application.flows.reconcile_account import ReconcileAccountUseC
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.bootstrap import (
     ClosedPositionsFromOpenings,
+    CycleFailureNotices,
     CycleFlow,
     FlowPauseFromFlows,
     FlowStateFromFlows,
     NotifiedClosedPositions,
-    NotifiedCycles,
     TenantCyclePorts,
     WorkerExchanges,
     WorkerSettings,
@@ -41,9 +41,7 @@ from autotrading.bootstrap import (
     order_exchanges_for,
 )
 from autotrading.domain.agent.provider_name import ProviderName
-from autotrading.domain.cycles.cycle_record import CycleFailure, CycleOutcome, CycleRecord
 from autotrading.domain.cycles.cycle_schedule import CycleSchedule
-from autotrading.domain.cycles.cycle_step import CycleStep
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
 from autotrading.domain.flows.flow_id import FlowId
@@ -246,51 +244,13 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
     assert world.received == ["alfa: chiusa BTC, PnL -100 USDC"]
 
 
-# NotifiedCycles
+# CycleFailureNotices
 
 
-def a_record(world: World, outcome: CycleOutcome, failure: CycleFailure | None = None) -> CycleRecord:
-    return CycleRecord(world.flow.id.value, PLANNED_AT, outcome, failure=failure)
+def test_a_failed_cycle_is_told_with_the_name_of_its_flow_and_its_message(world: World) -> None:
+    CycleFailureNotices(world.cycles.directory, world.ports_of).failed(world.flow.id.value, "timeout")
 
-
-def notified(world: World) -> NotifiedCycles:
-    return NotifiedCycles(world.cycles.records, world.cycles.directory, world.ports_of)
-
-
-def test_a_cycle_is_claimed_once() -> None:
-    world = World()
-    cycles = notified(world)
-
-    assert cycles.claim(world.flow.id.value, PLANNED_AT)
-    assert not cycles.claim(world.flow.id.value, PLANNED_AT)
-
-
-def test_a_failed_cycle_is_recorded_and_notified_with_its_message(world: World) -> None:
-    failure = CycleFailure(CycleStep.AGENT_DECISION, "ModelUnavailableError", "timeout")
-    record = a_record(world, CycleOutcome.FAILED, failure)
-
-    notified(world).record(record)
-
-    assert world.cycles.records.records == [record]
     assert world.received == ["alfa: ciclo fallito, timeout"]
-
-
-@pytest.mark.parametrize("outcome", [CycleOutcome.COMPLETED, CycleOutcome.SKIPPED, CycleOutcome.FAILED])
-def test_a_cycle_without_a_failure_is_recorded_silently(world: World, outcome: CycleOutcome) -> None:
-    record = a_record(world, outcome)
-
-    notified(world).record(record)
-
-    assert world.cycles.records.records == [record]
-    assert world.received == []
-
-
-def test_only_a_failed_cycle_is_notified_whatever_else_it_carries(world: World) -> None:
-    failure = CycleFailure(CycleStep.AGENT_DECISION, "ModelUnavailableError", "timeout")
-
-    notified(world).record(a_record(world, CycleOutcome.COMPLETED, failure))
-
-    assert world.received == []
 
 
 # FlowPauseFromFlows
