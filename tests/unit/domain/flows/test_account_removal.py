@@ -1,30 +1,27 @@
-from decimal import Decimal
+"""The rules of the removal of an account with its flows (R0.2.5, R1.1.8)."""
 
 import pytest
 
-from autotrading.domain.accounts.errors import (
+from autotrading.domain.flows.account_removal import (
+    require_all_closed,
+    require_confirmation_for_flows,
+    require_confirmation_for_positions,
+)
+from autotrading.domain.flows.errors import (
     FlowPositionsLeftOpenError,
     OpenPositionsNeedConfirmationError,
     OperatingFlowsNeedConfirmationError,
 )
-from autotrading.domain.accounts.position import Position, PositionSide
-from autotrading.domain.accounts.removal import (
-    FlowPositionLeftOpen,
-    require_all_closed,
-    require_confirmation_for,
-    require_confirmation_for_flows,
-)
-
-SHORT_ETH = Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("-4.2"), None)
+from autotrading.domain.flows.stop_outcome import PositionLeftOpen
 
 
 def test_an_account_without_positions_needs_no_confirmation() -> None:
-    require_confirmation_for(())
+    require_confirmation_for_positions(())
 
 
 def test_an_account_with_any_open_position_needs_confirmation() -> None:
     with pytest.raises(OpenPositionsNeedConfirmationError):
-        require_confirmation_for((SHORT_ETH,))
+        require_confirmation_for_positions(("ETH",))
 
 
 def test_an_account_without_operating_flows_needs_no_confirmation() -> None:
@@ -46,7 +43,7 @@ def test_an_account_whose_flow_positions_all_closed_can_be_removed() -> None:
 
 
 def test_a_flow_position_left_open_keeps_the_account_naming_it_with_its_reason() -> None:
-    left_open = (FlowPositionLeftOpen("BTC", "Order rejected"), FlowPositionLeftOpen("ETH", "margine insufficiente"))
+    left_open = (PositionLeftOpen("BTC", "Order rejected"), PositionLeftOpen("ETH", "margine insufficiente"))
 
     with pytest.raises(FlowPositionsLeftOpenError) as raised:
         require_all_closed(left_open)

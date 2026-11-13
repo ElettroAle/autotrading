@@ -168,3 +168,26 @@ def test_a_balance_the_worker_cannot_read_makes_the_exchange_unavailable_for_the
 
     with pytest.raises(FlowExchangeUnavailableError):
         adapter_on(worker, token).balance_of(account.id.value)
+
+
+def test_the_removal_reads_the_assets_of_the_open_positions_from_the_worker(worker: Worker) -> None:
+    account = worker.saved_account()
+    credentials = worker.vault[account.credentials.ciphertext][2]
+    worker.exchange.open_position(credentials, SHORT_ETH)
+
+    assert adapter_on(worker).open_positions_of(account.id.value) == ("ETH",)
+
+
+def test_the_positions_of_an_account_of_another_tenant_are_not_found_for_the_removal(worker: Worker) -> None:
+    theirs = worker.saved_account(TenantId.new())
+
+    with pytest.raises(FlowAccountNotFoundError):
+        adapter_on(worker).open_positions_of(theirs.id.value)
+
+
+def test_positions_the_worker_cannot_read_make_the_exchange_unavailable_for_the_removal(worker: Worker) -> None:
+    account = worker.saved_account()
+    worker.exchange.reachable = False
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        adapter_on(worker).open_positions_of(account.id.value)

@@ -9,14 +9,11 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
-from autotrading.application.flows.archive_account_flows import ArchiveAccountFlowsUseCase
-from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.create_flow import FlowChecks
-from autotrading.application.flows.list_account_flows import ListAccountFlowsUseCase
-from autotrading.application.flows.ports import FlowAccountPorts
+from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
-from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
+from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -32,7 +29,6 @@ from autotrading.bootstrap import (
     MODEL_CATALOG,
     SOURCE_CATALOG,
     AccountActivityFromAccounts,
-    AccountFlowsFromFlows,
     AccountReadingFromAccounts,
     FlowPositionsFromOrders,
     FlowSummariesFromFlows,
@@ -203,11 +199,7 @@ class Platform:
             ),
             flow_positions=flow_positions,
             stop_ports=stop_ports,
-            account_flows=AccountFlowsFromFlows(
-                ListAccountFlowsUseCase(flows),
-                StopFlowUseCase(flows, stop_ports),
-                ArchiveAccountFlowsUseCase(flows, ArchiveFlowUseCase(flows)),
-            ),
+            account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
             flow_operations=InMemoryFlowOperationsAdapter(
