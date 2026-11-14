@@ -106,8 +106,9 @@ def test_adr_0162_the_report_comes_after_the_services_are_up() -> None:
     assert action.index(TRAP) < action.index(SERVICES_UP)
 
 
-def test_adr_0162_the_report_goes_to_the_job_summary() -> None:
-    assert re.search(r'measure-resources\.sh report.*\n?.*>> "\$GITHUB_STEP_SUMMARY"', _report_function())
+def test_adr_0162_the_report_goes_to_the_job_summary_and_to_the_job_log() -> None:
+    # The job summary has no API: the job log keeps the same report readable for the limits of Task 254.
+    assert re.search(r'measure-resources\.sh report.*\n?.*\| tee -a "\$GITHUB_STEP_SUMMARY"', _report_function())
 
 
 def test_adr_0162_the_measure_never_fails_the_release() -> None:
