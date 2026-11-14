@@ -60,6 +60,10 @@ export class DashboardPages {
       .filter({ has: this.page.getByRole('link', { name, exact: true }) });
   }
 
+  async openRanking(): Promise<void> {
+    await this.open('/ranking');
+  }
+
   async openCyclesOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
@@ -381,5 +385,31 @@ export class DashboardPages {
     await form.getByLabel('Capitale allocato (USDC)').fill(capital);
     await form.getByLabel('Asset').fill(assets);
     await form.getByRole('button', { name: 'Assegna' }).click();
+  }
+
+  ranking(): Locator {
+    return this.page.getByRole('table', { name: 'Classifica dei flussi' });
+  }
+
+  /** The rows of the ranking, in the order the page shows them. */
+  rankingRows(): Locator {
+    return this.ranking().locator('tbody tr');
+  }
+
+  rankingRow(flow: string): Locator {
+    return this.rankingRows().filter({
+      has: this.page.getByRole('link', { name: flow, exact: true }),
+    });
+  }
+
+  rankingHeader(column: string): Locator {
+    return this.ranking().getByRole('columnheader', { name: column });
+  }
+
+  /** The value of a flow in a column of the ranking, as the page shows it. */
+  async rankingCell(flow: string, column: string): Promise<Locator> {
+    const headers = await this.ranking().getByRole('columnheader').allInnerTexts();
+    const index = headers.findIndex((header) => header.replace(/[▲▼]/g, '').trim() === column);
+    return this.rankingRow(flow).getByRole('cell').nth(index);
   }
 }

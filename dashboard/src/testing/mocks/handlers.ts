@@ -10,6 +10,7 @@ import {
   modifyFlow,
   Refusal,
 } from './flow-configuration';
+import { rankingOf } from './flow-ranking';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
@@ -409,6 +410,18 @@ export const handlers = [
         return HttpResponse.json(
           equityResponse(flow, periodAdmits(new URL(request.url).searchParams)),
         );
+      } catch (error) {
+        if (error instanceof InvalidPeriod) {
+          return problem(400, 'Bad Request', error.message);
+        }
+        throw error;
+      }
+    }),
+  ),
+  http.get('*/flows/ranking', ({ request }) =>
+    withUser(request, (user) => {
+      try {
+        return HttpResponse.json(rankingOf(user.flows, new URL(request.url).searchParams));
       } catch (error) {
         if (error instanceof InvalidPeriod) {
           return problem(400, 'Bad Request', error.message);

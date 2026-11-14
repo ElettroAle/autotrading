@@ -3,7 +3,13 @@ import type { Key, ReactNode } from 'react';
 export type DataTableColumn<T> = {
   readonly header: string;
   readonly cell: (row: T) => ReactNode;
+  /** The key the table asks to sort by when the header is pressed; without it the column does not sort. */
+  readonly sortKey?: string;
 };
+
+export type SortDirection = 'ascending' | 'descending';
+
+export type DataTableSort = { readonly key: string; readonly direction: SortDirection };
 
 type DataTableProps<T> = {
   readonly label: string;
@@ -11,6 +17,42 @@ type DataTableProps<T> = {
   readonly rows: readonly T[];
   readonly rowKey: (row: T) => Key;
   readonly empty?: string;
+  /** The order of the rows, which the caller applies: the table only declares it and asks to change it. */
+  readonly sort?: DataTableSort;
+  readonly onSort?: (key: string) => void;
+};
+
+const ARROWS: Record<SortDirection, string> = { ascending: '▲', descending: '▼' };
+
+type HeaderProps<T> = {
+  readonly column: DataTableColumn<T>;
+  readonly sort?: DataTableSort;
+  readonly onSort?: (key: string) => void;
+};
+
+// A sortable header is a button inside the header cell, which declares the order with aria-sort (ADR 0136).
+const Header = <T,>({ column, sort, onSort }: HeaderProps<T>) => {
+  const { header, sortKey } = column;
+  if (sortKey === undefined || onSort === undefined) {
+    return (
+      <th scope="col" className="px-3 py-2 font-semibold">
+        {header}
+      </th>
+    );
+  }
+  const direction = sort?.key === sortKey ? sort.direction : undefined;
+  return (
+    <th scope="col" aria-sort={direction ?? 'none'} className="px-3 py-2 font-semibold">
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 hover:underline"
+        onClick={() => onSort(sortKey)}
+      >
+        {header}
+        {direction !== undefined && <span aria-hidden="true">{ARROWS[direction]}</span>}
+      </button>
+    </th>
+  );
 };
 
 /**
@@ -23,6 +65,8 @@ export const DataTable = <T,>({
   rows,
   rowKey,
   empty = 'Nessun dato.',
+  sort,
+  onSort,
 }: DataTableProps<T>) => {
   if (rows.length === 0) {
     return <p className="text-slate-600">{empty}</p>;
@@ -32,9 +76,7 @@ export const DataTable = <T,>({
       <thead className="hidden border-b border-slate-200 text-left md:table-header-group">
         <tr>
           {columns.map((column) => (
-            <th key={column.header} scope="col" className="px-3 py-2 font-semibold">
-              {column.header}
-            </th>
+            <Header key={column.header} column={column} sort={sort} onSort={onSort} />
           ))}
         </tr>
       </thead>

@@ -12,11 +12,6 @@ Given(
   },
 );
 
-Given('che {string} ha il flusso {string}', async ({}, account: string, flow: string) => {
-  fakePlatform.addUser(account, { hasUserRole: true });
-  fakePlatform.addFlow(account, flow);
-});
-
 Given('che {string} non ha il ruolo Utente', async ({}, account: string) => {
   fakePlatform.addUser(account, { hasUserRole: false });
 });

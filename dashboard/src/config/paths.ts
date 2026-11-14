@@ -61,4 +61,14 @@ export const paths = {
     path: '/flows/:flowId/versions',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/versions`,
   },
+  ranking: {
+    path: '/ranking',
+    getHref: () => '/ranking',
+  },
+  // The overlaid curves of the flows chosen in the ranking, with its period and its flows in the query string
+  // (ADR 0136); the view comes with R2.4.3.
+  comparison: {
+    path: '/comparison',
+    getHref: (search: string) => `/comparison?${search}`,
+  },
 } as const;
