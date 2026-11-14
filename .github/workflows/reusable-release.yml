@@ -35,6 +35,7 @@ jobs:
     outputs:
       image: ${{ steps.publish.outputs.image }}
       forecaster-image: ${{ steps.publish-forecaster.outputs.image }}
+      dashboard-image: ${{ steps.publish-dashboard.outputs.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/image-build
@@ -64,6 +65,21 @@ jobs:
           version: ${{ needs.versione.outputs.version }}
           variant: forecaster
           token: ${{ secrets.GITHUB_TOKEN }}
+      # The dashboard has its own image too, published with the same version (ADR 0117).
+      - uses: ./.github/actions/image-build
+        with:
+          tag: autotrading-dashboard:candidate
+          target: dashboard
+      - uses: ./.github/actions/trivy-scan
+        with:
+          image: autotrading-dashboard:candidate
+      - id: publish-dashboard
+        uses: ./.github/actions/ghcr-publish
+        with:
+          local-image: autotrading-dashboard:candidate
+          version: ${{ needs.versione.outputs.version }}
+          variant: dashboard
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   dev:
     name: rilascio dev
@@ -92,6 +108,7 @@ jobs:
           version: ${{ needs.versione.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
           forecaster-image: ${{ needs.artefatto.outputs.forecaster-image }}
+          dashboard-image: ${{ needs.artefatto.outputs.dashboard-image }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
           auth-issuer: ${{ vars.AUTH_ISSUER }}
           auth-audience: ${{ vars.AUTH_AUDIENCE }}
@@ -136,6 +153,12 @@ jobs:
           version: ${{ steps.release.outputs.version }}
           variant: forecaster
           token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/image-promote
+        with:
+          image: ${{ needs.artefatto.outputs.dashboard-image }}
+          version: ${{ steps.release.outputs.version }}
+          variant: dashboard
+          token: ${{ secrets.GITHUB_TOKEN }}
       - id: host
         uses: ./.github/actions/tailscale-connect
         with:
@@ -149,6 +172,7 @@ jobs:
           version: ${{ steps.release.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
           forecaster-image: ${{ needs.artefatto.outputs.forecaster-image }}
+          dashboard-image: ${{ needs.artefatto.outputs.dashboard-image }}
           registry-token: ${{ secrets.GITHUB_TOKEN }}
           auth-issuer: ${{ vars.AUTH_ISSUER }}
           auth-audience: ${{ vars.AUTH_AUDIENCE }}

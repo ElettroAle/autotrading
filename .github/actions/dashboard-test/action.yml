@@ -1,0 +1,27 @@
+name: dashboard-test
+description: Unit test della dashboard con copertura e scenari Gherkin con Playwright; pubblica i report.
+runs:
+  using: composite
+  steps:
+    - name: Vitest
+      shell: bash
+      working-directory: dashboard
+      run: npm run test:coverage
+    - name: Browser di Playwright
+      shell: bash
+      working-directory: dashboard
+      run: npx playwright install --with-deps chromium
+    # The scenarios of specs/ run on the build served by the server of the image, with fake API and identity provider.
+    - name: Scenari
+      shell: bash
+      working-directory: dashboard
+      run: npm run test:scenarios
+    - name: Pubblica i report
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: dashboard-test-reports
+        path: |
+          dashboard/coverage/coverage-summary.json
+          dashboard/reports/cucumber.json
+        if-no-files-found: error

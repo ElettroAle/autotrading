@@ -37,4 +37,6 @@ runcmd:
   - apt-get install -y tailscale
   - tailscale up --auth-key=${TAILSCALE_AUTH_KEY} --hostname=autotrading-${ENVIRONMENT} --advertise-tags=tag:autotrading-${ENVIRONMENT} --ssh
   - tailscale serve --bg --https=443 http://127.0.0.1:8000
+  # The dashboard on /dashboard of the same name, so it shares the origin of the API (ADR 0117).
+  - tailscale serve --bg --https=443 --set-path=/dashboard http://127.0.0.1:8080/dashboard
   - systemctl disable --now ssh.socket ssh.service

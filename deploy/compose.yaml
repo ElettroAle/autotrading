@@ -167,6 +167,28 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
 
+  # La dashboard (ADR 0116, ADR 0117): build statica servita da un server Node non privilegiato, in sola lettura e senza
+  # segreti; la configurazione pubblica dell'installazione diventa il suo config.json all'avvio. Ascolta solo
+  # sull'interfaccia locale: Tailscale Serve la espone sul percorso /dashboard dello stesso nome HTTPS dell'API, quindi
+  # dashboard e API hanno la stessa origine.
+  dashboard:
+    image: ${DASHBOARD_IMAGE:-}
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
+      AUTH_ISSUER: ${AUTH_ISSUER:-}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
+      AUTH_SCOPE: ${AUTH_SCOPE:-}
+    read_only: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/dashboard/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+
 secrets:
   postgres_owner_password:
     file: ./secrets/postgres_owner_password

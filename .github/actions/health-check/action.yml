@@ -1,5 +1,5 @@
 name: health-check
-description: Attende fino a 2 minuti che l'installazione dichiari versione e ambiente attesi.
+description: Attende fino a 2 minuti che l'installazione dichiari versione e ambiente attesi e che la dashboard risponda.
 inputs:
   hostname:
     description: Nome pubblico dell'installazione
@@ -18,15 +18,18 @@ runs:
       env:
         PUBLIC_HOSTNAME: ${{ inputs.hostname }}
         EXPECTED: '{"version":"${{ inputs.version }}","environment":"${{ inputs.environment }}"}'
+        DASHBOARD_EXPECTED: '{"status":"ok"}'
         ENVIRONMENT: ${{ inputs.environment }}
+      # The dashboard answers through Tailscale Serve on /dashboard, beside the API (ADR 0117).
       run: |
         for attempt in $(seq 1 24); do
           actual="$(curl -fsS --max-time 4 "https://${PUBLIC_HOSTNAME}/health" || true)"
-          if [ "$actual" = "$EXPECTED" ]; then
-            echo "Installazione ${ENVIRONMENT}: ${actual}"
+          dashboard="$(curl -fsS --max-time 4 "https://${PUBLIC_HOSTNAME}/dashboard/health" || true)"
+          if [ "$actual" = "$EXPECTED" ] && [ "$dashboard" = "$DASHBOARD_EXPECTED" ]; then
+            echo "Installazione ${ENVIRONMENT}: ${actual}, dashboard: ${dashboard}"
             exit 0
           fi
           sleep 5
         done
-        echo "::error::controllo di salute non superato in ${ENVIRONMENT} (ultima risposta: ${actual:-nessuna})"
+        echo "::error::controllo di salute non superato in ${ENVIRONMENT} (API: ${actual:-nessuna risposta}, dashboard: ${dashboard:-nessuna risposta})"
         exit 1

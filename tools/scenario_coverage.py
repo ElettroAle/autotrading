@@ -31,8 +31,12 @@ def _passed(element: dict[str, Any]) -> bool:
 
 
 def main(arguments: list[str]) -> int:
-    specs, report = workspace_path(arguments[0]), workspace_path(arguments[1])
-    passed = passed_runs(json.loads(report.read_text(encoding="utf-8")))
+    specs = workspace_path(arguments[0])
+    # pytest-bdd and the Playwright scenarios of the dashboard write a report each (ADR 0116).
+    passed = sum(
+        (passed_runs(json.loads(workspace_path(report).read_text(encoding="utf-8"))) for report in arguments[1:]),
+        Counter[tuple[str, str]](),
+    )
     uncovered = uncovered_scenarios(expected_scenarios(specs), passed)
     for line in uncovered:
         print(f"scenario non eseguito o non superato: {line}", file=sys.stderr)

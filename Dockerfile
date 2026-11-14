@@ -30,6 +30,27 @@ EXPOSE 8000
 ENTRYPOINT ["/app/.venv/bin/python", "-m", "uvicorn"]
 CMD ["forecaster.service:create_application", "--factory", "--host", "0.0.0.0", "--port", "8000"]
 
+# The dashboard has its own image (ADR 0116, ADR 0117): the Vite build, served read only by the small Node server of
+# dashboard/server as the non-root user of the image. No secret: the configuration comes from public variables.
+FROM cgr.dev/chainguard/node:latest-dev@sha256:cd4a4e8d9b0c3aec45b824a15956cae875410419b01649f6672bfb2d9264f35a AS dashboard-build
+USER root
+WORKDIR /app
+COPY dashboard/package.json dashboard/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY dashboard ./
+RUN npx vite build
+
+FROM cgr.dev/chainguard/node:latest@sha256:b643ef822c6540e857516915b51e8fdbe9e8d30bd5df82f0d29dff646bae3527 AS dashboard
+ARG REVISION=unknown
+LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading"       org.opencontainers.image.revision="${REVISION}"
+COPY dashboard/package.json /app/package.json
+COPY dashboard/server /app/server
+COPY --from=dashboard-build /app/dist /app/dist
+ENV DASHBOARD_ROOT=/app/dist DASHBOARD_PORT=8080 NODE_ENV=production
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/node"]
+CMD ["/app/server/main.ts"]
+
 # The last stage is the default target: the image of api, worker and migrate.
 FROM cgr.dev/chainguard/python:latest@sha256:e5322b9d32064a645225b8b2419f11127bcf2d8b9927f9514f0acee1e1d25751
 ARG REVISION=unknown

@@ -1,0 +1,13 @@
+name: dashboard-lint
+description: Regole di stile e formattazione della dashboard con ESLint e Prettier (ADR 0116).
+runs:
+  using: composite
+  steps:
+    - name: ESLint
+      shell: bash
+      working-directory: dashboard
+      run: npm run lint
+    - name: Prettier
+      shell: bash
+      working-directory: dashboard
+      run: npm run format:check

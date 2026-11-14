@@ -85,6 +85,7 @@ tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
 tools/                          script Python della pipeline, fuori dall'esagono (.claude/rules/ci.md)
 forecaster/                     servizio Prophet in un container proprio, fuori dall'esagono (tech-forecaster.md)
+dashboard/                      dashboard React + TypeScript in un container proprio, fuori dall'esagono (tech-dashboard.md)
 deploy/                         cloud-init, compose e policy Tailscale delle installazioni
 .github/                        workflow e action della pipeline TrunkFlow
 docs/adr/                       decisioni tecniche, una per file
@@ -223,6 +224,17 @@ allenta e l'elenco non cresce senza approvazione del proprietario.
 - Una cartella di ruolo contiene solo tipi di quel ruolo. Nessuna cartella `common`/`utils`/`shared`.
 - Tipizzazione completa, mypy strict senza `Any` e senza `type: ignore` non motivati.
 
+## Dashboard
+
+Progetto a sé in `dashboard/` (Vite, React, TypeScript `strict`), fuori dall'esagono come `forecaster/`: parla solo
+con l'API programmatica di `api` e non ha logica di business che l'API non esponga (ADR 0116). Struttura, librerie e
+nomi di [bulletproof-react](https://github.com/alan2207/bulletproof-react): `src/app` ──> `src/features/<funzionalità>`
+──> codice condiviso, mai il contrario, nessun import tra funzionalità, nessun barrel file, import assoluti `@/`. Le
+cartelle `utils` e simili sono ammesse solo dentro `dashboard/`: la regola sulle cartelle generiche resta per il Python.
+Container `dashboard` servito sul percorso `/dashboard` dello stesso nome HTTPS di `api` (ADR 0117); accesso Entra come
+SPA con PKCE tramite MSAL, token in `sessionStorage`, autorizzazione solo sull'API (ADR 0118). Controlli come passi dei
+job obbligatori esistenti. Dettagli in `.claude/rules/tech-dashboard.md`.
+
 ## Multi-tenancy
 
 Ogni dato appartiene a un tenant. Le entità possedute estendono `TenantOwned`; le porte arrivano al
@@ -292,6 +304,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-apscheduler.md` | `adapters/outbound/apscheduler/**` |
 | `tech-openrouter.md` | `adapters/outbound/openrouter/**` |
 | `tech-forecaster.md` | `forecaster/**`, `adapters/outbound/forecaster/**` |
+| `tech-dashboard.md` | `dashboard/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |
 | `tests.md` | `tests/**` |
