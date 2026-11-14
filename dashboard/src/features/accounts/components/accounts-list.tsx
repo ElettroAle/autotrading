@@ -7,10 +7,8 @@ import { useAccountBalance } from '../api/get-account-state';
 import { useAccounts, type Account } from '../api/get-accounts';
 import { useFreeCapital } from '../api/get-free-capital';
 
+import { AccountActions } from './account-actions';
 import { ExchangeAmount } from './exchange-amount';
-
-// Until the dashboard has its own form (R2.3.1), an account is registered from the interactive page of the API.
-const REGISTRATION_ON_API = '/docs#/conti/register_account_accounts_post';
 
 const NETWORK_LABELS: Readonly<Record<string, string>> = { test: 'testnet', real: 'mainnet' };
 
@@ -34,6 +32,7 @@ const COLUMNS: DataTableColumn<Account>[] = [
     cell: (account) => `${formatAmount(account.allocated_capital)} ${account.currency}`,
   },
   { header: 'Capitale libero', cell: (account) => <FreeCapital account={account} /> },
+  { header: 'Comandi', cell: (account) => <AccountActions account={account} /> },
 ];
 
 /** Every account of the tenant with what the API says of it; what comes from the exchange may fail alone (ADR 0126). */
@@ -46,14 +45,7 @@ export const AccountsList = () => {
     return <ErrorMessage error={accounts.error} />;
   }
   if (accounts.data.length === 0) {
-    return (
-      <div className="space-y-2">
-        <p className="text-slate-600">Nessun conto registrato.</p>
-        <a href={REGISTRATION_ON_API} className="font-medium text-blue-800 hover:underline">
-          Registra un conto
-        </a>
-      </div>
-    );
+    return <p className="text-slate-600">Nessun conto registrato.</p>;
   }
   return (
     <DataTable

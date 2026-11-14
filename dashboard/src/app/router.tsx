@@ -14,6 +14,7 @@ import { HomeRoute } from './routes/app/home';
 import { NewFlowRoute } from './routes/app/new-flow';
 import { NotificationsRoute } from './routes/app/notifications';
 import { PositionsRoute } from './routes/app/positions';
+import { ProviderKeysRoute } from './routes/app/provider-keys';
 import { AppRoot } from './routes/app/root';
 import { LoginRoute } from './routes/login';
 import { NotFoundRoute } from './routes/not-found';
@@ -34,6 +35,7 @@ export const routes: RouteObject[] = [
       { path: paths.editFlow.path, element: <EditFlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
+      { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
       { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },

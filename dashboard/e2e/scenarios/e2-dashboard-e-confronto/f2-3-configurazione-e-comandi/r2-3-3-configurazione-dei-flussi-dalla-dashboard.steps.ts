@@ -76,7 +76,7 @@ Given(
     memory.account = account;
     fakePlatform.addUser(account, { hasUserRole: true });
     fakePlatform.giveAccountTo(account, accountName, free);
-    fakePlatform.registerProviderKey(account, provider);
+    fakePlatform.saveProviderKey(account, provider, '2026-11-14T09:00:00+00:00');
     await dashboard.openAndSignInAs(account);
     await expect(dashboard.pageHeading()).toHaveText('I tuoi flussi');
   },

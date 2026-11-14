@@ -48,6 +48,7 @@ Given(
 Given(
   'che il flusso {string} è fermo e il suo conto non ha capitale libero sufficiente',
   async ({ memory }, flow: string) => {
+    memory.refusal = 'capitale allocato oltre il capitale libero';
     fakePlatform.giveFlowTo(memory.account, flow);
     // Its capital exceeds the balance of the account less what the other flows of the account hold.
     fakePlatform.changeFlow(flow, {
@@ -116,8 +117,4 @@ Then('vede i comandi {string} e {string}', async ({ dashboard }, first: string, 
 
 Then('non vede il comando {string}', async ({ dashboard }, command: string) => {
   await expect(dashboard.flowCommand(command)).toHaveCount(0);
-});
-
-Then('la dashboard mostra il motivo del rifiuto', async ({ dashboard }) => {
-  await expect(dashboard.alert()).toContainText('capitale allocato oltre il capitale libero');
 });

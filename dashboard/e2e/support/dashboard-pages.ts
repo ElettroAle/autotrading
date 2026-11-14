@@ -20,6 +20,14 @@ export class DashboardPages {
     await this.open('/notifications');
   }
 
+  async openAccounts(): Promise<void> {
+    await this.open('/accounts');
+  }
+
+  async openProviderKeys(): Promise<void> {
+    await this.open('/provider-keys');
+  }
+
   async openFlow(name: string): Promise<void> {
     await this.open(`/flows/${encodeURIComponent(fakePlatform.flowNamed(name).id)}`);
   }
@@ -30,10 +38,6 @@ export class DashboardPages {
 
   async openClosedPositionsOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/closed-positions`);
-  }
-
-  async openAccounts(): Promise<void> {
-    await this.open('/accounts');
   }
 
   /** The histories of R2.5.1, with the tab and the filters already in the query string when given. */
@@ -47,11 +51,6 @@ export class DashboardPages {
 
   async openFlowEditor(name: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(name).id}/edit`);
-  }
-
-  /** A field of a form, by its label: its accessible description is the reason the API refused its value. */
-  field(label: string): Locator {
-    return this.page.getByLabel(label, { exact: true });
   }
 
   /** The row of the list of the flows that names the flow. */
@@ -172,7 +171,7 @@ export class DashboardPages {
   }
 
   registerAccount(): Locator {
-    return this.page.getByRole('link', { name: 'Registra un conto' });
+    return this.page.getByRole('button', { name: 'Registra il conto' });
   }
 
   flowStatus(): Locator {
@@ -184,11 +183,6 @@ export class DashboardPages {
     return this.page
       .getByRole('group', { name: 'Comandi del flusso' })
       .getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
-  }
-
-  /** The confirmation the dashboard asks before a command, by its title. */
-  confirmation(title: string): Locator {
-    return this.page.getByRole('group', { name: title });
   }
 
   cycleRows(): Locator {
@@ -279,6 +273,32 @@ export class DashboardPages {
 
   statistics(): Locator {
     return this.page.getByRole('region', { name: 'Statistiche' });
+  }
+
+  /** A field of a form, by its label: its accessible description is the reason the API refused its value. */
+  field(label: string, scope: Locator | Page = this.page): Locator {
+    return scope.getByLabel(label, { exact: true });
+  }
+
+  /** The key of the provider in the list of the keys. */
+  providerKey(provider: string): Locator {
+    return this.page
+      .getByRole('list', { name: 'Chiavi dei fornitori IA' })
+      .getByRole('listitem', { name: provider });
+  }
+
+  /** The window that asks to confirm an operation or a command, by its title. */
+  confirmation(title: string): Locator {
+    return this.page.getByRole('alertdialog', { name: title });
+  }
+
+  /** Whether the text shows anywhere in the page: in what it displays, in its markup or in the value of a field. */
+  async shows(text: string): Promise<boolean> {
+    const values = await this.page
+      .locator('input, textarea')
+      .evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value));
+    const markup = await this.page.content();
+    return markup.includes(text) || values.some((value) => value.includes(text));
   }
 
   /** The value the statistics panel shows beside a label. */

@@ -34,7 +34,7 @@ describe('CreateFlow', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
     fakePlatform.giveAccountTo('anna', 'principale', 500);
-    fakePlatform.registerProviderKey('anna', 'openrouter');
+    fakePlatform.saveProviderKey('anna', 'openrouter', '2026-11-14T09:00:00+00:00');
   });
 
   it('opens from the list of the flows', async () => {

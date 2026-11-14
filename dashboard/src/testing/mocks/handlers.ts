@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
+import { accountHandlers } from './account-handlers';
 import { FAKE_MODELS, FAKE_SOURCES } from './catalogs';
 import { apiInstant, summaryOf, type FakeCycle } from './cycles';
 import {
@@ -14,19 +15,18 @@ import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } fro
 import {
   configurationOf,
   FAKE_FLOW_COMMANDS,
-  FakeRefusal,
   fakePlatform,
   type FakeFlowCommand,
   type FakeConfiguration,
-  type FakeAccount,
   type FakeEquityPoint,
   type FakeFlow,
   type FakeStrategyDocument,
   type FakeUser,
 } from './platform';
 import type { FakeClosedPosition } from './positions';
+import { providerKeyHandlers } from './provider-key-handlers';
+import { problem, withUser } from './responses';
 
-const BEARER = 'Bearer ';
 const NO_LINKED_CHAT = 'nessuna chat collegata';
 
 /** The text of the test notification of R1.8.1, the same from the chat and from the dashboard. */
@@ -39,47 +39,7 @@ const RECENT_CYCLES = 10;
 const CYCLE_MINUTES = 15;
 const MINUTE = 60_000;
 
-// Answers as the API does: Problem Details, 401 without a valid token, 403 without the Utente role (R0.1.1).
-const problem = (
-  status: number,
-  title: string,
-  detail: string,
-  details: Record<string, unknown> = {},
-) =>
-  HttpResponse.json(
-    { type: 'about:blank', title, status, detail, ...details },
-    { status, headers: { 'Content-Type': 'application/problem+json' } },
-  );
-
 const notFound = (detail: string) => problem(404, 'Not Found', detail);
-
-const userOf = (request: Request) => {
-  const authorization = request.headers.get('Authorization') ?? '';
-  return authorization.startsWith(BEARER)
-    ? fakePlatform.userOfToken(authorization.slice(BEARER.length))
-    : undefined;
-};
-
-const withUser = async (
-  request: Request,
-  respond: (user: FakeUser) => Response | Promise<Response>,
-): Promise<Response> => {
-  const user = userOf(request);
-  if (user === undefined) {
-    return problem(401, 'Unauthorized', 'token assente o non valido');
-  }
-  if (!user.hasUserRole) {
-    return problem(403, 'Forbidden', 'ruolo Utente assente');
-  }
-  try {
-    return await respond(user);
-  } catch (error) {
-    if (error instanceof FakeRefusal) {
-      return problem(error.status, 'Refused', error.message);
-    }
-    throw error;
-  }
-};
 
 // A flow of another tenant is not found, as one that does not exist (R0.1.3).
 const withFlow = (request: Request, flowId: unknown, respond: (flow: FakeFlow) => Response) =>
@@ -113,44 +73,6 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,
 });
-
-const accountResponse = (user: FakeUser, account: FakeAccount) => ({
-  id: account.id,
-  name: account.name,
-  exchange: 'Hyperliquid',
-  has_credentials: true,
-  network: 'test',
-  allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
-  currency: CURRENCY,
-});
-
-const amountOf = (amount: string) => ({ amount, currency: CURRENCY });
-
-const accountStateResponse = (account: FakeAccount) => ({
-  balance: amountOf(String(account.balance)),
-  available_margin: amountOf(String(account.balance)),
-  positions: [],
-  read_at: '2026-11-14T09:00:00+00:00',
-});
-
-const freeCapitalResponse = (user: FakeUser, account: FakeAccount) =>
-  amountOf(String(fakePlatform.freeCapitalOfAccount(user, account)));
-
-// An account of another tenant does not exist for the user; what comes from the exchange fails when it does not answer.
-const withAccountOnExchange = (
-  user: FakeUser,
-  accountId: string,
-  respond: (account: FakeAccount) => Response,
-): Response => {
-  const account = user.accounts.find((candidate) => candidate.id === accountId);
-  if (account === undefined) {
-    return problem(404, 'Not Found', 'non trovato');
-  }
-  if (!fakePlatform.exchangeReachable()) {
-    return problem(503, 'Service Unavailable', 'exchange non raggiungibile, riprovare');
-  }
-  return respond(account);
-};
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
 const refusedOr = (respond: () => Response): Response => {
@@ -347,28 +269,11 @@ const attachmentOf = (flowName: string): string => {
 type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
 
 export const handlers = [
+  ...accountHandlers,
+  ...providerKeyHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json({ user_id: user.account, tenant_id: user.tenantId }),
-    ),
-  ),
-  http.get('*/accounts', ({ request }) =>
-    withUser(request, (user) =>
-      HttpResponse.json(user.accounts.map((account) => accountResponse(user, account))),
-    ),
-  ),
-  http.get('*/accounts/:accountId/state', ({ request, params }) =>
-    withUser(request, (user) =>
-      withAccountOnExchange(user, String(params.accountId), (account) =>
-        HttpResponse.json(accountStateResponse(account)),
-      ),
-    ),
-  ),
-  http.get('*/accounts/:accountId/free-capital', ({ request, params }) =>
-    withUser(request, (user) =>
-      withAccountOnExchange(user, String(params.accountId), (account) =>
-        HttpResponse.json(freeCapitalResponse(user, account)),
-      ),
     ),
   ),
   // Archived flows answer only when asked for, as on the API (R1.1.6).
@@ -409,7 +314,7 @@ export const handlers = [
       HttpResponse.json({
         providers: [...new Set(FAKE_MODELS.map((model) => model.provider))].map((provider) => ({
           name: provider,
-          key_registered: user.providerKeys.has(provider),
+          key_registered: user.providerKeys.some((key) => key.provider === provider),
         })),
         models: FAKE_MODELS,
       }),

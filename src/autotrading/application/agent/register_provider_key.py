@@ -2,7 +2,11 @@ from dataclasses import dataclass, field
 
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError
 from autotrading.application.agent.model_gateways import ModelGateways
-from autotrading.application.agent.ports import ProviderKeyRepositoryPort, ProviderKeySealerPort
+from autotrading.application.agent.ports import (
+    ProviderKeyRegistration,
+    ProviderKeyRepositoryPort,
+    ProviderKeySealerPort,
+)
 from autotrading.application.agent.provider_keys import operations, supported_provider
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
@@ -35,13 +39,14 @@ class RegisterProviderKeyUseCase:
         self._keys = keys
         self._services = services
 
-    def execute(self, command: RegisterProviderKeyCommand) -> ProviderName:
+    def execute(self, command: RegisterProviderKeyCommand) -> ProviderKeyRegistration:
         provider = supported_provider(self._services.gateways, command.provider)
         key = ProviderKey(command.key)
         self._require_none_for(provider)
-        self._keys.add(RegisteredProviderKey(self._tenant_id, provider, self._services.sealer.seal(provider, key)))
+        sealed = self._services.sealer.seal(provider, key)
+        registration = self._keys.add(RegisteredProviderKey(self._tenant_id, provider, sealed))
         operations.info("chiave del fornitore registrata", extra={"provider": provider.value})
-        return provider
+        return registration
 
     def _require_none_for(self, provider: ProviderName) -> None:
         if self._keys.get(provider) is not None:

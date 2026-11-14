@@ -65,10 +65,7 @@ describe('AccountsList', () => {
     await renderApp({ account: 'carla', url: ACCOUNTS_PAGE });
 
     expect(await screen.findByText('Nessun conto registrato.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Registra un conto' })).toHaveAttribute(
-      'href',
-      '/docs#/conti/register_account_accounts_post',
-    );
+    expect(screen.getByRole('button', { name: 'Registra il conto' })).toBeInTheDocument();
   });
 
   it('keeps network and allocated capital when the exchange does not answer', async () => {

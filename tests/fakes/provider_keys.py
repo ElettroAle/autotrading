@@ -1,13 +1,14 @@
 """Fakes of the ports on provider keys: the seal, the database, the flows using them."""
 
 import hashlib
+from datetime import UTC, datetime
 
 from autotrading.application.agent.errors import (
     ProviderKeyAlreadyRegisteredError,
     ProviderKeyNotFoundError,
     ProviderKeyNotOpenedError,
 )
-from autotrading.application.agent.ports import ModelUse
+from autotrading.application.agent.ports import ModelUse, ProviderKeyRegistration
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
@@ -36,13 +37,22 @@ class FakeProviderKeySealerAdapter:
 
 
 class ProviderKeyStore:
-    """The keys of every tenant, as the database holds them."""
+    """The keys of every tenant, as the database holds them, each stamped with the clock of the database."""
 
     def __init__(self) -> None:
         self.keys: list[RegisteredProviderKey] = []
+        self.now = datetime(2026, 1, 1, tzinfo=UTC)
+        self.saved_at: dict[tuple[TenantId, ProviderName], datetime] = {}
 
     def of(self, tenant_id: TenantId) -> list[RegisteredProviderKey]:
         return [key for key in self.keys if key.tenant_id == tenant_id]
+
+    def stamp(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
+        self.saved_at[(key.tenant_id, key.provider)] = self.now
+        return self.registration_of(key)
+
+    def registration_of(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
+        return ProviderKeyRegistration(key.provider, self.saved_at[(key.tenant_id, key.provider)])
 
 
 class InMemoryProviderKeyRepositoryAdapter:
@@ -55,6 +65,9 @@ class InMemoryProviderKeyRepositoryAdapter:
     def list(self) -> list[RegisteredProviderKey]:
         return sorted(self._store.of(self._tenant_id), key=lambda key: key.provider.value)
 
+    def registrations(self) -> tuple[ProviderKeyRegistration, ...]:
+        return tuple(self._store.registration_of(key) for key in self.list())
+
     def has_key(self, provider: ProviderName) -> bool:
         """The flows context asks only whether the tenant can use the provider (R1.4.1)."""
         return self.get(provider) is not None
@@ -62,18 +75,20 @@ class InMemoryProviderKeyRepositoryAdapter:
     def get(self, provider: ProviderName) -> RegisteredProviderKey | None:
         return next((key for key in self.list() if key.provider == provider), None)
 
-    def add(self, key: RegisteredProviderKey) -> None:
+    def add(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
         self._require_own(key)
         if self.get(key.provider) is not None:
             raise ProviderKeyAlreadyRegisteredError(key.provider)
         self._store.keys.append(key)
+        return self._store.stamp(key)
 
-    def replace(self, key: RegisteredProviderKey) -> None:
+    def replace(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
         self._require_own(key)
         current = self.get(key.provider)
         if current is None:
             raise ProviderKeyNotFoundError(key.provider)
         self._store.keys[self._store.keys.index(current)] = key
+        return self._store.stamp(key)
 
     def remove(self, provider: ProviderName) -> None:
         current = self.get(provider)
