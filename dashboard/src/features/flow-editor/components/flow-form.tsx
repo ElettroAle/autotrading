@@ -7,7 +7,7 @@ import { useTradableAssets } from '@/hooks/use-tradable-assets';
 import { showRefusal } from '@/lib/form-errors';
 
 import type { Account } from '../api/get-accounts';
-import type { Model } from '../api/get-model-catalog';
+import type { Model, Provider } from '../api/get-model-catalog';
 import type { Source } from '../api/get-sources';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
@@ -18,6 +18,7 @@ type FlowFormProps = {
   readonly values: FlowFormValues;
   readonly accounts: Account[];
   readonly models: Model[];
+  readonly providers: Provider[];
   readonly sources: Source[];
   readonly submitLabel: string;
   /** Whether the name is fixed: the API changes every setting of a flow but its name (R1.1.3). */
@@ -33,6 +34,7 @@ export const FlowForm = ({
   values,
   accounts,
   models,
+  providers,
   sources,
   submitLabel,
   nameFixed = false,
@@ -121,7 +123,7 @@ export const FlowForm = ({
           )}
         </FormField>
         <SourceFields sources={sources} />
-        <ModelFields models={models} />
+        <ModelFields models={models} providers={providers} currentModel={values.model} />
         <FormField id="flow-instructions" label="Istruzioni" error={errors.instructions?.message}>
           {(control) => (
             <textarea

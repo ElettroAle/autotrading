@@ -1,10 +1,13 @@
 import { useFormContext, useWatch } from 'react-hook-form';
+import { Link } from 'react-router';
 
 import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
+import { paths } from '@/config/paths';
 import { reasonOf } from '@/lib/form-errors';
 
-import type { Model, ModelParameter } from '../api/get-model-catalog';
+import type { Model, ModelParameter, Provider } from '../api/get-model-catalog';
 import type { FlowFormValues } from '../utils/flow-form';
+import { missesProviderKey, modelGroupsOf, type ModelGroup } from '../utils/model-groups';
 
 const PARAMETERS_ID = 'flow-model-parameters';
 
@@ -38,8 +41,21 @@ const ParameterField = ({ parameter }: { parameter: ModelParameter }) => {
   );
 };
 
-/** The model of the catalog with the parameters it admits: temperature, tokens, reasoning (R1.4.2, ADR 0131). */
-export const ModelFields = ({ models }: { models: Model[] }) => {
+const groupLabelOf = (group: ModelGroup): string =>
+  `${group.provider} · chiave ${group.keyRegistered ? 'registrata' : 'mancante'}`;
+
+type ModelFieldsProps = {
+  readonly models: Model[];
+  readonly providers: Provider[];
+  /** The model the flow already has, which stays choosable even when its provider lost the key (ADR 0151). */
+  readonly currentModel: string;
+};
+
+/**
+ * The model of the catalog with the parameters it admits: temperature, tokens, reasoning (R1.4.2, ADR 0131). The
+ * models are grouped by provider, with whether its key is registered (R2.3.7, ADR 0151).
+ */
+export const ModelFields = ({ models, providers, currentModel }: ModelFieldsProps) => {
   const {
     register,
     setValue,
@@ -49,6 +65,7 @@ export const ModelFields = ({ models }: { models: Model[] }) => {
   const selected = useWatch({ control, name: 'model' });
   const model = models.find((candidate) => candidate.name === selected);
   const parametersError = reasonOf(errors.model_parameters);
+  const groups = modelGroupsOf(models, providers, currentModel);
   return (
     <fieldset className="min-w-0 space-y-2">
       <legend className="font-semibold">Modello</legend>
@@ -63,14 +80,30 @@ export const ModelFields = ({ models }: { models: Model[] }) => {
             className={FORM_CONTROL}
           >
             <option value="">Scegli un modello</option>
-            {models.map((candidate) => (
-              <option key={candidate.name} value={candidate.name}>
-                {candidate.name}
-              </option>
+            {groups.map((group) => (
+              <optgroup key={group.provider} label={groupLabelOf(group)}>
+                {group.models.map((candidate) => (
+                  <option
+                    key={candidate.name}
+                    value={candidate.name}
+                    disabled={!candidate.selectable}
+                  >
+                    {candidate.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         )}
       </FormField>
+      {missesProviderKey(groups) && (
+        <p className="text-sm text-slate-600">
+          I modelli di un fornitore senza chiave non si possono scegliere:{' '}
+          <Link to={paths.providerKeys.getHref()} className="text-blue-800 hover:underline">
+            Chiavi dei fornitori IA
+          </Link>
+        </p>
+      )}
       {model !== undefined && model.parameters.length > 0 && (
         <div
           role="group"

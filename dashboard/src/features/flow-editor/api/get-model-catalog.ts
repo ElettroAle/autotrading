@@ -24,8 +24,13 @@ const modelSchema = z.object({
 
 export type Model = z.infer<typeof modelSchema>;
 
+const providerSchema = z.object({ name: z.string(), key_registered: z.boolean() });
+
+/** A provider of models, with whether the user registered its key (R1.4.1). */
+export type Provider = z.infer<typeof providerSchema>;
+
 const modelCatalogSchema = z.object({
-  providers: z.array(z.object({ name: z.string(), key_registered: z.boolean() })),
+  providers: z.array(providerSchema),
   models: z.array(modelSchema),
 });
 

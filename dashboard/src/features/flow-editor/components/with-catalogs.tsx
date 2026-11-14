@@ -4,12 +4,13 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 
 import { useAccounts, type Account } from '../api/get-accounts';
-import { useModelCatalog, type Model } from '../api/get-model-catalog';
+import { useModelCatalog, type Model, type Provider } from '../api/get-model-catalog';
 import { useSources, type Source } from '../api/get-sources';
 
 export type Catalogs = {
   readonly accounts: Account[];
   readonly models: Model[];
+  readonly providers: Provider[];
   readonly sources: Source[];
 };
 
@@ -25,5 +26,10 @@ export const WithCatalogs = ({ children }: { children: (catalogs: Catalogs) => R
   if (accounts.data === undefined || models.data === undefined || sources.data === undefined) {
     return <Loading />;
   }
-  return children({ accounts: accounts.data, models: models.data.models, sources: sources.data });
+  return children({
+    accounts: accounts.data,
+    models: models.data.models,
+    providers: models.data.providers,
+    sources: sources.data,
+  });
 };
