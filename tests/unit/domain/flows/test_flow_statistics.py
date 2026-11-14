@@ -92,3 +92,13 @@ def test_with_only_even_positions_the_win_rate_is_not_available() -> None:
 
     assert statistics.operations == 2
     assert statistics.win_rate_percent is None
+
+
+def test_the_net_pnl_is_the_sum_of_the_net_results_of_the_operations() -> None:
+    statistics = FlowStatistics.of([closed("20", fees="1"), closed("-6", fees="0.5"), closed("0")], NO_COST)
+
+    assert statistics.net_pnl == Decimal(14)
+
+
+def test_the_net_pnl_is_zero_without_operations() -> None:
+    assert FlowStatistics.of([], NO_COST).net_pnl == Decimal(0)

@@ -34,6 +34,8 @@ export type ScenarioMemory = {
   registeredAt: string;
   /** The reason the refusal a step caused is expected to give. */
   refusal: string;
+  /** The page whose period the user chooses, when it is not the page of the flow (R2.4.2). */
+  periodPage: string;
 };
 
 type Fixtures = {
@@ -75,6 +77,7 @@ export const test = base.extend<Fixtures>({
       subject: '',
       registeredAt: '',
       refusal: '',
+      periodPage: '',
     });
   },
 });

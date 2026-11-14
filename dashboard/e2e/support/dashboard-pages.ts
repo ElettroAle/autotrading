@@ -60,6 +60,10 @@ export class DashboardPages {
       .filter({ has: this.page.getByRole('link', { name, exact: true }) });
   }
 
+  async openRanking(): Promise<void> {
+    await this.open('/ranking');
+  }
+
   async openCyclesOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
@@ -381,5 +385,59 @@ export class DashboardPages {
     await form.getByLabel('Capitale allocato (USDC)').fill(capital);
     await form.getByLabel('Asset').fill(assets);
     await form.getByRole('button', { name: 'Assegna' }).click();
+  }
+
+  ranking(): Locator {
+    return this.page.getByRole('table', { name: 'Classifica dei flussi' });
+  }
+
+  /** The rows of the ranking, in the order the page shows them. */
+  rankingRows(): Locator {
+    return this.ranking().locator('tbody tr');
+  }
+
+  rankingRow(flow: string): Locator {
+    return this.rankingRows().filter({
+      has: this.page.getByRole('link', { name: flow, exact: true }),
+    });
+  }
+
+  rankingHeader(column: string): Locator {
+    return this.ranking().getByRole('columnheader', { name: column });
+  }
+
+  /** The box that chooses the flow for the overlaid curves (R2.4.3). */
+  compareBox(flow: string): Locator {
+    return this.ranking().getByRole('checkbox', { name: `Confronta ${flow}`, exact: true });
+  }
+
+  compareLink(): Locator {
+    return this.page.getByRole('link', { name: 'Confronta le curve' });
+  }
+
+  comparisonChart(): Locator {
+    return this.page.getByRole('figure', { name: 'Equity curve sovrapposte' });
+  }
+
+  /** The points of the curve of a flow on the comparison chart, oldest first: each names its change and instant. */
+  comparisonPoints(flow: string): Locator {
+    return this.comparisonChart().getByRole('img', {
+      name: new RegExp(`^${flow} [+-]?[0-9,]+% del `),
+    });
+  }
+
+  /** The entry of the legend of the comparison chart with the name of the flow. */
+  legendEntry(flow: string): Locator {
+    return this.comparisonChart()
+      .getByRole('list', { name: 'Legenda' })
+      .getByRole('listitem')
+      .filter({ hasText: new RegExp(`^${flow}$`) });
+  }
+
+  /** The value of a flow in a column of the ranking, as the page shows it. */
+  async rankingCell(flow: string, column: string): Promise<Locator> {
+    const headers = await this.ranking().getByRole('columnheader').allInnerTexts();
+    const index = headers.findIndex((header) => header.replace(/[▲▼]/g, '').trim() === column);
+    return this.rankingRow(flow).getByRole('cell').nth(index);
   }
 }

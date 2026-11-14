@@ -4,8 +4,8 @@ import { fakePlatform } from '@/testing/mocks/platform';
 
 import { When } from './fixtures';
 
-// Shared by the panels that read the period of the page (R2.2.3, R2.2.6; ADR 0123): the flow is the one the scenario
-// prepared, its histories waiting for the user when the scenario gave any.
+// Shared by the panels that read the period of the page (R2.2.3, R2.2.6, R2.4.2; ADR 0123): the page is the one the
+// scenario named, or the flow it prepared, its histories waiting for the user when the scenario gave any.
 When(
   '{string} sceglie il periodo {string}',
   async ({ dashboard, memory }, account: string, period: string) => {
@@ -16,7 +16,11 @@ When(
       fakePlatform.addFlow(account, name, { history });
     }
     const [historyFlow] = [...memory.histories.keys()];
-    await dashboard.openFlow(historyFlow ?? memory.flow);
+    if (memory.periodPage === '') {
+      await dashboard.openFlow(historyFlow ?? memory.flow);
+    } else {
+      await dashboard.open(memory.periodPage);
+    }
     await dashboard.signInAs(account);
     await expect(dashboard.period()).toBeVisible();
     await dashboard.period().selectOption({ label: period });

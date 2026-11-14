@@ -1,3 +1,5 @@
+import { withComparedFlows } from '@/utils/compared-flows';
+
 export const paths = {
   home: {
     path: '/',
@@ -60,5 +62,15 @@ export const paths = {
   flowVersions: {
     path: '/flows/:flowId/versions',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/versions`,
+  },
+  ranking: {
+    path: '/ranking',
+    getHref: () => '/ranking',
+  },
+  // The compared flows and the period travel in the query string, so the ranking links the comparison (ADR 0136).
+  comparison: {
+    path: '/comparison',
+    getHref: (flowIds: readonly string[], periodSearch = '') =>
+      `/comparison?${withComparedFlows(new URLSearchParams(periodSearch), flowIds).toString()}`,
   },
 } as const;

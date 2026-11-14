@@ -15,12 +15,14 @@ class FlowStatistics:
     An operation is a position closed in the period: won with a positive net result, lost with a negative one, neither
     when even. An even operation counts among the operations but not in the win rate, which is won over won and lost
     and is not available without a won or lost operation. The model cost leaves the calls whose cost nobody knows
-    apart, as the cost of the flow does (R1.4.6).
+    apart, as the cost of the flow does (R1.4.6). The net PnL is the sum of the net results of the operations, the
+    PnL the ranking compares (R2.4.2).
     """
 
     won: int
     lost: int
     operations: int
+    net_pnl: Decimal
     win_rate_percent: Decimal | None
     average_winning_pnl: Decimal | None
     average_losing_pnl: Decimal | None
@@ -37,6 +39,7 @@ class FlowStatistics:
             won=len(winning),
             lost=len(losing),
             operations=len(closed),
+            net_pnl=sum((position.net_pnl for position in closed), Decimal(0)),
             win_rate_percent=_win_rate(len(winning), len(losing)),
             average_winning_pnl=_average(winning),
             average_losing_pnl=_average(losing),

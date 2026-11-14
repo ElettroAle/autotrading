@@ -11,6 +11,7 @@ from autotrading.adapters.inbound.api.closed_positions import closed_positions_r
 from autotrading.adapters.inbound.api.cycles import cycles_router
 from autotrading.adapters.inbound.api.equity import equity_router
 from autotrading.adapters.inbound.api.errors import AuthenticationNotConfiguredError, install_error_responses
+from autotrading.adapters.inbound.api.flow_ranking import flow_ranking_router
 from autotrading.adapters.inbound.api.flow_state import flow_state_router
 from autotrading.adapters.inbound.api.flow_statistics import flow_statistics_router
 from autotrading.adapters.inbound.api.flows import flows_router
@@ -111,6 +112,7 @@ def create_api(
     protected.include_router(cycles_router(use_cases_of_request))
     protected.include_router(equity_router(use_cases_of_request))
     protected.include_router(history_router(use_cases_of_request))
+    protected.include_router(flow_ranking_router(use_cases_of_request))
     api.include_router(protected)
     return api
 

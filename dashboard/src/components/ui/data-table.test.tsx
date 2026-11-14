@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { DataTable } from './data-table';
 
@@ -55,5 +56,69 @@ describe('DataTable', () => {
 
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByText('Nessun frutto.')).toBeInTheDocument();
+  });
+
+  describe('with sortable headers', () => {
+    const SORTABLE = [
+      { header: 'Nome', cell: (fruit: Fruit) => fruit.name, sortKey: 'name' },
+      { header: 'Colore', cell: (fruit: Fruit) => fruit.colour, sortKey: 'colour' },
+      { header: 'Nota', cell: () => '' },
+    ];
+
+    const renderSorted = (onSort: (key: string) => void = () => undefined) => {
+      render(
+        <DataTable
+          label="Frutti"
+          columns={SORTABLE}
+          rows={FRUITS}
+          rowKey={(fruit) => fruit.name}
+          sort={{ key: 'colour', direction: 'descending' }}
+          onSort={onSort}
+        />,
+      );
+    };
+
+    it('declares the order on the sorted header only, and none on the other sortable ones', () => {
+      renderSorted();
+
+      expect(screen.getByRole('columnheader', { name: 'Colore' })).toHaveAttribute(
+        'aria-sort',
+        'descending',
+      );
+      expect(screen.getByRole('columnheader', { name: 'Nome' })).toHaveAttribute(
+        'aria-sort',
+        'none',
+      );
+      expect(screen.getByRole('columnheader', { name: 'Nota' })).not.toHaveAttribute('aria-sort');
+    });
+
+    it('asks to sort by the column whose header is pressed', async () => {
+      const onSort = vi.fn();
+      renderSorted(onSort);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Nome' }));
+
+      expect(onSort).toHaveBeenCalledWith('name');
+    });
+
+    it('offers no button on a header that does not sort', () => {
+      renderSorted();
+
+      expect(screen.queryByRole('button', { name: 'Nota' })).not.toBeInTheDocument();
+    });
+
+    it('shows plain headers without a way to sort', () => {
+      render(
+        <DataTable
+          label="Frutti"
+          columns={SORTABLE}
+          rows={FRUITS}
+          rowKey={(fruit) => fruit.name}
+        />,
+      );
+
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Nome' })).not.toHaveAttribute('aria-sort');
+    });
   });
 });

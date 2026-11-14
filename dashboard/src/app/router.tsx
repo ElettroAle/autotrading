@@ -4,6 +4,7 @@ import { paths } from '@/config/paths';
 
 import { AccountsRoute } from './routes/app/accounts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
+import { ComparisonRoute } from './routes/app/comparison';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { EditFlowRoute } from './routes/app/edit-flow';
@@ -15,6 +16,7 @@ import { NewFlowRoute } from './routes/app/new-flow';
 import { NotificationsRoute } from './routes/app/notifications';
 import { PositionsRoute } from './routes/app/positions';
 import { ProviderKeysRoute } from './routes/app/provider-keys';
+import { RankingRoute } from './routes/app/ranking';
 import { AppRoot } from './routes/app/root';
 import { LoginRoute } from './routes/login';
 import { NotFoundRoute } from './routes/not-found';
@@ -36,11 +38,13 @@ export const routes: RouteObject[] = [
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
       { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },
+      { path: paths.ranking.path, element: <RankingRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
       { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },
       { path: paths.flowPositions.path, element: <PositionsRoute /> },
       { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
+      { path: paths.comparison.path, element: <ComparisonRoute /> },
     ],
   },
   { path: '*', element: <NotFoundRoute /> },

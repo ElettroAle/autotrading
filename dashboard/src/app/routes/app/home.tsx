@@ -25,6 +25,11 @@ export const HomeRoute = () => (
         Storico
       </Link>
     </nav>
+    <nav aria-label="Confronto" className="mt-6">
+      <Link to={paths.ranking.getHref()} className="text-blue-800 hover:underline">
+        Classifica dei flussi
+      </Link>
+    </nav>
     <nav aria-label="Impostazioni" className="mt-6 flex gap-4">
       <Link to={paths.providerKeys.getHref()} className="text-blue-800 hover:underline">
         Chiavi dei fornitori IA
