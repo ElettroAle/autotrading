@@ -244,7 +244,11 @@ class TenantUseCases:
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock
             ),
             list_flow_overviews=ListFlowOverviewsUseCase(
-                ports.flow_summaries, ports.cycle_history, ports.environment, ports.clock
+                ports.flow_summaries,
+                ports.cycle_history,
+                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ports.environment,
+                ports.clock,
             ),
             read_flow_equity=ReadFlowEquityUseCase(ports.flows, ports.equity_snapshots, ports.clock),
             duplicate_flow=DuplicateFlowUseCase(ports.flows),

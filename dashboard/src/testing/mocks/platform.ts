@@ -56,6 +56,10 @@ export type FakeFlow = {
   cycleMinutes: number;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
+  /** Why the flow paused, as the API says it (R1.2.4). */
+  pauseReason: string | null;
+  /** What the flow is worth now, as the API measures it (R2.2.2). */
+  currentCapital: number;
   readonly history: FakeFlowHistory;
   /** The equity every cycle of the flow recorded, in the order the scenario records it. */
   readonly equity: FakeEquityPoint[];
@@ -63,6 +67,9 @@ export type FakeFlow = {
 };
 
 export type FakeAccount = { readonly id: string; readonly name: string; readonly balance: number };
+
+/** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
+export type FakeFlowChanges = Partial<Omit<FakeFlow, 'id' | 'name'>>;
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
 
@@ -267,6 +274,8 @@ export const fakePlatform = {
       sources: [],
       cycleMinutes: 15,
       cycles: 0,
+      pauseReason: null,
+      currentCapital: 100,
       history: emptyHistory(),
       equity: [],
       versions: versionsWith({}),
@@ -310,6 +319,11 @@ export const fakePlatform = {
     }
     const owned = state.users.get(account)?.flows.find((flow) => flow.name === name);
     return owned ?? this.addFlow(account, name);
+  },
+
+  /** Changes the flow with the name wherever it is, as the platform would after a command or a cycle. */
+  changeFlow(name: string, changes: FakeFlowChanges): FakeFlow {
+    return Object.assign(this.flowNamed(name), changes);
   },
 
   /** The cycles recorded for the flow with the name, in any order: the fake API serves them from the most recent. */

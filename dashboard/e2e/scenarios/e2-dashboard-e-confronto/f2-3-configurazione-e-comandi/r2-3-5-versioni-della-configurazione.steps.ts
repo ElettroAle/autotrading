@@ -5,7 +5,7 @@ import { fakePlatform, versionsWith } from '@/testing/mocks/platform';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
 
-const DATE_AND_TIME = /^\d{1,2} \S+ \d{4}, \d{2}:\d{2}$/;
+const DATE_AND_TIME = /^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2}$/;
 
 Given(
   'che il flusso {string} ha {int} versioni e tra la {int} e la {int} è cambiato solo il modello da {string} a {string}',
