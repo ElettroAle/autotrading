@@ -1,0 +1,14 @@
+name: node-setup
+description: Installa Node e le dipendenze della dashboard dal lockfile.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: "24"
+        cache: npm
+        cache-dependency-path: dashboard/package-lock.json
+    - name: Dipendenze della dashboard
+      shell: bash
+      working-directory: dashboard
+      run: npm ci --no-audit --no-fund

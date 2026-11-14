@@ -16,6 +16,9 @@ inputs:
   forecaster-image:
     description: Riferimento repository@sha256 dell'immagine del forecaster
     required: true
+  dashboard-image:
+    description: Riferimento repository@sha256 dell'immagine della dashboard
+    required: true
   registry-token:
     description: Token di sola lettura del registro, valido solo per questa esecuzione
     required: true
@@ -50,6 +53,7 @@ runs:
         APP_VERSION: ${{ inputs.version }}
         API_IMAGE: ${{ inputs.image }}
         FORECASTER_IMAGE: ${{ inputs.forecaster-image }}
+        DASHBOARD_IMAGE: ${{ inputs.dashboard-image }}
         REGISTRY_TOKEN: ${{ inputs.registry-token }}
         AUTH_ISSUER: ${{ inputs.auth-issuer }}
         AUTH_AUDIENCE: ${{ inputs.auth-audience }}
@@ -65,7 +69,7 @@ runs:
         # Public configuration only: issuer, audience, client id and scope are not secrets (ADR 0016).
         {
           printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION"
-          printf 'FORECASTER_IMAGE=%s\n' "$FORECASTER_IMAGE"
+          printf 'FORECASTER_IMAGE=%s\nDASHBOARD_IMAGE=%s\n' "$FORECASTER_IMAGE" "$DASHBOARD_IMAGE"
           printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
@@ -84,6 +88,9 @@ runs:
           < deploy/prepare-installation.sh
         ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/prepare-installation.sh' \
           < deploy/postgres/10-application-role.sh
+        # The dashboard on /dashboard of the same HTTPS name as the API, applied at every release (ADR 0117).
+        ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/configure-serve.sh' < deploy/configure-serve.sh
+        ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/configure-serve.sh'
         # The token of the bot is created outside the machine: it travels only inside SSH, on stdin (ADR 0071).
         if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
           ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/install-telegram-token.sh' \

@@ -1,0 +1,9 @@
+name: npm-audit
+description: Vulnerabilità note nelle dipendenze della dashboard; qualunque vulnerabilità blocca.
+runs:
+  using: composite
+  steps:
+    - name: Npm audit
+      shell: bash
+      working-directory: dashboard
+      run: npm audit --audit-level=low

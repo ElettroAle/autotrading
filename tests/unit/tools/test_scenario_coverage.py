@@ -59,3 +59,21 @@ def test_main_passes_when_every_scenario_passed(tmp_path: Path) -> None:
     report.write_text(json.dumps([{"name": "F", "elements": [element("A", "passed")]}]), encoding="utf-8")
 
     assert main([str(specs), str(report)]) == 0
+
+
+def test_main_counts_the_scenarios_of_every_report(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    (specs / "a.feature").write_text(
+        "# language: it\nFunzionalità: F\n  Scenario: A\n    Quando a\n    Allora b\n", encoding="utf-8"
+    )
+    (specs / "b.feature").write_text(
+        "# language: it\nFunzionalità: G\n  Scenario: B\n    Quando a\n    Allora b\n", encoding="utf-8"
+    )
+    python = tmp_path / "cucumber.json"
+    python.write_text(json.dumps([{"name": "F", "elements": [element("A", "passed")]}]), encoding="utf-8")
+    dashboard = tmp_path / "dashboard.json"
+    dashboard.write_text(json.dumps([{"name": "G", "elements": [element("B", "passed")]}]), encoding="utf-8")
+
+    assert main([str(specs), str(python), str(dashboard)]) == 0
+    assert main([str(specs), str(python)]) == 1

@@ -1,0 +1,9 @@
+name: dashboard-architecture
+description: Struttura della dashboard secondo bulletproof-react, verificata da ESLint (ADR 0116).
+runs:
+  using: composite
+  steps:
+    - name: Confini della dashboard
+      shell: bash
+      working-directory: dashboard
+      run: npm run lint:architecture

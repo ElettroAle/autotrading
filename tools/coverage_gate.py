@@ -2,12 +2,13 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from tools.workspace import workspace_path
 
 SERVICE_ROOT = "autotrading"
-THRESHOLDS = {"domain": 90.0, "application": 90.0, "totale": 80.0}
+THRESHOLDS = {"domain": 90.0, "application": 90.0, "totale": 80.0, "dashboard": 90.0}
+SERVICE_SCOPES = ("domain", "application", "totale")
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +25,7 @@ class Coverage:
 
 
 def coverage_by_scope(report: dict[str, Any]) -> dict[str, Coverage]:
-    scopes = {scope: Coverage(0, 0) for scope in THRESHOLDS}
+    scopes = {scope: Coverage(0, 0) for scope in SERVICE_SCOPES}
     for path, data in report["files"].items():
         if not _is_service(path):
             continue
@@ -36,11 +37,19 @@ def coverage_by_scope(report: dict[str, Any]) -> dict[str, Coverage]:
     return scopes
 
 
+def dashboard_coverage(summary: dict[str, Any]) -> Coverage:
+    """Lines and branches of the dashboard, from the json-summary report of Vitest (ADR 0116)."""
+    total = summary["total"]
+    return Coverage(
+        total["lines"]["covered"] + total["branches"]["covered"], total["lines"]["total"] + total["branches"]["total"]
+    )
+
+
 def violations(scopes: dict[str, Coverage]) -> list[str]:
     return [
         f"copertura {scope} {scopes[scope].percent:.2f}% sotto la soglia {threshold:g}%"
         for scope, threshold in THRESHOLDS.items()
-        if scopes[scope].percent < threshold
+        if scope in scopes and scopes[scope].percent < threshold
     ]
 
 
@@ -60,9 +69,15 @@ def _layer_of(path: str) -> str | None:
     return next((part for part in parts if part in ("domain", "application")), None)
 
 
+def _read_json(argument: str) -> dict[str, Any]:
+    return cast(dict[str, Any], json.loads(workspace_path(argument).read_text(encoding="utf-8")))
+
+
 def main(arguments: list[str]) -> int:
-    report = json.loads(workspace_path(arguments[0]).read_text(encoding="utf-8"))
-    problems = violations(coverage_by_scope(report))
+    scopes = coverage_by_scope(_read_json(arguments[0]))
+    if len(arguments) > 1:
+        scopes["dashboard"] = dashboard_coverage(_read_json(arguments[1]))
+    problems = violations(scopes)
     for problem in problems:
         print(problem, file=sys.stderr)
     return 1 if problems else 0

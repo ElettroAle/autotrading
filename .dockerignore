@@ -5,3 +5,13 @@
 !migrations/
 !deploy/logging.json
 !forecaster/
+!dashboard/
+dashboard/node_modules
+dashboard/dist
+dashboard/coverage
+dashboard/reports
+dashboard/test-results
+dashboard/playwright-report
+dashboard/.features-gen
+dashboard/**/*.test.ts
+dashboard/**/*.test.tsx

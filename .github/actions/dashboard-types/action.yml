@@ -1,0 +1,9 @@
+name: dashboard-types
+description: Controllo dei tipi della dashboard con TypeScript strict (ADR 0116).
+runs:
+  using: composite
+  steps:
+    - name: TypeScript
+      shell: bash
+      working-directory: dashboard
+      run: npm run check-types

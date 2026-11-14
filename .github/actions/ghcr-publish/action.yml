@@ -11,7 +11,7 @@ inputs:
     description: Token con permesso packages:write
     required: true
   variant:
-    description: Suffisso del tag per un'immagine diversa da quella di api e worker (forecaster)
+    description: Suffisso del tag per un'immagine diversa da quella di api e worker (forecaster, dashboard)
     required: false
     default: ""
 outputs:
