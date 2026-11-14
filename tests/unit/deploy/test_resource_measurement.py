@@ -1,4 +1,8 @@
-"""Every release measures memory and disk of the installation and reports them in the summary (ADR 0162, Bug 252)."""
+"""Every release measures memory and disk of the installation and reports them in the summary (Bug 252).
+
+Architecture proof of ADR-0162: the action starts the measure before the pull, reports it on exit after the services
+are up, and the measure never fails the release.
+"""
 
 import os
 import re
