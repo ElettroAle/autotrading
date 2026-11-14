@@ -2,7 +2,9 @@ import { renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 
-import { MAX_COMPARED_FLOWS, useComparedFlowIds } from './use-compared-flow-ids';
+import { MAX_COMPARED_FLOWS } from '@/utils/compared-flows';
+
+import { useComparedFlowIds } from './use-compared-flow-ids';
 
 const comparedAt = (url: string): string[] =>
   renderHook(() => useComparedFlowIds(), {

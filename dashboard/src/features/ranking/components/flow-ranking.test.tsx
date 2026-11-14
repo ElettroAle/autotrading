@@ -173,17 +173,17 @@ describe('FlowRanking', () => {
       await userEvent.click(screen.getByRole('checkbox', { name: 'Confronta beta' }));
 
       await waitFor(() =>
-        expect(router.state.location.search).toBe('?period=30d&flows=flow-alfa%2Cflow-beta'),
+        expect(router.state.location.search).toBe('?period=30d&flow=flow-alfa&flow=flow-beta'),
       );
       expect(screen.getByRole('link', { name: 'Confronta le curve' })).toHaveAttribute(
         'href',
-        '/comparison?period=30d&flows=flow-alfa%2Cflow-beta',
+        '/comparison?period=30d&flow=flow-alfa&flow=flow-beta',
       );
     });
 
     it('lets a flow chosen be left out again', async () => {
       giveFlow('alfa', [100, 110]);
-      const { router } = await renderApp({ account: 'anna', url: '/ranking?flows=flow-alfa' });
+      const { router } = await renderApp({ account: 'anna', url: '/ranking?flow=flow-alfa' });
 
       await userEvent.click(await screen.findByRole('checkbox', { name: 'Confronta alfa' }));
 
@@ -194,9 +194,9 @@ describe('FlowRanking', () => {
     it('offers no sixth flow once five are chosen', async () => {
       SIX.forEach((name, index) => giveFlow(name, [100, 110 + index]));
       const chosen = SIX.slice(0, 5)
-        .map((name) => `flow-${name}`)
-        .join(',');
-      await renderApp({ account: 'anna', url: `/ranking?flows=${chosen}` });
+        .map((name) => `flow=flow-${name}`)
+        .join('&');
+      await renderApp({ account: 'anna', url: `/ranking?${chosen}` });
 
       expect(await screen.findByRole('checkbox', { name: 'Confronta sei' })).toBeDisabled();
       expect(screen.getByRole('checkbox', { name: 'Confronta uno' })).toBeChecked();

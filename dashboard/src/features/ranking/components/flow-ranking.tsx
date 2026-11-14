@@ -5,6 +5,7 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { apiSearchOf, usePeriod, type Period } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
+import { MAX_COMPARED_FLOWS } from '@/utils/compared-flows';
 import {
   formatAmount,
   formatPercent,
@@ -14,11 +15,7 @@ import {
 } from '@/utils/format-amount';
 
 import { useFlowRanking, type FlowRankingRow } from '../api/get-flow-ranking';
-import {
-  comparisonSearchOf,
-  MAX_COMPARED_FLOWS,
-  useComparedFlows,
-} from '../hooks/use-compared-flows';
+import { useComparedFlows } from '../hooks/use-compared-flows';
 import { useRankingSort } from '../hooks/use-ranking-sort';
 import { sortRanking } from '../utils/sort-ranking';
 
@@ -92,7 +89,7 @@ const columnsFor = (comparison: Comparison): DataTableColumn<FlowRankingRow>[] =
 const CompareLink = ({ period, chosen }: { period: Period; chosen: readonly string[] }) => (
   <p className="mt-4">
     <Link
-      to={paths.comparison.getHref(comparisonSearchOf(apiSearchOf(period), chosen))}
+      to={paths.comparison.getHref(chosen, apiSearchOf(period))}
       className="text-blue-800 hover:underline"
     >
       Confronta le curve

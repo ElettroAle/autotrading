@@ -1,5 +1,5 @@
 # language: it
-@R2.4.3 @wip
+@R2.4.3
 Funzionalità: R2.4.3 Equity curve sovrapposte
   Come utente
   Voglio vedere le equity curve di più flussi sullo stesso grafico
