@@ -7,6 +7,9 @@ inputs:
   environment:
     description: dev o prod
     required: true
+  hyperliquid-network:
+    description: Rete di Hyperliquid dell'installazione, testnet o mainnet, dalla variabile dell'environment (Bug 277)
+    required: true
   version:
     description: Versione dichiarata dall'installazione
     required: true
@@ -54,6 +57,7 @@ runs:
         HOSTNAME_TS: ${{ inputs.hostname }}
         APP_ENVIRONMENT: ${{ inputs.environment }}
         APP_VERSION: ${{ inputs.version }}
+        HYPERLIQUID_NETWORK: ${{ inputs.hyperliquid-network }}
         API_IMAGE: ${{ inputs.image }}
         FORECASTER_IMAGE: ${{ inputs.forecaster-image }}
         DASHBOARD_IMAGE: ${{ inputs.dashboard-image }}

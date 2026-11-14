@@ -7,7 +7,7 @@ Funzionalità: R0.2.1 Registrazione di un conto di trading
 
   Le credenziali sono quelle che l'exchange richiede (per Hyperliquid: indirizzo del conto e chiave dell'API wallet).
   L'utente le crea sull'exchange e le inserisce; la piattaforma non le genera.
-  Quale rete dell'exchange si usa (test o reale) dipende dall'ambiente dell'installazione, non dal conto.
+  Quale rete dell'exchange si usa (test o reale) la dichiara la configurazione dell'exchange nell'installazione, non il conto.
 
   Fuori ambito: generazione delle chiavi da parte della piattaforma, controllo della facoltà di prelievo delle credenziali, più exchange oltre Hyperliquid.
 

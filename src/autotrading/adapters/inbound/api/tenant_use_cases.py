@@ -207,13 +207,9 @@ class TenantUseCases:
         key_services = ProviderKeyServices(ports.model_catalogs, ports.provider_key_sealer)
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
-            list_accounts=ListAccountsUseCase(
-                accounts, ports.allocated_capital, ports.environment, ports.settlement_currency
-            ),
+            list_accounts=ListAccountsUseCase(accounts, ports.allocated_capital, exchanges, ports.settlement_currency),
             list_supported_exchanges=ListSupportedExchangesUseCase(exchanges),
-            get_account=GetAccountUseCase(
-                accounts, ports.allocated_capital, ports.environment, ports.settlement_currency
-            ),
+            get_account=GetAccountUseCase(accounts, ports.allocated_capital, exchanges, ports.settlement_currency),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
             remove_account_with_flows=RemoveAccountWithFlowsUseCase(

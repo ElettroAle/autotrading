@@ -7,6 +7,14 @@ import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
 
 const STOP_CONFIRMATION = 'Conferma dello stop';
+const START_CONFIRMATION = "Conferma dell'avvio";
+// The button that confirms each window, by its title.
+const CONFIRM_LABELS: Readonly<Record<string, string>> = {
+  [STOP_CONFIRMATION]: 'Conferma lo stop',
+  [START_CONFIRMATION]: 'Avvia con denaro reale',
+};
+// Less than the free capital of the account, on an asset no other flow of the account trades.
+const AFFORDABLE_CAPITAL = 100;
 // More than the balance of every fake account, so no account has free capital enough for it.
 const UNAFFORDABLE_CAPITAL = 5000;
 
@@ -42,6 +50,38 @@ Given(
     await dashboard.openFlow(flow);
     await dashboard.signInAs(account);
     await expect(dashboard.flowName()).toHaveText(flow);
+  },
+);
+
+// A stopped flow ready to start, on an exchange configured on the network the scenario names (Bug 277).
+const stoppedFlowOn = async (
+  dashboard: DashboardPages,
+  memory: ScenarioMemory,
+  flow: string,
+  network: 'test' | 'real',
+): Promise<void> => {
+  fakePlatform.configureExchangeNetwork(network);
+  fakePlatform.giveFlowTo(memory.account, flow);
+  fakePlatform.changeFlow(flow, {
+    status: 'fermo',
+    assets: ['ETH'],
+    allocatedCapital: AFFORDABLE_CAPITAL,
+  });
+  await openFlow(dashboard, flow);
+};
+
+Given(
+  'che il flusso {string} è assegnato a un conto su un exchange configurato sulla rete reale',
+  async ({ dashboard, memory }, flow: string) => {
+    memory.subject = START_CONFIRMATION;
+    await stoppedFlowOn(dashboard, memory, flow, 'real');
+  },
+);
+
+Given(
+  'che il flusso {string} è assegnato a un conto su un exchange configurato sulla rete di test',
+  async ({ dashboard, memory }, flow: string) => {
+    await stoppedFlowOn(dashboard, memory, flow, 'test');
   },
 );
 
@@ -88,9 +128,25 @@ When(
   },
 );
 
+Then('la conferma avvisa che il flusso opererà con denaro reale', async ({ dashboard, memory }) => {
+  await expect(dashboard.confirmation(memory.subject)).toContainText(
+    'Il flusso opererà con denaro reale',
+  );
+});
+
+Then(
+  'il flusso {string} è nello stato {string} senza conferma',
+  async ({ dashboard }, flow: string, status: string) => {
+    await expect(dashboard.flowStatus()).toHaveText(`Stato: ${status}`);
+    await expect(dashboard.page.getByRole('alertdialog')).toHaveCount(0);
+    expect(fakePlatform.flowNamed(flow).status).toBe(status);
+  },
+);
+
 Then(
   'la conferma dice che la posizione su {string} sarà chiusa',
-  async ({ dashboard }, asset: string) => {
+  async ({ dashboard, memory }, asset: string) => {
+    memory.subject = STOP_CONFIRMATION;
     await expect(dashboard.confirmation(STOP_CONFIRMATION)).toContainText(
       `La posizione su ${asset} sarà chiusa`,
     );
@@ -99,11 +155,11 @@ Then(
 
 Then(
   'dopo la conferma il flusso {string} è nello stato {string}',
-  async ({ dashboard }, flow: string, status: string) => {
+  async ({ dashboard, memory }, flow: string, status: string) => {
     expect(fakePlatform.flowNamed(flow).status).not.toBe(status);
     await dashboard
-      .confirmation(STOP_CONFIRMATION)
-      .getByRole('button', { name: 'Conferma lo stop' })
+      .confirmation(memory.subject)
+      .getByRole('button', { name: CONFIRM_LABELS[memory.subject] })
       .click();
     await expect(dashboard.flowStatus()).toHaveText(`Stato: ${status}`);
     expect(fakePlatform.flowNamed(flow).status).toBe(status);

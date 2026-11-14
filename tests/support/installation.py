@@ -6,6 +6,12 @@ from secrets import token_hex
 
 from nacl.public import PrivateKey
 
+from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.outbound.hyperliquid.composition import (
+    HyperliquidAdaptersOfInstallation,
+    hyperliquid_adapters,
+)
+
 # Generated per run, as prepare-installation.sh generates it per machine.
 WORKER_TOKEN = token_hex(16)
 
@@ -19,6 +25,7 @@ def _secret(secrets: Path, name: str, content: str) -> str:
 def _database(secrets: Path) -> dict[str, str]:
     return {
         "APP_ENVIRONMENT": "dev",
+        "HYPERLIQUID_NETWORK": "testnet",
         "DATABASE_HOST": "postgres",
         "DATABASE_NAME": "autotrading",
         "DATABASE_USER": "autotrading_app",
@@ -46,3 +53,8 @@ def worker_configuration(secrets: Path, **overrides: str) -> dict[str, str]:
         "FORECASTER_URL": "http://forecaster:8000",
     }
     return configuration | overrides
+
+
+def dev_installation_on_testnet() -> tuple[str, HyperliquidAdaptersOfInstallation]:
+    """The dev installation with Hyperliquid on the testnet, as bootstrap hands it to the use cases (ADR 0155)."""
+    return "dev", hyperliquid_adapters(ConfigurationSource({"HYPERLIQUID_NETWORK": "testnet"}))

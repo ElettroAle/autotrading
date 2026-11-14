@@ -333,7 +333,7 @@
           "conti"
         ],
         "summary": "List Supported Exchanges",
-        "description": "The exchanges an account can be registered on, by name (ADR 0152).",
+        "description": "The exchanges an account can be registered on, each with the network it trades on (ADR 0152, ADR 0157).",
         "operationId": "list_supported_exchanges_exchanges_get",
         "responses": {
           "200": {
@@ -342,7 +342,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/ExchangeResponse"
                   },
                   "type": "array",
                   "title": "Response List Supported Exchanges Exchanges Get"
@@ -4134,6 +4134,24 @@
         ],
         "title": "EquityPointResponse",
         "description": "A point of the curve: its equity and how much it moved from the first point of the period, in percent with two\ndecimals, null when the first point has no equity (ADR 0137)."
+      },
+      "ExchangeResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "network": {
+            "type": "string",
+            "title": "Network"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "network"
+        ],
+        "title": "ExchangeResponse"
       },
       "FailureResponse": {
         "properties": {

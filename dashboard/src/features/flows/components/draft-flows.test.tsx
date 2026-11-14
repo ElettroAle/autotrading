@@ -210,6 +210,44 @@ describe('Draft flows', () => {
     expect(screen.queryByText('Bozza')).not.toBeInTheDocument();
   });
 
+  it('starts a draft on an account that trades real money only once the user confirms it', async () => {
+    fakePlatform.configureExchangeNetwork('real');
+    const anna = fakePlatform.user('anna');
+    const copy = fakePlatform.duplicate(anna, 'flow-alfa');
+    fakePlatform.assign(anna, copy.id, {
+      accountId: 'account-secondario',
+      allocatedCapital: 200,
+      assets: ['BTC'],
+    });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: "Conferma dell'avvio" });
+    expect(confirmation).toHaveTextContent('Il flusso opererà con denaro reale');
+    expect(screen.getByText('Bozza')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Avvia con denaro reale' }));
+
+    expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
+  });
+
+  it('keeps the draft when the user does not confirm the start on real money', async () => {
+    fakePlatform.configureExchangeNetwork('real');
+    const anna = fakePlatform.user('anna');
+    const copy = fakePlatform.duplicate(anna, 'flow-alfa');
+    fakePlatform.assign(anna, copy.id, {
+      accountId: 'account-secondario',
+      allocatedCapital: 200,
+      assets: ['BTC'],
+    });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Annulla' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByText('Bozza')).toBeInTheDocument();
+  });
+
   it('tells why the draft does not start', async () => {
     fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
     await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });

@@ -12,6 +12,7 @@ from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
+from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.accounts import ADDRESS, SECRET, an_account
 from tests.support.flows import a_configuration, a_flow
@@ -29,9 +30,12 @@ def flows() -> FlowStore:
     return FlowStore()
 
 
-def get_account(store: AccountStore, flows: FlowStore, account_id: AccountId) -> AccountSummary:
+def get_account(store: AccountStore, flows: FlowStore, account_id: AccountId, *, real: bool = False) -> AccountSummary:
     use_case = GetAccountUseCase(
-        InMemoryAccountRepositoryAdapter(store, ANNA), InMemoryFlowRepositoryAdapter(flows, ANNA), "dev", "USDC"
+        InMemoryAccountRepositoryAdapter(store, ANNA),
+        InMemoryFlowRepositoryAdapter(flows, ANNA),
+        {"Hyperliquid": FakeExchangeAdapter(real=real)},
+        "USDC",
     )
     return use_case.execute(GetAccountCommand(account_id))
 
@@ -67,6 +71,15 @@ def test_an_account_of_the_tenant_is_found_with_network_and_allocated_capital(
     found = get_account(store, flows, account.id)
 
     assert found == AccountSummary.of(account, Decimal(300), ExchangeNetwork.TEST, "USDC")
+
+
+def test_an_account_on_an_exchange_configured_on_real_money_is_on_the_real_network(
+    store: AccountStore, flows: FlowStore
+) -> None:
+    account = an_account(ANNA)
+    store.accounts.append(account)
+
+    assert get_account(store, flows, account.id, real=True).network is ExchangeNetwork.REAL
 
 
 @pytest.mark.parametrize("whose", ["another tenant", "nobody"])

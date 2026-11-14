@@ -54,7 +54,12 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.support.accounts import an_account
-from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
+from tests.support.installation import (
+    WORKER_TOKEN,
+    dev_installation_on_testnet,
+    installation_configuration,
+    worker_configuration,
+)
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.problems import reason_of
 from tests.support.worker import Worker
@@ -116,6 +121,13 @@ def test_application_refuses_to_start_with_an_unsupported_environment(tmp_path: 
 
     assert raised.value.environment == environment
     assert str(raised.value) == "ambiente non ammesso: sono ammessi dev e prod"
+
+
+def test_application_refuses_to_start_without_the_network_of_hyperliquid(tmp_path: Path) -> None:
+    with pytest.raises(MissingConfigurationError) as raised:
+        create_application(installation_configuration(tmp_path, HYPERLIQUID_NETWORK=""))
+
+    assert raised.value.name == "HYPERLIQUID_NETWORK"
 
 
 def test_environment_is_accepted_with_surrounding_spaces(tmp_path: Path) -> None:
@@ -187,7 +199,9 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of())
+    factory = tenant_use_cases(
+        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+    )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
 
@@ -213,7 +227,9 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of())
+    factory = tenant_use_cases(
+        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+    )
 
     with pytest.raises(ExchangeUnavailableError):
         factory(tenant_id).read_account_state.execute(ReadAccountStateCommand(account.id))
@@ -260,6 +276,7 @@ def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
     "name",
     [
         "APP_ENVIRONMENT",
+        "HYPERLIQUID_NETWORK",
         "CREDENTIALS_PRIVATE_KEY_FILE",
         "WORKER_TOKEN_FILE",
         "DATABASE_PASSWORD_FILE",
@@ -312,7 +329,9 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     opener = SodiumCredentialOpenerAdapter({})
-    factory = worker_use_cases(create_engine("sqlite://"), opener, "dev", Slippage.default(), FakeMessengerAdapter())
+    factory = worker_use_cases(
+        create_engine("sqlite://"), opener, dev_installation_on_testnet(), Slippage.default(), FakeMessengerAdapter()
+    )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
 
@@ -334,7 +353,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        "dev",
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -362,7 +381,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        "dev",
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -406,7 +425,9 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
-    factory = tenant_use_cases(create_engine("sqlite://"), _sealers(public_key), "dev", worker, providers_of())
+    factory = tenant_use_cases(
+        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+    )
 
     factory(TenantId.new())
 

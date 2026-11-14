@@ -116,6 +116,7 @@ jobs:
         with:
           hostname: ${{ steps.host.outputs.hostname }}
           environment: dev
+          hyperliquid-network: ${{ vars.HYPERLIQUID_NETWORK }}
           version: ${{ needs.versione.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
           forecaster-image: ${{ needs.artefatto.outputs.forecaster-image }}
@@ -191,6 +192,7 @@ jobs:
         with:
           hostname: ${{ steps.host.outputs.hostname }}
           environment: prod
+          hyperliquid-network: ${{ vars.HYPERLIQUID_NETWORK }}
           version: ${{ steps.release.outputs.version }}
           image: ${{ needs.artefatto.outputs.image }}
           forecaster-image: ${{ needs.artefatto.outputs.forecaster-image }}

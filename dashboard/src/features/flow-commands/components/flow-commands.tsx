@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ErrorMessage } from '@/components/ui/error-message';
+import { RealMoneyStartConfirmation } from '@/components/ui/real-money';
 import { paths } from '@/config/paths';
 
 import { useRunFlowCommand } from '../api/run-flow-command';
@@ -17,16 +18,21 @@ const LABELS: Readonly<Record<FlowCommand, string>> = {
   archive: 'Archivia',
 };
 
-type ConfirmedCommand = Extract<FlowCommand, 'stop' | 'archive'>;
+type ConfirmedCommand = Extract<FlowCommand, 'stop' | 'archive' | 'start'>;
 
-// The stop closes the positions and the archiving is final: both run only once the user confirms (ADR 0132).
-const needsConfirmation = (command: FlowCommand): command is ConfirmedCommand =>
-  command === 'stop' || command === 'archive';
+// The stop closes the positions and the archiving is final: both run only once the user confirms (ADR 0132). A start
+// on an account that trades real money is confirmed too (Bug 277).
+const needsConfirmation = (command: FlowCommand, realMoney: boolean): command is ConfirmedCommand =>
+  command === 'stop' || command === 'archive' || (command === 'start' && realMoney);
 
-type FlowCommandsProps = { readonly flowId: string; readonly status: string };
+type FlowCommandsProps = {
+  readonly flowId: string;
+  readonly status: string;
+  readonly realMoney: boolean;
+};
 
 /** The commands the status of the flow admits, with the reason of a command the API refuses (R2.3.4). */
-export const FlowCommands = ({ flowId, status }: FlowCommandsProps) => {
+export const FlowCommands = ({ flowId, status, realMoney }: FlowCommandsProps) => {
   const [confirming, setConfirming] = useState<ConfirmedCommand | null>(null);
   const navigate = useNavigate();
   const run = useRunFlowCommand(flowId, {
@@ -39,7 +45,7 @@ export const FlowCommands = ({ flowId, status }: FlowCommandsProps) => {
   });
 
   const request = (command: FlowCommand) => {
-    if (needsConfirmation(command)) {
+    if (needsConfirmation(command, realMoney)) {
       setConfirming(command);
       return;
     }
@@ -74,6 +80,9 @@ export const FlowCommands = ({ flowId, status }: FlowCommandsProps) => {
       )}
       {confirming === 'stop' && (
         <StopConfirmation flowId={flowId} onConfirm={() => confirm('stop')} {...confirmation} />
+      )}
+      {confirming === 'start' && (
+        <RealMoneyStartConfirmation onConfirm={() => confirm('start')} {...confirmation} />
       )}
       {confirming === 'archive' && (
         <ArchiveConfirmation onConfirm={() => confirm('archive')} {...confirmation} />

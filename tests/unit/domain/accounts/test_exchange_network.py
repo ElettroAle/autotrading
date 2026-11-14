@@ -1,10 +1,15 @@
-"""The network of the exchanges follows the installation: test networks in dev, real ones in prod (R0.2.1)."""
+"""The network of an exchange is the one its adapter is configured on, never the name of the installation (Bug 277)."""
 
 import pytest
 
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 
 
-@pytest.mark.parametrize(("environment", "test"), [("dev", True), ("prod", False)])
-def test_the_installation_chooses_the_network_of_the_exchanges(environment: str, test: bool) -> None:
-    assert ExchangeNetwork.of_installation(environment).is_test is test
+@pytest.mark.parametrize(("real", "network"), [(True, ExchangeNetwork.REAL), (False, ExchangeNetwork.TEST)])
+def test_an_exchange_on_real_money_is_on_the_real_network(real: bool, network: ExchangeNetwork) -> None:
+    assert ExchangeNetwork.of(real=real) is network
+
+
+def test_only_the_test_network_is_a_test() -> None:
+    assert ExchangeNetwork.TEST.is_test
+    assert not ExchangeNetwork.REAL.is_test

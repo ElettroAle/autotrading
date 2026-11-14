@@ -26,14 +26,16 @@ from autotrading.bootstrap import (
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.messenger import FakeMessengerAdapter
-from tests.support.installation import worker_configuration
+from tests.support.installation import dev_installation_on_testnet, worker_configuration
 
 FAKE_BOT = "BOT-FAKE_BOT-FAKE"
 DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
 def factory(engine: Engine, messenger: MessengerPort) -> Callable[[TenantId], WorkerUseCases]:
-    return worker_use_cases(engine, SodiumCredentialOpenerAdapter({}), "dev", Slippage.default(), messenger)
+    return worker_use_cases(
+        engine, SodiumCredentialOpenerAdapter({}), dev_installation_on_testnet(), Slippage.default(), messenger
+    )
 
 
 def token_file(tmp_path: Path, content: str) -> str:

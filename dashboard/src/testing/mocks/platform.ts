@@ -143,9 +143,12 @@ const FIRST_CHAT_ID = 1001;
 /** The key of a provider of models, as the API shows it: the provider and when the key was saved, never the key. */
 export type FakeProviderKey = { readonly provider: string; registeredAt: string };
 
-export const FAKE_EXCHANGE = 'hyperliquid';
+export const FAKE_EXCHANGE = 'Hyperliquid';
 /** The exchanges the fake platform supports, as the API lists them (ADR 0152). */
 export const FAKE_SUPPORTED_EXCHANGES: readonly string[] = [FAKE_EXCHANGE];
+
+/** The networks the API names: the one the exchange is configured on, never deduced (Bug 277). */
+export type FakeNetwork = 'test' | 'real';
 /** The secret key the exchange refuses, with the message it answers. */
 export const REJECTED_SECRET_KEY = '0xrifiutata';
 export const EXCHANGE_REFUSAL = 'User or API Wallet does not exist';
@@ -279,6 +282,7 @@ const state = {
   sessionsExpired: false,
   exchangeReachable: true,
   exchangesListed: true,
+  exchangeNetwork: 'test' as FakeNetwork,
   apiAnswers: true,
 };
 
@@ -421,6 +425,7 @@ export const fakePlatform = {
     state.sessionsExpired = false;
     state.exchangeReachable = true;
     state.exchangesListed = true;
+    state.exchangeNetwork = 'test';
     state.apiAnswers = true;
   },
 
@@ -539,6 +544,15 @@ export const fakePlatform = {
 
   listsExchanges(): boolean {
     return state.exchangesListed;
+  },
+
+  /** From now on the exchange is configured on this network, as the installation declares it (Bug 277). */
+  configureExchangeNetwork(network: FakeNetwork): void {
+    state.exchangeNetwork = network;
+  },
+
+  exchangeNetwork(): FakeNetwork {
+    return state.exchangeNetwork;
   },
 
   /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */

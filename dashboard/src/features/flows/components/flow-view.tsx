@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
+import { isRealMoney } from '@/components/ui/real-money';
 import { paths } from '@/config/paths';
 
 import { useAccounts } from '../api/get-accounts';
@@ -28,8 +29,9 @@ const FlowStatus = ({ flow }: { flow: Flow }) => {
 
 type FlowViewProps = {
   readonly flowId: string;
-  /** What the page offers on the flow once read, composed by the app from other features. */
-  readonly renderCommands: (flow: Flow) => ReactNode;
+  /** What the page offers on the flow once read, composed by the app from other features; realMoney says whether its
+   * account trades on an exchange configured on real money (Bug 277). */
+  readonly renderCommands: (flow: Flow, realMoney: boolean) => ReactNode;
 };
 
 export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
@@ -47,6 +49,9 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
     return <p>Flusso non trovato.</p>;
   }
   const accountsOfTenant = accounts.data ?? [];
+  const realMoney = isRealMoney(
+    accountsOfTenant.find((account) => account.id === flow.account_id)?.network,
+  );
   return (
     <section aria-labelledby="flow-name" className="rounded border border-slate-200 bg-white p-4">
       <h2 id="flow-name" className="text-xl font-semibold break-words">
@@ -77,9 +82,11 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
       <div className="mt-4 flex gap-3">
         <DuplicateFlowButton flowId={flow.id} />
         <ExportStrategyButton flowId={flow.id} />
-        {flow.status === DRAFT_STATUS ? <StartFlowButton flowId={flow.id} /> : null}
+        {flow.status === DRAFT_STATUS ? (
+          <StartFlowButton flowId={flow.id} realMoney={realMoney} />
+        ) : null}
       </div>
-      {renderCommands(flow)}
+      {renderCommands(flow, realMoney)}
       <RecentCycles flowId={flow.id} />
       {flow.status === DRAFT_STATUS ? (
         <DraftAssignmentForm flowId={flow.id} accounts={accountsOfTenant} />

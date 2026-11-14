@@ -69,6 +69,9 @@ class HyperliquidExchangeAdapter:
     def base_url(self) -> str:
         return self._base_url
 
+    def is_real(self) -> bool:
+        return bool(self._base_url == MAINNET_API_URL)
+
     @classmethod
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidExchangeAdapter:
         # The network is chosen by the installation, never deduced from the credentials.
