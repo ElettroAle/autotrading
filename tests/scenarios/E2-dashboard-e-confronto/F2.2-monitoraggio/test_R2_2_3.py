@@ -1,44 +1,57 @@
-"""R2.2.3: the equity every cycle records, run as the worker composes the cycle (ADR 0120).
-
-The scenarios of the curve itself (colours, period, a flow without cycles) are the dashboard's: playwright-bdd runs
-them on the build of the dashboard (ADR 0116, ADR 0121).
+"""R2.2.3: the equity every cycle records, run as the worker composes the cycle (ADR 0120), and the curve the
+dashboard reads from it (ADR 0122). playwright-bdd runs the same scenarios on the build of the dashboard (ADR 0116).
 """
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from pytest_bdd import given, parsers, scenario, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.application.flows.read_flow_equity import ReadFlowEquityCommand, ReadFlowEquityUseCase
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot, FlowEquity
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.statistics_period import TimeWindow
 from tests.fakes.cycles import FakeTransientError
 from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
+from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.attribution import amount, step
 from tests.support.flow_cycles import FlowCycles, at
+from tests.support.steps import quoted
 
 FEATURE = "E2-dashboard-e-confronto/F2.2-monitoraggio/R2.2.3-equity-curve.feature"
 CYCLE = timedelta(minutes=15)
 EVERY_CYCLE = TimeWindow(None, None)
 
 
-@scenario(FEATURE, "Punto di equity registrato a ogni ciclo")
-def test_equity_recorded_at_every_cycle() -> None:
-    """The cycle records the equity of the state of the flow at its end."""
+scenarios(FEATURE)
+
+PERIODS = {"tutta la vita": "all", "7 giorni": "7d", "30 giorni": "30d"}
 
 
-@scenario(FEATURE, "Punto registrato anche per un ciclo fallito")
-def test_equity_recorded_for_a_failed_cycle() -> None:
-    """A cycle failed after reading the state records the equity of the state it read."""
+@dataclass
+class Curve:
+    """The equity curve the user opened last."""
+
+    seen: FlowEquity | None = None
+
+    @property
+    def opened(self) -> FlowEquity:
+        assert self.seen is not None, "nessuna equity curve aperta"
+        return self.seen
 
 
 @pytest.fixture(name="flow_cycles")
 def flow_cycles_of_the_worker() -> FlowCycles:
     return FlowCycles()
+
+
+@pytest.fixture
+def curve() -> Curve:
+    return Curve()
 
 
 def equity_of(flow_cycles: FlowCycles, flow: Flow) -> InMemoryEquitySnapshotRepositoryAdapter:
@@ -88,6 +101,23 @@ def recorded_at(flow_cycles: FlowCycles, name: str) -> EquitySnapshot:
     return found[0]
 
 
+def open_curve(flow_cycles: FlowCycles, curve: Curve, name: str, period: str = "all") -> None:
+    flow = flow_cycles.flow(name)
+    use_case = ReadFlowEquityUseCase(
+        InMemoryFlowRepositoryAdapter(flow_cycles.platform.flows, flow.tenant_id),
+        equity_of(flow_cycles, flow),
+        flow_cycles.clock.now,
+    )
+    curve.seen = use_case.execute(ReadFlowEquityCommand(flow.id.value, period))
+
+
+def points_at(curve: Curve, values: str) -> list[EquitySnapshot]:
+    wanted = {Decimal(value) for value in values.split(" e ")}
+    found = [point for point in curve.opened.snapshots if point.equity in wanted]
+    assert {point.equity for point in found} == wanted, f"punti della curva: {curve.opened.snapshots}"
+    return found
+
+
 # Given
 
 
@@ -108,7 +138,37 @@ def last_three_cycles(flow_cycles: FlowCycles, a: str, b: str, c: str) -> None:
         equity.record(EquitySnapshot(flow.id.value, planned_at, capital, pnl, Decimal(0), Decimal(0), Decimal(0)))
 
 
+@given(quoted('che il flusso "{flow}" ha cicli negli ultimi 60 giorni'))
+def cycles_of_sixty_days(flow_cycles: FlowCycles, flow: str) -> None:
+    created = flow_cycles.flow(flow)
+    equity = equity_of(flow_cycles, created)
+    capital = created.configuration.allocated_capital
+    for days_ago in range(1, 61):
+        planned_at = flow_cycles.clock.now() - timedelta(days=days_ago)
+        equity.record(
+            EquitySnapshot(created.id.value, planned_at, capital, Decimal(0), Decimal(0), Decimal(0), Decimal(0))
+        )
+
+
+@given(quoted('che il flusso "{flow}" non ha ancora cicli'))
+def flow_without_cycles(flow_cycles: FlowCycles, flow: str) -> None:
+    flow_cycles.add_flow("anna", flow)
+
+
 # When
+
+
+@when(quoted('"{user}" apre l\'equity curve del flusso "{flow}"'))
+def opens_the_curve(flow_cycles: FlowCycles, curve: Curve, user: str, flow: str) -> None:
+    assert flow_cycles.users[flow] == user
+    open_curve(flow_cycles, curve, flow)
+
+
+@when(quoted('"{user}" sceglie il periodo "{period}"'))
+def chooses_the_period(flow_cycles: FlowCycles, curve: Curve, user: str, period: str) -> None:
+    flow = flow_cycles.platform.flows.flows[-1].name.value
+    assert flow_cycles.users[flow] == user
+    open_curve(flow_cycles, curve, flow, PERIODS[period])
 
 
 @when(
@@ -139,3 +199,30 @@ def failed_cycle(flow_cycles: FlowCycles, flow: str, a: str) -> None:
 def cycle_equity(flow_cycles: FlowCycles, a: str) -> None:
     name = flow_cycles.platform.flows.flows[-1].name.value
     assert recorded_at(flow_cycles, name).equity == amount(a)
+
+
+@then(parsers.re(r"^i punti a (?P<values>[\d e]+) USDC sono nell'area verde$"))
+def points_in_the_green(curve: Curve, values: str) -> None:
+    assert all(point.equity >= curve.opened.initial_capital for point in points_at(curve, values))
+
+
+@then(parsers.re(r"^il punto a (?P<values>\d+) USDC è nell'area rossa$"))
+def point_in_the_red(curve: Curve, values: str) -> None:
+    assert all(point.equity < curve.opened.initial_capital for point in points_at(curve, values))
+
+
+@then("la curva mostra solo i punti degli ultimi 30 giorni")
+def only_the_last_thirty_days(flow_cycles: FlowCycles, curve: Curve) -> None:
+    since = flow_cycles.clock.now() - timedelta(days=30)
+    planned = [point.planned_at for point in curve.opened.snapshots]
+    assert planned, "la curva non ha punti"
+    assert min(planned) >= since, f"punto più vecchio: {min(planned):%d/%m %H:%M}"
+    flow = flow_cycles.platform.flows.flows[-1]
+    recorded = equity_of(flow_cycles, flow).of_flow(flow.id.value, EVERY_CYCLE)
+    assert len(planned) < len(recorded), f"punti mostrati: {len(planned)} di {len(recorded)}"
+
+
+@then(quoted('la pagina mostra "{text}"'))
+def no_cycles_yet(curve: Curve, text: str) -> None:
+    assert text == "Nessun ciclo ancora eseguito"
+    assert curve.opened.snapshots == ()
