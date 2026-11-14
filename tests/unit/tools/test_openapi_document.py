@@ -26,7 +26,10 @@ def test_document_declares_the_functions_of_the_api() -> None:
 
 
 def test_document_is_the_same_at_every_generation() -> None:
-    assert openapi_document() == openapi_document()
+    first_generation = openapi_document()
+    second_generation = openapi_document()
+
+    assert second_generation == first_generation
 
 
 def test_main_saves_the_document_for_the_dashboard() -> None:
