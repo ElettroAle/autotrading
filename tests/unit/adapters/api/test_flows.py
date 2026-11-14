@@ -297,7 +297,7 @@ def test_a_stopped_flow_above_the_free_capital_of_now_answers_with_the_reason(
 
     assert (response.status_code, reason_of(response)) == (
         422,
-        {"detail": "capitale allocato oltre il capitale libero: 300 USDC"},
+        {"detail": "capitale allocato oltre il capitale libero: 300 USDC", "field": "allocated_capital"},
     )
     assert anna.get("/flows").json()[0]["status"] == "fermo"
 
