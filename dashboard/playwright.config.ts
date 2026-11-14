@@ -3,6 +3,12 @@ import { cucumberReporter, defineBddConfig } from 'playwright-bdd';
 
 import { FAKE_IDENTITY_PROVIDER } from './src/testing/mocks/identity-provider.ts';
 
+const TIME_ZONE = 'Europe/Rome';
+
+// The steps build the instants of a scenario with the clock of Node, the page reads them with the clock of the
+// browser: both run in the same zone, whatever the zone of the machine (R2.1.2). The workers inherit it.
+process.env.TZ = TIME_ZONE;
+
 const PORT = 4173;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
@@ -27,7 +33,7 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     baseURL: ORIGIN,
-    timezoneId: 'Europe/Rome',
+    timezoneId: TIME_ZONE,
     trace: 'retain-on-failure',
   },
   // The build of the image, served by the server of the image, configured as an installation dev (ADR 0117).
