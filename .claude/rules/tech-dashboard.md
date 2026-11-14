@@ -5,7 +5,8 @@ paths:
 
 # Dashboard React + TypeScript
 
-Decisioni in ADR 0116 (struttura e controlli), 0117 (container e percorso `/dashboard`), 0118 (accesso Entra).
+Decisioni in ADR 0116 (struttura e controlli), 0117 (container e percorso `/dashboard`), 0118 (accesso Entra), 0121
+(grafici).
 
 ## Progetto
 
@@ -40,9 +41,9 @@ dashboard/
 ## Librerie
 
 React Router, TanStack Query per i dati dell'API, React Hook Form + Zod per i form (Zod anche per validare le
-risposte), Tailwind per lo stile, MSAL (`@azure/msal-browser`, `@azure/msal-react`) per l'accesso. Grafici: una sola
-libreria, scelta dal primo lavoro che ne ha bisogno e scritta qui. Chiamate HTTP con `fetch`, dal client di
-`src/lib/api-client.ts`.
+risposte), Tailwind per lo stile, MSAL (`@azure/msal-browser`, `@azure/msal-react`) per l'accesso. Grafici: Recharts,
+unica libreria (ADR 0121), importata solo dai grafici condivisi di `src/components/charts`; le funzionalità passano i
+dati (`eslint.architecture.js`). Chiamate HTTP con `fetch`, dal client di `src/lib/api-client.ts`.
 
 ## Accesso (ADR 0118)
 

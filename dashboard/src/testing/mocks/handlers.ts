@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 
 import { summaryOf, type FakeCycle } from './cycles';
 import { InvalidPeriod, statisticsOf } from './flow-statistics';
-import { fakePlatform, type FakeFlow, type FakeUser } from './platform';
+import { fakePlatform, type FakeEquityPoint, type FakeFlow, type FakeUser } from './platform';
 
 const BEARER = 'Bearer ';
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -94,6 +94,36 @@ const cycleAt = (cycles: FakeCycle[], plannedAt: string): Response => {
     : HttpResponse.json(cycle);
 };
 
+const DAY = 24 * 60 * 60 * 1000;
+
+// The periods of the curve as the API reads them: from `from` included to `to` excluded (R2.2.3).
+const windowOf = (url: URL): ((point: FakeEquityPoint) => boolean) | undefined => {
+  const period = url.searchParams.get('period') ?? 'lifetime';
+  const lastDays = { '7d': 7, '30d': 30 }[period];
+  if (period === 'lifetime') {
+    return () => true;
+  }
+  if (lastDays !== undefined) {
+    const since = Date.now() - lastDays * DAY;
+    return (point) => point.plannedAt.getTime() >= since;
+  }
+  const start = url.searchParams.get('from');
+  const end = url.searchParams.get('to');
+  if (period !== 'range' || start === null || end === null) {
+    return undefined;
+  }
+  return (point) =>
+    point.plannedAt.getTime() >= Date.parse(start) && point.plannedAt.getTime() < Date.parse(end);
+};
+
+const equityResponse = (flow: FakeFlow, admits: (point: FakeEquityPoint) => boolean) => ({
+  initial_capital: flow.initialCapital,
+  points: flow.equity
+    .filter(admits)
+    .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime())
+    .map((point) => ({ planned_at: point.plannedAt.toISOString(), equity: String(point.equity) })),
+});
+
 export const handlers = [
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
@@ -148,6 +178,19 @@ export const handlers = [
     withUser(request, (user) =>
       withFlow(user, String(params.flowId), (cycles) => cycleAt(cycles, String(params.plannedAt))),
     ),
+
+  http.get('*/flows/:flowId/equity', ({ request, params }) =>
+    withUser(request, (user) => {
+      const flow = user.flows.find((candidate) => candidate.id === params.flowId);
+      if (flow === undefined) {
+        return problem(404, 'Not Found', 'flusso non trovato');
+      }
+      const admits = windowOf(new URL(request.url));
+      if (admits === undefined) {
+        return problem(422, 'Unprocessable Content', 'intervallo non valido');
+      }
+      return HttpResponse.json(equityResponse(flow, admits));
+    }),
   ),
   http.get('*/flows/:flowId/statistics', ({ request, params }) =>
     withUser(request, (user) => {

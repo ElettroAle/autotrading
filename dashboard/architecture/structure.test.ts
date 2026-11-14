@@ -1,5 +1,6 @@
-// ADR-0116: the dashboard follows the structure of bulletproof-react. Every rule of eslint.architecture.js is red on an
-// example that breaks it and silent on one that respects it, and the dashboard itself breaks none.
+// ADR-0116: the dashboard follows the structure of bulletproof-react. ADR-0121: Recharts is the one chart library, used
+// only by the shared charts of src/components/charts. Every rule of eslint.architecture.js is red on an example that
+// breaks it and silent on one that respects it, and the dashboard itself breaks none.
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
@@ -50,6 +51,26 @@ const VIOLATING: ReadonlyArray<readonly [string, string, string]> = [
     'server/route-list.ts',
     "import { paths } from '../src/config/paths';\n",
   ],
+  [
+    'ADR-0121: a feature draws a chart with Recharts itself',
+    'src/features/flows/components/flow-chart.tsx',
+    "import { AreaChart } from 'recharts';\n",
+  ],
+  [
+    'ADR-0121: the app draws a chart with Recharts itself',
+    'src/app/routes/app/comparison.tsx',
+    "import { LineChart } from 'recharts';\n",
+  ],
+  [
+    'ADR-0121: the shared charts use a second chart library',
+    'src/components/charts/bar-chart.tsx',
+    "import { Bar } from 'react-chartjs-2';\n",
+  ],
+  [
+    'ADR-0121: a feature uses a second chart library',
+    'src/features/flows/components/flow-chart.tsx',
+    "import * as d3 from 'd3';\n",
+  ],
   ['a file is not named in kebab-case', 'src/components/ui/EnvironmentLabel.tsx', 'export {};\n'],
   [
     'a folder is not named in kebab-case',
@@ -70,6 +91,16 @@ const CONFORMING: ReadonlyArray<readonly [string, string, string]> = [
     "import { useApiClient } from '@/lib/api-client';\nimport { useFlows } from '../api/get-flows';\n",
   ],
   [
+    'ADR-0121: the shared charts use Recharts',
+    'src/components/charts/line-chart.tsx',
+    "import { LineChart } from 'recharts';\n",
+  ],
+  [
+    'ADR-0121: a feature draws its data with a shared chart',
+    'src/features/flows/components/flow-chart.tsx',
+    "import { EquityChart } from '@/components/charts/equity-chart';\n",
+  ],
+  [
     'a test uses the fakes',
     'src/features/flows/components/flow-summary.test.tsx',
     "import { renderApp } from '@/testing/test-utils';\n",
@@ -81,7 +112,7 @@ const CONFORMING: ReadonlyArray<readonly [string, string, string]> = [
   ],
 ];
 
-describe('ADR-0116: the structure of the dashboard', () => {
+describe('ADR-0116, ADR-0121: the structure of the dashboard', () => {
   it.each(VIOLATING)('is red when %s', async (_rule, path, source) => {
     expect(await brokenRules(path, source)).not.toEqual([]);
   });
