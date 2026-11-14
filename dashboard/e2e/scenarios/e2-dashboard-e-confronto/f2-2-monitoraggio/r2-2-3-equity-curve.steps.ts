@@ -10,17 +10,17 @@ const DAY = 24 * 60 * 60 * 1000;
 const GREEN = '#16a34a';
 const RED = '#dc2626';
 
-const flowOf = (name: string, initialCapital = '100') => {
+const flowOf = (name: string, allocatedCapital = 100) => {
   if (!fakePlatform.hasUser(USER)) {
     fakePlatform.addUser(USER, { hasUserRole: true });
   }
-  return fakePlatform.addFlow(USER, name, undefined, { initialCapital });
+  return fakePlatform.addFlow(USER, name, { allocatedCapital });
 };
 
 Given(
   'che il flusso {string} ha capitale iniziale {int} USDC',
   async ({ memory }, flow: string, capital: number) => {
-    flowOf(flow, String(capital));
+    flowOf(flow, capital);
     memory.flow = flow;
   },
 );

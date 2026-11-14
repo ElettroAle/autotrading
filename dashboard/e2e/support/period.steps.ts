@@ -13,7 +13,7 @@ When(
       fakePlatform.addUser(account, { hasUserRole: true });
     }
     for (const [name, history] of memory.histories) {
-      fakePlatform.addFlow(account, name, history);
+      fakePlatform.addFlow(account, name, { history });
     }
     const [historyFlow] = [...memory.histories.keys()];
     await dashboard.openFlow(historyFlow ?? memory.flow);

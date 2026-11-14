@@ -60,7 +60,8 @@ class _ConfigurationDocument(TypedDict):
     sources: list[_SourceDocument]
     instructions: str
     risk_limits: _RiskLimitsDocument
-    allocated_capital: str
+    # None only in the versions of a draft (ADR 0124).
+    allocated_capital: str | None
     bring_to_minimum: NotRequired[bool]
 
 
@@ -147,6 +148,22 @@ class SqlAlchemyFlowRepositoryAdapter:
                     version=flow.configuration.version,
                 )
             )
+
+    def add_assignment(self, flow: Flow) -> None:
+        """The account of the draft and its new version in one transaction: a draft never has one without the other."""
+        if flow.tenant_id != self._tenant_id:
+            raise CrossTenantAccessError
+        self.get(flow.id)
+        statement = update(flows).where(flows.c.id == flow.id.value).values(account_id=flow.account_id)
+        try:
+            with self._transaction() as connection:
+                connection.execute(statement)
+                connection.execute(insert(flow_versions).values(_version_row_of(flow)))
+        except IntegrityError as error:
+            # The account was removed after the use case read it: the draft has no account to start on.
+            if ACCOUNT_OF_TENANT in str(error.orig):
+                raise FlowAccountNotFoundError from error
+            raise
 
     def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
         query = (
@@ -249,7 +266,7 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "max_margin_exposure_percent": _text(limits.max_margin_exposure_percent),
             "max_value_exposure_percent": _text(limits.max_value_exposure_percent),
         },
-        "allocated_capital": str(configuration.allocated_capital),
+        "allocated_capital": _text(configuration.allocated_capital),
         "bring_to_minimum": configuration.bring_to_minimum,
     }
 
@@ -273,7 +290,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
             _decimal(limits["max_margin_exposure_percent"]),
             _decimal(limits["max_value_exposure_percent"]),
         ),
-        allocated_capital=Decimal(document["allocated_capital"]),
+        allocated_capital=_decimal(document["allocated_capital"]),
         # Versions saved before the option existed read with it off, its default (ADR 0051).
         bring_to_minimum=document.get("bring_to_minimum", False),
     )

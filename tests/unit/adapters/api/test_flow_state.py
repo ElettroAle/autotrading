@@ -52,7 +52,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
     anna = client_of("anna")
     flow = flow_of(platform, "anna")
     platform.ledger.totals[flow.id] = FlowTotals(flow.id, Decimal(40), Decimal(2))
-    platform.account_activity.activities[flow.account_id] = an_activity(
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity(
         positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal(12)), a_position("ETH")),
     )
 
@@ -85,7 +85,7 @@ def test_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Plat
 def test_an_exchange_that_cannot_be_read_answers_unavailable(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     flow = flow_of(platform, "anna")
-    platform.account_activity.activities[flow.account_id] = an_activity()
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
     platform.account_activity.reachable = False
 
     response = anna.get(f"/flows/{flow.id.value}/state")

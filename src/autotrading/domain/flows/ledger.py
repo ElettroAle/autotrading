@@ -7,7 +7,6 @@ from uuid import UUID
 
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.flow_status import FlowStatus
 
 ZERO = Decimal(0)
 
@@ -182,9 +181,7 @@ class AccountLedger:
 
 def _owners_of(flows: Iterable[Flow]) -> dict[str, FlowId]:
     # The conflict rule gives every asset of an account at most one flow in use (R1.1.2).
-    return {
-        asset: flow.id for flow in flows if flow.status != FlowStatus.ARCHIVED for asset in flow.configuration.assets
-    }
+    return {asset: flow.id for flow in flows if flow.status.holds_account for asset in flow.configuration.assets}
 
 
 def _instant_of(event: Execution | FundingPayment) -> datetime:

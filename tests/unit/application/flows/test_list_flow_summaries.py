@@ -59,3 +59,12 @@ def test_an_archived_flow_is_not_in_use() -> None:
     flows.flows.append(a_flow(TENANT, status=FlowStatus.ARCHIVED))
 
     assert summaries_of(flows, AccountStore()).execute() == []
+
+
+def test_a_draft_has_no_account_and_plans_nothing() -> None:
+    flows = FlowStore()
+    flows.flows.append(a_flow(TENANT, status=FlowStatus.STOPPED).duplicated())
+
+    [summary] = summaries_of(flows, AccountStore()).execute()
+
+    assert (summary.name, summary.status, summary.account, summary.schedule) == ("alfa (copia)", "bozza", "", None)

@@ -25,6 +25,6 @@ class ReadFlowStateUseCase:
 
     def execute(self, command: ReadFlowStateCommand) -> FlowState:
         flow = self._flows.get(command.flow_id)
-        activity = self._activity.execute(flow.account_id)
+        activity = self._activity.execute(flow.assigned_account_id)
         totals = self._ledger.totals_of((flow.id,)).get(flow.id) or FlowTotals(flow.id)
         return FlowState.attributed(flow, activity, totals)

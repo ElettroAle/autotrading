@@ -20,7 +20,7 @@ const compare = async (first: string, second: string) => {
 describe('FlowVersions', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
-    fakePlatform.addFlow('anna', 'alfa', undefined, {
+    fakePlatform.addFlow('anna', 'alfa', {
       versions: versionsWith(
         { model: OPENROUTER },
         { instructions: 'prudente' },

@@ -106,6 +106,15 @@ def test_a_flow_without_cycles_has_no_point(flows: FlowStore, store: EquitySnaps
     assert use_case(flows, store).execute(ReadFlowEquityCommand(flow.id.value)).snapshots == ()
 
 
+def test_a_draft_has_no_initial_capital_and_no_point(flows: FlowStore, store: EquitySnapshotStore) -> None:
+    draft = a_flow_with_capital(flows).duplicated()
+    flows.flows.append(draft)
+
+    equity = use_case(flows, store).execute(ReadFlowEquityCommand(draft.id.value))
+
+    assert (equity.initial_capital, equity.snapshots) == (None, ())
+
+
 def test_a_flow_of_another_tenant_is_not_found(flows: FlowStore, store: EquitySnapshotStore) -> None:
     other = a_flow_with_capital(flows, tenant_id=TenantId.new())
     recorded(store, snapshot(other, 1, 305), tenant_id=other.tenant_id)

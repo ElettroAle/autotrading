@@ -123,3 +123,70 @@ describe('createApiClient', () => {
     expect(onSessionExpired).toHaveBeenCalledOnce();
   });
 });
+
+describe('createApiClient commands', () => {
+  it('sends a command with its body as JSON and reads the answer', async () => {
+    server.use(
+      http.put('http://localhost:3000/items/1', async ({ request }) =>
+        request.headers.get('Authorization') === 'Bearer token-1' &&
+        request.headers.get('Content-Type') === 'application/json'
+          ? HttpResponse.json({ name: ((await request.json()) as { name: string }).name })
+          : HttpResponse.json({}, { status: 400 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    expect(await api.put('/items/1', { name: 'beta' }, z.object({ name: z.string() }))).toEqual({
+      name: 'beta',
+    });
+  });
+
+  it('sends a command without body', async () => {
+    server.use(
+      http.post('*/items/1/copy', async ({ request }) =>
+        (await request.text()) === ''
+          ? HttpResponse.json({ name: 'alfa (copia)' }, { status: 201 })
+          : HttpResponse.json({}, { status: 400 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    expect(await api.post('/items/1/copy', z.object({ name: z.string() }))).toEqual({
+      name: 'alfa (copia)',
+    });
+  });
+
+  it('tells, for an invalid request, which field is wrong and why', async () => {
+    server.use(
+      http.put('*/items/1', () =>
+        HttpResponse.json(
+          {
+            detail: 'richiesta non valida',
+            errors: [
+              { loc: ['body', 'allocated_capital'], msg: 'Input should be a valid decimal' },
+              { loc: ['body'], msg: 'Field required' },
+            ],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const { api } = clientWith();
+
+    await expect(api.put('/items/1', {}, itemsSchema)).rejects.toMatchObject({
+      status: 422,
+      message: 'richiesta non valida',
+      fieldErrors: { allocated_capital: 'Input should be a valid decimal', body: 'Field required' },
+    });
+  });
+
+  it('sends the user to sign in again when a command is refused for the token', async () => {
+    server.use(http.post('*/items/1/copy', () => HttpResponse.json({}, { status: 401 })));
+    const { api, onSessionExpired } = clientWith();
+
+    await expect(api.post('/items/1/copy', itemsSchema)).rejects.toBeInstanceOf(
+      SessionExpiredError,
+    );
+    expect(onSessionExpired).toHaveBeenCalledOnce();
+  });
+});

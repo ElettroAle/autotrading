@@ -6,6 +6,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import (
     AllocatedCapitalNotPositiveError,
     AssetsRequiredError,
+    FlowAssignmentMissingError,
     RepeatedSourceError,
     SourceNotSelectedError,
 )
@@ -24,7 +25,11 @@ def assets_of(names: Iterable[str]) -> tuple[str, ...]:
 
 @dataclass(frozen=True, slots=True)
 class FlowConfiguration:
-    """One immutable, numbered version of what a flow does (R1.1.1, R1.1.3)."""
+    """One immutable, numbered version of what a flow does (R1.1.1, R1.1.3).
+
+    Assets and allocated capital are missing only in the versions of a draft: the flow requires them out of draft
+    (ADR 0124).
+    """
 
     version: int
     assets: tuple[str, ...]
@@ -33,19 +38,25 @@ class FlowConfiguration:
     sources: tuple[SourceSelection, ...]
     instructions: str
     risk_limits: RiskLimits
-    allocated_capital: Decimal
+    allocated_capital: Decimal | None
     # Off unless the user chooses it: an opening below the exchange minimum is blocked (R1.5.4).
     bring_to_minimum: bool = False
 
     def __post_init__(self) -> None:
-        if not self.assets:
-            raise AssetsRequiredError
         names = [source.name for source in self.sources]
         repeated = next((name for name in names if names.count(name) > 1), None)
         if repeated is not None:
             raise RepeatedSourceError(repeated)
-        if not self.allocated_capital.is_finite() or self.allocated_capital <= 0:
+        capital = self.allocated_capital
+        if capital is not None and (not capital.is_finite() or capital <= 0):
             raise AllocatedCapitalNotPositiveError
+
+    @property
+    def assigned_capital(self) -> Decimal:
+        """The allocated capital of a configuration that has one: every flow out of draft (ADR 0124)."""
+        if self.allocated_capital is None:
+            raise FlowAssignmentMissingError(("capitale allocato",))
+        return self.allocated_capital
 
     def covers(self, asset: str) -> bool:
         """The flow trades only its own assets: a position on another asset belongs to someone else."""

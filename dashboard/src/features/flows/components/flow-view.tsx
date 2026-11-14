@@ -4,10 +4,28 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { paths } from '@/config/paths';
 
-import { useFlows } from '../api/get-flows';
+import { useAccounts } from '../api/get-accounts';
+import { DRAFT_STATUS, useFlows, type Flow } from '../api/get-flows';
+
+import { DraftAssignmentForm } from './draft-assignment-form';
+import { DuplicateFlowButton } from './duplicate-flow-button';
+import { FlowDetails } from './flow-details';
+import { StartFlowButton } from './start-flow-button';
+
+const FlowStatus = ({ flow }: { flow: Flow }) => {
+  if (flow.status === DRAFT_STATUS) {
+    return (
+      <span className="rounded bg-amber-100 px-2 py-0.5 text-sm font-medium text-amber-900">
+        Bozza
+      </span>
+    );
+  }
+  return <p className="text-slate-600">Stato: {flow.status}</p>;
+};
 
 export const FlowView = ({ flowId }: { flowId: string }) => {
   const flows = useFlows();
+  const accounts = useAccounts();
   if (flows.isPending) {
     return <Loading />;
   }
@@ -18,12 +36,13 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
   if (flow === undefined) {
     return <p>Flusso non trovato.</p>;
   }
+  const accountsOfTenant = accounts.data ?? [];
   return (
     <section aria-labelledby="flow-name" className="rounded border border-slate-200 bg-white p-4">
       <h2 id="flow-name" className="text-xl font-semibold">
         {flow.name}
       </h2>
-      <p className="text-slate-600">Stato: {flow.status}</p>
+      <FlowStatus flow={flow} />
       <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
         Cicli del flusso
       </Link>
@@ -33,6 +52,14 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
       >
         Versioni della configurazione
       </Link>
+      <FlowDetails flow={flow} accounts={accountsOfTenant} />
+      <div className="mt-4 flex gap-3">
+        <DuplicateFlowButton flowId={flow.id} />
+        {flow.status === DRAFT_STATUS ? <StartFlowButton flowId={flow.id} /> : null}
+      </div>
+      {flow.status === DRAFT_STATUS ? (
+        <DraftAssignmentForm flowId={flow.id} accounts={accountsOfTenant} />
+      ) : null}
     </section>
   );
 };

@@ -26,13 +26,13 @@ class FlowEquityResponse(BaseModel):
     (R2.2.3); amounts as text without trailing zeros (ADR 0018).
     """
 
-    initial_capital: str
+    initial_capital: str | None
     points: list[EquityPointResponse]
 
     @classmethod
     def of(cls, equity: FlowEquity) -> FlowEquityResponse:
         return cls(
-            initial_capital=amount_text(equity.initial_capital),
+            initial_capital=None if equity.initial_capital is None else amount_text(equity.initial_capital),
             points=[EquityPointResponse.of(snapshot) for snapshot in equity.snapshots],
         )
 

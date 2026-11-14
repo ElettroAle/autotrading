@@ -37,6 +37,10 @@ def _source(source: SourceSelection) -> str:
     )
 
 
+def _money(amount: Decimal | None) -> str:
+    return NONE if amount is None else money_text(amount)
+
+
 def _percent(percent: Decimal | None) -> str:
     return NONE if percent is None else f"{number_text(percent)}%"
 
@@ -51,6 +55,6 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (LEVERAGE, lambda configuration: str(configuration.risk_limits.max_leverage)),
     (MARGIN_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_margin_exposure_percent)),
     (VALUE_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_value_exposure_percent)),
-    ("capitale allocato", lambda configuration: money_text(configuration.allocated_capital)),
+    ("capitale allocato", lambda configuration: _money(configuration.allocated_capital)),
     ("porta al minimo", lambda configuration: "sì" if configuration.bring_to_minimum else "no"),
 )

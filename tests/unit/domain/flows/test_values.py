@@ -65,7 +65,7 @@ def test_only_active_and_paused_flows_are_not_stopped(status: FlowStatus, *, not
 
 
 def test_the_statuses_read_as_the_user_reads_them() -> None:
-    assert [status.value for status in FlowStatus] == ["fermo", "attivo", "in pausa", "archiviato"]
+    assert [status.value for status in FlowStatus] == ["bozza", "fermo", "attivo", "in pausa", "archiviato"]
 
 
 def test_risk_limits_need_the_leverage_and_one_exposure() -> None:

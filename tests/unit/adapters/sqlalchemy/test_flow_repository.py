@@ -85,3 +85,24 @@ def test_a_version_saved_before_the_option_reads_without_bringing_to_the_minimum
     del document["bring_to_minimum"]
 
     assert configuration_of(1, document).bring_to_minimum is False
+
+
+def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_back() -> None:
+    draft = a_flow(TenantId.new(), configuration=CONFIGURATION).duplicated()
+    document = json.loads(json.dumps(document_of(draft.configuration)))
+
+    assert (document["assets"], document["allocated_capital"]) == ([], None)
+    assert configuration_of(1, document) == draft.configuration
+
+
+def test_a_draft_is_saved_without_account() -> None:
+    draft = a_flow(TenantId.new(), configuration=CONFIGURATION).duplicated()
+
+    assert (_row_of(draft)["account_id"], _row_of(draft)["status"]) == (None, "draft")
+
+
+def test_an_assignment_of_another_tenant_never_reaches_the_database() -> None:
+    repository = SqlAlchemyFlowRepositoryAdapter(ENGINE, TenantId.new())
+
+    with pytest.raises(CrossTenantAccessError):
+        repository.add_assignment(a_flow(TenantId.new()).duplicated())

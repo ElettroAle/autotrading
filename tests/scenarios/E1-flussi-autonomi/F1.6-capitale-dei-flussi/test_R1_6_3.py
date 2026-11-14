@@ -80,11 +80,11 @@ def record_flow_fills(
     fills = []
     for number, instant in enumerate(instants):
         order = uuid4()
-        bench.orders.add(order, owner.account_id, owner.id)
+        bench.orders.add(order, owner.assigned_account_id, owner.id)
         fill_id = f"{flow}-{number}"
         fills.append(a_fill(asset, order, realized_pnl=realized_pnl, fee=fee, executed_at=instant, fill_id=fill_id))
-    bench.extend(owner.account_id, fills=tuple(fills))
-    bench.record_executions(owner.account_id)
+    bench.extend(owner.assigned_account_id, fills=tuple(fills))
+    bench.record_executions(owner.assigned_account_id)
 
 
 def consult_flow(bench: AttributionBench, flow: str, query: OperationsQuery) -> OperationsReport:
@@ -132,7 +132,7 @@ def many_fills(bench: AttributionBench, flow: str, count: str, a: str, asset: st
 
 @given(step(r'che il flusso "{flow}" ha ricevuto un funding di {a} USDC su "{asset}" alle ' + clock("paid")))
 def funding_at(bench: AttributionBench, flow: str, a: str, asset: str, paid: str) -> None:
-    account_id = bench.flow(flow).account_id
+    account_id = bench.flow(flow).assigned_account_id
     bench.exchange.funding.setdefault(account_id, []).append(a_payment(asset, amount(a), paid_at=at(paid)))
     bench.record_executions(account_id)
 

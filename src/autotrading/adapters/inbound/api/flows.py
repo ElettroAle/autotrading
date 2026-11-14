@@ -10,10 +10,12 @@ from pydantic import BaseModel, Field
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
+from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
+from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
@@ -109,6 +111,17 @@ class FlowModificationRequest(BaseModel):
         )
 
 
+class DraftAssignmentRequest(BaseModel):
+    """Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason."""
+
+    account_id: UUID
+    allocated_capital: Decimal
+    assets: list[str] = Field(default_factory=list)
+
+    def command(self, flow_id: UUID) -> AssignDraftFlowCommand:
+        return AssignDraftFlowCommand(FlowId(flow_id), self.account_id, self.allocated_capital, tuple(self.assets))
+
+
 class ModelSelectionResponse(BaseModel):
     name: str
     # Numbers travel as strings, so no precision is lost on the way (ADR 0018).
@@ -149,7 +162,8 @@ class ConfigurationResponse(BaseModel):
     sources: list[SourceSelectionResponse]
     instructions: str
     risk_limits: RiskLimitsResponse
-    allocated_capital: str
+    # None only in the versions of a draft (ADR 0124).
+    allocated_capital: str | None
     bring_to_minimum: bool
 
     @classmethod
@@ -165,7 +179,7 @@ class ConfigurationResponse(BaseModel):
             sources=[SourceSelectionResponse.of(source) for source in configuration.sources],
             instructions=configuration.instructions,
             risk_limits=RiskLimitsResponse.of(configuration.risk_limits),
-            allocated_capital=amount_text(configuration.allocated_capital),
+            allocated_capital=_amount(configuration.allocated_capital),
             bring_to_minimum=configuration.bring_to_minimum,
         )
 
@@ -192,11 +206,11 @@ class DifferenceResponse(BaseModel):
 
 
 class FlowResponse(BaseModel):
-    """A flow with the configuration version in force."""
+    """A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."""
 
     id: UUID
     name: str
-    account_id: UUID
+    account_id: UUID | None
     status: str
     version: int
     assets: list[str]
@@ -205,7 +219,7 @@ class FlowResponse(BaseModel):
     sources: list[SourceSelectionResponse]
     instructions: str
     risk_limits: RiskLimitsResponse
-    allocated_capital: str
+    allocated_capital: str | None
     bring_to_minimum: bool
 
     @classmethod
@@ -226,7 +240,7 @@ class FlowResponse(BaseModel):
             sources=[SourceSelectionResponse.of(source) for source in configuration.sources],
             instructions=configuration.instructions,
             risk_limits=RiskLimitsResponse.of(configuration.risk_limits),
-            allocated_capital=amount_text(configuration.allocated_capital),
+            allocated_capital=_amount(configuration.allocated_capital),
             bring_to_minimum=configuration.bring_to_minimum,
         )
 
@@ -360,6 +374,20 @@ def flows_router(
         changes = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(FlowId(flow_id)))
         return [CapitalChangeResponse.of(change) for change in changes]
 
+    @router.post("/flows/{flow_id}/duplicate", status_code=status.HTTP_201_CREATED)
+    def duplicate_flow(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> FlowResponse:
+        return FlowResponse.of(use_cases.duplicate_flow.execute(DuplicateFlowCommand(FlowId(flow_id))))
+
+    @router.put("/flows/{flow_id}/assignment")
+    def assign_draft_flow(
+        flow_id: UUID,
+        request: DraftAssignmentRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> FlowResponse:
+        return FlowResponse.of(use_cases.assign_draft_flow.execute(request.command(flow_id)))
+
     @router.post("/flows/{flow_id}/{action}")
     def change_flow_status(
         flow_id: UUID,
@@ -379,6 +407,10 @@ def flows_router(
 
 
 COMMANDS = {"start": FlowAction.START, "pause": FlowAction.PAUSE, "resume": FlowAction.RESUME}
+
+
+def _amount(value: Decimal | None) -> str | None:
+    return None if value is None else amount_text(value)
 
 
 def _text(value: Decimal | None) -> str | None:

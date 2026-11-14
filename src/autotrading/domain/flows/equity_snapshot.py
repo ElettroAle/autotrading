@@ -43,8 +43,9 @@ class EquitySnapshot:
 class FlowEquity:
     """The equity curve of a flow: a point for each cycle of the period, and the capital the curve is judged against.
 
-    The initial capital is the capital allocated now, the same reference the return of the flow uses (R1.6.1).
+    The initial capital is the capital allocated now, the same reference the return of the flow uses (R1.6.1); a draft
+    has none, and no cycle either (ADR 0124).
     """
 
-    initial_capital: Decimal
+    initial_capital: Decimal | None
     snapshots: tuple[EquitySnapshot, ...]

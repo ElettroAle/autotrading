@@ -101,6 +101,10 @@ class InMemoryFlowRepositoryAdapter:
         self.add_version(flow)
         self._store.capital_changes.setdefault(flow.id, []).append(change)
 
+    def add_assignment(self, flow: Flow) -> None:
+        self._replace(replace(self.get(flow.id), account_id=flow.account_id, configuration=flow.configuration))
+        self._store.versions[flow.id].append(flow.configuration)
+
     def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
         self.get(flow_id)
         return tuple(self._store.capital_changes.get(flow_id, []))

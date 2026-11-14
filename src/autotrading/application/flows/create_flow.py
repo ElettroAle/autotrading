@@ -78,7 +78,7 @@ class CreateFlowUseCase:
         existing = self._flows.list()
         require_assets_free(command.account_id, configuration.assets, existing)
         free_capital = FreeCapital.of_account(account.balance, account.currency, command.account_id, existing)
-        free_capital.require_room_for(configuration.allocated_capital)
+        free_capital.require_room_for(configuration.assigned_capital)
         flow = Flow.created(self._tenant_id, command.account_id, name, configuration)
         self._flows.add(flow)
         operations.info("flusso creato", extra={"flow_id": str(flow.id.value)})

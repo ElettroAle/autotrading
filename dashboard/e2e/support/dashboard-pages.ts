@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { fakePlatform } from '@/testing/mocks/platform';
+import { accessTokenOf, fakePlatform } from '@/testing/mocks/platform';
 
 const BASE_PATH = '/dashboard';
 
@@ -21,7 +21,7 @@ export class DashboardPages {
   }
 
   async openFlow(name: string): Promise<void> {
-    await this.open(`/flows/${fakePlatform.flowNamed(name).id}`);
+    await this.open(`/flows/${encodeURIComponent(fakePlatform.flowNamed(name).id)}`);
   }
 
   async openCyclesOf(flowName: string): Promise<void> {
@@ -47,6 +47,27 @@ export class DashboardPages {
     fakePlatform.signIn(account);
     await this.signInButton().click();
     await this.page.waitForURL((url) => !url.pathname.endsWith('/login'));
+  }
+
+  /** Opens the page of a flow as the account: the sign-in brings the user back to the page asked for. */
+  async openFlowAs(account: string, name: string): Promise<void> {
+    await this.openFlow(name);
+    await this.signInAs(account);
+    await expect(this.flowName().or(this.page.getByText('Flusso non trovato.'))).toBeVisible();
+  }
+
+  /** Asks the API, with the token of the account, for a command the page does not offer. */
+  async send(account: string, method: string, path: string): Promise<number> {
+    return this.page.evaluate(
+      async (request) =>
+        (
+          await fetch(request.path, {
+            method: request.method,
+            headers: { Authorization: `Bearer ${request.token}` },
+          })
+        ).status,
+      { token: accessTokenOf(account), method, path },
+    );
   }
 
   async openAndSignInAs(account: string): Promise<void> {
@@ -163,5 +184,33 @@ export class DashboardPages {
 
   comparison(): Locator {
     return this.page.getByRole('table', { name: 'Confronto delle versioni' });
+  }
+
+  /** The value the page of a flow shows for one part of its configuration. */
+  detail(label: string): Locator {
+    return this.page
+      .getByLabel('Configurazione')
+      .locator('dt', { hasText: label })
+      .locator('xpath=following-sibling::dd[1]');
+  }
+
+  draftLabel(): Locator {
+    return this.page.getByText('Bozza', { exact: true });
+  }
+
+  status(status: string): Locator {
+    return status === 'bozza' ? this.draftLabel() : this.page.getByText(`Stato: ${status}`);
+  }
+
+  async command(name: string): Promise<void> {
+    await this.page.getByRole('button', { name, exact: true }).click();
+  }
+
+  async assign(account: string, capital: string, assets: string): Promise<void> {
+    const form = this.page.getByRole('form', { name: 'Assegnazione della bozza' });
+    await form.getByLabel('Conto').selectOption({ label: account });
+    await form.getByLabel('Capitale allocato (USDC)').fill(capital);
+    await form.getByLabel('Asset').fill(assets);
+    await form.getByRole('button', { name: 'Assegna' }).click();
   }
 }

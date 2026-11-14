@@ -126,12 +126,13 @@ provider_keys = Table(
 )
 
 # A flow keeps its name unique among the flows of the tenant not archived (R1.1.1, ADR 0031).
+# Only a draft, or a draft archived, has no account (ADR 0124).
 flows = Table(
     "flows",
     metadata,
     Column("id", Uuid, primary_key=True),
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
-    Column("account_id", Uuid, nullable=False),
+    Column("account_id", Uuid),
     Column("name", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),

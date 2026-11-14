@@ -25,10 +25,12 @@ from autotrading.application.agent.register_provider_key import ProviderKeyServi
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.assign_draft_flow import AssignDraftFlowUseCase
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
+from autotrading.application.flows.duplicate_flow import DuplicateFlowUseCase
 from autotrading.application.flows.export_account_operations import ExportAccountOperationsUseCase
 from autotrading.application.flows.export_flow_operations import ExportFlowOperationsUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
@@ -170,6 +172,8 @@ class TenantUseCases:
     read_flow_statistics: ReadFlowStatisticsUseCase
     list_flow_overviews: ListFlowOverviewsUseCase
     read_flow_equity: ReadFlowEquityUseCase
+    duplicate_flow: DuplicateFlowUseCase
+    assign_draft_flow: AssignDraftFlowUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -209,7 +213,9 @@ class TenantUseCases:
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             list_flow_versions=ListFlowVersionsUseCase(ports.flows),
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
-            change_flow_status=ChangeFlowStatusUseCase(ports.flows, ports.running_verifications),
+            change_flow_status=ChangeFlowStatusUseCase(
+                ports.flows, ports.running_verifications, ports.flow_checks.accounts
+            ),
             archive_flow=ArchiveFlowUseCase(ports.flows),
             stop_flow=StopFlowUseCase(ports.flows, ports.stop_ports),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
@@ -234,4 +240,6 @@ class TenantUseCases:
                 ports.flow_summaries, ports.cycle_history, ports.environment, ports.clock
             ),
             read_flow_equity=ReadFlowEquityUseCase(ports.flows, ports.equity_snapshots, ports.clock),
+            duplicate_flow=DuplicateFlowUseCase(ports.flows),
+            assign_draft_flow=AssignDraftFlowUseCase(ports.flows, ports.flow_checks),
         )

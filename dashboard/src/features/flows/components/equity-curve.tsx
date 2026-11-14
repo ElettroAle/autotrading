@@ -13,8 +13,10 @@ const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) =>
   if (equity.isError) {
     return <ErrorMessage error={equity.error} />;
   }
-  if (equity.data.points.length > 0) {
-    return <EquityChart points={equity.data.points} baseline={equity.data.initialCapital} />;
+  // A draft has no capital and no cycle yet (ADR 0124): it shows no curve.
+  const { points, initialCapital } = equity.data;
+  if (points.length > 0 && initialCapital !== null) {
+    return <EquityChart points={points} baseline={initialCapital} />;
   }
   return (
     <p className="text-slate-600">

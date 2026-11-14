@@ -46,7 +46,7 @@ class ChangeAllocatedCapitalUseCase:
     def execute(self, command: ChangeAllocatedCapitalCommand) -> Flow:
         flow = self._flows.get(command.flow_id)
         changed = flow.with_capital(command.capital)
-        current = flow.configuration.allocated_capital
+        current = flow.configuration.assigned_capital
         if command.capital == current:
             return flow
         self._require_admitted(flow, command.capital)
@@ -59,12 +59,11 @@ class ChangeAllocatedCapitalUseCase:
         return changed
 
     def _require_admitted(self, flow: Flow, capital: Decimal) -> None:
-        current = flow.configuration.allocated_capital
+        current = flow.configuration.assigned_capital
         if capital > current:
-            account = read_flow_account(self._accounts, flow.account_id)
-            free_capital = FreeCapital.of_account(
-                account.balance, account.currency, flow.account_id, self._flows.list()
-            )
+            account_id = flow.assigned_account_id
+            account = read_flow_account(self._accounts, account_id)
+            free_capital = FreeCapital.of_account(account.balance, account.currency, account_id, self._flows.list())
             require_increase_within(current, capital, free_capital)
             return
         state = self._flow_state.execute(ReadFlowStateCommand(flow.id))

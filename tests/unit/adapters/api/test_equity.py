@@ -135,6 +135,13 @@ def test_a_flow_without_cycles_answers_no_point(client_of: Client, platform: Pla
     assert anna.get(f"/flows/{flow_id}/equity").json()["points"] == []
 
 
+def test_a_draft_answers_no_initial_capital_and_no_point(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    draft = anna.post(f"/flows/{flow_of(platform, 'anna')}/duplicate").json()
+
+    assert anna.get(f"/flows/{draft['id']}/equity").json() == {"initial_capital": None, "points": []}
+
+
 def test_the_equity_of_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:
     flow_id = flow_of(platform, "bruno")
     record(platform, "bruno", flow_id, 1, "10")

@@ -1,11 +1,14 @@
 import logging
 from dataclasses import dataclass
 
-from autotrading.application.flows.ports import FlowRepositoryPort, RunningVerificationsPort
+from autotrading.application.flows.flow_account import read_flow_account
+from autotrading.application.flows.ports import FlowAccountPorts, FlowRepositoryPort, RunningVerificationsPort
+from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.free_capital import FreeCapital
 
 operations = logging.getLogger("autotrading.flows")
 
@@ -21,21 +24,38 @@ class ChangeFlowStatusUseCase:
 
     A flow that would trade does not start or resume while the procedure of verification runs on one of its assets:
     the assets stay free of procedures until the new status is recorded (R0.4.1, ADR 0079).
+
+    A draft starts only with account, capital and assets assigned, an account still of the tenant, its capital within
+    the free capital read now and no asset already used by another flow of the account (R2.4.1, ADR 0124).
     """
 
-    def __init__(self, flows: FlowRepositoryPort, verifications: RunningVerificationsPort) -> None:
+    def __init__(
+        self, flows: FlowRepositoryPort, verifications: RunningVerificationsPort, accounts: FlowAccountPorts
+    ) -> None:
         self._flows = flows
         self._verifications = verifications
+        self._accounts = accounts
 
     def execute(self, command: ChangeFlowStatusCommand) -> Flow:
-        flow = self._flows.get(command.flow_id).after(command.command)
+        current = self._flows.get(command.flow_id)
+        flow = current.after(command.command)
+        if current.status is FlowStatus.DRAFT:
+            self._require_startable(flow)
         self._record_status(flow)
         operations.info("stato del flusso cambiato", extra={"flow_id": str(flow.id.value), "status": flow.status.name})
         return flow
+
+    def _require_startable(self, flow: Flow) -> None:
+        account_id = flow.assigned_account_id
+        account = read_flow_account(self._accounts, account_id)
+        others = self._flows.list()
+        require_assets_free(account_id, flow.configuration.assets, others, excluding=flow.id)
+        free_capital = FreeCapital.of_account(account.balance, account.currency, account_id, others)
+        free_capital.require_room_for(flow.configuration.assigned_capital)
 
     def _record_status(self, flow: Flow) -> None:
         if flow.status is not FlowStatus.ACTIVE:
             self._flows.change_status(flow)
             return
-        with self._verifications.kept_free(flow.account_id, flow.configuration.assets):
+        with self._verifications.kept_free(flow.assigned_account_id, flow.configuration.assets):
             self._flows.change_status(flow)

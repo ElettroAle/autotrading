@@ -51,11 +51,11 @@ class ReconcileAccountUseCase:
         self._record_executions = record_executions
 
     def execute(self, command: ReconcileAccountCommand) -> ReconciliationOutcome:
-        account_id = self._flows.get(command.flow_id).account_id
+        account_id = self._flows.get(command.flow_id).assigned_account_id
         recorded = self._record_executions.execute(RecordAccountExecutionsCommand(account_id))
         reconciliation = AccountReconciliation.of(
             account_id,
-            (flow for flow in self._flows.list() if flow.account_id == account_id),
+            (flow for flow in self._flows.list() if flow.belongs_to(account_id)),
             self._activity.execute(account_id),
             self._readings.last_reading(account_id),
             recorded,

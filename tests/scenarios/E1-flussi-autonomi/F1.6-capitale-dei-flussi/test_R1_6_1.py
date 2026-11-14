@@ -44,16 +44,16 @@ FUNDED_AT = READ_AT + timedelta(minutes=1)
 
 def fills_of(bench: AttributionBench, flow: str, realized_pnl: Decimal, fee: Decimal) -> None:
     order, owner = uuid4(), bench.flow(flow)
-    bench.orders.add(order, owner.account_id, owner.id)
+    bench.orders.add(order, owner.assigned_account_id, owner.id)
     fill = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee, fill_id=str(order))
-    bench.extend(owner.account_id, fills=(fill,))
-    bench.record_executions(owner.account_id)
+    bench.extend(owner.assigned_account_id, fills=(fill,))
+    bench.record_executions(owner.assigned_account_id)
 
 
 def cycle_fills_of(flow_cycles: FlowCycles, flow: str, realized_pnl: Decimal, fee: Decimal) -> None:
     order, owner = uuid4(), flow_cycles.flow(flow)
     platform = flow_cycles.platform
-    platform.platform_orders.add(order, owner.account_id, owner.id)
+    platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
     address = flow_cycles.credentials_of(flow).account_address
     # An opening and its closing: the position the flow expects is the one the exchange shows, none (ADR 0064).
     opening = a_fill("BTC", order, fill_id=f"{order}-1", executed_at=OPENED_AT)
@@ -113,26 +113,26 @@ def read_again(bench: AttributionBench, account: str) -> None:
 )
 def published_late(bench: AttributionBench, flow: str, minutes: str, a: str) -> None:
     order, owner = uuid4(), bench.flow(flow)
-    bench.orders.add(order, owner.account_id, owner.id)
+    bench.orders.add(order, owner.assigned_account_id, owner.id)
     executed_at = READ_AT - timedelta(minutes=int(minutes))
     late = a_fill("BTC", order, realized_pnl=amount(a), fill_id="in-ritardo", executed_at=executed_at)
-    bench.extend(owner.account_id, fills=(late,))
-    bench.record_executions(owner.account_id)
+    bench.extend(owner.assigned_account_id, fills=(late,))
+    bench.record_executions(owner.assigned_account_id)
 
 
 @given(step(r'che il flusso "{flow}" ha aperto {a} "{asset}" con i propri ordini'))
 def opened_by_flow(bench: AttributionBench, flow: str, a: str, asset: str) -> None:
     order, owner = uuid4(), bench.flow(flow)
-    bench.orders.add(order, owner.account_id, owner.id)
+    bench.orders.add(order, owner.assigned_account_id, owner.id)
     opening = a_fill(asset, order, size=amount(a), fill_id="apertura", executed_at=OPENED_AT)
-    bench.extend(owner.account_id, fills=(opening,))
-    bench.record_executions(owner.account_id)
+    bench.extend(owner.assigned_account_id, fills=(opening,))
+    bench.record_executions(owner.assigned_account_id)
 
 
 def held_by_owner(bench: AttributionBench, asset: str) -> tuple[UUID, Decimal]:
     (owner,) = (flow for flow in bench.store.flows if asset in flow.configuration.assets)
     totals = bench.ledger.totals.get(owner.id) or FlowTotals(owner.id)
-    return owner.account_id, totals.expected(asset)
+    return owner.assigned_account_id, totals.expected(asset)
 
 
 @given(step(r'che l\'exchange liquida la posizione "{asset}" con PnL realizzato {a} USDC'))
@@ -184,7 +184,7 @@ def fills_without_fees(bench: AttributionBench, flow: str, a: str) -> None:
 @given(step(r'che il flusso "{flow}" ha {a} USDC impegnati come margine in posizioni aperte'))
 def committed_margin(bench: AttributionBench, flow: str, a: str) -> None:
     owner = bench.flow(flow)
-    bench.extend(owner.account_id, positions=(a_position(owner.configuration.assets[0], margin=amount(a)),))
+    bench.extend(owner.assigned_account_id, positions=(a_position(owner.configuration.assets[0], margin=amount(a)),))
 
 
 @given(
@@ -196,11 +196,11 @@ def committed_margin(bench: AttributionBench, flow: str, a: str) -> None:
 def liquidity_and_position(bench: AttributionBench, flow: str, a: str, b: str, c: str) -> None:
     owner, margin = bench.flow(flow), amount(b)
     bench.extend(
-        owner.account_id,
+        owner.assigned_account_id,
         positions=(a_position(owner.configuration.assets[0], margin=margin, unrealized_pnl=amount(c)),),
     )
     # The liquidity the step names comes from the executions of the flow: capital, plus their PnL, less the margin.
-    fills_of(bench, flow, amount(a) - owner.configuration.allocated_capital + margin, Decimal(0))
+    fills_of(bench, flow, amount(a) - owner.configuration.assigned_capital + margin, Decimal(0))
 
 
 @given(
@@ -356,10 +356,10 @@ def record_flow_fills(bench: AttributionBench, flow: str, asset: str, instants: 
     fills = []
     for number, instant in enumerate(instants):
         order = uuid4()
-        bench.orders.add(order, owner.account_id, owner.id)
+        bench.orders.add(order, owner.assigned_account_id, owner.id)
         fills.append(a_fill(asset, order, executed_at=instant, fill_id=f"{flow}-{number}"))
-    bench.extend(owner.account_id, fills=tuple(fills))
-    bench.record_executions(owner.account_id)
+    bench.extend(owner.assigned_account_id, fills=tuple(fills))
+    bench.record_executions(owner.assigned_account_id)
 
 
 def flow_operations(bench: AttributionBench) -> ListFlowOperationsUseCase:
@@ -383,7 +383,7 @@ def fills_at(bench: AttributionBench, flow: str, asset: str, clocks: str) -> Non
 
 @given(step(r'che il flusso "{flow}" ha ricevuto un funding di {a} USDC su "{asset}" alle ' + clock("paid")))
 def funding_at(bench: AttributionBench, flow: str, a: str, asset: str, paid: str) -> None:
-    account_id = bench.flow(flow).account_id
+    account_id = bench.flow(flow).assigned_account_id
     bench.exchange.funding.setdefault(account_id, []).append(a_payment(asset, amount(a), paid_at=at(paid)))
     bench.record_executions(account_id)
 

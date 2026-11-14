@@ -35,7 +35,7 @@ describe('FlowStatistics', () => {
   });
 
   it('shows every statistic of the flow formatted in Italian', async () => {
-    fakePlatform.addFlow('anna', 'alfa', ALFA);
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
     expect(await valueOf('Operazioni vinte')).toHaveTextContent('2');
@@ -59,7 +59,7 @@ describe('FlowStatistics', () => {
   });
 
   it('reads the statistics of the period of the page', async () => {
-    fakePlatform.addFlow('anna', 'alfa', ALFA);
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
     await valueOf('Numero di operazioni');
 
@@ -71,7 +71,7 @@ describe('FlowStatistics', () => {
   });
 
   it('says how many model calls have no known cost', async () => {
-    fakePlatform.addFlow('anna', 'alfa', ALFA);
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     server.use(
       http.get('*/flows/:flowId/statistics', () =>
         HttpResponse.json({
@@ -95,14 +95,14 @@ describe('FlowStatistics', () => {
   });
 
   it('waits for both days of a range', async () => {
-    fakePlatform.addFlow('anna', 'alfa', ALFA);
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=range&from=2026-11-01' });
 
     expect(await panel()).toHaveTextContent("Scegli il primo e l'ultimo giorno dell'intervallo.");
   });
 
   it('tells why the statistics could not be read', async () => {
-    fakePlatform.addFlow('anna', 'alfa', ALFA);
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     await renderApp({
       account: 'anna',
       url: '/flows/flow-alfa?period=range&from=2026-11-03&to=2026-11-01',

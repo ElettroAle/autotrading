@@ -18,6 +18,8 @@ export type ScenarioMemory = {
   histories: Map<string, FakeFlowHistory>;
   described: DescribedFlow | undefined;
   compared: number[];
+  freeCapital: number | undefined;
+  answerStatus: number | undefined;
 };
 
 type Fixtures = {
@@ -49,6 +51,8 @@ export const test = base.extend<Fixtures>({
       histories: new Map(),
       described: undefined,
       compared: [],
+      freeCapital: undefined,
+      answerStatus: undefined,
     });
   },
 });

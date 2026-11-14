@@ -18,6 +18,6 @@ class SendCycleOrdersUseCase:
             return ()
         flow = approved[0].flow.flow
         cycle = CycleOrders(
-            flow.account_id, flow_id, flow.name.value, planned_at, tuple(order.outcome for order in approved)
+            flow.assigned_account_id, flow_id, flow.name.value, planned_at, tuple(order.outcome for order in approved)
         )
         return self._execution.execute(cycle)
