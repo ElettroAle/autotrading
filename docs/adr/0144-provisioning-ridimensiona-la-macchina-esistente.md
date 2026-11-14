@@ -2,7 +2,8 @@
 
 - Stato: proposta (14 novembre 2026)
 - Requisiti: Bug: la macchina dev si blocca al rilascio (RNF di disponibilità dell'installazione dev)
-- Collegate: ADR 0008 (installazioni OVH dalla pipeline), ADR 0013 (accesso solo Tailscale), ADR 0107 (forecaster);
+- Collegate: ADR 0008 (installazioni OVH dalla pipeline), ADR 0013 (accesso solo Tailscale; questa ADR ne sostituisce il
+  punto «rilascio senza credenziali OVH»), ADR 0107 (forecaster);
   decisione del proprietario all'avvio di E1: passaggio a d2-4 pre-approvato se la misura mostra che d2-2 non basta
 
 ## Contesto e problema
@@ -22,6 +23,9 @@ bloccata non si recupera dalla pipeline.
   piantata. Con il tipo già giusto non fa nulla.
 - Lo stesso allineamento gira a ogni rilascio, prima del deploy, oltre che nel workflow `provision`: cambiare
   `OVH_FLAVOR` ha effetto al rilascio successivo, senza esecuzioni a mano. Con il tipo già giusto costa solo una lettura.
+- Per questo i job di rilascio usano le credenziali OVH dell'ambiente (`OVH_CLIENT_ID`, `OVH_CLIENT_SECRET`, segreti
+  dell'environment GitHub): sostituisce il punto dell'ADR 0013 per cui il rilascio trovava la macchina senza credenziali
+  OVH. L'environment prod dovrà avere gli stessi segreti prima della sua prima promozione.
 
 ## Alternative scartate
 
