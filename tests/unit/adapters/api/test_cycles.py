@@ -261,6 +261,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "status": "attivo",
             "pause_reason": None,
             "model": flow.configuration.model.name,
+            "version": flow.configuration.version,
             "last_cycle": {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
             "next_cycle_at": "2026-11-12T10:22:00Z",
             "currency": "USDC",
@@ -280,6 +281,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "status": "in pausa",
             "pause_reason": "credito esaurito presso openrouter",
             "model": paused.configuration.model.name,
+            "version": paused.configuration.version,
             "last_cycle": None,
             "next_cycle_at": None,
             "currency": "USDC",
@@ -292,7 +294,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
 
 
 def test_a_flow_without_initial_capital_answers_without_a_return() -> None:
-    summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None)
+    summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None, 1)
     overview = FlowOverview(summary, "dev", (), None, "USDC", FlowReturn(Decimal(0), Decimal("12.50")))
 
     response = FlowOverviewResponse.of(overview)

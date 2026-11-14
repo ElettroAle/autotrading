@@ -47,4 +47,5 @@ def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
         pause_reason=timing.pause_reason,
         model=configuration.model.name,
         schedule=CycleSchedule.planned(flow.status.runs_cycles, timing.anchor, interval),
+        version=configuration.version,
     )

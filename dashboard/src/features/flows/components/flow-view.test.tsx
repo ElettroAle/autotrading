@@ -44,6 +44,15 @@ describe('FlowView', () => {
     );
   });
 
+  it('leads to the editor of the configuration of the flow', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('link', { name: 'Modifica la configurazione' })).toHaveAttribute(
+      'href',
+      '/flows/flow-alfa/edit',
+    );
+  });
+
   it('says a flow outside the tenant of the user does not exist', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-omega' });
 

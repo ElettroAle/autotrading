@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 
-import { FORM_CONTROL, FormField } from '@/components/ui/form-field';
+import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { paths } from '@/config/paths';
 
 import {
@@ -39,16 +39,18 @@ export const ImportStrategyForm = () => {
     >
       <h2 className="font-semibold">Importa una strategia</h2>
       <FormField id="import-name" label="Nome del nuovo flusso" error={errors.name?.message}>
-        <input id="import-name" className={FORM_CONTROL} {...register('name')} />
+        {(control) => <input {...control} className={FORM_CONTROL} {...register('name')} />}
       </FormField>
       <FormField id="import-file" label="File della strategia" error={errors.files?.message}>
-        <input
-          id="import-file"
-          type="file"
-          accept="application/json,.json"
-          className={FORM_CONTROL}
-          {...register('files')}
-        />
+        {(control) => (
+          <input
+            {...control}
+            type="file"
+            accept="application/json,.json"
+            className={FORM_CONTROL}
+            {...register('files')}
+          />
+        )}
       </FormField>
       <button
         type="submit"

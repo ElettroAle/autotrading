@@ -12,6 +12,12 @@ export const HomeRoute = () => (
         I tuoi conti
       </Link>
     </nav>
+    <Link
+      to={paths.newFlow.getHref()}
+      className="mb-4 inline-block rounded bg-blue-700 px-3 py-1.5 text-white"
+    >
+      Nuovo flusso
+    </Link>
     <FlowsList />
     <ImportStrategyForm />
     <nav aria-label="Consultazione" className="mt-6">

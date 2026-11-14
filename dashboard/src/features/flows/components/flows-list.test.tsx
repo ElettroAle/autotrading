@@ -30,6 +30,7 @@ describe('FlowsList', () => {
       '/flows/flow-alfa',
     );
     expect(within(flows).getByText('attivo')).toBeInTheDocument();
+    expect(within(flows).getByLabelText('Versione')).toHaveTextContent('1');
     expect(screen.queryByText('omega')).not.toBeInTheDocument();
   });
 

@@ -163,6 +163,7 @@ class FlowOverviewResponse(BaseModel):
     status: str
     pause_reason: str | None
     model: str
+    version: int
     last_cycle: LastCycleResponse | None
     next_cycle_at: datetime | None
     # Empty for a draft, which has no account yet (ADR 0124).
@@ -184,6 +185,7 @@ class FlowOverviewResponse(BaseModel):
             status=summary.status,
             pause_reason=summary.pause_reason,
             model=summary.model,
+            version=summary.version,
             last_cycle=LastCycleResponse.of(overview.last_cycle),
             next_cycle_at=overview.next_cycle_at,
             currency=overview.currency,

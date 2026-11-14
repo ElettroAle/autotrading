@@ -67,6 +67,9 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
         <Link to={paths.flowVersions.getHref(flow.id)} className="text-blue-800 hover:underline">
           Versioni della configurazione
         </Link>
+        <Link to={paths.editFlow.getHref(flow.id)} className="text-blue-800 hover:underline">
+          Modifica la configurazione
+        </Link>
       </nav>
       <FlowDetails flow={flow} accounts={accountsOfTenant} />
       <div className="mt-4 flex gap-3">

@@ -38,7 +38,7 @@ def test_an_active_flow_is_planned_from_its_anchor_on_its_account() -> None:
         "test-1",
         "attivo",
     )
-    assert summary.model == flow.configuration.model.name
+    assert (summary.model, summary.version) == (flow.configuration.model.name, flow.configuration.version)
     assert summary.schedule == CycleSchedule(STARTED, timedelta(minutes=flow.configuration.cycle_interval.minutes))
 
 

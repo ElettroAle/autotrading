@@ -5,29 +5,21 @@ import { z } from 'zod';
 import { paths } from '@/config/paths';
 
 import { SessionExpiredError, useAccessToken } from './auth';
-
-export type FieldErrors = Readonly<Record<string, string>>;
+import { problemDetailsOf, type FieldProblem } from './problem-details';
 
 /** An answer of the API other than success, with the reason its Problem Details give (ADR 0027). */
 export class ApiError extends Error {
   readonly status: number;
-  /** For an invalid request, why each field named by the API is wrong. */
-  readonly fieldErrors: FieldErrors;
+  /** Each reason with the field of the request it concerns, when the API names one. */
+  readonly problems: FieldProblem[];
 
-  constructor(status: number, detail: string, fieldErrors: FieldErrors = {}) {
+  constructor(status: number, detail: string, problems: FieldProblem[] = []) {
     super(detail);
     this.name = 'ApiError';
     this.status = status;
-    this.fieldErrors = fieldErrors;
+    this.problems = problems;
   }
 }
-
-const problemSchema = z.object({
-  detail: z.string(),
-  errors: z
-    .array(z.object({ loc: z.array(z.union([z.string(), z.number()])), msg: z.string() }))
-    .optional(),
-});
 
 /** A file the API gives to download, with the name it gives it. */
 export type DownloadedFile = { readonly name: string; readonly content: Blob };
@@ -36,7 +28,13 @@ export type ApiClient = {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
   /** A command without body, or with a JSON document sent as it is, as the text of a file the user chose. */
   post<T>(path: string, schema: z.ZodType<T>, document?: string): Promise<T>;
-  put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
+  /** A request with a JSON body, as a form sends it, and its answer. */
+  write<T>(
+    method: 'POST' | 'PATCH' | 'PUT',
+    path: string,
+    body: unknown,
+    schema: z.ZodType<T>,
+  ): Promise<T>;
   /** A command the API answers without content. */
   send(method: 'POST' | 'DELETE', path: string): Promise<void>;
   download(path: string): Promise<DownloadedFile>;
@@ -109,8 +107,8 @@ export const createApiClient = ({
     get: (path, schema) => parsed(request(path, { method: 'GET' }), schema),
     post: (path, schema, document) =>
       parsed(request(path, { method: 'POST', body: document }), schema),
-    put: (path, body, schema) =>
-      parsed(request(path, { method: 'PUT', body: JSON.stringify(body) }), schema),
+    write: (method, path, body, schema) =>
+      parsed(request(path, { method, body: JSON.stringify(body) }), schema),
     async send(method, path) {
       await request(path, { method });
     },
@@ -125,14 +123,10 @@ export const createApiClient = ({
 };
 
 const refusalOf = async (response: Response): Promise<ApiError> => {
-  const problem = problemSchema.safeParse(await response.json().catch(() => null));
-  if (!problem.success) {
-    return new ApiError(response.status, response.statusText);
-  }
-  const fieldErrors = Object.fromEntries(
-    (problem.data.errors ?? []).map(({ loc, msg }) => [String(loc[loc.length - 1]), msg]),
-  );
-  return new ApiError(response.status, problem.data.detail, fieldErrors);
+  const problem = problemDetailsOf(await response.json().catch(() => null));
+  return problem === undefined
+    ? new ApiError(response.status, response.statusText)
+    : new ApiError(response.status, problem.detail, problem.problems);
 };
 
 export const useApiClient = (): ApiClient => {

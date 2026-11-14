@@ -12,9 +12,17 @@ export const paths = {
     path: '/accounts',
     getHref: () => '/accounts',
   },
+  newFlow: {
+    path: '/flows/new',
+    getHref: () => '/flows/new',
+  },
   flow: {
     path: '/flows/:flowId',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}`,
+  },
+  editFlow: {
+    path: '/flows/:flowId/edit',
+    getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/edit`,
   },
   notifications: {
     path: '/notifications',

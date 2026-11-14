@@ -41,6 +41,26 @@ export class DashboardPages {
     await this.open(`/history${search}`);
   }
 
+  async openNewFlow(): Promise<void> {
+    await this.open('/flows/new');
+  }
+
+  async openFlowEditor(name: string): Promise<void> {
+    await this.open(`/flows/${fakePlatform.flowNamed(name).id}/edit`);
+  }
+
+  /** A field of a form, by its label: its accessible description is the reason the API refused its value. */
+  field(label: string): Locator {
+    return this.page.getByLabel(label, { exact: true });
+  }
+
+  /** The row of the list of the flows that names the flow. */
+  flowInList(name: string): Locator {
+    return this.flows()
+      .getByRole('listitem')
+      .filter({ has: this.page.getByRole('link', { name, exact: true }) });
+  }
+
   async openCyclesOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
