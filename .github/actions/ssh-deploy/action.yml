@@ -90,8 +90,9 @@ runs:
           || echo "::warning::misura delle risorse non avviata (ADR 0162)"
         report_resources() {
           local status=$?
+          # The summary has no API: the same report goes to the job log too (Task 254). `shell: bash` runs with pipefail.
           timeout 120 ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/measure-resources.sh report' \
-            >> "$GITHUB_STEP_SUMMARY" || echo "::warning::rapporto delle risorse non disponibile (ADR 0162)"
+            | tee -a "$GITHUB_STEP_SUMMARY" || echo "::warning::rapporto delle risorse non disponibile (ADR 0162)"
           exit "$status"
         }
         trap report_resources EXIT
