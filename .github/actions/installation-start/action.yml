@@ -7,20 +7,17 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Attendi la macchina e copia il compose
+    - uses: ./.github/actions/ssh-wait
+      with:
+        hostname: ${{ inputs.hostname }}
+    - name: Attendi cloud-init e copia il compose
       shell: bash
       env:
         HOSTNAME_TS: ${{ inputs.hostname }}
-      # Tailscale SSH authenticates both ends with their tailnet identity, so no SSH key exists and a host
-      # key seen for the first time over the tailnet can be accepted (ADR 0013).
       run: |
         target="deploy@${HOSTNAME_TS}"
         ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
           -o BatchMode=yes -o ConnectTimeout=5)
-        for attempt in $(seq 1 120); do
-          ssh "${ssh_options[@]}" "$target" true && break
-          sleep 5
-        done
         ssh "${ssh_options[@]}" "$target" 'cloud-init status --wait'
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
     - name: Certificato HTTPS valido

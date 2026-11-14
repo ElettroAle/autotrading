@@ -1,0 +1,25 @@
+name: ssh-wait
+description: Attende che l'installazione accetti Tailscale SSH, dopo una creazione o un riavvio.
+inputs:
+  hostname:
+    description: Nome dell'installazione nel tailnet
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Attendi la macchina
+      shell: bash
+      env:
+        HOSTNAME_TS: ${{ inputs.hostname }}
+      # Tailscale SSH authenticates both ends with their tailnet identity, so no SSH key exists and a host
+      # key seen for the first time over the tailnet can be accepted (ADR 0013). A machine just created or
+      # resized (ADR 0144) joins the tailnet only after booting.
+      run: |
+        ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
+          -o BatchMode=yes -o ConnectTimeout=5)
+        for _ in $(seq 1 120); do
+          ssh "${ssh_options[@]}" "deploy@${HOSTNAME_TS}" true && exit 0
+          sleep 5
+        done
+        echo "::error::${HOSTNAME_TS} non accetta Tailscale SSH"
+        exit 1
