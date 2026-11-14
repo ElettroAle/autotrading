@@ -17,7 +17,10 @@ limiti di rischio e capitale. I parametri ammessi di fonti e modelli li dichiara
   codice della dashboard.
 - Creazione con `POST /flows`; modifica con `PATCH /flows/{id}` dei soli campi cambiati; il capitale con il suo
   endpoint dedicato.
-- Errori dell'API sui campi con il modulo di ADR 0130.
+- Errori dell'API sui campi con il modulo di ADR 0130 (`src/lib/problem-details.ts`, `src/lib/form-errors.ts`).
+- Gli errori di dominio della configurazione dichiarano l'impostazione rifiutata: base `FlowSettingError` (dominio) e
+  `FlowSettingRefusedError` (application) con l'enum `FlowSetting`; i Problem Details portano `field` tramite
+  `details` (ADR 0027), così la dashboard mette il motivo accanto al campo senza dedurlo dal testo.
 
 ## Alternative scartate
 
