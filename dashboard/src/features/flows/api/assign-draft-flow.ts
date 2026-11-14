@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 import { FLOWS_QUERY_KEY, flowsSchema } from './get-flows';
 
@@ -37,11 +37,12 @@ export const useAssignDraftFlow = (flowId: string) => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: AssignmentInput) =>
-      api.write(
-        'PUT',
-        `/flows/${encodeURIComponent(flowId)}/assignment`,
-        requestOf(input),
+    mutationFn: async (input: AssignmentInput) =>
+      readData(
+        await api.PUT('/flows/{flow_id}/assignment', {
+          params: { path: { flow_id: flowId } },
+          body: requestOf(input),
+        }),
         flowsSchema.element,
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: FLOWS_QUERY_KEY }),

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 import { PROVIDER_KEYS_QUERY_KEY, providerKeySchema } from './get-provider-keys';
 
@@ -16,11 +16,12 @@ export const useReplaceProviderKey = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ provider, key }: ProviderKeyReplacement) =>
-      api.write(
-        'PUT',
-        `/provider-keys/${encodeURIComponent(provider)}`,
-        { key },
+    mutationFn: async ({ provider, key }: ProviderKeyReplacement) =>
+      readData(
+        await api.PUT('/provider-keys/{provider}', {
+          params: { path: { provider } },
+          body: { key },
+        }),
         providerKeySchema,
       ),
     gcTime: 0,

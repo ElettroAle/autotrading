@@ -28,7 +28,8 @@ export const FlowVersions = ({ flowId }: { flowId: string }) => {
   if (versions.isPending) {
     return <Loading />;
   }
-  if (versions.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (versions.data === undefined) {
     return <ErrorMessage error={versions.error} />;
   }
   return (

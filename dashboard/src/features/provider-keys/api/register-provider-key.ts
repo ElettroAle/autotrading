@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 import { PROVIDER_KEYS_QUERY_KEY, providerKeySchema } from './get-provider-keys';
 
@@ -20,8 +20,8 @@ export const useRegisterProviderKey = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ProviderKeyInput) =>
-      api.write('POST', '/provider-keys', input, providerKeySchema),
+    mutationFn: async (input: ProviderKeyInput) =>
+      readData(await api.POST('/provider-keys', { body: input }), providerKeySchema),
     gcTime: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PROVIDER_KEYS_QUERY_KEY }),
   });

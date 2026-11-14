@@ -28,6 +28,9 @@ export const withUser = async (
   request: Request,
   respond: (user: FakeUser) => Response | Promise<Response>,
 ): Promise<Response> => {
+  if (!fakePlatform.apiAnswers()) {
+    return HttpResponse.error();
+  }
   const user = userOf(request);
   if (user === undefined) {
     return problem(401, 'Unauthorized', 'token assente o non valido');

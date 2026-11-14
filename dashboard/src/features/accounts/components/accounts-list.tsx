@@ -41,7 +41,8 @@ export const AccountsList = () => {
   if (accounts.isPending) {
     return <Loading />;
   }
-  if (accounts.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (accounts.data === undefined) {
     return <ErrorMessage error={accounts.error} />;
   }
   if (accounts.data.length === 0) {

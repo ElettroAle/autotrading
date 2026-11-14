@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
-import { ACCOUNTS_QUERY_KEY, accountSchema } from './get-accounts';
+import { ACCOUNTS_QUERY_KEY } from './get-accounts';
 
 const REQUIRED = 'Campo obbligatorio';
 
@@ -15,6 +15,9 @@ export const credentialsInputSchema = z.object({
 
 export type CredentialsInput = z.infer<typeof credentialsInputSchema>;
 
+// The API answers with the account alone: its capital and network come with the list of the accounts.
+const replacedAccountSchema = z.object({ id: z.string(), name: z.string() });
+
 type CredentialsReplacement = {
   readonly accountId: string;
   readonly credentials: CredentialsInput;
@@ -25,12 +28,13 @@ export const useReplaceCredentials = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ accountId, credentials }: CredentialsReplacement) =>
-      api.write(
-        'PUT',
-        `/accounts/${encodeURIComponent(accountId)}/credentials`,
-        credentials,
-        accountSchema,
+    mutationFn: async ({ accountId, credentials }: CredentialsReplacement) =>
+      readData(
+        await api.PUT('/accounts/{account_id}/credentials', {
+          params: { path: { account_id: accountId } },
+          body: credentials,
+        }),
+        replacedAccountSchema,
       ),
     gcTime: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readDone, useApiClient } from '@/lib/api-client';
 
 import { LINKED_CHAT_QUERY_KEY } from './get-linked-chat';
 
@@ -9,7 +9,7 @@ export const useUnlinkChat = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.send('DELETE', '/telegram/chat'),
+    mutationFn: async () => readDone(await api.DELETE('/telegram/chat')),
     onSettled: () => queryClient.invalidateQueries({ queryKey: LINKED_CHAT_QUERY_KEY }),
   });
 };

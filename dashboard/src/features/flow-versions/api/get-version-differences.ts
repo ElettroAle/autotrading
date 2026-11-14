@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const differenceSchema = z.object({ part: z.string(), before: z.string(), after: z.string() });
 
@@ -11,10 +12,12 @@ export type Difference = z.infer<typeof differenceSchema>;
 export const useVersionDifferences = (flowId: string, first: number, second: number) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flows', flowId, 'versions', first, 'differences', second],
-    queryFn: () =>
-      api.get(
-        `/flows/${encodeURIComponent(flowId)}/versions/${first}/differences/${second}`,
+    ...pageDataQuery('flows', flowId, 'versions', first, 'differences', second),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/versions/{first}/differences/{second}', {
+          params: { path: { flow_id: flowId, first, second } },
+        }),
         z.array(differenceSchema),
       ),
   });

@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { fakePlatform } from '@/testing/mocks/platform';
@@ -66,5 +67,18 @@ describe('FlowView', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
     expect(await screen.findByRole('alert')).toHaveTextContent('errore interno');
+  });
+
+  it('keeps showing the flow and its cycles when a rereading fails', async () => {
+    fakePlatform.concludeCycle('alfa', new Date(2026, 10, 14, 9, 45, 0));
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await screen.findByRole('list', { name: 'Cicli recenti' });
+    fakePlatform.stopApi();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aggiorna' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Dati non aggiornati');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('alfa');
+    expect(screen.getByRole('list', { name: 'Cicli recenti' })).toHaveTextContent('09:45:00');
   });
 });

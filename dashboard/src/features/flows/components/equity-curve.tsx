@@ -10,7 +10,8 @@ const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) =>
   if (equity.isPending) {
     return <Loading />;
   }
-  if (equity.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (equity.data === undefined) {
     return <ErrorMessage error={equity.error} />;
   }
   // A draft has no capital and no cycle yet (ADR 0124): it shows no curve.

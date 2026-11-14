@@ -38,7 +38,8 @@ export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number
   if (positions.isPending) {
     return <Loading />;
   }
-  if (positions.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (positions.data === undefined) {
     return <ErrorMessage error={positions.error} />;
   }
   return (

@@ -36,6 +36,8 @@ export type ScenarioMemory = {
   refusal: string;
   /** The page whose period the user chooses, when it is not the page of the flow (R2.4.2). */
   periodPage: string;
+  /** The time a new cycle of the flow concluded, as the page should show it (R2.1.2). */
+  newCycleAt: string;
 };
 
 type Fixtures = {
@@ -78,6 +80,7 @@ export const test = base.extend<Fixtures>({
       registeredAt: '',
       refusal: '',
       periodPage: '',
+      newCycleAt: '',
     });
   },
 });

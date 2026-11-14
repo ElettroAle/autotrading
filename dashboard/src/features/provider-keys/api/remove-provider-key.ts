@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readDone, useApiClient } from '@/lib/api-client';
 
 import { PROVIDER_KEYS_QUERY_KEY } from './get-provider-keys';
 
@@ -9,8 +9,8 @@ export const useRemoveProviderKey = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (provider: string) =>
-      api.send('DELETE', `/provider-keys/${encodeURIComponent(provider)}`),
+    mutationFn: async (provider: string) =>
+      readDone(await api.DELETE('/provider-keys/{provider}', { params: { path: { provider } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PROVIDER_KEYS_QUERY_KEY }),
   });
 };

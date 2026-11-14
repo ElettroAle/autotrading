@@ -1,0 +1,6782 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AutoTrading",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Read Health",
+        "operationId": "read_health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Read Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "summary": "Read Identity",
+        "operationId": "read_identity_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/accounts": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "List Accounts",
+        "operationId": "list_accounts_accounts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccountSummaryResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Accounts Accounts Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Register Account",
+        "operationId": "register_account_accounts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountRegistrationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/accounts/{account_id}": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Get Account",
+        "operationId": "get_account_accounts__account_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Remove Account",
+        "operationId": "remove_account_accounts__account_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "confirmed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Confirmed"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/credentials": {
+      "put": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Replace Credentials",
+        "operationId": "replace_credentials_accounts__account_id__credentials_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialsReplacementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetailsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/state": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Read Account State",
+        "operationId": "read_account_state_accounts__account_id__state_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/positions/{coin}/close": {
+      "post": {
+        "tags": [
+          "posizioni"
+        ],
+        "summary": "Close Position",
+        "operationId": "close_position_accounts__account_id__positions__coin__close_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "coin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderOutcomeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/positions": {
+      "post": {
+        "tags": [
+          "posizioni"
+        ],
+        "summary": "Open Position",
+        "operationId": "open_position_accounts__account_id__positions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "apertura manuale non consentita"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/accounts/{account_id}/verifications": {
+      "post": {
+        "tags": [
+          "procedura di verifica"
+        ],
+        "summary": "Run Verification",
+        "operationId": "run_verification_accounts__account_id__verifications_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/VerificationRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationRunResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "la procedura non parte"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sources": {
+      "get": {
+        "tags": [
+          "fonti dati"
+        ],
+        "summary": "List Sources",
+        "operationId": "list_sources_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sources Sources Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/sources/{name}": {
+      "get": {
+        "tags": [
+          "fonti dati"
+        ],
+        "summary": "Get Source",
+        "operationId": "get_source_sources__name__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "fonte non disponibile"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provider-keys": {
+      "get": {
+        "tags": [
+          "chiavi dei fornitori IA"
+        ],
+        "summary": "List Provider Keys",
+        "operationId": "list_provider_keys_provider_keys_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderKeyResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Provider Keys Provider Keys Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "chiavi dei fornitori IA"
+        ],
+        "summary": "Register Provider Key",
+        "operationId": "register_provider_key_provider_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderKeyRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderKeyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/provider-keys/{provider}": {
+      "put": {
+        "tags": [
+          "chiavi dei fornitori IA"
+        ],
+        "summary": "Replace Provider Key",
+        "operationId": "replace_provider_key_provider_keys__provider__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderKeyReplacementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderKeyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chiavi dei fornitori IA"
+        ],
+        "summary": "Remove Provider Key",
+        "operationId": "remove_provider_key_provider_keys__provider__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models": {
+      "get": {
+        "tags": [
+          "modelli IA"
+        ],
+        "summary": "List Models",
+        "operationId": "list_models_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCatalogResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/telegram/link-code": {
+      "post": {
+        "tags": [
+          "notifiche Telegram"
+        ],
+        "summary": "Request Link Code",
+        "operationId": "request_link_code_telegram_link_code_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkCodeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/telegram/chat": {
+      "get": {
+        "tags": [
+          "notifiche Telegram"
+        ],
+        "summary": "Read Linked Chat",
+        "operationId": "read_linked_chat_telegram_chat_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedChatResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "notifiche Telegram"
+        ],
+        "summary": "Unlink Chat",
+        "operationId": "unlink_chat_telegram_chat_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/telegram/test-notification": {
+      "post": {
+        "tags": [
+          "notifiche Telegram"
+        ],
+        "summary": "Send Test Notification",
+        "operationId": "send_test_notification_telegram_test_notification_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/flows": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Create Flow",
+        "operationId": "create_flow_flows_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlowCreationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Flows",
+        "operationId": "list_flows_flows_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FlowResponse"
+                  },
+                  "title": "Response List Flows Flows Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/import": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Import Flow Strategy",
+        "description": "A draft named as asked, with the strategy of the file sent as it is (R2.5.2, ADR 0140).",
+        "operationId": "import_flow_strategy_flows_import_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyDocument-Input"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}": {
+      "patch": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Modify Flow",
+        "operationId": "modify_flow_flows__flow_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlowModificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/versions": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Flow Versions",
+        "operationId": "list_flow_versions_flows__flow_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VersionResponse"
+                  },
+                  "title": "Response List Flow Versions Flows  Flow Id  Versions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Get Flow Version",
+        "operationId": "get_flow_version_flows__flow_id__versions__version__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/versions/{first}/differences/{second}": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Compare Flow Versions",
+        "operationId": "compare_flow_versions_flows__flow_id__versions__first__differences__second__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "first",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "First"
+            }
+          },
+          {
+            "name": "second",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Second"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DifferenceResponse"
+                  },
+                  "title": "Response Compare Flow Versions Flows  Flow Id  Versions  First  Differences  Second  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/archive": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Archive Flow",
+        "operationId": "archive_flow_flows__flow_id__archive_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/stop": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Stop Flow",
+        "operationId": "stop_flow_flows__flow_id__stop_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopOutcomeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/allocated-capital": {
+      "put": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Change Allocated Capital",
+        "operationId": "change_allocated_capital_flows__flow_id__allocated_capital_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapitalChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/capital-changes": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Capital Changes",
+        "operationId": "list_capital_changes_flows__flow_id__capital_changes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CapitalChangeResponse"
+                  },
+                  "title": "Response List Capital Changes Flows  Flow Id  Capital Changes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/duplicate": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Duplicate Flow",
+        "operationId": "duplicate_flow_flows__flow_id__duplicate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/strategy": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Export Flow Strategy",
+        "description": "The strategy file of the flow, to download under the name of the flow (R2.5.2, ADR 0140).",
+        "operationId": "export_flow_strategy_flows__flow_id__strategy_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyDocument-Output"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/assignment": {
+      "put": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Assign Draft Flow",
+        "operationId": "assign_draft_flow_flows__flow_id__assignment_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftAssignmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/{action}": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Change Flow Status",
+        "operationId": "change_flow_status_flows__flow_id___action__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "start",
+                "pause",
+                "resume"
+              ],
+              "type": "string",
+              "title": "Action"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/free-capital": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Free Capital",
+        "operationId": "read_free_capital_accounts__account_id__free_capital_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreeCapitalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/state": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Flow State",
+        "operationId": "read_flow_state_flows__flow_id__state_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/closed-positions": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Closed Positions",
+        "operationId": "list_closed_positions_flows__flow_id__closed_positions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosedPositionPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/statistics": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Flow Statistics",
+        "operationId": "read_flow_statistics_flows__flow_id__statistics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowStatisticsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/operations": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Flow Operations",
+        "operationId": "list_flow_operations_flows__flow_id__operations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/operations": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Account Operations",
+        "operationId": "list_account_operations_accounts__account_id__operations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AccountScope",
+              "default": "unattributed"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/operations.csv": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Export Flow Operations",
+        "operationId": "export_flow_operations_flows__flow_id__operations_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/operations.csv": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Export Account Operations",
+        "operationId": "export_account_operations_accounts__account_id__operations_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AccountScope",
+              "default": "unattributed"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/overview": {
+      "get": {
+        "tags": [
+          "cicli"
+        ],
+        "summary": "List Flow Overviews",
+        "operationId": "list_flow_overviews_flows_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FlowOverviewResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Flow Overviews Flows Overview Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/flows/{flow_id}/cycles": {
+      "get": {
+        "tags": [
+          "cicli"
+        ],
+        "summary": "List Cycles",
+        "operationId": "list_cycles_flows__flow_id__cycles_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CyclePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/cycles/{planned_at}": {
+      "get": {
+        "tags": [
+          "cicli"
+        ],
+        "summary": "Read Cycle",
+        "operationId": "read_cycle_flows__flow_id__cycles__planned_at__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "planned_at",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Planned At"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/cost": {
+      "get": {
+        "tags": [
+          "cicli"
+        ],
+        "summary": "Read Flow Cost",
+        "operationId": "read_flow_cost_flows__flow_id__cost_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowCostResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/equity": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Flow Equity",
+        "operationId": "read_flow_equity_flows__flow_id__equity_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowEquityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/cycles": {
+      "get": {
+        "tags": [
+          "storico"
+        ],
+        "summary": "Query Cycle History",
+        "operationId": "query_cycle_history_history_cycles_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "versione della configurazione di un flusso",
+              "title": "Version"
+            },
+            "description": "versione della configurazione di un flusso"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next` della pagina precedente",
+              "title": "After"
+            },
+            "description": "`next` della pagina precedente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryCyclesPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/closed-positions": {
+      "get": {
+        "tags": [
+          "storico"
+        ],
+        "summary": "Query Closed Position History",
+        "operationId": "query_closed_position_history_history_closed_positions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "versione della configurazione di un flusso",
+              "title": "Version"
+            },
+            "description": "versione della configurazione di un flusso"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next` della pagina precedente",
+              "title": "After"
+            },
+            "description": "`next` della pagina precedente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryClosedPositionsPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/orders": {
+      "get": {
+        "tags": [
+          "storico"
+        ],
+        "summary": "Query Order History",
+        "operationId": "query_order_history_history_orders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "versione della configurazione di un flusso",
+              "title": "Version"
+            },
+            "description": "versione della configurazione di un flusso"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next` della pagina precedente",
+              "title": "After"
+            },
+            "description": "`next` della pagina precedente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryOrdersPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/ranking": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Rank Flows",
+        "operationId": "rank_flows_flows_ranking_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FlowRankingResponse"
+                  },
+                  "title": "Response Rank Flows Flows Ranking Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AbsentSourceResponse": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "reason"
+        ],
+        "title": "AbsentSourceResponse"
+      },
+      "AccountDetailsResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "has_credentials": {
+            "type": "boolean",
+            "title": "Has Credentials"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "exchange",
+          "has_credentials"
+        ],
+        "title": "AccountDetailsResponse",
+        "description": "An account as its owner reads it: credentials are only declared present, never returned (R0.2.3)."
+      },
+      "AccountReadingResponse": {
+        "properties": {
+          "balance": {
+            "type": "string",
+            "title": "Balance"
+          },
+          "available_margin": {
+            "type": "string",
+            "title": "Available Margin"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionReadingResponse"
+            },
+            "type": "array",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance",
+          "available_margin",
+          "currency",
+          "positions"
+        ],
+        "title": "AccountReadingResponse"
+      },
+      "AccountRegistrationRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange",
+            "default": ""
+          },
+          "account_address": {
+            "type": "string",
+            "title": "Account Address",
+            "default": ""
+          },
+          "secret_key": {
+            "type": "string",
+            "title": "Secret Key",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AccountRegistrationRequest"
+      },
+      "AccountRegistrationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/BalanceResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "exchange",
+          "balance"
+        ],
+        "title": "AccountRegistrationResponse"
+      },
+      "AccountScope": {
+        "type": "string",
+        "enum": [
+          "unattributed",
+          "all"
+        ],
+        "title": "AccountScope",
+        "description": "Which rows of an account to read: those of no flow only, or all of them, of every flow and of none."
+      },
+      "AccountStateResponse": {
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/AmountResponse"
+          },
+          "available_margin": {
+            "$ref": "#/components/schemas/AmountResponse"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionResponse"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "read_at": {
+            "type": "string",
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance",
+          "available_margin",
+          "positions",
+          "read_at"
+        ],
+        "title": "AccountStateResponse",
+        "description": "The state of an account read from the exchange at the request (R0.2.2): the same body from worker and API."
+      },
+      "AccountSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "has_credentials": {
+            "type": "boolean",
+            "title": "Has Credentials"
+          },
+          "network": {
+            "type": "string",
+            "title": "Network"
+          },
+          "allocated_capital": {
+            "type": "string",
+            "title": "Allocated Capital"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "exchange",
+          "has_credentials",
+          "network",
+          "allocated_capital",
+          "currency"
+        ],
+        "title": "AccountSummaryResponse",
+        "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state."
+      },
+      "AmountResponse": {
+        "properties": {
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "title": "AmountResponse"
+      },
+      "BalanceResponse": {
+        "properties": {
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "title": "BalanceResponse"
+      },
+      "CallCostResponse": {
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_tokens",
+          "output_tokens",
+          "cost_usd"
+        ],
+        "title": "CallCostResponse"
+      },
+      "CapitalChangeRequest": {
+        "properties": {
+          "allocated_capital": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Allocated Capital"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allocated_capital"
+        ],
+        "title": "CapitalChangeRequest"
+      },
+      "CapitalChangeResponse": {
+        "properties": {
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "previous": {
+            "type": "string",
+            "title": "Previous"
+          },
+          "new": {
+            "type": "string",
+            "title": "New"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed_at",
+          "previous",
+          "new",
+          "user_id"
+        ],
+        "title": "CapitalChangeResponse"
+      },
+      "ClosedPositionPageResponse": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ClosedPositionResponse"
+            },
+            "type": "array",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "has_next",
+          "positions"
+        ],
+        "title": "ClosedPositionPageResponse",
+        "description": "A page of the closed positions of a flow, from the most recent close (R1.7.2, R2.2.5)."
+      },
+      "ClosedPositionResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "leverage": {
+            "type": "integer",
+            "title": "Leverage"
+          },
+          "margin": {
+            "type": "string",
+            "title": "Margin"
+          },
+          "open_price": {
+            "type": "string",
+            "title": "Open Price"
+          },
+          "close_price": {
+            "type": "string",
+            "title": "Close Price"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closed At"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds"
+          },
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "pnl_percent_of_margin": {
+            "type": "string",
+            "title": "Pnl Percent Of Margin"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "opening_cycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Cycle"
+          },
+          "closing_cycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closing Cycle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "side",
+          "leverage",
+          "margin",
+          "open_price",
+          "close_price",
+          "opened_at",
+          "closed_at",
+          "duration_seconds",
+          "pnl",
+          "pnl_percent_of_margin",
+          "fees",
+          "reason",
+          "opening_cycle",
+          "closing_cycle"
+        ],
+        "title": "ClosedPositionResponse",
+        "description": "A closed position of a flow with its result (R1.7.2); amounts as text without trailing zeros (ADR 0018)."
+      },
+      "ConfigurationResponse": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "cycle_minutes": {
+            "type": "integer",
+            "title": "Cycle Minutes"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelSelectionResponse"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSelectionResponse"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "risk_limits": {
+            "$ref": "#/components/schemas/RiskLimitsResponse"
+          },
+          "allocated_capital": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Capital"
+          },
+          "bring_to_minimum": {
+            "type": "boolean",
+            "title": "Bring To Minimum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "assets",
+          "cycle_minutes",
+          "model",
+          "sources",
+          "instructions",
+          "risk_limits",
+          "allocated_capital",
+          "bring_to_minimum"
+        ],
+        "title": "ConfigurationResponse",
+        "description": "One configuration version of a flow."
+      },
+      "CredentialsReplacementRequest": {
+        "properties": {
+          "account_address": {
+            "type": "string",
+            "title": "Account Address",
+            "default": ""
+          },
+          "secret_key": {
+            "type": "string",
+            "title": "Secret Key",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "CredentialsReplacementRequest"
+      },
+      "CycleDetailResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "delay_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay Seconds"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "absent_sources": {
+            "items": {
+              "$ref": "#/components/schemas/AbsentSourceResponse"
+            },
+            "type": "array",
+            "title": "Absent Sources"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/StepDocumentResponse"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallCostResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "started_at",
+          "delay_seconds",
+          "outcome",
+          "failure",
+          "steps",
+          "absent_sources",
+          "documents",
+          "cost"
+        ],
+        "title": "CycleDetailResponse",
+        "description": "A cycle with everything recorded about it (R1.7.1)."
+      },
+      "CyclePageResponse": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/CycleSummaryResponse"
+            },
+            "type": "array",
+            "title": "Cycles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "has_next",
+          "cycles"
+        ],
+        "title": "CyclePageResponse"
+      },
+      "CycleSummaryResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "started_at",
+          "outcome",
+          "failure",
+          "decisions"
+        ],
+        "title": "CycleSummaryResponse",
+        "description": "A cycle in the list: its instants, its outcome and the decisions of the agent (R1.7.3)."
+      },
+      "DailyCostResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "cost_usd": {
+            "type": "string",
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "cost_usd"
+        ],
+        "title": "DailyCostResponse"
+      },
+      "DifferenceResponse": {
+        "properties": {
+          "part": {
+            "type": "string",
+            "title": "Part"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part",
+          "before",
+          "after"
+        ],
+        "title": "DifferenceResponse"
+      },
+      "DraftAssignmentRequest": {
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "allocated_capital": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Allocated Capital"
+          },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account_id",
+          "allocated_capital"
+        ],
+        "title": "DraftAssignmentRequest",
+        "description": "Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason."
+      },
+      "EquityPointResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "equity": {
+            "type": "string",
+            "title": "Equity"
+          },
+          "change_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "equity",
+          "change_percent"
+        ],
+        "title": "EquityPointResponse",
+        "description": "A point of the curve: its equity and how much it moved from the first point of the period, in percent with two\ndecimals, null when the first point has no equity (ADR 0137)."
+      },
+      "FailureResponse": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "error_type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "error_type",
+          "message"
+        ],
+        "title": "FailureResponse"
+      },
+      "FlowCostResponse": {
+        "properties": {
+          "total_usd": {
+            "type": "string",
+            "title": "Total Usd"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DailyCostResponse"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "unavailable_calls": {
+            "type": "integer",
+            "title": "Unavailable Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_usd",
+          "days",
+          "unavailable_calls"
+        ],
+        "title": "FlowCostResponse"
+      },
+      "FlowCreationRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "cycle_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle Minutes"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": ""
+          },
+          "model_parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Model Parameters"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSelectionRequest"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions",
+            "default": ""
+          },
+          "max_leverage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Leverage"
+          },
+          "max_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Margin Exposure Percent"
+          },
+          "max_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value Exposure Percent"
+          },
+          "allocated_capital": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Allocated Capital"
+          },
+          "bring_to_minimum": {
+            "type": "boolean",
+            "title": "Bring To Minimum",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "account_id",
+          "allocated_capital"
+        ],
+        "title": "FlowCreationRequest",
+        "description": "A missing name, model, asset or risk limit arrives empty, so the domain answers with the reason (R1.1.1)."
+      },
+      "FlowEquityResponse": {
+        "properties": {
+          "initial_capital": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Capital"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/EquityPointResponse"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "initial_capital",
+          "points"
+        ],
+        "title": "FlowEquityResponse",
+        "description": "The equity curve of a flow: a point for each cycle, from the oldest, and the capital it is judged against\n(R2.2.3); amounts as text without trailing zeros (ADR 0018)."
+      },
+      "FlowModificationRequest": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "assets": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assets"
+          },
+          "cycle_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle Minutes"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Parameters"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SourceSelectionRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "max_leverage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Leverage"
+          },
+          "max_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Margin Exposure Percent"
+          },
+          "max_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value Exposure Percent"
+          },
+          "bring_to_minimum": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bring To Minimum"
+          }
+        },
+        "type": "object",
+        "title": "FlowModificationRequest",
+        "description": "Only the parts the user changes; the others keep the version in force (R1.1.3)."
+      },
+      "FlowOverviewResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause Reason"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "last_cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastCycleResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_cycle_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cycle At"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "initial_capital": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Capital"
+          },
+          "current_capital": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Capital"
+          },
+          "return_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Percent"
+          },
+          "recent_outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/LastCycleResponse"
+            },
+            "type": "array",
+            "title": "Recent Outcomes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "account",
+          "environment",
+          "status",
+          "pause_reason",
+          "model",
+          "version",
+          "last_cycle",
+          "next_cycle_at",
+          "currency",
+          "initial_capital",
+          "current_capital",
+          "return_percent",
+          "recent_outcomes"
+        ],
+        "title": "FlowOverviewResponse",
+        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127)."
+      },
+      "FlowPositionResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          },
+          "leverage": {
+            "type": "string",
+            "title": "Leverage"
+          },
+          "entry_price": {
+            "type": "string",
+            "title": "Entry Price"
+          },
+          "margin": {
+            "type": "string",
+            "title": "Margin"
+          },
+          "unrealized_pnl": {
+            "type": "string",
+            "title": "Unrealized Pnl"
+          },
+          "unrealized_pnl_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "side",
+          "size",
+          "leverage",
+          "entry_price",
+          "margin",
+          "unrealized_pnl",
+          "unrealized_pnl_percent"
+        ],
+        "title": "FlowPositionResponse",
+        "description": "An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin."
+      },
+      "FlowRankingResponse": {
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "title": "Flow Id"
+          },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "return_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Percent"
+          },
+          "max_drawdown_percent": {
+            "type": "string",
+            "title": "Max Drawdown Percent"
+          },
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "total_fees": {
+            "type": "string",
+            "title": "Total Fees"
+          },
+          "win_rate_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Percent"
+          },
+          "operations": {
+            "type": "integer",
+            "title": "Operations"
+          },
+          "model_cost_usd": {
+            "type": "string",
+            "title": "Model Cost Usd"
+          },
+          "model_calls_without_cost": {
+            "type": "integer",
+            "title": "Model Calls Without Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_id",
+          "flow_name",
+          "return_percent",
+          "max_drawdown_percent",
+          "pnl",
+          "total_fees",
+          "win_rate_percent",
+          "operations",
+          "model_cost_usd",
+          "model_calls_without_cost"
+        ],
+        "title": "FlowRankingResponse",
+        "description": "A row of the ranking of the flows (R2.4.2): amounts as text (ADR 0018), percentages with two decimals, null\nwhen not available (ADR 0135)."
+      },
+      "FlowResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "cycle_minutes": {
+            "type": "integer",
+            "title": "Cycle Minutes"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelSelectionResponse"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSelectionResponse"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "risk_limits": {
+            "$ref": "#/components/schemas/RiskLimitsResponse"
+          },
+          "allocated_capital": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Capital"
+          },
+          "bring_to_minimum": {
+            "type": "boolean",
+            "title": "Bring To Minimum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "account_id",
+          "status",
+          "version",
+          "assets",
+          "cycle_minutes",
+          "model",
+          "sources",
+          "instructions",
+          "risk_limits",
+          "allocated_capital",
+          "bring_to_minimum"
+        ],
+        "title": "FlowResponse",
+        "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
+      },
+      "FlowStateResponse": {
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "allocated_capital": {
+            "type": "string",
+            "title": "Allocated Capital"
+          },
+          "available_liquidity": {
+            "type": "string",
+            "title": "Available Liquidity"
+          },
+          "margin": {
+            "type": "string",
+            "title": "Margin"
+          },
+          "unrealized_pnl": {
+            "type": "string",
+            "title": "Unrealized Pnl"
+          },
+          "realized_pnl": {
+            "type": "string",
+            "title": "Realized Pnl"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          },
+          "total_value": {
+            "type": "string",
+            "title": "Total Value"
+          },
+          "return_percent": {
+            "type": "string",
+            "title": "Return Percent"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/FlowPositionResponse"
+            },
+            "type": "array",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_id",
+          "currency",
+          "allocated_capital",
+          "available_liquidity",
+          "margin",
+          "unrealized_pnl",
+          "realized_pnl",
+          "fees",
+          "total_value",
+          "return_percent",
+          "positions"
+        ],
+        "title": "FlowStateResponse",
+        "description": "The state of a flow attributed from the exchange at the request (R1.6.1); amounts as strings (ADR 0018)."
+      },
+      "FlowStatisticsResponse": {
+        "properties": {
+          "won": {
+            "type": "integer",
+            "title": "Won"
+          },
+          "lost": {
+            "type": "integer",
+            "title": "Lost"
+          },
+          "operations": {
+            "type": "integer",
+            "title": "Operations"
+          },
+          "win_rate_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Percent"
+          },
+          "average_winning_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Winning Pnl"
+          },
+          "average_losing_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Losing Pnl"
+          },
+          "total_fees": {
+            "type": "string",
+            "title": "Total Fees"
+          },
+          "model_cost_usd": {
+            "type": "string",
+            "title": "Model Cost Usd"
+          },
+          "model_calls_without_cost": {
+            "type": "integer",
+            "title": "Model Calls Without Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "won",
+          "lost",
+          "operations",
+          "win_rate_percent",
+          "average_winning_pnl",
+          "average_losing_pnl",
+          "total_fees",
+          "model_cost_usd",
+          "model_calls_without_cost"
+        ],
+        "title": "FlowStatisticsResponse",
+        "description": "The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate in percent with two\ndecimals, null when nothing is available (ADR 0122)."
+      },
+      "FreeCapitalResponse": {
+        "properties": {
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "title": "FreeCapitalResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HistoryClosedPositionResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "leverage": {
+            "type": "integer",
+            "title": "Leverage"
+          },
+          "margin": {
+            "type": "string",
+            "title": "Margin"
+          },
+          "open_price": {
+            "type": "string",
+            "title": "Open Price"
+          },
+          "close_price": {
+            "type": "string",
+            "title": "Close Price"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closed At"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds"
+          },
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "pnl_percent_of_margin": {
+            "type": "string",
+            "title": "Pnl Percent Of Margin"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "opening_cycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Cycle"
+          },
+          "closing_cycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closing Cycle"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "flow": {
+            "type": "string",
+            "title": "Flow"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "side",
+          "leverage",
+          "margin",
+          "open_price",
+          "close_price",
+          "opened_at",
+          "closed_at",
+          "duration_seconds",
+          "pnl",
+          "pnl_percent_of_margin",
+          "fees",
+          "reason",
+          "opening_cycle",
+          "closing_cycle",
+          "id",
+          "flow_id",
+          "flow"
+        ],
+        "title": "HistoryClosedPositionResponse",
+        "description": "A closed position of the history, with its flow (R2.5.1)."
+      },
+      "HistoryClosedPositionsPageResponse": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryClosedPositionResponse"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "next"
+        ],
+        "title": "HistoryClosedPositionsPageResponse",
+        "description": "At most 50 closed positions, newest close first; `next` is the `after` of the following page."
+      },
+      "HistoryCycleResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisions"
+          },
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "flow": {
+            "type": "string",
+            "title": "Flow"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "started_at",
+          "outcome",
+          "failure",
+          "decisions",
+          "flow_id",
+          "flow",
+          "version"
+        ],
+        "title": "HistoryCycleResponse",
+        "description": "A cycle of the history, with its flow and the configuration version in force when it ran (R2.5.1)."
+      },
+      "HistoryCyclesPageResponse": {
+        "properties": {
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryCycleResponse"
+            },
+            "type": "array",
+            "title": "Cycles"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cycles",
+          "next"
+        ],
+        "title": "HistoryCyclesPageResponse",
+        "description": "At most 50 cycles, newest first; `next` is the `after` of the following page, null on the last one."
+      },
+      "HistoryOrderResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Account Id"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow"
+          },
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction"
+          },
+          "closing": {
+            "type": "boolean",
+            "title": "Closing"
+          },
+          "leverage": {
+            "type": "integer",
+            "title": "Leverage"
+          },
+          "requested_size": {
+            "type": "string",
+            "title": "Requested Size"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/OrderExecutionResponse"
+            },
+            "type": "array",
+            "title": "Executions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "account_id",
+          "account",
+          "flow_id",
+          "flow",
+          "asset",
+          "direction",
+          "closing",
+          "leverage",
+          "requested_size",
+          "status",
+          "origin",
+          "executions"
+        ],
+        "title": "HistoryOrderResponse",
+        "description": "An order of the history with its outcome and its executions; `flow` is null for an order of no flow."
+      },
+      "HistoryOrdersPageResponse": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryOrderResponse"
+            },
+            "type": "array",
+            "title": "Orders"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orders",
+          "next"
+        ],
+        "title": "HistoryOrdersPageResponse",
+        "description": "At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one."
+      },
+      "Identity": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "tenant_id": {
+            "type": "string",
+            "title": "Tenant Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "tenant_id"
+        ],
+        "title": "Identity"
+      },
+      "LastCycleResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "outcome"
+        ],
+        "title": "LastCycleResponse"
+      },
+      "LinkCodeResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "expires_at",
+          "link"
+        ],
+        "title": "LinkCodeResponse",
+        "description": "The code the user sends to the bot from the chat to link, until when it is valid, and the link that sends it\nin one tap; no link while the bot is not active (R1.8.1)."
+      },
+      "LinkedChatResponse": {
+        "properties": {
+          "linked": {
+            "type": "boolean",
+            "title": "Linked"
+          },
+          "chat_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "linked",
+          "chat_id"
+        ],
+        "title": "LinkedChatResponse",
+        "description": "Whether the tenant has a linked chat, and which one as Telegram numbers it, for the dashboard to show it."
+      },
+      "ModelCatalogResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderResponse"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelResponse"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "providers",
+          "models"
+        ],
+        "title": "ModelCatalogResponse"
+      },
+      "ModelParameterResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "default": {
+            "type": "string",
+            "title": "Default"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "whole": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whole"
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "default"
+        ],
+        "title": "ModelParameterResponse",
+        "description": "A range has minimum and maximum, a choice its values; the default is always there."
+      },
+      "ModelResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ModelParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "provider",
+          "parameters"
+        ],
+        "title": "ModelResponse"
+      },
+      "ModelSelectionResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "parameters"
+        ],
+        "title": "ModelSelectionResponse"
+      },
+      "OperationResponse": {
+        "properties": {
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow"
+          },
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "fee": {
+            "type": "string",
+            "title": "Fee"
+          },
+          "realized_pnl": {
+            "type": "string",
+            "title": "Realized Pnl"
+          },
+          "funding": {
+            "type": "string",
+            "title": "Funding"
+          }
+        },
+        "type": "object",
+        "required": [
+          "occurred_at",
+          "flow",
+          "asset",
+          "kind",
+          "side",
+          "size",
+          "price",
+          "fee",
+          "realized_pnl",
+          "funding"
+        ],
+        "title": "OperationResponse",
+        "description": "A row of the ledger (ADR 0063, ADR 0074): amounts as text without trailing zeros (ADR 0047).\n\nAn execution has side, size and price; a funding payment has the amount paid (positive when received). `flow` is\nthe name of the flow of the row, null when it belongs to no flow (ADR 0080)."
+      },
+      "OperationsPageResponse": {
+        "properties": {
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/OperationResponse"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/OperationsTotalsResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operations",
+          "next",
+          "totals"
+        ],
+        "title": "OperationsPageResponse",
+        "description": "At most 50 rows, newest first; `next` is the `after` of the following page, null on the last one."
+      },
+      "OperationsTotalsResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "realized_pnl": {
+            "type": "string",
+            "title": "Realized Pnl"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          },
+          "funding": {
+            "type": "string",
+            "title": "Funding"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "realized_pnl",
+          "fees",
+          "funding"
+        ],
+        "title": "OperationsTotalsResponse",
+        "description": "The totals of every row of the filter, not only of the page (ADR 0080)."
+      },
+      "OrderExecutionResponse": {
+        "properties": {
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Executed At"
+          },
+          "price": {
+            "type": "string",
+            "title": "Price"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          },
+          "fee": {
+            "type": "string",
+            "title": "Fee"
+          }
+        },
+        "type": "object",
+        "required": [
+          "executed_at",
+          "price",
+          "size",
+          "fee"
+        ],
+        "title": "OrderExecutionResponse",
+        "description": "An execution of an order: price, quantity and fee as text without trailing zeros (ADR 0018)."
+      },
+      "OrderOutcomeResponse": {
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "title": "Order Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "coin": {
+            "type": "string",
+            "title": "Coin"
+          },
+          "filled_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled Size"
+          },
+          "average_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Price"
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee"
+          },
+          "realized_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Pnl"
+          },
+          "executed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executed At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "exchange_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "status",
+          "coin",
+          "filled_size",
+          "average_price",
+          "fee",
+          "realized_pnl",
+          "executed_at",
+          "reason",
+          "exchange_message"
+        ],
+        "title": "OrderOutcomeResponse",
+        "description": "The outcome of an order as the exchange gave it: the same body from worker and API (ADR 0023)."
+      },
+      "OrderResultResponse": {
+        "properties": {
+          "succeeded": {
+            "type": "boolean",
+            "title": "Succeeded"
+          },
+          "fee": {
+            "type": "string",
+            "title": "Fee"
+          },
+          "realized_pnl": {
+            "type": "string",
+            "title": "Realized Pnl"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "succeeded",
+          "fee",
+          "realized_pnl",
+          "message"
+        ],
+        "title": "OrderResultResponse"
+      },
+      "PositionLeftOpenResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "reason"
+        ],
+        "title": "PositionLeftOpenResponse"
+      },
+      "PositionReadingResponse": {
+        "properties": {
+          "coin": {
+            "type": "string",
+            "title": "Coin"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          },
+          "leverage": {
+            "type": "integer",
+            "title": "Leverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coin",
+          "side",
+          "size",
+          "leverage"
+        ],
+        "title": "PositionReadingResponse"
+      },
+      "PositionResponse": {
+        "properties": {
+          "coin": {
+            "type": "string",
+            "title": "Coin"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          },
+          "leverage": {
+            "type": "integer",
+            "title": "Leverage"
+          },
+          "entry_price": {
+            "type": "string",
+            "title": "Entry Price"
+          },
+          "unrealized_pnl": {
+            "type": "string",
+            "title": "Unrealized Pnl"
+          },
+          "liquidation_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidation Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coin",
+          "side",
+          "size",
+          "leverage",
+          "entry_price",
+          "unrealized_pnl",
+          "liquidation_price"
+        ],
+        "title": "PositionResponse"
+      },
+      "ProviderKeyRegistrationRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": ""
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ProviderKeyRegistrationRequest"
+      },
+      "ProviderKeyReplacementRequest": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ProviderKeyReplacementRequest"
+      },
+      "ProviderKeyResponse": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "registered_at": {
+            "type": "string",
+            "title": "Registered At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "registered_at"
+        ],
+        "title": "ProviderKeyResponse",
+        "description": "A registered key as its owner reads it: the provider and when it was saved, never the key (R1.4.1, ADR 0130)."
+      },
+      "ProviderResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "key_registered": {
+            "type": "boolean",
+            "title": "Key Registered"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "key_registered"
+        ],
+        "title": "ProviderResponse"
+      },
+      "RiskLimitsResponse": {
+        "properties": {
+          "max_leverage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Leverage"
+          },
+          "max_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Margin Exposure Percent"
+          },
+          "max_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value Exposure Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_leverage",
+          "max_margin_exposure_percent",
+          "max_value_exposure_percent"
+        ],
+        "title": "RiskLimitsResponse"
+      },
+      "SourceParameterResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "default": {
+            "type": "integer",
+            "title": "Default"
+          },
+          "minimum": {
+            "type": "integer",
+            "title": "Minimum"
+          },
+          "maximum": {
+            "type": "integer",
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "default",
+          "minimum",
+          "maximum"
+        ],
+        "title": "SourceParameterResponse"
+      },
+      "SourceResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "per_asset": {
+            "type": "boolean",
+            "title": "Per Asset"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/SourceParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "per_asset",
+          "parameters"
+        ],
+        "title": "SourceResponse"
+      },
+      "SourceSelectionRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SourceSelectionRequest"
+      },
+      "SourceSelectionResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight": {
+            "type": "integer",
+            "title": "Weight"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "weight",
+          "parameters"
+        ],
+        "title": "SourceSelectionResponse"
+      },
+      "StepDocumentResponse": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "content": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "content"
+        ],
+        "title": "StepDocumentResponse"
+      },
+      "StepOutcomeResponse": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "succeeded": {
+            "type": "boolean",
+            "title": "Succeeded"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountReadingResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderResultResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "succeeded",
+          "message",
+          "reading",
+          "order"
+        ],
+        "title": "StepOutcomeResponse"
+      },
+      "StopOutcomeResponse": {
+        "properties": {
+          "flow": {
+            "$ref": "#/components/schemas/FlowResponse"
+          },
+          "left_open": {
+            "items": {
+              "$ref": "#/components/schemas/PositionLeftOpenResponse"
+            },
+            "type": "array",
+            "title": "Left Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow",
+          "left_open"
+        ],
+        "title": "StopOutcomeResponse",
+        "description": "The flow stopped and the positions the exchange did not close, each with its reason (R1.1.5)."
+      },
+      "StrategyBody-Input": {
+        "properties": {
+          "cycle_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle Minutes"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyModel-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/StrategySource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions",
+            "default": ""
+          },
+          "risk_limits": {
+            "$ref": "#/components/schemas/StrategyRiskLimits-Input"
+          },
+          "bring_to_minimum": {
+            "type": "boolean",
+            "title": "Bring To Minimum",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "StrategyBody",
+        "description": "What a flow does, without account, capital, assets, keys or cycles (R2.5.2).\n\nA missing model or limit arrives empty, so the domain answers with the reason."
+      },
+      "StrategyBody-Output": {
+        "properties": {
+          "cycle_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle Minutes"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyModel-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/StrategySource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions",
+            "default": ""
+          },
+          "risk_limits": {
+            "$ref": "#/components/schemas/StrategyRiskLimits-Output"
+          },
+          "bring_to_minimum": {
+            "type": "boolean",
+            "title": "Bring To Minimum",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "StrategyBody",
+        "description": "What a flow does, without account, capital, assets, keys or cycles (R2.5.2).\n\nA missing model or limit arrives empty, so the domain answers with the reason."
+      },
+      "StrategyDocument-Input": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "format_version": {
+            "type": "integer",
+            "title": "Format Version"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/StrategyBody-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "format_version",
+          "strategy"
+        ],
+        "title": "StrategyDocument",
+        "description": "The strategy file: its format and version, so a file of another kind or of a later version is recognized."
+      },
+      "StrategyDocument-Output": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "format_version": {
+            "type": "integer",
+            "title": "Format Version"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/StrategyBody-Output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "format_version",
+          "strategy"
+        ],
+        "title": "StrategyDocument",
+        "description": "The strategy file: its format and version, so a file of another kind or of a later version is recognized."
+      },
+      "StrategyModel-Input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "title": "StrategyModel"
+      },
+      "StrategyModel-Output": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "title": "StrategyModel"
+      },
+      "StrategyRiskLimits-Input": {
+        "properties": {
+          "max_leverage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Leverage"
+          },
+          "max_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Margin Exposure Percent"
+          },
+          "max_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value Exposure Percent"
+          }
+        },
+        "type": "object",
+        "title": "StrategyRiskLimits"
+      },
+      "StrategyRiskLimits-Output": {
+        "properties": {
+          "max_leverage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Leverage"
+          },
+          "max_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Margin Exposure Percent"
+          },
+          "max_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value Exposure Percent"
+          }
+        },
+        "type": "object",
+        "title": "StrategyRiskLimits"
+      },
+      "StrategySource": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "StrategySource"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerificationRequest": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "title": "VerificationRequest"
+      },
+      "VerificationRunResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "total_fee": {
+            "type": "string",
+            "title": "Total Fee"
+          },
+          "realized_pnl": {
+            "type": "string",
+            "title": "Realized Pnl"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepOutcomeResponse"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "account_id",
+          "user_id",
+          "environment",
+          "started_at",
+          "outcome",
+          "total_fee",
+          "realized_pnl",
+          "warning",
+          "steps"
+        ],
+        "title": "VerificationRunResponse",
+        "description": "A run of the procedure with the outcome of each step: the same body from worker and API (ADR 0024)."
+      },
+      "VersionResponse": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "created_at"
+        ],
+        "title": "VersionResponse",
+        "description": "One configuration version of a flow in the list: its number and when it was saved (R2.3.5)."
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

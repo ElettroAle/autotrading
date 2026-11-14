@@ -1,8 +1,8 @@
-import { PageLayout } from '@/components/layouts/page-layout';
+import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { CreateFlow } from '@/features/flow-editor/components/create-flow';
 
 export const NewFlowRoute = () => (
-  <PageLayout title="Nuovo flusso">
+  <DashboardLayout title="Nuovo flusso">
     <CreateFlow />
-  </PageLayout>
+  </DashboardLayout>
 );

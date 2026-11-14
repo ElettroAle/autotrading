@@ -8,6 +8,7 @@
     "@azure/msal-react": "5.8.2",
     "@hookform/resolvers": "7.0.6",
     "@tanstack/react-query": "5.107.1",
+    "openapi-fetch": "0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-hook-form": "7.92.0",
@@ -40,6 +41,7 @@
     "globals": "17.14.0",
     "jsdom": "31.0.1",
     "msw": "3.0.5",
+    "openapi-typescript": "7.13.0",
     "playwright-bdd": "9.2.1",
     "prettier": "3.10.1",
     "tailwindcss": "4.3.5",
@@ -51,6 +53,9 @@
   "overrides": {
     "@typescript-eslint/typescript-estree": {
       "minimatch": "11.0.8"
+    },
+    "openapi-typescript": {
+      "typescript": "$typescript"
     }
   },
   "scripts": {
@@ -62,6 +67,8 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "check-types": "tsc --build --noEmit",
+    "generate:api-client": "cd .. && uv run python -m tools.openapi_document dashboard/openapi.json && cd dashboard && openapi-typescript openapi.json --output src/lib/api-schema.d.ts",
+    "check:api-client": "openapi-typescript openapi.json --output src/lib/api-schema.d.ts --check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:scenarios": "bddgen && playwright test"

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const openPositionSchema = z.object({
   asset: z.string(),
@@ -25,7 +26,11 @@ export type OpenPosition = z.infer<typeof openPositionSchema>;
 export const useFlowState = (flowId: string) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flow-state', flowId],
-    queryFn: () => api.get(`/flows/${encodeURIComponent(flowId)}/state`, flowStateSchema),
+    ...pageDataQuery('flow-state', flowId),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/state', { params: { path: { flow_id: flowId } } }),
+        flowStateSchema,
+      ),
   });
 };

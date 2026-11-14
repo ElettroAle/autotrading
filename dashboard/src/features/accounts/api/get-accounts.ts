@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 // The credentials are only declared present, never returned (R0.2.3); the balance is read apart (ADR 0126).
 export const accountSchema = z.object({
@@ -22,7 +23,7 @@ export const ACCOUNTS_QUERY_KEY = ['accounts'] as const;
 export const useAccounts = () => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ACCOUNTS_QUERY_KEY,
-    queryFn: () => api.get('/accounts', z.array(accountSchema)),
+    ...pageDataQuery(...ACCOUNTS_QUERY_KEY),
+    queryFn: async () => readData(await api.GET('/accounts'), z.array(accountSchema)),
   });
 };

@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 const flowOptionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  account_id: z.string(),
+  account_id: z.string().nullable(),
   version: z.number(),
   assets: z.array(z.string()),
 });
@@ -21,7 +21,7 @@ export const useFlowOptions = () => {
   const api = useApiClient();
   return useQuery({
     queryKey: ['history-options', 'flows'],
-    queryFn: () => api.get('/flows', z.array(flowOptionSchema)),
+    queryFn: async () => readData(await api.GET('/flows'), z.array(flowOptionSchema)),
   });
 };
 
@@ -30,6 +30,6 @@ export const useAccountOptions = () => {
   const api = useApiClient();
   return useQuery({
     queryKey: ['history-options', 'accounts'],
-    queryFn: () => api.get('/accounts', z.array(accountOptionSchema)),
+    queryFn: async () => readData(await api.GET('/accounts'), z.array(accountOptionSchema)),
   });
 };

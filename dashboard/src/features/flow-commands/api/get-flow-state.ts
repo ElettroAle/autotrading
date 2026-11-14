@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const flowStateSchema = z.object({
   positions: z.array(z.object({ asset: z.string() })),
@@ -13,7 +14,11 @@ export type FlowState = z.infer<typeof flowStateSchema>;
 export const useFlowState = (flowId: string) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flow-state', flowId, 'assets'],
-    queryFn: () => api.get(`/flows/${encodeURIComponent(flowId)}/state`, flowStateSchema),
+    ...pageDataQuery('flow-state', flowId, 'assets'),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/state', { params: { path: { flow_id: flowId } } }),
+        flowStateSchema,
+      ),
   });
 };

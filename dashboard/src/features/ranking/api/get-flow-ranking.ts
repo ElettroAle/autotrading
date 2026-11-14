@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { apiSearchOf, isComplete, type Period } from '@/components/ui/period-selector/use-period';
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const rowSchema = z.object({
   flow_id: z.string(),
@@ -25,8 +26,12 @@ const rankingSchema = z.array(rowSchema);
 export const useFlowRanking = (period: Period) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flow-ranking', period],
-    queryFn: () => api.get(`/flows/ranking?${apiSearchOf(period)}`, rankingSchema),
+    ...pageDataQuery('flow-ranking', period),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/ranking', { querySerializer: () => apiSearchOf(period) }),
+        rankingSchema,
+      ),
     enabled: isComplete(period),
   });
 };

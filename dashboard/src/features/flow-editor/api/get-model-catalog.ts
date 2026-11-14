@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 // A range has minimum and maximum, a choice its values; the default is always there (R1.4.2).
 const modelParameterSchema = z.object({
@@ -34,6 +34,6 @@ export const useModelCatalog = () => {
   const api = useApiClient();
   return useQuery({
     queryKey: ['models'],
-    queryFn: () => api.get('/models', modelCatalogSchema),
+    queryFn: async () => readData(await api.GET('/models'), modelCatalogSchema),
   });
 };

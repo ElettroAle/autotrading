@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 const sourceParameterSchema = z.object({
   key: z.string(),
@@ -27,7 +27,7 @@ export const useSources = () => {
   const api = useApiClient();
   return useQuery({
     queryKey: ['sources'],
-    queryFn: () => api.get('/sources', z.array(sourceSchema)),
+    queryFn: async () => readData(await api.GET('/sources'), z.array(sourceSchema)),
   });
 };
 
@@ -36,6 +36,7 @@ export const useSource = (name: string) => {
   const api = useApiClient();
   return useQuery({
     queryKey: ['sources', name],
-    queryFn: () => api.get(`/sources/${encodeURIComponent(name)}`, sourceSchema),
+    queryFn: async () =>
+      readData(await api.GET('/sources/{name}', { params: { path: { name } } }), sourceSchema),
   });
 };

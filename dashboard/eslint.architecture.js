@@ -52,6 +52,14 @@ const APPLICATION_ZONES = [
   },
 ];
 
+// The API is called only through the client generated from its OpenAPI document (ADR 0119).
+const API_CLIENT = 'src/lib/api-client.ts';
+
+const OPENAPI_FETCH_OUTSIDE_THE_CLIENT = {
+  name: 'openapi-fetch',
+  message: "l'API si chiama solo dal client di src/lib/api-client.ts",
+};
+
 const NO_FAKES_IN_PRODUCTION = {
   target: './src',
   from: './src/testing',
@@ -101,6 +109,8 @@ export default tseslint.config(
       'test-results/',
       'playwright-report/',
       '.features-gen/',
+      // Generated from the OpenAPI document of the API by npm run generate:api-client (ADR 0119).
+      'src/lib/api-schema.d.ts',
     ],
   },
   {
@@ -127,7 +137,19 @@ export default tseslint.config(
   },
   {
     files: SOURCE_FILES,
-    ignores: [CHARTS],
+    ignores: [CHARTS, API_CLIENT],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [OPENAPI_FETCH_OUTSIDE_THE_CLIENT],
+          patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS],
+        },
+      ],
+    },
+  },
+  {
+    files: [API_CLIENT],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -137,7 +159,12 @@ export default tseslint.config(
   },
   {
     files: [CHARTS],
-    rules: { 'no-restricted-imports': ['error', { patterns: [OTHER_CHART_LIBRARIES] }] },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: [OPENAPI_FETCH_OUTSIDE_THE_CLIENT], patterns: [OTHER_CHART_LIBRARIES] },
+      ],
+    },
   },
   {
     files: ['src/**/*.{ts,tsx}'],

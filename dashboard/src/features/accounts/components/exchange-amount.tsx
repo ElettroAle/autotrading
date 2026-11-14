@@ -15,7 +15,8 @@ export const ExchangeAmount = ({
   if (reading.isPending) {
     return <span className="text-slate-500">…</span>;
   }
-  if (reading.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (reading.data === undefined) {
     return (
       <span title={reading.error.message} className="text-amber-800">
         {unavailable}

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 const accountSchema = z.object({ id: z.string(), name: z.string(), exchange: z.string() });
 
@@ -12,6 +12,6 @@ export const useAccounts = () => {
   const api = useApiClient();
   return useQuery({
     queryKey: ['accounts'],
-    queryFn: () => api.get('/accounts', z.array(accountSchema)),
+    queryFn: async () => readData(await api.GET('/accounts'), z.array(accountSchema)),
   });
 };

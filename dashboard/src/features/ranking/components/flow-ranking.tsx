@@ -123,9 +123,6 @@ const RankingTable = ({ rows, period }: { rows: FlowRankingRow[]; period: Period
 export const FlowRanking = () => {
   const [period] = usePeriod();
   const ranking = useFlowRanking(period);
-  if (ranking.isError) {
-    return <ErrorMessage error={ranking.error} />;
-  }
   if (ranking.isPending && ranking.fetchStatus === 'idle') {
     return (
       <p className="text-slate-500">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
@@ -133,6 +130,10 @@ export const FlowRanking = () => {
   }
   if (ranking.isPending) {
     return <Loading />;
+  }
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (ranking.data === undefined) {
+    return <ErrorMessage error={ranking.error} />;
   }
   return <RankingTable rows={ranking.data} period={period} />;
 };

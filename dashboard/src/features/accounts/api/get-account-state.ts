@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 export const amountSchema = z.object({ amount: z.string(), currency: z.string() });
 
@@ -11,8 +12,14 @@ const accountStateSchema = z.object({ balance: amountSchema });
 export const useAccountBalance = (accountId: string) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['accounts', accountId, 'state'],
-    queryFn: () => api.get(`/accounts/${encodeURIComponent(accountId)}/state`, accountStateSchema),
+    ...pageDataQuery('accounts', accountId, 'state'),
+    queryFn: async () =>
+      readData(
+        await api.GET('/accounts/{account_id}/state', {
+          params: { path: { account_id: accountId } },
+        }),
+        accountStateSchema,
+      ),
     select: (state) => state.balance,
   });
 };

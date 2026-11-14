@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 /** A draft has only the strategy: account, capital and assets come before it starts (ADR 0124). */
 export const DRAFT_STATUS = 'bozza';
@@ -27,5 +28,8 @@ export const flowsSchema = z.array(flowSchema);
 /** The flows of the tenant of the user: the API answers only with those (R0.1.3). */
 export const useFlows = () => {
   const api = useApiClient();
-  return useQuery({ queryKey: FLOWS_QUERY_KEY, queryFn: () => api.get('/flows', flowsSchema) });
+  return useQuery({
+    ...pageDataQuery(...FLOWS_QUERY_KEY),
+    queryFn: async () => readData(await api.GET('/flows'), flowsSchema),
+  });
 };

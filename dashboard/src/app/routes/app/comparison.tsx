@@ -1,4 +1,4 @@
-import { PageLayout } from '@/components/layouts/page-layout';
+import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { PeriodSelector } from '@/components/ui/period-selector/period-selector';
@@ -18,8 +18,8 @@ const ComparedFlows = () => {
 };
 
 export const ComparisonRoute = () => (
-  <PageLayout title="Confronto dei flussi">
+  <DashboardLayout title="Confronto dei flussi">
     <PeriodSelector />
     <ComparedFlows />
-  </PageLayout>
+  </DashboardLayout>
 );
