@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
 
 import { summaryOf, type FakeCycle } from './cycles';
-import { InvalidPeriod, statisticsOf } from './flow-statistics';
-import { fakePlatform, type FakeFlow, type FakeUser } from './platform';
+import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
+import { fakePlatform, type FakeEquityPoint, type FakeFlow, type FakeUser } from './platform';
 
 const BEARER = 'Bearer ';
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -94,6 +94,14 @@ const cycleAt = (cycles: FakeCycle[], plannedAt: string): Response => {
     : HttpResponse.json(cycle);
 };
 
+const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => ({
+  initial_capital: flow.initialCapital,
+  points: flow.equity
+    .filter((point: FakeEquityPoint) => admits(point.plannedAt))
+    .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime())
+    .map((point) => ({ planned_at: point.plannedAt.toISOString(), equity: String(point.equity) })),
+});
+
 export const handlers = [
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
@@ -148,6 +156,24 @@ export const handlers = [
     withUser(request, (user) =>
       withFlow(user, String(params.flowId), (cycles) => cycleAt(cycles, String(params.plannedAt))),
     ),
+  ),
+  http.get('*/flows/:flowId/equity', ({ request, params }) =>
+    withUser(request, (user) => {
+      const flow = user.flows.find((candidate) => candidate.id === params.flowId);
+      if (flow === undefined) {
+        return problem(404, 'Not Found', 'flusso non trovato');
+      }
+      try {
+        return HttpResponse.json(
+          equityResponse(flow, periodAdmits(new URL(request.url).searchParams)),
+        );
+      } catch (error) {
+        if (error instanceof InvalidPeriod) {
+          return problem(400, 'Bad Request', error.message);
+        }
+        throw error;
+      }
+    }),
   ),
   http.get('*/flows/:flowId/statistics', ({ request, params }) =>
     withUser(request, (user) => {

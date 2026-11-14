@@ -103,15 +103,6 @@ When(
   },
 );
 
-When(
-  '{string} sceglie il periodo {string}',
-  async ({ dashboard, memory }, account: string, period: string) => {
-    const [flow] = [...memory.histories.keys()];
-    await openStatistics(dashboard, memory, account, flow ?? '');
-    await dashboard.period().selectOption({ label: period });
-  },
-);
-
 Then(
   /^vede (\d+) vinte, (\d+) perse, win rate ([\d,]+%), PnL medio vincenti ([+-][\d,]+ USDC), PnL medio perdenti ([+-][\d,]+ USDC), commissioni ([\d,]+ USDC), (\d+) operazioni, costo del modello ([\d,]+ USD)$/,
   async (

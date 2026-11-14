@@ -1,6 +1,7 @@
 // The structure of the dashboard, from bulletproof-react (ADR 0116): dependencies flow one way, shared code ──> features
 // ──> app, no feature imports another, production never imports the testing code, the server and the application
-// never import each other. Every rule is proved red on a violating example in architecture/structure.test.ts.
+// never import each other. One chart library, Recharts, used only by the shared charts of src/components/charts
+// (ADR 0121). Every rule is proved red on a violating example in architecture/structure.test.ts.
 import { readdirSync } from 'node:fs';
 
 import checkFile from 'eslint-plugin-check-file';
@@ -57,6 +58,39 @@ const NO_FAKES_IN_PRODUCTION = {
   message: 'il codice di produzione non importa i finti di src/testing',
 };
 
+const CHARTS = 'src/components/charts/**';
+
+const OTHER_CHART_LIBRARIES = {
+  group: [
+    'chart.js',
+    'chart.js/*',
+    'react-chartjs-2',
+    'echarts',
+    'echarts/*',
+    'echarts-for-react',
+    'd3',
+    'd3-*',
+    '@nivo/*',
+    '@visx/*',
+    'victory',
+    'victory-*',
+    'apexcharts',
+    'react-apexcharts',
+    'highcharts',
+    'highcharts-react-official',
+    'plotly.js',
+    'plotly.js-*',
+    'react-plotly.js',
+  ],
+  message: 'una sola libreria di grafici nella dashboard: Recharts (ADR 0121)',
+};
+
+const RECHARTS_OUTSIDE_THE_CHARTS = {
+  group: ['recharts', 'recharts/*'],
+  message:
+    'Recharts si usa solo nei grafici condivisi di src/components/charts: le funzionalità passano i dati (ADR 0121)',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -90,6 +124,20 @@ export default tseslint.config(
         { '{src,server,e2e,architecture}/**/': 'KEBAB_CASE' },
       ],
     },
+  },
+  {
+    files: SOURCE_FILES,
+    ignores: [CHARTS],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS] },
+      ],
+    },
+  },
+  {
+    files: [CHARTS],
+    rules: { 'no-restricted-imports': ['error', { patterns: [OTHER_CHART_LIBRARIES] }] },
   },
   {
     files: ['src/**/*.{ts,tsx}'],

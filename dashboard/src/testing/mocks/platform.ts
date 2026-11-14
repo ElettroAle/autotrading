@@ -21,11 +21,16 @@ export type FakeFlowHistory = {
   readonly modelCalls: FakeModelCall[];
 };
 
+export type FakeEquityPoint = { readonly plannedAt: Date; readonly equity: number };
+
 export type FakeFlow = {
   readonly id: string;
   readonly name: string;
   readonly status: string;
   readonly history: FakeFlowHistory;
+  readonly initialCapital: string;
+  /** The equity every cycle of the flow recorded, in the order the scenario records it. */
+  readonly equity: FakeEquityPoint[];
 };
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -86,12 +91,24 @@ export const fakePlatform = {
     return state.users.has(account);
   },
 
-  addFlow(account: string, name: string, history: FakeFlowHistory = emptyHistory()): FakeFlow {
+  addFlow(
+    account: string,
+    name: string,
+    history: FakeFlowHistory = emptyHistory(),
+    { initialCapital = '100' }: { initialCapital?: string } = {},
+  ): FakeFlow {
     const user = state.users.get(account);
     if (user === undefined) {
       throw new Error(`unknown fake user ${account}`);
     }
-    const flow = { id: flowIdOf(name), name, status: 'attivo', history };
+    const flow = {
+      id: flowIdOf(name),
+      name,
+      status: 'attivo',
+      history,
+      initialCapital,
+      equity: [],
+    };
     user.flows.push(flow);
     return flow;
   },
@@ -112,6 +129,11 @@ export const fakePlatform = {
 
   cyclesOf(flowId: string): FakeCycle[] {
     return state.cycles.get(flowId) ?? [];
+  },
+
+  /** The equity a cycle of the flow recorded at its planned instant (R2.2.3). */
+  recordEquity(name: string, plannedAt: Date, equity: number): void {
+    fakePlatform.flowNamed(name).equity.push({ plannedAt, equity });
   },
 
   flowNamed(name: string): FakeFlow {

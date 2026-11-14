@@ -217,6 +217,23 @@ cycles = Table(
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 
+# The equity of every cycle that read the state of its flow, partitioned by month like a time series (ADR 0120).
+equity_snapshots = Table(
+    "equity_snapshots",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("planned_at", DateTime(timezone=True), primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("equity", Numeric, nullable=False),
+    Column("allocated_capital", Numeric, nullable=False),
+    Column("realized_pnl", Numeric, nullable=False),
+    Column("unrealized_pnl", Numeric, nullable=False),
+    Column("fees", Numeric, nullable=False),
+    Column("funding", Numeric, nullable=False),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+    postgresql_partition_by="RANGE (planned_at)",
+)
+
 forecasts = Table(
     "forecasts",
     metadata,

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 
-from autotrading.application.flows.cycle_graph import FailedCycle, PlannedCycle, real_seconds
+from autotrading.application.flows.cycle_graph import CompletedCycle, FailedCycle, PlannedCycle, real_seconds
 from autotrading.application.flows.ports import SourceReading
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -23,9 +23,9 @@ def planned(cycles: Cycles, name: str = "alfa") -> PlannedCycle:
     return PlannedCycle(cycles.id_of(name), cycles.flow(name).schedule, at("10:00:00"))
 
 
-def completed(outcome: CycleRecord | FailedCycle) -> CycleRecord:
-    assert isinstance(outcome, CycleRecord)
-    return outcome
+def completed(outcome: CompletedCycle | FailedCycle) -> CycleRecord:
+    assert isinstance(outcome, CompletedCycle)
+    return outcome.record
 
 
 def readings_of(record: CycleRecord) -> object:
@@ -133,3 +133,44 @@ def test_an_interrupted_cycle_resumes_from_the_node_that_failed_keeping_what_cam
     assert record.started_at == at("10:00:00")
     assert len(cycles.agent.contexts) == contexts_before + 1
     assert [document.step for document in record.documents] == list(CycleStep)[:-1]
+
+
+def test_a_completed_cycle_gives_the_state_of_the_flow_at_its_end(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, CompletedCycle)
+    assert outcome.state == {"flow": "alfa", "executions": 0}
+
+
+def test_a_failed_cycle_gives_the_last_state_of_the_flow_it_read(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.UPDATE_FLOW_STATE, FakeTransientError("timeout"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.state == {"flow": "alfa", "positions": []}
+
+
+def test_a_cycle_failed_recording_itself_gives_the_state_of_the_flow_at_its_end(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.records.failing_once = FakeTransientError("database non raggiungibile")
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.record.failure is not None
+    assert outcome.record.failure.step is CycleStep.RECORD_CYCLE
+    assert outcome.state == {"flow": "alfa", "executions": 0}
+
+
+def test_a_cycle_failed_reading_the_flow_gives_no_state(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.state is None

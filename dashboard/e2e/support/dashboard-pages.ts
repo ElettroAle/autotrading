@@ -130,4 +130,17 @@ export class DashboardPages {
   statistic(label: string): Locator {
     return this.statistics().getByLabel(label, { exact: true });
   }
+
+  equityCurve(): Locator {
+    return this.page.getByRole('figure', { name: 'Equity curve' });
+  }
+
+  /** The points of the equity curve: each names its equity, its instant and the area it falls in. */
+  equityPoints(): Locator {
+    return this.equityCurve().getByRole('img', { name: /^Equity / });
+  }
+
+  equityPoint(equity: number): Locator {
+    return this.equityCurve().getByRole('img', { name: new RegExp(`^Equity ${equity} del `) });
+  }
 }

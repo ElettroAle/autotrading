@@ -34,6 +34,7 @@ from autotrading.application.flows.ports import (
     PlannedFlowsPort,
 )
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
+from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -80,6 +81,7 @@ class TenantCyclePorts:
     notify: NotifyUseCase
     settlement_currency: str
     checkpoints: GraphCheckpoints
+    equity: RecordCycleEquityUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +150,7 @@ def run_cycle_for(
         clock=services.clock,
         failures=ports.cycle_failure,
     )
-    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards)
+    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
 
 
 def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:

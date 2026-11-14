@@ -52,6 +52,7 @@ from tests.fakes.closed_position_repository import ClosedPositionStore, InMemory
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
+from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
@@ -130,6 +131,7 @@ class Platform:
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))
         self.closed_positions = ClosedPositionStore()
         self.cycles = InMemoryCycleRepositoryAdapter()
+        self.equity_snapshots = EquitySnapshotStore()
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -210,6 +212,7 @@ class Platform:
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
+            equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
             environment="dev",
         )
         return TenantUseCases.on(tenant_id, ports)

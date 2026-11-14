@@ -27,6 +27,7 @@ from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -75,6 +76,7 @@ from tests.fakes.cycles import (
     InMemoryCycleRepositoryAdapter,
     InMemoryFlowLockAdapter,
 )
+from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import (
@@ -158,6 +160,7 @@ class FlowCycles:
         self.users: dict[str, str] = {}
         self.running: threading.Thread | None = None
         self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.equity_snapshots = EquitySnapshotStore()
 
     # The platform
 
@@ -229,6 +232,7 @@ class FlowCycles:
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             checkpoints=self.checkpoints,
+            equity=RecordCycleEquityUseCase(InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id)),
         )
 
     def services(self) -> CycleServices:

@@ -39,6 +39,9 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
 from autotrading.adapters.outbound.sqlalchemy.composition import SqlAlchemyEngine, sqlalchemy_adapters
 from autotrading.adapters.outbound.sqlalchemy.cycle_checkpoints import SqlAlchemyCycleCheckpointsAdapter
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
+    SqlAlchemyEquitySnapshotRepositoryAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
@@ -113,6 +116,7 @@ from autotrading.application.flows.reconcile_account_for_cycle import (
     ReconcileAccountForCycleUseCase,
 )
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
@@ -252,6 +256,7 @@ def tenant_use_cases(
             cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
+            equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
             environment=environment,
         )
         return TenantUseCases.on(tenant_id, ports)
@@ -419,7 +424,8 @@ def cycle_of(
             failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
-        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints), guards)
+        equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))
+        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints), guards, equity)
 
     return cycle_for
 

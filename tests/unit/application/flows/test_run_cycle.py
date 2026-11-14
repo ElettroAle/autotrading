@@ -237,3 +237,48 @@ def test_a_completed_cycle_is_not_told(cycles: Cycles) -> None:
     run(cycles)
 
     assert cycles.failure_notices.told == []
+
+
+def test_a_completed_cycle_records_the_equity_of_the_state_at_its_end(cycles: Cycles) -> None:
+    run(cycles)
+
+    assert cycles.equity.recorded == [(cycles.id_of("alfa"), at("10:22:00"), {"flow": "alfa", "executions": 0})]
+
+
+@pytest.mark.parametrize(
+    "step",
+    [CycleStep.COMPOSE_CONTEXT, CycleStep.AGENT_DECISION, CycleStep.ORDER_EXECUTION, CycleStep.UPDATE_FLOW_STATE],
+)
+def test_a_cycle_failed_after_reading_the_state_records_the_equity_of_the_state_read(
+    cycles: Cycles, step: CycleStep
+) -> None:
+    cycles.failures.fail_once(cycles.id_of("alfa"), step, FakeTransientError("timeout"))
+
+    run(cycles)
+
+    assert cycles.equity.recorded == [(cycles.id_of("alfa"), at("10:22:00"), {"flow": "alfa", "positions": []})]
+
+
+def test_the_equity_of_a_failed_cycle_follows_its_record(cycles: Cycles) -> None:
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakePermanentError("chiave revocata"))
+
+    with pytest.raises(FakePermanentError):
+        run(cycles)
+
+    assert len(cycles.records.records) == len(cycles.equity.recorded) == 1
+
+
+def test_a_cycle_failed_reading_the_state_records_no_equity(cycles: Cycles) -> None:
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
+
+    run(cycles)
+
+    assert cycles.records.records[0].outcome is CycleOutcome.FAILED
+    assert cycles.equity.recorded == []
+
+
+def test_a_skipped_cycle_records_no_equity(cycles: Cycles) -> None:
+    with cycles.lock.hold(cycles.id_of("alfa")):
+        run(cycles)
+
+    assert cycles.equity.recorded == []

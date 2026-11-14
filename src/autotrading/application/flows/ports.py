@@ -22,6 +22,7 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -680,9 +681,30 @@ class CycleStartPort[S = object](Protocol):
         ...
 
 
-class CycleEndPort[E = object](Protocol):
-    def execute(self, flow_id: UUID, anchor: datetime, executions: Sequence[E]) -> object:
+class CycleEndPort[S = object, E = object](Protocol):
+    def execute(self, flow_id: UUID, anchor: datetime, executions: Sequence[E]) -> S:
         """Applies the executions of the cycle and gives back the state of the flow at the end of it."""
+        ...
+
+
+class CycleEquityPort[S = object](Protocol):
+    def execute(self, flow_id: UUID, planned_at: datetime, state: S) -> None:
+        """Records the equity of the flow at the cycle, from the last state of the flow the cycle read (R2.2.3)."""
+        ...
+
+
+class EquitySnapshotRepositoryPort(Protocol):
+    """Bound to the tenant of the request or of the cycle: it never shows the equity of a flow of another tenant."""
+
+    def record(self, snapshot: EquitySnapshot) -> None:
+        """Adds the equity of a cycle; a cycle already recorded keeps its first equity (ADR 0120).
+
+        Raises CrossTenantAccessError for the equity of a flow of another tenant.
+        """
+        ...
+
+    def of_flow(self, flow_id: UUID, window: TimeWindow) -> list[EquitySnapshot]:
+        """The equity of every cycle of the flow in the window, from the oldest planned instant."""
         ...
 
 
