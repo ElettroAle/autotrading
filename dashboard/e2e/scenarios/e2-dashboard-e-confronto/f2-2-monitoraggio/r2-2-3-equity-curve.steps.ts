@@ -90,8 +90,3 @@ Then(
     expect(expected).toBeLessThan(fakePlatform.flowNamed(memory.flow).equity.length);
   },
 );
-
-Then('la pagina mostra {string}', async ({ dashboard }, message: string) => {
-  await expect(dashboard.page.getByText(message, { exact: true })).toBeVisible();
-  await expect(dashboard.equityCurve()).toHaveCount(0);
-});

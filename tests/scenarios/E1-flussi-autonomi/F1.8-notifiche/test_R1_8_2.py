@@ -207,7 +207,7 @@ def chat_receives_once(flow_cycles: FlowCycles, chat: str, text: str) -> None:
 def history_with_pnl(flow_cycles: FlowCycles, flow: str, asset: str, pnl: str) -> None:
     operating = flow_cycles.flow(flow)
     use_cases = flow_cycles.platform.use_cases_of(flow_cycles.users[flow])
-    [position] = use_cases.list_closed_positions.execute(ListClosedPositionsCommand(operating.id.value))
+    [position] = use_cases.list_closed_positions.execute(ListClosedPositionsCommand(operating.id.value)).positions
     assert (position.asset, position.pnl) == (asset, Decimal(pnl.replace(",", ".")))
 
 

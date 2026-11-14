@@ -500,7 +500,9 @@ class ClosedPositionRepositoryPort(Protocol):
         """Raises CrossTenantAccessError for a position of another tenant."""
         ...
 
-    def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...
+    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
+        """The closed positions of the flow from the most recent close."""
+        ...
 
     def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
         """The closed positions of the flow whose closing falls in the window (R2.2.6)."""

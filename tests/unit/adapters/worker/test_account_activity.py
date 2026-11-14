@@ -37,7 +37,11 @@ def test_the_activity_read_by_the_worker_arrives_unchanged(worker: Worker) -> No
     address = worker.vault[account.credentials.ciphertext][2].account_address
     activity = an_activity(
         balance=Decimal("1012.5"),
-        positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal("-1.5")),),
+        positions=(
+            a_position(
+                "BTC", margin=Decimal(100), unrealized_pnl=Decimal("-1.5"), leverage=3, entry_price=Decimal("60000.5")
+            ),
+        ),
         movements=(a_movement(Decimal(-20)),),
     )
     worker.activity_reader.activities[address] = activity

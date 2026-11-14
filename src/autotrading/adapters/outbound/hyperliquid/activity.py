@@ -92,6 +92,8 @@ def _position_of(position: _UserPosition) -> AccountPosition:
         size=abs(position.signed_size),
         margin=position.margin,
         unrealized_pnl=position.unrealized_pnl,
+        leverage=position.leverage,
+        entry_price=position.entry_price,
     )
 
 

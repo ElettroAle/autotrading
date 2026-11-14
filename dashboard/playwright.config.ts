@@ -10,7 +10,7 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
 const testDir = defineBddConfig({
   features: '../specs/E2-dashboard-e-confronto/**/*.feature',
   featuresRoot: '../specs',
-  steps: ['e2e/support/fixtures.ts', 'e2e/support/*.steps.ts', 'e2e/scenarios/**/*.steps.ts'],
+  steps: ['e2e/support/fixtures.ts', 'e2e/support/**/*.steps.ts', 'e2e/scenarios/**/*.steps.ts'],
   tags: 'not @wip and not @pipeline',
   // A scenario of what the worker does (the equity a cycle records) has no step here: pytest-bdd runs it on the use
   // cases, and the coverage of the scenarios reads both reports (ADR 0116).

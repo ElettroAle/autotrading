@@ -13,7 +13,7 @@ class ClosedPositionStore:
 
 
 class InMemoryClosedPositionRepositoryAdapter:
-    """Bound to one tenant, like the real adapter under row level security; the order is the order of saving."""
+    """Bound to one tenant, like the real adapter under row level security; newest first, like the real adapter."""
 
     def __init__(self, store: ClosedPositionStore, tenant_id: TenantId) -> None:
         self._store = store
@@ -24,12 +24,20 @@ class InMemoryClosedPositionRepositoryAdapter:
             raise CrossTenantAccessError
         self._store.positions.append(position)
 
-    def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]:
+    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
+        of_flow = sorted(
+            self._of_flow(flow_id),
+            key=lambda position: position.closing.at,
+            reverse=True,
+        )
+        return of_flow[offset : offset + limit]
+
+    def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
+        return [position for position in self._of_flow(flow_id) if window.contains(position.closing.at)]
+
+    def _of_flow(self, flow_id: FlowId) -> list[ClosedPosition]:
         return [
             position
             for position in self._store.positions
             if position.tenant_id == self._tenant_id and position.flow_id == flow_id
         ]
-
-    def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
-        return [position for position in self.of_flow(flow_id) if window.contains(position.closing.at)]

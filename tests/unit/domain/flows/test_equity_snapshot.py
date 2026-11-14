@@ -15,7 +15,7 @@ FLOW_ID = FlowId.new()
 
 def a_state(*, unrealized: tuple[Decimal, ...] = (), funding: Decimal = Decimal(0)) -> FlowState:
     positions = tuple(
-        AccountPosition(asset, TradeSide.LONG, Decimal(1), Decimal(20), pnl)
+        AccountPosition(asset, TradeSide.LONG, Decimal(1), Decimal(20), pnl, 1, Decimal(100))
         for asset, pnl in zip(("BTC", "ETH"), unrealized, strict=False)
     )
     return FlowState(FLOW_ID, "USDC", Decimal(300), positions, Decimal(4), Decimal(1), funding)

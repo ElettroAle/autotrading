@@ -3,7 +3,8 @@ from uuid import UUID
 
 from autotrading.application.flows.errors import CycleFlowNotFoundError
 from autotrading.application.flows.ports import CycleHistoryPort, FlowDirectoryPort
-from autotrading.domain.flows.cycle_page import CYCLES_PER_PAGE, CyclePage, PageNumber
+from autotrading.domain.flows.cycle_page import CYCLES_PER_PAGE, CyclePage
+from autotrading.domain.flows.page_number import PageNumber
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,5 +25,5 @@ class ListCyclesUseCase:
         if not self._flows.exists(command.flow_id):
             raise CycleFlowNotFoundError
         # One cycle more than the page tells whether another page follows.
-        found = self._history.newest(command.flow_id, number.offset, CYCLES_PER_PAGE + 1)
+        found = self._history.newest(command.flow_id, number.offset(CYCLES_PER_PAGE), CYCLES_PER_PAGE + 1)
         return CyclePage(number.value, tuple(found[:CYCLES_PER_PAGE]), len(found) > CYCLES_PER_PAGE)

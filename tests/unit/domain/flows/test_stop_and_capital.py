@@ -81,7 +81,7 @@ def test_a_raise_beyond_the_free_capital_plus_the_own_names_the_capital_availabl
 
 def state(capital: str, *, margin: str = "150", realized: str = "0", fees: str = "0") -> FlowState:
     flow = a_flow(TENANT, configuration=a_configuration(allocated_capital=Decimal(capital)))
-    position = AccountPosition("BTC", TradeSide.LONG, Decimal(1), Decimal(margin), Decimal(0))
+    position = AccountPosition("BTC", TradeSide.LONG, Decimal(1), Decimal(margin), Decimal(0), 1, Decimal(100))
     return FlowState(flow.id, "USDC", Decimal(capital), (position,), Decimal(realized), Decimal(fees), Decimal(0))
 
 

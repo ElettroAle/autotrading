@@ -10,6 +10,8 @@ class ActivityPositionResponse(BaseModel):
     size: str
     margin: str
     unrealized_pnl: str
+    leverage: int
+    entry_price: str
 
     @classmethod
     def of(cls, position: AccountPosition) -> ActivityPositionResponse:
@@ -19,6 +21,8 @@ class ActivityPositionResponse(BaseModel):
             size=str(position.size),
             margin=str(position.margin),
             unrealized_pnl=str(position.unrealized_pnl),
+            leverage=position.leverage,
+            entry_price=str(position.entry_price),
         )
 
 

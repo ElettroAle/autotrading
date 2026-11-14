@@ -13,9 +13,15 @@ READ_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 
 
 def a_position(
-    asset: str, *, margin: Decimal = Decimal(0), unrealized_pnl: Decimal = Decimal(0), size: Decimal = Decimal(1)
+    asset: str,
+    *,
+    margin: Decimal = Decimal(0),
+    unrealized_pnl: Decimal = Decimal(0),
+    size: Decimal = Decimal(1),
+    leverage: int = 1,
+    entry_price: Decimal = Decimal(100),
 ) -> AccountPosition:
-    return AccountPosition(asset, TradeSide.LONG, size, margin, unrealized_pnl)
+    return AccountPosition(asset, TradeSide.LONG, size, margin, unrealized_pnl, leverage, entry_price)
 
 
 def a_fill(

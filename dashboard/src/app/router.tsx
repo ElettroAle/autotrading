@@ -2,12 +2,14 @@ import type { RouteObject } from 'react-router';
 
 import { paths } from '@/config/paths';
 
+import { ClosedPositionsRoute } from './routes/app/closed-positions';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { FlowRoute } from './routes/app/flow';
 import { FlowVersionsRoute } from './routes/app/flow-versions';
 import { HomeRoute } from './routes/app/home';
 import { NotificationsRoute } from './routes/app/notifications';
+import { PositionsRoute } from './routes/app/positions';
 import { AppRoot } from './routes/app/root';
 import { LoginRoute } from './routes/login';
 import { NotFoundRoute } from './routes/not-found';
@@ -27,6 +29,8 @@ export const routes: RouteObject[] = [
       { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
       { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },
+      { path: paths.flowPositions.path, element: <PositionsRoute /> },
+      { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
     ],
   },
   { path: '*', element: <NotFoundRoute /> },

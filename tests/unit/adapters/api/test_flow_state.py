@@ -53,7 +53,17 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
     flow = flow_of(platform, "anna")
     platform.ledger.totals[flow.id] = FlowTotals(flow.id, Decimal(40), Decimal(2))
     platform.account_activity.activities[flow.assigned_account_id] = an_activity(
-        positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal(12)), a_position("ETH")),
+        positions=(
+            a_position(
+                "BTC",
+                margin=Decimal(100),
+                unrealized_pnl=Decimal(12),
+                size=Decimal("0.010"),
+                leverage=3,
+                entry_price=Decimal("60000.0"),
+            ),
+            a_position("ETH"),
+        ),
     )
 
     response = anna.get(f"/flows/{flow.id.value}/state")
@@ -70,8 +80,29 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
         "fees": "2",
         "total_value": "550",
         "return_percent": "10",
-        "positions": [{"asset": "BTC", "side": "long", "size": "1", "margin": "100", "unrealized_pnl": "12"}],
+        "positions": [
+            {
+                "asset": "BTC",
+                "side": "long",
+                "size": "0.01",
+                "leverage": "3",
+                "entry_price": "60000",
+                "margin": "100",
+                "unrealized_pnl": "12",
+                "unrealized_pnl_percent": "12",
+            }
+        ],
     }
+
+
+def test_a_position_without_margin_answers_no_pnl_percent(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity(positions=(a_position("BTC"),))
+
+    [position] = anna.get(f"/flows/{flow.id.value}/state").json()["positions"]
+
+    assert position["unrealized_pnl_percent"] is None
 
 
 def test_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:

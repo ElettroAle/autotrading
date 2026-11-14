@@ -203,7 +203,7 @@ def closed_at_instants(history: History, flow: str, instants: str) -> None:
 @when(quoted('"{user}" consulta lo storico delle posizioni chiuse del flusso "{flow}"'))
 def consult_history(history: History, user: str, flow: str) -> None:
     command = ListClosedPositionsCommand(history.flows[flow].id.value)
-    history.consulted = history.platform.use_cases_of(user).list_closed_positions.execute(command)
+    history.consulted = list(history.platform.use_cases_of(user).list_closed_positions.execute(command).positions)
 
 
 @then(

@@ -19,6 +19,8 @@ class _PositionBody(TypedDict):
     size: str
     margin: str
     unrealized_pnl: str
+    leverage: int
+    entry_price: str
 
 
 class _MovementBody(TypedDict):
@@ -87,6 +89,8 @@ def _position_of(position: _PositionBody) -> AccountPosition:
         size=Decimal(position["size"]),
         margin=Decimal(position["margin"]),
         unrealized_pnl=Decimal(position["unrealized_pnl"]),
+        leverage=int(position["leverage"]),
+        entry_price=Decimal(position["entry_price"]),
     )
 
 
