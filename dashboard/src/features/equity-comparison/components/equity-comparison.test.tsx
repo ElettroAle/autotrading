@@ -18,8 +18,8 @@ const recordEquities = (flow: string, equities: ReadonlyArray<readonly [number, 
 describe('EquityComparison', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
-    fakePlatform.addFlow('anna', 'alfa', undefined, { initialCapital: '300' });
-    fakePlatform.addFlow('anna', 'beta', undefined, { initialCapital: '200' });
+    fakePlatform.addFlow('anna', 'alfa', { allocatedCapital: 300 });
+    fakePlatform.addFlow('anna', 'beta', { allocatedCapital: 200 });
   });
 
   it('draws the curves of the chosen flows from 0% at the first point of the period', async () => {

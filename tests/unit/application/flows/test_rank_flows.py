@@ -107,6 +107,13 @@ def test_the_ranking_leaves_out_the_archived_flows(platform: Platform) -> None:
     assert names(platform.use_case().execute(RankFlowsCommand())) == ["alfa"]
 
 
+def test_the_ranking_leaves_out_the_drafts(platform: Platform) -> None:
+    platform.flow("alfa", "100", "110")
+    platform.flow("bozza", "100", "300", status=FlowStatus.DRAFT)
+
+    assert names(platform.use_case().execute(RankFlowsCommand())) == ["alfa"]
+
+
 def test_the_ranking_leaves_out_the_flows_of_another_tenant(platform: Platform) -> None:
     platform.flow("alfa", "100", "110")
     platform.flow("omega", "100", "400", tenant_id=TenantId.new())

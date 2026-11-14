@@ -14,7 +14,7 @@ Funzionalità: R2.4.2 Classifica dei flussi
   qualsiasi colonna; il predefinito è il rendimento decrescente. Compaiono i flussi non archiviati con almeno
   un ciclo nel periodo. Disponibile dalla dashboard e dall'interfaccia programmatica.
 
-  Fuori ambito: i flussi di altri utenti, i flussi archiviati.
+  Fuori ambito: i flussi di altri utenti, i flussi archiviati, le bozze.
 
   Contesto:
     Dato che "anna" ha il flusso "alfa" con equity per ciclo 300, 330, 297, 360 USDC

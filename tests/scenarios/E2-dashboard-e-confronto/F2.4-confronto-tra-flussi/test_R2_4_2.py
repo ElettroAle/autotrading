@@ -88,6 +88,7 @@ class Ranking:
 
 def _snapshot(flow: Flow, planned_at: datetime, equity: Decimal) -> EquitySnapshot:
     capital = flow.configuration.allocated_capital
+    assert capital is not None, "a flow that records its equity has an allocated capital"
     return EquitySnapshot(flow.id.value, planned_at, capital, equity - capital, Decimal(0), Decimal(0), Decimal(0))
 
 

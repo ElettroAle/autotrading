@@ -25,9 +25,13 @@ class RankFlowsCommand:
     last_day: date | None = None
 
 
+# A draft has never run and an archived flow is over: neither competes with the flows at work.
+_OUT_OF_RANKING = frozenset({FlowStatus.DRAFT, FlowStatus.ARCHIVED})
+
+
 class RankFlowsUseCase:
-    """The ranking of the flows of the tenant not archived with a cycle in the period, from the highest return
-    (R2.4.2, ADR 0135).
+    """The ranking of the flows of the tenant neither drafts nor archived with a cycle in the period, from the highest
+    return (R2.4.2, ADR 0135).
     """
 
     def __init__(
@@ -51,7 +55,7 @@ class RankFlowsUseCase:
 
     def _rankings(self, window: TimeWindow) -> Iterator[FlowRanking]:
         for flow in self._flows.list():
-            if flow.status is FlowStatus.ARCHIVED:
+            if flow.status in _OUT_OF_RANKING:
                 continue
             snapshots = self._equity.of_flow(flow.id.value, window)
             if not snapshots:
