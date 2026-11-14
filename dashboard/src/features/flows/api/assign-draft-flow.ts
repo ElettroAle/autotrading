@@ -17,7 +17,7 @@ export const assignmentInputSchema = z.object({
       (amount) => POSITIVE_AMOUNT.test(amount) && Number(amount) > 0,
       'il capitale allocato deve essere positivo',
     ),
-  assets: z.string().trim().min(1, 'almeno un asset è obbligatorio'),
+  assets: z.array(z.string()).min(1, 'almeno un asset è obbligatorio'),
 });
 
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>;
@@ -26,10 +26,7 @@ const requestOf = ({ accountId, allocatedCapital, assets }: AssignmentInput) => 
   account_id: accountId,
   // The amount travels as text, so no digit is rounded on the way (ADR 0018).
   allocated_capital: allocatedCapital.trim(),
-  assets: assets
-    .split(',')
-    .map((asset) => asset.trim())
-    .filter((asset) => asset !== ''),
+  assets,
 });
 
 /** Account, capital and assets the draft will start with (R2.4.1, ADR 0124). */

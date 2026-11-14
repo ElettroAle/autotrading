@@ -1,5 +1,6 @@
 import { loadExternalTokens, type IPublicClientApplication } from '@azure/msal-browser';
 import { render } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { createMemoryRouter } from 'react-router';
 
 import { App } from '@/app';
@@ -37,4 +38,11 @@ export const renderApp = async ({
   const router = createMemoryRouter(routes, { initialEntries: [url] });
   render(<App config={TEST_CONFIG} authClient={authClient} router={router} />);
   return { router, authClient };
+};
+
+/** A piece of the dashboard alone, inside the providers of the dashboard, as a user with the account sees it. */
+export const renderInApp = async (ui: ReactNode, { account }: { account?: string } = {}) => {
+  const authClient = await authClientFor(account);
+  const router = createMemoryRouter([{ path: '*', element: ui }]);
+  render(<App config={TEST_CONFIG} authClient={authClient} router={router} />);
 };

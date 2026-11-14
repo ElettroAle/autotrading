@@ -412,7 +412,13 @@ export class DashboardPages {
     const form = this.page.getByRole('form', { name: 'Assegnazione della bozza' });
     await form.getByLabel('Conto').selectOption({ label: account });
     await form.getByLabel('Capitale allocato (USDC)').fill(capital);
-    await form.getByLabel('Asset').fill(assets);
+    for (const asset of assets.split(',').map((name) => name.trim())) {
+      await form.getByLabel('Asset', { exact: true }).fill(asset);
+      await form
+        .getByRole('list', { name: 'Asset negoziabili' })
+        .getByRole('button', { name: asset, exact: true })
+        .click();
+    }
     await form.getByRole('button', { name: 'Assegna' }).click();
   }
 

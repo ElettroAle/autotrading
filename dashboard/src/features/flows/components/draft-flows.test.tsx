@@ -12,6 +12,16 @@ const detail = (label: string) =>
 
 const assignmentForm = () => screen.getByRole('form', { name: 'Assegnazione della bozza' });
 
+/** Chooses an asset as a user does: typing its name and picking it among the tradable ones. */
+const chooseAsset = async (asset: string) => {
+  await userEvent.type(await screen.findByLabelText('Asset', { exact: true }), asset);
+  await userEvent.click(
+    within(screen.getByRole('list', { name: 'Asset negoziabili' })).getByRole('button', {
+      name: asset,
+    }),
+  );
+};
+
 describe('Draft flows', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
@@ -72,7 +82,8 @@ describe('Draft flows', () => {
 
     await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
     await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '200');
-    await userEvent.type(screen.getByLabelText('Asset'), 'btc, eth');
+    await chooseAsset('BTC');
+    await chooseAsset('ETH');
     await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
 
     await waitFor(() => expect(detail('Conto')).toBe('secondario'));
@@ -101,7 +112,7 @@ describe('Draft flows', () => {
 
     await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
     await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '5000');
-    await userEvent.type(screen.getByLabelText('Asset'), 'BTC');
+    await chooseAsset('BTC');
     await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
 
     expect(await within(assignmentForm()).findByRole('alert')).toHaveTextContent(
@@ -126,7 +137,7 @@ describe('Draft flows', () => {
 
     await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
     await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '200');
-    await userEvent.type(screen.getByLabelText('Asset'), 'BTC');
+    await chooseAsset('BTC');
     await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
 
     expect(await within(assignmentForm()).findByText('numero non valido')).toBeInTheDocument();
@@ -147,13 +158,32 @@ describe('Draft flows', () => {
 
     await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
     await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '200');
-    await userEvent.type(screen.getByLabelText('Asset'), 'BTC');
+    await chooseAsset('BTC');
     await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
 
     expect(await within(assignmentForm()).findByRole('alert')).toHaveTextContent(
       'richiesta non valida',
     );
     expect(within(assignmentForm()).queryByText('corpo assente')).not.toBeInTheDocument();
+  });
+
+  it('sends no assignment while the API cannot list the assets', async () => {
+    server.use(
+      http.get('*/assets', () =>
+        HttpResponse.json(
+          { detail: 'exchange non raggiungibile, riprovare' },
+          { status: 503, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+
+    const form = await screen.findByRole('form', { name: 'Assegnazione della bozza' });
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'Impossibile leggere gli asset negoziabili: exchange non raggiungibile, riprovare',
+    );
+    expect(within(form).getByRole('button', { name: 'Assegna' })).toBeDisabled();
   });
 
   it('names the account by its identifier while the accounts cannot be read', async () => {

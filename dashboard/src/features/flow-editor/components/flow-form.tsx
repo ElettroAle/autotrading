@@ -1,16 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, useForm } from 'react-hook-form';
 
+import { AssetPicker } from '@/components/ui/form/asset-picker';
 import { FORM_CONTROL, FORM_TEXT_AREA, FormField } from '@/components/ui/form/form-field';
+import { useTradableAssets } from '@/hooks/use-tradable-assets';
 import { showRefusal } from '@/lib/form-errors';
 
 import type { Account } from '../api/get-accounts';
 import type { Model } from '../api/get-model-catalog';
 import type { Source } from '../api/get-sources';
-import { useTradableAssets } from '../api/get-tradable-assets';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
-import { AssetFields } from './asset-fields';
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
 
@@ -43,6 +43,7 @@ export const FlowForm = ({
   const tradable = useTradableAssets();
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -91,7 +92,20 @@ export const FlowForm = ({
             </select>
           )}
         </FormField>
-        <AssetFields />
+        <Controller
+          control={control}
+          name="assets"
+          render={({ field }) => (
+            <AssetPicker
+              id="flow-assets"
+              chosen={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              inputRef={field.ref}
+              error={errors.assets?.message}
+            />
+          )}
+        />
         <FormField
           id="flow-cycle-minutes"
           label="Intervallo del ciclo in minuti"

@@ -1,14 +1,9 @@
-import { useState, type KeyboardEvent } from 'react';
-import { useController, useFormContext } from 'react-hook-form';
+import { useState, type KeyboardEvent, type Ref } from 'react';
 
 import { ErrorMessage } from '@/components/ui/error-message';
-import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
+import { useTradableAssets } from '@/hooks/use-tradable-assets';
 
-import { useTradableAssets } from '../api/get-tradable-assets';
-import type { FlowFormValues } from '../utils/flow-form';
-
-const ID = 'flow-assets';
-const OFFERED_ID = `${ID}-offered`;
+import { FORM_CONTROL, FormField } from './form-field';
 
 const matchesOf = (tradable: readonly string[], chosen: readonly string[], search: string) => {
   const wanted = search.trim().toUpperCase();
@@ -22,26 +17,38 @@ const pickedBy = (matches: readonly string[], search: string): string | undefine
   matches.find((asset) => asset.toUpperCase() === search.trim().toUpperCase()) ??
   (matches.length === 1 ? matches[0] : undefined);
 
+type AssetPickerProps = {
+  readonly id: string;
+  readonly chosen: readonly string[];
+  readonly onChange: (assets: string[]) => void;
+  /** The reason the API or the form refused the assets, shown beside the field. */
+  readonly error: string | undefined;
+  readonly onBlur?: () => void;
+  readonly inputRef?: Ref<HTMLInputElement>;
+};
+
 /**
- * The assets of the flow, chosen among those the API says the exchange trades now: typing filters the list, each
+ * The assets of a flow, chosen among those the API says the exchange trades now: typing filters the list, each
  * chosen asset is a label the user can remove. No list of assets lives in the dashboard (ADR 0147).
  */
-export const AssetFields = () => {
-  const {
-    control,
-    formState: { errors },
-  } = useFormContext<FlowFormValues>();
-  const { field } = useController({ control, name: 'assets' });
+export const AssetPicker = ({
+  id,
+  chosen,
+  onChange,
+  error,
+  onBlur,
+  inputRef,
+}: AssetPickerProps) => {
   const tradable = useTradableAssets();
   const [search, setSearch] = useState('');
-  const chosen = field.value;
   const matches = matchesOf(tradable.data ?? [], chosen, search);
+  const offeredId = `${id}-offered`;
 
   const choose = (asset: string) => {
-    field.onChange([...chosen, asset]);
+    onChange([...chosen, asset]);
     setSearch('');
   };
-  const remove = (asset: string) => field.onChange(chosen.filter((other) => other !== asset));
+  const remove = (asset: string) => onChange(chosen.filter((other) => other !== asset));
   const pickOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') {
       return;
@@ -54,8 +61,8 @@ export const AssetFields = () => {
   };
 
   return (
-    <FormField id={ID} label="Asset" error={errors.assets?.message}>
-      {(props) => (
+    <FormField id={id} label="Asset" error={error}>
+      {(control) => (
         <div className="min-w-0 space-y-2">
           {chosen.length > 0 && (
             <ul aria-label="Asset scelti" className="flex min-w-0 flex-wrap gap-2">
@@ -78,18 +85,17 @@ export const AssetFields = () => {
             </ul>
           )}
           <input
-            {...props}
+            {...control}
             type="search"
-            ref={field.ref}
-            name={field.name}
+            ref={inputRef}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            onBlur={field.onBlur}
+            onBlur={onBlur}
             onKeyDown={pickOnEnter}
             disabled={tradable.isError}
             autoComplete="off"
             placeholder="Cerca un asset"
-            aria-controls={OFFERED_ID}
+            aria-controls={offeredId}
             className={FORM_CONTROL}
           />
           {tradable.isError && (
@@ -100,7 +106,7 @@ export const AssetFields = () => {
           )}
           {matches.length > 0 && (
             <ul
-              id={OFFERED_ID}
+              id={offeredId}
               aria-label="Asset negoziabili"
               className="max-h-48 min-w-0 overflow-y-auto rounded border border-slate-200"
             >

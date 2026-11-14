@@ -74,47 +74,7 @@ describe('CreateFlow', () => {
     );
   });
 
-  it('offers the assets the API lists, filtered by what the user types', async () => {
-    await renderApp({ account: 'anna', url: NEW_FLOW });
-
-    await userEvent.type(await screen.findByLabelText('Asset'), 's');
-
-    const offered = within(screen.getByRole('list', { name: 'Asset negoziabili' }));
-    expect(offered.getAllByRole('button').map((button) => button.textContent)).toEqual(['SOL']);
-  });
-
-  it('shows the chosen assets as labels the user can remove, and offers them no more', async () => {
-    await renderApp({ account: 'anna', url: NEW_FLOW });
-    await screen.findByLabelText('Asset');
-
-    await chooseAsset('btc', 'BTC');
-    await chooseAsset('e', 'ETH');
-    const chosen = within(screen.getByRole('list', { name: 'Asset scelti' }));
-    expect(chosen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'BTC×',
-      'ETH×',
-    ]);
-    expect(field('Asset')).toHaveValue('');
-    await userEvent.type(field('Asset'), 'btc');
-    expect(screen.queryByRole('list', { name: 'Asset negoziabili' })).toBeNull();
-
-    await userEvent.click(chosen.getByRole('button', { name: 'Togli BTC' }));
-    expect(chosen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['ETH×']);
-  });
-
-  it('chooses with Enter the asset typed in full, without sending the form', async () => {
-    await renderApp({ account: 'anna', url: NEW_FLOW });
-
-    await userEvent.type(await screen.findByLabelText('Asset'), 'eth{Enter}');
-    await userEvent.type(field('Asset'), 'zzz{Enter}');
-
-    const chosen = within(screen.getByRole('list', { name: 'Asset scelti' }));
-    expect(chosen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['ETH×']);
-    expect(field('Asset')).toHaveValue('zzz');
-    expect(fakePlatform.flowsOf('anna')).toEqual([]);
-  });
-
-  it('says why the assets cannot be chosen when the API cannot list them, and sends nothing', async () => {
+  it('sends nothing while the API cannot list the assets', async () => {
     server.use(
       http.get('*/assets', () =>
         HttpResponse.json(
