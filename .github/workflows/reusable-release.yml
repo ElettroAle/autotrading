@@ -95,6 +95,17 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The machine follows the declared instance type before every deploy, so a changed OVH_FLAVOR applies at the
+      # next release; with the right type this is only a lookup (ADR 0144).
+      - uses: ./.github/actions/ovh-resize
+        with:
+          environment: dev
+          client-id: ${{ secrets.OVH_CLIENT_ID }}
+          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
+          project-id: ${{ vars.OVH_PROJECT_ID }}
+          region: ${{ vars.OVH_REGION || 'SBG5' }}
+          zone: ${{ vars.OVH_ZONE || 'eu' }}
+          flavor: ${{ vars.OVH_FLAVOR || 'd2-2' }}
       - id: host
         uses: ./.github/actions/tailscale-connect
         with:
@@ -159,6 +170,17 @@ jobs:
           version: ${{ steps.release.outputs.version }}
           variant: dashboard
           token: ${{ secrets.GITHUB_TOKEN }}
+      # The machine follows the declared instance type before every deploy, so a changed OVH_FLAVOR applies at the
+      # next release; with the right type this is only a lookup (ADR 0144).
+      - uses: ./.github/actions/ovh-resize
+        with:
+          environment: prod
+          client-id: ${{ secrets.OVH_CLIENT_ID }}
+          client-secret: ${{ secrets.OVH_CLIENT_SECRET }}
+          project-id: ${{ vars.OVH_PROJECT_ID }}
+          region: ${{ vars.OVH_REGION || 'SBG5' }}
+          zone: ${{ vars.OVH_ZONE || 'eu' }}
+          flavor: ${{ vars.OVH_FLAVOR || 'd2-2' }}
       - id: host
         uses: ./.github/actions/tailscale-connect
         with:

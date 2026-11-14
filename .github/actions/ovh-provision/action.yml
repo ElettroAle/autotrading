@@ -1,5 +1,5 @@
 name: ovh-provision
-description: Crea la macchina dell'installazione su OVH Public Cloud da cloud-init versionato; non duplica un'installazione esistente.
+description: Crea la macchina dell'installazione su OVH Public Cloud da cloud-init versionato; non duplica un'installazione esistente e la porta al tipo d'istanza dichiarato.
 inputs:
   environment:
     description: dev o prod
@@ -60,6 +60,17 @@ runs:
         else
           echo "created=true" >> "$GITHUB_OUTPUT"
         fi
+    - name: Porta la macchina esistente al tipo d'istanza dichiarato
+      if: ${{ steps.exists.outputs.created == 'false' }}
+      uses: ./.github/actions/ovh-resize
+      with:
+        environment: ${{ inputs.environment }}
+        client-id: ${{ inputs.client-id }}
+        client-secret: ${{ inputs.client-secret }}
+        project-id: ${{ inputs.project-id }}
+        region: ${{ inputs.region }}
+        zone: ${{ inputs.zone }}
+        flavor: ${{ inputs.flavor }}
     - name: Crea la macchina
       if: ${{ steps.exists.outputs.created == 'true' }}
       shell: bash

@@ -45,6 +45,9 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/ssh-wait
+      with:
+        hostname: ${{ inputs.hostname }}
     - name: Aggiorna l'installazione
       shell: bash
       env:
