@@ -233,10 +233,3 @@ def test_a_draft_does_not_start_on_an_asset_under_verification(drafts: Drafts) -
         drafts.start(draft)
 
     assert drafts.repository.get(draft.id).status is FlowStatus.DRAFT
-
-
-def test_a_stopped_flow_starts_without_reading_its_account(drafts: Drafts) -> None:
-    original = drafts.original()
-    drafts.accounts.reachable = False
-
-    assert drafts.start(original).status is FlowStatus.ACTIVE

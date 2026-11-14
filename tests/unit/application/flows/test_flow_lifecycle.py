@@ -29,6 +29,7 @@ from autotrading.domain.flows.errors import (
     ArchivedFlowNotModifiableError,
     ArchiveOnlyStoppedError,
     AssetsAssignedToOtherFlowError,
+    CapitalAboveFreeCapitalError,
     CycleIntervalOutOfRangeError,
     FlowCommandNotAllowedError,
 )
@@ -84,14 +85,18 @@ class Flows:
         self.activity.activities[self.account_id] = an_activity(positions=tuple(a_position(asset) for asset in assets))
 
     def saved(
-        self, name: str = "alfa", status: FlowStatus = FlowStatus.STOPPED, assets: tuple[str, ...] = ("BTC",)
+        self,
+        name: str = "alfa",
+        status: FlowStatus = FlowStatus.STOPPED,
+        assets: tuple[str, ...] = ("BTC",),
+        capital: int = 100,
     ) -> Flow:
         flow = a_flow(
             self.tenant_id,
             name=name,
             status=status,
             account_id=self.account_id,
-            configuration=a_configuration(assets=assets),
+            configuration=a_configuration(assets=assets, allocated_capital=Decimal(capital)),
         )
         self.repository.add(flow)
         return flow
@@ -333,6 +338,50 @@ def test_a_refused_command_leaves_the_status(flows: Flows) -> None:
         flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.RESUME))
 
     assert flows.current(flow) == flow
+
+
+def test_a_stopped_flow_above_the_free_capital_of_now_does_not_start(flows: Flows) -> None:
+    flow = flows.saved("alfa", capital=100)
+    flows.saved("beta", assets=("ETH",), capital=100)
+    flows.accounts.balances[flows.account_id] = Decimal(150)
+
+    with pytest.raises(CapitalAboveFreeCapitalError) as refused:
+        flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
+
+    assert (str(refused.value), refused.value.status_code) == (
+        "capitale allocato oltre il capitale libero: 50 USDC",
+        422,
+    )
+    assert flows.current(flow) == flow
+
+
+def test_a_stopped_flow_starts_on_the_free_capital_that_leaves_out_its_own(flows: Flows) -> None:
+    flow = flows.saved(capital=100)
+    flows.accounts.balances[flows.account_id] = Decimal(150)
+
+    started = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
+
+    assert started.status is FlowStatus.ACTIVE
+    assert flows.current(flow) == started
+
+
+def test_a_stopped_flow_on_an_account_out_of_reach_does_not_start(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.accounts.reachable = False
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
+
+    assert flows.current(flow) == flow
+
+
+def test_a_paused_flow_resumes_without_reading_its_account(flows: Flows) -> None:
+    flow = flows.saved(status=FlowStatus.PAUSED)
+    flows.accounts.reachable = False
+
+    resumed = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.RESUME))
+
+    assert resumed.status is FlowStatus.ACTIVE
 
 
 @pytest.mark.parametrize(
