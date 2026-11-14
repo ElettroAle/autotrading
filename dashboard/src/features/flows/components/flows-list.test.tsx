@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
@@ -137,5 +138,17 @@ describe('FlowsList', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'exchange non raggiungibile, riprovare',
     );
+  });
+
+  it('keeps showing the flows when a rereading fails', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    await renderApp({ account: 'anna' });
+    await screen.findByRole('list', { name: 'Flussi' });
+    fakePlatform.stopApi();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aggiorna' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Dati non aggiornati');
+    expect(screen.getByRole('link', { name: 'alfa' })).toBeInTheDocument();
   });
 });

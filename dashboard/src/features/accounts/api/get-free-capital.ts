@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 import { amountSchema } from './get-account-state';
 
@@ -8,7 +9,13 @@ import { amountSchema } from './get-account-state';
 export const useFreeCapital = (accountId: string) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['accounts', accountId, 'free-capital'],
-    queryFn: () => api.get(`/accounts/${encodeURIComponent(accountId)}/free-capital`, amountSchema),
+    ...pageDataQuery('accounts', accountId, 'free-capital'),
+    queryFn: async () =>
+      readData(
+        await api.GET('/accounts/{account_id}/free-capital', {
+          params: { path: { account_id: accountId } },
+        }),
+        amountSchema,
+      ),
   });
 };

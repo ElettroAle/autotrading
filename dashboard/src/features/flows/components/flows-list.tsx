@@ -11,7 +11,8 @@ export const FlowsList = () => {
   if (flows.isPending) {
     return <Loading />;
   }
-  if (flows.isError) {
+  // A failed rereading keeps the flows already read on the page: the warning is the page's (ADR 0119).
+  if (flows.data === undefined) {
     return <ErrorMessage error={flows.error} />;
   }
   if (flows.data.length === 0) {

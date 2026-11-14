@@ -56,7 +56,8 @@ export const CycleView = ({ flowId, plannedAt }: { flowId: string; plannedAt: st
   if (cycle.isPending) {
     return <Loading />;
   }
-  if (cycle.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (cycle.data === undefined) {
     return <ErrorMessage error={cycle.error} />;
   }
   const { failure, absent_sources: absentSources, documents } = cycle.data;

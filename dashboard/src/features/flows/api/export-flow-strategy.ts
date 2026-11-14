@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readFile, useApiClient } from '@/lib/api-client';
 
 import { saveFile } from '../utils/save-file';
 
@@ -11,7 +11,13 @@ import { saveFile } from '../utils/save-file';
 export const useExportFlowStrategy = () => {
   const api = useApiClient();
   return useMutation({
-    mutationFn: (flowId: string) => api.download(`/flows/${encodeURIComponent(flowId)}/strategy`),
+    mutationFn: async (flowId: string) =>
+      readFile(
+        await api.GET('/flows/{flow_id}/strategy', {
+          params: { path: { flow_id: flowId } },
+          parseAs: 'blob',
+        }),
+      ),
     onSuccess: saveFile,
   });
 };

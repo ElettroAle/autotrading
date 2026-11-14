@@ -2,7 +2,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { apiSearchOf, type Period } from '@/components/ui/period-selector/use-period';
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 // Amounts travel as text, so no precision is lost on the way (ADR 0018); the chart needs numbers.
 const equitySchema = z
@@ -29,8 +30,15 @@ export const useFlowEquity = (flowId: string, period: Period) => {
   const api = useApiClient();
   const path = equityPath(flowId, period);
   return useQuery({
-    queryKey: ['flow-equity', path],
-    queryFn: () => api.get(path, equitySchema),
+    ...pageDataQuery('flow-equity', path),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/equity', {
+          params: { path: { flow_id: flowId } },
+          querySerializer: () => apiSearchOf(period),
+        }),
+        equitySchema,
+      ),
     placeholderData: keepPreviousData,
   });
 };

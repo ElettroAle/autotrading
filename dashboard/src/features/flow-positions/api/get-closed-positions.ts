@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const closedPositionSchema = z.object({
   asset: z.string(),
@@ -28,10 +29,12 @@ export type ClosedPosition = z.infer<typeof closedPositionSchema>;
 export const useClosedPositions = (flowId: string, page: number) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['closed-positions', flowId, page],
-    queryFn: () =>
-      api.get(
-        `/flows/${encodeURIComponent(flowId)}/closed-positions?page=${page}`,
+    ...pageDataQuery('closed-positions', flowId, page),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/closed-positions', {
+          params: { path: { flow_id: flowId }, query: { page } },
+        }),
         closedPositionPageSchema,
       ),
   });

@@ -6,3 +6,5 @@ test-results/
 playwright-report/
 .features-gen/
 package-lock.json
+openapi.json
+src/lib/api-schema.d.ts

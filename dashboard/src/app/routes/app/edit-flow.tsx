@@ -1,13 +1,13 @@
 import { useParams } from 'react-router';
 
-import { PageLayout } from '@/components/layouts/page-layout';
+import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { EditFlow } from '@/features/flow-editor/components/edit-flow';
 
 export const EditFlowRoute = () => {
   const { flowId = '' } = useParams();
   return (
-    <PageLayout title="Configurazione del flusso">
+    <DashboardLayout title="Configurazione del flusso">
       <EditFlow flowId={flowId} />
-    </PageLayout>
+    </DashboardLayout>
   );
 };

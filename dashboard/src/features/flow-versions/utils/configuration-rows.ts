@@ -43,7 +43,7 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       part: 'esposizione massima del valore',
       value: percentText(limits.max_value_exposure_percent),
     },
-    { part: 'capitale allocato', value: configuration.allocated_capital },
+    { part: 'capitale allocato', value: configuration.allocated_capital ?? NONE },
     { part: 'porta al minimo', value: configuration.bring_to_minimum ? 'sì' : 'no' },
   ];
 };

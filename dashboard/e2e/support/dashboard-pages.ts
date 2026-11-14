@@ -235,6 +235,21 @@ export class DashboardPages {
       .and(this.page.getByText(text, { exact: true }));
   }
 
+  cycles(): Locator {
+    return this.page.getByRole('list', { name: 'Cicli recenti' });
+  }
+
+  lastUpdate(): Locator {
+    return this.page.getByText(/^Ultimo aggiornamento:/);
+  }
+
+  /** How far the page reaches beyond the width of the screen: what the user would have to scroll sideways. */
+  async horizontalOverflow(): Promise<number> {
+    return this.page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+  }
+
   button(name: string): Locator {
     return this.page.getByRole('button', { name });
   }

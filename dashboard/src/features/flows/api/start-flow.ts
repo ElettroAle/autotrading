@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 import { FLOWS_QUERY_KEY, flowsSchema } from './get-flows';
 
@@ -9,7 +9,13 @@ export const useStartFlow = (flowId: string) => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post(`/flows/${encodeURIComponent(flowId)}/start`, flowsSchema.element),
+    mutationFn: async () =>
+      readData(
+        await api.POST('/flows/{flow_id}/{action}', {
+          params: { path: { flow_id: flowId, action: 'start' } },
+        }),
+        flowsSchema.element,
+      ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: FLOWS_QUERY_KEY }),
   });
 };

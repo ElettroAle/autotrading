@@ -98,7 +98,8 @@ export const ProviderKeysList = () => {
   if (keys.isPending) {
     return <Loading />;
   }
-  if (keys.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (keys.data === undefined) {
     return <ErrorMessage error={keys.error} />;
   }
   if (keys.data.length === 0) {

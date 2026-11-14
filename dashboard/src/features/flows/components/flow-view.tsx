@@ -12,6 +12,7 @@ import { DraftAssignmentForm } from './draft-assignment-form';
 import { DuplicateFlowButton } from './duplicate-flow-button';
 import { ExportStrategyButton } from './export-strategy-button';
 import { FlowDetails } from './flow-details';
+import { RecentCycles } from './recent-cycles';
 import { StartFlowButton } from './start-flow-button';
 
 const FlowStatus = ({ flow }: { flow: Flow }) => {
@@ -37,7 +38,8 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
   if (flows.isPending) {
     return <Loading />;
   }
-  if (flows.isError) {
+  // A failed rereading keeps the flow already read on the page: the warning is the page's (ADR 0119).
+  if (flows.data === undefined) {
     return <ErrorMessage error={flows.error} />;
   }
   const flow = flows.data.find((candidate) => candidate.id === flowId);
@@ -47,7 +49,7 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
   const accountsOfTenant = accounts.data ?? [];
   return (
     <section aria-labelledby="flow-name" className="rounded border border-slate-200 bg-white p-4">
-      <h2 id="flow-name" className="text-xl font-semibold">
+      <h2 id="flow-name" className="text-xl font-semibold break-words">
         {flow.name}
       </h2>
       <FlowStatus flow={flow} />
@@ -78,6 +80,7 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
         {flow.status === DRAFT_STATUS ? <StartFlowButton flowId={flow.id} /> : null}
       </div>
       {renderCommands(flow)}
+      <RecentCycles flowId={flow.id} />
       {flow.status === DRAFT_STATUS ? (
         <DraftAssignmentForm flowId={flow.id} accounts={accountsOfTenant} />
       ) : null}

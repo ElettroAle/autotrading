@@ -139,7 +139,8 @@ const textOf = (value: number | string | null): string => (value === null ? '' :
 /** The form filled with the configuration version in force of the flow. */
 export const formValuesOf = (flow: Flow): FlowFormValues => ({
   name: flow.name,
-  account_id: flow.account_id,
+  // A draft has neither account nor capital yet (ADR 0124).
+  account_id: flow.account_id ?? '',
   assets: flow.assets.join(', '),
   cycle_minutes: String(flow.cycle_minutes),
   model: flow.model.name,
@@ -160,7 +161,7 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   max_leverage: textOf(flow.risk_limits.max_leverage),
   max_margin_exposure_percent: textOf(flow.risk_limits.max_margin_exposure_percent),
   max_value_exposure_percent: textOf(flow.risk_limits.max_value_exposure_percent),
-  allocated_capital: flow.allocated_capital,
+  allocated_capital: flow.allocated_capital ?? '',
   bring_to_minimum: flow.bring_to_minimum,
 });
 
@@ -183,7 +184,7 @@ export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
   const keys = changed.includes(MODEL) ? [...new Set([...changed, MODEL_PARAMETERS])] : changed;
   const settings = Object.fromEntries(keys.map((key) => [key, after[key]]));
   const capital = decimalOf(values.allocated_capital);
-  return capital === decimalOf(flow.allocated_capital) ? { settings } : { settings, capital };
+  return capital === decimalOf(flow.allocated_capital ?? '') ? { settings } : { settings, capital };
 };
 
 const FORM_FIELDS = new Set<string>(Object.keys(flowFormSchema.shape));

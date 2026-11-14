@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 import { FLOWS_QUERY_KEY, flowsSchema, type Flow } from './get-flows';
 
@@ -11,8 +11,11 @@ export const useDuplicateFlow = ({ onSuccess }: { onSuccess: (copy: Flow) => voi
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (flowId: string) =>
-      api.post(`/flows/${encodeURIComponent(flowId)}/duplicate`, flowSchema),
+    mutationFn: async (flowId: string) =>
+      readData(
+        await api.POST('/flows/{flow_id}/duplicate', { params: { path: { flow_id: flowId } } }),
+        flowSchema,
+      ),
     onSuccess: async (copy) => {
       await queryClient.invalidateQueries({ queryKey: FLOWS_QUERY_KEY });
       onSuccess(copy);

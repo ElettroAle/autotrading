@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { apiSearchOf, isComplete, type Period } from '@/components/ui/period-selector/use-period';
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const statisticsSchema = z.object({
   won: z.number(),
@@ -22,10 +23,13 @@ export type FlowStatistics = z.infer<typeof statisticsSchema>;
 export const useFlowStatistics = (flowId: string, period: Period) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flow-statistics', flowId, period],
-    queryFn: () =>
-      api.get(
-        `/flows/${encodeURIComponent(flowId)}/statistics?${apiSearchOf(period)}`,
+    ...pageDataQuery('flow-statistics', flowId, period),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/statistics', {
+          params: { path: { flow_id: flowId } },
+          querySerializer: () => apiSearchOf(period),
+        }),
         statisticsSchema,
       ),
     enabled: isComplete(period),

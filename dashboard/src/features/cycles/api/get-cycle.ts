@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 import { failureSchema } from './get-cycles';
 
@@ -30,10 +31,12 @@ export type StepDocument = Cycle['documents'][number];
 export const useCycle = (flowId: string, plannedAt: string) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['cycle', flowId, plannedAt],
-    queryFn: () =>
-      api.get(
-        `/flows/${encodeURIComponent(flowId)}/cycles/${encodeURIComponent(plannedAt)}`,
+    ...pageDataQuery('cycle', flowId, plannedAt),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/cycles/{planned_at}', {
+          params: { path: { flow_id: flowId, planned_at: plannedAt } },
+        }),
         cycleSchema,
       ),
   });

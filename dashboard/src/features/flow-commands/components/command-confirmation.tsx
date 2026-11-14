@@ -15,7 +15,8 @@ const PositionsToClose = ({ flowId }: { flowId: string }) => {
   if (state.isPending) {
     return <Loading />;
   }
-  if (state.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (state.data === undefined) {
     return (
       <>
         <ErrorMessage error={state.error} />

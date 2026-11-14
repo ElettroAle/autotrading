@@ -1,8 +1,8 @@
-import { PageLayout } from '@/components/layouts/page-layout';
+import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { HistoryView } from '@/features/history/components/history-view';
 
 export const HistoryRoute = () => (
-  <PageLayout title="Storico">
+  <DashboardLayout title="Storico">
     <HistoryView />
-  </PageLayout>
+  </DashboardLayout>
 );

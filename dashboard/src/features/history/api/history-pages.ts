@@ -1,7 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import type { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { useApiClient, type ApiClient } from '@/lib/api-client';
 
 import type { HistoryKind } from '../utils/history-search';
 
@@ -14,7 +13,7 @@ type Page = { readonly next: string | null };
 export const useHistoryPages = <T extends Page>(
   kind: HistoryKind,
   query: string,
-  schema: z.ZodType<T>,
+  readPage: (api: ApiClient, search: string) => Promise<T>,
   enabled: boolean,
 ) => {
   const api = useApiClient();
@@ -22,7 +21,7 @@ export const useHistoryPages = <T extends Page>(
     queryKey: ['history', kind, query],
     queryFn: ({ pageParam }) => {
       const after = pageParam === null ? '' : `&after=${encodeURIComponent(pageParam)}`;
-      return api.get(`/history/${kind}?${query}${after}`, schema);
+      return readPage(api, `${query}${after}`);
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next,

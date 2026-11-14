@@ -40,7 +40,8 @@ export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) =
   if (cycles.isPending) {
     return <Loading />;
   }
-  if (cycles.isError) {
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (cycles.data === undefined) {
     return <ErrorMessage error={cycles.error} />;
   }
   return (

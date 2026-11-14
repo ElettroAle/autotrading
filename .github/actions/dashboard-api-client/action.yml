@@ -1,0 +1,10 @@
+name: dashboard-api-client
+description: I tipi del client della dashboard corrispondono al documento OpenAPI dell'API (ADR 0119).
+runs:
+  using: composite
+  steps:
+    # The document itself follows the API through tests/unit/tools/test_openapi_document.py, in the test job.
+    - name: Tipi generati dal documento OpenAPI
+      shell: bash
+      working-directory: dashboard
+      run: npm run check:api-client

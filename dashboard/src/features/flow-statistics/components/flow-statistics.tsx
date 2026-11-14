@@ -67,9 +67,6 @@ const StatisticsList = ({ statistics }: { statistics: Statistics }) => (
 const StatisticsContent = ({ flowId }: { flowId: string }) => {
   const [period] = usePeriod();
   const statistics = useFlowStatistics(flowId, period);
-  if (statistics.isError) {
-    return <ErrorMessage error={statistics.error} />;
-  }
   if (statistics.isPending && statistics.fetchStatus === 'idle') {
     return (
       <p className="text-slate-500">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
@@ -77,6 +74,10 @@ const StatisticsContent = ({ flowId }: { flowId: string }) => {
   }
   if (statistics.isPending) {
     return <Loading />;
+  }
+  // A failed rereading keeps the data already read on the page: the warning is the page's (ADR 0119).
+  if (statistics.data === undefined) {
+    return <ErrorMessage error={statistics.error} />;
   }
   return <StatisticsList statistics={statistics.data} />;
 };

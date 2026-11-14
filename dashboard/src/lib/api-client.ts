@@ -1,9 +1,11 @@
+import createClient, { type Client } from 'openapi-fetch';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { z } from 'zod';
 
-import { paths } from '@/config/paths';
+import { paths as dashboardPaths } from '@/config/paths';
 
+import type { paths } from './api-schema';
 import { SessionExpiredError, useAccessToken } from './auth';
 import { problemDetailsOf, type FieldProblem } from './problem-details';
 
@@ -21,113 +23,122 @@ export class ApiError extends Error {
   }
 }
 
+/** The functions of the API with the types its OpenAPI document declares (ADR 0119). */
+export type ApiClient = Client<paths>;
+
 /** A file the API gives to download, with the name it gives it. */
 export type DownloadedFile = { readonly name: string; readonly content: Blob };
-
-export type ApiClient = {
-  get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
-  /** A command without body, or with a JSON document sent as it is, as the text of a file the user chose. */
-  post<T>(path: string, schema: z.ZodType<T>, document?: string): Promise<T>;
-  /** A request with a JSON body, as a form sends it, and its answer. */
-  write<T>(
-    method: 'POST' | 'PATCH' | 'PUT',
-    path: string,
-    body: unknown,
-    schema: z.ZodType<T>,
-  ): Promise<T>;
-  /** A command the API answers without content. */
-  send(method: 'POST' | 'DELETE', path: string): Promise<void>;
-  download(path: string): Promise<DownloadedFile>;
-};
 
 type ApiClientOptions = {
   readonly accessToken: () => Promise<string>;
   readonly onSessionExpired: () => void;
-  readonly fetcher?: typeof fetch;
 };
 
-/** The body is JSON text already: the client sends it as it is. */
-type Command = { readonly method: string; readonly body?: string };
+const UNAUTHORIZED = 401;
+
+// Dashboard and API share the origin under Tailscale Serve: no CORS, no address to configure (ADR 0117).
+export const createApiClient = ({ accessToken, onSessionExpired }: ApiClientOptions): ApiClient => {
+  const client = createClient<paths>({ baseUrl: window.location.origin });
+  client.use({
+    async onRequest({ request }) {
+      request.headers.set(
+        'Authorization',
+        `Bearer ${await tokenOrSignIn(accessToken, onSessionExpired)}`,
+      );
+      request.headers.set('Accept', 'application/json');
+      return request;
+    },
+    onResponse({ response }) {
+      if (response.status === UNAUTHORIZED) {
+        onSessionExpired();
+        throw new SessionExpiredError();
+      }
+    },
+  });
+  return client;
+};
+
+const tokenOrSignIn = async (
+  accessToken: () => Promise<string>,
+  onSessionExpired: () => void,
+): Promise<string> => {
+  try {
+    return await accessToken();
+  } catch (error) {
+    onSessionExpired();
+    throw error;
+  }
+};
+
+type ApiResult<Data> = {
+  readonly data?: Data;
+  readonly error?: unknown;
+  readonly response: Response;
+};
+
+const refusalOf = ({ error, response }: ApiResult<unknown>): ApiError => {
+  const problem = problemDetailsOf(error);
+  return problem === undefined
+    ? new ApiError(response.status, response.statusText)
+    : new ApiError(response.status, problem.detail, problem.problems);
+};
+
+/**
+ * The data of a successful answer, validated by the schema of what the dashboard reads. The schema must read a part
+ * of the type the API declares, so a change of the API that breaks the dashboard fails the compilation; what the
+ * schema turns it into is the dashboard's.
+ */
+export const readData = <Read, Answer, Data extends Answer>(
+  result: ApiResult<Data>,
+  schema: z.ZodType<Read, Answer>,
+): Read => {
+  if (!result.response.ok) {
+    throw refusalOf(result);
+  }
+  return schema.parse(result.data);
+};
+
+/** The outcome of a command the API answers without content. */
+export const readDone = (result: ApiResult<unknown>): void => {
+  if (!result.response.ok) {
+    throw refusalOf(result);
+  }
+};
 
 // RFC 6266: the full name, encoded, wins over the plain one that every client reads.
 const ENCODED_FILE_NAME = /filename\*=UTF-8''([^;]+)/i;
 const PLAIN_FILE_NAME = /filename="([^"]+)"/i;
 
-const fileNameOf = (path: string, disposition: string | null): string => {
+const fileNameOf = (url: string, disposition: string | null): string => {
   const encoded = ENCODED_FILE_NAME.exec(disposition ?? '')?.[1];
   if (encoded !== undefined) {
     return decodeURIComponent(encoded);
   }
-  return PLAIN_FILE_NAME.exec(disposition ?? '')?.[1] ?? path.slice(path.lastIndexOf('/') + 1);
+  const { pathname } = new URL(url);
+  return (
+    PLAIN_FILE_NAME.exec(disposition ?? '')?.[1] ?? pathname.slice(pathname.lastIndexOf('/') + 1)
+  );
 };
 
-// Dashboard and API share the origin under Tailscale Serve: no CORS, no address to configure (ADR 0117).
-export const createApiClient = ({
-  accessToken,
-  onSessionExpired,
-  fetcher = fetch,
-}: ApiClientOptions): ApiClient => {
-  const tokenOrSignIn = async (): Promise<string> => {
-    try {
-      return await accessToken();
-    } catch (error) {
-      onSessionExpired();
-      throw error;
-    }
-  };
-
-  const request = async (path: string, { method, body }: Command): Promise<Response> => {
-    const token = await tokenOrSignIn();
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    };
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-    }
-    const response = await fetcher(new URL(path, window.location.origin), {
-      method,
-      headers,
-      body,
-    });
-    if (response.status === 401) {
-      onSessionExpired();
-      throw new SessionExpiredError();
-    }
-    if (!response.ok) {
-      throw await refusalOf(response);
-    }
-    return response;
-  };
-
-  const parsed = async <T>(response: Promise<Response>, schema: z.ZodType<T>): Promise<T> =>
-    schema.parse(await (await response).json());
-
+/** A file the API answers with, read with `parseAs: 'blob'`, and the name the API gives it. */
+export const readFile = (result: ApiResult<Blob>): DownloadedFile => {
+  if (!result.response.ok || result.data === undefined) {
+    throw refusalOf(result);
+  }
   return {
-    get: (path, schema) => parsed(request(path, { method: 'GET' }), schema),
-    post: (path, schema, document) =>
-      parsed(request(path, { method: 'POST', body: document }), schema),
-    write: (method, path, body, schema) =>
-      parsed(request(path, { method, body: JSON.stringify(body) }), schema),
-    async send(method, path) {
-      await request(path, { method });
-    },
-    async download(path) {
-      const response = await request(path, { method: 'GET' });
-      return {
-        name: fileNameOf(path, response.headers.get('Content-Disposition')),
-        content: await response.blob(),
-      };
-    },
+    name: fileNameOf(result.response.url, result.response.headers.get('Content-Disposition')),
+    content: result.data,
   };
 };
 
-const refusalOf = async (response: Response): Promise<ApiError> => {
-  const problem = problemDetailsOf(await response.json().catch(() => null));
-  return problem === undefined
-    ? new ApiError(response.status, response.statusText)
-    : new ApiError(response.status, problem.detail, problem.problems);
-};
+/**
+ * The text of a file the user chose as the body of a request, sent as it is: the API, not the dashboard, judges the
+ * file and tells what is wrong with it (R2.5.2). The types see the text as the body they ask for; it is never serialized.
+ */
+export const documentBody = <Body>(document: string) => ({
+  body: document as Body,
+  bodySerializer: () => document,
+});
 
 export const useApiClient = (): ApiClient => {
   const accessToken = useAccessToken();
@@ -138,7 +149,7 @@ export const useApiClient = (): ApiClient => {
       createApiClient({
         accessToken,
         onSessionExpired: () => {
-          void navigate(paths.login.getHref(pathname), { replace: true });
+          void navigate(dashboardPaths.login.getHref(pathname), { replace: true });
         },
       }),
     [accessToken, navigate, pathname],

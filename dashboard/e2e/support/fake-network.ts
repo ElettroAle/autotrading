@@ -27,6 +27,11 @@ const answerWith = (fakes: RequestHandler[]) => async (route: Route) => {
     await route.fulfill({ status: 404 });
     return;
   }
+  // A fake that does not answer fails the request on the network, as a server that is down.
+  if (response.type === 'error') {
+    await route.abort('failed');
+    return;
+  }
   await route.fulfill({
     status: response.status,
     headers: Object.fromEntries(response.headers),

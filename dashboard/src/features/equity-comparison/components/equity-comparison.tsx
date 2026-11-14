@@ -20,7 +20,10 @@ const ComparedCurves = ({
     flows.map((flow) => flow.id),
     period,
   );
-  const [error] = equities.flatMap((equity) => (equity.error === null ? [] : [equity.error]));
+  // A failed rereading keeps the curves already read on the page: the warning is the page's (ADR 0119).
+  const [error] = equities.flatMap((equity) =>
+    equity.error === null || equity.data !== undefined ? [] : [equity.error],
+  );
   if (error !== undefined) {
     return <ErrorMessage error={error} />;
   }

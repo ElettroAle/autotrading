@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { readData } from '@/lib/api-client';
+
 import { useHistoryPages } from './history-pages';
 
 const executionSchema = z.object({
@@ -31,4 +33,13 @@ export type HistoryExecution = z.infer<typeof executionSchema>;
 
 /** The orders on the accounts of the user that match the search, with their executions, newest first (R2.5.1). */
 export const useOrderHistory = (query: string, enabled: boolean) =>
-  useHistoryPages('orders', query, ordersPageSchema, enabled);
+  useHistoryPages(
+    'orders',
+    query,
+    async (api, search) =>
+      readData(
+        await api.GET('/history/orders', { querySerializer: () => search }),
+        ordersPageSchema,
+      ),
+    enabled,
+  );

@@ -1,13 +1,13 @@
 import { useParams } from 'react-router';
 
-import { PageLayout } from '@/components/layouts/page-layout';
+import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { CycleView } from '@/features/cycles/components/cycle-view';
 
 export const CycleRoute = () => {
   const { flowId = '', plannedAt = '' } = useParams();
   return (
-    <PageLayout title="Dettaglio del ciclo">
+    <DashboardLayout title="Dettaglio del ciclo">
       <CycleView flowId={flowId} plannedAt={plannedAt} />
-    </PageLayout>
+    </DashboardLayout>
   );
 };

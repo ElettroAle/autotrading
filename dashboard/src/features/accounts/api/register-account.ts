@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 import { ACCOUNTS_QUERY_KEY } from './get-accounts';
 
@@ -27,8 +27,8 @@ export const useRegisterAccount = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: AccountRegistrationInput) =>
-      api.write('POST', '/accounts', input, registeredAccountSchema),
+    mutationFn: async (input: AccountRegistrationInput) =>
+      readData(await api.POST('/accounts', { body: input }), registeredAccountSchema),
     gcTime: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
   });

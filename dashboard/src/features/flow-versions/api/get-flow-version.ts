@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const configurationSchema = z.object({
   version: z.number(),
@@ -21,7 +22,7 @@ const configurationSchema = z.object({
     max_margin_exposure_percent: z.string().nullable(),
     max_value_exposure_percent: z.string().nullable(),
   }),
-  allocated_capital: z.string(),
+  allocated_capital: z.string().nullable(),
   bring_to_minimum: z.boolean(),
 });
 
@@ -31,8 +32,13 @@ export type Configuration = z.infer<typeof configurationSchema>;
 export const useFlowVersion = (flowId: string, version: number) => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flows', flowId, 'versions', version],
-    queryFn: () =>
-      api.get(`/flows/${encodeURIComponent(flowId)}/versions/${version}`, configurationSchema),
+    ...pageDataQuery('flows', flowId, 'versions', version),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/{flow_id}/versions/{version}', {
+          params: { path: { flow_id: flowId, version } },
+        }),
+        configurationSchema,
+      ),
   });
 };

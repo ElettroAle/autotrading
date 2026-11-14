@@ -78,6 +78,7 @@ jobs:
       - uses: ./.github/actions/mypy-check
       - uses: ./.github/actions/node-setup
       - uses: ./.github/actions/dashboard-types
+      - uses: ./.github/actions/dashboard-api-client
 
   architettura:
     name: architettura

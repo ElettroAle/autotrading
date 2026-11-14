@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const linkedChatSchema = z.object({ linked: z.boolean(), chat_id: z.number().nullable() });
 
@@ -13,7 +14,7 @@ export const LINKED_CHAT_QUERY_KEY = ['telegram-chat'] as const;
 export const useLinkedChat = () => {
   const api = useApiClient();
   return useQuery({
-    queryKey: LINKED_CHAT_QUERY_KEY,
-    queryFn: () => api.get('/telegram/chat', linkedChatSchema),
+    ...pageDataQuery(...LINKED_CHAT_QUERY_KEY),
+    queryFn: async () => readData(await api.GET('/telegram/chat'), linkedChatSchema),
   });
 };

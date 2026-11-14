@@ -4,7 +4,7 @@
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const DASHBOARD = fileURLToPath(new URL('..', import.meta.url));
 
@@ -14,6 +14,14 @@ const brokenRules = async (path: string, source: string): Promise<string[]> => {
   const [result] = await architecture.lintText(source, { filePath: `${DASHBOARD}${path}` });
   return (result?.messages ?? []).map((message) => message.ruleId ?? message.message);
 };
+
+const WARM_UP_TIMEOUT_MS = 60_000;
+
+// The first lint loads the TypeScript resolver and the import graph of the dashboard, generated client included: it is
+// paid once here, so no rule below is timed on it.
+beforeAll(async () => {
+  await architecture.lintFiles(['src/lib/api-client.ts']);
+}, WARM_UP_TIMEOUT_MS);
 
 const VIOLATING: ReadonlyArray<readonly [string, string, string]> = [
   [
@@ -128,5 +136,22 @@ describe('ADR-0116, ADR-0121: the structure of the dashboard', () => {
     );
 
     expect(broken).toEqual([]);
+  });
+});
+
+describe('ADR-0119: one client for the API, generated from its OpenAPI document', () => {
+  it('is red when the API is called without the client of src/lib/api-client.ts', async () => {
+    expect(
+      await brokenRules(
+        'src/features/flows/api/get-cycles.ts',
+        "import createClient from 'openapi-fetch';\n",
+      ),
+    ).toEqual(['no-restricted-imports']);
+  });
+
+  it('is silent when the client of src/lib/api-client.ts calls the API', async () => {
+    expect(
+      await brokenRules('src/lib/api-client.ts', "import createClient from 'openapi-fetch';\n"),
+    ).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useApiClient } from '@/lib/api-client';
+import { readDone, useApiClient } from '@/lib/api-client';
 
 import { ACCOUNTS_QUERY_KEY } from './get-accounts';
 
@@ -14,10 +14,11 @@ export const useRemoveAccount = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ accountId, confirmed }: AccountRemoval) =>
-      api.send(
-        'DELETE',
-        `/accounts/${encodeURIComponent(accountId)}${confirmed ? '?confirmed=true' : ''}`,
+    mutationFn: async ({ accountId, confirmed }: AccountRemoval) =>
+      readDone(
+        await api.DELETE('/accounts/{account_id}', {
+          params: { path: { account_id: accountId }, query: confirmed ? { confirmed } : {} },
+        }),
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
   });

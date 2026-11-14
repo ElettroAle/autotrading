@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 const cycleOutcomeSchema = z.object({
   planned_at: z.string(),
@@ -34,7 +35,7 @@ export type FlowOverview = z.infer<typeof flowOverviewSchema>;
 export const useFlowOverviews = () => {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['flows', 'overview'],
-    queryFn: () => api.get('/flows/overview', z.array(flowOverviewSchema)),
+    ...pageDataQuery('flows', 'overview'),
+    queryFn: async () => readData(await api.GET('/flows/overview'), z.array(flowOverviewSchema)),
   });
 };

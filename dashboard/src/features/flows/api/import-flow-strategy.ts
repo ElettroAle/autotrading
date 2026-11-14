@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { documentBody, readData, useApiClient } from '@/lib/api-client';
+import type { components } from '@/lib/api-schema';
 
 import { FLOWS_QUERY_KEY, flowsSchema, type Flow } from './get-flows';
 
@@ -28,6 +29,8 @@ export const importInputSchema = z.object({
     ),
 });
 
+type StrategyDocument = components['schemas']['StrategyDocument-Input'];
+
 export type ImportInput = z.infer<typeof importInputSchema>;
 
 // The schema admits one file only: its text is the document.
@@ -47,10 +50,12 @@ export const useImportFlowStrategy = ({ onSuccess }: { onSuccess: (draft: Flow) 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ name, files }: ImportInput) =>
-      api.post(
-        `/flows/import?name=${encodeURIComponent(name)}`,
+      readData(
+        await api.POST('/flows/import', {
+          params: { query: { name } },
+          ...documentBody<StrategyDocument>(await documentOf(files)),
+        }),
         flowsSchema.element,
-        await documentOf(files),
       ),
     onSuccess: async (draft) => {
       await queryClient.invalidateQueries({ queryKey: FLOWS_QUERY_KEY });

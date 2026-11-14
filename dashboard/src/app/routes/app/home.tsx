@@ -1,12 +1,12 @@
 import { Link } from 'react-router';
 
-import { PageLayout } from '@/components/layouts/page-layout';
+import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { paths } from '@/config/paths';
 import { FlowsList } from '@/features/flows/components/flows-list';
 import { ImportStrategyForm } from '@/features/flows/components/import-strategy-form';
 
 export const HomeRoute = () => (
-  <PageLayout title="I tuoi flussi">
+  <DashboardLayout title="I tuoi flussi">
     <nav aria-label="Pagine" className="mb-4">
       <Link to={paths.accounts.getHref()} className="text-blue-800 hover:underline">
         I tuoi conti
@@ -38,5 +38,5 @@ export const HomeRoute = () => (
         Notifiche Telegram
       </Link>
     </nav>
-  </PageLayout>
+  </DashboardLayout>
 );

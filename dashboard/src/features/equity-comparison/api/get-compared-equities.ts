@@ -2,7 +2,8 @@ import { useQueries } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { apiSearchOf, type Period } from '@/components/ui/period-selector/use-period';
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
+import { pageDataQuery } from '@/lib/react-query';
 
 // The API computes the change of each point from the first point of the period (ADR 0137); the chart needs numbers.
 const changesSchema = z
@@ -27,7 +28,17 @@ export const useComparedEquities = (flowIds: readonly string[], period: Period) 
   return useQueries({
     queries: flowIds.map((flowId) => {
       const path = equityPath(flowId, period);
-      return { queryKey: ['compared-equity', path], queryFn: () => api.get(path, changesSchema) };
+      return {
+        ...pageDataQuery('compared-equity', path),
+        queryFn: async () =>
+          readData(
+            await api.GET('/flows/{flow_id}/equity', {
+              params: { path: { flow_id: flowId } },
+              querySerializer: () => apiSearchOf(period),
+            }),
+            changesSchema,
+          ),
+      };
     }),
   });
 };

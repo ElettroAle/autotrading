@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { readData } from '@/lib/api-client';
+
 import { useHistoryPages } from './history-pages';
 
 const historyPositionSchema = z.object({
@@ -26,4 +28,13 @@ export type HistoryPosition = z.infer<typeof historyPositionSchema>;
 
 /** The closed positions of the flows of the user that match the search, from the most recent close (R2.5.1). */
 export const useClosedPositionHistory = (query: string, enabled: boolean) =>
-  useHistoryPages('closed-positions', query, positionsPageSchema, enabled);
+  useHistoryPages(
+    'closed-positions',
+    query,
+    async (api, search) =>
+      readData(
+        await api.GET('/history/closed-positions', { querySerializer: () => search }),
+        positionsPageSchema,
+      ),
+    enabled,
+  );

@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { useApiClient } from '@/lib/api-client';
+import { readData, useApiClient } from '@/lib/api-client';
 
 // Numbers of the configuration travel as strings, so no precision is lost on the way (ADR 0018).
 export const flowSchema = z.object({
   id: z.string(),
   name: z.string(),
-  account_id: z.string(),
+  account_id: z.string().nullable(),
   status: z.string(),
   version: z.number(),
   assets: z.array(z.string()),
@@ -26,7 +26,7 @@ export const flowSchema = z.object({
     max_margin_exposure_percent: z.string().nullable(),
     max_value_exposure_percent: z.string().nullable(),
   }),
-  allocated_capital: z.string(),
+  allocated_capital: z.string().nullable(),
   bring_to_minimum: z.boolean(),
 });
 
@@ -38,7 +38,7 @@ export const useFlow = (flowId: string) => {
   return useQuery({
     // Its own key under the flows: the list elsewhere keeps less of each flow, and both refresh together.
     queryKey: ['flows', 'configurations'],
-    queryFn: () => api.get('/flows', z.array(flowSchema)),
+    queryFn: async () => readData(await api.GET('/flows'), z.array(flowSchema)),
     select: (flows) => flows.find((flow) => flow.id === flowId),
   });
 };

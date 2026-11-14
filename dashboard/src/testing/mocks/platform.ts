@@ -1,4 +1,4 @@
-import type { FakeCycle } from './cycles';
+import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
@@ -275,6 +275,7 @@ const state = {
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
   exchangeReachable: true,
+  apiAnswers: true,
 };
 
 export const flowIdOf = (name: string): string => `flow-${name}`;
@@ -415,6 +416,7 @@ export const fakePlatform = {
     state.signingIn = undefined;
     state.sessionsExpired = false;
     state.exchangeReachable = true;
+    state.apiAnswers = true;
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
@@ -581,6 +583,21 @@ export const fakePlatform = {
   /** The cycles recorded for the flow with the name, in any order: the fake API serves them from the most recent. */
   recordCycles(flowName: string, cycles: FakeCycle[]): void {
     state.cycles.set(flowIdOf(flowName), cycles);
+  },
+
+  /** A cycle of the flow concludes: from now on the API lists it (R2.1.2). */
+  concludeCycle(flowName: string, plannedAt: Date): void {
+    const flowId = flowIdOf(flowName);
+    state.cycles.set(flowId, [...(state.cycles.get(flowId) ?? []), aCompletedCycle(plannedAt)]);
+  },
+
+  /** From now on the API does not answer: every request fails on the network (R2.1.2). */
+  stopApi(): void {
+    state.apiAnswers = false;
+  },
+
+  apiAnswers(): boolean {
+    return state.apiAnswers;
   },
 
   cyclesOf(flowId: string): FakeCycle[] {
