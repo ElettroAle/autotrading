@@ -81,6 +81,20 @@ runs:
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
           printf 'HYPERLIQUID_NETWORK=%s\n' "$HYPERLIQUID_NETWORK"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
+        # Memory and disk of the installation, sampled from before the pull until the services are up, go to the summary
+        # of the job (ADR 0162, Bug 252). The report runs on exit, so a failed release stops the sampling too; the measure
+        # never fails the release, and a time limit keeps a hung machine from holding it.
+        timeout 60 ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/measure-resources.sh' \
+          < deploy/measure-resources.sh || echo "::warning::misura delle risorse non avviata (ADR 0162)"
+        timeout 60 ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/measure-resources.sh start' \
+          || echo "::warning::misura delle risorse non avviata (ADR 0162)"
+        report_resources() {
+          local status=$?
+          timeout 120 ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/measure-resources.sh report' \
+            >> "$GITHUB_STEP_SUMMARY" || echo "::warning::rapporto delle risorse non disponibile (ADR 0162)"
+          exit "$status"
+        }
+        trap report_resources EXIT
         # Every release pulls new images and the old ones stay on the small disk of the machine: the images no container
         # uses are removed before the pull, the running ones are kept (Bug 186: disk full at the first forecaster pull).
         ssh "${ssh_options[@]}" "$target" 'docker image prune --all --force > /dev/null'
