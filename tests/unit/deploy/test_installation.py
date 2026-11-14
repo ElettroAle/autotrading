@@ -61,3 +61,12 @@ def test_every_read_only_service_has_a_writable_temporary_directory() -> None:
     ]
 
     assert without == [], f"read-only services without a /tmp in tmpfs: {without}"
+
+
+def test_every_variable_the_compose_file_reads_is_written_by_the_release() -> None:
+    """Bug 285: compose reads its variables from the .env the release writes; one left out starts a service without
+    it (HYPERLIQUID_NETWORK stopped api and worker)."""
+    read = set(re.findall(r"\$\{([A-Z_][A-Z0-9_]*)(?::?-[^}]*)?\}", COMPOSE.read_text(encoding="utf-8")))
+    written = set(re.findall(r"([A-Z_][A-Z0-9_]*)=%s", DEPLOY_ACTION.read_text(encoding="utf-8")))
+
+    assert sorted(read - written) == []
