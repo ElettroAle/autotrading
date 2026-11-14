@@ -56,6 +56,20 @@ describe('EditFlow', () => {
     expect(field('Capitale allocato')).toHaveValue('300');
   });
 
+  it('keeps the model of the flow chosen when its provider has no key, as the current choice', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', {
+      account_id: 'account-principale',
+      model: { name: 'anthropic/claude-sonnet', parameters: {} },
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const models = await screen.findByLabelText('Modello');
+    expect(models).toHaveValue('anthropic/claude-sonnet');
+    const missing = within(models).getByRole('group', { name: 'anthropic · chiave mancante' });
+    expect(within(missing).getByRole('option', { name: 'anthropic/claude-sonnet' })).toBeEnabled();
+    expect(within(models).getByRole('option', { name: 'openai/gpt-4o' })).toBeDisabled();
+  });
+
   it('saves a change as the next version, sending only what changed', async () => {
     giveAlfa();
     const sent: unknown[] = [];

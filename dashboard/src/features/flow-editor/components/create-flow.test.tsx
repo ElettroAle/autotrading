@@ -92,7 +92,53 @@ describe('CreateFlow', () => {
     expect(screen.getByRole('button', { name: 'Crea il flusso' })).toBeDisabled();
   });
 
+  it('groups the models by provider, naming whether the key of each provider is registered', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    const models = within(await screen.findByLabelText('Modello'));
+    const groups = models.getAllByRole('group').map((group) => ({
+      label: group.getAttribute('label'),
+      models: within(group)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    }));
+    expect(groups).toEqual([
+      {
+        label: 'openrouter · chiave registrata',
+        models: [
+          MODEL,
+          'openrouter/nvidia/llama-3.1-nemotron-ultra-253b-v1-instruct-extended-reasoning-preview',
+        ],
+      },
+      { label: 'openai · chiave mancante', models: ['openai/gpt-4o'] },
+      { label: 'anthropic · chiave mancante', models: ['anthropic/claude-sonnet'] },
+    ]);
+  });
+
+  it('shows but does not let choose a model whose provider misses the key, pointing to the keys', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    const models = within(await screen.findByLabelText('Modello'));
+    expect(models.getByRole('option', { name: 'anthropic/claude-sonnet' })).toBeDisabled();
+    expect(models.getByRole('option', { name: MODEL })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Chiavi dei fornitori IA' })).toHaveAttribute(
+      'href',
+      '/provider-keys',
+    );
+  });
+
+  it('points to the keys only while a provider misses its key', async () => {
+    fakePlatform.saveProviderKey('anna', 'openai', '2026-11-14T09:00:00+00:00');
+    fakePlatform.saveProviderKey('anna', 'anthropic', '2026-11-14T09:00:00+00:00');
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    const models = within(await screen.findByLabelText('Modello'));
+    expect(models.getByRole('option', { name: 'anthropic/claude-sonnet' })).toBeEnabled();
+    expect(screen.queryByRole('link', { name: 'Chiavi dei fornitori IA' })).toBeNull();
+  });
+
   it('builds the parameters of the chosen model from the catalog, starting again for a new model', async () => {
+    fakePlatform.saveProviderKey('anna', 'openai', '2026-11-14T09:00:00+00:00');
     await renderApp({ account: 'anna', url: NEW_FLOW });
 
     await userEvent.selectOptions(await screen.findByLabelText('Modello'), MODEL);
