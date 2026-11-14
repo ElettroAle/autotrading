@@ -32,6 +32,10 @@ export class DashboardPages {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/closed-positions`);
   }
 
+  async openAccounts(): Promise<void> {
+    await this.open('/accounts');
+  }
+
   async openCyclesOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
@@ -109,6 +113,27 @@ export class DashboardPages {
 
   flowName(): Locator {
     return this.page.getByRole('heading', { level: 2 });
+  }
+
+  accountRow(name: string): Locator {
+    return this.page
+      .getByRole('table', { name: 'Conti' })
+      .locator('tbody tr')
+      .filter({ has: this.page.getByRole('cell', { name, exact: true }) });
+  }
+
+  /** The cell of the account under the column with the header, as the table shows it on a wide screen. */
+  async accountCell(name: string, header: string): Promise<Locator> {
+    await this.accountRow(name).waitFor();
+    const headers = await this.page
+      .getByRole('table', { name: 'Conti' })
+      .getByRole('columnheader')
+      .allTextContents();
+    return this.accountRow(name).getByRole('cell').nth(headers.indexOf(header));
+  }
+
+  registerAccount(): Locator {
+    return this.page.getByRole('link', { name: 'Registra un conto' });
   }
 
   cycleRows(): Locator {

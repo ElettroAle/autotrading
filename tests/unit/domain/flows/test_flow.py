@@ -15,7 +15,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital_of_account
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -91,6 +91,30 @@ def test_the_free_capital_of_an_account_ignores_the_flows_of_other_accounts() ->
     ]
 
     assert FreeCapital.of_account(Decimal(1000), "USDC", account_id, flows) == FreeCapital(Decimal(700), "USDC")
+
+
+def test_the_allocated_capital_of_an_account_sums_its_flows_not_archived_only() -> None:
+    tenant_id, account_id = TenantId.new(), uuid4()
+    flows = [
+        a_flow(
+            tenant_id, name="alfa", account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(300))
+        ),
+        a_flow(
+            tenant_id,
+            name="beta",
+            status=FlowStatus.PAUSED,
+            account_id=account_id,
+            configuration=a_configuration(allocated_capital=Decimal(200)),
+        ),
+        a_flow(tenant_id, name="gamma", status=FlowStatus.ARCHIVED, account_id=account_id),
+        a_flow(tenant_id, name="delta", configuration=a_configuration(allocated_capital=Decimal(900))),
+    ]
+
+    assert allocated_capital_of_account(account_id, flows) == Decimal(500)
+
+
+def test_an_account_without_flows_has_no_allocated_capital() -> None:
+    assert allocated_capital_of_account(uuid4(), []) == Decimal(0)
 
 
 def test_a_capital_up_to_the_free_one_fits() -> None:

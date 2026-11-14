@@ -6,6 +6,7 @@ import {
   FakeRefusal,
   fakePlatform,
   type FakeConfiguration,
+  type FakeAccount,
   type FakeEquityPoint,
   type FakeFlow,
   type FakeUser,
@@ -91,6 +92,44 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,
 });
+
+const accountResponse = (user: FakeUser, account: FakeAccount) => ({
+  id: account.id,
+  name: account.name,
+  exchange: 'Hyperliquid',
+  has_credentials: true,
+  network: 'test',
+  allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
+  currency: CURRENCY,
+});
+
+const amountOf = (amount: string) => ({ amount, currency: CURRENCY });
+
+const accountStateResponse = (account: FakeAccount) => ({
+  balance: amountOf(String(account.balance)),
+  available_margin: amountOf(String(account.balance)),
+  positions: [],
+  read_at: '2026-11-14T09:00:00+00:00',
+});
+
+const freeCapitalResponse = (user: FakeUser, account: FakeAccount) =>
+  amountOf(String(fakePlatform.freeCapitalOfAccount(user, account)));
+
+// An account of another tenant does not exist for the user; what comes from the exchange fails when it does not answer.
+const withAccountOnExchange = (
+  user: FakeUser,
+  accountId: string,
+  respond: (account: FakeAccount) => Response,
+): Response => {
+  const account = user.accounts.find((candidate) => candidate.id === accountId);
+  if (account === undefined) {
+    return problem(404, 'Not Found', 'non trovato');
+  }
+  if (!fakePlatform.exchangeReachable()) {
+    return problem(503, 'Service Unavailable', 'exchange non raggiungibile, riprovare');
+  }
+  return respond(account);
+};
 
 const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
   [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
@@ -193,6 +232,25 @@ export const handlers = [
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json({ user_id: user.account, tenant_id: user.tenantId }),
+    ),
+  ),
+  http.get('*/accounts', ({ request }) =>
+    withUser(request, (user) =>
+      HttpResponse.json(user.accounts.map((account) => accountResponse(user, account))),
+    ),
+  ),
+  http.get('*/accounts/:accountId/state', ({ request, params }) =>
+    withUser(request, (user) =>
+      withAccountOnExchange(user, String(params.accountId), (account) =>
+        HttpResponse.json(accountStateResponse(account)),
+      ),
+    ),
+  ),
+  http.get('*/accounts/:accountId/free-capital', ({ request, params }) =>
+    withUser(request, (user) =>
+      withAccountOnExchange(user, String(params.accountId), (account) =>
+        HttpResponse.json(freeCapitalResponse(user, account)),
+      ),
     ),
   ),
   http.get('*/flows', ({ request }) =>
@@ -301,18 +359,6 @@ export const handlers = [
         throw error;
       }
     }),
-  ),
-  http.get('*/accounts', ({ request }) =>
-    withUser(request, (user) =>
-      HttpResponse.json(
-        user.accounts.map((account) => ({
-          id: account.id,
-          name: account.name,
-          exchange: 'Hyperliquid',
-          has_credentials: true,
-        })),
-      ),
-    ),
   ),
   http.post('*/flows/:flowId/duplicate', ({ request, params }) =>
     withUser(request, (user) =>

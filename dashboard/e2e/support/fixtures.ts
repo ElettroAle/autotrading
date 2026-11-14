@@ -12,6 +12,7 @@ export type DescribedFlow = { readonly name: string; readonly versions: FakeVers
 /** What a scenario remembers between its steps: the histories wait for the user who owns their flow. */
 export type ScenarioMemory = {
   account: string;
+  tradingAccount: string;
   environments: string[];
   flow: string;
   cycles: FakeCycle[];
@@ -45,6 +46,7 @@ export const test = base.extend<Fixtures>({
   memory: async ({}, use) => {
     await use({
       account: '',
+      tradingAccount: '',
       environments: [],
       flow: '',
       cycles: [],

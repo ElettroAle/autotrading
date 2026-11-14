@@ -7,6 +7,7 @@ from autotrading.application.accounts.list_accounts import ListAccountsUseCase
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
     AccountStatePort,
+    AllocatedCapitalPort,
     CredentialSealerPort,
     ExchangePort,
 )
@@ -92,6 +93,7 @@ class TenantPorts:
     """The adapters of one request, bound to its tenant, that the use cases of the API run on."""
 
     accounts: AccountRepositoryPort
+    allocated_capital: AllocatedCapitalPort
     sealer: CredentialSealerPort
     exchanges: Mapping[str, ExchangePort]
     account_state: AccountStatePort
@@ -123,6 +125,7 @@ class TenantPorts:
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
     environment: str
+    settlement_currency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,8 +185,12 @@ class TenantUseCases:
         key_services = ProviderKeyServices(ports.model_gateways, ports.provider_key_sealer)
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
-            list_accounts=ListAccountsUseCase(accounts),
-            get_account=GetAccountUseCase(accounts),
+            list_accounts=ListAccountsUseCase(
+                accounts, ports.allocated_capital, ports.environment, ports.settlement_currency
+            ),
+            get_account=GetAccountUseCase(
+                accounts, ports.allocated_capital, ports.environment, ports.settlement_currency
+            ),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
             remove_account_with_flows=RemoveAccountWithFlowsUseCase(

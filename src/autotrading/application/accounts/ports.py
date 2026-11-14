@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Protocol
 
 from autotrading.domain.accounts.account import Account
@@ -56,4 +57,12 @@ class AccountRepositoryPort(Protocol):
 
     def add(self, account: Account) -> None:
         """Raises AccountNameInUseError when the tenant already has an account with that name."""
+        ...
+
+
+class AllocatedCapitalPort(Protocol):
+    """Bound to the tenant of the request: the capital its flows hold on one of its accounts (R2.2.1, ADR 0126)."""
+
+    def allocated_capital(self, account_id: AccountId) -> Decimal:
+        """The sum over its flows not archived: zero for an account without them, or of another tenant."""
         ...

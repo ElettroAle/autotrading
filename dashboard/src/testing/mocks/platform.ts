@@ -151,6 +151,7 @@ const state = {
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
+  exchangeReachable: true,
 };
 
 const flowIdOf = (name: string): string => `flow-${name}`;
@@ -185,10 +186,14 @@ const flowOf = (user: FakeUser, flowId: string): FakeFlow => {
 
 const holdsAccount = (flow: FakeFlow) => flow.status !== DRAFT && flow.status !== ARCHIVED;
 
-const freeCapital = (user: FakeUser, account: FakeAccount): number =>
+// The capital the flows of the account hold, neither draft nor archived, as the API sums it (R1.1.1, ADR 0124).
+const allocatedCapital = (user: FakeUser, account: FakeAccount): number =>
   user.flows
     .filter((flow) => flow.accountId === account.id && holdsAccount(flow))
-    .reduce((free, flow) => free - (flow.allocatedCapital ?? 0), account.balance);
+    .reduce((total, flow) => total + (flow.allocatedCapital ?? 0), 0);
+
+const freeCapital = (user: FakeUser, account: FakeAccount): number =>
+  account.balance - allocatedCapital(user, account);
 
 const missingOf = (flow: FakeFlow): string[] =>
   [
@@ -222,6 +227,7 @@ export const fakePlatform = {
     state.closedPositions.clear();
     state.signingIn = undefined;
     state.sessionsExpired = false;
+    state.exchangeReachable = true;
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
@@ -268,6 +274,33 @@ export const fakePlatform = {
     };
     user.flows.push(flow);
     return flow;
+  },
+
+  /** The account belongs to the user, who has the Utente role: the user is created when missing. */
+  giveAccountTo(account: string, name: string, balance: number): FakeAccount {
+    if (!state.users.has(account)) {
+      this.addUser(account, { hasUserRole: true });
+    }
+    const created = { id: `account-${name}`, name, balance };
+    userNamed(account).accounts.push(created);
+    return created;
+  },
+
+  allocatedCapitalOf(user: FakeUser, account: FakeAccount): number {
+    return allocatedCapital(user, account);
+  },
+
+  freeCapitalOfAccount(user: FakeUser, account: FakeAccount): number {
+    return freeCapital(user, account);
+  },
+
+  /** From now on the exchange does not answer: what the API reads from it fails as on the API. */
+  stopExchange(): void {
+    state.exchangeReachable = false;
+  },
+
+  exchangeReachable(): boolean {
+    return state.exchangeReachable;
   },
 
   /** The flow belongs to the account, which has the Utente role: both are created when missing. */

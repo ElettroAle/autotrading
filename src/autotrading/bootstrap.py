@@ -222,6 +222,7 @@ def tenant_use_cases(
         )
         ports = TenantPorts(
             accounts=accounts,
+            allocated_capital=flows,
             sealer=sealer,
             exchanges=exchanges,
             account_state=account_state,
@@ -258,6 +259,7 @@ def tenant_use_cases(
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
             environment=environment,
+            settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         return TenantUseCases.on(tenant_id, ports)
 

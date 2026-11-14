@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +11,7 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from tests.fakes.exchange import READ_AT, REDACTED_REJECTION
+from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
 from tests.support.problems import reason_of
@@ -64,7 +65,37 @@ def test_the_list_shows_the_accounts_of_the_tenant(client_of: Client, account_id
     response = client_of("anna").get("/accounts")
 
     assert response.status_code == 200
-    assert response.json() == [{"id": account_id, "name": "test-1", "exchange": HYPERLIQUID, "has_credentials": True}]
+    assert response.json() == [
+        {
+            "id": account_id,
+            "name": "test-1",
+            "exchange": HYPERLIQUID,
+            "has_credentials": True,
+            "network": "test",
+            "allocated_capital": "0",
+            "currency": "USDC",
+        }
+    ]
+
+
+def test_the_list_carries_the_capital_the_flows_of_the_account_hold(
+    client_of: Client, platform: Platform, account_id: str
+) -> None:
+    platform.flows.flows += [
+        a_flow(
+            platform.tenant_of("anna"),
+            name=name,
+            account_id=UUID(account_id),
+            configuration=a_configuration(allocated_capital=capital),
+        )
+        for name, capital in (("alfa", Decimal("300.50")), ("beta", Decimal("199.50")))
+    ]
+
+    [listed] = client_of("anna").get("/accounts").json()
+    details = client_of("anna").get(f"/accounts/{account_id}").json()
+
+    assert (listed["allocated_capital"], listed["currency"]) == ("500", "USDC")
+    assert (details["network"], details["allocated_capital"], details["currency"]) == ("test", "500", "USDC")
 
 
 def test_the_list_of_another_user_is_empty(client_of: Client, account_id: str) -> None:

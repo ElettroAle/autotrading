@@ -18,6 +18,7 @@ from autotrading.application.flows.errors import (
     FlowVersionNotFoundError,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
@@ -122,6 +123,23 @@ def test_the_agent_sees_each_flow_with_the_provider_of_its_model_and_whether_it_
         ModelUse("alfa", "openrouter", running=True),
         ModelUse("beta", "openrouter", running=False),
     )
+
+
+def test_the_allocated_capital_of_an_account_sums_its_flows_not_archived_of_the_tenant_only(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    other_tenant, other_account = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    for name, status, capital in (
+        ("alfa", FlowStatus.ACTIVE, Decimal(300)),
+        ("beta", FlowStatus.STOPPED, Decimal(200)),
+        ("gamma", FlowStatus.ARCHIVED, Decimal(700)),
+    ):
+        configuration = a_configuration(allocated_capital=capital)
+        repository.add(a_flow(tenant_id, name=name, status=status, account_id=account_id, configuration=configuration))
+    SqlAlchemyFlowRepositoryAdapter(database, other_tenant).add(a_flow(other_tenant, account_id=other_account))
+
+    assert repository.allocated_capital(AccountId(account_id)) == Decimal(500)
+    assert repository.allocated_capital(AccountId(other_account)) == Decimal(0)
 
 
 def test_a_name_is_in_use_only_by_a_flow_not_archived(database: Engine) -> None:

@@ -8,6 +8,10 @@ export const paths = {
     getHref: (returnTo?: string) =>
       returnTo === undefined ? '/login' : `/login?returnTo=${encodeURIComponent(returnTo)}`,
   },
+  accounts: {
+    path: '/accounts',
+    getHref: () => '/accounts',
+  },
   flow: {
     path: '/flows/:flowId',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}`,

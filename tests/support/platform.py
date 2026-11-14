@@ -174,6 +174,7 @@ class Platform:
         stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice)
         ports = TenantPorts(
             accounts=accounts,
+            allocated_capital=flows,
             sealer=self.sealer_of(tenant_id),
             exchanges=self.exchanges,
             account_state=account_state,
@@ -214,6 +215,7 @@ class Platform:
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
             environment="dev",
+            settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         return TenantUseCases.on(tenant_id, ports)
 
