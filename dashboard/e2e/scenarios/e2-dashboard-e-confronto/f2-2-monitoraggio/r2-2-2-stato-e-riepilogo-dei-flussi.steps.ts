@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 
-import { Given, Then, When } from '../../../support/fixtures';
+import { Given, Then } from '../../../support/fixtures';
 
 // The scenario reads times of a day in Italy; the browser of the scenarios runs in the same time zone.
 const LAST_CYCLE = new Date('2026-11-14T10:07:00+01:00');
@@ -62,10 +62,6 @@ Given(
     fakePlatform.changeFlow(flow, { currentCapital: current });
   },
 );
-
-When('{string} apre la pagina dei flussi', async ({ dashboard }, account: string) => {
-  await dashboard.openAndSignInAs(account);
-});
 
 Then(
   'il flusso {string} mostra stato {string}, capitale iniziale {int} USDC, capitale attuale {int} USDC e rendimento {word} in verde',

@@ -575,11 +575,16 @@ export const fakePlatform = {
     return userNamed(account).flows;
   },
 
-  /** The flow belongs to the account, which has the Utente role: both are created when missing. */
-  giveFlowTo(account: string, name: string): FakeFlow {
+  /** The account has the Utente role: it is created when missing, kept as it is otherwise. */
+  ensureUser(account: string): void {
     if (!state.users.has(account)) {
       this.addUser(account, { hasUserRole: true });
     }
+  },
+
+  /** The flow belongs to the account, which has the Utente role: both are created when missing. */
+  giveFlowTo(account: string, name: string): FakeFlow {
+    this.ensureUser(account);
     const owned = state.users.get(account)?.flows.find((flow) => flow.name === name);
     return owned ?? this.addFlow(account, name);
   },
