@@ -50,3 +50,14 @@ def test_a_release_removes_what_the_proxy_left_on_the_machine() -> None:
 
     assert re.search(r"rm -rf .*secrets/litellm_master_key secrets/litellm_config", script)
     assert "docker compose up -d --remove-orphans" in DEPLOY_ACTION.read_text(encoding="utf-8")
+
+
+def test_every_read_only_service_has_a_writable_temporary_directory() -> None:
+    """ADR 0154: a library may write a temporary file at import (litellm does); a read-only service needs /tmp."""
+    without = [
+        name
+        for name, body in _services().items()
+        if "read_only: true" in body and not re.search(r"tmpfs:\n\s+- /tmp\b", body)
+    ]
+
+    assert without == [], f"read-only services without a /tmp in tmpfs: {without}"
