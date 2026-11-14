@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
@@ -42,6 +42,7 @@ describe('ClosedPositions', () => {
     ]);
     await renderApp({ account: 'anna', url: URL });
 
+    await screen.findByText('+15 USDC');
     const [first] = await rowsOf();
     const cells = within(first as HTMLElement).getAllByRole('cell');
     expect(cells.map((cell) => cell.textContent)).toEqual([
@@ -51,9 +52,9 @@ describe('ClosedPositions', () => {
       'Apertura3000',
       'Chiusa il14/11/2026, 10:07:00',
       'Chiusura3150',
-      'PnL+15',
+      'PnL+15 USDC',
       'PnL %+5,00%',
-      'Commissioni0,12',
+      'Commissioni0,12 USDC',
       'Motivocomando manuale',
     ]);
   });
@@ -64,8 +65,33 @@ describe('ClosedPositions', () => {
     ]);
     await renderApp({ account: 'anna', url: URL });
 
-    expect(await screen.findByText('-2')).toHaveClass('text-red-700');
+    expect(await screen.findByText('-2 USDC')).toHaveClass('text-red-700');
     expect(screen.getByText('-2,00%')).toHaveClass('text-red-700');
+  });
+
+  it('shows the amounts without currency when the exchange does not answer', async () => {
+    fakePlatform.recordClosedPositions('alfa', [
+      aClosedPosition({ closedAt: LAST, pnl: '15', fees: '0.12' }),
+    ]);
+    let stateRefused = false;
+    server.use(
+      http.get('*/flows/:flowId/state', () => {
+        stateRefused = true;
+        return HttpResponse.json(
+          { detail: 'exchange non raggiungibile, riprovare' },
+          { status: 503 },
+        );
+      }),
+    );
+    await renderApp({ account: 'anna', url: URL });
+
+    await waitFor(() => expect(stateRefused).toBe(true));
+    const [first] = await rowsOf();
+    const cells = within(first as HTMLElement).getAllByRole('cell');
+    expect(cells.map((cell) => cell.textContent)).toEqual(
+      expect.arrayContaining(['PnL+15', 'Commissioni0,12']),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('shows 50 positions a page, with the next page and back', async () => {

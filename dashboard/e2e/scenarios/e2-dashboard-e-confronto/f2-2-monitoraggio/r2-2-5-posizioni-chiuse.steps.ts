@@ -71,7 +71,7 @@ Then(
     await expect(dashboard.cell(first, 'Chiusura')).toHaveText(
       `Chiusura${formatAmount(closePrice)}`,
     );
-    await expect(dashboard.cell(first, 'PnL')).toHaveText(`PnL${formatSignedAmount(pnl)}`);
+    await expect(dashboard.cell(first, 'PnL')).toHaveText(`PnL${formatSignedAmount(pnl)} USDC`);
     await expect(dashboard.cell(first, 'PnL %')).toHaveText(`PnL %${percent}`);
   },
 );
