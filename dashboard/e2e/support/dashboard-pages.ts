@@ -291,6 +291,34 @@ export class DashboardPages {
     await this.page.getByRole('button', { name, exact: true }).click();
   }
 
+  importForm(): Locator {
+    return this.page.getByRole('form', { name: 'Importazione di una strategia' });
+  }
+
+  /** Imports a strategy file, chosen from the disk of the user, as a new flow with the name. */
+  async importStrategy(name: string, file: string): Promise<void> {
+    const form = this.importForm();
+    await form.getByLabel('Nome del nuovo flusso').fill(name);
+    await form.getByLabel('File della strategia').setInputFiles({
+      name: 'strategia.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(file),
+    });
+    await form.getByRole('button', { name: 'Importa' }).click();
+  }
+
+  /** Exports the strategy of the flow on the page and gives the file the browser saved, with its name. */
+  async exportStrategy(): Promise<{ name: string; content: string }> {
+    const download = this.page.waitForEvent('download');
+    await this.command('Esporta');
+    const saved = await download;
+    const chunks: Buffer[] = [];
+    for await (const chunk of await saved.createReadStream()) {
+      chunks.push(Buffer.from(chunk as Uint8Array));
+    }
+    return { name: saved.suggestedFilename(), content: Buffer.concat(chunks).toString('utf-8') };
+  }
+
   async assign(account: string, capital: string, assets: string): Promise<void> {
     const form = this.page.getByRole('form', { name: 'Assegnazione della bozza' });
     await form.getByLabel('Conto').selectOption({ label: account });

@@ -10,6 +10,7 @@ import {
   type FakeAccount,
   type FakeEquityPoint,
   type FakeFlow,
+  type FakeStrategyDocument,
   type FakeUser,
 } from './platform';
 import type { FakeClosedPosition } from './positions';
@@ -302,6 +303,13 @@ const flowResponse = (flow: FakeFlow) => ({
   bring_to_minimum: false,
 });
 
+/** As the API names the file after the flow: a plain name for every client, the full one encoded (RFC 6266). */
+const attachmentOf = (flowName: string): string => {
+  const fileName = `${flowName}.json`;
+  const plain = fileName.replace(/[^A-Za-z0-9 ._-]/g, '_');
+  return `attachment; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+};
+
 type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
 
 export const handlers = [
@@ -460,6 +468,23 @@ export const handlers = [
         status: 201,
       }),
     ),
+  ),
+  http.get('*/flows/:flowId/strategy', ({ request, params }) =>
+    withUser(request, (user) => {
+      const { flowName, document } = fakePlatform.exportStrategy(user, String(params.flowId));
+      return HttpResponse.json(document, {
+        headers: { 'Content-Disposition': attachmentOf(flowName) },
+      });
+    }),
+  ),
+  http.post('*/flows/import', ({ request }) =>
+    withUser(request, async (user) => {
+      const document = (await request.json()) as FakeStrategyDocument;
+      const name = new URL(request.url).searchParams.get('name') ?? '';
+      return HttpResponse.json(flowResponse(fakePlatform.importStrategy(user, name, document)), {
+        status: 201,
+      });
+    }),
   ),
   http.put('*/flows/:flowId/assignment', ({ request, params }) =>
     withUser(request, async (user) => {

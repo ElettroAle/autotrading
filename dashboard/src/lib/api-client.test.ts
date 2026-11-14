@@ -190,3 +190,81 @@ describe('createApiClient commands', () => {
     expect(onSessionExpired).toHaveBeenCalledOnce();
   });
 });
+
+describe('createApiClient documents', () => {
+  it('posts a JSON document as it is, with the access token of the user', async () => {
+    const document = '{ "format": "autotrading-strategy",\n  "strategy": {} }';
+    server.use(
+      http.post('http://localhost:3000/flows/import', async ({ request }) =>
+        request.headers.get('Authorization') === 'Bearer token-1' &&
+        request.headers.get('Content-Type') === 'application/json' &&
+        (await request.text()) === document
+          ? HttpResponse.json({ name: 'alfa bis' }, { status: 201 })
+          : HttpResponse.json({}, { status: 400 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    expect(await api.post('/flows/import', z.object({ name: z.string() }), document)).toEqual({
+      name: 'alfa bis',
+    });
+  });
+
+  it('downloads a file with the name the API gives it, in its full form', async () => {
+    server.use(
+      http.get('http://localhost:3000/flows/1/strategy', ({ request }) =>
+        request.headers.get('Authorization') === 'Bearer token-1'
+          ? HttpResponse.json(
+              { format: 'autotrading-strategy' },
+              {
+                headers: {
+                  'Content-Disposition':
+                    'attachment; filename="per_.json"; filename*=UTF-8\'\'per%C3%B2.json',
+                },
+              },
+            )
+          : HttpResponse.json({}, { status: 401 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    const file = await api.download('/flows/1/strategy');
+
+    expect(file.name).toBe('però.json');
+    expect(JSON.parse(await file.content.text())).toEqual({ format: 'autotrading-strategy' });
+  });
+
+  it('downloads a file with its plain name when the API gives no other', async () => {
+    server.use(
+      http.get('*/files/1', () =>
+        HttpResponse.text('a,b', {
+          headers: { 'Content-Disposition': 'attachment; filename="operazioni.csv"' },
+        }),
+      ),
+    );
+    const { api } = clientWith();
+
+    expect((await api.download('/files/1')).name).toBe('operazioni.csv');
+  });
+
+  it('names a downloaded file after the path when the API names it not', async () => {
+    server.use(http.get('*/flows/1/strategy', () => HttpResponse.json({})));
+    const { api } = clientWith();
+
+    expect((await api.download('/flows/1/strategy')).name).toBe('strategy');
+  });
+
+  it('tells the reason of a download the API refuses', async () => {
+    server.use(
+      http.get('*/flows/1/strategy', () =>
+        HttpResponse.json({ detail: 'flusso non trovato' }, { status: 404 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    await expect(api.download('/flows/1/strategy')).rejects.toMatchObject({
+      status: 404,
+      message: 'flusso non trovato',
+    });
+  });
+});
