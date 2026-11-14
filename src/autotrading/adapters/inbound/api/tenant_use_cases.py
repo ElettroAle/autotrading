@@ -34,7 +34,9 @@ from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChe
 from autotrading.application.flows.duplicate_flow import DuplicateFlowUseCase
 from autotrading.application.flows.export_account_operations import ExportAccountOperationsUseCase
 from autotrading.application.flows.export_flow_operations import ExportFlowOperationsUseCase
+from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
+from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyUseCase
 from autotrading.application.flows.list_account_operations import ListAccountOperationsUseCase
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
@@ -189,6 +191,8 @@ class TenantUseCases:
     query_cycle_history: QueryCycleHistoryUseCase
     query_closed_position_history: QueryClosedPositionHistoryUseCase
     query_order_history: QueryOrderHistoryUseCase
+    export_flow_strategy: ExportFlowStrategyUseCase
+    import_flow_strategy: ImportFlowStrategyUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -270,4 +274,8 @@ class TenantUseCases:
                 ports.historical_closed_positions, ports.clock
             ),
             query_order_history=QueryOrderHistoryUseCase(ports.historical_orders, ports.clock),
+            export_flow_strategy=ExportFlowStrategyUseCase(ports.flows),
+            import_flow_strategy=ImportFlowStrategyUseCase(
+                tenant_id, ports.flows, ports.flow_checks.models, ports.flow_checks.sources
+            ),
         )
