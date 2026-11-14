@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import type { DashboardPages } from './dashboard-pages';
 import type { ScenarioMemory } from './fixtures';
 
-/** Signs in once per scenario: the later steps act on the page the user is already on. */
+/** Signs in once per scenario: the later steps act on the page of the flow, opening it if the user is elsewhere. */
 export const onFlowPage = async (
   dashboard: DashboardPages,
   memory: ScenarioMemory,
@@ -13,6 +13,10 @@ export const onFlowPage = async (
   if (memory.account !== account) {
     memory.account = account;
     await dashboard.openFlowAs(account, flow);
+  }
+  const onTheFlow = await dashboard.flowName().filter({ hasText: flow }).isVisible();
+  if (!onTheFlow) {
+    await dashboard.openFlow(flow);
   }
   await expect(dashboard.flowName()).toHaveText(flow);
 };
