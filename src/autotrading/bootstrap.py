@@ -42,6 +42,7 @@ from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
     SqlAlchemyEquitySnapshotRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.flow_history import SqlAlchemyFlowHistoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
@@ -220,6 +221,7 @@ def tenant_use_cases(
         stop_ports = StopPorts(
             SqlAlchemyRunningCycleAdapter(engine), flow_positions, flow_openings, closed_positions, closing_notice
         )
+        history = SqlAlchemyFlowHistoryAdapter(engine, tenant_id)
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -258,6 +260,9 @@ def tenant_use_cases(
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
+            historical_cycles=history,
+            historical_closed_positions=history,
+            historical_orders=history,
             environment=environment,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )

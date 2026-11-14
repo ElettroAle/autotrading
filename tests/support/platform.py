@@ -54,6 +54,7 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
@@ -132,6 +133,7 @@ class Platform:
         self.closed_positions = ClosedPositionStore()
         self.cycles = InMemoryCycleRepositoryAdapter()
         self.equity_snapshots = EquitySnapshotStore()
+        self.histories: dict[TenantId, InMemoryFlowHistoryAdapter] = {}
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -214,10 +216,17 @@ class Platform:
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
+            historical_cycles=self.history_of(tenant_id),
+            historical_closed_positions=self.history_of(tenant_id),
+            historical_orders=self.history_of(tenant_id),
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         return TenantUseCases.on(tenant_id, ports)
+
+    def history_of(self, tenant_id: TenantId) -> InMemoryFlowHistoryAdapter:
+        """The histories of the tenant: each tenant reads its own store, as row level security does (R2.5.1)."""
+        return self.histories.setdefault(tenant_id, InMemoryFlowHistoryAdapter(HistoryStore()))
 
     def worker_for(self, tenant_id: TenantId) -> WorkerUseCases:
         """What the worker builds for a request of the API, with the opener only it holds."""

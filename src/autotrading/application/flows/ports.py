@@ -29,6 +29,12 @@ from autotrading.domain.flows.flow_cost import CycleCost
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_timing import FlowTiming
+from autotrading.domain.flows.history import (
+    ClosedPositionHistoryEntry,
+    CycleHistoryEntry,
+    HistoryQuery,
+    OrderHistoryEntry,
+)
 from autotrading.domain.flows.ledger import (
     AccountLedger,
     ExecutionsWindow,
@@ -967,4 +973,40 @@ class FlowAccountNamesPort(Protocol):
 class FlowDirectoryPort(Protocol):
     def exists(self, flow_id: UUID) -> bool:
         """True when the flow belongs to the tenant of the request."""
+        ...
+
+
+class HistoricalCyclesPort(Protocol):
+    """Bound to the tenant of the request: the cycles of its flows as the history reads them (R2.5.1, ADR 0138)."""
+
+    def cycles(self, query: HistoryQuery) -> list[CycleHistoryEntry]:
+        """Up to one cycle more than the limit, newest first by planned instant then flow, after the cursor.
+
+        The period goes by the planned instant. The version is the one in force when the cycle started, or was
+        planned when it never started, since a cycle reads its configuration at its start; the asset is one of that
+        version.
+        """
+        ...
+
+
+class HistoricalClosedPositionsPort(Protocol):
+    """Bound to the tenant of the request: the closed positions of its flows as the history reads them (R2.5.1)."""
+
+    def closed_positions(self, query: HistoryQuery) -> list[ClosedPositionHistoryEntry]:
+        """Up to one position more than the limit, newest first by closing instant then identifier, after the cursor.
+
+        Period and versions go by the closing instant.
+        """
+        ...
+
+
+class HistoricalOrdersPort(Protocol):
+    """Bound to the tenant of the request: the orders sent on its accounts, with their executions (R2.5.1)."""
+
+    def orders(self, query: HistoryQuery) -> list[OrderHistoryEntry]:
+        """Up to one order more than the limit, newest first by creation instant then identifier, after the cursor.
+
+        Period and versions go by the creation instant; a filter on the flow or the version leaves out the orders of
+        no flow.
+        """
         ...

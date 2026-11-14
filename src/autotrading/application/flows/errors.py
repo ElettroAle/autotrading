@@ -212,3 +212,12 @@ class FlowModelCatalogUnavailableError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("catalogo dei modelli non disponibile")
+
+
+class HistoryCursorInvalidError(ApplicationError):
+    """The `after` of a page of a history is not one the platform gave (R2.5.1, ADR 0138)."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("pagina dello storico non valida")
