@@ -38,6 +38,8 @@ services:
     secrets:
       - postgres_owner_password
     read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,6 +89,8 @@ services:
       - worker_token
       - telegram_bot_token
     read_only: true
+    tmpfs:
+      - /tmp
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
@@ -124,6 +128,8 @@ services:
       - credentials_public_key
       - worker_token
     read_only: true
+    tmpfs:
+      - /tmp
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
@@ -151,6 +157,8 @@ services:
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
       AUTH_SCOPE: ${AUTH_SCOPE:-}
     read_only: true
+    tmpfs:
+      - /tmp
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/dashboard/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))"]
       interval: 10s
