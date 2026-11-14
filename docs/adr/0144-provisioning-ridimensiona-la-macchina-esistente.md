@@ -1,4 +1,4 @@
-# ADR 0144 — Il provisioning porta la macchina esistente al tipo d'istanza dichiarato
+# ADR 0144 — A ogni rilascio la macchina esistente si allinea al tipo d'istanza dichiarato
 
 - Stato: proposta (14 novembre 2026)
 - Requisiti: Bug: la macchina dev si blocca al rilascio (RNF di disponibilità dell'installazione dev)
@@ -20,7 +20,8 @@ bloccata non si recupera dalla pipeline.
   ridimensiona (`openstack server resize --flavor`, attesa di `VERIFY_RESIZE`, conferma con `resize confirm`) e attende
   `ACTIVE`; il disco e i dati restano. Il ridimensionamento riavvia la macchina, quindi sblocca anche una macchina
   piantata. Con il tipo già giusto non fa nulla.
-- Si esegue con il workflow `provision` (dev) dalla pipeline; il rilascio successivo riporta i servizi.
+- Lo stesso allineamento gira a ogni rilascio, prima del deploy, oltre che nel workflow `provision`: cambiare
+  `OVH_FLAVOR` ha effetto al rilascio successivo, senza esecuzioni a mano. Con il tipo già giusto costa solo una lettura.
 
 ## Alternative scartate
 
@@ -32,4 +33,4 @@ bloccata non si recupera dalla pipeline.
 ## Conseguenze
 
 - Costo dev da circa 5,71 a circa 11,44 €/mese, come pre-approvato.
-- Cambiare tipo d'istanza in futuro è un cambio di variabile più un'esecuzione di `provision`.
+- Cambiare tipo d'istanza in futuro è solo un cambio di variabile; il rilascio dopo lo applica.

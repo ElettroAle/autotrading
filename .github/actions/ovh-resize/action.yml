@@ -1,0 +1,73 @@
+name: ovh-resize
+description: Porta la macchina esistente dell'installazione al tipo d'istanza dichiarato, con disco e dati; con il tipo già giusto non fa nulla.
+inputs:
+  environment:
+    description: dev o prod
+    required: true
+  client-id:
+    description: Identificativo del service account OVH
+    required: true
+  client-secret:
+    description: Segreto del service account OVH
+    required: true
+  project-id:
+    description: Identificativo del progetto Public Cloud
+    required: true
+  region:
+    description: Regione Public Cloud
+    required: true
+  zone:
+    description: Zona dell'account OVH (eu o ca)
+    required: true
+  flavor:
+    description: Tipo di istanza Public Cloud dichiarato
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/ovh-setup
+      with:
+        project-id: ${{ inputs.project-id }}
+        region: ${{ inputs.region }}
+        zone: ${{ inputs.zone }}
+    - name: Porta la macchina al tipo d'istanza dichiarato
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        FLAVOR: ${{ inputs.flavor }}
+      # A resize keeps disk and data and reboots the machine, so it also recovers a machine that stopped answering
+      # (ADR 0144). The list shows the flavor name on every compute microversion, unlike the server details.
+      run: |
+        server="$(openstack server list --name "^autotrading-${ENVIRONMENT}\$" -f value -c ID -c Flavor)"
+        read -r id current <<< "$server"
+        if [ -z "$id" ]; then
+          echo "::error::installazione ${ENVIRONMENT} inesistente: va creata con il workflow provision"
+          exit 1
+        fi
+        if [ -z "$current" ]; then
+          echo "::error::tipo d'istanza della macchina ${id} non leggibile"
+          exit 1
+        fi
+        if [ "$current" = "$FLAVOR" ]; then
+          echo "::notice::installazione ${ENVIRONMENT} già sul tipo d'istanza ${FLAVOR}"
+          exit 0
+        fi
+        echo "::notice::installazione ${ENVIRONMENT} da ${current} a ${FLAVOR}"
+        openstack server resize --flavor "$FLAVOR" --wait "$id"
+        if [ "$(openstack server show "$id" -f value -c status)" = "VERIFY_RESIZE" ]; then
+          openstack server resize confirm "$id"
+        fi
+        for _ in $(seq 1 60); do
+          status="$(openstack server show "$id" -f value -c status)"
+          if [ "$status" = "ACTIVE" ] || [ "$status" = "ERROR" ]; then
+            break
+          fi
+          sleep 10
+        done
+        if [ "$status" != "ACTIVE" ]; then
+          fault="$(openstack server show "$id" -f json -c fault | jq -r '.fault.message // .fault // "nessun dettaglio"')"
+          echo "::error::OVH non ha ridimensionato la macchina (stato ${status}): ${fault}"
+          exit 1
+        fi

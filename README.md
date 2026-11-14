@@ -41,8 +41,8 @@ gh variable set OVH_ZONE --env <env> -R ElettroAle/autotrading --body <eu|ca>
 ```
 
 Facoltative: `OVH_REGION` (predefinita `SBG5`) e `OVH_FLAVOR` (predefinito `d2-2`). Per cambiare il tipo
-d'istanza di una macchina esistente si cambia `OVH_FLAVOR` e si lancia **provision**: la macchina viene
-ridimensionata con disco e dati, e riavviata (ADR 0144).
+d'istanza di una macchina esistente basta cambiare `OVH_FLAVOR`: il rilascio successivo (o **provision**) la
+ridimensiona con disco e dati, e la riavvia (ADR 0144).
 
 ### 4. Tailscale (rete privata delle installazioni, ADR 0013)
 
