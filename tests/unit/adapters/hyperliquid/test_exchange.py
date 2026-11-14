@@ -25,6 +25,7 @@ from autotrading.application.verification.errors import (
 )
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
+from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.flows.cycle_access import CycleAccess
@@ -32,11 +33,12 @@ from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
+from tests.support.credentials import hyperliquid_credentials
 
 BASE_URL = "https://api.hyperliquid-testnet.xyz"
 WALLET = EthereumAccount.create()
 ADDRESS = "0xAbCdEf0000000000000000000000000000000001"
-CREDENTIALS = Credentials(ADDRESS, WALLET.key.hex())
+CREDENTIALS = hyperliquid_credentials(ADDRESS, WALLET.key.hex())
 ACCEPTED = {"status": "ok", "response": {"type": "cancel", "data": {"statuses": [{"error": "never placed"}]}}}
 READ_AT_MS = 1_794_307_200_000
 STATE = {
@@ -156,7 +158,7 @@ def test_a_malformed_key_is_rejected_without_reaching_the_exchange() -> None:
     sdk = FakeSdk()
 
     with pytest.raises(ExchangeRejectedCredentialsError) as raised:
-        read(sdk, Credentials(ADDRESS, "not-a-key"))
+        read(sdk, hyperliquid_credentials(ADDRESS, "not-a-key"))
 
     assert raised.value.exchange_message == INVALID_KEY_MESSAGE
     assert sdk.calls == []
@@ -268,3 +270,11 @@ def test_an_exchange_that_does_not_answer_the_cycle_is_unavailable() -> None:
 
     with pytest.raises(FlowExchangeUnavailableError, match=r"^exchange non raggiungibile, riprovare$"):
         HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
+
+
+def test_declares_the_address_of_the_account_and_the_key_of_the_api_wallet() -> None:
+    """R2.3.9: the names are the keys of the credentials already sealed (ADR 0158)."""
+    assert HyperliquidExchangeAdapter(TESTNET_API_URL).credential_fields() == (
+        CredentialField("account_address", "Indirizzo del conto", secret=False),
+        CredentialField("secret_key", "Chiave dell'API wallet", secret=True),
+    )

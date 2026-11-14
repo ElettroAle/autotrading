@@ -46,10 +46,6 @@ def public_key_of(raw: bytes) -> PublicKey:
 
 
 def _plaintext(tenant_id: TenantId, account_id: AccountId, credentials: Credentials) -> bytes:
-    document = {
-        "tenant_id": str(tenant_id.value),
-        "account_id": str(account_id.value),
-        "account_address": credentials.account_address,
-        "secret_key": credentials.secret_key,
-    }
+    # Each field keeps the name its exchange declares: the opener reads them back without knowing any (ADR 0158).
+    document = {**credentials.values, "tenant_id": str(tenant_id.value), "account_id": str(account_id.value)}
     return json.dumps(document, separators=(",", ":")).encode()

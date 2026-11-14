@@ -51,7 +51,7 @@ def telegram_linked(flow_cycles: FlowCycles) -> None:
 def opened_by_flow(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> None:
     order, owner = uuid4(), flow_cycles.flow(flow)
     flow_cycles.platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
-    address = flow_cycles.credentials_of(flow).account_address
+    address = flow_cycles.credentials_of(flow).value("account_address")
     opening = a_fill(asset, order, size=amount(a), executed_at=READ_AT - timedelta(minutes=10))
     flow_cycles.platform.activity_reader.executions.setdefault(address, []).append(opening)
 
@@ -62,7 +62,7 @@ def opened_by_flow(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> No
 def opened_late(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> None:
     order, owner = uuid4(), flow_cycles.flow(flow)
     flow_cycles.platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
-    address = flow_cycles.credentials_of(flow).account_address
+    address = flow_cycles.credentials_of(flow).value("account_address")
     late = a_fill(asset, order, size=amount(a), fill_id="2", executed_at=READ_AT - timedelta(minutes=5))
     flow_cycles.platform.activity_reader.late.setdefault(address, []).append(late)
 
@@ -70,7 +70,7 @@ def opened_late(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> None:
 @given(step(r'che sull\'exchange il conto "{account}" ha una posizione di {a} "{asset}"'))
 def position_on_account(flow_cycles: FlowCycles, account: str, a: str, asset: str) -> None:
     (flow,) = flow_cycles.platform.flows.flows
-    address = flow_cycles.credentials_of(flow.name.value, account).account_address
+    address = flow_cycles.credentials_of(flow.name.value, account).value("account_address")
     flow_cycles.platform.activity_reader.activities[address] = an_activity(
         positions=(a_position(asset, size=amount(a)),)
     )

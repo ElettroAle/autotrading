@@ -1,8 +1,7 @@
 from autotrading.adapters.outbound.litellm.model_call import Completion, LiteLlmModelCallAdapter
 from autotrading.adapters.outbound.litellm.model_catalog import (
     LiteLlmModelCatalogAdapter,
-    ModelMap,
-    SupportedParameters,
+    _ModelLibrary,
 )
 
 
@@ -12,13 +11,12 @@ class LiteLlmModelGatewayAdapter:
     def __init__(
         self,
         completion: Completion,
-        model_map: ModelMap,
-        parameters_of: SupportedParameters,
+        library: _ModelLibrary,
         providers: frozenset[str],
         timeout_seconds: float,
     ) -> None:
         self._model_call = LiteLlmModelCallAdapter(completion, timeout_seconds)
-        self._model_catalog = LiteLlmModelCatalogAdapter(model_map, parameters_of, providers)
+        self._model_catalog = LiteLlmModelCatalogAdapter(library, providers)
 
     def model_call(self) -> LiteLlmModelCallAdapter:
         return self._model_call

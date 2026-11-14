@@ -28,7 +28,9 @@ const readIdentity = async (api: ApiClient) => readData(await api.GET('/me'), id
 
 const registerKey = async (api: ApiClient) =>
   readData(
-    await api.POST('/provider-keys', { body: { provider: 'openrouter', key: 'chiave-finta' } }),
+    await api.POST('/provider-keys', {
+      body: { provider: 'openrouter', key: { api_key: 'chiave-finta' } },
+    }),
     providerKeySchema,
   );
 
@@ -110,7 +112,11 @@ describe('createApiClient', () => {
 
     expect(await registerKey(api)).toEqual({ provider: 'openrouter' });
     expect(received).toEqual([
-      ['Bearer token-1', 'application/json', { provider: 'openrouter', key: 'chiave-finta' }],
+      [
+        'Bearer token-1',
+        'application/json',
+        { provider: 'openrouter', key: { api_key: 'chiave-finta' } },
+      ],
     ]);
   });
 });

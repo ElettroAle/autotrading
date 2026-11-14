@@ -1,5 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from autotrading.application.agent.model_gateways import joined_catalog
 from autotrading.application.agent.ports import ProviderKeyRegistration, ProviderKeyRepositoryPort
 from autotrading.application.agent.provider_keys import operations, registered_key, supported_provider
 from autotrading.application.agent.register_provider_key import ProviderKeyServices
@@ -10,7 +12,7 @@ from autotrading.domain.agent.registered_provider_key import RegisteredProviderK
 @dataclass(frozen=True, slots=True)
 class ReplaceProviderKeyCommand:
     provider: str
-    key: str = field(repr=False)
+    key: Mapping[str, str] = field(repr=False)
 
 
 class ReplaceProviderKeyUseCase:
@@ -25,7 +27,7 @@ class ReplaceProviderKeyUseCase:
 
     def execute(self, command: ReplaceProviderKeyCommand) -> ProviderKeyRegistration:
         provider = supported_provider(self._services.catalogs, command.provider)
-        key = ProviderKey(command.key)
+        key = ProviderKey.declared(joined_catalog(self._services.catalogs).key_fields_of(provider), command.key)
         current = registered_key(self._keys, provider)
         sealed = self._services.sealer.seal(provider, key)
         replacement = self._keys.replace(RegisteredProviderKey(current.tenant_id, provider, sealed))

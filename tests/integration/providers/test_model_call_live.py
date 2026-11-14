@@ -9,11 +9,11 @@ import pytest
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.application.agent.errors import ModelKeyRejectedError
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
-from autotrading.domain.agent.provider_key import ProviderKey
+from tests.support.provider_key import api_key_of
 
 pytestmark = pytest.mark.providers
 
-MADE_UP_KEY = ProviderKey("K-made-up-key-for-autotrading-tests")
+MADE_UP_KEY = api_key_of("K-made-up-key-for-autotrading-tests")
 MESSAGES = (ModelMessage(MessageRole.SYSTEM, "Rispondi {}"), ModelMessage(MessageRole.USER, "{}"))
 
 

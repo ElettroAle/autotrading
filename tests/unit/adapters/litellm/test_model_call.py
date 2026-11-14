@@ -19,9 +19,10 @@ from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
+from tests.support.provider_key import api_key_of
 
 TIMEOUT_SECONDS = 120.0
-KEY = ProviderKey("K-FAKE-MODEL-KEY")
+KEY = api_key_of("K-FAKE-MODEL-KEY")
 MESSAGES = (ModelMessage(MessageRole.SYSTEM, "regole"), ModelMessage(MessageRole.USER, '{"ora_corrente": "10:30"}'))
 SENT_MESSAGES = [{"role": "system", "content": "regole"}, {"role": "user", "content": '{"ora_corrente": "10:30"}'}]
 SETTINGS: dict[str, ParameterValue] = {
@@ -93,7 +94,7 @@ def test_every_provider_gets_the_same_request_of_the_openai_api_with_the_key_of_
     assert library.sent == {
         "model": model,
         "messages": SENT_MESSAGES,
-        "api_key": KEY.secret,
+        "api_key": KEY.value("api_key"),
         "max_tokens": 2048,
         "temperature": 0.7,
         "response_format": {"type": "json_object"},
@@ -102,6 +103,16 @@ def test_every_provider_gets_the_same_request_of_the_openai_api_with_the_key_of_
         "num_retries": 0,
         "timeout": TIMEOUT_SECONDS,
     }
+
+
+def test_every_field_of_the_key_travels_as_the_parameter_of_the_call_it_names() -> None:
+    """R2.3.9, ADR 0159: a provider that asks more than the key gets each field by its name, in this call only."""
+    library = Library()
+    key = ProviderKey({"api_key": "K-AZURE", "api_base": "https://models.example.test", "api_version": "2026-01"})
+
+    LiteLlmModelCallAdapter(library.completion, TIMEOUT_SECONDS).call("azure/gpt-4o", key, SETTINGS, MESSAGES)
+
+    assert {name: library.sent[name] for name in ("api_key", "api_base", "api_version")} == dict(key.values)
 
 
 def test_the_answer_and_what_the_call_consumed_are_the_reply() -> None:
@@ -129,7 +140,7 @@ def test_without_settings_the_defaults_apply(model: str) -> None:
 
 @pytest.mark.parametrize("model", ["anthropic/claude", "openai/gpt", "deepseek/deepseek-chat"])
 def test_a_key_rejected_by_the_provider_is_a_permanent_error(model: str) -> None:
-    failure = refusal(exceptions.AuthenticationError, f"Incorrect API key provided: {KEY.secret}")
+    failure = refusal(exceptions.AuthenticationError, f"Incorrect API key provided: {KEY.value('api_key')}")
 
     with pytest.raises(ModelKeyRejectedError) as raised:
         call(failing(failure), model)
@@ -212,12 +223,12 @@ def test_a_long_original_message_is_cut() -> None:
 
 
 def test_the_key_never_travels_in_a_transient_error() -> None:
-    failure = refusal(exceptions.InternalServerError, f"upstream rejected header Bearer {KEY.secret}")
+    failure = refusal(exceptions.InternalServerError, f"upstream rejected header Bearer {KEY.value('api_key')}")
 
     with pytest.raises(ModelUnavailableError) as raised:
         call(failing(failure), "openai/gpt")
 
-    assert KEY.secret not in str(raised.value)
+    assert KEY.value("api_key") not in str(raised.value)
     assert raised.value.__cause__ is None
 
 

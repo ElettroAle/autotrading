@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.amounts import amount_text
@@ -21,18 +21,17 @@ from autotrading.domain.tenancy.user_id import UserId
 
 class AccountRegistrationRequest(BaseModel):
     # Missing values arrive empty, so the domain answers with the reason the requirement names (R0.2.1).
+    # The credentials hold the fields the exchange declares, by name (R2.3.9): the domain checks them.
     name: str = ""
     exchange: str = ""
-    account_address: str = ""
-    secret_key: str = ""
+    credentials: dict[str, str] = Field(default_factory=dict)
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return [("name", self.name), ("exchange", self.exchange)]
 
 
 class CredentialsReplacementRequest(BaseModel):
-    account_address: str = ""
-    secret_key: str = ""
+    credentials: dict[str, str] = Field(default_factory=dict)
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return []
@@ -108,7 +107,7 @@ def accounts_router(
     def register_account(
         request: AccountRegistrationRequest, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
     ) -> AccountRegistrationResponse:
-        command = RegisterAccountCommand(request.name, request.exchange, request.account_address, request.secret_key)
+        command = RegisterAccountCommand(request.name, request.exchange, request.credentials)
         return AccountRegistrationResponse.of(use_cases.register_account.execute(command))
 
     @router.get("")
@@ -130,7 +129,7 @@ def accounts_router(
         request: CredentialsReplacementRequest,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> AccountDetailsResponse:
-        command = ReplaceCredentialsCommand(AccountId(account_id), request.account_address, request.secret_key)
+        command = ReplaceCredentialsCommand(AccountId(account_id), request.credentials)
         return AccountDetailsResponse.of(use_cases.replace_credentials.execute(command))
 
     @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

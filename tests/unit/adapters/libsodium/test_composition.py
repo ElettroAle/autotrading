@@ -13,11 +13,11 @@ from autotrading.adapters.outbound.libsodium.composition import (
 from autotrading.adapters.outbound.libsodium.opener import InvalidPrivateCredentialsKeyError
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
 from autotrading.domain.accounts.account_id import AccountId
-from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.credentials import hyperliquid_credentials
 
 KEY = PrivateKey.generate()
-CREDENTIALS = Credentials("0x" + "a" * 40, "0x" + "b" * 64)
+CREDENTIALS = hyperliquid_credentials("0x" + "a" * 40, "0x" + "b" * 64)
 
 
 def _file(tmp_path: Path, name: str, content: str) -> str:

@@ -1,14 +1,19 @@
 import pytest
 
 from autotrading.domain.accounts.account import Account
-from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError
+from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
 from tests.support.accounts import ADDRESS, an_account
+from tests.support.credentials import HYPERLIQUID_FIELDS, hyperliquid_credentials
 
 OTHER_SECRET = "0x" + "cd" * 32
+
+
+def exchange_account_of(address: str, secret: str) -> ExchangeAccount:
+    return ExchangeAccount.of(hyperliquid_credentials(address, secret), HYPERLIQUID_FIELDS)
 
 
 def test_an_account_belongs_to_a_tenant() -> None:
@@ -28,12 +33,12 @@ def test_every_entity_saved_by_a_tenant_bound_repository_extends_tenant_owned() 
 def test_new_credentials_of_the_same_exchange_account_are_admitted_whatever_the_case() -> None:
     account = an_account(TenantId.new())
 
-    account.require_same_exchange_account(Credentials(ADDRESS.upper().replace("0X", "0x"), OTHER_SECRET))
+    account.require_same_exchange_account(exchange_account_of(ADDRESS.upper().replace("0X", "0x"), OTHER_SECRET))
 
 
 def test_credentials_of_another_exchange_account_are_refused() -> None:
     account = an_account(TenantId.new())
-    other = Credentials("0x2222222222222222222222222222222222222222", OTHER_SECRET)
+    other = exchange_account_of("0x2222222222222222222222222222222222222222", OTHER_SECRET)
 
     with pytest.raises(CredentialsOfAnotherAccountError) as raised:
         account.require_same_exchange_account(other)

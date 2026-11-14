@@ -12,8 +12,9 @@ from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.provider_key import api_key_of
 
-KEY = ProviderKey("K-FAKE-OPENER")
+KEY = api_key_of("K-FAKE-OPENER")
 TENANT = TenantId.new()
 OPENROUTER = ProviderName("openrouter")
 
@@ -39,14 +40,14 @@ def with_plaintext(private_key: PrivateKey, plaintext: bytes) -> RegisteredProvi
 def test_opens_what_the_sealer_sealed_for_the_same_tenant_and_provider(private_key: PrivateKey) -> None:
     opener = SodiumProviderKeyOpenerAdapter({1: bytes(private_key)})
 
-    assert opener.open(registered(private_key)).secret == KEY.secret
+    assert opener.open(registered(private_key)) == KEY
 
 
 def test_the_private_key_follows_the_version_saved_with_the_sealed_text(private_key: PrivateKey) -> None:
     newer = PrivateKey.generate()
     opener = SodiumProviderKeyOpenerAdapter({1: bytes(private_key), 2: bytes(newer)})
 
-    assert opener.open(registered(newer, version=2)).secret == KEY.secret
+    assert opener.open(registered(newer, version=2)) == KEY
 
 
 def test_a_version_without_its_private_key_is_not_opened(private_key: PrivateKey) -> None:
@@ -86,6 +87,8 @@ def test_a_text_sealed_with_another_key_is_refused(private_key: PrivateKey) -> N
         b"[1, 2]",
         json.dumps({"tenant_id": str(TENANT.value), "provider": "openrouter"}).encode(),
         json.dumps({"tenant_id": str(TENANT.value), "provider": "openrouter", "key": 7}).encode(),
+        json.dumps({"tenant_id": str(TENANT.value), "provider": "openrouter", "fields": {"api_key": 7}}).encode(),
+        json.dumps({"tenant_id": str(TENANT.value), "provider": "openrouter", "fields": {}}).encode(),
     ],
 )
 def test_a_document_that_is_not_a_sealed_key_is_refused(private_key: PrivateKey, plaintext: bytes) -> None:
@@ -120,7 +123,7 @@ def test_every_opening_of_a_key_records_tenant_provider_and_outcome_never_the_ke
     assert "openrouter" in message
     assert "versione 1" in message
     assert "riuscita" in message
-    assert KEY.secret not in message
+    assert KEY.value("api_key") not in message
 
 
 def test_a_refused_opening_of_a_key_is_recorded_as_refused(
@@ -134,3 +137,23 @@ def test_a_refused_opening_of_a_key_is_recorded_as_refused(
     (record,) = _decryption_records(caplog)
     assert record.levelno == logging.WARNING
     assert "rifiutata" in record.getMessage()
+
+
+def test_a_key_sealed_before_the_declared_fields_opens_as_the_api_key(private_key: PrivateKey) -> None:
+    """ADR 0159: the keys already saved hold the secret alone, which was always the API key; nothing is migrated."""
+    document = {"tenant_id": str(TENANT.value), "provider": OPENROUTER.value, "key": "K-SAVED-BEFORE"}
+    opener = SodiumProviderKeyOpenerAdapter({1: bytes(private_key)})
+
+    opened = opener.open(with_plaintext(private_key, json.dumps(document).encode()))
+
+    assert opened == api_key_of("K-SAVED-BEFORE")
+
+
+def test_every_declared_field_sealed_is_opened(private_key: PrivateKey) -> None:
+    key = ProviderKey({"api_key": "K-AZURE", "api_base": "https://models.example.test", "api_version": "2026-01"})
+    sealer = SodiumProviderKeySealerAdapter(bytes(private_key.public_key), 1, TENANT)
+    opener = SodiumProviderKeyOpenerAdapter({1: bytes(private_key)})
+
+    opened = opener.open(RegisteredProviderKey(TENANT, OPENROUTER, sealer.seal(OPENROUTER, key)))
+
+    assert opened == key

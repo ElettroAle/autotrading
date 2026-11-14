@@ -9,13 +9,19 @@ import {
   type FakeAccount,
   type FakeUser,
 } from './platform';
-import { problem, textFieldsOf, withUser } from './responses';
+import { problem, textFieldsWithin, withUser } from './responses';
 
 const CURRENCY = 'USDC';
 
 // The reasons the API gives, with the same words (R0.2.1, R0.2.4, R0.2.5, R1.1.8).
 const NOT_FOUND = 'non trovato';
 const CREDENTIALS_REQUIRED = 'credenziali obbligatorio';
+
+// The fields the exchange declares for its credentials (R2.3.9, ADR 0158).
+const CREDENTIAL_FIELDS = [
+  { name: 'account_address', label: 'Indirizzo del conto', secret: false },
+  { name: 'secret_key', label: "Chiave dell'API wallet", secret: true },
+] as const;
 
 const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   id: account.id,
@@ -56,10 +62,29 @@ const withAccountOnExchange = (
 };
 
 // The exchange reads the balance with the credentials before they are saved: a refused key saves nothing.
-const refusalOfCredentials = (address: string, secretKey: string): Response | undefined => {
-  if (address.trim() === '' || secretKey.trim() === '') {
+const refusalOfCredentials = (credentials: Record<string, string>): Response | undefined => {
+  const unknown = Object.keys(credentials).find(
+    (name) => !CREDENTIAL_FIELDS.some((field) => field.name === name),
+  );
+  if (unknown !== undefined) {
+    return problem(
+      422,
+      'Unprocessable Content',
+      `campo delle credenziali non previsto: ${unknown}`,
+      {
+        field: unknown,
+      },
+    );
+  }
+  if (Object.values(credentials).every((value) => value.trim() === '')) {
     return problem(422, 'Unprocessable Content', CREDENTIALS_REQUIRED);
   }
+  const missing = CREDENTIAL_FIELDS.find((field) => (credentials[field.name] ?? '').trim() === '');
+  if (missing !== undefined) {
+    const label = `${missing.label.charAt(0).toLowerCase()}${missing.label.slice(1)}`;
+    return problem(422, 'Unprocessable Content', `${label} obbligatorio`, { field: missing.name });
+  }
+  const secretKey = credentials.secret_key ?? '';
   if (secretKey === REJECTED_SECRET_KEY) {
     return problem(422, 'Unprocessable Content', "credenziali rifiutate dall'exchange", {
       exchange_message: EXCHANGE_REFUSAL,
@@ -68,7 +93,11 @@ const refusalOfCredentials = (address: string, secretKey: string): Response | un
   return undefined;
 };
 
-const refusalOfRegistration = (user: FakeUser, fields: Record<string, string>) => {
+const refusalOfRegistration = (
+  user: FakeUser,
+  fields: Record<string, string>,
+  credentials: Record<string, string>,
+) => {
   const name = (fields.name ?? '').trim();
   const exchange = (fields.exchange ?? '').trim();
   if (name === '') {
@@ -85,7 +114,7 @@ const refusalOfRegistration = (user: FakeUser, fields: Record<string, string>) =
   if (user.accounts.some((account) => account.name === name)) {
     return problem(409, 'Conflict', 'nome del conto già in uso');
   }
-  return refusalOfCredentials(fields.account_address ?? '', fields.secret_key ?? '');
+  return refusalOfCredentials(credentials);
 };
 
 const withAccount = (
@@ -105,6 +134,7 @@ export const accountHandlers = [
             FAKE_SUPPORTED_EXCHANGES.map((name) => ({
               name,
               network: fakePlatform.exchangeNetwork(),
+              fields: CREDENTIAL_FIELDS,
             })),
           )
         : problem(500, 'Internal Server Error', 'errore interno'),
@@ -131,8 +161,8 @@ export const accountHandlers = [
   ),
   http.post('*/accounts', ({ request }) =>
     withUser(request, async (user) => {
-      const fields = await textFieldsOf(request);
-      const refusal = refusalOfRegistration(user, fields);
+      const { fields, within } = await textFieldsWithin(request, 'credentials');
+      const refusal = refusalOfRegistration(user, fields, within);
       if (refusal !== undefined) {
         return refusal;
       }
@@ -150,13 +180,12 @@ export const accountHandlers = [
   ),
   http.put('*/accounts/:accountId/credentials', ({ request, params }) =>
     withUser(request, async (user) => {
-      const fields = await textFieldsOf(request);
+      const { within } = await textFieldsWithin(request, 'credentials');
       return withAccount(
         user,
         String(params.accountId),
         (account) =>
-          refusalOfCredentials(fields.account_address ?? '', fields.secret_key ?? '') ??
-          HttpResponse.json(accountResponse(user, account)),
+          refusalOfCredentials(within) ?? HttpResponse.json(accountResponse(user, account)),
       );
     }),
   ),

@@ -50,7 +50,6 @@ from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.agent_context import MessageRole
-from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.errors import AutotradingError
@@ -108,6 +107,7 @@ from tests.support.cycle_composition import (
 )
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
+from tests.support.provider_key import api_key_of
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 ACCOUNT = "test-1"
@@ -273,7 +273,7 @@ class FlowCycles:
         name = ProviderName(provider)
         if any(key.provider == name for key in self.platform.provider_keys.of(tenant_id)):
             return
-        sealed = FakeProviderKeySealerAdapter(tenant_id, self.platform.key_vault).seal(name, ProviderKey(KEY))
+        sealed = FakeProviderKeySealerAdapter(tenant_id, self.platform.key_vault).seal(name, api_key_of(KEY))
         self.platform.provider_keys.keys.append(RegisteredProviderKey(tenant_id, name, sealed))
 
     def add_flow(

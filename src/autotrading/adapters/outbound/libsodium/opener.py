@@ -21,6 +21,11 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 
 PRIVATE_KEY_BYTES = 32
+OWNER_KEYS = frozenset({"tenant_id", "account_id"})
+# The access of orders, flows and verification still carries an address and a secret: the only exchange is
+# Hyperliquid, whose fields have these names (ADR 0158, Bug 284).
+ACCOUNT_ADDRESS = "account_address"
+API_WALLET_KEY = "secret_key"
 # The register of the openings the threat model counts on to detect misuse (docs/architecture.md §8.2, ADR 0007).
 decryptions = logging.getLogger("autotrading.credentials")
 
@@ -55,21 +60,21 @@ class SodiumCredentialOpenerAdapter:
         credentials = self._opened("ordini", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
         if credentials is None:
             raise OrderCredentialsNotOpenedError
-        return TradingAccess(sealed.exchange, credentials.account_address, credentials.secret_key)
+        return TradingAccess(sealed.exchange, credentials.value(ACCOUNT_ADDRESS), credentials.value(API_WALLET_KEY))
 
     def open_address(self, sealed: SealedAddress) -> str:
         """The same opening for the flows context, which only reads the account on its exchange (ADR 0044)."""
         credentials = self._opened("flussi", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
         if credentials is None:
             raise FlowCredentialsNotOpenedError
-        return credentials.account_address
+        return credentials.value(ACCOUNT_ADDRESS)
 
     def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:
         """The same opening for the cycle of a flow, which proves the credentials on the exchange (R1.2.4)."""
         credentials = self._opened("ciclo", sealed.key_version, sealed.ciphertext, sealed.tenant_id, sealed.account_id)
         if credentials is None:
             raise FlowCredentialsNotOpenedError
-        return CycleAccess(credentials.account_address, credentials.secret_key)
+        return CycleAccess(credentials.value(ACCOUNT_ADDRESS), credentials.value(API_WALLET_KEY))
 
     def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
         """The same opening for the verification procedure, which proves the credentials on the exchange (ADR 0024)."""
@@ -78,7 +83,7 @@ class SodiumCredentialOpenerAdapter:
         )
         if credentials is None:
             raise VerificationCredentialsNotOpenedError
-        return VerificationAccess(credentials.account_address, credentials.secret_key)
+        return VerificationAccess(credentials.value(ACCOUNT_ADDRESS), credentials.value(API_WALLET_KEY))
 
     def _opened(
         self, purpose: str, key_version: int, ciphertext: bytes, tenant_id: TenantId, account_id: UUID
@@ -131,7 +136,7 @@ def private_key_of(raw: bytes) -> PrivateKey:
 
 
 def _credentials_of(document: Mapping[str, object]) -> Credentials | None:
-    address, secret = document.get("account_address"), document.get("secret_key")
-    if not isinstance(address, str) or not isinstance(secret, str):
+    values = {name: value for name, value in document.items() if name not in OWNER_KEYS}
+    if not values or not all(isinstance(value, str) for value in values.values()):
         return None
-    return Credentials(address, secret)
+    return Credentials({name: str(value) for name, value in values.items()})

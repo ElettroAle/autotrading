@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from autotrading.domain.errors import DomainError
 
 
@@ -13,6 +15,31 @@ class ProviderKeyRequiredError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("chiave obbligatoria")
+
+
+class ProviderKeyFieldRequiredError(DomainError):
+    status_code = 422
+
+    def __init__(self, field: str, label: str) -> None:
+        # Only the first letter changes: the label may hold a name, as in "chiave dell'API wallet".
+        super().__init__(f"{label[:1].lower()}{label[1:]} obbligatorio")
+        self.field = field
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.field}
+
+
+class UnknownProviderKeyFieldError(DomainError):
+    status_code = 422
+
+    def __init__(self, field: str) -> None:
+        super().__init__(f"campo della chiave non previsto: {field}")
+        self.field = field
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.field}
 
 
 class ParameterOutOfRangeError(DomainError):

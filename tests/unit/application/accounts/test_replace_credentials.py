@@ -19,10 +19,11 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter
 from tests.fakes.exchange import REDACTED_REJECTION, FakeExchangeAdapter
 from tests.support.accounts import ADDRESS, an_account
+from tests.support.credentials import hyperliquid_credentials
 from tests.support.platform import HYPERLIQUID, new_credentials
 
 TENANT = TenantId.new()
-ROTATED = Credentials(ADDRESS, "0x" + "ef" * 32)
+ROTATED = hyperliquid_credentials(ADDRESS, "0x" + "ef" * 32)
 
 
 @pytest.fixture
@@ -55,7 +56,7 @@ def use_case(
 
 
 def command(account: Account, credentials: Credentials = ROTATED) -> ReplaceCredentialsCommand:
-    return ReplaceCredentialsCommand(account.id, credentials.account_address, credentials.secret_key)
+    return ReplaceCredentialsCommand(account.id, credentials.values)
 
 
 def test_accepted_credentials_replace_the_sealed_ones(
@@ -140,7 +141,7 @@ def test_an_account_of_another_tenant_is_not_found(
 
 def test_missing_credentials_are_refused(use_case: ReplaceCredentialsUseCase, account: Account) -> None:
     with pytest.raises(CredentialsRequiredError):
-        use_case.execute(ReplaceCredentialsCommand(account.id, " ", ""))
+        use_case.execute(ReplaceCredentialsCommand(account.id, {"account_address": " ", "secret_key": ""}))
 
 
 def test_an_account_on_an_exchange_no_longer_supported_is_refused(
@@ -155,5 +156,5 @@ def test_an_account_on_an_exchange_no_longer_supported_is_refused(
 def test_the_command_never_shows_the_credentials(account: Account) -> None:
     shown = repr(command(account))
 
-    assert ROTATED.account_address not in shown
-    assert ROTATED.secret_key not in shown
+    assert ROTATED.value("account_address") not in shown
+    assert ROTATED.value("secret_key") not in shown

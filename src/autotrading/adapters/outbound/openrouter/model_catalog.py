@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 import httpx
 
-from autotrading.adapters.outbound.openrouter.model_call import API_URL, PREFIX
+from autotrading.adapters.outbound.openrouter.model_call import API_URL, OPENROUTER, PREFIX
 from autotrading.application.agent.errors import ModelCatalogUnavailableError
 from autotrading.application.flows.errors import FlowModelCatalogUnavailableError
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, InvalidModelUsageError
@@ -12,6 +12,7 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParameter, RangeParameter
 from autotrading.domain.agent.model_usage import ModelPrices
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD
 
 CATALOG_TIMEOUT_SECONDS = 10.0
 # OpenRouter adds and retires models every day; a few minutes are enough to see them.
@@ -43,7 +44,8 @@ class OpenRouterModelCatalogAdapter:
         now = self._clock()
         if self._read is not None and now - self._read[0] < REFRESH_SECONDS:
             return self._read[1]
-        catalog = ModelCatalog(_definitions(self._entries()))
+        # OpenRouter asks the key alone, sent as the bearer of every call (ADR 0159).
+        catalog = ModelCatalog(_definitions(self._entries()), {OPENROUTER: (API_KEY_FIELD,)})
         self._read = (now, catalog)
         return catalog
 

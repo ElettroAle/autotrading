@@ -54,11 +54,24 @@ def test_lists_each_exchange_with_the_network_its_adapter_is_configured_on(
 
     response = client_of("anna").get("/exchanges")
 
-    assert (response.status_code, response.json()) == (200, [{"name": HYPERLIQUID, "network": "real"}])
+    assert (response.status_code, [(exchange["name"], exchange["network"]) for exchange in response.json()]) == (
+        200,
+        [(HYPERLIQUID, "real")],
+    )
 
 
 def test_an_exchange_on_the_test_network_is_listed_as_test(client_of: Client) -> None:
-    assert client_of("anna").get("/exchanges").json() == [{"name": HYPERLIQUID, "network": "test"}]
+    assert [exchange["network"] for exchange in client_of("anna").get("/exchanges").json()] == ["test"]
+
+
+def test_lists_each_exchange_with_the_fields_its_credentials_need(client_of: Client) -> None:
+    """R2.3.9: the dashboard builds the registration from these fields, secrets shown hidden."""
+    [exchange] = client_of("anna").get("/exchanges").json()
+
+    assert exchange["fields"] == [
+        {"name": "account_address", "label": "Indirizzo del conto", "secret": False},
+        {"name": "secret_key", "label": "Chiave dell'API wallet", "secret": True},
+    ]
 
 
 def test_the_exchanges_need_an_identity(client_of: Client) -> None:

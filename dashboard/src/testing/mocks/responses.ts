@@ -48,11 +48,23 @@ export const withUser = async (
   }
 };
 
-/** The body of a request as JSON, every field read as text: a missing one arrives empty, as on the API. */
-export const textFieldsOf = async (request: Request): Promise<Record<string, string>> => {
-  const body: unknown = await request.json().catch(() => ({}));
-  const fields = typeof body === 'object' && body !== null ? Object.entries(body) : [];
-  return Object.fromEntries(
-    fields.map(([name, value]) => [name, typeof value === 'string' ? value : '']),
+const textRecordOf = (value: unknown): Record<string, string> =>
+  Object.fromEntries(
+    (typeof value === 'object' && value !== null ? Object.entries(value) : []).map(
+      ([name, field]) => [name, typeof field === 'string' ? field : ''],
+    ),
   );
+
+/** The body of a request as JSON, every field read as text: a missing one arrives empty, as on the API. */
+export const textFieldsOf = async (request: Request): Promise<Record<string, string>> =>
+  textRecordOf(await request.json().catch(() => ({})));
+
+/** The text fields of a request and those of the object it carries under `inner`, read as on the API. */
+export const textFieldsWithin = async (
+  request: Request,
+  inner: string,
+): Promise<{ fields: Record<string, string>; within: Record<string, string> }> => {
+  const body: unknown = await request.json().catch(() => ({}));
+  const nested = typeof body === 'object' && body !== null ? Reflect.get(body, inner) : undefined;
+  return { fields: textRecordOf(body), within: textRecordOf(nested) };
 };

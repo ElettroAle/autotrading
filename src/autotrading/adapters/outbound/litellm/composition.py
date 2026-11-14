@@ -2,6 +2,7 @@
 lazy import litellm
 
 from autotrading.adapters.outbound.litellm.configuration import _LiteLlmSettings
+from autotrading.adapters.outbound.litellm.model_catalog import _ModelLibrary
 from autotrading.adapters.outbound.litellm.model_gateway import LiteLlmModelGatewayAdapter
 
 GATEWAY_NAME = "litellm"
@@ -13,12 +14,17 @@ def litellm_adapters() -> dict[str, LiteLlmModelGatewayAdapter]:
     _keep_the_library_to_itself()
     gateway = LiteLlmModelGatewayAdapter(
         litellm.completion,
-        litellm.model_cost,
-        litellm.get_supported_openai_params,
+        _ModelLibrary(litellm.model_cost, litellm.get_supported_openai_params, _required_keys),
         settings.providers,
         settings.timeout_seconds,
     )
     return {GATEWAY_NAME: gateway}
+
+
+def _required_keys(model: str) -> list[str]:
+    """The variables the library would read to call the model: the fields of the key its provider asks (ADR 0159)."""
+    missing = litellm.validate_environment(model=model).get("missing_keys", [])
+    return [str(variable) for variable in missing]
 
 
 def _keep_the_library_to_itself() -> None:

@@ -21,7 +21,7 @@ class Replacement:
 
     def attempt(self, user: str, account: str, credentials: Credentials) -> None:
         saved = self.platform.account_named(user, account)
-        command = ReplaceCredentialsCommand(saved.id, credentials.account_address, credentials.secret_key)
+        command = ReplaceCredentialsCommand(saved.id, credentials.values)
         try:
             self.platform.use_cases_of(user).replace_credentials.execute(command)
         except AutotradingError as error:

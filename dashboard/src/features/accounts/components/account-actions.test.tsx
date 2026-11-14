@@ -77,7 +77,7 @@ describe('AccountActions', () => {
     expect(within(item).getByLabelText(SECRET_LABEL)).toHaveValue('');
   });
 
-  it('asks for the credentials before sending the replacement, and can be cancelled', async () => {
+  it('tells the credentials are missing when the replacement is sent empty, and can be cancelled', async () => {
     fakePlatform.addAccount('anna', 'principale');
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const item = await accountItem('principale');
@@ -85,9 +85,7 @@ describe('AccountActions', () => {
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
-    expect(await within(item).findByLabelText(SECRET_LABEL)).toHaveAccessibleDescription(
-      'Campo obbligatorio',
-    );
+    expect(await within(item).findByRole('alert')).toHaveTextContent('credenziali obbligatorio');
     await userEvent.click(within(item).getByRole('button', { name: 'Annulla' }));
     expect(within(item).queryByLabelText(SECRET_LABEL)).not.toBeInTheDocument();
   });

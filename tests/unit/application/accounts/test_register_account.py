@@ -23,6 +23,7 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter
 from tests.fakes.exchange import REDACTED_REJECTION, FakeExchangeAdapter
 from tests.support.accounts import an_account
+from tests.support.credentials import HYPERLIQUID_FIELDS, credentials_of
 from tests.support.platform import HYPERLIQUID, new_credentials, registration
 
 TENANT = TenantId.new()
@@ -64,7 +65,7 @@ def test_saves_the_account_in_the_tenant_with_sealed_credentials(
     assert store.accounts == [result.account]
     assert result.account.tenant_id == TENANT
     assert (result.account.name, result.account.exchange) == (AccountName("test-1"), ExchangeName(HYPERLIQUID))
-    assert command.secret_key.encode() not in result.account.credentials.ciphertext
+    assert command.credentials["secret_key"].encode() not in result.account.credentials.ciphertext
 
 
 def test_reports_the_balance_read_at_registration(
@@ -137,9 +138,9 @@ def test_a_name_taken_by_a_concurrent_request_is_refused_at_save(
 @pytest.mark.parametrize(
     ("command", "error"),
     [
-        (RegisterAccountCommand("", HYPERLIQUID, "0xa", "0xb"), AccountNameRequiredError),
-        (RegisterAccountCommand("test-5", " ", "0xa", "0xb"), ExchangeRequiredError),
-        (RegisterAccountCommand("test-5", HYPERLIQUID, "0xa", ""), CredentialsRequiredError),
+        (RegisterAccountCommand("", HYPERLIQUID, credentials_of("0xa", "0xb")), AccountNameRequiredError),
+        (RegisterAccountCommand("test-5", " ", credentials_of("0xa", "0xb")), ExchangeRequiredError),
+        (RegisterAccountCommand("test-5", HYPERLIQUID, credentials_of("", "")), CredentialsRequiredError),
     ],
     ids=["name", "exchange", "credentials"],
 )
@@ -156,7 +157,7 @@ def test_missing_data_is_refused_without_calling_the_exchange(
 
 
 def test_the_command_never_shows_the_credentials() -> None:
-    command = RegisterAccountCommand("test-1", HYPERLIQUID, "0xaddress", "0xsecret")
+    command = RegisterAccountCommand("test-1", HYPERLIQUID, credentials_of("0xaddress", "0xsecret"))
 
     assert "0xaddress" not in repr(command)
     assert "0xsecret" not in repr(command)
@@ -169,7 +170,7 @@ def test_the_account_remembers_which_exchange_account_its_credentials_operate(
 
     account = use_case.execute(command).account
 
-    assert account.exchange_account == ExchangeAccount.of(Credentials(command.account_address, command.secret_key))
+    assert account.exchange_account == ExchangeAccount.of(Credentials(command.credentials), HYPERLIQUID_FIELDS)
 
 
 def test_a_registration_is_recorded_by_account_id_only(

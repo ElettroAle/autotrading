@@ -10,7 +10,8 @@ const REQUIRED = 'Campo obbligatorio';
 // Only presence: the API tells which providers it accepts, and never asks the provider about the key (R1.4.1).
 export const providerKeyInputSchema = z.object({
   provider: z.string().trim().min(1, REQUIRED),
-  key: z.string().min(1, REQUIRED),
+  // The fields the chosen provider declares: the API tells which one is missing, by its label (R2.3.9).
+  key: z.record(z.string(), z.string()),
 });
 
 export type ProviderKeyInput = z.infer<typeof providerKeyInputSchema>;

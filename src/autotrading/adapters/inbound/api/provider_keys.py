@@ -2,7 +2,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.agent.ports import ProviderKeyRegistration
@@ -13,15 +13,16 @@ from autotrading.application.agent.replace_provider_key import ReplaceProviderKe
 
 class ProviderKeyRegistrationRequest(BaseModel):
     # Missing values arrive empty, so the domain answers with the reason of the requirement.
+    # The key holds the fields its provider declares, by name (R2.3.9): the domain checks them.
     provider: str = ""
-    key: str = ""
+    key: dict[str, str] = Field(default_factory=dict)
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return [("provider", self.provider)]
 
 
 class ProviderKeyReplacementRequest(BaseModel):
-    key: str = ""
+    key: dict[str, str] = Field(default_factory=dict)
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return []

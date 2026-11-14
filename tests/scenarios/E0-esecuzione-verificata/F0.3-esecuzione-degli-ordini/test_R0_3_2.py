@@ -49,7 +49,7 @@ class Session:
 
     def access_of(self, account: str) -> TradingAccess:
         credentials = self.credentials[account]
-        return TradingAccess(HYPERLIQUID, credentials.account_address, credentials.secret_key)
+        return TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
 
     def closing_execution(self) -> Execution:
         return self.platform.order_exchange.executions[self.platform.order_exchange.sent[-1].id]
