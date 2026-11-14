@@ -2,9 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { FormAlert, InputField, SecretField } from '@/components/ui/form/input-field';
+import { FormAlert, SecretField } from '@/components/ui/form/input-field';
+import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
 import { showRefusal } from '@/lib/form-errors';
 
+import { useModelProviders, type ModelProvider } from '../api/get-model-providers';
 import {
   providerKeyInputSchema,
   useRegisterProviderKey,
@@ -15,9 +17,20 @@ const FIELDS = ['provider', 'key'] as const;
 
 const EMPTY_FORM: ProviderKeyInput = { provider: '', key: '' };
 
-/** Registers the key of a provider of models, without asking the provider about it (R1.4.1). */
+// A provider whose key is registered is not chosen here: its key is replaced from the list (R2.3.2).
+const optionOf = ({ name, key_registered }: ModelProvider): SelectOption =>
+  key_registered
+    ? { value: name, label: name, disabled: true, note: 'chiave già registrata' }
+    : { value: name, label: name };
+
+/**
+ * Registers the key of a provider of the catalog of the models (R2.3.8), without asking the provider about it
+ * (R1.4.1).
+ */
 export const RegisterProviderKeyForm = () => {
   const registration = useRegisterProviderKey();
+  // Without the providers of the catalog the user cannot choose one: the form waits for them (ADR 0153).
+  const providers = useModelProviders();
   const [registered, setRegistered] = useState<string | null>(null);
   const {
     register,
@@ -56,11 +69,23 @@ export const RegisterProviderKeyForm = () => {
       </h2>
       <form onSubmit={(event) => void onSubmit(event)} noValidate className="space-y-3">
         <FormAlert error={errors.root?.server} />
-        <InputField label="Fornitore" error={errors.provider} {...register('provider')} />
+        <SelectField
+          label="Fornitore"
+          placeholder="Scegli un fornitore"
+          choices={(providers.data ?? []).map(optionOf)}
+          loading={providers.isPending}
+          unavailable={
+            providers.isError
+              ? { prefix: 'Impossibile leggere i fornitori IA', error: providers.error }
+              : undefined
+          }
+          error={errors.provider}
+          {...register('provider')}
+        />
         <SecretField label="Chiave" error={errors.key} {...register('key')} />
         <button
           type="submit"
-          disabled={registration.isPending}
+          disabled={registration.isPending || !providers.isSuccess}
           className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50"
         >
           Registra la chiave

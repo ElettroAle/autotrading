@@ -59,7 +59,7 @@ When(
     expectSignedIn(memory, account);
     memory.secret = FIRST_KEY;
     const form = dashboard.page.getByRole('region', { name: 'Nuova chiave' });
-    await dashboard.field('Fornitore', form).fill(provider);
+    await dashboard.field('Fornitore', form).selectOption(provider);
     await dashboard.field('Chiave', form).fill(FIRST_KEY);
     await form.getByRole('button', { name: 'Registra la chiave' }).click();
   },

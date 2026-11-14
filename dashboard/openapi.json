@@ -327,6 +327,37 @@
         }
       }
     },
+    "/exchanges": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "List Supported Exchanges",
+        "description": "The exchanges an account can be registered on, by name (ADR 0152).",
+        "operationId": "list_supported_exchanges_exchanges_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response List Supported Exchanges Exchanges Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/accounts/{account_id}/positions/{coin}/close": {
       "post": {
         "tags": [

@@ -144,6 +144,8 @@ const FIRST_CHAT_ID = 1001;
 export type FakeProviderKey = { readonly provider: string; registeredAt: string };
 
 export const FAKE_EXCHANGE = 'hyperliquid';
+/** The exchanges the fake platform supports, as the API lists them (ADR 0152). */
+export const FAKE_SUPPORTED_EXCHANGES: readonly string[] = [FAKE_EXCHANGE];
 /** The secret key the exchange refuses, with the message it answers. */
 export const REJECTED_SECRET_KEY = '0xrifiutata';
 export const EXCHANGE_REFUSAL = 'User or API Wallet does not exist';
@@ -276,6 +278,7 @@ const state = {
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
   exchangeReachable: true,
+  exchangesListed: true,
   apiAnswers: true,
 };
 
@@ -417,6 +420,7 @@ export const fakePlatform = {
     state.signingIn = undefined;
     state.sessionsExpired = false;
     state.exchangeReachable = true;
+    state.exchangesListed = true;
     state.apiAnswers = true;
   },
 
@@ -526,6 +530,15 @@ export const fakePlatform = {
 
   exchangeReachable(): boolean {
     return state.exchangeReachable;
+  },
+
+  /** From now on the API fails listing the exchanges it supports, with its generic reason (R2.3.8). */
+  stopListingExchanges(): void {
+    state.exchangesListed = false;
+  },
+
+  listsExchanges(): boolean {
+    return state.exchangesListed;
   },
 
   /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */
