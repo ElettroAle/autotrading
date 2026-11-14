@@ -2,11 +2,12 @@
 
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
+from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow import Flow, holder_of
@@ -29,6 +30,13 @@ class FlowStore:
         self.first_starts: dict[FlowId, datetime] = {}
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
         self.capital_changes: dict[FlowId, list[CapitalChange]] = {}
+        # As the default of the database: a version is stamped with the time it is saved, here the one the test sets.
+        self.now = datetime(2026, 1, 1, tzinfo=UTC)
+        self.created_at: dict[tuple[FlowId, int], datetime] = {}
+
+    def save_version(self, flow: Flow) -> None:
+        self.versions.setdefault(flow.id, []).append(flow.configuration)
+        self.created_at[flow.id, flow.configuration.version] = self.now
 
     def of(self, tenant_id: TenantId) -> list[Flow]:
         return [flow for flow in self.flows if flow.tenant_id == tenant_id]
@@ -56,7 +64,7 @@ class InMemoryFlowRepositoryAdapter:
         if self.name_in_use(flow.name):
             raise FlowNameInUseError
         self._store.flows.append(flow)
-        self._store.versions[flow.id] = [flow.configuration]
+        self._store.save_version(flow)
 
     def exists(self, flow_id: UUID) -> bool:
         return any(flow.id.value == flow_id for flow in self.list())
@@ -77,12 +85,17 @@ class InMemoryFlowRepositoryAdapter:
             raise FlowVersionNotFoundError(number)
         return configuration
 
+    def versions(self, flow_id: FlowId) -> tuple[FlowVersion, ...]:
+        self.get(flow_id)
+        numbers = sorted((each.version for each in self._store.versions[flow_id]), reverse=True)
+        return tuple(FlowVersion(number, self._store.created_at[flow_id, number]) for number in numbers)
+
     def change_status(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), status=flow.status))
 
     def add_version(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), configuration=flow.configuration))
-        self._store.versions[flow.id].append(flow.configuration)
+        self._store.save_version(flow)
 
     def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
         self.add_version(flow)

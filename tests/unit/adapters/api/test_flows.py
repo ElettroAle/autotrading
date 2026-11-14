@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -181,6 +182,25 @@ def test_a_flow_is_modified_compared_commanded_and_archived(client_of: Client, p
     ]
     refused = anna.post(f"/flows/{flow_id}/archive")
     assert (refused.status_code, reason_of(refused)) == (409, {"detail": "si archivia solo un flusso fermo"})
+
+
+def test_the_versions_of_a_flow_are_listed_newest_first_with_when_each_was_saved(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    platform.flows.now = datetime(2026, 11, 14, 10, 30, tzinfo=UTC)
+    anna.patch(f"/flows/{flow_id}", json={"instructions": "audace"})
+
+    response = anna.get(f"/flows/{flow_id}/versions")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"version": 2, "created_at": "2026-11-14T10:30:00Z"},
+        {"version": 1, "created_at": "2026-01-01T00:00:00Z"},
+    ]
+    missing = client_of("bruno").get(f"/flows/{flow_id}/versions")
+    assert (missing.status_code, reason_of(missing)) == (404, {"detail": "flusso non trovato"})
 
 
 def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform) -> None:

@@ -38,6 +38,7 @@ from autotrading.application.flows.list_closed_positions import ListClosedPositi
 from autotrading.application.flows.list_cycles import ListCyclesUseCase
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsUseCase
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
+from autotrading.application.flows.list_flow_versions import ListFlowVersionsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
@@ -151,6 +152,7 @@ class TenantUseCases:
     send_test_notification: SendLinkedChatTestNotificationUseCase
     modify_flow: ModifyFlowUseCase
     get_flow_version: GetFlowVersionUseCase
+    list_flow_versions: ListFlowVersionsUseCase
     compare_flow_versions: CompareFlowVersionsUseCase
     change_flow_status: ChangeFlowStatusUseCase
     archive_flow: ArchiveFlowUseCase
@@ -205,6 +207,7 @@ class TenantUseCases:
             send_test_notification=SendLinkedChatTestNotificationUseCase(ports.linked_chats, ports.notifier),
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
+            list_flow_versions=ListFlowVersionsUseCase(ports.flows),
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
             change_flow_status=ChangeFlowStatusUseCase(ports.flows, ports.running_verifications),
             archive_flow=ArchiveFlowUseCase(ports.flows),

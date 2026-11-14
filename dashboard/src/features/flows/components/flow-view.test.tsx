@@ -16,6 +16,10 @@ describe('FlowView', () => {
 
     expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('alfa');
     expect(screen.getByText('Stato: attivo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Versioni della configurazione' })).toHaveAttribute(
+      'href',
+      '/flows/flow-alfa/versions',
+    );
   });
 
   it('leads to the cycles of the flow', async () => {
