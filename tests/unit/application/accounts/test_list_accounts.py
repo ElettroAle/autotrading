@@ -8,6 +8,7 @@ from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
+from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.flows import a_configuration, a_flow
@@ -26,9 +27,12 @@ def flows() -> FlowStore:
     return FlowStore()
 
 
-def list_accounts(store: AccountStore, flows: FlowStore, environment: str = "dev") -> list[AccountSummary]:
+def list_accounts(store: AccountStore, flows: FlowStore, *, real: bool = False) -> list[AccountSummary]:
     use_case = ListAccountsUseCase(
-        InMemoryAccountRepositoryAdapter(store, ANNA), InMemoryFlowRepositoryAdapter(flows, ANNA), environment, CURRENCY
+        InMemoryAccountRepositoryAdapter(store, ANNA),
+        InMemoryFlowRepositoryAdapter(flows, ANNA),
+        {"Hyperliquid": FakeExchangeAdapter(real=real)},
+        CURRENCY,
     )
     return use_case.execute()
 
@@ -65,12 +69,12 @@ def test_each_account_carries_the_capital_its_flows_not_archived_hold(store: Acc
     assert (summary.allocated_capital, summary.currency) == (Decimal(500), CURRENCY)
 
 
-@pytest.mark.parametrize(("environment", "network"), [("dev", ExchangeNetwork.TEST), ("prod", ExchangeNetwork.REAL)])
-def test_each_account_carries_the_network_of_the_installation(
-    store: AccountStore, flows: FlowStore, environment: str, network: ExchangeNetwork
+@pytest.mark.parametrize(("real", "network"), [(False, ExchangeNetwork.TEST), (True, ExchangeNetwork.REAL)])
+def test_each_account_carries_the_network_its_exchange_is_configured_on(
+    store: AccountStore, flows: FlowStore, real: bool, network: ExchangeNetwork
 ) -> None:
     store.accounts.append(an_account(ANNA))
 
-    [summary] = list_accounts(store, flows, environment)
+    [summary] = list_accounts(store, flows, real=real)
 
     assert summary.network is network

@@ -1,3 +1,5 @@
+"""The exchanges an account can be registered on, with their network (Bug 277)."""
+
 from collections.abc import Callable
 
 import pytest
@@ -42,7 +44,21 @@ def test_lists_the_exchanges_the_registration_of_an_account_accepts_by_name(
 
     response = client_of("anna").get("/exchanges")
 
-    assert (response.status_code, response.json()) == (200, ["Bybit", HYPERLIQUID])
+    assert (response.status_code, [exchange["name"] for exchange in response.json()]) == (200, ["Bybit", HYPERLIQUID])
+
+
+def test_lists_each_exchange_with_the_network_its_adapter_is_configured_on(
+    platform: Platform, client_of: Client
+) -> None:
+    platform.exchanges[HYPERLIQUID] = FakeExchangeAdapter(real=True)
+
+    response = client_of("anna").get("/exchanges")
+
+    assert (response.status_code, response.json()) == (200, [{"name": HYPERLIQUID, "network": "real"}])
+
+
+def test_an_exchange_on_the_test_network_is_listed_as_test(client_of: Client) -> None:
+    assert client_of("anna").get("/exchanges").json() == [{"name": HYPERLIQUID, "network": "test"}]
 
 
 def test_the_exchanges_need_an_identity(client_of: Client) -> None:

@@ -16,7 +16,11 @@ from autotrading.adapters.outbound.alternative_me.composition import alternative
 from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
-from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
+from autotrading.adapters.outbound.hyperliquid.composition import (
+    HyperliquidAdaptersOfInstallation,
+    hyperliquid_adapters,
+    hyperliquid_slippage_adapters,
+)
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
 from autotrading.adapters.outbound.libsodium.composition import libsodium_opening_adapters, libsodium_sealing_adapters
@@ -187,7 +191,6 @@ from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
     VerificationReadings,
 )
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.source_data import SourceData
@@ -202,14 +205,15 @@ def tenant_use_cases(
     sealers: tuple[
         Callable[[TenantId], SodiumCredentialSealerAdapter], Callable[[TenantId], SodiumProviderKeySealerAdapter]
     ],
-    environment: str,
+    installation: tuple[str, HyperliquidAdaptersOfInstallation],
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
     models: tuple[ModelCatalogs, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     model_catalogs, flow_models = models
     credential_sealer, provider_key_sealer = sealers
-    exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
+    environment, hyperliquid = installation
+    exchanges, markets, *_ = hyperliquid
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
@@ -280,14 +284,13 @@ def tenant_use_cases(
 def worker_use_cases(
     engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
-    environment: str,
+    installation: tuple[str, HyperliquidAdaptersOfInstallation],
     slippage: Slippage,
     messenger: MessengerPort,
 ) -> Callable[[TenantId], WorkerUseCases]:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
-    exchanges, _, order_exchanges, activity_readers, *_ = hyperliquid_adapters(
-        ExchangeNetwork.of_installation(environment)
-    )
+    environment, hyperliquid = installation
+    exchanges, _, order_exchanges, activity_readers, *_ = hyperliquid
 
     verification_failures = FailureNames(VerificationAccountNotFoundError, VerificationStepError)
 
@@ -326,7 +329,7 @@ def worker_use_cases(
 def cycle_of(
     engine: SqlAlchemyEngine,
     openers: tuple[SodiumCredentialOpenerAdapter, SodiumProviderKeyOpenerAdapter],
-    trading: tuple[str, Slippage],
+    trading: tuple[str, Slippage, HyperliquidAdaptersOfInstallation],
     messenger: MessengerPort,
     predictors: tuple[ModelGateways, PriceForecasterPort],
 ) -> Callable[[TenantId], WorkerCycle]:
@@ -334,12 +337,10 @@ def cycle_of(
 
     The clock, the models, the sources and the exchanges are the same for every tenant.
     """
-    environment, slippage = trading
+    environment, slippage, hyperliquid = trading
     models, forecaster = predictors
     opener, provider_key_opener = openers
-    exchanges, markets, order_exchanges, activity_readers, executions_readers, prices, market = hyperliquid_adapters(
-        ExchangeNetwork.of_installation(environment)
-    )
+    exchanges, markets, order_exchanges, activity_readers, executions_readers, prices, market = hyperliquid
     clock = system_clock_adapters()
     sentiments: Mapping[str, SentimentPort] = {
         SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
@@ -466,7 +467,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
-        source.environment(),
+        (source.environment(), hyperliquid_adapters(source)),
         worker_adapters(source),
         (catalogs, catalogs),
     )
@@ -479,15 +480,18 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     environment = source.environment()
     opener, provider_key_opener = libsodium_opening_adapters(source)
     slippage = hyperliquid_slippage_adapters(source)
+    hyperliquid = hyperliquid_adapters(source)
     engine = sqlalchemy_adapters(source)
     messenger, inbox, start_link = telegram_adapters(source)
-    for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
+    for_tenant = worker_use_cases(engine, opener, (environment, hyperliquid), slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
     library_gateways = litellm_adapters()
     models: ModelGateways = {**library_gateways, **openrouter_adapters()}
     predictors = (models, forecaster_adapters(source))
-    cycle_for = cycle_of(engine, (opener, provider_key_opener), (environment, slippage), messenger, predictors)
-    cycles = worker_cycles(engine, cycle_for, environment)
+    cycle_for = cycle_of(
+        engine, (opener, provider_key_opener), (environment, slippage, hyperliquid), messenger, predictors
+    )
+    cycles = worker_cycles(engine, cycle_for, hyperliquid)
     library_catalog = ReadModelCatalogUseCase(
         {name: gateway.model_catalog() for name, gateway in library_gateways.items()}
     )
@@ -515,10 +519,12 @@ type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDe
 
 
 def worker_cycles(
-    engine: SqlAlchemyEngine, cycle_for: Callable[[TenantId], WorkerCycle], environment: str
+    engine: SqlAlchemyEngine,
+    cycle_for: Callable[[TenantId], WorkerCycle],
+    hyperliquid: HyperliquidAdaptersOfInstallation,
 ) -> CyclePolling:
     """Each round plans the cycles of the flows and records the actual price beside every expired forecast (R1.3.5)."""
-    *_, prices, _ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
+    *_, prices, _ = hyperliquid
     clock = system_clock_adapters()
     planned = ThreadsPlannedFlowsAdapter()
     plan = PlanFlowCyclesUseCase(

@@ -6,6 +6,7 @@ from autotrading.application.accounts.ports import ExchangePort
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.exchange_name import ExchangeName
+from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 
 # Operations on accounts are recorded by account id; the credentials never enter a record (R0.2.3).
 operations = logging.getLogger("autotrading.accounts")
@@ -16,6 +17,11 @@ def supported_exchange(exchanges: Mapping[str, ExchangePort], exchange_name: Exc
     if exchange is None:
         raise UnsupportedExchangeError(exchange_name, exchanges)
     return exchange
+
+
+def network_of(exchanges: Mapping[str, ExchangePort], exchange_name: ExchangeName) -> ExchangeNetwork:
+    """The network the adapter of the exchange is configured on, never the name of the installation (Bug 277)."""
+    return ExchangeNetwork.of(real=supported_exchange(exchanges, exchange_name).is_real())
 
 
 def read_state_proving(exchange: ExchangePort, credentials: Credentials) -> AccountState:

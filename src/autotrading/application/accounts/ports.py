@@ -10,6 +10,10 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 
 
 class ExchangePort(Protocol):
+    def is_real(self) -> bool:
+        """True when the adapter is configured on the network that moves real money (Bug 277)."""
+        ...
+
     def read_state(self, credentials: Credentials) -> AccountState:
         """Reads balance, margin and positions, proving the credentials work on the exchange.
 

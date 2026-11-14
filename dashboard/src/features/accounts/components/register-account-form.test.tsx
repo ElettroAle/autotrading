@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
-import { REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
+import { FAKE_EXCHANGE, REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
@@ -14,11 +14,15 @@ const SECRET_LABEL = "Chiave dell'API wallet";
 
 const form = () => screen.getByRole('region', { name: 'Nuovo conto' });
 
+const chooseExchange = async (region: HTMLElement) => {
+  await within(region).findByRole('option', { name: FAKE_EXCHANGE });
+  await userEvent.selectOptions(within(region).getByLabelText('Exchange'), FAKE_EXCHANGE);
+};
+
 const fillAndSend = async ({ name = 'principale', secretKey = SECRET_KEY } = {}) => {
   const region = await screen.findByRole('region', { name: 'Nuovo conto' });
   await userEvent.type(within(region).getByLabelText('Nome'), name);
-  await within(region).findByRole('option', { name: 'hyperliquid' });
-  await userEvent.selectOptions(within(region).getByLabelText('Exchange'), 'hyperliquid');
+  await chooseExchange(region);
   await userEvent.type(within(region).getByLabelText('Indirizzo del conto'), ADDRESS);
   await userEvent.type(within(region).getByLabelText(SECRET_LABEL), secretKey);
   await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
@@ -48,12 +52,12 @@ describe('RegisterAccountForm', () => {
     const region = await screen.findByRole('region', { name: 'Nuovo conto' });
 
     const exchange = within(region).getByRole('combobox', { name: 'Exchange' });
-    expect(await within(exchange).findByRole('option', { name: 'hyperliquid' })).toBeEnabled();
+    expect(await within(exchange).findByRole('option', { name: FAKE_EXCHANGE })).toBeEnabled();
     expect(
       within(exchange)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Scegli un exchange', 'hyperliquid']);
+    ).toEqual(['Scegli un exchange', FAKE_EXCHANGE]);
     expect(exchange).toHaveValue('');
   });
 
@@ -126,7 +130,7 @@ describe('RegisterAccountForm', () => {
     server.use(http.post('*/accounts', sent));
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const region = await screen.findByRole('region', { name: 'Nuovo conto' });
-    await within(region).findByRole('option', { name: 'hyperliquid' });
+    await within(region).findByRole('option', { name: FAKE_EXCHANGE });
 
     await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
 
@@ -136,5 +140,25 @@ describe('RegisterAccountForm', () => {
       );
     }
     expect(sent).not.toHaveBeenCalled();
+  });
+
+  it('offers the exchanges the API lists and warns when the chosen one trades real money', async () => {
+    fakePlatform.configureExchangeNetwork('real');
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    expect(within(region).queryByRole('note')).not.toBeInTheDocument();
+    await chooseExchange(region);
+
+    expect(within(region).getByRole('note')).toHaveTextContent('Il conto opererà con denaro reale');
+  });
+
+  it('says nothing of real money for an exchange on the test network', async () => {
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    await chooseExchange(region);
+
+    expect(within(region).queryByRole('note')).not.toBeInTheDocument();
   });
 });

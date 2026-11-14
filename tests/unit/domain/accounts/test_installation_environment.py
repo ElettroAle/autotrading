@@ -1,7 +1,6 @@
 import pytest
 
 from autotrading.domain.accounts.errors import UndeclaredEnvironmentError, UnsupportedEnvironmentError
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.installation_environment import InstallationEnvironment
 
 
@@ -25,13 +24,3 @@ def test_no_other_environment_is_supported(text: str) -> None:
 
     assert raised.value.environment == text
     assert str(raised.value) == "ambiente non ammesso: sono ammessi dev e prod"
-
-
-@pytest.mark.parametrize(
-    ("environment", "network"),
-    [(InstallationEnvironment.DEV, ExchangeNetwork.TEST), (InstallationEnvironment.PROD, ExchangeNetwork.REAL)],
-)
-def test_the_network_follows_the_declared_environment(
-    environment: InstallationEnvironment, network: ExchangeNetwork
-) -> None:
-    assert ExchangeNetwork.of_installation(environment) is network

@@ -20,9 +20,9 @@ const CREDENTIALS_REQUIRED = 'credenziali obbligatorio';
 const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   id: account.id,
   name: account.name,
-  exchange: 'Hyperliquid',
+  exchange: FAKE_EXCHANGE,
   has_credentials: true,
-  network: 'test',
+  network: fakePlatform.exchangeNetwork(),
   allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
   currency: CURRENCY,
 });
@@ -101,7 +101,12 @@ export const accountHandlers = [
   http.get('*/exchanges', ({ request }) =>
     withUser(request, () =>
       fakePlatform.listsExchanges()
-        ? HttpResponse.json(FAKE_SUPPORTED_EXCHANGES)
+        ? HttpResponse.json(
+            FAKE_SUPPORTED_EXCHANGES.map((name) => ({
+              name,
+              network: fakePlatform.exchangeNetwork(),
+            })),
+          )
         : problem(500, 'Internal Server Error', 'errore interno'),
     ),
   ),

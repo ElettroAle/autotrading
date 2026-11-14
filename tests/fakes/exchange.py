@@ -32,12 +32,16 @@ def rejection_message(credentials: Credentials) -> str:
 class FakeExchangeAdapter:
     """An exchange that knows which credentials it accepts and the state of each account behind them."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, real: bool = False) -> None:
+        self._real = real
         self._states: dict[Credentials, AccountState] = {}
         self.reachable = True
         self.requests: list[Credentials] = []
         self.shown: dict[Credentials, list[AccountState]] = {}
         self._orders: FakeOrderExchangeAdapter | None = None
+
+    def is_real(self) -> bool:
+        return self._real
 
     def trades_on(self, orders: FakeOrderExchangeAdapter) -> None:
         """The same exchange for orders: the positions it holds for an account are part of its state."""

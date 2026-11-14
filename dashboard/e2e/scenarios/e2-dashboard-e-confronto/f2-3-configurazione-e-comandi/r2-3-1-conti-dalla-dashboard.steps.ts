@@ -13,6 +13,15 @@ const OTHER_SECRET_KEY = `0x${'7c'.repeat(32)}`;
 const REJECTED_ACCOUNT = 'rifiutato';
 const CONFIRM_REMOVAL = 'Conferma la rimozione';
 const REMOVAL_WITH_FLOWS = 'il conto ha flussi attivi o in pausa che verranno fermati: ';
+const REAL_MONEY = 'Il conto opererà con denaro reale';
+
+const registrationForm = (dashboard: DashboardPages) =>
+  dashboard.page.getByRole('region', { name: 'Nuovo conto' });
+
+// The exchanges come from the API, each with the network it trades on (Bug 277).
+const chooseExchange = async (dashboard: DashboardPages, exchange: string): Promise<void> => {
+  await dashboard.field('Exchange', registrationForm(dashboard)).selectOption(exchange);
+};
 
 // The user acting in a step is the one the background signed in on the page of the accounts.
 const expectSignedIn = (memory: ScenarioMemory, account: string): void => {
@@ -26,9 +35,9 @@ const registerAccount = async (
   secretKey: string,
 ): Promise<void> => {
   memory.secret = secretKey;
-  const form = dashboard.page.getByRole('region', { name: 'Nuovo conto' });
+  const form = registrationForm(dashboard);
   await dashboard.field('Nome', form).fill(name);
-  await dashboard.field('Exchange', form).selectOption(FAKE_EXCHANGE);
+  await chooseExchange(dashboard, FAKE_EXCHANGE);
   await dashboard.field('Indirizzo del conto', form).fill(VALID_ADDRESS);
   await dashboard.field("Chiave dell'API wallet", form).fill(secretKey);
   await form.getByRole('button', { name: 'Registra il conto' }).click();
@@ -85,11 +94,33 @@ When(
   "{string} registra il conto {string} su testnet con indirizzo e chiave dell'API wallet validi",
   async ({ dashboard, memory }, account: string, name: string) => {
     expectSignedIn(memory, account);
-    // The network of the accounts is the one of the installation: dev trades on the testnet (R0.2.1).
-    await expect(dashboard.environment()).toHaveText('dev');
+    // The network is the one the exchange is configured on: on the testnet nothing warns of real money (Bug 277).
+    expect(fakePlatform.exchangeNetwork()).toBe('test');
     await registerAccount(dashboard, memory, name, VALID_SECRET_KEY);
+    await expect(registrationForm(dashboard).getByRole('note')).toHaveCount(0);
   },
 );
+
+Given(
+  "che l'exchange {string} è configurato sulla rete reale",
+  async ({ dashboard }, exchange: string) => {
+    expect(exchange).toBe(FAKE_EXCHANGE);
+    fakePlatform.configureExchangeNetwork('real');
+    await dashboard.openAccounts();
+  },
+);
+
+When(
+  "{string} sceglie l'exchange {string} per registrare un conto",
+  async ({ dashboard, memory }, account: string, exchange: string) => {
+    expectSignedIn(memory, account);
+    await chooseExchange(dashboard, exchange);
+  },
+);
+
+Then('la registrazione avvisa che il conto opererà con denaro reale', async ({ dashboard }) => {
+  await expect(registrationForm(dashboard).getByRole('note')).toHaveText(REAL_MONEY);
+});
 
 When(
   "{string} registra un conto con una chiave che l'exchange rifiuta",
