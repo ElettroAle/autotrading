@@ -1,6 +1,8 @@
+import type { FakeCycle } from './cycles';
+
 /**
- * The platform behind the fakes: the users of the identity provider, their role and the flows of their tenant.
- * Unit tests and scenarios prepare it; the fake identity provider and the fake API read it.
+ * The platform behind the fakes: the users of the identity provider, their role, the flows of their tenant and the
+ * cycles of each flow. Unit tests and scenarios prepare it; the fake identity provider and the fake API read it.
  */
 export type FakeFlow = { readonly id: string; readonly name: string; readonly status: string };
 
@@ -15,15 +17,19 @@ const TOKEN_PREFIX = 'fake-access-token-';
 
 const state = {
   users: new Map<string, FakeUser>(),
+  cycles: new Map<string, FakeCycle[]>(),
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
 };
+
+const flowIdOf = (name: string): string => `flow-${name}`;
 
 export const accessTokenOf = (account: string): string => `${TOKEN_PREFIX}${account}`;
 
 export const fakePlatform = {
   reset(): void {
     state.users.clear();
+    state.cycles.clear();
     state.signingIn = undefined;
     state.sessionsExpired = false;
   },
@@ -37,9 +43,27 @@ export const fakePlatform = {
     if (user === undefined) {
       throw new Error(`unknown fake user ${account}`);
     }
-    const flow = { id: `flow-${name}`, name, status: 'attivo' };
+    const flow = { id: flowIdOf(name), name, status: 'attivo' };
     user.flows.push(flow);
     return flow;
+  },
+
+  /** The flow belongs to the account, which has the Utente role: both are created when missing. */
+  giveFlowTo(account: string, name: string): FakeFlow {
+    if (!state.users.has(account)) {
+      this.addUser(account, { hasUserRole: true });
+    }
+    const owned = state.users.get(account)?.flows.find((flow) => flow.name === name);
+    return owned ?? this.addFlow(account, name);
+  },
+
+  /** The cycles recorded for the flow with the name, in any order: the fake API serves them from the most recent. */
+  recordCycles(flowName: string, cycles: FakeCycle[]): void {
+    state.cycles.set(flowIdOf(flowName), cycles);
+  },
+
+  cyclesOf(flowId: string): FakeCycle[] {
+    return state.cycles.get(flowId) ?? [];
   },
 
   flowNamed(name: string): FakeFlow {

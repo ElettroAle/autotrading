@@ -51,6 +51,8 @@ export default defineConfig({
           globals: true,
           include: ['src/**/*.test.{ts,tsx}'],
           setupFiles: ['./src/testing/setup-tests.ts'],
+          // Instants show in the time zone of the browser: the tests read them in Italy, as the scenarios do.
+          env: { TZ: 'Europe/Rome' },
         },
       },
       {

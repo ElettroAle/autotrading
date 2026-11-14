@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw';
 
-import { fakePlatform, type FakeFlow } from './platform';
+import { summaryOf, type FakeCycle } from './cycles';
+import { fakePlatform, type FakeFlow, type FakeUser } from './platform';
 
 const BEARER = 'Bearer ';
+const CYCLES_PER_PAGE = 50;
 
 // Answers as the API does: Problem Details, 401 without a valid token, 403 without the Utente role (R0.1.1).
 const problem = (status: number, title: string, detail: string) =>
@@ -52,6 +54,40 @@ const flowResponse = (flow: FakeFlow) => ({
   bring_to_minimum: false,
 });
 
+const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
+  [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
+
+// A flow of another tenant does not exist for the user, as on the API (R0.1.3).
+const withFlow = (
+  user: FakeUser,
+  flowId: string,
+  respond: (cycles: FakeCycle[]) => Response,
+): Response => {
+  if (!user.flows.some((flow) => flow.id === flowId)) {
+    return problem(404, 'Not Found', 'flusso non trovato');
+  }
+  return respond(fakePlatform.cyclesOf(flowId));
+};
+
+const cyclePage = (cycles: FakeCycle[], page: number) => {
+  const start = (page - 1) * CYCLES_PER_PAGE;
+  const sorted = newestFirst(cycles);
+  return {
+    page,
+    has_next: sorted.length > start + CYCLES_PER_PAGE,
+    cycles: sorted.slice(start, start + CYCLES_PER_PAGE).map(summaryOf),
+  };
+};
+
+const cycleAt = (cycles: FakeCycle[], plannedAt: string): Response => {
+  const cycle = cycles.find(
+    (candidate) => Date.parse(candidate.planned_at) === Date.parse(plannedAt),
+  );
+  return cycle === undefined
+    ? problem(404, 'Not Found', 'ciclo non trovato')
+    : HttpResponse.json(cycle);
+};
+
 export const handlers = [
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
@@ -60,5 +96,19 @@ export const handlers = [
   ),
   http.get('*/flows', ({ request }) =>
     withUser(request, (user) => HttpResponse.json(user.flows.map(flowResponse))),
+  ),
+  http.get('*/flows/:flowId/cycles', ({ request, params }) =>
+    withUser(request, (user) =>
+      withFlow(user, String(params.flowId), (cycles) =>
+        HttpResponse.json(
+          cyclePage(cycles, Number(new URL(request.url).searchParams.get('page') ?? '1')),
+        ),
+      ),
+    ),
+  ),
+  http.get('*/flows/:flowId/cycles/:plannedAt', ({ request, params }) =>
+    withUser(request, (user) =>
+      withFlow(user, String(params.flowId), (cycles) => cycleAt(cycles, String(params.plannedAt))),
+    ),
   ),
 ];

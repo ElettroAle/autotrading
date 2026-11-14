@@ -20,7 +20,13 @@ export default defineConfig({
   forbidOnly: true,
   fullyParallel: true,
   reporter: [['list'], cucumberReporter('json', { outputFile: 'reports/cucumber.json' })],
-  use: { ...devices['Desktop Chrome'], baseURL: ORIGIN, trace: 'retain-on-failure' },
+  // The dashboard shows instants in the time zone of the browser: the scenarios read times of a day in Italy.
+  use: {
+    ...devices['Desktop Chrome'],
+    baseURL: ORIGIN,
+    timezoneId: 'Europe/Rome',
+    trace: 'retain-on-failure',
+  },
   // The build of the image, served by the server of the image, configured as an installation dev (ADR 0117).
   webServer: {
     command: 'npx vite build && node server/main.ts',
