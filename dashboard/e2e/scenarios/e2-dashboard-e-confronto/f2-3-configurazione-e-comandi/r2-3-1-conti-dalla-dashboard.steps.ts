@@ -94,10 +94,10 @@ When(
   "{string} registra il conto {string} su testnet con indirizzo e chiave dell'API wallet validi",
   async ({ dashboard, memory }, account: string, name: string) => {
     expectSignedIn(memory, account);
-    // The network is the one the exchange is configured on: on the testnet the notice names the test network (R2.3.10).
+    // The network is the one the exchange is configured on: on the testnet nothing warns of real money (Bug 277).
     expect(fakePlatform.exchangeNetwork()).toBe('test');
     await registerAccount(dashboard, memory, name, VALID_SECRET_KEY);
-    await expect(registrationForm(dashboard).getByRole('note')).toContainText('rete di test');
+    await expect(registrationForm(dashboard).getByRole('note')).toHaveCount(0);
   },
 );
 
