@@ -66,6 +66,7 @@ from autotrading.application.flows.ports import (
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
 from autotrading.application.flows.query_cycle_history import QueryCycleHistoryUseCase
 from autotrading.application.flows.query_order_history import QueryOrderHistoryUseCase
+from autotrading.application.flows.rank_flows import RankFlowsUseCase
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
@@ -193,6 +194,7 @@ class TenantUseCases:
     query_order_history: QueryOrderHistoryUseCase
     export_flow_strategy: ExportFlowStrategyUseCase
     import_flow_strategy: ImportFlowStrategyUseCase
+    rank_flows: RankFlowsUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -277,5 +279,8 @@ class TenantUseCases:
             export_flow_strategy=ExportFlowStrategyUseCase(ports.flows),
             import_flow_strategy=ImportFlowStrategyUseCase(
                 tenant_id, ports.flows, ports.flow_checks.models, ports.flow_checks.sources
+            ),
+            rank_flows=RankFlowsUseCase(
+                ports.flows, ports.equity_snapshots, ports.closed_positions, ports.cycle_history, ports.clock
             ),
         )

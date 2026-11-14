@@ -262,3 +262,10 @@ class StrategyModelMissingError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("modello mancante")
+
+
+class RankingWithoutEquityError(DomainError):
+    """A flow enters the ranking of a period only with a cycle in it (R2.4.2)."""
+
+    def __init__(self) -> None:
+        super().__init__("nessun ciclo del flusso nel periodo della classifica")
