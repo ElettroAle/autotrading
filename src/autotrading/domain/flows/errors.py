@@ -121,6 +121,26 @@ class ArchivedFlowNotModifiableError(DomainError):
         super().__init__("un flusso archiviato non si modifica")
 
 
+class FlowAssignmentMissingError(DomainError):
+    """Only a draft lacks account, allocated capital or assets: any other flow trades with them (ADR 0124)."""
+
+    status_code = 409
+
+    def __init__(self, missing: tuple[str, ...]) -> None:
+        listed = missing[0] if len(missing) == 1 else ", ".join(missing[:-1]) + " e " + missing[-1]
+        super().__init__(f"{listed} {'mancante' if len(missing) == 1 else 'mancanti'}")
+        self.missing = missing
+
+
+class FlowNotDraftError(DomainError):
+    """Account, capital and assets of a flow already out of draft change only through their own commands."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("conto, capitale e asset si assegnano solo a un flusso in bozza")
+
+
 class AccountNotChangeableError(DomainError):
     status_code = 422
 

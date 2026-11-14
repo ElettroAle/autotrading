@@ -47,7 +47,7 @@ def a_request(flow: Flow, coin: str = "BTC", *, reduce_only: bool = False) -> Or
     opening = MarketOrder.opening(coin, Direction.LONG, Decimal("0.0002"), Slippage.default())
     market_order = replace(opening, reduce_only=reduce_only)
     link = FlowLink(flow.id.value, CYCLE_PLANNED_AT, coin)
-    return OrderRequest(flow.account_id, OrderSource(OrderOrigin.FLOW, flow=link), 2, market_order)
+    return OrderRequest(flow.assigned_account_id, OrderSource(OrderOrigin.FLOW, flow=link), 2, market_order)
 
 
 def executed(request: OrderRequest, *, later_by: timedelta = timedelta(0), price: str = "100030.5") -> Order:

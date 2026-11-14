@@ -110,6 +110,13 @@ class FlowRepositoryPort(Protocol):
         """Saves, together, the version with the new capital and the change in its history. Raises FlowNotFoundError."""
         ...
 
+    def add_assignment(self, flow: Flow) -> None:
+        """Saves, together, the account of the draft and the version with its capital and assets (ADR 0124).
+
+        Raises FlowNotFoundError, or FlowAccountNotFoundError when the account is not of the tenant any more.
+        """
+        ...
+
     def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
         """The changes of the capital allocated to the flow, oldest first. Raises FlowNotFoundError."""
         ...

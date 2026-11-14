@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { summaryOf, type FakeCycle } from './cycles';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import {
+  FakeRefusal,
   fakePlatform,
   type FakeConfiguration,
   type FakeEquityPoint,
@@ -34,7 +35,10 @@ const userOf = (request: Request) => {
     : undefined;
 };
 
-const withUser = (request: Request, respond: (user: FakeUser) => Response) => {
+const withUser = async (
+  request: Request,
+  respond: (user: FakeUser) => Response | Promise<Response>,
+): Promise<Response> => {
   const user = userOf(request);
   if (user === undefined) {
     return problem(401, 'Unauthorized', 'token assente o non valido');
@@ -42,7 +46,14 @@ const withUser = (request: Request, respond: (user: FakeUser) => Response) => {
   if (!user.hasUserRole) {
     return problem(403, 'Forbidden', 'ruolo Utente assente');
   }
-  return respond(user);
+  try {
+    return await respond(user);
+  } catch (error) {
+    if (error instanceof FakeRefusal) {
+      return problem(error.status, 'Refused', error.message);
+    }
+    throw error;
+  }
 };
 
 // A flow of another tenant is not found, as one that does not exist (R0.1.3).
@@ -101,24 +112,13 @@ const cycleAt = (cycles: FakeCycle[], plannedAt: string): Response => {
 };
 
 const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => ({
-  initial_capital: flow.initialCapital,
+  // A draft has no capital, and no cycle yet (ADR 0124).
+  initial_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
   points: flow.equity
     .filter((point: FakeEquityPoint) => admits(point.plannedAt))
     .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime())
     .map((point) => ({ planned_at: point.plannedAt.toISOString(), equity: String(point.equity) })),
 });
-
-const flowResponse = (flow: FakeFlow) => {
-  const current = flow.versions.at(-1);
-  return {
-    id: flow.id,
-    name: flow.name,
-    account_id: 'account-1',
-    status: flow.status,
-    version: current?.number,
-    ...(current && configurationResponse(current.configuration)),
-  };
-};
 
 // The parts the API compares, with the same names and texts (R1.1.3): the fake never compares in another way.
 const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
@@ -134,6 +134,28 @@ const differences = (before: FakeConfiguration, after: FakeConfiguration) =>
   PARTS.map(([part, text]) => ({ part, before: text(before), after: text(after) })).filter(
     (difference) => difference.before !== difference.after,
   );
+
+const flowResponse = (flow: FakeFlow) => ({
+  id: flow.id,
+  name: flow.name,
+  account_id: flow.accountId,
+  status: flow.status,
+  version: flow.version,
+  assets: flow.assets,
+  cycle_minutes: flow.cycleMinutes,
+  model: { name: flow.model, parameters: {} },
+  sources: flow.sources.map((source) => ({ ...source, parameters: {} })),
+  instructions: '',
+  risk_limits: {
+    max_leverage: 3,
+    max_margin_exposure_percent: '10',
+    max_value_exposure_percent: null,
+  },
+  allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
+  bring_to_minimum: false,
+});
+
+type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
 
 export const handlers = [
   http.get('*/me', ({ request }) =>
@@ -252,5 +274,42 @@ export const handlers = [
         throw error;
       }
     }),
+  ),
+  http.get('*/accounts', ({ request }) =>
+    withUser(request, (user) =>
+      HttpResponse.json(
+        user.accounts.map((account) => ({
+          id: account.id,
+          name: account.name,
+          exchange: 'Hyperliquid',
+          has_credentials: true,
+        })),
+      ),
+    ),
+  ),
+  http.post('*/flows/:flowId/duplicate', ({ request, params }) =>
+    withUser(request, (user) =>
+      HttpResponse.json(flowResponse(fakePlatform.duplicate(user, String(params.flowId))), {
+        status: 201,
+      }),
+    ),
+  ),
+  http.put('*/flows/:flowId/assignment', ({ request, params }) =>
+    withUser(request, async (user) => {
+      const body = (await request.json()) as AssignmentRequest;
+      const assignment = {
+        accountId: body.account_id,
+        allocatedCapital: Number(body.allocated_capital),
+        assets: body.assets ?? [],
+      };
+      return HttpResponse.json(
+        flowResponse(fakePlatform.assign(user, String(params.flowId), assignment)),
+      );
+    }),
+  ),
+  http.post('*/flows/:flowId/start', ({ request, params }) =>
+    withUser(request, (user) =>
+      HttpResponse.json(flowResponse(fakePlatform.start(user, String(params.flowId)))),
+    ),
   ),
 ];

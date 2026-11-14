@@ -69,7 +69,7 @@ class CycleFlow:
         """The state of the flow alone, as the agent and the record of the cycle see it (R1.4.3)."""
         return FlowStateView(
             currency=self.account.currency,
-            allocated_capital=self.configuration.allocated_capital,
+            allocated_capital=self.configuration.assigned_capital,
             funds=self.attributed.funds,
             available_liquidity=self.available_liquidity,
             total_value=self.total_value,

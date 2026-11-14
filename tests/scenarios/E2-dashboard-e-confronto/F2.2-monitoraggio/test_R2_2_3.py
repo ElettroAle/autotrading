@@ -43,6 +43,11 @@ class Curve:
         assert self.seen is not None, "nessuna equity curve aperta"
         return self.seen
 
+    @property
+    def baseline(self) -> Decimal:
+        assert self.opened.initial_capital is not None, "la curva di una bozza non ha capitale iniziale"
+        return self.opened.initial_capital
+
 
 @pytest.fixture(name="flow_cycles")
 def flow_cycles_of_the_worker() -> FlowCycles:
@@ -68,7 +73,7 @@ def attribute(
     opened_at = flow_cycles.clock.now() - timedelta(minutes=10)
     orders = (uuid4(), uuid4())
     for order in orders:
-        platform.platform_orders.add(order, flow.account_id, flow.id)
+        platform.platform_orders.add(order, flow.assigned_account_id, flow.id)
     platform.activity_reader.executions.setdefault(address, []).extend(
         (
             a_fill("BTC", orders[0], fill_id=f"{orders[0]}-1", executed_at=opened_at),
@@ -131,7 +136,7 @@ def initial_capital(flow_cycles: FlowCycles, flow: str, a: str) -> None:
 def last_three_cycles(flow_cycles: FlowCycles, a: str, b: str, c: str) -> None:
     flow = flow_cycles.platform.flows.flows[-1]
     equity = equity_of(flow_cycles, flow)
-    capital = flow.configuration.allocated_capital
+    capital = flow.configuration.assigned_capital
     for index, value in enumerate((a, b, c)):
         planned_at = at("09:15") + index * CYCLE
         pnl = Decimal(value) - capital
@@ -142,7 +147,7 @@ def last_three_cycles(flow_cycles: FlowCycles, a: str, b: str, c: str) -> None:
 def cycles_of_sixty_days(flow_cycles: FlowCycles, flow: str) -> None:
     created = flow_cycles.flow(flow)
     equity = equity_of(flow_cycles, created)
-    capital = created.configuration.allocated_capital
+    capital = created.configuration.assigned_capital
     for days_ago in range(1, 61):
         planned_at = flow_cycles.clock.now() - timedelta(days=days_ago)
         equity.record(
@@ -185,7 +190,7 @@ def completed_cycle(flow_cycles: FlowCycles, *, flow: str, a: str, b: str, c: st
 
 @when(step(r'un ciclo del flusso "{flow}" fallisce dopo la lettura dello stato con equity {a} USDC'))
 def failed_cycle(flow_cycles: FlowCycles, flow: str, a: str) -> None:
-    capital = flow_cycles.flow(flow).configuration.allocated_capital
+    capital = flow_cycles.flow(flow).configuration.assigned_capital
     attribute(flow_cycles, flow, realized_pnl=amount(a) - capital, unrealized_pnl=Decimal(0), fee=Decimal(0))
     flow_cycles.model.failure = FakeTransientError("il modello non risponde")
     flow_cycles.run(flow, "10:00")
@@ -203,12 +208,12 @@ def cycle_equity(flow_cycles: FlowCycles, a: str) -> None:
 
 @then(parsers.re(r"^i punti a (?P<values>[\d e]+) USDC sono nell'area verde$"))
 def points_in_the_green(curve: Curve, values: str) -> None:
-    assert all(point.equity >= curve.opened.initial_capital for point in points_at(curve, values))
+    assert all(point.equity >= curve.baseline for point in points_at(curve, values))
 
 
 @then(parsers.re(r"^il punto a (?P<values>\d+) USDC è nell'area rossa$"))
 def point_in_the_red(curve: Curve, values: str) -> None:
-    assert all(point.equity < curve.opened.initial_capital for point in points_at(curve, values))
+    assert all(point.equity < curve.baseline for point in points_at(curve, values))
 
 
 @then("la curva mostra solo i punti degli ultimi 30 giorni")

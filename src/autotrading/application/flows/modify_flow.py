@@ -99,16 +99,16 @@ class ModifyFlowUseCase:
         )
 
     def _require_assets_admitted(self, flow: Flow, assets: tuple[str, ...]) -> None:
-        account = read_flow_account(self._checks.accounts, flow.account_id)
+        account = read_flow_account(self._checks.accounts, flow.assigned_account_id)
         require_tradable(self._checks.markets, account.exchange, assets)
-        require_assets_free(flow.account_id, assets, self._flows.list(), excluding=flow.id)
+        require_assets_free(flow.assigned_account_id, assets, self._flows.list(), excluding=flow.id)
 
     def _require_removed_without_position(self, flow: Flow, assets: tuple[str, ...]) -> None:
         removed = tuple(asset for asset in flow.configuration.assets if asset not in assets)
         if not removed:
             return
         # What the exchange shows of the account decides, as for the state of the flow (R1.6.1, ADR 0067).
-        open_assets = self._activity.execute(flow.account_id).open_assets
+        open_assets = self._activity.execute(flow.assigned_account_id).open_assets
         held = tuple(asset for asset in removed if asset in open_assets)
         if held:
             raise AssetWithOpenPositionError(held)

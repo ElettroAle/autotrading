@@ -73,7 +73,7 @@ class Flows:
         self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)
         self.running_verifications: RunningVerifications = set()
         self.verifications = InMemoryRunningVerificationsAdapter(self.running_verifications)
-        self.change_status = ChangeFlowStatusUseCase(self.repository, self.verifications)
+        self.change_status = ChangeFlowStatusUseCase(self.repository, self.verifications, self.accounts.ports())
         self.archive = ArchiveFlowUseCase(self.repository)
         self.get_version = GetFlowVersionUseCase(self.repository)
         self.compare = CompareFlowVersionsUseCase(self.repository)
@@ -344,7 +344,7 @@ def test_a_flow_does_not_trade_while_the_procedure_runs_on_one_of_its_assets(
     flows: Flows, status: FlowStatus, command: FlowAction
 ) -> None:
     flow = flows.saved(status=status, assets=("ETH", "BTC"))
-    flows.running_verifications.add((flow.account_id, "BTC"))
+    flows.running_verifications.add((flow.assigned_account_id, "BTC"))
 
     with pytest.raises(AssetUnderVerificationError) as raised:
         flows.change_status.execute(ChangeFlowStatusCommand(flow.id, command))
@@ -366,7 +366,7 @@ def test_the_assets_of_a_flow_that_starts_are_kept_free_of_procedures_while_its_
 def test_a_pause_never_waits_for_the_procedure(flows: Flows) -> None:
     flow = flows.saved()
     flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
-    flows.running_verifications.add((flow.account_id, "BTC"))
+    flows.running_verifications.add((flow.assigned_account_id, "BTC"))
 
     paused = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.PAUSE))
 

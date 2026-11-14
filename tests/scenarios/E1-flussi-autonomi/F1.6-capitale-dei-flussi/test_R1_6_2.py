@@ -50,7 +50,7 @@ def telegram_linked(flow_cycles: FlowCycles) -> None:
 @given(step(r'che il flusso "{flow}" ha aperto {a} "{asset}" con i propri ordini'))
 def opened_by_flow(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> None:
     order, owner = uuid4(), flow_cycles.flow(flow)
-    flow_cycles.platform.platform_orders.add(order, owner.account_id, owner.id)
+    flow_cycles.platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
     address = flow_cycles.credentials_of(flow).account_address
     opening = a_fill(asset, order, size=amount(a), executed_at=READ_AT - timedelta(minutes=10))
     flow_cycles.platform.activity_reader.executions.setdefault(address, []).append(opening)
@@ -61,7 +61,7 @@ def opened_by_flow(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> No
 )
 def opened_late(flow_cycles: FlowCycles, flow: str, a: str, asset: str) -> None:
     order, owner = uuid4(), flow_cycles.flow(flow)
-    flow_cycles.platform.platform_orders.add(order, owner.account_id, owner.id)
+    flow_cycles.platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
     address = flow_cycles.credentials_of(flow).account_address
     late = a_fill(asset, order, size=amount(a), fill_id="2", executed_at=READ_AT - timedelta(minutes=5))
     flow_cycles.platform.activity_reader.late.setdefault(address, []).append(late)
@@ -83,7 +83,7 @@ def position_of_no_flow(bench: AttributionBench, account: str, asset: str) -> No
 
 @given(step(r'che il flusso "{flow}" aveva una posizione aperta su "{asset}"'))
 def position_seen_open(bench: AttributionBench, flow: str, asset: str) -> None:
-    bench.previous_reading(bench.flow(flow).account_id, {flow: frozenset({asset})})
+    bench.previous_reading(bench.flow(flow).assigned_account_id, {flow: frozenset({asset})})
 
 
 @given(step(r'che sull\'exchange la posizione su "{asset}" non c\'è più'))

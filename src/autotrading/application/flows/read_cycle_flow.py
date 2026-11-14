@@ -37,7 +37,7 @@ class ReadCycleFlowUseCase:
 
     def execute(self, command: ReadCycleFlowCommand) -> CycleFlow:
         flow = self._flows.get(command.flow_id)
-        reading = self._read_account.execute(flow.account_id)
+        reading = self._read_account.execute(flow.assigned_account_id)
         attributed = self._read_state.execute(ReadCycleFlowStateCommand(flow.id, command.reconciled))
         started_at = self._timing.timings().get(flow.id, UNSTAMPED).beginning(command.anchor)
         return CycleFlow(flow.tenant_id, flow, reading.name, reading.exchange, started_at, reading.account, attributed)

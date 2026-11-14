@@ -65,7 +65,7 @@ class StopFlowUseCase:
 
     def _close(self, flow: Flow, asset: str, command: StopFlowCommand) -> PositionLeftOpen | None:
         closing = _closing_of(
-            asset, self._ports.positions.execute(PositionToClose(flow.account_id, asset, command.user_id))
+            asset, self._ports.positions.execute(PositionToClose(flow.assigned_account_id, asset, command.user_id))
         )
         if closing is None:
             return None

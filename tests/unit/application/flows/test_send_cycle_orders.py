@@ -41,7 +41,9 @@ def test_the_orders_go_to_the_account_of_the_flow_with_its_name() -> None:
 
     assert sent == ("inviato",)
     assert execution.cycles == [
-        CycleOrders(FLOW.account_id, FLOW.id.value, FLOW.name.value, PLANNED_AT, (opening, ApprovedClose("ETH")))
+        CycleOrders(
+            FLOW.assigned_account_id, FLOW.id.value, FLOW.name.value, PLANNED_AT, (opening, ApprovedClose("ETH"))
+        )
     ]
 
 

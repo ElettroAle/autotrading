@@ -50,7 +50,7 @@ class FlowState:
         return cls(
             flow_id=flow.id,
             currency=activity.currency,
-            allocated_capital=flow.configuration.allocated_capital,
+            allocated_capital=flow.configuration.assigned_capital,
             positions=flow.configuration.held(activity.positions, lambda position: position.asset),
             realized_pnl=totals.realized_pnl,
             fees=totals.fees,

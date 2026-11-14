@@ -49,7 +49,7 @@ class RecordAccountExecutionsUseCase:
             raise FlowLedgerIncompleteError(account_id)
         known = LedgerKeys() if since is None else self._ledger.recorded_since(account_id, since)
         unknown = known.unknown_in(window)
-        flows = [flow for flow in self._flows.list() if flow.account_id == account_id]
+        flows = [flow for flow in self._flows.list() if flow.belongs_to(account_id)]
         ledger = AccountLedger.attributed(
             flows,
             unknown,

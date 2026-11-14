@@ -21,7 +21,8 @@ class FlowAction(StrEnum):
 
 
 _STARTS_FROM = {
-    FlowAction.START: frozenset({FlowStatus.STOPPED}),
+    # A draft starts once account, capital and assets are assigned: the flow refuses it otherwise (ADR 0124).
+    FlowAction.START: frozenset({FlowStatus.STOPPED, FlowStatus.DRAFT}),
     FlowAction.PAUSE: frozenset({FlowStatus.ACTIVE}),
     FlowAction.RESUME: frozenset({FlowStatus.PAUSED}),
     # A paused flow still holds its positions: stopping it closes them like for an active one (R1.1.5).

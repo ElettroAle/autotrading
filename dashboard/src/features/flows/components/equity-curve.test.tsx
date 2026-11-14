@@ -14,7 +14,7 @@ const curve = async () => screen.findByRole('figure', { name: 'Equity curve' });
 describe('EquityCurve', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
-    fakePlatform.addFlow('anna', 'alfa', undefined, { initialCapital: '300' });
+    fakePlatform.addFlow('anna', 'alfa', { allocatedCapital: 300 });
   });
 
   it('draws a point for each cycle of the whole life of the flow by default', async () => {
@@ -94,6 +94,13 @@ describe('EquityCurve', () => {
 
     expect(await screen.findByText('Nessun ciclo ancora eseguito')).toBeInTheDocument();
     expect(screen.queryByRole('figure', { name: 'Equity curve' })).not.toBeInTheDocument();
+  });
+
+  it('shows no curve for a draft, which has no capital and no cycle yet', async () => {
+    fakePlatform.addFlow('anna', 'bozza', { status: 'bozza', allocatedCapital: null });
+    await renderApp({ account: 'anna', url: '/flows/flow-bozza' });
+
+    expect(await screen.findByText('Nessun ciclo ancora eseguito')).toBeInTheDocument();
   });
 
   it('says when no cycle falls in the period', async () => {

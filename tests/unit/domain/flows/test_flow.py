@@ -8,6 +8,7 @@ from autotrading.domain.flows.errors import (
     AllocatedCapitalNotPositiveError,
     AssetsRequiredError,
     CapitalAboveFreeCapitalError,
+    FlowAssignmentMissingError,
     RepeatedSourceError,
 )
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
@@ -31,9 +32,9 @@ def test_at_least_one_asset_is_required(names: list[str]) -> None:
         assets_of(names)
 
 
-def test_a_configuration_without_assets_is_refused() -> None:
-    with pytest.raises(AssetsRequiredError):
-        a_configuration(assets=())
+def test_a_flow_out_of_draft_without_assets_is_refused() -> None:
+    with pytest.raises(FlowAssignmentMissingError, match=r"^asset mancante$"):
+        a_flow(TenantId.new(), configuration=a_configuration(assets=()))
 
 
 def test_a_source_cannot_appear_twice() -> None:

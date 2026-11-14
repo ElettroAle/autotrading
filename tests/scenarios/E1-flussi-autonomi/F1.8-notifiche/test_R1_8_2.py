@@ -153,11 +153,11 @@ def position_closes_for(flow_cycles: FlowCycles, asset: str, flow: str, reason: 
         use_cases.stop_flow.execute(StopFlowCommand(operating.id, user_id))
     elif reason == "rimozione del conto":
         use_cases.remove_account_with_flows.execute(
-            RemoveAccountWithFlowsCommand(operating.account_id, user_id, confirmed=True)
+            RemoveAccountWithFlowsCommand(operating.assigned_account_id, user_id, confirmed=True)
         )
     else:
         assert reason == "comando manuale", reason
-        use_cases.close_position.execute(ClosePositionCommand(operating.account_id, asset, user_id))
+        use_cases.close_position.execute(ClosePositionCommand(operating.assigned_account_id, asset, user_id))
 
 
 @when(quoted('un ciclo del flusso "{flow}" fallisce con il messaggio "{message}"'))

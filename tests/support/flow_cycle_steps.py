@@ -181,7 +181,7 @@ def flow_return(flow_cycles: FlowCycles, flow: str, percent: str) -> None:
     exchange = flow_cycles.platform.hyperliquid
     state = exchange.read_state(credentials)
     [held] = [held for held in state.positions if held.coin in flow_cycles.flow(flow).configuration.assets]
-    pnl = flow_cycles.flow(flow).configuration.allocated_capital * number(percent) / 100
+    pnl = flow_cycles.flow(flow).configuration.assigned_capital * number(percent) / 100
     exchange.revoke(credentials)
     exchange.accept(credentials, amount=BALANCE)
     exchange.open_position(credentials, replace(held, unrealized_pnl=pnl))

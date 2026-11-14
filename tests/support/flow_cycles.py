@@ -356,7 +356,7 @@ class FlowCycles:
                         ScheduledFlow(flow.id.value, CycleSchedule(self.anchor_of(flow), timedelta(minutes=15))),
                     )
                     for flow in flows
-                    if flow.status is FlowStatus.ACTIVE
+                    if flow.status.runs_cycles
                 ]
 
         PlanFlowCyclesUseCase(Scheduled(), self.directory, self.run_cycle_of, self.scheduler, self.clock).execute()

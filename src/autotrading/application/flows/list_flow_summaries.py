@@ -1,4 +1,6 @@
+from collections.abc import Mapping
 from datetime import timedelta
+from uuid import UUID
 
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.ports import FlowAccountNamesPort, FlowRepositoryPort, FlowSummary, FlowTimingPort
@@ -22,9 +24,16 @@ class ListFlowSummariesUseCase:
         timings = self._timing.timings()
         names = self._accounts.account_names()
         return [
-            _summary_of(flow, names.get(flow.account_id, ""), timings.get(flow.id, UNSTAMPED))
+            _summary_of(flow, _account_name(names, flow), timings.get(flow.id, UNSTAMPED))
             for flow in ListFlowsUseCase(self._flows).execute()
         ]
+
+
+def _account_name(names: Mapping[UUID, str], flow: Flow) -> str:
+    """A draft has no account yet: its name is empty, like that of an account no longer listed (ADR 0124)."""
+    if flow.account_id is None:
+        return ""
+    return names.get(flow.account_id, "")
 
 
 def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:

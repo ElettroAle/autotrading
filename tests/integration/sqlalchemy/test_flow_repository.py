@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import Engine, RowMapping, Table, func, select, text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter, document_of
@@ -261,3 +261,69 @@ def test_the_flow_on_an_asset_of_the_account_is_the_active_or_paused_one_of_the_
     assert repository.flow_on(account_id, "BTC") == "alfa"
     assert repository.flow_on(account_id, "ETH") is None
     assert SqlAlchemyFlowRepositoryAdapter(database, other_tenant).flow_on(account_id, "BTC") is None
+
+
+def test_a_draft_is_saved_without_account_and_reads_back(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    original = a_flow(tenant_id, account_id=account_id)
+    draft = original.duplicated()
+    repository.add(original)
+
+    repository.add(draft)
+
+    assert repository.get(draft.id) == draft
+    assert repository.name_in_use(draft.name)
+
+
+def test_an_assignment_saves_the_account_of_the_draft_with_its_next_version(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    draft = a_flow(tenant_id, account_id=account_id).duplicated()
+    repository.add(draft)
+    assigned = draft.assigned(account_id, Decimal(200), ("SOL",))
+
+    repository.add_assignment(assigned)
+
+    assert repository.get(draft.id) == assigned
+    assert repository.version(draft.id, 1) == draft.configuration
+
+
+def test_an_assignment_on_the_account_of_another_tenant_is_refused(database: Engine) -> None:
+    tenant_id, _ = new_account(database)
+    _, stranger_account = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    draft = a_flow(tenant_id).duplicated()
+    repository.add(draft)
+
+    with pytest.raises(FlowAccountNotFoundError):
+        repository.add_assignment(draft.assigned(stranger_account, Decimal(200), ("SOL",)))
+
+    assert repository.get(draft.id) == draft
+
+
+def test_the_database_refuses_a_flow_out_of_draft_without_account(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    draft = a_flow(tenant_id, account_id=account_id).duplicated()
+    repository.add(draft)
+
+    with pytest.raises(IntegrityError, match="flows_account_outside_draft"):
+        stop_without_account(database, tenant_id, draft.id)
+
+
+def stop_without_account(database: Engine, tenant_id: TenantId, flow_id: FlowId) -> None:
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
+        connection.execute(text("UPDATE flows SET status = 'stopped' WHERE id = :id"), {"id": flow_id.value})
+
+
+def test_a_draft_archived_keeps_no_account(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    draft = a_flow(tenant_id, account_id=account_id).duplicated()
+    repository.add(draft)
+
+    repository.change_status(draft.archived())
+
+    assert repository.get(draft.id) == draft.archived()

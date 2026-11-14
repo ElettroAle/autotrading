@@ -7,11 +7,11 @@ import { useApiClient } from '@/lib/api-client';
 // Amounts travel as text, so no precision is lost on the way (ADR 0018); the chart needs numbers.
 const equitySchema = z
   .object({
-    initial_capital: z.string(),
+    initial_capital: z.string().nullable(),
     points: z.array(z.object({ planned_at: z.string(), equity: z.string() })),
   })
   .transform((equity) => ({
-    initialCapital: Number(equity.initial_capital),
+    initialCapital: equity.initial_capital === null ? null : Number(equity.initial_capital),
     points: equity.points.map((point) => ({
       plannedAt: point.planned_at,
       equity: Number(point.equity),

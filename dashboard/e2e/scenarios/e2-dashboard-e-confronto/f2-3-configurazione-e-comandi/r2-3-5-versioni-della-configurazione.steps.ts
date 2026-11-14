@@ -36,7 +36,7 @@ const openVersions = async (dashboard: DashboardPages, memory: ScenarioMemory, a
     throw new Error('the background describes no flow');
   }
   fakePlatform.addUser(account, { hasUserRole: true });
-  fakePlatform.addFlow(account, flow.name, undefined, { versions: flow.versions });
+  fakePlatform.addFlow(account, flow.name, { versions: flow.versions });
   await dashboard.openAndSignInAs(account);
   await dashboard.openVersionsOf(flow.name);
 };

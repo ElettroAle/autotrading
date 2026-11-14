@@ -9,7 +9,6 @@ from autotrading.application.flows.ports import (
     ReportedFillPort,
 )
 from autotrading.domain.flows.closed_position import CloseReason
-from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import ClosingFill
 
 operations = logging.getLogger("autotrading.flows")
@@ -43,9 +42,7 @@ class RecordManualClosingUseCase:
         owners = [
             flow
             for flow in self._flows.list()
-            if flow.account_id == account_id
-            and flow.status != FlowStatus.ARCHIVED
-            and asset in flow.configuration.assets
+            if flow.account_id == account_id and flow.status.holds_account and asset in flow.configuration.assets
         ]
         if not owners:
             return
