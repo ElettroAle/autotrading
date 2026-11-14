@@ -15,6 +15,7 @@ from autotrading.application.flows.errors import (
     FlowNotFoundError,
     FlowVersionNotFoundError,
 )
+from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -103,6 +104,17 @@ class SqlAlchemyFlowRepositoryAdapter:
         if document is None:
             raise FlowVersionNotFoundError(number)
         return configuration_of(number, document)
+
+    def versions(self, flow_id: FlowId) -> tuple[FlowVersion, ...]:
+        query = (
+            select(flow_versions.c.version, flow_versions.c.created_at)
+            .where(flow_versions.c.flow_id == flow_id.value)
+            .order_by(flow_versions.c.version.desc())
+        )
+        self.get(flow_id)
+        with self._transaction() as connection:
+            rows = connection.execute(query).all()
+        return tuple(FlowVersion(number, created_at) for number, created_at in rows)
 
     def change_status(self, flow: Flow) -> None:
         statement = update(flows).where(flows.c.id == flow.id.value).values(status=flow.status.name.lower())

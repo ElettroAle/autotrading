@@ -27,6 +27,12 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
       <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
         Cicli del flusso
       </Link>
+      <Link
+        to={paths.flowVersions.getHref(flow.id)}
+        className="mt-2 inline-block text-blue-800 hover:underline"
+      >
+        Versioni della configurazione
+      </Link>
     </section>
   );
 };

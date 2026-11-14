@@ -60,6 +60,14 @@ class FlowAccount:
     currency: str
 
 
+@dataclass(frozen=True, slots=True)
+class FlowVersion:
+    """One configuration version of a flow as a list shows it: its number and when it was saved (R2.3.5)."""
+
+    number: int
+    created_at: datetime
+
+
 class FlowRepositoryPort(Protocol):
     """Bound to the tenant of the request: it never sees the flows of another tenant."""
 
@@ -84,6 +92,10 @@ class FlowRepositoryPort(Protocol):
 
     def version(self, flow_id: FlowId, number: int) -> FlowConfiguration:
         """One configuration version of the flow. Raises FlowNotFoundError or FlowVersionNotFoundError."""
+        ...
+
+    def versions(self, flow_id: FlowId) -> tuple[FlowVersion, ...]:
+        """Every configuration version of the flow, newest first. Raises FlowNotFoundError."""
         ...
 
     def change_status(self, flow: Flow) -> None:

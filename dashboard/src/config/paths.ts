@@ -27,4 +27,8 @@ export const paths = {
     getHref: (flowId: string, plannedAt: string) =>
       `/flows/${encodeURIComponent(flowId)}/cycles/${encodeURIComponent(plannedAt)}`,
   },
+  flowVersions: {
+    path: '/flows/:flowId/versions',
+    getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/versions`,
+  },
 } as const;

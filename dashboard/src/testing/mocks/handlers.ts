@@ -2,7 +2,13 @@ import { http, HttpResponse } from 'msw';
 
 import { summaryOf, type FakeCycle } from './cycles';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
-import { fakePlatform, type FakeEquityPoint, type FakeFlow, type FakeUser } from './platform';
+import {
+  fakePlatform,
+  type FakeConfiguration,
+  type FakeEquityPoint,
+  type FakeFlow,
+  type FakeUser,
+} from './platform';
 
 const BEARER = 'Bearer ';
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -19,6 +25,8 @@ const problem = (status: number, title: string, detail: string) =>
     { status, headers: { 'Content-Type': 'application/problem+json' } },
   );
 
+const notFound = (detail: string) => problem(404, 'Not Found', detail);
+
 const userOf = (request: Request) => {
   const authorization = request.headers.get('Authorization') ?? '';
   return authorization.startsWith(BEARER)
@@ -26,10 +34,7 @@ const userOf = (request: Request) => {
     : undefined;
 };
 
-const withUser = (
-  request: Request,
-  respond: (user: NonNullable<ReturnType<typeof userOf>>) => Response,
-) => {
+const withUser = (request: Request, respond: (user: FakeUser) => Response) => {
   const user = userOf(request);
   if (user === undefined) {
     return problem(401, 'Unauthorized', 'token assente o non valido');
@@ -40,40 +45,41 @@ const withUser = (
   return respond(user);
 };
 
-const flowResponse = (flow: FakeFlow) => ({
-  id: flow.id,
-  name: flow.name,
-  account_id: 'account-1',
-  status: flow.status,
-  version: 1,
-  assets: ['BTC'],
-  cycle_minutes: 15,
-  model: { name: 'openai/gpt-4o', parameters: {} },
+// A flow of another tenant is not found, as one that does not exist (R0.1.3).
+const withFlow = (request: Request, flowId: unknown, respond: (flow: FakeFlow) => Response) =>
+  withUser(request, (user) => {
+    const flow = user.flows.find((candidate) => candidate.id === flowId);
+    return flow === undefined ? notFound('flusso non trovato') : respond(flow);
+  });
+
+const withConfiguration = (
+  flow: FakeFlow,
+  number: unknown,
+  respond: (configuration: FakeConfiguration) => Response,
+) => {
+  const version = flow.versions.find((candidate) => String(candidate.number) === number);
+  return version === undefined
+    ? notFound(`versione di configurazione non trovata: ${String(number)}`)
+    : respond(version.configuration);
+};
+
+const configurationResponse = (configuration: FakeConfiguration) => ({
+  assets: configuration.assets,
+  cycle_minutes: configuration.cycleMinutes,
+  model: { name: configuration.model, parameters: {} },
   sources: [],
-  instructions: '',
+  instructions: configuration.instructions,
   risk_limits: {
-    max_leverage: 3,
+    max_leverage: configuration.maxLeverage,
     max_margin_exposure_percent: null,
     max_value_exposure_percent: null,
   },
-  allocated_capital: '100',
+  allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,
 });
 
 const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
   [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
-
-// A flow of another tenant does not exist for the user, as on the API (R0.1.3).
-const withFlow = (
-  user: FakeUser,
-  flowId: string,
-  respond: (cycles: FakeCycle[]) => Response,
-): Response => {
-  if (!user.flows.some((flow) => flow.id === flowId)) {
-    return problem(404, 'Not Found', 'flusso non trovato');
-  }
-  return respond(fakePlatform.cyclesOf(flowId));
-};
 
 const cyclePage = (cycles: FakeCycle[], page: number) => {
   const start = (page - 1) * CYCLES_PER_PAGE;
@@ -101,6 +107,33 @@ const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => (
     .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime())
     .map((point) => ({ planned_at: point.plannedAt.toISOString(), equity: String(point.equity) })),
 });
+
+const flowResponse = (flow: FakeFlow) => {
+  const current = flow.versions.at(-1);
+  return {
+    id: flow.id,
+    name: flow.name,
+    account_id: 'account-1',
+    status: flow.status,
+    version: current?.number,
+    ...(current && configurationResponse(current.configuration)),
+  };
+};
+
+// The parts the API compares, with the same names and texts (R1.1.3): the fake never compares in another way.
+const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
+  ['asset', (configuration) => configuration.assets.join(', ')],
+  ['intervallo di ciclo', (configuration) => `${configuration.cycleMinutes} minuti`],
+  ['modello', (configuration) => configuration.model],
+  ['istruzioni', (configuration) => configuration.instructions],
+  ['leva massima', (configuration) => String(configuration.maxLeverage)],
+  ['capitale allocato', (configuration) => configuration.allocatedCapital],
+];
+
+const differences = (before: FakeConfiguration, after: FakeConfiguration) =>
+  PARTS.map(([part, text]) => ({ part, before: text(before), after: text(after) })).filter(
+    (difference) => difference.before !== difference.after,
+  );
 
 export const handlers = [
   http.get('*/me', ({ request }) =>
@@ -144,17 +177,46 @@ export const handlers = [
     }),
   ),
   http.get('*/flows/:flowId/cycles', ({ request, params }) =>
-    withUser(request, (user) =>
-      withFlow(user, String(params.flowId), (cycles) =>
-        HttpResponse.json(
-          cyclePage(cycles, Number(new URL(request.url).searchParams.get('page') ?? '1')),
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json(
+        cyclePage(
+          fakePlatform.cyclesOf(flow.id),
+          Number(new URL(request.url).searchParams.get('page') ?? '1'),
+        ),
+      ),
+    ),
+  ),
+  http.get('*/flows/:flowId/versions', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json(
+        flow.versions
+          .map((version) => ({ version: version.number, created_at: version.createdAt }))
+          .reverse(),
+      ),
+    ),
+  ),
+  http.get('*/flows/:flowId/versions/:version', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      withConfiguration(flow, params.version, (configuration) =>
+        HttpResponse.json({
+          version: Number(params.version),
+          ...configurationResponse(configuration),
+        }),
+      ),
+    ),
+  ),
+  http.get('*/flows/:flowId/versions/:first/differences/:second', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      withConfiguration(flow, params.first, (first) =>
+        withConfiguration(flow, params.second, (second) =>
+          HttpResponse.json(differences(first, second)),
         ),
       ),
     ),
   ),
   http.get('*/flows/:flowId/cycles/:plannedAt', ({ request, params }) =>
-    withUser(request, (user) =>
-      withFlow(user, String(params.flowId), (cycles) => cycleAt(cycles, String(params.plannedAt))),
+    withFlow(request, params.flowId, (flow) =>
+      cycleAt(fakePlatform.cyclesOf(flow.id), String(params.plannedAt)),
     ),
   ),
   http.get('*/flows/:flowId/equity', ({ request, params }) =>

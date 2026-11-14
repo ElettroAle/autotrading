@@ -23,6 +23,21 @@ export type FakeFlowHistory = {
 
 export type FakeEquityPoint = { readonly plannedAt: Date; readonly equity: number };
 
+export type FakeConfiguration = {
+  readonly assets: string[];
+  readonly cycleMinutes: number;
+  readonly model: string;
+  readonly instructions: string;
+  readonly maxLeverage: number;
+  readonly allocatedCapital: string;
+};
+
+export type FakeVersion = {
+  readonly number: number;
+  readonly createdAt: string;
+  readonly configuration: FakeConfiguration;
+};
+
 export type FakeFlow = {
   readonly id: string;
   readonly name: string;
@@ -31,6 +46,7 @@ export type FakeFlow = {
   readonly initialCapital: string;
   /** The equity every cycle of the flow recorded, in the order the scenario records it. */
   readonly equity: FakeEquityPoint[];
+  readonly versions: FakeVersion[];
 };
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -57,6 +73,32 @@ export type FakeUser = {
 };
 
 const TOKEN_PREFIX = 'fake-access-token-';
+
+export const FIRST_CONFIGURATION: FakeConfiguration = {
+  assets: ['BTC'],
+  cycleMinutes: 15,
+  model: 'openai/gpt-4o',
+  instructions: '',
+  maxLeverage: 3,
+  allocatedCapital: '100',
+};
+
+const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
+const DAY = 24 * 60 * 60 * 1000;
+
+/** The versions of a flow, one a day from the first of November 2026, each with its changes to the one before. */
+export const versionsWith = (...changes: Partial<FakeConfiguration>[]): FakeVersion[] =>
+  changes.reduce<FakeVersion[]>((versions, change, index) => {
+    const previous = versions.at(-1)?.configuration ?? FIRST_CONFIGURATION;
+    return [
+      ...versions,
+      {
+        number: index + 1,
+        createdAt: new Date(FIRST_CREATION + index * DAY).toISOString(),
+        configuration: { ...previous, ...change },
+      },
+    ];
+  }, []);
 
 const state = {
   users: new Map<string, FakeUser>(),
@@ -95,7 +137,10 @@ export const fakePlatform = {
     account: string,
     name: string,
     history: FakeFlowHistory = emptyHistory(),
-    { initialCapital = '100' }: { initialCapital?: string } = {},
+    {
+      initialCapital = '100',
+      versions = versionsWith({}),
+    }: { initialCapital?: string; versions?: FakeVersion[] } = {},
   ): FakeFlow {
     const user = state.users.get(account);
     if (user === undefined) {
@@ -108,6 +153,7 @@ export const fakePlatform = {
       history,
       initialCapital,
       equity: [],
+      versions,
     };
     user.flows.push(flow);
     return flow;

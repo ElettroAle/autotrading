@@ -5,6 +5,7 @@ import { paths } from '@/config/paths';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { FlowRoute } from './routes/app/flow';
+import { FlowVersionsRoute } from './routes/app/flow-versions';
 import { HomeRoute } from './routes/app/home';
 import { NotificationsRoute } from './routes/app/notifications';
 import { AppRoot } from './routes/app/root';
@@ -25,6 +26,7 @@ export const routes: RouteObject[] = [
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
+      { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },
     ],
   },
   { path: '*', element: <NotFoundRoute /> },

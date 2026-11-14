@@ -28,6 +28,19 @@ export class DashboardPages {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
 
+  /** From the page of the flow, as a user gets there. */
+  async openVersionsOf(name: string): Promise<void> {
+    await this.flows().getByRole('link', { name, exact: true }).click();
+    await this.page.getByRole('link', { name: 'Versioni della configurazione' }).click();
+    await expect(this.versions()).toBeVisible();
+  }
+
+  async compare(first: number, second: number): Promise<void> {
+    await this.page.getByLabel('Prima versione').selectOption(String(first));
+    await this.page.getByLabel('Seconda versione').selectOption(String(second));
+    await this.page.getByRole('button', { name: 'Confronta' }).click();
+  }
+
   /** Signs in from the sign-in page: the account is the one typed on the page of the identity provider. */
   async signInAs(account: string): Promise<void> {
     await expect(this.signInButton()).toBeVisible();
@@ -142,5 +155,13 @@ export class DashboardPages {
 
   equityPoint(equity: number): Locator {
     return this.equityCurve().getByRole('img', { name: new RegExp(`^Equity ${equity} del `) });
+  }
+
+  versions(): Locator {
+    return this.page.getByRole('list', { name: 'Versioni' });
+  }
+
+  comparison(): Locator {
+    return this.page.getByRole('table', { name: 'Confronto delle versioni' });
   }
 }

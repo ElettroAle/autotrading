@@ -16,7 +16,9 @@ from autotrading.application.flows.compare_flow_versions import CompareFlowVersi
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
+from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
+from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -168,6 +170,17 @@ class ConfigurationResponse(BaseModel):
         )
 
 
+class VersionResponse(BaseModel):
+    """One configuration version of a flow in the list: its number and when it was saved (R2.3.5)."""
+
+    version: int
+    created_at: datetime
+
+    @classmethod
+    def of(cls, version: FlowVersion) -> VersionResponse:
+        return cls(version=version.number, created_at=version.created_at)
+
+
 class DifferenceResponse(BaseModel):
     part: str
     before: str
@@ -294,6 +307,13 @@ def flows_router(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.modify_flow.execute(request.command(flow_id)))
+
+    @router.get("/flows/{flow_id}/versions")
+    def list_flow_versions(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> list[VersionResponse]:
+        command = ListFlowVersionsCommand(FlowId(flow_id))
+        return [VersionResponse.of(version) for version in use_cases.list_flow_versions.execute(command)]
 
     @router.get("/flows/{flow_id}/versions/{version}")
     def get_flow_version(

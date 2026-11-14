@@ -199,6 +199,22 @@ def test_a_flow_is_read_by_its_id_with_the_version_in_force(database: Engine) ->
     assert len(rows_of(database, flow_versions, tenant_id)) == 3
 
 
+def test_the_versions_are_listed_newest_first_with_when_each_was_saved(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    flow = a_flow(tenant_id, account_id=account_id)
+    repository.add(flow)
+    repository.add_version(flow.reconfigured(a_configuration(assets=("ETH",))))
+
+    versions = repository.versions(flow.id)
+
+    assert [version.number for version in versions] == [2, 1]
+    assert versions[0].created_at >= versions[1].created_at
+    assert all(version.created_at.tzinfo is not None for version in versions)
+    with pytest.raises(FlowNotFoundError):
+        SqlAlchemyFlowRepositoryAdapter(database, new_account(database)[0]).versions(flow.id)
+
+
 def test_a_status_change_is_saved(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
