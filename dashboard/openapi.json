@@ -1705,6 +1705,40 @@
         }
       }
     },
+    "/assets": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "List Tradable Assets",
+        "description": "The assets a flow can trade now on the exchange of the installation, by name (ADR 0147).",
+        "operationId": "list_tradable_assets_assets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response List Tradable Assets Assets Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "exchange non raggiungibile"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/flows/{flow_id}/state": {
       "get": {
         "tags": [

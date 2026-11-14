@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
@@ -46,7 +46,9 @@ describe('EditFlow', () => {
     expect(await screen.findByLabelText('Nome')).toHaveValue('alfa');
     expect(field('Nome')).toHaveAttribute('readonly');
     expect(field('Conto')).toHaveValue('account-principale');
-    expect(field('Asset')).toHaveValue('BTC');
+    expect(
+      within(screen.getByRole('list', { name: 'Asset scelti' })).getByRole('listitem'),
+    ).toHaveTextContent('BTC');
     expect(screen.getByRole('checkbox', { name: 'indicatori' })).toBeChecked();
     expect(field('Peso di sentiment')).toHaveValue(1);
     expect(await screen.findByLabelText('lunghezza serie di indicatori')).toHaveValue(10);
@@ -127,8 +129,12 @@ describe('EditFlow', () => {
     });
     await renderApp({ account: 'anna', url: EDIT_ALFA });
 
-    const assets = await screen.findByLabelText('Asset');
-    await userEvent.type(assets, ', ETH');
+    await userEvent.type(await screen.findByLabelText('Asset'), 'ETH');
+    await userEvent.click(
+      within(screen.getByRole('list', { name: 'Asset negoziabili' })).getByRole('button', {
+        name: 'ETH',
+      }),
+    );
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
 
     await waitFor(() =>

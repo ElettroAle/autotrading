@@ -11,10 +11,21 @@ const MODEL = 'openrouter/deepseek-chat';
 
 const field = (label: string) => screen.getByLabelText(label, { exact: true });
 
+/** Chooses an asset as a user does: typing part of its name and picking it among the tradable ones. */
+const chooseAsset = async (search: string, asset: string) => {
+  await userEvent.type(field('Asset'), search);
+  await userEvent.click(
+    within(screen.getByRole('list', { name: 'Asset negoziabili' })).getByRole('button', {
+      name: asset,
+    }),
+  );
+};
+
 const fillValidFlow = async ({ capital = '300' }: { capital?: string } = {}) => {
   await userEvent.type(await screen.findByLabelText('Nome'), 'alfa');
   await userEvent.selectOptions(field('Conto'), 'principale');
-  await userEvent.type(field('Asset'), 'BTC, eth');
+  await chooseAsset('bt', 'BTC');
+  await chooseAsset('eth', 'ETH');
   await userEvent.clear(field('Intervallo del ciclo in minuti'));
   await userEvent.type(field('Intervallo del ciclo in minuti'), '30');
   await userEvent.click(screen.getByRole('checkbox', { name: 'indicatori' }));
@@ -61,6 +72,24 @@ describe('CreateFlow', () => {
     expect(screen.getByRole('checkbox', { name: 'notizie' })).toHaveAccessibleDescription(
       'Le notizie recenti sugli asset del flusso.',
     );
+  });
+
+  it('sends nothing while the API cannot list the assets', async () => {
+    server.use(
+      http.get('*/assets', () =>
+        HttpResponse.json(
+          { detail: 'exchange non raggiungibile, riprovare' },
+          { status: 503, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Impossibile leggere gli asset negoziabili: exchange non raggiungibile, riprovare',
+    );
+    expect(field('Asset')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Crea il flusso' })).toBeDisabled();
   });
 
   it('builds the parameters of the chosen model from the catalog, starting again for a new model', async () => {

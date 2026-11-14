@@ -24,18 +24,21 @@ const testDir = defineBddConfig({
 });
 
 export default defineConfig({
-  testDir,
   tsconfig: './tsconfig.node.json',
   forbidOnly: true,
   fullyParallel: true,
   reporter: [['list'], cucumberReporter('json', { outputFile: 'reports/cucumber.json' })],
   // The dashboard shows instants in the time zone of the browser: the scenarios read times of a day in Italy.
   use: {
-    ...devices['Desktop Chrome'],
     baseURL: ORIGIN,
     timezoneId: TIME_ZONE,
     trace: 'retain-on-failure',
   },
+  // The scenarios on a desktop; the layout of the forms also on the width of a phone (ADR 0146).
+  projects: [
+    { name: 'scenari', testDir, use: { ...devices['Desktop Chrome'] } },
+    { name: 'telefono', testDir: './e2e/layout', use: { ...devices['Pixel 7'] } },
+  ],
   // The build of the image, served by the server of the image, configured as an installation dev (ADR 0117).
   webServer: {
     command: 'npx vite build && node server/main.ts',

@@ -1,12 +1,11 @@
 import { useFormContext, useWatch } from 'react-hook-form';
 
-import { describedBy, FieldError, FormField } from '@/components/ui/form/form-field';
+import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { reasonOf } from '@/lib/form-errors';
 
 import type { Model, ModelParameter } from '../api/get-model-catalog';
 import type { FlowFormValues } from '../utils/flow-form';
 
-const INPUT = 'rounded border border-slate-300 px-2 py-1';
 const PARAMETERS_ID = 'flow-model-parameters';
 
 // A range is a number between its bounds, a choice one of its values; blank keeps the default of the catalog.
@@ -22,10 +21,10 @@ const ParameterField = ({ parameter }: { parameter: ModelParameter }) => {
             {...register(name)}
             inputMode={parameter.whole === true ? 'numeric' : 'decimal'}
             placeholder={parameter.default}
-            className={INPUT}
+            className={FORM_CONTROL}
           />
         ) : (
-          <select {...control} {...register(name)} className={INPUT}>
+          <select {...control} {...register(name)} className={FORM_CONTROL}>
             <option value="">{`predefinito (${parameter.default})`}</option>
             {parameter.choices.map((choice) => (
               <option key={choice} value={choice}>
@@ -51,7 +50,7 @@ export const ModelFields = ({ models }: { models: Model[] }) => {
   const model = models.find((candidate) => candidate.name === selected);
   const parametersError = reasonOf(errors.model_parameters);
   return (
-    <fieldset className="space-y-2">
+    <fieldset className="min-w-0 space-y-2">
       <legend className="font-semibold">Modello</legend>
       <FormField id="flow-model" label="Modello" error={errors.model?.message}>
         {(props) => (
@@ -61,7 +60,7 @@ export const ModelFields = ({ models }: { models: Model[] }) => {
               // The parameters belong to the model: a new model starts from its own defaults.
               onChange: () => setValue('model_parameters', {}),
             })}
-            className={INPUT}
+            className={FORM_CONTROL}
           >
             <option value="">Scegli un modello</option>
             {models.map((candidate) => (
@@ -76,7 +75,7 @@ export const ModelFields = ({ models }: { models: Model[] }) => {
         <div
           role="group"
           aria-label="Parametri del modello"
-          className="flex flex-wrap gap-4"
+          className="flex min-w-0 flex-wrap gap-4"
           {...describedBy(PARAMETERS_ID, parametersError)}
         >
           {model.parameters.map((parameter) => (

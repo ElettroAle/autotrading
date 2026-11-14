@@ -14,7 +14,7 @@ const filled = (changes: Partial<FlowFormValues> = {}): FlowFormValues => ({
   ...emptyFormValues(),
   name: ' alfa ',
   account_id: 'account-principale',
-  assets: 'btc, ETH, ,',
+  assets: ['BTC', 'ETH'],
   cycle_minutes: '15',
   model: 'openrouter/deepseek-chat',
   model_parameters: { temperature: '0,7', max_tokens: '', reasoning_effort: 'high' },
@@ -59,7 +59,7 @@ describe('creationRequestOf', () => {
     expect(creationRequestOf(filled())).toEqual({
       name: 'alfa',
       account_id: 'account-principale',
-      assets: ['btc', 'ETH'],
+      assets: ['BTC', 'ETH'],
       cycle_minutes: 15,
       model: 'openrouter/deepseek-chat',
       model_parameters: { temperature: '0.7', reasoning_effort: 'high' },
@@ -90,7 +90,7 @@ describe('formValuesOf', () => {
     expect(formValuesOf(FLOW)).toEqual({
       name: 'alfa',
       account_id: 'account-principale',
-      assets: 'BTC, ETH',
+      assets: ['BTC', 'ETH'],
       cycle_minutes: '15',
       model: 'openrouter/deepseek-chat',
       model_parameters: { temperature: '0.7' },
@@ -155,7 +155,11 @@ describe('changesOf', () => {
   });
 
   it('keeps the capital apart, as it changes through its own request', () => {
-    const values = { ...formValuesOf(FLOW), allocated_capital: '350,5', assets: 'BTC, ETH, SOL' };
+    const values = {
+      ...formValuesOf(FLOW),
+      allocated_capital: '350,5',
+      assets: ['BTC', 'ETH', 'SOL'],
+    };
 
     expect(changesOf(FLOW, values)).toEqual({
       settings: { assets: ['BTC', 'ETH', 'SOL'] },

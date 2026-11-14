@@ -16,7 +16,7 @@ const sourceValuesSchema = z.object({
 export const flowFormSchema = z.object({
   name: z.string(),
   account_id: z.string(),
-  assets: z.string(),
+  assets: z.array(z.string()),
   cycle_minutes: numberText,
   model: z.string(),
   model_parameters: z.record(z.string(), z.string()),
@@ -61,7 +61,7 @@ export type FlowChanges = { settings: Partial<SettingsRequest>; capital?: string
 export const emptyFormValues = (): FlowFormValues => ({
   name: '',
   account_id: '',
-  assets: '',
+  assets: [],
   cycle_minutes: '',
   model: '',
   model_parameters: {},
@@ -82,12 +82,6 @@ const decimalOrNull = (text: string): string | null => (isBlank(text) ? null : d
 
 const numberOrNull = (text: string): number | null =>
   isBlank(text) ? null : Number(decimalOf(text));
-
-const assetsOf = (text: string): string[] =>
-  text
-    .split(',')
-    .map((asset) => asset.trim())
-    .filter((asset) => asset !== '');
 
 // A blank parameter takes the default the catalog declares.
 const filledOf = (values: Record<string, string>): Record<string, string> =>
@@ -113,7 +107,7 @@ const sourcesOf = (sources: Record<string, SourceValues>): SourceRequest[] =>
 
 const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   account_id: values.account_id,
-  assets: assetsOf(values.assets),
+  assets: values.assets,
   cycle_minutes: numberOrNull(values.cycle_minutes),
   model: values.model,
   model_parameters: filledOf(values.model_parameters),
@@ -141,7 +135,7 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   name: flow.name,
   // A draft has neither account nor capital yet (ADR 0124).
   account_id: flow.account_id ?? '',
-  assets: flow.assets.join(', '),
+  assets: [...flow.assets],
   cycle_minutes: String(flow.cycle_minutes),
   model: flow.model.name,
   model_parameters: { ...flow.model.parameters },

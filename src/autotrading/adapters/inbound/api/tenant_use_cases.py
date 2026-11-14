@@ -45,6 +45,7 @@ from autotrading.application.flows.list_flow_operations import ListFlowOperation
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.list_tradable_assets import ListTradableAssetsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
@@ -161,6 +162,7 @@ class TenantUseCases:
     list_models: ListModelsUseCase
     create_flow: CreateFlowUseCase
     list_flows: ListFlowsUseCase
+    list_tradable_assets: ListTradableAssetsUseCase
     read_free_capital: ReadFreeCapitalUseCase
     read_flow_state: ReadFlowStateUseCase
     request_link_code: RequestLinkCodeUseCase
@@ -228,6 +230,7 @@ class TenantUseCases:
             list_models=ListModelsUseCase(ports.model_gateways, keys),
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
+            list_tradable_assets=ListTradableAssetsUseCase(ports.flow_checks.markets),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
             read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.bot_identity, ports.clock),

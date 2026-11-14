@@ -1,8 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
+import { AssetPicker } from '@/components/ui/form/asset-picker';
 import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
+import { useTradableAssets } from '@/hooks/use-tradable-assets';
 import { showRefusal } from '@/lib/form-errors';
 
 import {
@@ -30,14 +32,17 @@ export const DraftAssignmentForm = ({
   accounts: Account[];
 }) => {
   const assign = useAssignDraftFlow(flowId);
+  // Without the list of the tradable assets the user cannot choose them: the form waits for it (ADR 0147).
+  const tradable = useTradableAssets();
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors },
   } = useForm<AssignmentInput>({
     resolver: zodResolver(assignmentInputSchema),
-    defaultValues: { accountId: '', allocatedCapital: '', assets: '' },
+    defaultValues: { accountId: '', allocatedCapital: '', assets: [] },
   });
 
   useEffect(() => {
@@ -79,19 +84,23 @@ export const DraftAssignmentForm = ({
           />
         )}
       </FormField>
-      <FormField id="assignment-assets" label="Asset" error={errors.assets?.message}>
-        {(control) => (
-          <input
-            {...control}
-            placeholder="BTC, ETH"
-            className={FORM_CONTROL}
-            {...register('assets')}
+      <Controller
+        control={control}
+        name="assets"
+        render={({ field }) => (
+          <AssetPicker
+            id="assignment-assets"
+            chosen={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            inputRef={field.ref}
+            error={errors.assets?.message}
           />
         )}
-      </FormField>
+      />
       <button
         type="submit"
-        disabled={assign.isPending}
+        disabled={assign.isPending || !tradable.isSuccess}
         className="self-start rounded border border-slate-300 px-3 py-1 hover:bg-slate-100"
       >
         Assegna

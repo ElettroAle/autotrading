@@ -1,14 +1,13 @@
 import { useFormContext, useWatch } from 'react-hook-form';
 
 import { ErrorMessage } from '@/components/ui/error-message';
-import { describedBy, FieldError, FormField } from '@/components/ui/form/form-field';
+import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { Loading } from '@/components/ui/loading';
 import { reasonOf } from '@/lib/form-errors';
 
 import { useSource, type Source } from '../api/get-sources';
 import type { FlowFormValues } from '../utils/flow-form';
 
-const INPUT = 'w-24 rounded border border-slate-300 px-2 py-1';
 const SOURCES_ID = 'flow-sources';
 
 // The parameters a source admits come from its description in the catalog, never from the dashboard (ADR 0131).
@@ -39,7 +38,7 @@ const SourceParameters = ({ name }: { name: string }) => {
           min={parameter.minimum}
           max={parameter.maximum}
           placeholder={String(parameter.default)}
-          className={INPUT}
+          className={FORM_CONTROL}
         />
       )}
     </FormField>
@@ -55,7 +54,7 @@ const SourceChoice = ({ source }: { source: Source }) => {
   const active = useWatch({ control, name: `sources.${source.name}.active` }) === true;
   const id = `flow-source-${source.name}`;
   return (
-    <div className="space-y-2 border-t border-slate-100 pt-2">
+    <div className="min-w-0 space-y-2 border-t border-slate-100 pt-2">
       <div className="flex items-center gap-2">
         <input
           id={id}
@@ -71,7 +70,7 @@ const SourceChoice = ({ source }: { source: Source }) => {
         {source.description}
       </p>
       {active && (
-        <div className="flex flex-wrap gap-4">
+        <div className="flex min-w-0 flex-wrap gap-4">
           <FormField
             id={`${id}-weight`}
             label={`Peso di ${source.name}`}
@@ -84,7 +83,7 @@ const SourceChoice = ({ source }: { source: Source }) => {
                 type="number"
                 min={1}
                 max={10}
-                className={INPUT}
+                className={FORM_CONTROL}
               />
             )}
           </FormField>
@@ -102,7 +101,7 @@ export const SourceFields = ({ sources }: { sources: Source[] }) => {
   } = useFormContext<FlowFormValues>();
   const error = reasonOf(errors.sources);
   return (
-    <fieldset className="space-y-2" {...describedBy(SOURCES_ID, error)}>
+    <fieldset className="min-w-0 space-y-2" {...describedBy(SOURCES_ID, error)}>
       <legend className="font-semibold">Fonti</legend>
       {sources.map((source) => (
         <SourceChoice key={source.name} source={source} />

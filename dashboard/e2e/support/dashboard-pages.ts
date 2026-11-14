@@ -307,6 +307,20 @@ export class DashboardPages {
     return scope.getByLabel(label, { exact: true });
   }
 
+  /** Chooses an asset of the flow as a user does: typing its name and picking it among the tradable ones. */
+  async chooseAsset(asset: string): Promise<void> {
+    await this.field('Asset').fill(asset);
+    await this.page
+      .getByRole('list', { name: 'Asset negoziabili' })
+      .getByRole('button', { name: asset, exact: true })
+      .click();
+  }
+
+  /** The assets chosen for the flow, each a label the user can remove. */
+  chosenAssets(): Locator {
+    return this.page.getByRole('list', { name: 'Asset scelti' }).getByRole('listitem');
+  }
+
   /** The key of the provider in the list of the keys. */
   providerKey(provider: string): Locator {
     return this.page
@@ -406,7 +420,13 @@ export class DashboardPages {
     const form = this.page.getByRole('form', { name: 'Assegnazione della bozza' });
     await form.getByLabel('Conto').selectOption({ label: account });
     await form.getByLabel('Capitale allocato (USDC)').fill(capital);
-    await form.getByLabel('Asset').fill(assets);
+    for (const asset of assets.split(',').map((name) => name.trim())) {
+      await form.getByLabel('Asset', { exact: true }).fill(asset);
+      await form
+        .getByRole('list', { name: 'Asset negoziabili' })
+        .getByRole('button', { name: asset, exact: true })
+        .click();
+    }
     await form.getByRole('button', { name: 'Assegna' }).click();
   }
 
