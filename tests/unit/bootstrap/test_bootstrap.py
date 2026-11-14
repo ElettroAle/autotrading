@@ -311,7 +311,7 @@ def test_the_access_to_trade_is_opened_from_the_account_of_the_tenant() -> None:
     )
 
     assert accesses.execute(OpenTradingAccessCommand(account.id.value)) == TradingAccess(
-        "Hyperliquid", credentials.account_address, credentials.secret_key
+        "Hyperliquid", credentials.value("account_address"), credentials.value("secret_key")
     )
 
 

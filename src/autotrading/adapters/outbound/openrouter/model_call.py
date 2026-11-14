@@ -15,6 +15,7 @@ from autotrading.domain.agent.model_definition import PROVIDER_SEPARATOR
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD
 from autotrading.domain.agent.provider_name import ProviderName
 
 API_URL = "https://openrouter.ai/api/v1"
@@ -54,7 +55,7 @@ class OpenRouterModelCallAdapter:
         try:
             response = self._client.post(
                 f"{API_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {key.secret}"},
+                headers={"Authorization": f"Bearer {key.value(API_KEY_FIELD.name)}"},
                 json=_request(model, settings, messages),
                 timeout=TIMEOUT_SECONDS,
             )

@@ -11,8 +11,8 @@ const REQUIRED = 'Campo obbligatorio';
 export const accountRegistrationInputSchema = z.object({
   name: z.string().trim().min(1, REQUIRED),
   exchange: z.string().trim().min(1, REQUIRED),
-  account_address: z.string().trim().min(1, REQUIRED),
-  secret_key: z.string().min(1, REQUIRED),
+  // The fields the chosen exchange declares: the API tells which one is missing, by its label (R2.3.9).
+  credentials: z.record(z.string(), z.string()),
 });
 
 export type AccountRegistrationInput = z.infer<typeof accountRegistrationInputSchema>;

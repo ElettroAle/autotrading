@@ -11,6 +11,7 @@ from autotrading.domain.errors import AutotradingError
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.platform import Platform
+from tests.support.provider_key import key_values
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.4-agente-ia/R1.4.1-chiavi-dei-fornitori-ia.feature")
@@ -38,7 +39,7 @@ def no_keys(platform: Platform, user: str) -> None:
 
 @when(quoted('"{user}" registra la chiave "{key}" per il fornitore "{provider}"'))
 def register_key(platform: Platform, user: str, key: str, provider: str, outcome: dict[str, object]) -> None:
-    command = RegisterProviderKeyCommand(provider, key)
+    command = RegisterProviderKeyCommand(provider, key_values(key))
     try:
         outcome["answer"] = platform.use_cases_of(user).register_provider_key.execute(command)
     except AutotradingError as error:
@@ -60,7 +61,7 @@ def key_not_in_answer(outcome: dict[str, object], key: str) -> None:
 
 @given(quoted('che "{user}" ha registrato la chiave "{key}" per il fornitore "{provider}"'))
 def key_registered_before(platform: Platform, user: str, key: str, provider: str) -> None:
-    platform.use_cases_of(user).register_provider_key.execute(RegisterProviderKeyCommand(provider, key))
+    platform.use_cases_of(user).register_provider_key.execute(RegisterProviderKeyCommand(provider, key_values(key)))
 
 
 @given(quoted('che "{user}" ha il flusso "{name}" attivo con modello "{model}"'))
@@ -70,7 +71,7 @@ def active_flow_with_model(flow_cycles: FlowCycles, user: str, name: str, model:
 
 @when(quoted('"{user}" sostituisce la chiave del fornitore "{provider}" con "{key}"'))
 def replace_key(platform: Platform, user: str, provider: str, key: str) -> None:
-    platform.use_cases_of(user).replace_provider_key.execute(ReplaceProviderKeyCommand(provider, key))
+    platform.use_cases_of(user).replace_provider_key.execute(ReplaceProviderKeyCommand(provider, key_values(key)))
 
 
 @when(quoted('"{user}" rimuove la chiave del fornitore "{provider}"'))
@@ -93,7 +94,7 @@ def cycles_use_key(flow_cycles: FlowCycles, user: str, key: str, provider: str) 
     flow_cycles.add_flow(user, "alfa", model=f"{provider}/deepseek-chat")
     flow_cycles.run("alfa")
     call = flow_cycles.model.calls[-1]
-    assert (call.model.partition("/")[0], call.key.secret) == (provider, key)
+    assert (call.model.partition("/")[0], call.key.value("api_key")) == (provider, key)
 
 
 @then(quoted('la rimozione è rifiutata con il motivo "{reason}"'))
@@ -104,7 +105,7 @@ def removal_refused(outcome: dict[str, object], reason: str) -> None:
 @then(quoted('la chiave "{key}" non compare nel contesto inviato all\'agente'))
 def key_not_in_context(flow_cycles: FlowCycles, key: str) -> None:
     [call] = flow_cycles.model.calls
-    assert call.key.secret == key
+    assert call.key.value("api_key") == key
     assert all(key not in message.content for message in call.messages)
 
 

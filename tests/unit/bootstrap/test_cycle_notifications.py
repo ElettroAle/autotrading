@@ -137,7 +137,7 @@ class World:
 
     @property
     def address(self) -> str:
-        return self.cycles.credentials_of("alfa").account_address
+        return self.cycles.credentials_of("alfa").value("account_address")
 
 
 @pytest.fixture

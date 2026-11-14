@@ -19,7 +19,8 @@ class FakeCredentialSealerAdapter:
         self._vault: SealedVault = {} if vault is None else vault
 
     def seal(self, account_id: AccountId, credentials: Credentials) -> SealedCredentials:
-        material = f"{self._tenant_id.value}|{account_id.value}|{credentials.account_address}|{credentials.secret_key}"
+        values = "|".join(f"{name}={value}" for name, value in sorted(credentials.values.items()))
+        material = f"{self._tenant_id.value}|{account_id.value}|{values}"
         ciphertext = hashlib.sha256(material.encode()).digest()
         self._vault[ciphertext] = (self._tenant_id, account_id, credentials)
         return SealedCredentials(KEY_VERSION, ciphertext)

@@ -30,7 +30,7 @@ class FakeProviderKeySealerAdapter:
         self._vault: ProviderKeyVault = {} if vault is None else vault
 
     def seal(self, provider: ProviderName, key: ProviderKey) -> SealedProviderKey:
-        material = f"{self._tenant_id.value}|{provider.value}|{key.secret}"
+        material = f"{self._tenant_id.value}|{provider.value}|{key.value('api_key')}"
         ciphertext = hashlib.sha256(material.encode()).digest()
         self._vault[ciphertext] = (self._tenant_id, provider, key)
         return SealedProviderKey(KEY_VERSION, ciphertext)

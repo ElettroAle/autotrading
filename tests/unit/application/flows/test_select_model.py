@@ -15,6 +15,7 @@ from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.provider_keys import InMemoryProviderKeyRepositoryAdapter
 from tests.support.flows import TEMPERATURE
 from tests.support.platform import Platform
+from tests.support.provider_key import key_values
 
 REASONING = ChoiceParameter("reasoning_effort", ("basso", "alto"), "basso")
 CATALOG = ModelCatalog(
@@ -33,7 +34,9 @@ class Models:
         self.use_case = SelectModelUseCase({"models": InMemoryModelCatalogAdapter(CATALOG)}, self.keys)
 
     def register(self, provider: str) -> None:
-        self.platform.use_cases_of("anna").register_provider_key.execute(RegisterProviderKeyCommand(provider, "K-TEST"))
+        self.platform.use_cases_of("anna").register_provider_key.execute(
+            RegisterProviderKeyCommand(provider, key_values("K-TEST"))
+        )
 
 
 def test_a_model_with_the_key_of_its_provider_gets_its_parameters_with_the_defaults() -> None:

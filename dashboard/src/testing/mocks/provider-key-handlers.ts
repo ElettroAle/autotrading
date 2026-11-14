@@ -1,10 +1,13 @@
 import { http, HttpResponse } from 'msw';
 
 import { fakePlatform, type FakeProviderKey, type FakeUser } from './platform';
-import { problem, textFieldsOf, withUser } from './responses';
+import { problem, textFieldsWithin, withUser } from './responses';
 
 /** The providers of the catalog of the fake platform: a key is accepted only for one of them (R1.4.1). */
 export const FAKE_PROVIDERS = ['anthropic', 'openai', 'openrouter'] as const;
+
+/** The only field every provider of the fake catalog declares for its key (R2.3.9, ADR 0159). */
+export const API_KEY_FIELD = { name: 'api_key', label: 'Chiave API', secret: true } as const;
 
 const providerOf = (name: string): string => name.trim().toLowerCase();
 
@@ -14,8 +17,14 @@ const responseOf = (key: FakeProviderKey) => ({
 });
 
 // The key is never asked to the provider: only presence and catalog (R1.4.1, ADR 0108).
-const refusalOfKey = (provider: string, key: string): Response | undefined => {
-  if (key.trim() === '') {
+const refusalOfKey = (provider: string, key: Record<string, string>): Response | undefined => {
+  const unknown = Object.keys(key).find((name) => name !== API_KEY_FIELD.name);
+  if (unknown !== undefined) {
+    return problem(422, 'Unprocessable Content', `campo della chiave non previsto: ${unknown}`, {
+      field: unknown,
+    });
+  }
+  if ((key[API_KEY_FIELD.name] ?? '').trim() === '') {
     return problem(422, 'Unprocessable Content', 'chiave obbligatoria');
   }
   if (!FAKE_PROVIDERS.some((known) => known === provider)) {
@@ -44,9 +53,9 @@ export const providerKeyHandlers = [
   ),
   http.post('*/provider-keys', ({ request }) =>
     withUser(request, async (user) => {
-      const fields = await textFieldsOf(request);
+      const { fields, within } = await textFieldsWithin(request, 'key');
       const provider = providerOf(fields.provider ?? '');
-      const refusal = refusalOfKey(provider, fields.key ?? '');
+      const refusal = refusalOfKey(provider, within);
       if (refusal !== undefined) {
         return refusal;
       }
@@ -59,9 +68,9 @@ export const providerKeyHandlers = [
   ),
   http.put('*/provider-keys/:provider', ({ request, params }) =>
     withUser(request, async (user) => {
-      const fields = await textFieldsOf(request);
+      const { within } = await textFieldsWithin(request, 'key');
       const provider = providerOf(String(params.provider));
-      const refusal = refusalOfKey(provider, fields.key ?? '');
+      const refusal = refusalOfKey(provider, within);
       if (refusal !== undefined) {
         return refusal;
       }

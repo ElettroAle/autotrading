@@ -43,8 +43,8 @@ describe('RegisterAccountForm', () => {
     );
     expect(await screen.findByRole('cell', { name: 'principale' })).toBeInTheDocument();
     expect(within(form()).getByLabelText('Nome')).toHaveValue('');
-    expect(within(form()).getByLabelText(SECRET_LABEL)).toHaveValue('');
     expect(within(form()).getByLabelText('Exchange')).toHaveValue('');
+    expect(within(form()).queryByLabelText(SECRET_LABEL)).not.toBeInTheDocument();
   });
 
   it('offers only the exchanges the API supports, none chosen at first', async () => {
@@ -125,7 +125,7 @@ describe('RegisterAccountForm', () => {
     );
   });
 
-  it('asks for every field before sending anything', async () => {
+  it('asks for name and exchange before sending anything', async () => {
     const sent = vi.fn();
     server.use(http.post('*/accounts', sent));
     await renderApp({ account: 'anna', url: ACCOUNTS });
@@ -134,7 +134,7 @@ describe('RegisterAccountForm', () => {
 
     await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
 
-    for (const label of ['Nome', 'Exchange', 'Indirizzo del conto', SECRET_LABEL]) {
+    for (const label of ['Nome', 'Exchange']) {
       expect(await within(region).findByLabelText(label)).toHaveAccessibleDescription(
         'Campo obbligatorio',
       );
@@ -151,6 +151,37 @@ describe('RegisterAccountForm', () => {
     await chooseExchange(region);
 
     expect(within(region).getByRole('note')).toHaveTextContent('Il conto opererà con denaro reale');
+  });
+
+  it('asks only the fields the chosen exchange declares, the secret ones hidden while typed', async () => {
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    expect(within(region).queryByLabelText('Indirizzo del conto')).not.toBeInTheDocument();
+    await chooseExchange(region);
+
+    expect(within(region).getByLabelText('Indirizzo del conto')).not.toHaveAttribute(
+      'type',
+      'password',
+    );
+    expect(within(region).getByLabelText(SECRET_LABEL)).toHaveAttribute('type', 'password');
+  });
+
+  it('shows beside the declared field the reason the API gives when it is missing', async () => {
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+    await userEvent.type(within(region).getByLabelText('Nome'), 'principale');
+    await chooseExchange(region);
+    await userEvent.type(within(region).getByLabelText('Indirizzo del conto'), ADDRESS);
+
+    await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
+
+    await waitFor(() =>
+      expect(within(region).getByLabelText(SECRET_LABEL)).toHaveAccessibleDescription(
+        "chiave dell'API wallet obbligatorio",
+      ),
+    );
+    expect(fakePlatform.user('anna').accounts).toEqual([]);
   });
 
   it('says nothing of real money for an exchange on the test network', async () => {

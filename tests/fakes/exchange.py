@@ -10,6 +10,7 @@ from autotrading.application.verification.errors import (
 )
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
+from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.flows.cycle_access import CycleAccess
@@ -18,6 +19,7 @@ from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
+from tests.support.credentials import HYPERLIQUID_FIELDS, hyperliquid_credentials
 
 # What the user reads of a refusal: the text of the exchange with the address masked (R0.2.3).
 REDACTED_REJECTION = "User or API Wallet *** does not exist."
@@ -26,7 +28,7 @@ READ_AT = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
 
 def rejection_message(credentials: Credentials) -> str:
     """Hyperliquid names the wallet it does not know: the text of a refusal carries the address sent."""
-    return f"User or API Wallet {credentials.account_address.upper()} does not exist."
+    return f"User or API Wallet {credentials.value('account_address').upper()} does not exist."
 
 
 class FakeExchangeAdapter:
@@ -34,6 +36,7 @@ class FakeExchangeAdapter:
 
     def __init__(self, *, real: bool = False) -> None:
         self._real = real
+        self.fields: tuple[CredentialField, ...] = HYPERLIQUID_FIELDS
         self._states: dict[Credentials, AccountState] = {}
         self.reachable = True
         self.requests: list[Credentials] = []
@@ -42,6 +45,9 @@ class FakeExchangeAdapter:
 
     def is_real(self) -> bool:
         return self._real
+
+    def credential_fields(self) -> tuple[CredentialField, ...]:
+        return self.fields
 
     def trades_on(self, orders: FakeOrderExchangeAdapter) -> None:
         """The same exchange for orders: the positions it holds for an account are part of its state."""
@@ -78,7 +84,7 @@ class FakeExchangeAdapter:
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         try:
-            state = self.read_state(Credentials(access.account_address, access.secret_key))
+            state = self.read_state(hyperliquid_credentials(access.account_address, access.secret_key))
         except ExchangeRejectedCredentialsError as error:
             raise VerificationCredentialsRejectedError from error
         except ExchangeUnavailableError as error:
@@ -92,7 +98,7 @@ class FakeExchangeAdapter:
 
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:
         try:
-            state = self.read_state(Credentials(access.account_address, access.secret_key))
+            state = self.read_state(hyperliquid_credentials(access.account_address, access.secret_key))
         except ExchangeRejectedCredentialsError as error:
             raise FlowCredentialsRefusedError from error
         except ExchangeUnavailableError as error:
@@ -117,7 +123,9 @@ class FakeExchangeAdapter:
     def _traded_positions(self, credentials: Credentials) -> tuple[Position, ...]:
         if self._orders is None:
             return ()
-        held = [p for (address, _), p in self._orders.positions.items() if address == credentials.account_address]
+        held = [
+            p for (address, _), p in self._orders.positions.items() if address == credentials.value("account_address")
+        ]
         return tuple(
             Position(
                 p.coin,

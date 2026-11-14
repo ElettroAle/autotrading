@@ -14,6 +14,7 @@ from eth_account import Account as EthereumAccount
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError
 from autotrading.domain.accounts.credentials import Credentials
+from tests.support.credentials import hyperliquid_credentials
 
 pytestmark = pytest.mark.testnet
 
@@ -24,7 +25,7 @@ def credentials() -> Credentials:
     if not location:
         pytest.skip("HYPERLIQUID_TESTNET_CREDENTIALS_FILE not set")
     document = json.loads(Path(location).read_text(encoding="utf-8"))
-    return Credentials(document["account_address"], document["secret_key"])
+    return hyperliquid_credentials(document["account_address"], document["secret_key"])
 
 
 def test_approved_credentials_read_the_account_value(credentials: Credentials) -> None:
@@ -35,7 +36,7 @@ def test_approved_credentials_read_the_account_value(credentials: Credentials) -
 
 
 def test_a_wallet_not_approved_for_the_account_is_rejected_by_the_exchange(credentials: Credentials) -> None:
-    stranger = Credentials(credentials.account_address, EthereumAccount.create().key.hex())
+    stranger = hyperliquid_credentials(credentials.value("account_address"), EthereumAccount.create().key.hex())
 
     with pytest.raises(ExchangeRejectedCredentialsError) as raised:
         HyperliquidExchangeAdapter.for_network(testnet=True).read_state(stranger)

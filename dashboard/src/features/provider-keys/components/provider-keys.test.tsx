@@ -17,7 +17,7 @@ const registerKey = async (provider: string, key = KEY) => {
   const region = await screen.findByRole('region', { name: 'Nuova chiave' });
   await within(region).findByRole('option', { name: provider });
   await userEvent.selectOptions(within(region).getByLabelText('Fornitore'), provider);
-  await userEvent.type(within(region).getByLabelText('Chiave'), key);
+  await userEvent.type(within(region).getByLabelText('Chiave API'), key);
   await userEvent.click(within(region).getByRole('button', { name: 'Registra la chiave' }));
 };
 
@@ -67,7 +67,7 @@ describe('ProviderKeysList', () => {
     const item = await keyItem('openrouter');
 
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci la chiave' }));
-    await userEvent.type(within(item).getByLabelText('Nuova chiave'), `${KEY}-nuova`);
+    await userEvent.type(within(item).getByLabelText('Chiave API'), `${KEY}-nuova`);
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
     expect(await within(item).findByRole('status')).toHaveTextContent(
@@ -98,16 +98,16 @@ describe('ProviderKeysList', () => {
     const item = await keyItem('openrouter');
 
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci la chiave' }));
-    await userEvent.type(within(item).getByLabelText('Nuova chiave'), KEY);
+    await userEvent.type(within(item).getByLabelText('Chiave API'), KEY);
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
     expect(await within(item).findByRole('alert')).toHaveTextContent(
       'nessuna chiave registrata per il fornitore: openrouter',
     );
-    expect(within(item).getByLabelText('Nuova chiave')).toHaveValue('');
+    expect(within(item).getByLabelText('Chiave API')).toHaveValue('');
   });
 
-  it('asks for the new key before sending, and the replacement can be cancelled', async () => {
+  it('tells the key is missing when the replacement is sent empty, and can be cancelled', async () => {
     fakePlatform.saveProviderKey('anna', 'openrouter', EARLIER);
     await renderApp({ account: 'anna', url: PROVIDER_KEYS });
     const item = await keyItem('openrouter');
@@ -115,11 +115,9 @@ describe('ProviderKeysList', () => {
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci la chiave' }));
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
-    expect(await within(item).findByLabelText('Nuova chiave')).toHaveAccessibleDescription(
-      'Campo obbligatorio',
-    );
+    expect(await within(item).findByRole('alert')).toHaveTextContent('chiave obbligatoria');
     await userEvent.click(within(item).getByRole('button', { name: 'Annulla' }));
-    expect(within(item).queryByLabelText('Nuova chiave')).not.toBeInTheDocument();
+    expect(within(item).queryByLabelText('Chiave API')).not.toBeInTheDocument();
   });
 
   it('removes the key once the user confirms, naming the provider', async () => {
@@ -184,18 +182,21 @@ describe('RegisterProviderKeyForm', () => {
       fakePlatform.providerKeyOf('anna', 'openrouter')?.registeredAt,
     );
     expect(within(form()).getByLabelText('Fornitore')).toHaveValue('');
-    expect(within(form()).getByLabelText('Chiave')).toHaveValue('');
+    expect(within(form()).queryByLabelText('Chiave API')).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(KEY);
     const mutationCache = mutations.mock.contexts[0] as MutationCache;
     await waitFor(() => expect(mutationCache.getAll()).toEqual([]));
   });
 
-  it('hides the key while typed', async () => {
+  it('asks the fields the chosen provider declares, and hides the key while typed', async () => {
     await renderApp({ account: 'anna', url: PROVIDER_KEYS });
-
     const region = await screen.findByRole('region', { name: 'Nuova chiave' });
 
-    expect(within(region).getByLabelText('Chiave')).toHaveAttribute('type', 'password');
+    expect(within(region).queryByLabelText('Chiave API')).not.toBeInTheDocument();
+    await within(region).findByRole('option', { name: 'openrouter' });
+    await userEvent.selectOptions(within(region).getByLabelText('Fornitore'), 'openrouter');
+
+    expect(within(region).getByLabelText('Chiave API')).toHaveAttribute('type', 'password');
   });
 
   it('shows the reason of a refusal at the head of the form and empties the key', async () => {
@@ -212,7 +213,7 @@ describe('RegisterProviderKeyForm', () => {
       'fornitore non supportato: openai',
     );
     expect(within(form()).getByLabelText('Fornitore')).toHaveValue('openai');
-    expect(within(form()).getByLabelText('Chiave')).toHaveValue('');
+    expect(within(form()).getByLabelText('Chiave API')).toHaveValue('');
   });
 
   it('offers the providers of the catalog of the models, none chosen at first', async () => {
@@ -268,7 +269,7 @@ describe('RegisterProviderKeyForm', () => {
     expect(within(region).getByRole('button', { name: 'Registra la chiave' })).toBeDisabled();
   });
 
-  it('asks for the provider and the key before sending anything', async () => {
+  it('asks for the provider before sending anything, and the API for its key', async () => {
     const sent = vi.fn();
     server.use(http.post('*/provider-keys', sent));
     await renderApp({ account: 'anna', url: PROVIDER_KEYS });
@@ -280,9 +281,10 @@ describe('RegisterProviderKeyForm', () => {
     expect(await within(region).findByLabelText('Fornitore')).toHaveAccessibleDescription(
       'Campo obbligatorio',
     );
-    expect(within(region).getByLabelText('Chiave')).toHaveAccessibleDescription(
-      'Campo obbligatorio',
-    );
     expect(sent).not.toHaveBeenCalled();
+    server.resetHandlers();
+    await userEvent.selectOptions(within(region).getByLabelText('Fornitore'), 'openrouter');
+    await userEvent.click(within(region).getByRole('button', { name: 'Registra la chiave' }));
+    expect(await within(region).findByRole('alert')).toHaveTextContent('chiave obbligatoria');
   });
 });

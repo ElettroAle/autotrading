@@ -11,6 +11,7 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from tests.fakes.exchange import READ_AT, REDACTED_REJECTION
+from tests.support.credentials import hyperliquid_credentials
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
@@ -54,11 +55,11 @@ def account_id(platform: Platform, client_of: Client, credentials: Credentials) 
     return str(platform.account_named("anna", "test-1").id.value)
 
 
-def rotated(platform: Platform, credentials: Credentials, *, accepted: bool = True) -> dict[str, str]:
-    new = Credentials(credentials.account_address, "0x" + "cd" * 32)
+def rotated(platform: Platform, credentials: Credentials, *, accepted: bool = True) -> dict[str, dict[str, str]]:
+    new = hyperliquid_credentials(credentials.value("account_address"), "0x" + "cd" * 32)
     if accepted:
         platform.hyperliquid.accept(new)
-    return {"account_address": new.account_address, "secret_key": new.secret_key}
+    return {"credentials": dict(new.values)}
 
 
 def test_the_list_shows_the_accounts_of_the_tenant(client_of: Client, account_id: str) -> None:
@@ -110,8 +111,8 @@ def test_the_details_declare_credentials_without_showing_them(
 
     assert response.status_code == 200
     assert response.json()["has_credentials"] is True
-    assert credentials.account_address not in response.text
-    assert credentials.secret_key not in response.text
+    assert credentials.value("account_address") not in response.text
+    assert credentials.value("secret_key") not in response.text
 
 
 @pytest.mark.parametrize("whose", ["another tenant", "nobody"])
@@ -147,14 +148,14 @@ def test_rejected_credentials_answer_with_the_redacted_message_of_the_exchange(
         "detail": "credenziali rifiutate dall'exchange",
         "exchange_message": REDACTED_REJECTION,
     }
-    assert body["account_address"] not in response.text.lower()
+    assert body["credentials"]["account_address"] not in response.text.lower()
 
 
 def test_credentials_of_another_exchange_account_are_refused(
     client_of: Client, platform: Platform, account_id: str
 ) -> None:
     other = platform.accepted_credentials()
-    body = {"account_address": other.account_address, "secret_key": other.secret_key}
+    body = {"credentials": dict(other.values)}
 
     response = client_of("anna").put(f"/accounts/{account_id}/credentials", json=body)
 
@@ -174,7 +175,9 @@ def test_another_user_cannot_replace_the_credentials(
 
 
 def test_the_replacement_request_never_shows_the_credentials() -> None:
-    request = CredentialsReplacementRequest.model_validate({"account_address": "0xaddr", "secret_key": "0xsk"})
+    request = CredentialsReplacementRequest.model_validate(
+        {"credentials": {"account_address": "0xaddr", "secret_key": "0xsk"}}
+    )
 
     shown = repr(request)
 
@@ -302,8 +305,7 @@ def test_a_removed_name_can_be_registered_again(client_of: Client, account_id: s
         json={
             "name": "test-1",
             "exchange": HYPERLIQUID,
-            "account_address": credentials.account_address,
-            "secret_key": credentials.secret_key,
+            "credentials": dict(credentials.values),
         },
     )
 

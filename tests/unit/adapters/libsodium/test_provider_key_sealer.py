@@ -5,11 +5,11 @@ from nacl.public import PrivateKey, SealedBox
 
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
-from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.provider_key import api_key_of
 
-KEY = ProviderKey("K-OPENROUTER-TEST")
+KEY = api_key_of("K-OPENROUTER-TEST")
 OPENROUTER = ProviderName("openrouter")
 
 
@@ -28,7 +28,7 @@ def test_only_the_private_key_opens_what_was_sealed_with_tenant_and_provider(pri
     assert json.loads(SealedBox(private_key).decrypt(sealed.ciphertext)) == {
         "tenant_id": str(tenant_id.value),
         "provider": "openrouter",
-        "key": KEY.secret,
+        "fields": {"api_key": KEY.value("api_key")},
     }
 
 
@@ -37,7 +37,7 @@ def test_the_sealed_text_never_holds_the_key_and_changes_at_every_seal(private_k
 
     first, second = sealer.seal(OPENROUTER, KEY), sealer.seal(OPENROUTER, KEY)
 
-    assert KEY.secret.encode() not in first.ciphertext
+    assert KEY.value("api_key").encode() not in first.ciphertext
     assert first.ciphertext != second.ciphertext
 
 

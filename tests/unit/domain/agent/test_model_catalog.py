@@ -12,6 +12,7 @@ from autotrading.domain.agent.errors import (
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, RangeParameter
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD, ProviderKeyField
 from autotrading.domain.agent.provider_name import ProviderName
 
 TEMPERATURE = RangeParameter("temperature", Decimal(0), Decimal(2), Decimal(1))
@@ -151,3 +152,33 @@ def test_catalogs_joined_offer_the_models_of_each() -> None:
 def test_catalogs_joined_that_offer_the_same_model_are_a_defect() -> None:
     with pytest.raises(InvalidModelDefinitionError):
         ModelCatalog.joined((ModelCatalog((DEEPSEEK,)), ModelCatalog((DEEPSEEK,))))
+
+
+AZURE_FIELDS = (
+    ProviderKeyField("api_key", "Chiave API", secret=True),
+    ProviderKeyField("api_base", "Indirizzo dell'API", secret=False),
+)
+
+
+def test_a_provider_asks_the_fields_its_gateway_declares() -> None:
+    catalog = ModelCatalog([ModelDefinition("azure/gpt-4o", ())], {ProviderName("azure"): AZURE_FIELDS})
+
+    assert catalog.key_fields_of(ProviderName("azure")) == AZURE_FIELDS
+
+
+def test_a_provider_without_declared_fields_asks_the_key_alone() -> None:
+    catalog = ModelCatalog([ModelDefinition("openai/gpt-4o", ())])
+
+    assert catalog.key_fields_of(ProviderName("openai")) == (API_KEY_FIELD,)
+
+
+def test_a_joined_catalog_keeps_the_fields_of_each_provider() -> None:
+    first = ModelCatalog([ModelDefinition("azure/gpt-4o", ())], {ProviderName("azure"): AZURE_FIELDS})
+    second = ModelCatalog([ModelDefinition("openrouter/x/y", ())], {ProviderName("openrouter"): (API_KEY_FIELD,)})
+
+    joined = ModelCatalog.joined([first, second])
+
+    assert (joined.key_fields_of(ProviderName("azure")), joined.key_fields_of(ProviderName("openrouter"))) == (
+        AZURE_FIELDS,
+        (API_KEY_FIELD,),
+    )

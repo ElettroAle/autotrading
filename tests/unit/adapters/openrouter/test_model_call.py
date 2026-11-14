@@ -16,9 +16,9 @@ from autotrading.application.agent.ports import ModelReply
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
-from autotrading.domain.agent.provider_key import ProviderKey
+from tests.support.provider_key import api_key_of
 
-KEY = ProviderKey("sk-or-FAKE-MODEL-KEY")
+KEY = api_key_of("sk-or-FAKE-MODEL-KEY")
 MODEL = "openrouter/deepseek/deepseek-chat"
 MESSAGES = (ModelMessage(MessageRole.SYSTEM, "regole"), ModelMessage(MessageRole.USER, '{"ora": "10:30"}'))
 SETTINGS: dict[str, ParameterValue] = {
@@ -66,7 +66,7 @@ def test_the_call_reaches_openrouter_with_the_key_of_the_user_and_its_own_reason
 
     request = openrouter.requests[0]
     assert str(request.url) == "https://openrouter.ai/api/v1/chat/completions"
-    assert request.headers["Authorization"] == f"Bearer {KEY.secret}"
+    assert request.headers["Authorization"] == f"Bearer {KEY.value('api_key')}"
     assert openrouter.sent == {
         "model": "deepseek/deepseek-chat",
         "messages": [{"role": "system", "content": "regole"}, {"role": "user", "content": '{"ora": "10:30"}'}],
@@ -129,9 +129,9 @@ def test_any_other_refusal_is_transient_with_the_message_of_openrouter(status: i
 
 def test_a_refusal_that_echoes_the_key_never_carries_it() -> None:
     with pytest.raises(ModelUnavailableError) as raised:
-        call(OpenRouter(500, text=f"upstream rejected header Bearer {KEY.secret}"))
+        call(OpenRouter(500, text=f"upstream rejected header Bearer {KEY.value('api_key')}"))
 
-    assert KEY.secret not in str(raised.value)
+    assert KEY.value("api_key") not in str(raised.value)
     assert raised.value.__cause__ is None
 
 

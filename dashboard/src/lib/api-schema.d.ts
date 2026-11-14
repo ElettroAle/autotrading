@@ -117,7 +117,8 @@ export interface paths {
         };
         /**
          * List Supported Exchanges
-         * @description The exchanges an account can be registered on, each with the network it trades on (ADR 0152, ADR 0157).
+         * @description The exchanges an account can be registered on, each with its network and the fields of its credentials
+         *     (ADR 0152, ADR 0157, ADR 0158).
          */
         get: operations["list_supported_exchanges_exchanges_get"];
         put?: never;
@@ -920,16 +921,10 @@ export interface components {
              * @default
              */
             exchange: string;
-            /**
-             * Account Address
-             * @default
-             */
-            account_address: string;
-            /**
-             * Secret Key
-             * @default
-             */
-            secret_key: string;
+            /** Credentials */
+            credentials?: {
+                [key: string]: string;
+            };
         };
         /** AccountRegistrationResponse */
         AccountRegistrationResponse: {
@@ -1098,18 +1093,21 @@ export interface components {
             /** Bring To Minimum */
             bring_to_minimum: boolean;
         };
+        /** CredentialFieldResponse */
+        CredentialFieldResponse: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Secret */
+            secret: boolean;
+        };
         /** CredentialsReplacementRequest */
         CredentialsReplacementRequest: {
-            /**
-             * Account Address
-             * @default
-             */
-            account_address: string;
-            /**
-             * Secret Key
-             * @default
-             */
-            secret_key: string;
+            /** Credentials */
+            credentials?: {
+                [key: string]: string;
+            };
         };
         /**
          * CycleDetailResponse
@@ -1221,6 +1219,8 @@ export interface components {
             name: string;
             /** Network */
             network: string;
+            /** Fields */
+            fields: components["schemas"]["CredentialFieldResponse"][];
         };
         /** FailureResponse */
         FailureResponse: {
@@ -1909,6 +1909,15 @@ export interface components {
             /** Liquidation Price */
             liquidation_price: string | null;
         };
+        /** ProviderKeyFieldResponse */
+        ProviderKeyFieldResponse: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Secret */
+            secret: boolean;
+        };
         /** ProviderKeyRegistrationRequest */
         ProviderKeyRegistrationRequest: {
             /**
@@ -1916,19 +1925,17 @@ export interface components {
              * @default
              */
             provider: string;
-            /**
-             * Key
-             * @default
-             */
-            key: string;
+            /** Key */
+            key?: {
+                [key: string]: string;
+            };
         };
         /** ProviderKeyReplacementRequest */
         ProviderKeyReplacementRequest: {
-            /**
-             * Key
-             * @default
-             */
-            key: string;
+            /** Key */
+            key?: {
+                [key: string]: string;
+            };
         };
         /**
          * ProviderKeyResponse
@@ -1946,6 +1953,8 @@ export interface components {
             name: string;
             /** Key Registered */
             key_registered: boolean;
+            /** Key Fields */
+            key_fields: components["schemas"]["ProviderKeyFieldResponse"][];
         };
         /** RiskLimitsResponse */
         RiskLimitsResponse: {

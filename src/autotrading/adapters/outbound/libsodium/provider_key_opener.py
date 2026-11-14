@@ -7,6 +7,7 @@ from nacl.public import SealedBox
 from autotrading.adapters.outbound.libsodium.opener import private_key_of, record_opening
 from autotrading.application.agent.errors import ProviderKeyNotOpenedError
 from autotrading.domain.agent.provider_key import ProviderKey
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 
 
@@ -39,10 +40,10 @@ class SodiumProviderKeyOpenerAdapter:
     def _secret_of(self, key: RegisteredProviderKey) -> ProviderKey:
         document = self._document_of(key)
         expected = (str(key.tenant_id.value), key.provider.value)
-        secret = document.get("key")
-        if (document.get("tenant_id"), document.get("provider")) != expected or not isinstance(secret, str):
+        values = _values_of(document)
+        if (document.get("tenant_id"), document.get("provider")) != expected or values is None:
             raise ProviderKeyNotOpenedError(key.provider)
-        return ProviderKey(secret)
+        return ProviderKey(values)
 
     def _document_of(self, key: RegisteredProviderKey) -> Mapping[str, object]:
         box = self._boxes.get(key.sealed.key_version)
@@ -55,3 +56,14 @@ class SodiumProviderKeyOpenerAdapter:
         if not isinstance(document, Mapping):
             raise ProviderKeyNotOpenedError(key.provider)
         return document
+
+
+def _values_of(document: Mapping[str, object]) -> dict[str, str] | None:
+    fields = document.get("fields")
+    if isinstance(fields, Mapping) and fields and all(isinstance(value, str) for value in fields.values()):
+        return {str(name): str(value) for name, value in fields.items()}
+    # A key sealed before the declared fields holds the secret alone, which was always the API key (ADR 0159).
+    legacy = document.get("key")
+    if isinstance(legacy, str) and legacy:
+        return {API_KEY_FIELD.name: legacy}
+    return None

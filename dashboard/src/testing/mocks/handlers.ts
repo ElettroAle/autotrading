@@ -25,7 +25,7 @@ import {
   type FakeUser,
 } from './platform';
 import type { FakeClosedPosition } from './positions';
-import { providerKeyHandlers } from './provider-key-handlers';
+import { API_KEY_FIELD, providerKeyHandlers } from './provider-key-handlers';
 import { problem, withUser } from './responses';
 
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -327,6 +327,7 @@ export const handlers = [
         providers: [...new Set(FAKE_MODELS.map((model) => model.provider))].map((provider) => ({
           name: provider,
           key_registered: user.providerKeys.some((key) => key.provider === provider),
+          key_fields: [API_KEY_FIELD],
         })),
         models: FAKE_MODELS,
       }),

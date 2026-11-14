@@ -31,7 +31,7 @@ def activity_on(worker: Worker, reader: FakeActivityReaderAdapter | None) -> Rea
 def test_the_activity_is_read_on_the_address_of_the_account() -> None:
     worker, reader = Worker(), FakeActivityReaderAdapter()
     account = worker.saved_account()
-    address = worker.vault[account.credentials.ciphertext][2].account_address
+    address = worker.vault[account.credentials.ciphertext][2].value("account_address")
     reader.activities[address] = activity = an_activity(balance=Decimal(42))
 
     assert activity_on(worker, reader).execute(account.id.value) == activity
@@ -82,7 +82,7 @@ def executions_on(worker: Worker, reader: FakeActivityReaderAdapter | None) -> R
 def test_the_executions_are_read_on_the_address_of_the_account_since_the_moment() -> None:
     worker, reader = Worker(), FakeActivityReaderAdapter()
     account = worker.saved_account()
-    address = worker.vault[account.credentials.ciphertext][2].account_address
+    address = worker.vault[account.credentials.ciphertext][2].value("account_address")
     reader.executions[address] = [fill := a_fill("BTC", None)]
 
     window = executions_on(worker, reader).execute(account.id.value, READ_AT)

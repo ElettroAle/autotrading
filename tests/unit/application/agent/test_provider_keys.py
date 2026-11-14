@@ -24,6 +24,7 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import RangeParameter
 from autotrading.domain.agent.provider_key import ProviderKey
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
@@ -34,6 +35,7 @@ from tests.fakes.provider_keys import (
     ProviderKeyStore,
     ProviderKeyVault,
 )
+from tests.support.provider_key import api_key_of, key_values
 
 OPENROUTER = ProviderName("openrouter")
 CATALOG = ModelCatalog(
@@ -62,11 +64,11 @@ class Keys:
 
     def register(self, provider: str, key: str) -> ProviderKeyRegistration:
         use_case = RegisterProviderKeyUseCase(self.tenant_id, self.repository, self.services)
-        return use_case.execute(RegisterProviderKeyCommand(provider, key))
+        return use_case.execute(RegisterProviderKeyCommand(provider, key_values(key)))
 
     def replace(self, provider: str, key: str) -> ProviderKeyRegistration:
         return ReplaceProviderKeyUseCase(self.repository, self.services).execute(
-            ReplaceProviderKeyCommand(provider, key)
+            ReplaceProviderKeyCommand(provider, key_values(key))
         )
 
     def remove(self, provider: str) -> None:
@@ -92,7 +94,7 @@ def test_a_key_is_saved_sealed_for_the_tenant_without_asking_the_provider(keys: 
     (registered,) = keys.store.keys
     assert (registered.tenant_id, registered.provider) == (keys.tenant_id, OPENROUTER)
     assert b"K-OR" not in registered.sealed.ciphertext
-    assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR")
+    assert keys.opened_key_of(OPENROUTER) == api_key_of("K-OR")
 
 
 def test_a_provider_outside_the_catalog_is_refused(keys: Keys) -> None:
@@ -115,7 +117,7 @@ def test_a_second_key_for_the_same_provider_is_refused(keys: Keys) -> None:
     ):
         keys.register("openrouter", "K-OR2")
 
-    assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR")
+    assert keys.opened_key_of(OPENROUTER) == api_key_of("K-OR")
 
 
 def test_the_replacement_puts_the_new_key_in_place(keys: Keys) -> None:
@@ -124,7 +126,7 @@ def test_the_replacement_puts_the_new_key_in_place(keys: Keys) -> None:
     assert keys.replace("openrouter", "K-OR2").provider == OPENROUTER
 
     assert len(keys.store.keys) == 1
-    assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR2")
+    assert keys.opened_key_of(OPENROUTER) == api_key_of("K-OR2")
 
 
 def test_a_replacement_without_a_registered_key_is_refused(keys: Keys) -> None:
@@ -204,14 +206,14 @@ def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys:
 
     assert listing.models == CATALOG.models
     assert listing.providers == (
-        ProviderListing(ProviderName("anthropic"), key_registered=False),
-        ProviderListing(OPENROUTER, key_registered=True),
+        ProviderListing(ProviderName("anthropic"), key_registered=False, key_fields=(API_KEY_FIELD,)),
+        ProviderListing(OPENROUTER, key_registered=True, key_fields=(API_KEY_FIELD,)),
     )
 
 
 def test_the_commands_never_show_the_key() -> None:
     for command in (
-        RegisterProviderKeyCommand("openrouter", "K-SECRET"),
-        ReplaceProviderKeyCommand("openrouter", "K-SECRET"),
+        RegisterProviderKeyCommand("openrouter", key_values("K-SECRET")),
+        ReplaceProviderKeyCommand("openrouter", key_values("K-SECRET")),
     ):
         assert "K-SECRET" not in repr(command)

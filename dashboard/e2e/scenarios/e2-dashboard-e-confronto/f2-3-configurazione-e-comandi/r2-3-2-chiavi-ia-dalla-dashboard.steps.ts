@@ -60,7 +60,7 @@ When(
     memory.secret = FIRST_KEY;
     const form = dashboard.page.getByRole('region', { name: 'Nuova chiave' });
     await dashboard.field('Fornitore', form).selectOption(provider);
-    await dashboard.field('Chiave', form).fill(FIRST_KEY);
+    await dashboard.field('Chiave API', form).fill(FIRST_KEY);
     await form.getByRole('button', { name: 'Registra la chiave' }).click();
   },
 );
@@ -70,7 +70,7 @@ When('{string} la sostituisce', async ({ dashboard, memory }, account: string) =
   memory.secret = NEW_KEY;
   const item = dashboard.providerKey(memory.subject);
   await item.getByRole('button', { name: 'Sostituisci la chiave' }).click();
-  await dashboard.field('Nuova chiave', item).fill(NEW_KEY);
+  await dashboard.field('Chiave API', item).fill(NEW_KEY);
   await item.getByRole('button', { name: 'Sostituisci', exact: true }).click();
 });
 

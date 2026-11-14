@@ -69,9 +69,7 @@ def get_account(platform: Platform, requests: Requests, user: str, account: str)
 @when(quoted('"{user}" chiede di sostituire le credenziali del conto "{account}"'))
 def replace_credentials(platform: Platform, requests: Requests, user: str, account: str) -> None:
     credentials = platform.accepted_credentials()
-    command = ReplaceCredentialsCommand(
-        platform.account_named("anna", account).id, credentials.account_address, credentials.secret_key
-    )
+    command = ReplaceCredentialsCommand(platform.account_named("anna", account).id, credentials.values)
     requests.refused[user] = refusal_of(lambda: platform.use_cases_of(user).replace_credentials.execute(command))
 
 

@@ -40,7 +40,7 @@ class FakeCredentialOpenerAdapter:
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise OrderCredentialsNotOpenedError
         self.opened_accesses.append(sealed)
-        return TradingAccess(sealed.exchange, credentials.account_address, credentials.secret_key)
+        return TradingAccess(sealed.exchange, credentials.value("account_address"), credentials.value("secret_key"))
 
     def open_address(self, sealed: SealedAddress) -> str:
         opened = self._vault.get(sealed.ciphertext)
@@ -50,7 +50,7 @@ class FakeCredentialOpenerAdapter:
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise FlowCredentialsNotOpenedError
         self.opened_addresses.append(sealed)
-        return credentials.account_address
+        return credentials.value("account_address")
 
     def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:
         opened = self._vault.get(sealed.ciphertext)
@@ -59,7 +59,7 @@ class FakeCredentialOpenerAdapter:
         tenant_id, account_id, credentials = opened
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise FlowCredentialsNotOpenedError
-        return CycleAccess(credentials.account_address, credentials.secret_key)
+        return CycleAccess(credentials.value("account_address"), credentials.value("secret_key"))
 
     def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
         opened = self._vault.get(sealed.ciphertext)
@@ -68,4 +68,4 @@ class FakeCredentialOpenerAdapter:
         tenant_id, account_id, credentials = opened
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise VerificationCredentialsNotOpenedError
-        return VerificationAccess(credentials.account_address, credentials.secret_key)
+        return VerificationAccess(credentials.value("account_address"), credentials.value("secret_key"))

@@ -56,13 +56,13 @@ def every_record(caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
 
 def contains(texts: list[str], label: str, keyring: Keyring) -> bool:
     credentials = keyring[label]
-    secrets = (credentials.account_address.lower(), credentials.secret_key.lower())
+    secrets = (credentials.value("account_address").lower(), credentials.value("secret_key").lower())
     return any(secret in text.lower() for text in texts for secret in secrets)
 
 
 def replace(platform: Platform, seen: Seen, credentials: Credentials) -> AutotradingError | None:
     account = platform.account_named(seen.owner, seen.account)
-    command = ReplaceCredentialsCommand(account.id, credentials.account_address, credentials.secret_key)
+    command = ReplaceCredentialsCommand(account.id, credentials.values)
     try:
         platform.use_cases_of(seen.owner).replace_credentials.execute(command)
     except AutotradingError as error:

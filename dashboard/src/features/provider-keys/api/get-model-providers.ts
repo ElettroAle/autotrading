@@ -5,9 +5,18 @@ import { readData, useApiClient } from '@/lib/api-client';
 
 import { PROVIDER_KEYS_QUERY_KEY } from './get-provider-keys';
 
-const providerSchema = z.object({ name: z.string(), key_registered: z.boolean() });
+const keyFieldSchema = z.object({ name: z.string(), label: z.string(), secret: z.boolean() });
 
-/** A provider of the catalog of the models, with whether the user registered its key (R1.4.1). */
+const providerSchema = z.object({
+  name: z.string(),
+  key_registered: z.boolean(),
+  key_fields: z.array(keyFieldSchema),
+});
+
+/**
+ * A provider of the catalog of the models, with whether the user registered its key (R1.4.1) and the fields its key
+ * asks (R2.3.9, ADR 0159).
+ */
 export type ModelProvider = z.infer<typeof providerSchema>;
 
 const catalogProvidersSchema = z.object({ providers: z.array(providerSchema) });

@@ -12,7 +12,6 @@ from autotrading.domain.agent.agent_context import AgentContext, FlowStateView
 from autotrading.domain.agent.errors import ModelNotAvailableError
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
-from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -26,6 +25,7 @@ from tests.fakes.provider_keys import (
     ProviderKeyStore,
     ProviderKeyVault,
 )
+from tests.support.provider_key import api_key_of
 
 TENANT = TenantId.new()
 NOW = datetime(2026, 11, 13, 10, 30, tzinfo=UTC)
@@ -56,7 +56,7 @@ class Gateways:
         self.keys = InMemoryProviderKeyRepositoryAdapter(ProviderKeyStore(), TENANT)
         for provider in ("anthropic", "openrouter"):
             name = ProviderName(provider)
-            sealed = FakeProviderKeySealerAdapter(TENANT, self.vault).seal(name, ProviderKey(f"K-{provider}"))
+            sealed = FakeProviderKeySealerAdapter(TENANT, self.vault).seal(name, api_key_of(f"K-{provider}"))
             self.keys.add(RegisteredProviderKey(TENANT, name, sealed))
 
     def ask(self, model: str) -> None:

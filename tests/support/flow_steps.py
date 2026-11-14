@@ -16,6 +16,7 @@ from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from tests.support.flows import OPENROUTER_MODEL, account_id_of
 from tests.support.platform import HYPERLIQUID, Platform
+from tests.support.provider_key import key_values
 from tests.support.steps import quoted
 
 KEY = "K-REGISTERED"
@@ -72,7 +73,7 @@ def names(listed: str) -> tuple[str, ...]:
 
 @given(quoted('che "{user}" ha registrato la chiave del fornitore "{provider}"'))
 def provider_key_registered(platform: Platform, user: str, provider: str) -> None:
-    platform.use_cases_of(user).register_provider_key.execute(RegisterProviderKeyCommand(provider, KEY))
+    platform.use_cases_of(user).register_provider_key.execute(RegisterProviderKeyCommand(provider, key_values(KEY)))
 
 
 @when(

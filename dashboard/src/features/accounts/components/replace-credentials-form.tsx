@@ -1,7 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { FormAlert, InputField, SecretField } from '@/components/ui/form/input-field';
+import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
+import { FormAlert } from '@/components/ui/form/input-field';
+import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { showRefusal } from '@/lib/form-errors';
 
 import type { Account } from '../api/get-accounts';
@@ -11,9 +13,7 @@ import {
   type CredentialsInput,
 } from '../api/replace-credentials';
 
-const FIELDS = ['account_address', 'secret_key'] as const;
-
-const EMPTY_FORM: CredentialsInput = { account_address: '', secret_key: '' };
+const EMPTY_FORM: CredentialsInput = { credentials: {} };
 
 type ReplaceCredentialsFormProps = {
   readonly account: Account;
@@ -21,13 +21,19 @@ type ReplaceCredentialsFormProps = {
   readonly onCancel: () => void;
 };
 
-/** New credentials for an account, checked with the exchange before they take the place of the old ones (R0.2.4). */
+/**
+ * New credentials for an account, with the fields its exchange declares (R2.3.9), checked with the exchange before
+ * they take the place of the old ones (R0.2.4).
+ */
 export const ReplaceCredentialsForm = ({
   account,
   onReplaced,
   onCancel,
 }: ReplaceCredentialsFormProps) => {
   const replacement = useReplaceCredentials();
+  const exchanges = useSupportedExchanges();
+  const fields =
+    exchanges.data?.find((exchange) => exchange.name === account.exchange)?.fields ?? [];
   const {
     register,
     handleSubmit,
@@ -39,14 +45,18 @@ export const ReplaceCredentialsForm = ({
     defaultValues: EMPTY_FORM,
   });
 
-  const onSubmit = handleSubmit((credentials) => {
+  const onSubmit = handleSubmit(({ credentials }) => {
     replacement.mutate(
       { accountId: account.id, credentials },
       {
         onSuccess: onReplaced,
         onError: (error) => {
-          resetField('secret_key');
-          showRefusal(error, setError, (field) => FIELDS.find((known) => known === field));
+          fields
+            .filter((field) => field.secret)
+            .forEach((field) => resetField(`credentials.${field.name}`));
+          showRefusal(error, setError, (field) =>
+            declaredFieldOf(fields, field) === undefined ? undefined : `credentials.${field}`,
+          );
         },
         onSettled: () => replacement.reset(),
       },
@@ -61,20 +71,15 @@ export const ReplaceCredentialsForm = ({
       className="mt-2 space-y-3"
     >
       <FormAlert error={errors.root?.server} />
-      <InputField
-        label="Indirizzo del conto"
-        error={errors.account_address}
-        {...register('account_address')}
-      />
-      <SecretField
-        label="Chiave dell'API wallet"
-        error={errors.secret_key}
-        {...register('secret_key')}
+      <DeclaredFields
+        fields={fields}
+        registerField={(name) => register(`credentials.${name}`)}
+        reasonOf={(name) => errors.credentials?.[name]?.message}
       />
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={replacement.isPending}
+          disabled={replacement.isPending || !exchanges.isSuccess}
           className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50"
         >
           Sostituisci

@@ -12,7 +12,8 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
 ## Glossario
 
 - **Provider key**: chiave dell'utente presso un fornitore di modelli, al massimo una per fornitore,
-  verificata presso il fornitore alla registrazione e alla sostituzione (R1.4.1).
+  verificata presso il fornitore alla registrazione e alla sostituzione (R1.4.1). È una mappa sui campi che il
+  catalogo dichiara per quel fornitore (`api_key` se non ne dichiara altri, R2.3.9, ADR 0159).
 - **Model catalog**: modelli disponibili con fornitore, nome, parametri ammessi, valori predefiniti e
   prezzi (R1.4.2).
 - **Agent context**: istruzioni del flusso, regole operative, ora, stato del flusso, dati delle fonti con

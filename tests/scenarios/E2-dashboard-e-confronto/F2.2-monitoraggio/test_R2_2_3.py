@@ -69,7 +69,7 @@ def attribute(
     """What the exchange shows of the account: a trade on ETH opened and closed, a position on BTC still open."""
     flow = flow_cycles.flow(name)
     platform = flow_cycles.platform
-    address = flow_cycles.credentials_of(name).account_address
+    address = flow_cycles.credentials_of(name).value("account_address")
     opened_at = flow_cycles.clock.now() - timedelta(minutes=10)
     orders = (uuid4(), uuid4())
     for order in orders:

@@ -15,7 +15,6 @@ from autotrading.domain.agent.errors import ModelNotAvailableError
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_usage import ModelPrices, ModelUsage
-from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
@@ -30,6 +29,7 @@ from tests.fakes.provider_keys import (
     ProviderKeyStore,
     ProviderKeyVault,
 )
+from tests.support.provider_key import api_key_of
 
 TENANT = TenantId.new()
 TENANT_KEY = "K-FAKE-TENANT"
@@ -69,7 +69,7 @@ class World:
 
     def register(self, provider: str, secret: str) -> None:
         name = ProviderName(provider)
-        sealed = FakeProviderKeySealerAdapter(TENANT, self.vault).seal(name, ProviderKey(secret))
+        sealed = FakeProviderKeySealerAdapter(TENANT, self.vault).seal(name, api_key_of(secret))
         self.keys.add(RegisteredProviderKey(TENANT, name, sealed))
 
     def ask(self, model: str = "openrouter/deepseek-chat") -> object:
@@ -88,7 +88,7 @@ def test_the_model_of_the_flow_is_called_with_the_key_of_the_tenant_and_the_cont
 
     [call] = world.model.calls
     assert call.model == "openrouter/deepseek-chat"
-    assert call.key == ProviderKey(TENANT_KEY)
+    assert call.key == api_key_of(TENANT_KEY)
     assert call.settings == {"temperature": Decimal("0.5")}
     assert call.messages == CONTEXT.messages()
 

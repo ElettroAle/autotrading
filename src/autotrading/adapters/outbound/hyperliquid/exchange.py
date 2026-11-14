@@ -1,4 +1,3 @@
-import re
 import secrets
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
@@ -21,6 +20,7 @@ from autotrading.application.verification.errors import (
 )
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
+from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.flows.cycle_access import CycleAccess
@@ -35,7 +35,13 @@ TIMEOUT_SECONDS = 10.0
 PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
 INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
-MASK = "***"
+# The names match the keys of the credentials already sealed, so nothing saved needs migrating (ADR 0158).
+ACCOUNT_ADDRESS = "account_address"
+API_WALLET_KEY = "secret_key"
+CREDENTIAL_FIELDS = (
+    CredentialField(ACCOUNT_ADDRESS, "Indirizzo del conto", secret=False),
+    CredentialField(API_WALLET_KEY, "Chiave dell'API wallet", secret=True),
+)
 
 
 class HyperliquidSdkAdapter:
@@ -72,6 +78,9 @@ class HyperliquidExchangeAdapter:
     def is_real(self) -> bool:
         return bool(self._base_url == MAINNET_API_URL)
 
+    def credential_fields(self) -> tuple[CredentialField, ...]:
+        return CREDENTIAL_FIELDS
+
     @classmethod
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidExchangeAdapter:
         # The network is chosen by the installation, never deduced from the credentials.
@@ -80,9 +89,10 @@ class HyperliquidExchangeAdapter:
     def read_state(self, credentials: Credentials) -> AccountState:
         wallet = _wallet_of(credentials)
         try:
-            exchange = self._sdk.exchange(wallet, self._base_url, credentials.account_address, self._timeout)
+            address = credentials.value(ACCOUNT_ADDRESS)
+            exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
-            state = self._sdk.info(self._base_url, self._timeout).user_state(credentials.account_address)
+            state = self._sdk.info(self._base_url, self._timeout).user_state(address)
         except ClientError as error:
             raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
         except (ServerError, requests.RequestException) as error:
@@ -92,7 +102,7 @@ class HyperliquidExchangeAdapter:
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
         try:
-            state = self.read_state(Credentials(access.account_address, access.secret_key))
+            state = self.read_state(_credentials_of(access.account_address, access.secret_key))
         except ExchangeRejectedCredentialsError as error:
             raise VerificationCredentialsRejectedError from error
         except ExchangeUnavailableError as error:
@@ -110,7 +120,7 @@ class HyperliquidExchangeAdapter:
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:
         """The same reading for the cycle of a flow: a refusal pauses the flows of the account (R1.2.4)."""
         try:
-            state = self.read_state(Credentials(access.account_address, access.secret_key))
+            state = self.read_state(_credentials_of(access.account_address, access.secret_key))
         except ExchangeRejectedCredentialsError as error:
             raise FlowCredentialsRefusedError from error
         except ExchangeUnavailableError as error:
@@ -135,7 +145,7 @@ class HyperliquidExchangeAdapter:
 
 def _wallet_of(credentials: Credentials) -> LocalAccount:
     try:
-        wallet: LocalAccount = EthereumAccount.from_key(credentials.secret_key)
+        wallet: LocalAccount = EthereumAccount.from_key(credentials.value(API_WALLET_KEY))
     except ValueError as error:
         raise ExchangeRejectedCredentialsError(INVALID_KEY_MESSAGE) from error
     return wallet
@@ -185,6 +195,8 @@ def _decimal(value: object) -> Decimal:
 
 def _masked(message: str, credentials: Credentials) -> str:
     # The message of the exchange goes back to the user; the credentials it may echo never do (R0.2.3).
-    for secret in (credentials.secret_key, credentials.account_address):
-        message = re.sub(re.escape(secret), MASK, message, flags=re.IGNORECASE)
-    return message
+    return credentials.redact(message)
+
+
+def _credentials_of(account_address: str, secret_key: str) -> Credentials:
+    return Credentials({ACCOUNT_ADDRESS: account_address, API_WALLET_KEY: secret_key})

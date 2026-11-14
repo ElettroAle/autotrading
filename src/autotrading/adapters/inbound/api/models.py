@@ -43,13 +43,24 @@ class ModelResponse(BaseModel):
         return cls(name=model.name, provider=model.provider.value, parameters=parameters)
 
 
+class ProviderKeyFieldResponse(BaseModel):
+    name: str
+    label: str
+    secret: bool
+
+
 class ProviderResponse(BaseModel):
     name: str
     key_registered: bool
+    key_fields: list[ProviderKeyFieldResponse]
 
     @classmethod
     def of(cls, listing: ProviderListing) -> ProviderResponse:
-        return cls(name=listing.provider.value, key_registered=listing.key_registered)
+        fields = [
+            ProviderKeyFieldResponse(name=field.name, label=field.label, secret=field.secret)
+            for field in listing.key_fields
+        ]
+        return cls(name=listing.provider.value, key_registered=listing.key_registered, key_fields=fields)
 
 
 class ModelCatalogResponse(BaseModel):
