@@ -3,6 +3,10 @@ import { http, HttpResponse } from 'msw';
 import { fakePlatform, type FakeFlow } from './platform';
 
 const BEARER = 'Bearer ';
+const NO_LINKED_CHAT = 'nessuna chat collegata';
+
+/** The text of the test notification of R1.8.1, the same from the chat and from the dashboard. */
+export const TEST_NOTIFICATION = 'notifica di prova: le notifiche dei tuoi flussi arrivano qui';
 
 // Answers as the API does: Problem Details, 401 without a valid token, 403 without the Utente role (R0.1.1).
 const problem = (status: number, title: string, detail: string) =>
@@ -60,5 +64,37 @@ export const handlers = [
   ),
   http.get('*/flows', ({ request }) =>
     withUser(request, (user) => HttpResponse.json(user.flows.map(flowResponse))),
+  ),
+  http.post('*/telegram/link-code', ({ request }) =>
+    withUser(request, (user) => {
+      const issued = fakePlatform.issueLinkCode(user.account, new Date());
+      return HttpResponse.json(
+        { code: issued.code, expires_at: issued.expiresAt, link: issued.link },
+        { status: 201 },
+      );
+    }),
+  ),
+  http.get('*/telegram/chat', ({ request }) =>
+    withUser(request, (user) => {
+      const chat = fakePlatform.linkedChatOf(user.account);
+      return HttpResponse.json({ linked: chat !== undefined, chat_id: chat?.id ?? null });
+    }),
+  ),
+  http.delete('*/telegram/chat', ({ request }) =>
+    withUser(request, (user) =>
+      fakePlatform.unlinkChat(user.account)
+        ? new HttpResponse(null, { status: 204 })
+        : problem(404, 'Not Found', NO_LINKED_CHAT),
+    ),
+  ),
+  http.post('*/telegram/test-notification', ({ request }) =>
+    withUser(request, (user) => {
+      const chat = fakePlatform.linkedChatOf(user.account);
+      if (chat === undefined) {
+        return problem(409, 'Conflict', NO_LINKED_CHAT);
+      }
+      chat.received.push(TEST_NOTIFICATION);
+      return new HttpResponse(null, { status: 204 });
+    }),
   ),
 ];

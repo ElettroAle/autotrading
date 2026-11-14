@@ -21,6 +21,9 @@ const problemSchema = z.object({ detail: z.string() });
 
 export type ApiClient = {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+  post<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+  /** A command the API answers without content. */
+  send(method: 'POST' | 'DELETE', path: string): Promise<void>;
 };
 
 type ApiClientOptions = {
@@ -44,20 +47,31 @@ export const createApiClient = ({
     }
   };
 
+  const request = async (method: string, path: string): Promise<Response> => {
+    const token = await tokenOrSignIn();
+    const response = await fetcher(new URL(path, window.location.origin), {
+      method,
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    if (response.status === 401) {
+      onSessionExpired();
+      throw new SessionExpiredError();
+    }
+    if (!response.ok) {
+      throw new ApiError(response.status, await reasonOf(response));
+    }
+    return response;
+  };
+
   return {
     async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-      const token = await tokenOrSignIn();
-      const response = await fetcher(new URL(path, window.location.origin), {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      });
-      if (response.status === 401) {
-        onSessionExpired();
-        throw new SessionExpiredError();
-      }
-      if (!response.ok) {
-        throw new ApiError(response.status, await reasonOf(response));
-      }
-      return schema.parse(await response.json());
+      return schema.parse(await (await request('GET', path)).json());
+    },
+    async post<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+      return schema.parse(await (await request('POST', path)).json());
+    },
+    async send(method: 'POST' | 'DELETE', path: string): Promise<void> {
+      await request(method, path);
     },
   };
 };

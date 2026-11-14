@@ -16,6 +16,10 @@ export class DashboardPages {
     await this.page.goto(`${BASE_PATH}${path}`);
   }
 
+  async openNotifications(): Promise<void> {
+    await this.open('/notifications');
+  }
+
   async openFlow(name: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(name).id}`);
   }
@@ -63,5 +67,33 @@ export class DashboardPages {
 
   alert(): Locator {
     return this.page.getByRole('alert');
+  }
+
+  /** A message the dashboard tells the user, as an alert or as a status, with exactly this text. */
+  message(text: string): Locator {
+    return this.page
+      .getByRole('alert')
+      .or(this.page.getByRole('status'))
+      .and(this.page.getByText(text, { exact: true }));
+  }
+
+  button(name: string): Locator {
+    return this.page.getByRole('button', { name });
+  }
+
+  linkCode(): Locator {
+    return this.page.getByLabel('Codice di collegamento');
+  }
+
+  linkCodeExpiry(): Locator {
+    return this.page.getByLabel('Scadenza del codice');
+  }
+
+  botLink(): Locator {
+    return this.page.getByRole('link', { name: 'Apri il bot e collega la chat' });
+  }
+
+  linkedChat(): Locator {
+    return this.page.getByLabel('Chat collegata');
   }
 }

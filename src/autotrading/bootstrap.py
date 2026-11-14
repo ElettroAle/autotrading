@@ -246,6 +246,7 @@ def tenant_use_cases(
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
             bot_identity=bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
+            notifier=notifier,
             clock=system_clock_adapters().now,
             closed_positions=closed_positions,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
