@@ -7,11 +7,14 @@ from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.orders.slippage import Slippage
 
 SLIPPAGE = "ORDER_MAX_SLIPPAGE_PERCENT"
+NETWORK = "HYPERLIQUID_NETWORK"
+# The names Hyperliquid gives its networks: the installation declares one, nothing deduces it (Bug 277).
+NETWORKS = {"testnet": ExchangeNetwork.TEST, "mainnet": ExchangeNetwork.REAL}
 
 
 @dataclass(frozen=True, slots=True)
 class _HyperliquidSettings:
-    """The network chosen by the installation, never deduced from the credentials (ADR 0087).
+    """The network the installation declares, never deduced from its name or from the credentials (Bug 277).
 
     The name is the exchange an account declares at registration: the use cases pick the adapter by it.
     """
@@ -22,6 +25,13 @@ class _HyperliquidSettings:
     @property
     def testnet(self) -> bool:
         return self.network.is_test
+
+
+def _settings_of(source: ConfigurationSource) -> _HyperliquidSettings:
+    network = NETWORKS.get(source.value(NETWORK).lower())
+    if network is None:
+        raise InvalidConfigurationError(NETWORK)
+    return _HyperliquidSettings(network)
 
 
 @dataclass(frozen=True, slots=True)

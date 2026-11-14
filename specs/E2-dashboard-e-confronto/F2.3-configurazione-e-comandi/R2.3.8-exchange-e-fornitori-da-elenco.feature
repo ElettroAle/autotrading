@@ -11,9 +11,9 @@ Funzionalità: R2.3.8 Exchange e fornitori IA scelti da un elenco
   sostituisce (R2.3.2).
 
   Scenario: Exchange del conto da un elenco
-    Dato che la piattaforma supporta l'exchange "hyperliquid"
+    Dato che la piattaforma supporta l'exchange "Hyperliquid"
     Quando "anna" apre la registrazione di un conto
-    Allora il campo exchange offre "hyperliquid" e non accetta un valore fuori dall'elenco
+    Allora il campo exchange offre "Hyperliquid" e non accetta un valore fuori dall'elenco
 
   Scenario: Fornitore della chiave da un elenco
     Dato che il catalogo dei modelli ha i fornitori "openrouter" e "anthropic"

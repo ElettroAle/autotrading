@@ -4,11 +4,11 @@ import { z } from 'zod';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
-const accountsSchema = z.array(z.object({ id: z.string(), name: z.string() }));
+const accountsSchema = z.array(z.object({ id: z.string(), name: z.string(), network: z.string() }));
 
 export type Account = z.infer<typeof accountsSchema>[number];
 
-/** The accounts of the tenant a flow can run on. */
+/** The accounts of the tenant a flow can run on, with the network each trades on (Bug 277). */
 export const useAccounts = () => {
   const api = useApiClient();
   return useQuery({

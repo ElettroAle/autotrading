@@ -1,6 +1,6 @@
 from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
-from autotrading.adapters.outbound.hyperliquid.configuration import _HyperliquidSettings, _order_settings_of
+from autotrading.adapters.outbound.hyperliquid.configuration import _order_settings_of, _settings_of
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.executions import HyperliquidAccountExecutionsAdapter
 from autotrading.adapters.outbound.hyperliquid.market_data import (
@@ -9,7 +9,6 @@ from autotrading.adapters.outbound.hyperliquid.market_data import (
 )
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.orders.slippage import Slippage
 
 type HyperliquidAdaptersOfInstallation = tuple[
@@ -23,9 +22,10 @@ type HyperliquidAdaptersOfInstallation = tuple[
 ]
 
 
-def hyperliquid_adapters(network: ExchangeNetwork) -> HyperliquidAdaptersOfInstallation:
-    """The adapters by exchange name, for the use cases that pick the exchange of an account, and the market data."""
-    settings = _HyperliquidSettings(network)
+def hyperliquid_adapters(source: ConfigurationSource) -> HyperliquidAdaptersOfInstallation:
+    """The adapters by exchange name, for the use cases that pick the exchange of an account, and the market data,
+    all on the network the installation declares."""
+    settings = _settings_of(source)
     testnet = settings.testnet
     return (
         {settings.name: HyperliquidExchangeAdapter.for_network(testnet=testnet)},

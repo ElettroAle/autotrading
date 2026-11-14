@@ -13,7 +13,9 @@ export const FlowRoute = () => {
     <DashboardLayout title="Flusso">
       <FlowView
         flowId={flowId}
-        renderCommands={(flow) => <FlowCommands flowId={flow.id} status={flow.status} />}
+        renderCommands={(flow, realMoney) => (
+          <FlowCommands flowId={flow.id} status={flow.status} realMoney={realMoney} />
+        )}
       />
       <PeriodSelector />
       <EquityCurve flowId={flowId} />

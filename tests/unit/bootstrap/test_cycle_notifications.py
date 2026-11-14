@@ -60,6 +60,7 @@ from tests.support.activity import a_fill, a_movement, a_position, an_activity
 from tests.support.cycle_composition import TenantCyclePorts
 from tests.support.flow_cycles import FlowCycles, at
 from tests.support.flows import scenario_catalog
+from tests.support.installation import dev_installation_on_testnet
 
 USER = "oid-anna"
 CHAT = ChatId(4242)
@@ -474,7 +475,7 @@ def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
     worker = cycle_of(
         create_engine("sqlite://"),
         (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({})),
-        ("dev", Slippage.default()),
+        ("dev", Slippage.default(), dev_installation_on_testnet()[1]),
         FakeMessengerAdapter(),
         ({"models": FakeModelGatewayAdapter(catalog)}, FakePriceForecasterAdapter()),
     )

@@ -117,7 +117,7 @@ export interface paths {
         };
         /**
          * List Supported Exchanges
-         * @description The exchanges an account can be registered on, by name (ADR 0152).
+         * @description The exchanges an account can be registered on, each with the network it trades on (ADR 0152, ADR 0157).
          */
         get: operations["list_supported_exchanges_exchanges_get"];
         put?: never;
@@ -1214,6 +1214,13 @@ export interface components {
             equity: string;
             /** Change Percent */
             change_percent: string | null;
+        };
+        /** ExchangeResponse */
+        ExchangeResponse: {
+            /** Name */
+            name: string;
+            /** Network */
+            network: string;
         };
         /** FailureResponse */
         FailureResponse: {
@@ -2451,7 +2458,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["ExchangeResponse"][];
                 };
             };
         };

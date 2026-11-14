@@ -20,6 +20,11 @@ Funzionalità: R2.3.1 Gestione dei conti dalla dashboard
     Allora il conto "principale" compare nell'elenco con il suo saldo
     E la chiave non è visibile in alcuna pagina
 
+  Scenario: La registrazione mostra che l'exchange opera su rete reale
+    Dato che l'exchange "Hyperliquid" è configurato sulla rete reale
+    Quando "anna" sceglie l'exchange "Hyperliquid" per registrare un conto
+    Allora la registrazione avvisa che il conto opererà con denaro reale
+
   Scenario: Credenziali rifiutate
     Quando "anna" registra un conto con una chiave che l'exchange rifiuta
     Allora la dashboard mostra il motivo del rifiuto

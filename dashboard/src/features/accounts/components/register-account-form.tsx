@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { FormAlert, InputField, SecretField } from '@/components/ui/form/input-field';
 import { SelectField } from '@/components/ui/form/select-field';
+import { isRealMoney, RealMoneyNotice } from '@/components/ui/real-money';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -24,7 +25,7 @@ const EMPTY_FORM: AccountRegistrationInput = {
 
 /**
  * Registers an account on an exchange the API supports (R2.3.8): the API checks the credentials with the exchange
- * before saving them (R0.2.1).
+ * before saving them (R0.2.1), and the form warns when the chosen exchange trades real money (ADR 0157).
  */
 export const RegisterAccountForm = () => {
   const registration = useRegisterAccount();
@@ -33,6 +34,7 @@ export const RegisterAccountForm = () => {
   const [registered, setRegistered] = useState<string | null>(null);
   const {
     register,
+    control,
     handleSubmit,
     reset,
     resetField,
@@ -42,6 +44,8 @@ export const RegisterAccountForm = () => {
     resolver: zodResolver(accountRegistrationInputSchema),
     defaultValues: EMPTY_FORM,
   });
+  const chosenExchange = useWatch({ control, name: 'exchange' });
+  const network = exchanges.data?.find((exchange) => exchange.name === chosenExchange)?.network;
 
   const onSubmit = handleSubmit((input) => {
     setRegistered(null);
@@ -72,7 +76,7 @@ export const RegisterAccountForm = () => {
         <SelectField
           label="Exchange"
           placeholder="Scegli un exchange"
-          choices={(exchanges.data ?? []).map((name) => ({ value: name, label: name }))}
+          choices={(exchanges.data ?? []).map(({ name }) => ({ value: name, label: name }))}
           loading={exchanges.isPending}
           unavailable={
             exchanges.isError
@@ -82,6 +86,7 @@ export const RegisterAccountForm = () => {
           error={errors.exchange}
           {...register('exchange')}
         />
+        {isRealMoney(network) && <RealMoneyNotice subject="Il conto" />}
         <InputField
           label="Indirizzo del conto"
           error={errors.account_address}

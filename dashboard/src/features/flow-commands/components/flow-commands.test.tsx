@@ -93,6 +93,31 @@ describe('FlowCommands', () => {
     expect(fakePlatform.flowNamed('alfa').status).toBe('attivo');
   });
 
+  it('starts a stopped flow on the test network without asking', async () => {
+    alfa.status = 'fermo';
+    await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+    await click('Avvia');
+
+    expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('starts a stopped flow on real money only once the user confirms it', async () => {
+    fakePlatform.configureExchangeNetwork('real');
+    alfa.status = 'fermo';
+    await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+    await click('Avvia');
+    expect(
+      await screen.findByRole('alertdialog', { name: "Conferma dell'avvio" }),
+    ).toHaveTextContent('Il flusso opererà con denaro reale');
+    expect(fakePlatform.flowNamed('alfa').status).toBe('fermo');
+    await click('Avvia con denaro reale');
+
+    expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
+  });
+
   it('stops the flow once the user confirms, closing its positions', async () => {
     fakePlatform.holdPositions('alfa', [anOpenPosition({ asset: 'BTC' })]);
     await renderApp({ account: 'anna', url: FLOW_PAGE });
