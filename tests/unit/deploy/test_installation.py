@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE = ROOT / "deploy" / "compose.yaml"
 DEPLOY_ACTION = ROOT / ".github" / "actions" / "ssh-deploy" / "action.yml"
+PREPARE = ROOT / "deploy" / "prepare-installation.sh"
 SERVICE = re.compile(r"^  ([a-z_-]+):\n((?:    .*\n|\s*\n)*)", re.MULTILINE)
 # A one-shot service is ready when it exits successfully, as its dependants require; it has no health to check.
 ONE_SHOT = 'restart: "no"'
@@ -31,4 +32,21 @@ def test_every_start_of_the_installation_waits_for_the_services_to_be_healthy() 
 
 
 def test_the_services_are_found_in_the_compose_file() -> None:
-    assert {"postgres", "migrate", "litellm", "forecaster", "worker", "api"} <= set(_services())
+    assert {"postgres", "migrate", "forecaster", "worker", "api"} <= set(_services())
+
+
+def test_the_installation_runs_no_litellm_proxy_and_keeps_none_of_its_secrets() -> None:
+    """ADR 0150: the library runs inside the worker; the proxy, its master key and its configuration are gone."""
+    compose = COMPOSE.read_text(encoding="utf-8")
+
+    assert "litellm" not in _services()
+    assert re.findall(r"LITELLM_(?:URL|MASTER_KEY)\w*|litellm_(?:master_key|config)", compose) == []
+    assert "litellm" not in DEPLOY_ACTION.read_text(encoding="utf-8")
+
+
+def test_a_release_removes_what_the_proxy_left_on_the_machine() -> None:
+    """ADR 0150: --remove-orphans stops the old container, the script removes its files."""
+    script = PREPARE.read_text(encoding="utf-8")
+
+    assert re.search(r"rm -rf .*secrets/litellm_master_key secrets/litellm_config", script)
+    assert "docker compose up -d --remove-orphans" in DEPLOY_ACTION.read_text(encoding="utf-8")

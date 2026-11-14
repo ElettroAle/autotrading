@@ -15,7 +15,9 @@ from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
+from autotrading.adapters.inbound.api.worker_model_catalog import WorkerModelCatalogResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
+from autotrading.application.agent.read_model_catalog import ReadModelCatalogUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotInboxPort, BotStartLinkPort
@@ -54,6 +56,18 @@ class WorkerUseCases:
     run_exchange_verification: RunExchangeVerificationUseCase
     notify: NotifyUseCase
     read_account_activity: ReadAccountActivityUseCase
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerAnswers:
+    """What the worker answers for the whole installation, whatever the tenant: what only it holds."""
+
+    bot_start_link: BotStartLinkPort | None = None
+    # The catalog of the gateways whose library only the worker loads (ADR 0148, ADR 0149).
+    model_catalog: ReadModelCatalogUseCase | None = None
+
+
+NO_ANSWERS = WorkerAnswers()
 
 
 class UserRequest(BaseModel):
@@ -148,7 +162,7 @@ def create_worker_api(
     for_tenant: Callable[[TenantId], WorkerUseCases],
     bot: BotPolling | None = None,
     cycles: CyclePolling | None = None,
-    bot_start_link: BotStartLinkPort | None = None,
+    answers: WorkerAnswers = NO_ANSWERS,
 ) -> FastAPI:
     """The internal service of the worker: reachable only by the API on the network of the installation (ADR 0021).
 
@@ -200,10 +214,25 @@ def create_worker_api(
 
     @api.get("/bot/start-link", dependencies=[Depends(require_api)])
     def read_bot_start_link(code: str) -> StartLinkResponse:
+        bot_start_link = answers.bot_start_link
         return StartLinkResponse(link=None if bot_start_link is None else bot_start_link.start_link(code))
+
+    _add_model_catalog(api, require_api, answers.model_catalog)
 
     @api.get("/health")
     def read_health() -> dict[str, str]:
         return {"status": "ok"}
 
     return api
+
+
+def _add_model_catalog(
+    api: FastAPI, require_api: Callable[[Request], None], model_catalog: ReadModelCatalogUseCase | None
+) -> None:
+    """Outside any tenant: the catalog is the same for everyone (ADR 0149). A worker without it does not offer it."""
+    if model_catalog is None:
+        return
+
+    @api.get("/internal/model-catalog", dependencies=[Depends(require_api)])
+    def read_model_catalog() -> WorkerModelCatalogResponse:
+        return WorkerModelCatalogResponse.of(model_catalog.execute())

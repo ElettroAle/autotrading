@@ -7,8 +7,8 @@ paths:
 
 # Adapter in uscita: OpenRouter
 
-- API pubblica di OpenRouter (`https://openrouter.ai/api/v1`), raggiunta con `httpx` (libreria di trasporto). Nessun
-  SDK di un altro sistema: l'SDK `openai` appartiene a `litellm/`.
+- API pubblica di OpenRouter (`https://openrouter.ai/api/v1`), raggiunta con `httpx` (libreria di trasporto). Nessuna
+  libreria di un altro sistema: `litellm` appartiene a `litellm/`.
 - `OpenRouterModelGatewayAdapter` è la fabbrica concreta di `ModelGatewayPort` (abstract factory, ADR 0109): crea
   `OpenRouterModelCallAdapter` (`ModelCallPort`) e `OpenRouterModelCatalogAdapter` (`ModelCatalogPort` di `agent`,
   `FlowModelsPort` di `flows`). Non riceve porte: crea solo oggetti della propria tecnologia.

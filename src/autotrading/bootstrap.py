@@ -8,6 +8,7 @@ from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, Tenan
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
     CyclePolling,
+    WorkerAnswers,
     WorkerUseCases,
     bot_polling,
 )
@@ -26,10 +27,9 @@ from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumPr
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
-from autotrading.adapters.outbound.litellm.model_gateway import LiteLlmModelGatewayAdapter
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
-from autotrading.adapters.outbound.openrouter.model_gateway import OpenRouterModelGatewayAdapter
+from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterModelCatalogAdapter
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -76,12 +76,18 @@ from autotrading.adapters.outbound.system_clock.composition import system_clock_
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
-from autotrading.adapters.outbound.worker.composition import WorkerAdaptersOfTenant, worker_adapters
+from autotrading.adapters.outbound.worker.composition import (
+    WorkerAdaptersOfTenant,
+    worker_adapters,
+    worker_model_catalog_adapters,
+)
+from autotrading.adapters.outbound.worker.model_catalog import WorkerModelCatalogAdapter
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
-from autotrading.application.agent.model_gateways import ModelGateways
+from autotrading.application.agent.model_gateways import ModelCatalogs, ModelGateways
+from autotrading.application.agent.read_model_catalog import ReadModelCatalogUseCase
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.create_flow import FlowChecks
@@ -198,10 +204,10 @@ def tenant_use_cases(
     ],
     environment: str,
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
-    models: tuple[ModelGateways, Mapping[str, FlowModelsPort]],
+    models: tuple[ModelCatalogs, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
-    model_gateways, flow_models = models
+    model_catalogs, flow_models = models
     credential_sealer, provider_key_sealer = sealers
     exchanges, markets, *_ = hyperliquid_adapters(ExchangeNetwork.of_installation(environment))
 
@@ -235,7 +241,7 @@ def tenant_use_cases(
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_usage=flows,
-            model_gateways=model_gateways,
+            model_catalogs=model_catalogs,
             flows=flows,
             running_verifications=SqlAlchemyRunningVerificationsAdapter(engine),
             flow_checks=FlowChecks(
@@ -452,16 +458,17 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     source = ConfigurationSource(configuration)
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
-    gateways: dict[str, LiteLlmModelGatewayAdapter | OpenRouterModelGatewayAdapter] = {
-        **litellm_adapters(source),
-        **openrouter_adapters(),
+    # The API never loads the LiteLLM library: it asks the worker for its catalog (ADR 0148, ADR 0149).
+    catalogs: dict[str, WorkerModelCatalogAdapter | OpenRouterModelCatalogAdapter] = {
+        **worker_model_catalog_adapters(source),
+        **{name: gateway.model_catalog() for name, gateway in openrouter_adapters().items()},
     }
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
         source.environment(),
         worker_adapters(source),
-        (gateways, {name: gateway.model_catalog() for name, gateway in gateways.items()}),
+        (catalogs, catalogs),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
 
@@ -476,11 +483,15 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     messenger, inbox, start_link = telegram_adapters(source)
     for_tenant = worker_use_cases(engine, opener, environment, slippage, messenger)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger))
-    models: ModelGateways = {**litellm_adapters(source), **openrouter_adapters()}
+    library_gateways = litellm_adapters()
+    models: ModelGateways = {**library_gateways, **openrouter_adapters()}
     predictors = (models, forecaster_adapters(source))
     cycle_for = cycle_of(engine, (opener, provider_key_opener), (environment, slippage), messenger, predictors)
     cycles = worker_cycles(engine, cycle_for, environment)
-    return worker_api_adapters(source, for_tenant, bot, cycles, start_link)
+    library_catalog = ReadModelCatalogUseCase(
+        {name: gateway.model_catalog() for name, gateway in library_gateways.items()}
+    )
+    return worker_api_adapters(source, for_tenant, bot, cycles, WorkerAnswers(start_link, library_catalog))
 
 
 def telegram_bot(engine: SqlAlchemyEngine, inbox: BotInboxPort, messenger: MessengerPort) -> BotPolling:

@@ -1,16 +1,14 @@
-"""The model call through the LiteLLM proxy, served in memory in the shapes the proxy answers with (ADR 0101)."""
+"""The model call through the LiteLLM library, on a completion that answers and fails as the library does (ADR 0148)."""
 
-import json
 from collections.abc import Callable
 from decimal import Decimal
 
-import httpx2
+import httpx
+import litellm
 import pytest
-from openai import OpenAI
+from litellm import exceptions
 
-from autotrading.adapters.outbound.litellm.model_call import (
-    LiteLlmModelCallAdapter,
-)
+from autotrading.adapters.outbound.litellm.model_call import LiteLlmModelCallAdapter
 from autotrading.application.agent.errors import (
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
@@ -22,8 +20,7 @@ from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
 
-PROXY_URL = "http://litellm:4000"
-MASTER_KEY = "sk-master-of-the-installation"
+TIMEOUT_SECONDS = 120.0
 KEY = ProviderKey("K-FAKE-MODEL-KEY")
 MESSAGES = (ModelMessage(MessageRole.SYSTEM, "regole"), ModelMessage(MessageRole.USER, '{"ora_corrente": "10:30"}'))
 SENT_MESSAGES = [{"role": "system", "content": "regole"}, {"role": "user", "content": '{"ora_corrente": "10:30"}'}]
@@ -33,259 +30,234 @@ SETTINGS: dict[str, ParameterValue] = {
     "reasoning_effort": "alto",
 }
 ANSWER = '{"decisioni": []}'
-TIMED_OUT, REFUSED = "timed out", "connection refused"
 USAGE: dict[str, object] = {"prompt_tokens": 2000, "completion_tokens": 500, "total_tokens": 2500}
-REPLY: dict[str, object] = {
-    "id": "chatcmpl-1",
-    "object": "chat.completion",
-    "created": 1,
-    "model": "openai/gpt-4.1-mini",
-    "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": ANSWER}}],
-    "usage": USAGE,
-}
-ROUTING_NOISE = ". Received Model Group=openai/gpt\nAvailable Model Group Fallbacks=None"
+CHOICES: list[dict[str, object]] = [
+    {"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": ANSWER}}
+]
 
-type Answer = Callable[[httpx2.Request], httpx2.Response]
+type Failure = Callable[[], Exception]
 
 
-class Proxy:
-    """The LiteLLM proxy in memory, recording the requests it receives."""
+def response(**fields: object) -> litellm.ModelResponse:
+    return litellm.ModelResponse(**({"model": "gpt-4.1-mini", "choices": CHOICES, "usage": USAGE} | fields))
 
-    def __init__(self, status: int = 200, body: object = REPLY, text: str | None = None) -> None:
-        self.requests: list[httpx2.Request] = []
-        self._status, self._body, self._text = status, body, text
 
-    def answer(self, request: httpx2.Request) -> httpx2.Response:
+class Library:
+    """The completion of the library, recording what it is asked and answering or failing as told."""
+
+    def __init__(self, answer: object = None, failure: Failure | None = None) -> None:
+        self.requests: list[dict[str, object]] = []
+        self._answer = response() if answer is None else answer
+        self._failure = failure
+
+    def completion(self, **request: object) -> object:
         self.requests.append(request)
-        if self._text is not None:
-            return httpx2.Response(self._status, text=self._text)
-        return httpx2.Response(self._status, json=self._body)
+        if self._failure is not None:
+            raise self._failure()
+        return self._answer
 
     @property
     def sent(self) -> dict[str, object]:
-        body: dict[str, object] = json.loads(self.requests[0].content)
-        return body
+        return self.requests[0]
 
 
-def adapter_on(answer: Answer) -> LiteLlmModelCallAdapter:
-    client = OpenAI(
-        api_key=MASTER_KEY,
-        base_url=PROXY_URL,
-        max_retries=0,
-        http_client=httpx2.Client(transport=httpx2.MockTransport(answer)),
-    )
-    return LiteLlmModelCallAdapter(client)
+def call(library: Library, model: str, settings: dict[str, ParameterValue] | None = None) -> ModelReply:
+    adapter = LiteLlmModelCallAdapter(library.completion, TIMEOUT_SECONDS)
+    return adapter.call(model, KEY, SETTINGS if settings is None else settings, MESSAGES)
 
 
-def call(proxy: Proxy, model: str, settings: dict[str, ParameterValue] | None = None) -> ModelReply:
-    return adapter_on(proxy.answer).call(model, KEY, SETTINGS if settings is None else settings, MESSAGES)
+def failing(failure: Failure) -> Library:
+    return Library(failure=failure)
 
 
-def refusal(status: int, message: str) -> Proxy:
-    return Proxy(status, {"error": {"message": message, "type": None, "param": None, "code": str(status)}})
+type Refused = Callable[..., Exception]
 
 
-def test_the_request_reaches_the_proxy_with_the_master_key_and_the_key_of_the_user_in_the_body() -> None:
-    proxy = Proxy()
+def refusal(kind: Refused, message: str) -> Failure:
+    return lambda: kind(message=message, llm_provider="openai", model="gpt")
 
-    call(proxy, "openai/gpt-4.1-mini")
 
-    request = proxy.requests[0]
-    assert str(request.url) == f"{PROXY_URL}/chat/completions"
-    assert request.headers["Authorization"] == f"Bearer {MASTER_KEY}"
-    assert proxy.sent["api_key"] == KEY.secret
+def refusal_with_response(kind: Refused, status: int, message: str) -> Failure:
+    answer = httpx.Response(status, request=httpx.Request("POST", "https://provider.test"))
+    return lambda: kind(message=message, llm_provider="openai", model="gpt", response=answer)
 
 
 @pytest.mark.parametrize(
     "model", ["anthropic/claude-sonnet-5-5", "openai/gpt-4.1-mini", "deepseek/deepseek-chat", "gemini/gemini-pro"]
 )
-def test_every_provider_gets_the_same_request_of_the_openai_api(model: str) -> None:
-    proxy = Proxy()
+def test_every_provider_gets_the_same_request_of_the_openai_api_with_the_key_of_the_user(model: str) -> None:
+    library = Library()
 
-    call(proxy, model)
+    call(library, model)
 
-    assert proxy.sent == {
+    assert library.sent == {
         "model": model,
         "messages": SENT_MESSAGES,
+        "api_key": KEY.secret,
         "max_tokens": 2048,
         "temperature": 0.7,
         "response_format": {"type": "json_object"},
         "reasoning_effort": "high",
-        "api_key": KEY.secret,
+        "drop_params": True,
+        "num_retries": 0,
+        "timeout": TIMEOUT_SECONDS,
     }
 
 
-def test_a_cost_the_provider_reports_is_the_cost_of_the_call() -> None:
-    proxy = Proxy(body={**REPLY, "usage": {**USAGE, "cost": 0.0031}})
-
-    reply = call(proxy, "openai/gpt-4.1-mini")
-
-    assert reply == ModelReply(ANSWER, ModelUsage(2000, 500, Decimal("0.0031")))
-
-
-def test_without_a_reported_cost_the_prices_of_the_catalog_apply() -> None:
-    assert call(Proxy(), "openai/gpt-4.1-mini") == ModelReply(ANSWER, ModelUsage(2000, 500, None))
+def test_the_answer_and_what_the_call_consumed_are_the_reply() -> None:
+    assert call(Library(), "openai/gpt-4.1-mini") == ModelReply(ANSWER, ModelUsage(2000, 500, None))
 
 
 @pytest.mark.parametrize(("effort", "expected"), [("basso", "low"), ("medio", "medium"), ("alto", "high")])
 def test_the_reasoning_levels_become_the_names_of_the_provider(effort: str, expected: str) -> None:
-    proxy = Proxy()
+    library = Library()
 
-    call(proxy, "openai/o4-mini", {"reasoning_effort": effort})
+    call(library, "openai/o4-mini", {"reasoning_effort": effort})
 
-    assert proxy.sent["reasoning_effort"] == expected
+    assert library.sent["reasoning_effort"] == expected
 
 
 @pytest.mark.parametrize("model", ["openai/gpt", "deepseek/deepseek-chat", "anthropic/claude"])
 def test_without_settings_the_defaults_apply(model: str) -> None:
-    proxy = Proxy()
+    library = Library()
 
-    call(proxy, model, {})
+    call(library, model, {})
 
-    sent = proxy.sent
-    assert sent["max_tokens"] == 4096
-    assert not {"temperature", "reasoning_effort"} & set(sent)
+    assert library.sent["max_tokens"] == 4096
+    assert not {"temperature", "reasoning_effort"} & set(library.sent)
 
 
-@pytest.mark.parametrize("status", [401, 403])
 @pytest.mark.parametrize("model", ["anthropic/claude", "openai/gpt", "deepseek/deepseek-chat"])
-def test_a_key_rejected_by_the_provider_is_a_permanent_error(status: int, model: str) -> None:
-    proxy = refusal(status, f"litellm.AuthenticationError: Incorrect API key provided: {KEY.secret}{ROUTING_NOISE}")
+def test_a_key_rejected_by_the_provider_is_a_permanent_error(model: str) -> None:
+    failure = refusal(exceptions.AuthenticationError, f"Incorrect API key provided: {KEY.secret}")
 
     with pytest.raises(ModelKeyRejectedError) as raised:
-        call(proxy, model)
+        call(failing(failure), model)
 
     assert str(raised.value) == f"chiave del fornitore non valida: {model.partition('/')[0]}"
     assert raised.value.permanent
+    assert raised.value.__cause__ is None
 
 
-def test_a_master_key_the_proxy_does_not_know_is_transient() -> None:
-    proxy = Proxy(400, {"error": {"message": "No connected db.", "type": "no_db_connection", "code": "400"}})
+def test_a_key_without_permission_is_a_permanent_error() -> None:
+    failure = refusal_with_response(exceptions.PermissionDeniedError, 403, "not allowed")
 
-    with pytest.raises(ModelUnavailableError) as raised:
-        call(proxy, "openai/gpt")
-
-    assert raised.value.original == "400 No connected db."
-    assert not raised.value.permanent
+    with pytest.raises(ModelKeyRejectedError, match=r"^chiave del fornitore non valida: anthropic$"):
+        call(failing(failure), "anthropic/claude")
 
 
 @pytest.mark.parametrize("model", ["openai/gpt", "deepseek/deepseek-chat"])
 def test_payment_required_is_an_exhausted_credit(model: str) -> None:
-    proxy = refusal(
-        402, f'litellm.APIError: {{"error": {{"code": 402, "message": "Insufficient credits"}}}}{ROUTING_NOISE}'
-    )
-
     with pytest.raises(ModelCreditExhaustedError) as raised:
-        call(proxy, model)
+        call(failing(refusal(exceptions.PaymentRequiredError, "Insufficient credits")), model)
 
     assert str(raised.value) == f"credito esaurito presso {model.partition('/')[0]}"
     assert raised.value.permanent
 
 
 @pytest.mark.parametrize(
-    "message",
-    [
-        f"litellm.RateLimitError: OpenAIException - You exceeded your current quota{ROUTING_NOISE}",
-        "litellm.RateLimitError: {'code': 'insufficient_quota'}",
-    ],
+    "message", ["OpenAIException - You exceeded your current quota", "{'code': 'insufficient_quota'}"]
 )
 def test_an_exhausted_openai_quota_is_an_exhausted_credit(message: str) -> None:
     with pytest.raises(ModelCreditExhaustedError, match=r"^credito esaurito presso openai$"):
-        call(refusal(429, message), "openai/gpt")
+        call(failing(refusal(exceptions.RateLimitError, message)), "openai/gpt")
 
 
-def test_a_rate_limit_is_transient_with_the_original_message_without_the_routing_of_the_proxy() -> None:
-    proxy = refusal(429, f"litellm.RateLimitError: RateLimitError: OpenAIException - Rate limit reached{ROUTING_NOISE}")
+def test_a_rate_limit_is_transient_with_the_original_message() -> None:
+    failure = refusal(exceptions.RateLimitError, "OpenAIException - Rate limit reached")
 
     with pytest.raises(ModelUnavailableError) as raised:
-        call(proxy, "openai/gpt")
+        call(failing(failure), "openai/gpt")
 
-    assert raised.value.original == "429 litellm.RateLimitError: RateLimitError: OpenAIException - Rate limit reached"
+    assert raised.value.original == "429 litellm.RateLimitError: OpenAIException - Rate limit reached"
     assert not raised.value.permanent
 
 
 @pytest.mark.parametrize(
-    ("status", "body", "text", "original"),
+    ("failure", "original"),
     [
+        (refusal(exceptions.InternalServerError, "Overloaded"), "500 litellm.InternalServerError: Overloaded"),
         (
-            500,
-            {"error": {"message": "litellm.InternalServerError: Overloaded"}},
-            None,
-            "500 litellm.InternalServerError: Overloaded",
+            refusal(exceptions.BadGatewayError, "<html>\n  Bad   gateway\n</html>"),
+            "502 litellm.BadGatewayError: <html> Bad gateway </html>",
         ),
-        (502, None, "<html>\n  Bad   gateway\n</html>", "502 <html> Bad gateway </html>"),
-        (500, {"error": "boom"}, None, "500 boom"),
-        (503, ["unavailable"], None, "503 ['unavailable']"),
-        (504, None, "", "504 "),
-        (400, {"error": {"message": 42}}, None, "400 {'message': 42}"),
+        (refusal(exceptions.ServiceUnavailableError, "busy"), "503 litellm.ServiceUnavailableError: busy"),
+        (refusal(exceptions.BadRequestError, "too long"), "400 litellm.BadRequestError: too long"),
+        (refusal(exceptions.NotFoundError, "no such model"), "404 litellm.NotFoundError: no such model"),
+        (refusal(exceptions.APIResponseValidationError, "odd"), "500 odd"),
+        (
+            lambda: exceptions.APIError(status_code=418, message="tea", llm_provider="openai", model="gpt"),
+            "418 litellm.APIError: tea",
+        ),
+        (
+            refusal_with_response(exceptions.UnprocessableEntityError, 422, "bad"),
+            "422 litellm.UnprocessableEntityError: bad",
+        ),
     ],
+    ids=["internal", "gateway", "unavailable", "bad-request", "not-found", "validation", "api", "unprocessable"],
 )
-def test_other_refusals_are_transient_with_the_original_message(
-    status: int, body: object, text: str | None, original: str
-) -> None:
+def test_other_refusals_are_transient_with_the_original_message(failure: Failure, original: str) -> None:
     with pytest.raises(ModelUnavailableError) as raised:
-        call(Proxy(status, body, text), "anthropic/claude")
+        call(failing(failure), "anthropic/claude")
 
     assert raised.value.original == original
+    assert not raised.value.permanent
 
 
 def test_a_long_original_message_is_cut() -> None:
     with pytest.raises(ModelUnavailableError) as raised:
-        call(refusal(500, "x" * 1000), "openai/gpt")
+        call(failing(refusal(exceptions.InternalServerError, "x" * 1000)), "openai/gpt")
 
-    assert raised.value.original == "500 " + "x" * 300
+    assert raised.value.original == "500 " + ("litellm.InternalServerError: " + "x" * 1000)[:300]
 
 
 def test_the_key_never_travels_in_a_transient_error() -> None:
+    failure = refusal(exceptions.InternalServerError, f"upstream rejected header Bearer {KEY.secret}")
+
     with pytest.raises(ModelUnavailableError) as raised:
-        call(refusal(500, f"upstream rejected header Bearer {KEY.secret}"), "openai/gpt")
+        call(failing(failure), "openai/gpt")
 
     assert KEY.secret not in str(raised.value)
     assert raised.value.__cause__ is None
 
 
 def test_a_timeout_is_transient() -> None:
-    def slow(request: httpx2.Request) -> httpx2.Response:
-        raise httpx2.ReadTimeout(TIMED_OUT, request=request)
+    def slow() -> Exception:
+        return exceptions.Timeout(message="timed out", model="gpt", llm_provider="openai")
 
     with pytest.raises(
         ModelUnavailableError, match=r"^fornitore IA non raggiungibile: openai: tempo di risposta scaduto$"
-    ):
-        adapter_on(slow).call("openai/gpt", KEY, {}, MESSAGES)
+    ) as raised:
+        call(failing(slow), "openai/gpt")
+
+    assert raised.value.__cause__ is None
 
 
-def test_an_unreachable_proxy_is_transient_and_carries_no_request() -> None:
-    def refuse(request: httpx2.Request) -> httpx2.Response:
-        raise httpx2.ConnectError(REFUSED, request=request)
+def test_an_unreachable_provider_is_transient_and_carries_no_request() -> None:
+    def refused() -> Exception:
+        return exceptions.APIConnectionError(message="connection refused", model="gpt", llm_provider="openai")
 
     with pytest.raises(
         ModelUnavailableError, match=r"^fornitore IA non raggiungibile: openai: APIConnectionError$"
     ) as raised:
-        adapter_on(refuse).call("openai/gpt", KEY, {}, MESSAGES)
+        call(failing(refused), "openai/gpt")
 
     assert raised.value.__cause__ is None
 
 
 @pytest.mark.parametrize(
-    "body",
+    "answer",
     [
-        {**REPLY, "choices": []},
-        {key: value for key, value in REPLY.items() if key != "usage"},
-        {**REPLY, "usage": {**USAGE, "prompt_tokens": -1}},
-        {**REPLY, "usage": {**USAGE, "cost": "free"}},
-        {
-            **REPLY,
-            "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": None}}],
-        },
+        response(choices=[]),
+        litellm.ModelResponse(model="gpt", choices=CHOICES),
+        response(usage={**USAGE, "prompt_tokens": -1}),
+        response(choices=[{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": None}}]),
+        "not a response",
     ],
+    ids=["no-choice", "no-usage", "negative-tokens", "no-text", "not-a-response"],
 )
-def test_an_answer_in_another_shape_is_transient(body: object) -> None:
+def test_an_answer_in_another_shape_is_transient(answer: object) -> None:
     with pytest.raises(ModelUnavailableError) as raised:
-        call(Proxy(200, body), "openai/gpt")
+        call(Library(answer), "openai/gpt")
 
     assert raised.value.original == "risposta del fornitore inattesa"
-
-
-def test_an_answer_that_is_not_json_is_transient() -> None:
-    with pytest.raises(ModelUnavailableError, match=r"risposta del fornitore inattesa$"):
-        call(Proxy(200, text="<html>ok</html>"), "openai/gpt")

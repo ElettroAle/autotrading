@@ -14,9 +14,9 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
 |------|-----------|--------|
 | Linguaggio backend | **Python 3.15** | SDK ufficiale Hyperliquid, CCXT, Prophet, LangGraph: tutto l'ecosistema di riferimento è Python. |
 | Esecuzione | **Container**, cloud agnostic | Nessun servizio proprietario di un cloud, a parte i fornitori dei modelli IA. Deve girare uguale su Docker Compose locale, su una VM, su Azure Container Apps o su Railway. Costi minimi. |
-| Database | **PostgreSQL 16** (scelta delegata) | Un solo database per tutto: dati di dominio, JSON dei contesti, serie temporali, stato di LangGraph. Il proxy LiteLLM gira senza database (ADR 0101). Disponibile ovunque. |
+| Database | **PostgreSQL 16** (scelta delegata) | Un solo database per tutto: dati di dominio, JSON dei contesti, serie temporali, stato di LangGraph. LiteLLM gira come libreria nel `worker`, senza database (ADR 0148). Disponibile ovunque. |
 | Orchestrazione dell'agente | **LangGraph** | Grafo tipizzato con fan-out parallelo delle fonti; stessa base per comitato (6.28) e doppio timeframe (6.27). |
-| Accesso ai modelli | **LiteLLM proxy** self-hosted | API unica OpenAI-compatible verso oltre 100 fornitori (OpenAI, Anthropic, DeepSeek, Gemini, xAI, Mistral, Kimi, Groq, Azure OpenAI, Bedrock, Vertex, OpenRouter, Ollama) **[doc]**. Nessuna chiave dei fornitori nel proxy: ogni richiesta porta la chiave dell'utente del flusso (RF-01.05, ADR 0101). Catalogo dei modelli letto dal proxy, dalle rotte wildcard e dalla mappa dei modelli di LiteLLM (ADR 0103); OpenRouter è chiamato direttamente, col catalogo dal suo elenco pubblico (ADR 0109). Cambio modello = configurazione (RF-16). |
+| Accesso ai modelli | **Libreria LiteLLM** nel `worker` | API unica OpenAI-compatible verso oltre 100 fornitori (OpenAI, Anthropic, DeepSeek, Gemini, xAI, Mistral, Kimi, Groq, Azure OpenAI, Bedrock, Vertex, OpenRouter, Ollama) **[doc]**, usata in-process dal solo `worker` (ADR 0148). Nessuna chiave della piattaforma: ogni chiamata porta la chiave dell'utente del flusso (RF-01.05). Catalogo dei modelli dalla mappa dei modelli della libreria per i fornitori abilitati, che l'`api` chiede al `worker` (ADR 0149); OpenRouter è chiamato direttamente, col catalogo dal suo elenco pubblico (ADR 0109). Cambio modello = configurazione (RF-16). |
 | Identità | **OIDC generico**, primo IdP Entra ID | L'applicazione conosce solo issuer, client id e claim; Entra ID è sostituibile con qualunque IdP OIDC. Vedi 7.1 per i limiti con utenti esterni. |
 | Dashboard | **React + TypeScript** (fase F2) | Frontend separato che consuma la stessa API programmatica di F1. |
 | Budget | Nessun vincolo ora | I costi vengono misurati per flusso (RNF-09) e decisi dopo. |
@@ -33,24 +33,23 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
   (browser,      │  │ dashboard│──▶│    api    │──▶│ postgres │◀─│ worker │  │
    CLI, script)  │  │ (F2)     │   │ (FastAPI) │   │          │  │        │  │
                  │  └──────────┘   └───────────┘   └──────────┘  └───┬────┘  │
-                 │                                       ▲           │       │
-                 │                                       │     ┌─────┴─────┐ │
-                 │                                  ┌────┴────┐│ forecaster│ │
-                 │                                  │ litellm ││ (Prophet) │ │
-                 │                                  └────┬────┘└───────────┘ │
-                 └───────────────────────────────────────┼───────────────────┘
-                                                         ▼
-                    Fornitori IA · Hyperliquid (testnet/mainnet) · fonti esterne · Telegram · SMTP
+                 │                                                   │       │
+                 │                                             ┌─────┴─────┐ │
+                 │                                             │ forecaster│ │
+                 │                                             │ (Prophet) │ │
+                 │                                             └───────────┘ │
+                 └───────────────────────────────────────────────────────────┘
+                    worker ──▶ Fornitori IA (libreria LiteLLM) · Hyperliquid (testnet/mainnet) · fonti esterne
+                               · Telegram · SMTP
 ```
 
-Sei container, tutti sostituibili e tutti senza dipendenze da un cloud specifico:
+Cinque container, tutti sostituibili e tutti senza dipendenze da un cloud specifico:
 
 | Container | Ruolo | Fase |
 |-----------|-------|------|
 | `postgres` | Unico stato persistente. | F0 |
-| `litellm` | Gateway verso i modelli IA con la chiave dell'utente di ogni richiesta; catalogo dei modelli; senza database (ADR 0101, ADR 0103). | F1 |
 | `api` | Interfaccia programmatica (RF-21): autenticazione OIDC, tenancy, configurazione versionata, comandi, consultazione. Serve anche la dashboard statica in F2. | F0 |
-| `worker` | Pianificatore e ciclo decisionale dei flussi (RF-04), esecuzione ordini, contabilità virtuale, riconciliazione, notifiche. | F1 |
+| `worker` | Pianificatore e ciclo decisionale dei flussi (RF-04), esecuzione ordini, contabilità virtuale, riconciliazione, notifiche; chiamata ai modelli IA con la libreria LiteLLM e catalogo dei suoi modelli per l'`api` (ADR 0148, ADR 0149). | F1 |
 | `forecaster` | Servizio interno per le previsioni Prophet (RF-08), isolato perché pesante (cmdstan) e condivisibile tra flussi. | F1 |
 | `dashboard` | Build statica React, servita da `api` o da un server statico. | F2 |
 
@@ -72,13 +71,13 @@ autotrading/
 │   │   ├── inbound/api/            # FastAPI (api e API interna del worker)
 │   │   └── outbound/               # un sistema integrato per cartella: hyperliquid/, litellm/, sqlalchemy/,
 │   │                               #   libsodium/, oidc/, telegram/, worker/, rss/, alternative_me/,
-│   │                               #   coinmarketcap/, json/, threads/, system_clock/
+│   │                               #   coinmarketcap/, json/, threads/, system_clock/, openrouter/
 │   └── bootstrap.py                # composition root
 ├── migrations/                     # Alembic
 ├── tests/                          # unit, scenari, integrazione, architettura
 ├── specs/                          # scenari Gherkin
 ├── tools/                          # script della pipeline
-├── deploy/                         # cloud-init, compose.yaml, litellm/config.yaml, postgres, tailscale
+├── deploy/                         # cloud-init, compose.yaml, postgres, tailscale
 ├── docs/                           # requisiti, architettura, adr/
 └── .github/                        # workflow e action della pipeline
 ```
@@ -112,7 +111,7 @@ Tutte le tabelle di dominio hanno `tenant_id`; l'API filtra sempre per il tenant
 | `reconciliations` | Esiti delle riconciliazioni per conto. | RF-13.06 |
 | `notifications` | Eventi notificati, canale, esito. | 6.24 |
 
-Il catalogo dei modelli (fornitori, modelli, parametri ammessi; RF-16.05) non è una tabella: lo leggono l'adapter `litellm` dal proxy (ADR 0103) e l'adapter `openrouter` dall'elenco pubblico di OpenRouter (ADR 0109).
+Il catalogo dei modelli (fornitori, modelli, parametri ammessi; RF-16.05) non è una tabella: lo legge l'adapter `litellm` del `worker` dalla mappa dei modelli della libreria (ADR 0148), e l'`api` lo chiede al `worker` (ADR 0149); l'adapter `openrouter` lo legge dall'elenco pubblico di OpenRouter (ADR 0109).
 
 Serie temporali (`source_samples`, `equity_snapshots`, `forecasts`) partizionate per mese. TimescaleDB non necessario in F1; opzione futura, resta PostgreSQL.
 
@@ -132,7 +131,7 @@ START ─▶ load_state ─▶ ┌ source:indicators ┐
 ```
 
 - **Fonti attive e pesi** vengono letti dalla configurazione del flusso: il grafo viene costruito a ogni ciclo con i soli nodi delle fonti attive (RF-05.02). Il fallimento di un nodo fonte scrive un errore nello stato e il ciclo prosegue (RF-04.05).
-- **decide**: chiamata a LiteLLM con output strutturato (schema Pydantic della decisione per asset); risposta non conforme = ciclo registrato senza ordini (RF-17.10).
+- **decide**: chiamata alla libreria LiteLLM con output strutturato (schema Pydantic della decisione per asset); risposta non conforme = ciclo registrato senza ordini (RF-17.10).
 - **risk_filter**: codice deterministico, senza LLM (sezione 6.18).
 - **execute**: adapter exchange; ogni ordine porta `cloid` = identificativo univoco del ciclo e dell'asset (RF-19.07).
 - **Checkpointer** LangGraph su PostgreSQL **[doc]** usato per ripresa e debug; la verità contabile resta nelle tabelle di dominio, scritte da `persist`.
@@ -167,7 +166,7 @@ Fonti F1: `indicators` (candele dall'exchange, calcolo con pandas-ta), `pivots`,
 
 ### 6.2 Modello IA
 
-Due fabbriche della chiamata al modello (abstract factory `ModelGatewayPort`, ADR 0109), in cartelle indipendenti: `litellm/` parla con il proxy via SDK OpenAI (`base_url` del proxy) per tutti i fornitori che hanno una rotta, senza alcun ramo per fornitore (solo parametri dell'API OpenAI; traduzione e `drop_params` di LiteLLM); `openrouter/` chiama direttamente l'API di OpenRouter. Il caso d'uso usa la fabbrica il cui catalogo contiene il modello scelto dal flusso (`provider/model`); il catalogo mostrato all'utente unisce i due. La chiave del fornitore è quella dell'utente del flusso e viaggia solo nella sua richiesta (RF-01.05, ADR 0101). Il proxy non ha database: il costo di ogni chiamata si registra nel ciclo del flusso (R1.4.6), riportato dal fornitore quando lo dà, altrimenti dai prezzi del catalogo. Parametri per flusso: temperatura (0-2), limite token, livello di ragionamento se supportato. Cataloghi: quello del proxy dalle rotte wildcard espanse con la mappa dei modelli di LiteLLM (ADR 0103); quello di OpenRouter dal suo elenco pubblico dei modelli, senza chiave (ADR 0109). Nessun modello scritto a mano. La chiave non si verifica alla registrazione: una chiave non valida emerge al primo ciclo come errore permanente che mette in pausa i flussi che la usano (R1.2.4, ADR 0108). Abilitare un fornitore del proxy è solo una rotta nella sua configurazione.
+Due fabbriche della chiamata al modello (abstract factory `ModelGatewayPort`, ADR 0109), in cartelle indipendenti: `litellm/` usa la libreria LiteLLM dentro il `worker` (`litellm.completion`, ADR 0148) per tutti i fornitori abilitati, senza alcun ramo per fornitore (solo parametri dell'API OpenAI; traduzione e `drop_params` di LiteLLM, nessun nuovo tentativo); `openrouter/` chiama direttamente l'API di OpenRouter. Il caso d'uso usa la fabbrica il cui catalogo contiene il modello scelto dal flusso (`provider/model`); il catalogo mostrato all'utente unisce i due. La chiave del fornitore è quella dell'utente del flusso e viaggia solo nella sua richiesta (RF-01.05, ADR 0148). LiteLLM non ha database: il costo di ogni chiamata si registra nel ciclo del flusso (R1.4.6), riportato dal fornitore quando lo dà, altrimenti dai prezzi del catalogo. Parametri per flusso: temperatura (0-2), limite token, livello di ragionamento se supportato. Cataloghi: quello di LiteLLM dai modelli di chat dei fornitori abilitati nella mappa dei modelli della versione della libreria, senza chiamate di rete, chiesto dall'`api` al `worker` (ADR 0148, ADR 0149); quello di OpenRouter dal suo elenco pubblico dei modelli, senza chiave (ADR 0109). Nessun modello scritto a mano. La chiave non si verifica alla registrazione: una chiave non valida emerge al primo ciclo come errore permanente che mette in pausa i flussi che la usano (R1.2.4, ADR 0108). Abilitare un fornitore di LiteLLM è solo un nome nelle impostazioni del suo adapter.
 
 ### 6.3 Exchange
 
@@ -229,14 +228,14 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 - **Segreti dei servizi** (password del database, token del bot Telegram): segreti degli environment GitHub, consegnati dalla pipeline come file montati in sola lettura, leggibili solo dall'utente del container.
 - **Mai variabili d'ambiente per i segreti** (visibili con `docker inspect` e da `/proc`): solo file montati.
 - **Registro delle decifrature**: ogni decifratura registra conto e momento, mai il contenuto.
-- **LiteLLM**: nessuna chiave dei fornitori nel proxy; la chiave IA dell'utente, cifrata nel database, la decifra il `worker` e la passa solo nella richiesta del suo flusso (RF-01.05). La chiave master del proxy è generata sulla macchina e montata come file in `api` e `worker` (ADR 0101).
+- **LiteLLM**: nessuna chiave dei fornitori della piattaforma; la chiave IA dell'utente, cifrata nel database, la decifra il `worker` e la passa solo nella chiamata del suo flusso alla libreria (RF-01.05, ADR 0148). Messaggi e risposte mai nei log della libreria, nessuna callback.
 
 **Limitare il danno se la macchina è compromessa.**
 
 - Credenziali di sola operatività: su Hyperliquid l'API wallet non può prelevare; il wallet principale con i fondi non tocca mai la piattaforma.
 - Rilevazione: registro delle decifrature, riconciliazione con allarme, notifica di ogni apertura.
 - Revoca: playbook scritto per revocare l'API wallet dal wallet principale e ruotare le chiavi dei servizi.
-- Esposizione: nessuna porta verso Internet; HTTPS (Tailscale Serve) e Tailscale SSH solo dal tailnet del proprietario (ADR 0013); `postgres`, `litellm`, `forecaster` su rete interna. Container non root, filesystem in sola lettura dove possibile, nessun accesso al socket Docker.
+- Esposizione: nessuna porta verso Internet; HTTPS (Tailscale Serve) e Tailscale SSH solo dal tailnet del proprietario (ADR 0013); `postgres`, `forecaster` su rete interna. Container non root, filesystem in sola lettura dove possibile, nessun accesso al socket Docker.
 
 ---
 
@@ -277,7 +276,7 @@ Motivi: canone fisso minimo, sempre acceso, nessun compromesso sull'architettura
 Alternative scartate e perché:
 
 - **Macchina del proprietario** (VM Windows 11 su Hyper-V): Docker e WSL2 assenti, servirebbe virtualizzazione annidata dall'host, 27 GB liberi, uptime legato alla VM.
-- **GitHub Actions come runtime**: il cron non è puntuale (ritardi di decine di minuti, job saltati), nessuno stato, minuti a pagamento oltre 2.000/mese su repo privato, nessun processo sempre attivo per API e LiteLLM. Adatto solo allo "script unico" dei video, non a questa architettura.
+- **GitHub Actions come runtime**: il cron non è puntuale (ritardi di decine di minuti, job saltati), nessuno stato, minuti a pagamento oltre 2.000/mese su repo privato, nessun processo sempre attivo per API e worker. Adatto solo allo "script unico" dei video, non a questa architettura.
 - **Oracle Cloud Free Tier** (ARM 4 OCPU / 24 GB gratis): capacità spesso non disponibile, sospensioni di account segnalate, immagini ARM da costruire. Tentabile come esperimento, non come base.
 - **Fly.io, Render, Koyeb, Railway**: 8-35 €/mese, ogni servizio fattura a parte.
 - **Azure Container Apps**: 30-45 €/mese con PostgreSQL gestito; scala a zero inutile con worker e gateway sempre attivi.
@@ -286,7 +285,7 @@ Configurazione del nodo (F0):
 
 1. Ubuntu LTS, utente non root, nessuna connessione accettata da Internet: accesso solo dal tailnet Tailscale del proprietario con Tailscale SSH (nessuna chiave SSH, `sshd` spento), `ufw` aperto solo sull'interfaccia `tailscale0`; aggiornamenti automatici di sicurezza (ADR 0013).
 2. Docker Engine + plugin compose; immagini da GHCR.
-3. Tailscale Serve davanti ad `api` (in ascolto solo su `127.0.0.1`), con TLS automatico sul nome `autotrading-<ambiente>.<tailnet>.ts.net`; `postgres`, `litellm`, `forecaster` su rete interna del compose, mai esposti.
+3. Tailscale Serve davanti ad `api` (in ascolto solo su `127.0.0.1`), con TLS automatico sul nome `autotrading-<ambiente>.<tailnet>.ts.net`; `postgres`, `forecaster` su rete interna del compose, mai esposti.
 4. Segreti secondo la sezione 8.2: segreti dei servizi come file montati dalla pipeline; coppia di chiavi delle credenziali generata sul server, privata leggibile solo da root.
 5. Entra ID: redirect URI sul nome `.ts.net` dell'installazione (e `http://localhost` per lo sviluppo).
 
@@ -316,7 +315,7 @@ Configurazione del nodo (F0):
 | T7 | Nonce con più worker. | Un API wallet per replica; in F1 una sola replica. |
 | T8 | Fonti esterne instabili (feed RSS, endpoint non ufficiali). | Isolamento per nodo, timeout, campione mancante registrato; chiusura della fonte se non praticabile (principio dei requisiti). |
 | T9 | Nodo singolo OVH: nessuna ridondanza, disco locale. | Accettato in testnet; `pg_dump` notturno su storage esterno da F1; lo stesso compose gira altrove in caso di guasto. |
-| T10 | Sviluppo locale sulla VM del proprietario senza Docker. | Sviluppare con Python locale contro PostgreSQL e LiteLLM sul nodo OVH (porte via tunnel SSH), oppure installare WSL2/Docker se la virtualizzazione annidata è disponibile. |
+| T10 | Sviluppo locale sulla VM del proprietario senza Docker. | Sviluppare con Python locale contro PostgreSQL sul nodo OVH (porte via tunnel SSH), oppure installare WSL2/Docker se la virtualizzazione annidata è disponibile. |
 
 ---
 
@@ -330,7 +329,7 @@ Configurazione del nodo (F0):
 
 **F1. Flussi autonomi senza dashboard**
 1. Modello dati completo (sezione 4), configurazione versionata, validazioni (RF-21.05), regola di conflitto.
-2. `litellm` in compose, catalogo modelli, client con output strutturato.
+2. Libreria LiteLLM nel `worker`, catalogo modelli, client con output strutturato (ADR 0148).
 3. Fonti `indicators`, `pivots`, `sentiment`, `news`; `forecaster` con Prophet.
 4. Grafo del ciclo (sezione 5), rischio base, esecuzione, contabilità virtuale, persistenza, riconciliazione base.
 5. Worker con APScheduler e advisory lock; comandi avvio/pausa/stop.

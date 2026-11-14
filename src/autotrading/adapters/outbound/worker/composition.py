@@ -7,6 +7,7 @@ from autotrading.adapters.outbound.worker.account_activity import WorkerAccountA
 from autotrading.adapters.outbound.worker.account_state import WorkerAccountStateAdapter
 from autotrading.adapters.outbound.worker.bot_identity import WorkerBotIdentityAdapter
 from autotrading.adapters.outbound.worker.configuration import _settings_of
+from autotrading.adapters.outbound.worker.model_catalog import GATEWAY_NAME, WorkerModelCatalogAdapter
 from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
 from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
 from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
@@ -42,3 +43,12 @@ def worker_adapters(
         )
 
     return adapters_of
+
+
+def worker_model_catalog_adapters(
+    source: ConfigurationSource, transport: httpx.BaseTransport | None = None
+) -> dict[str, WorkerModelCatalogAdapter]:
+    """The catalog of the gateway that only the worker holds, by the name of that gateway (ADR 0149)."""
+    settings = _settings_of(source)
+    client = httpx.Client(base_url=settings.url, timeout=settings.timeout_seconds, transport=transport)
+    return {GATEWAY_NAME: WorkerModelCatalogAdapter(client, settings.token)}

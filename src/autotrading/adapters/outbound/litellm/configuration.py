@@ -1,15 +1,14 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.outbound.litellm.model_call import TIMEOUT_SECONDS
+
+# Enabling a provider is one name here: every chat model the library knows for it enters the catalog (ADR 0148).
+ENABLED_PROVIDERS = frozenset({"anthropic", "deepseek", "openai"})
 
 
 @dataclass(frozen=True, slots=True)
 class _LiteLlmSettings:
-    """Where the proxy of the installation is and the master key that reaches it, from a mounted file."""
+    """The providers the library serves and how long the cycle waits: no address and no key, every key is the user's."""
 
-    url: str
-    master_key: str = field(repr=False)
-
-
-def _settings_of(source: ConfigurationSource) -> _LiteLlmSettings:
-    return _LiteLlmSettings(source.value("LITELLM_URL"), source.secret("LITELLM_MASTER_KEY"))
+    providers: frozenset[str] = ENABLED_PROVIDERS
+    timeout_seconds: float = TIMEOUT_SECONDS

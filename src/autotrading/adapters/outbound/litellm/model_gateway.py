@@ -1,15 +1,24 @@
-from openai import OpenAI
-
-from autotrading.adapters.outbound.litellm.model_call import LiteLlmModelCallAdapter
-from autotrading.adapters.outbound.litellm.model_catalog import LiteLlmModelCatalogAdapter
+from autotrading.adapters.outbound.litellm.model_call import Completion, LiteLlmModelCallAdapter
+from autotrading.adapters.outbound.litellm.model_catalog import (
+    LiteLlmModelCatalogAdapter,
+    ModelMap,
+    SupportedParameters,
+)
 
 
 class LiteLlmModelGatewayAdapter:
-    """The concrete factory of the LiteLLM proxy: the model call and the catalog of its routes (ADR 0109)."""
+    """The concrete factory of the LiteLLM library: the model call and the catalog of its models (ADR 0109, 0148)."""
 
-    def __init__(self, client: OpenAI) -> None:
-        self._model_call = LiteLlmModelCallAdapter(client)
-        self._model_catalog = LiteLlmModelCatalogAdapter(client)
+    def __init__(
+        self,
+        completion: Completion,
+        model_map: ModelMap,
+        parameters_of: SupportedParameters,
+        providers: frozenset[str],
+        timeout_seconds: float,
+    ) -> None:
+        self._model_call = LiteLlmModelCallAdapter(completion, timeout_seconds)
+        self._model_catalog = LiteLlmModelCatalogAdapter(model_map, parameters_of, providers)
 
     def model_call(self) -> LiteLlmModelCallAdapter:
         return self._model_call

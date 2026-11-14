@@ -35,16 +35,17 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
 - Formato della risposta, lettura delle decisioni, contesto e costo sono regole del domain (`AgentResponse`,
   `AgentContext`, `ModelUsage`, ADR 0038): le chiavi della risposta sono i nomi dei campi dei motivi di scarto.
-- La chiamata al modello passa dal proxy LiteLLM con l'SDK OpenAI (`adapters/outbound/litellm`, ADR 0101): la
-  chiave dell'utente viaggia nella sola richiesta del suo flusso, nessuna chiave dei fornitori nel proxy. 401/403
-  chiave non valida e 402 (o quota OpenAI esaurita) credito esaurito sono permanenti, ogni altro errore è
-  transitorio con il messaggio originale.
+- La chiamata al modello passa dalla libreria LiteLLM nel solo `worker` (`adapters/outbound/litellm`, ADR 0148) o
+  dall'API di OpenRouter (ADR 0109): la chiave dell'utente viaggia nella sola chiamata del suo flusso, nessuna
+  chiave dei fornitori della piattaforma. 401/403 chiave non valida e 402 (o quota OpenAI esaurita) credito
+  esaurito sono permanenti, ogni altro errore è transitorio con il messaggio originale.
 
 - La chiave non si verifica presso il fornitore alla registrazione né alla sostituzione: una chiave non valida
   emerge al primo ciclo come `ModelKeyRejectedError`, permanente (R1.2.4, ADR 0108).
-- Il catalogo dei modelli lo descrive il proxy LiteLLM (`/model_group/info`, ADR 0103): i modelli di chat dei
-  fornitori con una rotta in `deploy/litellm/config.yaml`, con parametri e prezzi della mappa dei modelli di
-  LiteLLM. Abilitare un fornitore è solo una rotta; nessun catalogo scritto a mano.
+- Il catalogo LiteLLM viene dalla mappa dei modelli della libreria (ADR 0148): i modelli di chat dei fornitori
+  abilitati nell'adapter, con parametri e prezzi della mappa; l'`api` lo chiede al `worker` (ADR 0149). Abilitare
+  un fornitore è solo un nome nelle impostazioni dell'adapter; nessun catalogo scritto a mano. I casi d'uso che
+  leggono solo i modelli ricevono i cataloghi (`ModelCatalogs`), non le fabbriche.
 
 ## Porte del contesto
 

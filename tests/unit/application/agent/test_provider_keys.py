@@ -27,7 +27,6 @@ from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
-from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     FakeProviderKeyUsageAdapter,
@@ -57,7 +56,7 @@ class Keys:
         self.repository = InMemoryProviderKeyRepositoryAdapter(self.store, self.tenant_id)
         self.usage = FakeProviderKeyUsageAdapter()
         self.services = ProviderKeyServices(
-            {"models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(CATALOG))},
+            {"models": InMemoryModelCatalogAdapter(CATALOG)},
             FakeProviderKeySealerAdapter(self.tenant_id, self.vault),
         )
 
@@ -201,9 +200,7 @@ def test_the_replacement_answers_with_the_instant_of_the_new_key(keys: Keys) -> 
 def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys: Keys) -> None:
     keys.register("openrouter", "K-OR")
 
-    listing = ListModelsUseCase(
-        {"models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(CATALOG))}, keys.repository
-    ).execute()
+    listing = ListModelsUseCase({"models": InMemoryModelCatalogAdapter(CATALOG)}, keys.repository).execute()
 
     assert listing.models == CATALOG.models
     assert listing.providers == (
