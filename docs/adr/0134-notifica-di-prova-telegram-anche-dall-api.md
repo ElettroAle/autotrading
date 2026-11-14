@@ -12,9 +12,12 @@ prova. Oggi la prova parte solo da un comando nella chat: l'API non la espone.
 
 ## Decisione
 
-- Endpoint `POST /telegram/test-notification`: il contesto `notifications` legge la chat collegata del tenant e
-  invia il testo di prova con le stesse regole di R1.8.1, riusando `SendTestNotificationUseCase` (o estendendone il
-  comando con la chat del tenant) senza duplicare il testo; senza chat collegata, errore del contesto (409).
+- Endpoint `POST /telegram/test-notification` (204): il nuovo caso d'uso `SendLinkedChatTestNotificationUseCase` del
+  contesto `notifications`, legato al tenant, legge la chat collegata e invia lo stesso testo di prova di R1.8.1
+  (`Notification.test()`) per la strada delle notifiche vere (`NotifierPort`, worker); senza chat collegata
+  `NoLinkedChatToTestError` (409). `SendTestNotificationUseCase` non si riusa: parte dalla chat e cerca il tenant,
+  l'opposto di ciò che serve all'API.
+- `GET /telegram/chat` restituisce anche `chat_id`, per mostrare quale chat è collegata.
 - Frontend `notifications`: codice con il link del bot restituito dall'API, stato della chat, scollegamento con
   conferma, pulsante di prova con esito.
 
