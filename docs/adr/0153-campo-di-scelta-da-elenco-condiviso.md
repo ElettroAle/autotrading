@@ -1,6 +1,6 @@
 # ADR 0153 — Campo di scelta da elenco condiviso nella dashboard
 
-- Stato: proposta (14 novembre 2026)
+- Stato: accettata (14 novembre 2026), decisione del proprietario
 - Requisiti: R2.3.8 (Task 271)
 - Collegate: ADR 0147 (`AssetPicker`), ADR 0151 (tendina del modello per fornitore), ADR 0146 (campi entro la
   larghezza), ADR 0152 (`GET /exchanges`)

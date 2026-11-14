@@ -1,6 +1,6 @@
 # ADR 0161 — Pagina dei flussi con azioni in testata, importazione su richiesta e vista classifica
 
-- Stato: proposta (14 novembre 2026)
+- Stato: accettata (14 novembre 2026), decisione del proprietario
 - Requisiti: R2.1.3 (Task 276)
 - Collegate: ADR 0160 (menu a gruppi), ADR 0119, ADR 0146 (campi entro la larghezza)
 
