@@ -262,3 +262,12 @@ class VersionWithoutFlowError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("la versione richiede un flusso")
+
+
+class StrategyModelMissingError(DomainError):
+    """A strategy file without a model: a draft cannot exist without the model that decides (R2.5.2)."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("modello mancante")

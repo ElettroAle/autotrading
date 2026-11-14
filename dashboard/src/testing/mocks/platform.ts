@@ -107,6 +107,29 @@ export type Assignment = {
   readonly assets: string[];
 };
 
+/** The strategy file of a flow, as the API writes it: no account, capital, assets or keys (R2.5.2, ADR 0140). */
+export type FakeStrategyDocument = {
+  readonly format: string;
+  readonly format_version: number;
+  readonly strategy: {
+    readonly cycle_minutes?: number;
+    readonly model?: { readonly name: string; readonly parameters: Record<string, string> };
+    readonly sources?: { readonly name: string; readonly weight: number }[];
+    readonly instructions?: string;
+    readonly risk_limits?: Record<string, number | string | null>;
+    readonly bring_to_minimum?: boolean;
+  };
+};
+
+export const STRATEGY_FORMAT = 'autotrading-strategy';
+
+/** The models the catalog of the fake platform offers: any other model is not available (R1.4.2). */
+export const FAKE_MODEL_CATALOG = new Set([
+  'openai/gpt-4o',
+  'openrouter/deepseek-chat',
+  'anthropic/claude-sonnet',
+]);
+
 /** A refusal of the fake API, with the status and the reason the API would answer. */
 export class FakeRefusal extends Error {
   readonly status: number;
@@ -183,6 +206,52 @@ const accountOf = (user: FakeUser, name: string): FakeAccount => {
   const account = { id: `account-${name}`, name, balance: 1000 };
   user.accounts.push(account);
   return account;
+};
+
+const requireFreeName = (user: FakeUser, name: string): void => {
+  if (user.flows.some((flow) => flow.name === name && flow.status !== ARCHIVED)) {
+    throw new FakeRefusal(409, 'nome già usato da un altro flusso');
+  }
+};
+
+/** A draft with the strategy alone, its own history from version 1 (ADR 0124). */
+const draftOf = (
+  name: string,
+  strategy: Pick<FakeFlow, 'model' | 'sources' | 'cycleMinutes'>,
+): FakeFlow => ({
+  id: flowIdOf(name),
+  name,
+  status: DRAFT,
+  accountId: null,
+  version: 1,
+  assets: [],
+  allocatedCapital: null,
+  model: strategy.model,
+  sources: strategy.sources.map(({ name, weight }) => ({ name, weight })),
+  cycleMinutes: strategy.cycleMinutes,
+  cycles: 0,
+  pauseReason: null,
+  currentCapital: 0,
+  history: emptyHistory(),
+  equity: [],
+  versions: versionsWith({}),
+});
+
+const modelOfStrategy = (document: FakeStrategyDocument): string => {
+  if (document.format !== STRATEGY_FORMAT || document.format_version !== 1) {
+    throw new FakeRefusal(
+      400,
+      `formato del file non supportato: ${document.format} versione ${document.format_version}`,
+    );
+  }
+  const model = document.strategy.model?.name.trim() ?? '';
+  if (model === '') {
+    throw new FakeRefusal(422, 'modello mancante');
+  }
+  if (!FAKE_MODEL_CATALOG.has(model)) {
+    throw new FakeRefusal(422, `modello non disponibile: ${model}`);
+  }
+  return model;
 };
 
 const flowOf = (user: FakeUser, flowId: string): FakeFlow => {
@@ -424,26 +493,51 @@ export const fakePlatform = {
   duplicate(user: FakeUser, flowId: string): FakeFlow {
     const original = flowOf(user, flowId);
     const name = `${original.name} (copia)`;
-    if (user.flows.some((flow) => flow.name === name && flow.status !== ARCHIVED)) {
-      throw new FakeRefusal(409, 'nome già usato da un altro flusso');
-    }
-    const copy: FakeFlow = {
-      ...original,
-      id: flowIdOf(name),
-      name,
-      status: DRAFT,
-      accountId: null,
-      version: 1,
-      assets: [],
-      allocatedCapital: null,
-      sources: [...original.sources],
-      cycles: 0,
-      history: emptyHistory(),
-      equity: [],
-      versions: versionsWith({}),
-    };
+    requireFreeName(user, name);
+    const copy = draftOf(name, original);
     user.flows.push(copy);
     return copy;
+  },
+
+  /** The strategy file of the flow, as the API exports it, and the name of the flow that names it (R2.5.2). */
+  exportStrategy(
+    user: FakeUser,
+    flowId: string,
+  ): { readonly flowName: string; readonly document: FakeStrategyDocument } {
+    const flow = flowOf(user, flowId);
+    const document: FakeStrategyDocument = {
+      format: STRATEGY_FORMAT,
+      format_version: 1,
+      strategy: {
+        cycle_minutes: flow.cycleMinutes,
+        model: { name: flow.model, parameters: {} },
+        sources: flow.sources.map((source) => ({ ...source, parameters: {} })),
+        instructions: '',
+        risk_limits: {
+          max_leverage: 3,
+          max_margin_exposure_percent: '10',
+          max_value_exposure_percent: null,
+        },
+        bring_to_minimum: false,
+      },
+    };
+    return { flowName: flow.name, document };
+  },
+
+  /** A draft with the strategy of the file, refused with the reason the API gives when the file is not valid. */
+  importStrategy(user: FakeUser, name: string, document: FakeStrategyDocument): FakeFlow {
+    const flowName = name.trim();
+    if (flowName === '') {
+      throw new FakeRefusal(422, 'nome del flusso obbligatorio');
+    }
+    requireFreeName(user, flowName);
+    const draft = draftOf(flowName, {
+      model: modelOfStrategy(document),
+      sources: (document.strategy.sources ?? []).map(({ name, weight }) => ({ name, weight })),
+      cycleMinutes: document.strategy.cycle_minutes ?? 15,
+    });
+    user.flows.push(draft);
+    return draft;
   },
 
   assign(user: FakeUser, flowId: string, assignment: Assignment): FakeFlow {

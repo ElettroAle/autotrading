@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { paths } from '@/config/paths';
 import { FlowsList } from '@/features/flows/components/flows-list';
+import { ImportStrategyForm } from '@/features/flows/components/import-strategy-form';
 
 export const HomeRoute = () => (
   <PageLayout title="I tuoi flussi">
@@ -12,6 +13,7 @@ export const HomeRoute = () => (
       </Link>
     </nav>
     <FlowsList />
+    <ImportStrategyForm />
     <nav aria-label="Consultazione" className="mt-6">
       <Link to={paths.history.getHref()} className="text-blue-800 hover:underline">
         Storico

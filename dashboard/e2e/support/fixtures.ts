@@ -22,6 +22,9 @@ export type ScenarioMemory = {
   freeCapital: number | undefined;
   answerStatus: number | undefined;
   secondVersionFrom: number;
+  /** The strategy file the user has, as text, and the flows of the user before an import (R2.5.2). */
+  strategyFile: string;
+  flowsBefore: string[];
 };
 
 type Fixtures = {
@@ -57,6 +60,8 @@ export const test = base.extend<Fixtures>({
       freeCapital: undefined,
       answerStatus: undefined,
       secondVersionFrom: 1,
+      strategyFile: '',
+      flowsBefore: [],
     });
   },
 });

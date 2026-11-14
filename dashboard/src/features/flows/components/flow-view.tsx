@@ -9,6 +9,7 @@ import { DRAFT_STATUS, useFlows, type Flow } from '../api/get-flows';
 
 import { DraftAssignmentForm } from './draft-assignment-form';
 import { DuplicateFlowButton } from './duplicate-flow-button';
+import { ExportStrategyButton } from './export-strategy-button';
 import { FlowDetails } from './flow-details';
 import { StartFlowButton } from './start-flow-button';
 
@@ -63,6 +64,7 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
       <FlowDetails flow={flow} accounts={accountsOfTenant} />
       <div className="mt-4 flex gap-3">
         <DuplicateFlowButton flowId={flow.id} />
+        <ExportStrategyButton flowId={flow.id} />
         {flow.status === DRAFT_STATUS ? <StartFlowButton flowId={flow.id} /> : null}
       </div>
       {flow.status === DRAFT_STATUS ? (

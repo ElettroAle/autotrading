@@ -1,19 +1,16 @@
 from dataclasses import replace
 from datetime import timedelta
-from decimal import Decimal
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
-from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
-from autotrading.domain.flows.errors import AssetsAssignedToOtherFlowError
-from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.free_capital import FreeCapital
+from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, shared by the features
+from tests.support.draft_steps import Draft
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flow_steps import provider_key_registered, valid_command
 from tests.support.flows import account_id_of
@@ -26,10 +23,9 @@ scenarios("E2-dashboard-e-confronto/F2.4-confronto-tra-flussi/R2.4.1-duplicazion
 
 
 class Duplication:
-    """The copy a scenario talks about, and the free capital of an account before time passed."""
+    """The free capital of an account before time passed."""
 
     def __init__(self) -> None:
-        self.copy = ""
         self.free_capital: FreeCapital | None = None
 
 
@@ -53,11 +49,11 @@ def free_capital_of(platform: Platform, user: str, account: str) -> FreeCapital:
     return platform.use_cases_of(user).read_free_capital.execute(command)
 
 
-def duplicate(platform: Platform, lifecycle: Lifecycle, duplication: Duplication, user: str, name: str) -> None:
+def duplicate(platform: Platform, lifecycle: Lifecycle, draft: Draft, user: str, name: str) -> None:
     flow_id = flow_named(platform, lifecycle.user, name).id
 
     def duplicated() -> None:
-        duplication.copy = platform.use_cases_of(user).duplicate_flow.execute(DuplicateFlowCommand(flow_id)).name.value
+        draft.name = platform.use_cases_of(user).duplicate_flow.execute(DuplicateFlowCommand(flow_id)).name.value
 
     attempt(lifecycle, duplicated)
 
@@ -99,30 +95,30 @@ def other_account(platform: Platform, user: str, account: str) -> None:
 
 @given(quoted('che "{user}" ha duplicato il flusso "{name}"'))
 @when(quoted('"{user}" duplica il flusso "{name}"'))
-def duplicate_flow(platform: Platform, lifecycle: Lifecycle, duplication: Duplication, user: str, name: str) -> None:
-    duplicate(platform, lifecycle, duplication, user, name)
+def duplicate_flow(platform: Platform, lifecycle: Lifecycle, draft: Draft, user: str, name: str) -> None:
+    duplicate(platform, lifecycle, draft, user, name)
     assert lifecycle.error is None
 
 
 @when(quoted('"{user}" chiede di duplicare il flusso "{name}"'))
-def ask_duplicate(platform: Platform, lifecycle: Lifecycle, duplication: Duplication, user: str, name: str) -> None:
-    duplicate(platform, lifecycle, duplication, user, name)
+def ask_duplicate(platform: Platform, lifecycle: Lifecycle, draft: Draft, user: str, name: str) -> None:
+    duplicate(platform, lifecycle, draft, user, name)
 
 
 @then(quoted('esiste il flusso "{name}" nello stato "{status}" alla versione {version}'))
 def copy_exists(
-    platform: Platform, lifecycle: Lifecycle, duplication: Duplication, *, name: str, status: str, version: str
+    platform: Platform, lifecycle: Lifecycle, draft: Draft, *, name: str, status: str, version: str
 ) -> None:
     copy = flow_named(platform, lifecycle.user, name)
-    assert (duplication.copy, copy.status.value, copy.configuration.version) == (name, status, int(version))
+    assert (draft.name, copy.status.value, copy.configuration.version) == (name, status, int(version))
 
 
 @then(quoted('ha fonti "{source}" peso {weight} e modello "{model}"'))
 def copy_strategy(
-    platform: Platform, lifecycle: Lifecycle, duplication: Duplication, source: str, *, weight: str, model: str
+    platform: Platform, lifecycle: Lifecycle, draft: Draft, source: str, *, weight: str, model: str
 ) -> None:
-    configuration = flow_named(platform, lifecycle.user, duplication.copy).configuration
-    original = flow_named(platform, lifecycle.user, duplication.copy.removesuffix(" (copia)")).configuration
+    configuration = flow_named(platform, lifecycle.user, draft.name).configuration
+    original = flow_named(platform, lifecycle.user, draft.name.removesuffix(" (copia)")).configuration
     assert [(each.name, each.weight) for each in configuration.sources] == [(source, int(weight))]
     assert configuration.sources == original.sources
     assert configuration.model == original.model
@@ -132,12 +128,6 @@ def copy_strategy(
         original.risk_limits,
         original.cycle_interval,
     )
-
-
-@then("non ha conto, capitale allocato né asset")
-def copy_without_assignment(platform: Platform, lifecycle: Lifecycle, duplication: Duplication) -> None:
-    copy = flow_named(platform, lifecycle.user, duplication.copy)
-    assert (copy.account_id, copy.configuration.allocated_capital, copy.configuration.assets) == (None, None, ())
 
 
 @when(quoted('passa un intervallo intero del flusso "{name}"'))
@@ -163,39 +153,9 @@ def free_capital_unchanged(platform: Platform, lifecycle: Lifecycle, duplication
     assert free_capital_of(platform, lifecycle.user, account) == duplication.free_capital
 
 
-@when(quoted('"{user}" assegna al flusso "{name}" il conto "{account}", {capital} USDC e l\'asset "{asset}"'))
-def assign(
-    platform: Platform, lifecycle: Lifecycle, user: str, name: str, *, account: str, capital: str, asset: str
-) -> None:
-    command = AssignDraftFlowCommand(
-        flow_named(platform, user, name).id, account_id_of(platform, user, account), Decimal(capital), (asset,)
-    )
-    attempt(lifecycle, lambda: platform.use_cases_of(user).assign_draft_flow.execute(command))
-    assert lifecycle.error is None
-
-
-@when(quoted('"{user}" avvia il flusso "{name}" senza assegnare conto, capitale e asset'))
-@when(quoted('"{user}" avvia il flusso "{name}"'))
-def start(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
-    change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction.START)
-    attempt(lifecycle, lambda: platform.use_cases_of(user).change_flow_status.execute(change))
-
-
 @then(quoted('l\'avvio è rifiutato con il motivo "{reason}"'))
 def start_refused(lifecycle: Lifecycle, reason: str) -> None:
     assert str(lifecycle.error) == reason
-
-
-@then(quoted('l\'avvio è rifiutato perché "{asset}" è già usato dal flusso "{other}" sul conto "{account}"'))
-def start_refused_for_asset(
-    platform: Platform, lifecycle: Lifecycle, duplication: Duplication, *, asset: str, other: str, account: str
-) -> None:
-    error = lifecycle.error
-    assert isinstance(error, AssetsAssignedToOtherFlowError)
-    assert (error.flow, error.assets) == (other, (asset,))
-    account_id = account_id_of(platform, lifecycle.user, account)
-    assert flow_named(platform, lifecycle.user, other).account_id == account_id
-    assert flow_named(platform, lifecycle.user, duplication.copy).account_id == account_id
 
 
 @then(quoted('il flusso "{name}" resta nello stato "{status}"'))

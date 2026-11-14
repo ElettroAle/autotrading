@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useForm, type UseFormSetError } from 'react-hook-form';
 
+import { FORM_CONTROL, FormField } from '@/components/ui/form-field';
 import { ApiError } from '@/lib/api-client';
 
 import {
@@ -32,32 +33,6 @@ const showFieldErrors = (error: Error | null, setError: UseFormSetError<Assignme
   }
 };
 
-const Field = ({
-  id,
-  label,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  error: string | undefined;
-  children: ReactNode;
-}) => (
-  <div className="flex flex-col gap-1">
-    <label htmlFor={id} className="text-sm text-slate-700">
-      {label}
-    </label>
-    {children}
-    {error === undefined ? null : (
-      <p id={`${id}-error`} className="text-sm text-red-700">
-        {error}
-      </p>
-    )}
-  </div>
-);
-
-const CONTROL = 'rounded border border-slate-300 px-2 py-1';
-
 /** Account, capital and assets of a draft, sent to the API; its refusals stay beside the fields (ADR 0125). */
 export const DraftAssignmentForm = ({
   flowId,
@@ -86,8 +61,8 @@ export const DraftAssignmentForm = ({
       onSubmit={handleSubmit((input) => assign.mutate(input))}
       className="mt-4 flex flex-col gap-3 rounded border border-slate-200 p-3"
     >
-      <Field id="assignment-account" label="Conto" error={errors.accountId?.message}>
-        <select id="assignment-account" className={CONTROL} {...register('accountId')}>
+      <FormField id="assignment-account" label="Conto" error={errors.accountId?.message}>
+        <select id="assignment-account" className={FORM_CONTROL} {...register('accountId')}>
           <option value="">Scegli un conto</option>
           {accounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -95,8 +70,8 @@ export const DraftAssignmentForm = ({
             </option>
           ))}
         </select>
-      </Field>
-      <Field
+      </FormField>
+      <FormField
         id="assignment-capital"
         label="Capitale allocato (USDC)"
         error={errors.allocatedCapital?.message}
@@ -104,18 +79,18 @@ export const DraftAssignmentForm = ({
         <input
           id="assignment-capital"
           inputMode="decimal"
-          className={CONTROL}
+          className={FORM_CONTROL}
           {...register('allocatedCapital')}
         />
-      </Field>
-      <Field id="assignment-assets" label="Asset" error={errors.assets?.message}>
+      </FormField>
+      <FormField id="assignment-assets" label="Asset" error={errors.assets?.message}>
         <input
           id="assignment-assets"
           placeholder="BTC, ETH"
-          className={CONTROL}
+          className={FORM_CONTROL}
           {...register('assets')}
         />
-      </Field>
+      </FormField>
       <button
         type="submit"
         disabled={assign.isPending}

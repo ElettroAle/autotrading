@@ -15,6 +15,7 @@ from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
 
@@ -51,6 +52,11 @@ class Flow(TenantOwned):
         """A new flow is stopped: it runs no cycle until the user starts it."""
         return cls(FlowId.new(), tenant_id, account_id, name, FlowStatus.STOPPED, configuration)
 
+    @classmethod
+    def drafted(cls, tenant_id: TenantId, name: FlowName, strategy: FlowStrategy) -> Flow:
+        """A new draft with the strategy alone and its own history from version 1 (ADR 0124, ADR 0140)."""
+        return cls(FlowId.new(), tenant_id, None, name, FlowStatus.DRAFT, strategy.draft_configuration(FIRST_VERSION))
+
     @property
     def missing_assignment(self) -> tuple[str, ...]:
         """What a draft still lacks before it can start, in the order the user assigns it (ADR 0124)."""
@@ -70,9 +76,8 @@ class Flow(TenantOwned):
 
     def duplicated(self) -> Flow:
         """A new draft with the strategy of the version in force, its own history and no account (R2.4.1)."""
-        strategy = replace(self.configuration, version=FIRST_VERSION, assets=(), allocated_capital=None)
         name = FlowName(self.name.value + COPY_SUFFIX)
-        return Flow(FlowId.new(), self.tenant_id, None, name, FlowStatus.DRAFT, strategy)
+        return Flow.drafted(self.tenant_id, name, FlowStrategy.of(self.configuration))
 
     def assigned(self, account_id: UUID, capital: Decimal, assets: tuple[str, ...]) -> Flow:
         """The draft with the account and, as its next version, the capital and the assets to start with (ADR 0124)."""

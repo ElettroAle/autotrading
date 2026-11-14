@@ -29,12 +29,17 @@ const problemSchema = z.object({
     .optional(),
 });
 
+/** A file the API gives to download, with the name it gives it. */
+export type DownloadedFile = { readonly name: string; readonly content: Blob };
+
 export type ApiClient = {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
-  post<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+  /** A command without body, or with a JSON document sent as it is, as the text of a file the user chose. */
+  post<T>(path: string, schema: z.ZodType<T>, document?: string): Promise<T>;
   put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
   /** A command the API answers without content. */
   send(method: 'POST' | 'DELETE', path: string): Promise<void>;
+  download(path: string): Promise<DownloadedFile>;
 };
 
 type ApiClientOptions = {
@@ -43,7 +48,20 @@ type ApiClientOptions = {
   readonly fetcher?: typeof fetch;
 };
 
-type Command = { readonly method: string; readonly body?: unknown };
+/** The body is JSON text already: the client sends it as it is. */
+type Command = { readonly method: string; readonly body?: string };
+
+// RFC 6266: the full name, encoded, wins over the plain one that every client reads.
+const ENCODED_FILE_NAME = /filename\*=UTF-8''([^;]+)/i;
+const PLAIN_FILE_NAME = /filename="([^"]+)"/i;
+
+const fileNameOf = (path: string, disposition: string | null): string => {
+  const encoded = ENCODED_FILE_NAME.exec(disposition ?? '')?.[1];
+  if (encoded !== undefined) {
+    return decodeURIComponent(encoded);
+  }
+  return PLAIN_FILE_NAME.exec(disposition ?? '')?.[1] ?? path.slice(path.lastIndexOf('/') + 1);
+};
 
 // Dashboard and API share the origin under Tailscale Serve: no CORS, no address to configure (ADR 0117).
 export const createApiClient = ({
@@ -72,7 +90,7 @@ export const createApiClient = ({
     const response = await fetcher(new URL(path, window.location.origin), {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body,
     });
     if (response.status === 401) {
       onSessionExpired();
@@ -89,10 +107,19 @@ export const createApiClient = ({
 
   return {
     get: (path, schema) => parsed(request(path, { method: 'GET' }), schema),
-    post: (path, schema) => parsed(request(path, { method: 'POST' }), schema),
-    put: (path, body, schema) => parsed(request(path, { method: 'PUT', body }), schema),
+    post: (path, schema, document) =>
+      parsed(request(path, { method: 'POST', body: document }), schema),
+    put: (path, body, schema) =>
+      parsed(request(path, { method: 'PUT', body: JSON.stringify(body) }), schema),
     async send(method, path) {
       await request(path, { method });
+    },
+    async download(path) {
+      const response = await request(path, { method: 'GET' });
+      return {
+        name: fileNameOf(path, response.headers.get('Content-Disposition')),
+        content: await response.blob(),
+      };
     },
   };
 };

@@ -5,9 +5,11 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
@@ -16,6 +18,7 @@ from autotrading.application.flows.change_flow_status import ChangeFlowStatusCom
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
+from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
@@ -308,6 +311,15 @@ def flows_router(
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.create_flow.execute(request.command()))
 
+    @router.post("/flows/import", status_code=status.HTTP_201_CREATED)
+    def import_flow_strategy(
+        document: StrategyDocument,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        name: str = "",
+    ) -> FlowResponse:
+        """A draft named as asked, with the strategy of the file sent as it is (R2.5.2, ADR 0140)."""
+        return FlowResponse.of(use_cases.import_flow_strategy.execute(document.command(name)))
+
     @router.get("/flows")
     def list_flows(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)], archived: bool = False
@@ -379,6 +391,17 @@ def flows_router(
         flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.duplicate_flow.execute(DuplicateFlowCommand(FlowId(flow_id))))
+
+    @router.get("/flows/{flow_id}/strategy", response_model=StrategyDocument)
+    def export_flow_strategy(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> JSONResponse:
+        """The strategy file of the flow, to download under the name of the flow (R2.5.2, ADR 0140)."""
+        exported = use_cases.export_flow_strategy.execute(ExportFlowStrategyCommand(FlowId(flow_id)))
+        return JSONResponse(
+            StrategyDocument.of(exported.strategy).model_dump(mode="json"),
+            headers={"Content-Disposition": attachment_of(exported.flow_name.value)},
+        )
 
     @router.put("/flows/{flow_id}/assignment")
     def assign_draft_flow(

@@ -2,24 +2,8 @@ import { expect } from '@playwright/test';
 
 import { fakePlatform } from '@/testing/mocks/platform';
 
-import type { DashboardPages } from '../../../support/dashboard-pages';
-import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
-
-const NOT_ASSIGNED = 'da assegnare';
-
-// Signs in once per scenario: the later steps act on the page the user is already on.
-const onFlowPage = async (
-  dashboard: DashboardPages,
-  memory: ScenarioMemory,
-  account: string,
-  flow: string,
-): Promise<void> => {
-  if (memory.account !== account) {
-    memory.account = account;
-    await dashboard.openFlowAs(account, flow);
-  }
-  await expect(dashboard.flowName()).toHaveText(flow);
-};
+import { Given, Then, When } from '../../../support/fixtures';
+import { onFlowPage } from '../../../support/flow-page';
 
 Given(
   'che {string} ha il flusso {string} sul conto {string} con asset {string}, fonti {string} peso {int} e modello {string}',
@@ -76,12 +60,6 @@ Then(
   },
 );
 
-Then('non ha conto, capitale allocato né asset', async ({ dashboard }) => {
-  await expect(dashboard.detail('Conto')).toHaveText(NOT_ASSIGNED);
-  await expect(dashboard.detail('Capitale allocato')).toHaveText(NOT_ASSIGNED);
-  await expect(dashboard.detail('Asset')).toHaveText(NOT_ASSIGNED);
-});
-
 When('passa un intervallo intero del flusso {string}', async ({ memory }, flow: string) => {
   memory.freeCapital = fakePlatform.freeCapitalOf('anna', 'principale');
   fakePlatform.passMinutes(fakePlatform.flowNamed(flow).cycleMinutes);
@@ -95,30 +73,6 @@ Then(
   'il capitale libero del conto {string} non cambia',
   async ({ memory }, accountName: string) => {
     expect(fakePlatform.freeCapitalOf('anna', accountName)).toBe(memory.freeCapital);
-  },
-);
-
-When(
-  "{string} assegna al flusso {string} il conto {string}, {int} USDC e l'asset {string}",
-  async (
-    { dashboard, memory },
-    account: string,
-    flow: string,
-    accountName: string,
-    capital: number,
-    asset: string,
-  ) => {
-    await onFlowPage(dashboard, memory, account, flow);
-    await dashboard.assign(accountName, String(capital), asset);
-    await expect(dashboard.detail('Conto')).toHaveText(accountName);
-  },
-);
-
-When(
-  '{string} avvia il flusso {string}',
-  async ({ dashboard, memory }, account: string, flow: string) => {
-    await onFlowPage(dashboard, memory, account, flow);
-    await dashboard.command('Avvia');
   },
 );
 
@@ -141,18 +95,6 @@ Then(
 Then("l'avvio è rifiutato con il motivo {string}", async ({ dashboard }, reason: string) => {
   await expect(dashboard.alert()).toHaveText(`Avvio rifiutato: ${reason}`);
 });
-
-Then(
-  "l'avvio è rifiutato perché {string} è già usato dal flusso {string} sul conto {string}",
-  async ({ dashboard }, asset: string, holder: string, accountName: string) => {
-    await expect(dashboard.alert()).toHaveText(
-      `Avvio rifiutato: asset già assegnati al flusso ${holder} sullo stesso conto: ${asset}`,
-    );
-    expect(fakePlatform.flowNamed(holder).accountId).toBe(
-      fakePlatform.accountNamed(accountName).id,
-    );
-  },
-);
 
 Then(
   'il flusso {string} resta nello stato {string}',
