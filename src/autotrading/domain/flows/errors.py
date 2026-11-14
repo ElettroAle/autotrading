@@ -255,3 +255,10 @@ class RangeDaysRequiredError(InvalidStatisticsPeriodError):
 class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
         super().__init__("il giorno iniziale è successivo al giorno finale")
+
+
+class VersionWithoutFlowError(DomainError):
+    """A configuration version is numbered within its flow: without the flow it names nothing (R2.5.1)."""
+
+    def __init__(self) -> None:
+        super().__init__("la versione richiede un flusso")

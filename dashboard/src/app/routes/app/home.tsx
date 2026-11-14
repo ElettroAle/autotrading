@@ -12,6 +12,11 @@ export const HomeRoute = () => (
       </Link>
     </nav>
     <FlowsList />
+    <nav aria-label="Consultazione" className="mt-6">
+      <Link to={paths.history.getHref()} className="text-blue-800 hover:underline">
+        Storico
+      </Link>
+    </nav>
     <nav aria-label="Impostazioni" className="mt-6">
       <Link to={paths.notifications.getHref()} className="text-blue-800 hover:underline">
         Notifiche Telegram

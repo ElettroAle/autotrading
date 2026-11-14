@@ -1,5 +1,6 @@
 import type { FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
+import { emptyRecords, type FakeRecords } from './history';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 
 /**
@@ -93,6 +94,7 @@ export type FakeUser = {
   readonly tenantId: string;
   readonly flows: FakeFlow[];
   readonly accounts: FakeAccount[];
+  readonly records: FakeRecords;
 };
 
 export type FlowOptions = Partial<Omit<FakeFlow, 'id' | 'name' | 'accountId'>> & {
@@ -244,6 +246,7 @@ export const fakePlatform = {
       tenantId: `tenant-${account}`,
       flows: [],
       accounts: [],
+      records: emptyRecords(),
     });
   },
 
@@ -324,6 +327,11 @@ export const fakePlatform = {
   /** Changes the flow with the name wherever it is, as the platform would after a command or a cycle. */
   changeFlow(name: string, changes: FakeFlowChanges): FakeFlow {
     return Object.assign(this.flowNamed(name), changes);
+  },
+
+  /** The histories of the tenant of the user (R2.5.1): the fake API serves only these to the user. */
+  recordsOf(account: string): FakeRecords {
+    return userNamed(account).records;
   },
 
   /** The cycles recorded for the flow with the name, in any order: the fake API serves them from the most recent. */

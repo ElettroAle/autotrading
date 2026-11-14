@@ -3,13 +3,13 @@ import type { FakeFlowHistory } from './platform';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LAST_DAYS: Record<string, number> = { '7d': 7, '30d': 30 };
 
-type Window = { readonly since?: number; readonly until?: number };
+export type Window = { readonly since?: number; readonly until?: number };
 
 /** The answer of the API to a period it rejects, with the reason it gives (ADR 0122). */
 export class InvalidPeriod extends Error {}
 
 // The period of the API: the whole life, the last 7 or 30 days, or the days from `from` to `to`, both whole, in UTC.
-const windowOf = (search: URLSearchParams, now: number): Window => {
+export const windowOf = (search: URLSearchParams, now: number): Window => {
   const period = search.get('period') ?? 'all';
   const from = search.get('from');
   const to = search.get('to');
@@ -37,7 +37,7 @@ const windowOf = (search: URLSearchParams, now: number): Window => {
   return { since: Date.parse(`${from}T00:00:00Z`), until: Date.parse(`${to}T00:00:00Z`) + DAY_MS };
 };
 
-const contains = (window: Window, instant: Date): boolean =>
+export const contains = (window: Window, instant: Date): boolean =>
   (window.since === undefined || instant.getTime() >= window.since) &&
   (window.until === undefined || instant.getTime() < window.until);
 

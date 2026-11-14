@@ -36,6 +36,11 @@ export class DashboardPages {
     await this.open('/accounts');
   }
 
+  /** The histories of R2.5.1, with the tab and the filters already in the query string when given. */
+  async openHistory(search = ''): Promise<void> {
+    await this.open(`/history${search}`);
+  }
+
   async openCyclesOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
@@ -218,6 +223,22 @@ export class DashboardPages {
 
   period(): Locator {
     return this.page.getByLabel('Periodo');
+  }
+
+  historyTab(name: string): Locator {
+    return this.page.getByRole('tab', { name });
+  }
+
+  /** A filter of the histories, by the label it shows. */
+  filter(label: string): Locator {
+    return this.page.getByLabel(label, { exact: true });
+  }
+
+  /** The rows of a history, by the name of its table. */
+  historyRows(table: string): Locator {
+    return this.page
+      .getByRole('table', { name: table, exact: true })
+      .locator(':scope > tbody > tr');
   }
 
   statistics(): Locator {

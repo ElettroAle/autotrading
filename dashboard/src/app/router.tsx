@@ -8,6 +8,7 @@ import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { FlowRoute } from './routes/app/flow';
 import { FlowVersionsRoute } from './routes/app/flow-versions';
+import { HistoryRoute } from './routes/app/history';
 import { HomeRoute } from './routes/app/home';
 import { NotificationsRoute } from './routes/app/notifications';
 import { PositionsRoute } from './routes/app/positions';
@@ -28,6 +29,7 @@ export const routes: RouteObject[] = [
       { path: paths.accounts.path, element: <AccountsRoute /> },
       { path: paths.flow.path, element: <FlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
+      { path: paths.history.path, element: <HistoryRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
       { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },

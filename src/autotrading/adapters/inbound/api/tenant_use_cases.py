@@ -56,8 +56,14 @@ from autotrading.application.flows.ports import (
     FlowPositionsPort,
     FlowRepositoryPort,
     FlowSummaryPort,
+    HistoricalClosedPositionsPort,
+    HistoricalCyclesPort,
+    HistoricalOrdersPort,
     RunningVerificationsPort,
 )
+from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
+from autotrading.application.flows.query_cycle_history import QueryCycleHistoryUseCase
+from autotrading.application.flows.query_order_history import QueryOrderHistoryUseCase
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
@@ -124,6 +130,9 @@ class TenantPorts:
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
+    historical_cycles: HistoricalCyclesPort
+    historical_closed_positions: HistoricalClosedPositionsPort
+    historical_orders: HistoricalOrdersPort
     environment: str
     settlement_currency: str
 
@@ -177,6 +186,9 @@ class TenantUseCases:
     read_flow_equity: ReadFlowEquityUseCase
     duplicate_flow: DuplicateFlowUseCase
     assign_draft_flow: AssignDraftFlowUseCase
+    query_cycle_history: QueryCycleHistoryUseCase
+    query_closed_position_history: QueryClosedPositionHistoryUseCase
+    query_order_history: QueryOrderHistoryUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -253,4 +265,9 @@ class TenantUseCases:
             read_flow_equity=ReadFlowEquityUseCase(ports.flows, ports.equity_snapshots, ports.clock),
             duplicate_flow=DuplicateFlowUseCase(ports.flows),
             assign_draft_flow=AssignDraftFlowUseCase(ports.flows, ports.flow_checks),
+            query_cycle_history=QueryCycleHistoryUseCase(ports.historical_cycles, ports.clock),
+            query_closed_position_history=QueryClosedPositionHistoryUseCase(
+                ports.historical_closed_positions, ports.clock
+            ),
+            query_order_history=QueryOrderHistoryUseCase(ports.historical_orders, ports.clock),
         )

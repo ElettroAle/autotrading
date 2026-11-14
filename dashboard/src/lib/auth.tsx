@@ -126,7 +126,7 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     return null;
   }
   if (accounts.length === 0) {
-    return <Navigate to={paths.login.getHref(location.pathname)} replace />;
+    return <Navigate to={paths.login.getHref(`${location.pathname}${location.search}`)} replace />;
   }
   return children;
 };
