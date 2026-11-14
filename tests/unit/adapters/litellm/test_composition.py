@@ -1,53 +1,39 @@
-"""The gateway of the installation through the LiteLLM proxy, with the master key (ADR 0101, 0103, 0109)."""
+"""The gateway of the LiteLLM library inside the worker, with no address and no key of the platform (ADR 0148)."""
 
-from pathlib import Path
+import litellm
 
-import pytest
-
-from autotrading.adapters.configuration.errors import MissingConfigurationError
-from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.adapters.outbound.litellm.configuration import _LiteLlmSettings
 from autotrading.adapters.outbound.litellm.model_gateway import LiteLlmModelGatewayAdapter
-from autotrading.application.agent.errors import ModelCatalogUnavailableError, ModelUnavailableError
-from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
-from autotrading.domain.agent.provider_key import ProviderKey
+from autotrading.domain.agent.provider_name import ProviderName
 
-MASTER_KEY = "sk-fake-master-key"
-URL = "http://litellm:4000"
-NOWHERE = "http://127.0.0.1:9"
+ENABLED = ("anthropic", "deepseek", "openai")
 
 
-def _configuration(tmp_path: Path, **overrides: str) -> dict[str, str]:
-    location = tmp_path / "litellm_master_key"
-    location.write_text(f"{MASTER_KEY}\n", encoding="utf-8")
-    return {"LITELLM_URL": URL, "LITELLM_MASTER_KEY_FILE": str(location), **overrides}
-
-
-def test_the_gateway_of_the_proxy_is_offered_by_its_name(tmp_path: Path) -> None:
-    gateways = litellm_adapters(ConfigurationSource(_configuration(tmp_path)))
+def test_the_gateway_of_the_library_is_offered_by_its_name() -> None:
+    gateways = litellm_adapters()
 
     assert list(gateways) == ["litellm"]
     assert isinstance(gateways["litellm"], LiteLlmModelGatewayAdapter)
 
 
-def test_the_call_and_the_catalog_reach_the_proxy_at_its_address(tmp_path: Path) -> None:
-    (gateway,) = litellm_adapters(ConfigurationSource(_configuration(tmp_path, LITELLM_URL=NOWHERE))).values()
-    messages = (ModelMessage(MessageRole.USER, "{}"),)
+def test_the_catalog_offers_the_chat_models_the_library_knows_for_the_enabled_providers() -> None:
+    (gateway,) = litellm_adapters().values()
 
-    with pytest.raises(ModelUnavailableError, match=r"APIConnectionError$"):
-        gateway.model_call().call("openai/gpt", ProviderKey("K-FAKE"), {}, messages)
-    with pytest.raises(ModelCatalogUnavailableError):
-        gateway.model_catalog().catalog()
+    catalog = gateway.model_catalog().catalog()
 
-
-@pytest.mark.parametrize("name", ["LITELLM_URL", "LITELLM_MASTER_KEY_FILE"])
-def test_without_the_proxy_the_gateway_is_a_missing_configuration(tmp_path: Path, name: str) -> None:
-    with pytest.raises(MissingConfigurationError) as raised:
-        litellm_adapters(ConfigurationSource(_configuration(tmp_path, **{name: ""})))
-
-    assert raised.value.name == name
+    assert catalog.providers == tuple(ProviderName(provider) for provider in ENABLED)
+    assert len(catalog.models) > len(ENABLED)
 
 
-def test_the_master_key_never_appears_in_the_settings_repr() -> None:
-    assert MASTER_KEY not in repr(_LiteLlmSettings(URL, MASTER_KEY))
+def test_the_enabled_providers_and_the_wait_are_settings_of_the_adapter() -> None:
+    settings = _LiteLlmSettings()
+
+    assert (settings.providers, settings.timeout_seconds) == (frozenset(ENABLED), 120.0)
+
+
+def test_messages_and_answers_never_reach_the_logs_and_nobody_is_called_back() -> None:
+    litellm_adapters()
+
+    assert litellm.turn_off_message_logging is True
+    assert (litellm.callbacks, litellm.success_callback, litellm.failure_callback) == ([], [], [])

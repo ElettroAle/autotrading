@@ -9,4 +9,4 @@ paths:
 - Solo la libreria standard (`json`, `importlib.resources`): i file viaggiano nel pacchetto, accanto al
   modulo che li legge.
 - I numeri si leggono come `Decimal`, mai come `float`.
-- Il catalogo dei modelli non è più un file JSON: lo descrive il proxy LiteLLM (ADR 0103).
+- Il catalogo dei modelli non è più un file JSON: viene dalla mappa dei modelli della libreria LiteLLM (ADR 0148).

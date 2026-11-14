@@ -53,7 +53,6 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
-from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.support.accounts import an_account
 from tests.support.installation import WORKER_TOKEN, installation_configuration, worker_configuration
 from tests.support.model_catalog import PLATFORM_MODELS
@@ -68,10 +67,10 @@ AUTHENTICATION = {
 }
 
 
-def providers_of() -> tuple[dict[str, FakeModelGatewayAdapter], dict[str, InMemoryModelCatalogAdapter]]:
-    """The models of the API: one gateway of the test models, for the agent and for the flows."""
+def providers_of() -> tuple[dict[str, InMemoryModelCatalogAdapter], dict[str, InMemoryModelCatalogAdapter]]:
+    """The models of the API: the catalog of the test models, for the agent and for the flows."""
     catalog = InMemoryModelCatalogAdapter(PLATFORM_MODELS)
-    return {"models": FakeModelGatewayAdapter(catalog)}, {"models": catalog}
+    return {"models": catalog}, {"models": catalog}
 
 
 def _sealers(
@@ -231,14 +230,6 @@ def test_application_refuses_to_start_without_the_worker(tmp_path: Path, name: s
     assert raised.value.name == name
 
 
-@pytest.mark.parametrize("name", ["LITELLM_URL", "LITELLM_MASTER_KEY_FILE"])
-def test_application_refuses_to_start_without_the_model_proxy(tmp_path: Path, name: str) -> None:
-    with pytest.raises(MissingConfigurationError) as raised:
-        create_application(installation_configuration(tmp_path, **{name: ""}))
-
-    assert raised.value.name == name
-
-
 def test_the_worker_answers_only_with_the_token_generated_on_the_machine(tmp_path: Path) -> None:
     client = TestClient(create_worker_application(worker_configuration(tmp_path)))
     path = f"/tenants/{uuid4()}/accounts/{uuid4()}/state"
@@ -247,6 +238,16 @@ def test_the_worker_answers_only_with_the_token_generated_on_the_machine(tmp_pat
 
     assert (response.status_code, reason_of(response)) == (401, {"detail": "non autenticato"})
     assert client.get("/health").json() == {"status": "ok"}
+
+
+def test_the_worker_gives_the_api_the_catalog_of_its_litellm_library(tmp_path: Path) -> None:
+    client = TestClient(create_worker_application(worker_configuration(tmp_path)))
+
+    response = client.get("/internal/model-catalog", headers={"Authorization": f"Bearer {WORKER_TOKEN}"})
+
+    assert response.status_code == 200
+    providers = {model["name"].partition("/")[0] for model in response.json()["models"]}
+    assert providers == {"anthropic", "deepseek", "openai"}
 
 
 def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
@@ -262,8 +263,6 @@ def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
         "CREDENTIALS_PRIVATE_KEY_FILE",
         "WORKER_TOKEN_FILE",
         "DATABASE_PASSWORD_FILE",
-        "LITELLM_URL",
-        "LITELLM_MASTER_KEY_FILE",
         "FORECASTER_URL",
     ],
 )

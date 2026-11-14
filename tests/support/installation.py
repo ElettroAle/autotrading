@@ -24,13 +24,11 @@ def _database(secrets: Path) -> dict[str, str]:
         "DATABASE_USER": "autotrading_app",
         "DATABASE_PASSWORD_FILE": _secret(secrets, "postgres_app_password", "unit-only\n"),
         "WORKER_TOKEN_FILE": _secret(secrets, "worker_token", f"{WORKER_TOKEN}\n"),
-        "LITELLM_URL": "http://litellm:4000",
-        "LITELLM_MASTER_KEY_FILE": _secret(secrets, "litellm_master_key", f"sk-{token_hex(16)}\n"),
     }
 
 
 def installation_configuration(secrets: Path, **overrides: str) -> dict[str, str]:
-    """What the API receives: the public key of the credentials, the address of the worker and of the proxy."""
+    """What the API receives: the public key of the credentials and the address of the worker."""
     public_key = base64.b64encode(bytes(PrivateKey.generate().public_key)).decode()
     configuration = _database(secrets) | {
         "APP_VERSION": "1.0.0",

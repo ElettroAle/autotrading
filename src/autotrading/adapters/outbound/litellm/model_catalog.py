@@ -1,23 +1,13 @@
-import time
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 
-from openai import OpenAI, OpenAIError
-
-from autotrading.application.agent.errors import ModelCatalogUnavailableError
-from autotrading.application.flows.errors import FlowModelCatalogUnavailableError
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, InvalidModelUsageError
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import PROVIDER_SEPARATOR, ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParameter, RangeParameter
 from autotrading.domain.agent.model_usage import ModelPrices
 
-MODEL_GROUPS_PATH = "/model_group/info"
-# The proxy learns its models when it starts; a few minutes are enough to see a route added to its configuration.
-REFRESH_SECONDS = 300.0
-CATALOG_TIMEOUT_SECONDS = 10.0
 CHAT_MODE = "chat"
-WILDCARD = "*"
 # LiteLLM tells whether a model takes a temperature, not its range: the range is the one of the OpenAI API it speaks,
 # and a provider that takes less refuses the call with its own reason.
 TEMPERATURE_MAXIMUM = Decimal(2)
@@ -26,85 +16,75 @@ DEFAULT_MAX_TOKENS = Decimal(4096)
 REASONING_LEVELS = ("basso", "medio", "alto")
 DEFAULT_REASONING_LEVEL = "medio"
 TOKENS_PER_MILLION = Decimal(1_000_000)
-# An entry the proxy describes in another shape is left out: the other models stay selectable.
-UNDESCRIBED = (KeyError, TypeError, ValueError, InvalidOperation, InvalidModelDefinitionError, InvalidModelUsageError)
+# An entry the map describes in another shape is left out: the other models stay selectable.
+UNDESCRIBED = (TypeError, ValueError, InvalidOperation, InvalidModelDefinitionError, InvalidModelUsageError)
 
-type Group = Mapping[str, object]
+type Entry = Mapping[str, object]
+type ModelMap = Mapping[str, Entry]
+type SupportedParameters = Callable[[str, str], Sequence[str] | None]
 
 
 class LiteLlmModelCatalogAdapter:
-    """The models the LiteLLM proxy routes, with what its model map knows of them (R1.4.2, ADR 0103).
+    """The chat models the LiteLLM library knows for the enabled providers, from its model map (R1.4.2, ADR 0148).
 
-    Enabling a provider is a route in the configuration of the proxy: every chat model LiteLLM knows for it becomes
-    selectable, with no list kept by hand. The catalog does not depend on any key: the key of the user travels only
-    with the calls of its flows.
+    Enabling a provider is a setting of the adapter: every chat model the map knows for it becomes selectable, with no
+    list kept by hand. The map comes with the version of the library, so it is read once and asks nothing on the
+    network; the catalog does not depend on any key.
     """
 
-    def __init__(self, client: OpenAI, clock: Callable[[], float] = time.monotonic) -> None:
-        self._client = client
-        self._clock = clock
-        self._read: tuple[float, ModelCatalog] | None = None
+    def __init__(self, model_map: ModelMap, parameters_of: SupportedParameters, providers: frozenset[str]) -> None:
+        self._model_map = model_map
+        self._parameters_of = parameters_of
+        self._providers = providers
+        self._catalog: ModelCatalog | None = None
 
     def catalog(self) -> ModelCatalog:
-        now = self._clock()
-        if self._read is not None and now - self._read[0] < REFRESH_SECONDS:
-            return self._read[1]
-        catalog = ModelCatalog(_definitions(self._groups()))
-        self._read = (now, catalog)
-        return catalog
+        if self._catalog is None:
+            self._catalog = ModelCatalog(self._definitions())
+        return self._catalog
 
     def definition_of(self, model: str) -> ModelDefinition:
-        try:
-            catalog = self.catalog()
-        except ModelCatalogUnavailableError as error:
-            raise FlowModelCatalogUnavailableError from error
-        return catalog.find(model)
+        return self.catalog().find(model)
 
-    def _groups(self) -> list[Group]:
-        try:
-            answer = self._client.get(MODEL_GROUPS_PATH, cast_to=object, options={"timeout": CATALOG_TIMEOUT_SECONDS})
-        except OpenAIError:
-            raise ModelCatalogUnavailableError from None
-        groups = answer.get("data") if isinstance(answer, Mapping) else None
-        if not isinstance(groups, list):
-            raise ModelCatalogUnavailableError
-        return [entry for entry in groups if isinstance(entry, Mapping)]
+    def _definitions(self) -> Iterator[ModelDefinition]:
+        # The map names a model of some providers both with and without the provider: the catalog offers it once.
+        offered: dict[str, ModelDefinition] = {}
+        for key, entry in self._model_map.items():
+            definition = self._described(key, entry)
+            if definition is not None:
+                offered.setdefault(definition.name, definition)
+        return iter(offered.values())
 
-
-def _definitions(groups: list[Group]) -> Iterator[ModelDefinition]:
-    for group in groups:
+    def _described(self, key: str, entry: Entry) -> ModelDefinition | None:
+        provider = entry.get("litellm_provider")
+        if not isinstance(provider, str) or provider not in self._providers or entry.get("mode") != CHAT_MODE:
+            return None
         try:
-            definition = _definition_of(group)
+            return _definition_of(key, provider, entry, self._parameters_of(key, provider))
         except UNDESCRIBED:
-            continue
-        if definition is not None:
-            yield definition
+            return None
 
 
-def _definition_of(group: Group) -> ModelDefinition | None:
-    name = str(group["model_group"])
-    _, separator, _ = name.partition(PROVIDER_SEPARATOR)
-    if not separator or WILDCARD in name or group.get("mode") != CHAT_MODE:
-        return None
-    longest = group.get("max_output_tokens")
+def _definition_of(key: str, provider: str, entry: Entry, supported: Sequence[str] | None) -> ModelDefinition | None:
+    longest = entry.get("max_output_tokens")
     if longest is None:
         return None
-    return ModelDefinition(name, tuple(_parameters(group, _number(longest))), _prices(group))
+    name = provider + PROVIDER_SEPARATOR + key.removeprefix(provider + PROVIDER_SEPARATOR)
+    return ModelDefinition(name, tuple(_parameters(entry, supported or (), _number(longest))), _prices(entry))
 
 
-def _parameters(group: Group, longest: Decimal) -> Iterator[ModelParameter]:
-    supported = group.get("supported_openai_params")
-    if isinstance(supported, list) and "temperature" in supported:
+def _parameters(entry: Entry, supported: Sequence[str], longest: Decimal) -> Iterator[ModelParameter]:
+    if "temperature" in supported:
         yield RangeParameter("temperature", Decimal(0), TEMPERATURE_MAXIMUM, DEFAULT_TEMPERATURE)
     whole = longest.to_integral_value()
     yield RangeParameter("max_tokens", Decimal(1), whole, min(DEFAULT_MAX_TOKENS, whole), whole=True)
-    if group.get("supports_reasoning") is True:
+    if entry.get("supports_reasoning") is True:
         yield ChoiceParameter("reasoning_effort", REASONING_LEVELS, DEFAULT_REASONING_LEVEL)
 
 
-def _prices(group: Group) -> ModelPrices | None:
+def _prices(entry: Entry) -> ModelPrices | None:
     """The prices of LiteLLM's model map; none when it does not know them (zero for both is its unknown)."""
-    per_input, per_output = group.get("input_cost_per_token"), group.get("output_cost_per_token")
+    per_input, per_output = entry.get("input_cost_per_token"), entry.get("output_cost_per_token")
     if per_input is None or per_output is None:
         return None
     input_price, output_price = _number(per_input), _number(per_output)

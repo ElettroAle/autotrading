@@ -3,7 +3,7 @@
 import logging
 
 from autotrading.application.agent.errors import ProviderKeyNotFoundError, UnsupportedProviderError
-from autotrading.application.agent.model_gateways import ModelGateways, joined_catalog
+from autotrading.application.agent.model_gateways import ModelCatalogs, joined_catalog
 from autotrading.application.agent.ports import ProviderKeyRepositoryPort
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -11,9 +11,9 @@ from autotrading.domain.agent.registered_provider_key import RegisteredProviderK
 operations = logging.getLogger("autotrading.agent")
 
 
-def supported_provider(gateways: ModelGateways, name: str) -> ProviderName:
+def supported_provider(catalogs: ModelCatalogs, name: str) -> ProviderName:
     provider = ProviderName(name)
-    catalog = joined_catalog(gateways)
+    catalog = joined_catalog(catalogs)
     if not catalog.offers(provider):
         raise UnsupportedProviderError(provider, catalog.providers)
     return provider

@@ -7,7 +7,7 @@ from autotrading.adapters.configuration.errors import MissingConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.inbound.api.composition import api_adapters, worker_api_adapters
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
-from autotrading.adapters.inbound.api.worker import WorkerUseCases
+from autotrading.adapters.inbound.api.worker import WorkerAnswers, WorkerUseCases
 from autotrading.application.tenancy.ports import LoginEndpoints
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -73,7 +73,7 @@ def test_the_worker_api_refuses_a_caller_without_the_token_of_the_machine(tmp_pa
     token = tmp_path / "worker_token"
     token.write_text("t0k\n", encoding="utf-8")
     source = ConfigurationSource({"WORKER_TOKEN_FILE": str(token)})
-    client = TestClient(worker_api_adapters(source, _no_worker_use_cases, None, None, None))
+    client = TestClient(worker_api_adapters(source, _no_worker_use_cases, None, None, WorkerAnswers()))
 
     response = client.get("/bot/start-link", headers={"Authorization": "Bearer wrong"})
 
@@ -82,6 +82,6 @@ def test_the_worker_api_refuses_a_caller_without_the_token_of_the_machine(tmp_pa
 
 def test_the_worker_api_needs_the_token_of_the_machine() -> None:
     with pytest.raises(MissingConfigurationError) as raised:
-        worker_api_adapters(ConfigurationSource({}), _no_worker_use_cases, None, None, None)
+        worker_api_adapters(ConfigurationSource({}), _no_worker_use_cases, None, None, WorkerAnswers())
 
     assert raised.value.name == "WORKER_TOKEN_FILE"

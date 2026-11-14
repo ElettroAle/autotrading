@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError
-from autotrading.application.agent.model_gateways import ModelGateways
+from autotrading.application.agent.model_gateways import ModelCatalogs
 from autotrading.application.agent.ports import (
     ProviderKeyRegistration,
     ProviderKeyRepositoryPort,
@@ -27,7 +27,7 @@ class ProviderKeyServices:
     The provider is not asked about the key: a key it refuses comes out at the first cycle (R1.2.4).
     """
 
-    gateways: ModelGateways
+    catalogs: ModelCatalogs
     sealer: ProviderKeySealerPort
 
 
@@ -40,7 +40,7 @@ class RegisterProviderKeyUseCase:
         self._services = services
 
     def execute(self, command: RegisterProviderKeyCommand) -> ProviderKeyRegistration:
-        provider = supported_provider(self._services.gateways, command.provider)
+        provider = supported_provider(self._services.catalogs, command.provider)
         key = ProviderKey(command.key)
         self._require_none_for(provider)
         sealed = self._services.sealer.seal(provider, key)

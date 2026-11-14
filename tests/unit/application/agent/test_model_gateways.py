@@ -66,7 +66,7 @@ class Gateways:
         use_case.execute(AskAgentCommand(model, {}, CONTEXT))
 
     def listing(self) -> list[str]:
-        use_case = ListModelsUseCase({"proxy": self.proxy, "direct": self.direct}, self.keys)
+        use_case = ListModelsUseCase({"proxy": self.proxy.catalog, "direct": self.direct.catalog}, self.keys)
         return [model.name for model in use_case.execute().models]
 
 
