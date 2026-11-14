@@ -1,16 +1,34 @@
+from collections.abc import Mapping
 from uuid import UUID
 
 from autotrading.application.errors import ApplicationError
 from autotrading.domain.errors import ErrorScope
+from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.flow_state import PositionMismatch
 from autotrading.domain.italian_text import number_text
 
 
-class FlowNameInUseError(ApplicationError):
+class FlowSettingRefusedError(ApplicationError):
+    """A setting of a flow the other contexts refuse: the answer names the setting, so the user sees the reason beside
+    it (R2.3.3).
+    """
+
+    status_code = 422
+
+    def __init__(self, reason: str, setting: FlowSetting) -> None:
+        super().__init__(reason)
+        self.setting = setting
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.setting.value}
+
+
+class FlowNameInUseError(FlowSettingRefusedError):
     status_code = 409
 
     def __init__(self) -> None:
-        super().__init__("nome già usato da un altro flusso")
+        super().__init__("nome già usato da un altro flusso", FlowSetting.NAME)
 
 
 class FlowAccountNotFoundError(ApplicationError):
@@ -22,11 +40,9 @@ class FlowAccountNotFoundError(ApplicationError):
         super().__init__("conto non trovato")
 
 
-class AssetNotTradableError(ApplicationError):
-    status_code = 422
-
+class AssetNotTradableError(FlowSettingRefusedError):
     def __init__(self, assets: tuple[str, ...]) -> None:
-        super().__init__("asset non negoziabile sull'exchange: " + ", ".join(assets))
+        super().__init__("asset non negoziabile sull'exchange: " + ", ".join(assets), FlowSetting.ASSETS)
         self.assets = assets
 
 
@@ -65,13 +81,11 @@ class FlowExchangeUnavailableError(ApplicationError):
         super().__init__("exchange non raggiungibile, riprovare")
 
 
-class InvalidFlowSettingError(ApplicationError):
+class InvalidFlowSettingError(FlowSettingRefusedError):
     """A model, a source or one of their parameters the platform does not admit for the flow, with the reason."""
 
-    status_code = 422
-
-    def __init__(self, reason: str) -> None:
-        super().__init__(reason)
+    def __init__(self, reason: str, setting: FlowSetting) -> None:
+        super().__init__(reason, setting)
         self.reason = reason
 
 
@@ -110,13 +124,13 @@ class FlowVersionNotFoundError(ApplicationError):
         self.version = version
 
 
-class AssetWithOpenPositionError(ApplicationError):
+class AssetWithOpenPositionError(FlowSettingRefusedError):
     """The flow would leave a position it no longer follows: it is closed first, then the asset removed (R1.1.3)."""
 
     status_code = 409
 
     def __init__(self, assets: tuple[str, ...]) -> None:
-        super().__init__("posizione aperta sull'asset da togliere: " + ", ".join(assets))
+        super().__init__("posizione aperta sull'asset da togliere: " + ", ".join(assets), FlowSetting.ASSETS)
         self.assets = assets
 
 
@@ -177,7 +191,7 @@ class FlowProviderKeyMissingError(InvalidFlowSettingError):
     """The model of the flow needs a key of its provider the tenant has not registered (R1.4.1)."""
 
     def __init__(self, provider: str) -> None:
-        super().__init__(f"nessuna chiave registrata per il fornitore: {provider}")
+        super().__init__(f"nessuna chiave registrata per il fornitore: {provider}", FlowSetting.MODEL)
 
 
 class CycleFlowNotFoundError(ApplicationError):

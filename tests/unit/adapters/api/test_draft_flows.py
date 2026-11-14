@@ -137,7 +137,10 @@ def test_an_assignment_without_assets_answers_with_the_reason(client_of: Client,
         json={"account_id": str(account_id_of(platform, "anna")), "allocated_capital": "200"},
     )
 
-    assert (response.status_code, reason_of(response)) == (422, {"detail": "almeno un asset è obbligatorio"})
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "almeno un asset è obbligatorio", "field": "assets"},
+    )
 
 
 def test_a_flow_out_of_draft_is_not_assigned(client_of: Client, platform: Platform) -> None:

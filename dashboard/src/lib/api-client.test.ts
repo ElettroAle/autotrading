@@ -122,25 +122,101 @@ describe('createApiClient', () => {
     await expect(api.send('DELETE', '/chat')).rejects.toBeInstanceOf(SessionExpiredError);
     expect(onSessionExpired).toHaveBeenCalledOnce();
   });
-});
 
-describe('createApiClient commands', () => {
-  it('sends a command with its body as JSON and reads the answer', async () => {
+  it.each(['POST', 'PATCH', 'PUT'] as const)(
+    'sends a %s with a JSON body and the access token of the user, and reads the answer',
+    async (method) => {
+      const received: unknown[] = [];
+      server.use(
+        http.all('http://localhost:3000/things', async ({ request }) => {
+          received.push([
+            request.method,
+            request.headers.get('Authorization'),
+            request.headers.get('Content-Type'),
+            await request.json(),
+          ]);
+          return HttpResponse.json([{ name: 'gamma' }]);
+        }),
+      );
+      const { api } = clientWith();
+
+      expect(await api.write(method, '/things', { name: 'gamma' }, itemsSchema)).toEqual([
+        { name: 'gamma' },
+      ]);
+      expect(received).toEqual([[method, 'Bearer token-1', 'application/json', { name: 'gamma' }]]);
+    },
+  );
+
+  it('keeps the field a refusal names, so a form can show the reason beside it', async () => {
     server.use(
-      http.put('http://localhost:3000/items/1', async ({ request }) =>
-        request.headers.get('Authorization') === 'Bearer token-1' &&
-        request.headers.get('Content-Type') === 'application/json'
-          ? HttpResponse.json({ name: ((await request.json()) as { name: string }).name })
-          : HttpResponse.json({}, { status: 400 }),
+      http.post('*/things', () =>
+        HttpResponse.json(
+          {
+            detail: 'capitale allocato oltre il capitale libero: 500 USDC',
+            field: 'allocated_capital',
+          },
+          { status: 422 },
+        ),
       ),
     );
     const { api } = clientWith();
 
-    expect(await api.put('/items/1', { name: 'beta' }, z.object({ name: z.string() }))).toEqual({
-      name: 'beta',
+    await expect(api.write('POST', '/things', {}, itemsSchema)).rejects.toMatchObject({
+      status: 422,
+      message: 'capitale allocato oltre il capitale libero: 500 USDC',
+      problems: [
+        {
+          field: 'allocated_capital',
+          reason: 'capitale allocato oltre il capitale libero: 500 USDC',
+        },
+      ],
     });
   });
 
+  it('keeps each field an invalid request names, with its reason', async () => {
+    server.use(
+      http.post('*/things', () =>
+        HttpResponse.json(
+          {
+            detail: 'richiesta non valida',
+            errors: [
+              { loc: ['body', 'allocated_capital'], msg: 'Field required', type: 'missing' },
+              {
+                loc: ['query', 'page'],
+                msg: 'Input should be a valid integer',
+                type: 'int_parsing',
+              },
+            ],
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    const { api } = clientWith();
+
+    await expect(api.write('POST', '/things', {}, itemsSchema)).rejects.toMatchObject({
+      problems: [
+        { field: 'allocated_capital', reason: 'Field required' },
+        { field: undefined, reason: 'Input should be a valid integer' },
+      ],
+    });
+  });
+
+  it('keeps the reason alone when the refusal names no field', async () => {
+    server.use(
+      http.post('*/things', () =>
+        HttpResponse.json({ detail: 'conto non trovato' }, { status: 404 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    await expect(api.write('POST', '/things', {}, itemsSchema)).rejects.toMatchObject({
+      problems: [{ field: undefined, reason: 'conto non trovato' }],
+    });
+  });
+});
+
+describe('createApiClient commands', () => {
   it('sends a command without body', async () => {
     server.use(
       http.post('*/items/1/copy', async ({ request }) =>
@@ -153,30 +229,6 @@ describe('createApiClient commands', () => {
 
     expect(await api.post('/items/1/copy', z.object({ name: z.string() }))).toEqual({
       name: 'alfa (copia)',
-    });
-  });
-
-  it('tells, for an invalid request, which field is wrong and why', async () => {
-    server.use(
-      http.put('*/items/1', () =>
-        HttpResponse.json(
-          {
-            detail: 'richiesta non valida',
-            errors: [
-              { loc: ['body', 'allocated_capital'], msg: 'Input should be a valid decimal' },
-              { loc: ['body'], msg: 'Field required' },
-            ],
-          },
-          { status: 422 },
-        ),
-      ),
-    );
-    const { api } = clientWith();
-
-    await expect(api.put('/items/1', {}, itemsSchema)).rejects.toMatchObject({
-      status: 422,
-      message: 'richiesta non valida',
-      fieldErrors: { allocated_capital: 'Input should be a valid decimal', body: 'Field required' },
     });
   });
 

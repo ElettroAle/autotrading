@@ -956,6 +956,7 @@ class FlowSummary:
     pause_reason: str | None
     model: str
     schedule: CycleSchedule | None
+    version: int
 
 
 class FlowSummaryPort(Protocol):

@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 from autotrading.application.flows.errors import InvalidFlowSettingError
+from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
 from autotrading.domain.sources.errors import (
     SourceNotAvailableError,
@@ -20,5 +21,5 @@ class SelectSourceUseCase:
         try:
             parameters = self._catalog.find(source).settings(requested)
         except (SourceNotAvailableError, SourceParameterOutOfRangeError, UnknownSourceParameterError) as error:
-            raise InvalidFlowSettingError(str(error)) from error
+            raise InvalidFlowSettingError(str(error), FlowSetting.SOURCES) from error
         return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, parameters)

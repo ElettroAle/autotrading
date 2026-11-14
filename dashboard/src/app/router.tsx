@@ -6,10 +6,12 @@ import { AccountsRoute } from './routes/app/accounts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
+import { EditFlowRoute } from './routes/app/edit-flow';
 import { FlowRoute } from './routes/app/flow';
 import { FlowVersionsRoute } from './routes/app/flow-versions';
 import { HistoryRoute } from './routes/app/history';
 import { HomeRoute } from './routes/app/home';
+import { NewFlowRoute } from './routes/app/new-flow';
 import { NotificationsRoute } from './routes/app/notifications';
 import { PositionsRoute } from './routes/app/positions';
 import { AppRoot } from './routes/app/root';
@@ -27,7 +29,9 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <HomeRoute /> },
       { path: paths.accounts.path, element: <AccountsRoute /> },
+      { path: paths.newFlow.path, element: <NewFlowRoute /> },
       { path: paths.flow.path, element: <FlowRoute /> },
+      { path: paths.editFlow.path, element: <EditFlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },

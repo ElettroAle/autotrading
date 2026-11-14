@@ -230,7 +230,7 @@ def test_an_import_of_a_model_out_of_the_catalog_answers_with_the_reason(client_
 
     assert (response.status_code, reason_of(response)) == (
         422,
-        {"detail": "modello non disponibile: openrouter/ritirato"},
+        {"detail": "modello non disponibile: openrouter/ritirato", "field": "model"},
     )
 
 
@@ -256,4 +256,7 @@ def test_an_import_without_name_answers_with_the_reason(client_of: Client) -> No
 
     response = anna.post("/flows/import", json=StrategyDocument.of(a_strategy()).model_dump(mode="json"))
 
-    assert (response.status_code, reason_of(response)) == (422, {"detail": "nome del flusso obbligatorio"})
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "nome del flusso obbligatorio", "field": "name"},
+    )

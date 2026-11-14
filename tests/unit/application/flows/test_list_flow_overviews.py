@@ -54,7 +54,7 @@ class Bench:
             TENANT, account_id=ACCOUNT, configuration=a_configuration(assets=("BTC",), allocated_capital=capital)
         )
         self.store.flows.append(flow)
-        summary = FlowSummary(flow.id.value, "alfa", "test-1", status, None, "openrouter/deepseek-chat", schedule)
+        summary = FlowSummary(flow.id.value, "alfa", "test-1", status, None, "openrouter/deepseek-chat", schedule, 1)
         self.summaries.summaries.append(summary)
         return flow, summary
 
@@ -126,7 +126,7 @@ def test_a_draft_has_neither_capital_nor_return_and_reads_no_account(bench: Benc
     draft = a_flow(TENANT, account_id=ACCOUNT).duplicated()
     bench.store.flows.append(draft)
     bench.summaries.summaries.append(
-        FlowSummary(draft.id.value, "alfa (copia)", "", "bozza", None, "openrouter/deepseek-chat", None)
+        FlowSummary(draft.id.value, "alfa (copia)", "", "bozza", None, "openrouter/deepseek-chat", None, 1)
     )
 
     [overview] = bench.use_case.execute()

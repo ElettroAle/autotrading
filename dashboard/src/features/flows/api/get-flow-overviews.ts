@@ -16,6 +16,7 @@ const flowOverviewSchema = z.object({
   status: z.string(),
   pause_reason: z.string().nullable(),
   model: z.string(),
+  version: z.number(),
   last_cycle: cycleOutcomeSchema.nullable(),
   next_cycle_at: z.string().nullable(),
   currency: z.string().nullable(),

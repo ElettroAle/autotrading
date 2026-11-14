@@ -54,6 +54,7 @@ export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
       <Fact term="Conto">{flow.account}</Fact>
       <Fact term="Ambiente">{flow.environment}</Fact>
       <Fact term="Modello">{flow.model}</Fact>
+      <Fact term="Versione">{flow.version}</Fact>
       <Fact term="Ultima esecuzione">{lastCycleOf(flow)}</Fact>
       {flow.next_cycle_at !== null && (
         <Fact term="Prossima esecuzione prevista">{formatInstant(flow.next_cycle_at)}</Fact>

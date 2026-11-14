@@ -42,7 +42,18 @@ export type FakeVersion = {
   readonly configuration: FakeConfiguration;
 };
 
-export type FakeSource = { readonly name: string; readonly weight: number };
+export type FakeSource = {
+  readonly name: string;
+  readonly weight: number;
+  readonly parameters?: Readonly<Record<string, number>>;
+};
+
+/** The risk rules of a flow, as the API names them (R1.1.3). */
+export type FakeRiskLimits = {
+  readonly maxLeverage: number;
+  readonly maxMarginExposurePercent: string | null;
+  readonly maxValueExposurePercent: string | null;
+};
 
 export type FakeFlow = {
   readonly id: string;
@@ -53,8 +64,12 @@ export type FakeFlow = {
   assets: string[];
   allocatedCapital: number | null;
   model: string;
+  modelParameters: Record<string, string>;
   sources: FakeSource[];
   cycleMinutes: number;
+  instructions: string;
+  riskLimits: FakeRiskLimits;
+  bringToMinimum: boolean;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
   /** Why the flow paused, as the API says it (R1.2.4). */
@@ -71,6 +86,42 @@ export type FakeAccount = { readonly id: string; readonly name: string; readonly
 
 /** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
 export type FakeFlowChanges = Partial<Omit<FakeFlow, 'id' | 'name'>>;
+
+/** The configuration version in force of a flow, as the API answers it. */
+export type FakeFlowConfiguration = {
+  account_id: string | null;
+  version: number;
+  assets: string[];
+  cycle_minutes: number;
+  model: { name: string; parameters: Record<string, string> };
+  sources: { name: string; weight: number; parameters: Readonly<Record<string, number>> }[];
+  instructions: string;
+  risk_limits: {
+    max_leverage: number;
+    max_margin_exposure_percent: string | null;
+    max_value_exposure_percent: string | null;
+  };
+  allocated_capital: string | null;
+  bring_to_minimum: boolean;
+};
+
+/** The configuration of the flow in force, in the shape of the answers of the API. */
+export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
+  account_id: flow.accountId,
+  version: flow.version,
+  assets: flow.assets,
+  cycle_minutes: flow.cycleMinutes,
+  model: { name: flow.model, parameters: flow.modelParameters },
+  sources: flow.sources.map((source) => ({ parameters: {}, ...source })),
+  instructions: flow.instructions,
+  risk_limits: {
+    max_leverage: flow.riskLimits.maxLeverage,
+    max_margin_exposure_percent: flow.riskLimits.maxMarginExposurePercent,
+    max_value_exposure_percent: flow.riskLimits.maxValueExposurePercent,
+  },
+  allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
+  bring_to_minimum: flow.bringToMinimum,
+});
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
 
@@ -95,6 +146,7 @@ export type FakeUser = {
   readonly flows: FakeFlow[];
   readonly accounts: FakeAccount[];
   readonly records: FakeRecords;
+  readonly providerKeys: Set<string>;
 };
 
 export type FlowOptions = Partial<Omit<FakeFlow, 'id' | 'name' | 'accountId'>> & {
@@ -157,6 +209,12 @@ const refusedFor =
     `comando ${name} non ammesso per un flusso ${status}`;
 
 const TOKEN_PREFIX = 'fake-access-token-';
+
+export const DEFAULT_RISK_LIMITS: FakeRiskLimits = {
+  maxLeverage: 3,
+  maxMarginExposurePercent: '10',
+  maxValueExposurePercent: null,
+};
 const DRAFT = 'bozza';
 const STOPPED = 'fermo';
 const ACTIVE = 'attivo';
@@ -211,7 +269,7 @@ const state = {
   exchangeReachable: true,
 };
 
-const flowIdOf = (name: string): string => `flow-${name}`;
+export const flowIdOf = (name: string): string => `flow-${name}`;
 
 export const accessTokenOf = (account: string): string => `${TOKEN_PREFIX}${account}`;
 
@@ -242,7 +300,8 @@ const requireFreeName = (user: FakeUser, name: string): void => {
 /** A draft with the strategy alone, its own history from version 1 (ADR 0124). */
 const draftOf = (
   name: string,
-  strategy: Pick<FakeFlow, 'model' | 'sources' | 'cycleMinutes'>,
+  strategy: Pick<FakeFlow, 'model' | 'sources' | 'cycleMinutes'> &
+    Partial<Pick<FakeFlow, 'modelParameters' | 'instructions' | 'riskLimits' | 'bringToMinimum'>>,
 ): FakeFlow => ({
   id: flowIdOf(name),
   name,
@@ -252,8 +311,12 @@ const draftOf = (
   assets: [],
   allocatedCapital: null,
   model: strategy.model,
-  sources: strategy.sources.map(({ name, weight }) => ({ name, weight })),
+  modelParameters: { ...strategy.modelParameters },
+  sources: strategy.sources.map((source) => ({ ...source })),
   cycleMinutes: strategy.cycleMinutes,
+  instructions: strategy.instructions ?? '',
+  riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
+  bringToMinimum: strategy.bringToMinimum ?? false,
   cycles: 0,
   pauseReason: null,
   currentCapital: 0,
@@ -354,6 +417,7 @@ export const fakePlatform = {
       flows: [],
       accounts: [],
       records: emptyRecords(),
+      providerKeys: new Set(),
     });
   },
 
@@ -381,8 +445,12 @@ export const fakePlatform = {
       assets: ['BTC'],
       allocatedCapital: 100,
       model: 'openai/gpt-4o',
+      modelParameters: {},
       sources: [],
       cycleMinutes: 15,
+      instructions: '',
+      riskLimits: DEFAULT_RISK_LIMITS,
+      bringToMinimum: false,
       cycles: 0,
       pauseReason: null,
       currentCapital: 100,
@@ -420,6 +488,45 @@ export const fakePlatform = {
 
   exchangeReachable(): boolean {
     return state.exchangeReachable;
+  },
+
+  /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */
+  addConfiguredFlow(
+    account: string,
+    name: string,
+    configuration: Partial<FakeFlowConfiguration>,
+  ): FakeFlow {
+    const { risk_limits: limits, model } = configuration;
+    const owner = userNamed(account).accounts.find(({ id }) => id === configuration.account_id);
+    return this.addFlow(account, name, {
+      status: STOPPED,
+      ...(owner === undefined ? {} : { accountName: owner.name }),
+      ...(configuration.version === undefined ? {} : { version: configuration.version }),
+      ...(configuration.assets === undefined ? {} : { assets: configuration.assets }),
+      ...(model === undefined ? {} : { model: model.name, modelParameters: model.parameters }),
+      ...(configuration.sources === undefined ? {} : { sources: configuration.sources }),
+      ...(limits === undefined
+        ? {}
+        : {
+            riskLimits: {
+              maxLeverage: limits.max_leverage,
+              maxMarginExposurePercent: limits.max_margin_exposure_percent,
+              maxValueExposurePercent: limits.max_value_exposure_percent,
+            },
+          }),
+      ...(configuration.allocated_capital == null
+        ? {}
+        : { allocatedCapital: Number(configuration.allocated_capital) }),
+    });
+  },
+
+  flowsOf(account: string): FakeFlow[] {
+    return userNamed(account).flows;
+  },
+
+  /** The user registered a key for the provider: its models become selectable (R1.4.1). */
+  registerProviderKey(account: string, provider: string): void {
+    userNamed(account).providerKeys.add(provider);
   },
 
   /** The flow belongs to the account, which has the Utente role: both are created when missing. */

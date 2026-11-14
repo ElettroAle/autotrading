@@ -38,7 +38,8 @@ export const useAssignDraftFlow = (flowId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: AssignmentInput) =>
-      api.put(
+      api.write(
+        'PUT',
         `/flows/${encodeURIComponent(flowId)}/assignment`,
         requestOf(input),
         flowsSchema.element,

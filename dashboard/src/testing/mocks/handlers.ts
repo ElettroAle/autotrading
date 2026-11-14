@@ -1,9 +1,18 @@
 import { http, HttpResponse } from 'msw';
 
+import { FAKE_MODELS, FAKE_SOURCES } from './catalogs';
 import { apiInstant, summaryOf, type FakeCycle } from './cycles';
+import {
+  changeAllocatedCapital,
+  createFlow,
+  InvalidRequest,
+  modifyFlow,
+  Refusal,
+} from './flow-configuration';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
+  configurationOf,
   FAKE_FLOW_COMMANDS,
   FakeRefusal,
   fakePlatform,
@@ -31,9 +40,14 @@ const CYCLE_MINUTES = 15;
 const MINUTE = 60_000;
 
 // Answers as the API does: Problem Details, 401 without a valid token, 403 without the Utente role (R0.1.1).
-const problem = (status: number, title: string, detail: string) =>
+const problem = (
+  status: number,
+  title: string,
+  detail: string,
+  details: Record<string, unknown> = {},
+) =>
   HttpResponse.json(
-    { type: 'about:blank', title, status, detail },
+    { type: 'about:blank', title, status, detail, ...details },
     { status, headers: { 'Content-Type': 'application/problem+json' } },
   );
 
@@ -169,6 +183,30 @@ const commandResponse = (flow: FakeFlow, command: FakeFlowCommand) =>
     ? HttpResponse.json({ flow: flowResponse(flow), left_open: [] })
     : HttpResponse.json(flowResponse(flow));
 
+// A refused configuration names its setting (R2.3.3); an unreadable request lists where and why, as the API does.
+const configuring = async (
+  request: Request,
+  respond: (user: FakeUser, body: Record<string, unknown>) => FakeFlow,
+  status = 200,
+): Promise<Response> => {
+  const body = (await request.json()) as Record<string, unknown>;
+  return withUser(request, (user) => {
+    try {
+      return HttpResponse.json(flowResponse(respond(user, body)), { status });
+    } catch (error) {
+      if (error instanceof Refusal) {
+        return problem(error.status, 'Refused', error.message, { field: error.field });
+      }
+      if (error instanceof InvalidRequest) {
+        return problem(422, 'Unprocessable Entity', 'richiesta non valida', {
+          errors: [{ loc: ['body', error.field], msg: error.message, type: 'invalid' }],
+        });
+      }
+      throw error;
+    }
+  });
+};
+
 const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
   [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
 
@@ -233,6 +271,7 @@ const overviewOf = (user: FakeUser, flow: FakeFlow) => {
     status: flow.status,
     pause_reason: flow.pauseReason,
     model: flow.model,
+    version: flow.version,
     last_cycle: newest === undefined ? null : outcomeOf(newest),
     next_cycle_at: nextCycleOf(flow, newest),
     // A draft has no account yet, so no currency nor capital (ADR 0124).
@@ -294,21 +333,8 @@ const differences = (before: FakeConfiguration, after: FakeConfiguration) =>
 const flowResponse = (flow: FakeFlow) => ({
   id: flow.id,
   name: flow.name,
-  account_id: flow.accountId,
   status: flow.status,
-  version: flow.version,
-  assets: flow.assets,
-  cycle_minutes: flow.cycleMinutes,
-  model: { name: flow.model, parameters: {} },
-  sources: flow.sources.map((source) => ({ ...source, parameters: {} })),
-  instructions: '',
-  risk_limits: {
-    max_leverage: 3,
-    max_margin_exposure_percent: '10',
-    max_value_exposure_percent: null,
-  },
-  allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
-  bring_to_minimum: false,
+  ...configurationOf(flow),
 });
 
 /** As the API names the file after the flow: a plain name for every client, the full one encoded (RFC 6266). */
@@ -370,6 +396,33 @@ export const handlers = [
   ),
   http.get('*/history/orders', ({ request }) =>
     historyResponse(request, (records) => records.orders, 'orders'),
+  ),
+  http.post('*/flows', ({ request }) => configuring(request, createFlow, 201)),
+  http.patch('*/flows/:flowId', ({ request, params }) =>
+    configuring(request, (user, body) => modifyFlow(user, String(params.flowId), body)),
+  ),
+  http.put('*/flows/:flowId/allocated-capital', ({ request, params }) =>
+    configuring(request, (user, body) => changeAllocatedCapital(user, String(params.flowId), body)),
+  ),
+  http.get('*/models', ({ request }) =>
+    withUser(request, (user) =>
+      HttpResponse.json({
+        providers: [...new Set(FAKE_MODELS.map((model) => model.provider))].map((provider) => ({
+          name: provider,
+          key_registered: user.providerKeys.has(provider),
+        })),
+        models: FAKE_MODELS,
+      }),
+    ),
+  ),
+  http.get('*/sources', ({ request }) => withUser(request, () => HttpResponse.json(FAKE_SOURCES))),
+  http.get('*/sources/:name', ({ request, params }) =>
+    withUser(request, () => {
+      const source = FAKE_SOURCES.find((candidate) => candidate.name === params.name);
+      return source === undefined
+        ? problem(404, 'Not Found', `fonte non disponibile: ${String(params.name)}`)
+        : HttpResponse.json(source);
+    }),
   ),
   http.post('*/telegram/link-code', ({ request }) =>
     withUser(request, (user) => {

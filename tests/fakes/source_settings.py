@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 
 from autotrading.application.flows.errors import InvalidFlowSettingError
+from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
 
 
@@ -13,5 +14,5 @@ class FakeSourceSettingsAdapter:
     def execute(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
         if source not in self.sources:
             reason = f"fonte non disponibile: {source}"
-            raise InvalidFlowSettingError(reason)
+            raise InvalidFlowSettingError(reason, FlowSetting.SOURCES)
         return SourceSelection(source, DEFAULT_WEIGHT if weight is None else weight, dict(requested))

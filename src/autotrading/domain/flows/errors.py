@@ -1,100 +1,91 @@
+from collections.abc import Mapping
+
 from autotrading.domain.errors import DomainError
+from autotrading.domain.flows.flow_setting import FlowSetting
 
 
-class FlowNameRequiredError(DomainError):
+class FlowSettingError(DomainError):
+    """A setting of a flow refused: the answer names the setting, so the user sees the reason beside it (R2.3.3)."""
+
     status_code = 422
 
+    def __init__(self, reason: str, setting: FlowSetting) -> None:
+        super().__init__(reason)
+        self.setting = setting
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.setting.value}
+
+
+class FlowNameRequiredError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("nome del flusso obbligatorio")
+        super().__init__("nome del flusso obbligatorio", FlowSetting.NAME)
 
 
-class ModelRequiredError(DomainError):
-    status_code = 422
-
+class ModelRequiredError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("modello obbligatorio")
+        super().__init__("modello obbligatorio", FlowSetting.MODEL)
 
 
-class CycleIntervalOutOfRangeError(DomainError):
-    status_code = 422
-
+class CycleIntervalOutOfRangeError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("intervallo di ciclo fuori da 1-1440 minuti")
+        super().__init__("intervallo di ciclo fuori da 1-1440 minuti", FlowSetting.CYCLE_MINUTES)
 
 
-class AssetsRequiredError(DomainError):
-    status_code = 422
-
+class AssetsRequiredError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("almeno un asset è obbligatorio")
+        super().__init__("almeno un asset è obbligatorio", FlowSetting.ASSETS)
 
 
-class MaxLeverageRequiredError(DomainError):
-    status_code = 422
-
+class MaxLeverageRequiredError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("la leva massima è obbligatoria")
+        super().__init__("la leva massima è obbligatoria", FlowSetting.MAX_LEVERAGE)
 
 
-class ExposureLimitRequiredError(DomainError):
-    status_code = 422
-
+class ExposureLimitRequiredError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("almeno un limite di esposizione è obbligatorio")
+        super().__init__("almeno un limite di esposizione è obbligatorio", FlowSetting.MAX_MARGIN_EXPOSURE)
 
 
-class InvalidRiskLimitError(DomainError):
-    status_code = 422
-
-    def __init__(self, label: str) -> None:
-        super().__init__(f"limite di rischio non valido: {label}")
+class InvalidRiskLimitError(FlowSettingError):
+    def __init__(self, label: str, setting: FlowSetting) -> None:
+        super().__init__(f"limite di rischio non valido: {label}", setting)
         self.label = label
 
 
-class SourceWeightOutOfRangeError(DomainError):
-    status_code = 422
-
+class SourceWeightOutOfRangeError(FlowSettingError):
     def __init__(self, source: str) -> None:
-        super().__init__(f"peso fuori da 1-10: {source}")
+        super().__init__(f"peso fuori da 1-10: {source}", FlowSetting.SOURCES)
         self.source = source
 
 
-class RepeatedSourceError(DomainError):
-    status_code = 422
-
+class RepeatedSourceError(FlowSettingError):
     def __init__(self, source: str) -> None:
-        super().__init__(f"fonte ripetuta: {source}")
+        super().__init__(f"fonte ripetuta: {source}", FlowSetting.SOURCES)
         self.source = source
 
 
-class AllocatedCapitalNotPositiveError(DomainError):
-    status_code = 422
-
+class AllocatedCapitalNotPositiveError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("il capitale allocato deve essere positivo")
+        super().__init__("il capitale allocato deve essere positivo", FlowSetting.ALLOCATED_CAPITAL)
 
 
-class CapitalAboveFreeCapitalError(DomainError):
-    status_code = 422
-
+class CapitalAboveFreeCapitalError(FlowSettingError):
     def __init__(self, free_capital: str) -> None:
-        super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}")
+        super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}", FlowSetting.ALLOCATED_CAPITAL)
         self.free_capital = free_capital
 
 
-class CapitalAboveAvailableCapitalError(DomainError):
-    status_code = 422
-
+class CapitalAboveAvailableCapitalError(FlowSettingError):
     def __init__(self, available: str) -> None:
-        super().__init__(f"capitale allocato oltre il capitale disponibile: {available}")
+        super().__init__(f"capitale allocato oltre il capitale disponibile: {available}", FlowSetting.ALLOCATED_CAPITAL)
         self.available = available
 
 
-class CapitalBelowFlowMinimumError(DomainError):
-    status_code = 422
-
+class CapitalBelowFlowMinimumError(FlowSettingError):
     def __init__(self, minimum: str) -> None:
-        super().__init__(f"capitale allocato sotto il minimo del flusso: {minimum}")
+        super().__init__(f"capitale allocato sotto il minimo del flusso: {minimum}", FlowSetting.ALLOCATED_CAPITAL)
         self.minimum = minimum
 
 
@@ -141,20 +132,20 @@ class FlowNotDraftError(DomainError):
         super().__init__("conto, capitale e asset si assegnano solo a un flusso in bozza")
 
 
-class AccountNotChangeableError(DomainError):
-    status_code = 422
-
+class AccountNotChangeableError(FlowSettingError):
     def __init__(self) -> None:
-        super().__init__("il conto di un flusso non si cambia")
+        super().__init__("il conto di un flusso non si cambia", FlowSetting.ACCOUNT)
 
 
-class AssetsAssignedToOtherFlowError(DomainError):
+class AssetsAssignedToOtherFlowError(FlowSettingError):
     """Two flows of one account never share an asset: each position stays attributable to one flow (R1.1.2)."""
 
     status_code = 409
 
     def __init__(self, flow: str, assets: tuple[str, ...]) -> None:
-        super().__init__(f"asset già assegnati al flusso {flow} sullo stesso conto: " + ", ".join(assets))
+        super().__init__(
+            f"asset già assegnati al flusso {flow} sullo stesso conto: " + ", ".join(assets), FlowSetting.ASSETS
+        )
         self.flow = flow
         self.assets = assets
 
