@@ -7,6 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
+from autotrading.adapters.inbound.api.cycles import FlowOverviewResponse
+from autotrading.application.flows.list_flow_overviews import FlowOverview
+from autotrading.application.flows.ports import FlowSummary
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import (
@@ -17,8 +20,10 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_status import FlowStatus
-from tests.support.flows import a_flow
+from autotrading.domain.flows.ledger import FlowTotals
+from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
@@ -209,14 +214,37 @@ def test_a_flow_never_created_does_not_exist(client_of: Client) -> None:
     assert response.status_code == 404
 
 
+def test_a_draft_in_use_answers_without_currency_nor_capital(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    draft = a_flow(platform.tenant_of("anna")).duplicated()
+    platform.flows.flows.append(draft)
+
+    [overview] = anna.get("/flows/overview").json()
+
+    assert overview["status"] == "bozza"
+    assert [overview[key] for key in ("currency", "initial_capital", "current_capital", "return_percent")] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+
+
 def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
-    flow = a_flow(platform.tenant_of("anna"), status=FlowStatus.ACTIVE)
+    flow = a_flow(
+        platform.tenant_of("anna"),
+        status=FlowStatus.ACTIVE,
+        configuration=a_configuration(allocated_capital=Decimal(300)),
+    )
     platform.flows.flows.append(flow)
     platform.flows.anchors[flow.id] = PLANNED - timedelta(minutes=15)
+    platform.cycles.record(CycleRecord(flow.id.value, PLANNED - timedelta(minutes=15), CycleOutcome.FAILED))
     platform.cycles.record(a_completed_cycle(flow.id.value))
+    platform.ledger.totals[flow.id] = FlowTotals(flow.id, Decimal(30))
     platform.now = PLANNED + timedelta(minutes=1)
     paused = a_flow(platform.tenant_of("anna"), name="beta", status=FlowStatus.PAUSED)
+    platform.ledger.totals[paused.id] = FlowTotals(paused.id, Decimal(0), Decimal("10.5"))
     platform.flows.flows.append(paused)
     platform.flows.pause_reasons[paused.id] = "credito esaurito presso openrouter"
     platform.flows.flows.append(a_flow(platform.tenant_of("bruno"), name="omega"))
@@ -235,6 +263,14 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "model": flow.configuration.model.name,
             "last_cycle": {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
             "next_cycle_at": "2026-11-12T10:22:00Z",
+            "currency": "USDC",
+            "initial_capital": "300",
+            "current_capital": "330",
+            "return_percent": "10.00",
+            "recent_outcomes": [
+                {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
+                {"planned_at": "2026-11-12T09:52:00Z", "outcome": "fallito"},
+            ],
         },
         {
             "id": str(paused.id.value),
@@ -246,5 +282,19 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "model": paused.configuration.model.name,
             "last_cycle": None,
             "next_cycle_at": None,
+            "currency": "USDC",
+            "initial_capital": "100",
+            "current_capital": "89.5",
+            "return_percent": "-10.50",
+            "recent_outcomes": [],
         },
     ]
+
+
+def test_a_flow_without_initial_capital_answers_without_a_return() -> None:
+    summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None)
+    overview = FlowOverview(summary, "dev", (), None, "USDC", FlowReturn(Decimal(0), Decimal("12.50")))
+
+    response = FlowOverviewResponse.of(overview)
+
+    assert (response.initial_capital, response.current_capital, response.return_percent) == ("0", "12.5", None)

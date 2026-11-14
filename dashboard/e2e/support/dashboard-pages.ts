@@ -111,6 +111,20 @@ export class DashboardPages {
     return this.page.locator(`a[href^="${BASE_PATH}/flows/"]`);
   }
 
+  /** The summary of a flow on the page of the flows, by its name. */
+  flowSummary(name: string): Locator {
+    return this.page.getByRole('article', { name, exact: true });
+  }
+
+  /** One fact of the summary of a flow, by the term it shows: «Stato», «Rendimento», ... */
+  flowFact(name: string, term: string): Locator {
+    return this.flowSummary(name).getByLabel(term, { exact: true });
+  }
+
+  recentOutcomes(name: string): Locator {
+    return this.flowSummary(name).getByRole('list', { name: 'Esito degli ultimi cicli' });
+  }
+
   flowName(): Locator {
     return this.page.getByRole('heading', { level: 2 });
   }

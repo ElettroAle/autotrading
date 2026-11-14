@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.application.flows.list_flow_overviews import FlowOverview
@@ -151,7 +152,9 @@ class LastCycleResponse(BaseModel):
 
 
 class FlowOverviewResponse(BaseModel):
-    """A flow in use with its last cycle and the next planned one (R1.7.3)."""
+    """A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most
+    recent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127).
+    """
 
     id: UUID
     name: str
@@ -162,10 +165,17 @@ class FlowOverviewResponse(BaseModel):
     model: str
     last_cycle: LastCycleResponse | None
     next_cycle_at: datetime | None
+    # Empty for a draft, which has no account yet (ADR 0124).
+    currency: str | None
+    # Amounts travel as strings (ADR 0018); the return keeps its two decimals and is empty without initial capital.
+    initial_capital: str | None
+    current_capital: str | None
+    return_percent: str | None
+    recent_outcomes: list[LastCycleResponse]
 
     @classmethod
     def of(cls, overview: FlowOverview) -> FlowOverviewResponse:
-        summary = overview.summary
+        summary, capital = overview.summary, overview.capital
         return cls(
             id=summary.flow_id,
             name=summary.name,
@@ -176,6 +186,14 @@ class FlowOverviewResponse(BaseModel):
             model=summary.model,
             last_cycle=LastCycleResponse.of(overview.last_cycle),
             next_cycle_at=overview.next_cycle_at,
+            currency=overview.currency,
+            initial_capital=None if capital is None else amount_text(capital.initial_capital),
+            current_capital=None if capital is None else amount_text(capital.current_capital),
+            return_percent=None if capital is None else _text(capital.percent),
+            recent_outcomes=[
+                LastCycleResponse(planned_at=record.planned_at, outcome=record.outcome.value)
+                for record in overview.recent_cycles
+            ],
         )
 
 

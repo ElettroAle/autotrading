@@ -40,7 +40,7 @@ describe('FlowVersions', () => {
       'Versione 2',
       'Versione 1',
     ]);
-    const times = items.map((item) => within(item).getByText(/\d{4}, \d{2}:\d{2}$/));
+    const times = items.map((item) => within(item).getByText(/\d{4}, \d{2}:\d{2}:\d{2}$/));
     expect(times.map((time) => time.getAttribute('datetime'))).toEqual([
       '2026-11-03T09:30:00.000Z',
       '2026-11-02T09:30:00.000Z',

@@ -1,5 +1,6 @@
+import { formatInstant } from '@/utils/format-instant';
+
 import type { Version } from '../api/get-flow-versions';
-import { dateTimeText } from '../utils/date-time';
 
 export const VersionsList = ({ versions }: { versions: Version[] }) => (
   <ol
@@ -10,7 +11,7 @@ export const VersionsList = ({ versions }: { versions: Version[] }) => (
       <li key={version.version} className="px-4 py-3">
         {`Versione ${version.version} · `}
         <time dateTime={version.created_at} className="text-slate-600">
-          {dateTimeText(version.created_at)}
+          {formatInstant(version.created_at)}
         </time>
       </li>
     ))}

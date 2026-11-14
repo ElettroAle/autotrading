@@ -1,13 +1,13 @@
-import { Link } from 'react-router';
-
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
-import { paths } from '@/config/paths';
 
-import { useFlows } from '../api/get-flows';
+import { useFlowOverviews } from '../api/get-flow-overviews';
 
+import { FlowOverviewCard } from './flow-overview-card';
+
+/** The flows in use of the user, each at a glance (R2.2.2). */
 export const FlowsList = () => {
-  const flows = useFlows();
+  const flows = useFlowOverviews();
   if (flows.isPending) {
     return <Loading />;
   }
@@ -23,14 +23,8 @@ export const FlowsList = () => {
       className="divide-y divide-slate-200 rounded border border-slate-200 bg-white"
     >
       {flows.data.map((flow) => (
-        <li key={flow.id} className="flex items-center justify-between px-4 py-3">
-          <Link
-            to={paths.flow.getHref(flow.id)}
-            className="font-medium text-blue-800 hover:underline"
-          >
-            {flow.name}
-          </Link>
-          <span className="text-sm text-slate-600">{flow.status}</span>
+        <li key={flow.id} className="px-4 py-3">
+          <FlowOverviewCard flow={flow} />
         </li>
       ))}
     </ul>

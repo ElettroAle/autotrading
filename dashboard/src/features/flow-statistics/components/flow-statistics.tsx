@@ -3,7 +3,12 @@ import { useId, type ReactNode } from 'react';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { usePeriod } from '@/components/ui/period-selector/use-period';
-import { formatAmount, formatPercent, formatResult, formatUsd } from '@/utils/format-number';
+import {
+  formatRate,
+  formatRoundedAmount,
+  formatRoundedResult,
+  formatUsd,
+} from '@/utils/format-amount';
 
 import { useFlowStatistics, type FlowStatistics as Statistics } from '../api/get-flow-statistics';
 
@@ -39,15 +44,21 @@ const StatisticsList = ({ statistics }: { statistics: Statistics }) => (
     <Statistic label="Operazioni vinte">{statistics.won}</Statistic>
     <Statistic label="Operazioni perse">{statistics.lost}</Statistic>
     <Statistic label="Win rate">
-      {orNotAvailable(statistics.win_rate_percent, formatPercent)}
+      {orNotAvailable(statistics.win_rate_percent, formatRate)}
     </Statistic>
     <Statistic label="PnL medio delle vincenti">
-      {orNotAvailable(statistics.average_winning_pnl, (value) => `${formatResult(value)} USDC`)}
+      {orNotAvailable(
+        statistics.average_winning_pnl,
+        (value) => `${formatRoundedResult(value)} USDC`,
+      )}
     </Statistic>
     <Statistic label="PnL medio delle perdenti">
-      {orNotAvailable(statistics.average_losing_pnl, (value) => `${formatResult(value)} USDC`)}
+      {orNotAvailable(
+        statistics.average_losing_pnl,
+        (value) => `${formatRoundedResult(value)} USDC`,
+      )}
     </Statistic>
-    <Statistic label="Commissioni totali">{`${formatAmount(statistics.total_fees)} USDC`}</Statistic>
+    <Statistic label="Commissioni totali">{`${formatRoundedAmount(statistics.total_fees)} USDC`}</Statistic>
     <Statistic label="Numero di operazioni">{statistics.operations}</Statistic>
     <Statistic label="Costo del modello IA">{modelCost(statistics)}</Statistic>
   </dl>

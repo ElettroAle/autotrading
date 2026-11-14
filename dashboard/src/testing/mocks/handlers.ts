@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
-import { summaryOf, type FakeCycle } from './cycles';
+import { apiInstant, summaryOf, type FakeCycle } from './cycles';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import {
   FakeRefusal,
@@ -22,6 +22,9 @@ export const TEST_NOTIFICATION = 'notifica di prova: le notifiche dei tuoi fluss
 const CYCLES_PER_PAGE = 50;
 const CLOSED_POSITIONS_PER_PAGE = 50;
 const CURRENCY = 'USDC';
+const RECENT_CYCLES = 10;
+const CYCLE_MINUTES = 15;
+const MINUTE = 60_000;
 
 // Answers as the API does: Problem Details, 401 without a valid token, 403 without the Utente role (R0.1.1).
 const problem = (status: number, title: string, detail: string) =>
@@ -163,6 +166,53 @@ const closedPositionPage = (positions: FakeClosedPosition[], page: number) => {
   };
 };
 
+// Only an active flow plans a next cycle, one interval after its last one (R1.7.3).
+const nextCycleOf = (flow: FakeFlow, newest: FakeCycle | undefined): string | null => {
+  if (flow.status !== 'attivo') {
+    return null;
+  }
+  const last = newest === undefined ? Date.now() : Date.parse(newest.planned_at);
+  return apiInstant(new Date(last + CYCLE_MINUTES * MINUTE));
+};
+
+// The API measures the return in the domain (ADR 0127): the fake answers with the same figure, two decimals.
+const returnPercentOf = (flow: FakeFlow): string | null => {
+  const initial = flow.allocatedCapital ?? 0;
+  return initial === 0 ? null : (((flow.currentCapital - initial) / initial) * 100).toFixed(2);
+};
+
+// A draft has no account yet: its name is empty, as on the API (ADR 0124).
+const accountNameOf = (user: FakeUser, flow: FakeFlow): string =>
+  user.accounts.find((account) => account.id === flow.accountId)?.name ?? '';
+
+const outcomeOf = (cycle: FakeCycle) => ({ planned_at: cycle.planned_at, outcome: cycle.outcome });
+
+const overviewOf = (user: FakeUser, flow: FakeFlow) => {
+  const recent = newestFirst(fakePlatform.cyclesOf(flow.id)).slice(0, RECENT_CYCLES);
+  const newest = recent[0];
+  return {
+    id: flow.id,
+    name: flow.name,
+    account: accountNameOf(user, flow),
+    environment: 'dev',
+    status: flow.status,
+    pause_reason: flow.pauseReason,
+    model: flow.model,
+    last_cycle: newest === undefined ? null : outcomeOf(newest),
+    next_cycle_at: nextCycleOf(flow, newest),
+    // A draft has no account yet, so no currency nor capital (ADR 0124).
+    ...(flow.status === 'bozza'
+      ? { currency: null, initial_capital: null, current_capital: null }
+      : {
+          currency: CURRENCY,
+          initial_capital: String(flow.allocatedCapital ?? 0),
+          current_capital: String(flow.currentCapital),
+        }),
+    return_percent: returnPercentOf(flow),
+    recent_outcomes: recent.map(outcomeOf),
+  };
+};
+
 const cyclePage = (cycles: FakeCycle[], page: number) => {
   const start = (page - 1) * CYCLES_PER_PAGE;
   const sorted = newestFirst(cycles);
@@ -255,6 +305,15 @@ export const handlers = [
   ),
   http.get('*/flows', ({ request }) =>
     withUser(request, (user) => HttpResponse.json(user.flows.map(flowResponse))),
+  ),
+  http.get('*/flows/overview', ({ request }) =>
+    withUser(request, (user) =>
+      HttpResponse.json(
+        user.flows
+          .filter((flow) => flow.status !== 'archiviato')
+          .map((flow) => overviewOf(user, flow)),
+      ),
+    ),
   ),
   http.post('*/telegram/link-code', ({ request }) =>
     withUser(request, (user) => {
