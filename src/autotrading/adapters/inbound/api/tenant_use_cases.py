@@ -45,6 +45,7 @@ from autotrading.application.flows.ports import (
     AccountRemovalPorts,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
+    EquitySnapshotRepositoryPort,
     FlowDirectoryPort,
     FlowLedgerPort,
     FlowOperationsPort,
@@ -55,6 +56,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
+from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
@@ -116,6 +118,7 @@ class TenantPorts:
     cycle_history: CycleHistoryPort
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
+    equity_snapshots: EquitySnapshotRepositoryPort
     environment: str
 
 
@@ -164,6 +167,7 @@ class TenantUseCases:
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
     list_flow_overviews: ListFlowOverviewsUseCase
+    read_flow_equity: ReadFlowEquityUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -226,4 +230,5 @@ class TenantUseCases:
             list_flow_overviews=ListFlowOverviewsUseCase(
                 ports.flow_summaries, ports.cycle_history, ports.environment, ports.clock
             ),
+            read_flow_equity=ReadFlowEquityUseCase(ports.flows, ports.equity_snapshots, ports.clock),
         )

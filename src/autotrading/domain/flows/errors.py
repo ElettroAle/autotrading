@@ -235,3 +235,19 @@ class RangeDaysRequiredError(InvalidStatisticsPeriodError):
 class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
         super().__init__("il giorno iniziale è successivo al giorno finale")
+
+
+class InvalidEquityRangeError(DomainError):
+    """A range of the equity curve the user cannot choose (R2.2.3)."""
+
+    status_code = 422
+
+
+class EquityRangeIncompleteError(InvalidEquityRangeError):
+    def __init__(self) -> None:
+        super().__init__("intervallo dell'equity curve non valido: l'intervallo richiede inizio e fine")
+
+
+class EquityRangeInvertedError(InvalidEquityRangeError):
+    def __init__(self) -> None:
+        super().__init__("intervallo dell'equity curve non valido: l'inizio non precede la fine")

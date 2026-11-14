@@ -78,6 +78,8 @@ class InMemoryCycleRepositoryAdapter:
         self._guard = threading.Lock()
         self._claimed: set[tuple[UUID, datetime]] = set()
         self.records: list[CycleRecord] = []
+        # An error the next record raises once, as a database out of reach would.
+        self.failing_once: AutotradingError | None = None
 
     def claim(self, flow_id: UUID, planned_at: datetime) -> bool:
         with self._guard:
@@ -87,6 +89,9 @@ class InMemoryCycleRepositoryAdapter:
             return True
 
     def record(self, record: CycleRecord) -> None:
+        error, self.failing_once = self.failing_once, None
+        if error is not None:
+            raise error
         with self._guard:
             self.records.append(record)
 
@@ -387,6 +392,16 @@ class FakeCycleJournalAdapter:
 
     def call_cost(self, decision: object) -> CallCost | None:  # noqa: ARG002 - the same cost for every call
         return self.cost
+
+
+class InMemoryCycleEquityAdapter:
+    """The equity every cycle recorded: the flow, the planned instant and the state it was taken from."""
+
+    def __init__(self) -> None:
+        self.recorded: list[tuple[UUID, datetime, object]] = []
+
+    def execute(self, flow_id: UUID, planned_at: datetime, state: object) -> None:
+        self.recorded.append((flow_id, planned_at, state))
 
 
 class RecordedCycleFailuresAdapter:

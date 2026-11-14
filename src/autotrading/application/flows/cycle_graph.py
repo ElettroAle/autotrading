@@ -69,7 +69,7 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
     agent: AgentPort[C, A]
     risk: RiskPort[S, A, O]
     orders: OrderPort[O, E]
-    end: CycleEndPort[E]
+    end: CycleEndPort[S, E]
     journal: CycleJournalPort
 
 
@@ -81,11 +81,22 @@ class PlannedCycle:
 
 
 @dataclass(frozen=True, slots=True)
-class FailedCycle:
-    """A cycle stopped by an error: its record, with the steps done before, and the error that stopped it."""
+class CompletedCycle[S = object]:
+    """A cycle that ran every node: its record and the state of the flow at its end."""
+
+    record: CycleRecord
+    state: S
+
+
+@dataclass(frozen=True, slots=True)
+class FailedCycle[S = object]:
+    """A cycle stopped by an error: its record, with the steps done before, the error that stopped it and the last
+    state of the flow it read, None when it failed reading the first one.
+    """
 
     record: CycleRecord
     error: AutotradingError
+    state: S | None = None
 
 
 class CycleState[S = object, D = object, C = object, A = object, O = object, E = object](TypedDict, total=False):
@@ -97,6 +108,7 @@ class CycleState[S = object, D = object, C = object, A = object, O = object, E =
 
     started_at: datetime
     snapshot: FlowSnapshot[S]
+    ended: S
     readings: Annotated[list[SourceReading[D]], operator.add]
     absent: Annotated[list[AbsentSource], operator.add]
     context: C
@@ -146,7 +158,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         # The tests compress time; the cycle waits for real seconds.
         self._seconds_of = seconds_of
 
-    def run(self, cycle: PlannedCycle, started_at: datetime) -> CycleRecord | FailedCycle:
+    def run(self, cycle: PlannedCycle, started_at: datetime) -> CompletedCycle[S] | FailedCycle[S]:
         """Runs the cycle from its start, or resumes it from the last node done when it has a checkpoint."""
         thread = self._checkpoints.thread(cycle.flow_id, cycle.planned_at)
         with self._checkpoints.opened() as checkpointer:
@@ -162,8 +174,8 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
                     if part["type"] == "values":
                         state = part["data"]
             except AutotradingError as error:
-                return FailedCycle(_failed_record(cycle, state, error), error)
-        return state["record"]
+                return FailedCycle(_failed_record(cycle, state, error), error, _last_state(state))
+        return CompletedCycle(state["record"], state["ended"])
 
     def _graph(self, cycle: PlannedCycle) -> StateGraph[CycleState[S, D, C, A, O, E]]:
         graph: StateGraph[CycleState[S, D, C, A, O, E]] = StateGraph(CycleState)
@@ -229,7 +241,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
 
     def _update_ledger(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         updated = self._steps.end.execute(cycle.flow_id, cycle.schedule.anchor, state["executions"])
-        return self._done(CycleStep.UPDATE_FLOW_STATE, updated)
+        return {"ended": updated, **self._done(CycleStep.UPDATE_FLOW_STATE, updated)}
 
     def _persist(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         steps = [*state["steps"], CycleStep.RECORD_CYCLE]
@@ -253,6 +265,14 @@ def _result_of[D](source: str, outcome: CallOutcome[D], wait: timedelta) -> Sour
     if isinstance(outcome, CallFailed):
         return AbsentSource(source, str(outcome.error))
     return AbsentSource(source, f"nessuna risposta entro {int(wait.total_seconds())} secondi")
+
+
+def _last_state[S, D, C, A, O, E](state: CycleState[S, D, C, A, O, E]) -> S | None:
+    if "ended" in state:
+        return state["ended"]
+    if "snapshot" in state:
+        return state["snapshot"].state
+    return None
 
 
 def _failed_record[S, D, C, A, O, E](

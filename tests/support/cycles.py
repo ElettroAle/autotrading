@@ -31,6 +31,7 @@ from tests.fakes.cycles import (
     FakeRiskAdapter,
     FakeSourcesAdapter,
     InMemoryCycleCheckpointsAdapter,
+    InMemoryCycleEquityAdapter,
     InMemoryCycleRepositoryAdapter,
     InMemoryFlowLockAdapter,
     RecordedCycleFailuresAdapter,
@@ -64,6 +65,7 @@ class Cycles:
         self.journal = FakeCycleJournalAdapter()
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
         self.failure_notices = RecordedCycleFailuresAdapter()
+        self.equity = InMemoryCycleEquityAdapter()
         self.scheduler = FakeCycleSchedulerAdapter()
         self.raised: AutotradingError | None = None
         self.planned = ThreadsPlannedFlowsAdapter()
@@ -72,7 +74,9 @@ class Cycles:
 
     def run_cycle(self) -> RunCycleUseCase:
         return RunCycleUseCase(
-            self.graph(), CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices)
+            self.graph(),
+            CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices),
+            self.equity,
         )
 
     def graph(self) -> CycleGraph:
