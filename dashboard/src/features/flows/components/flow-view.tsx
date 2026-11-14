@@ -1,5 +1,8 @@
+import { Link } from 'react-router';
+
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
+import { paths } from '@/config/paths';
 
 import { useFlows } from '../api/get-flows';
 
@@ -21,6 +24,9 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
         {flow.name}
       </h2>
       <p className="text-slate-600">Stato: {flow.status}</p>
+      <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
+        Cicli del flusso
+      </Link>
     </section>
   );
 };
