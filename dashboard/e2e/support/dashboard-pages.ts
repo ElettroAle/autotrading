@@ -117,4 +117,17 @@ export class DashboardPages {
   linkedChat(): Locator {
     return this.page.getByLabel('Chat collegata');
   }
+
+  period(): Locator {
+    return this.page.getByLabel('Periodo');
+  }
+
+  statistics(): Locator {
+    return this.page.getByRole('region', { name: 'Statistiche' });
+  }
+
+  /** The value the statistics panel shows beside a label. */
+  statistic(label: string): Locator {
+    return this.statistics().getByLabel(label, { exact: true });
+  }
 }

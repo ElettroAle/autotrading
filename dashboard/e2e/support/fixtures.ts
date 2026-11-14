@@ -1,17 +1,18 @@
 import { createBdd, defineParameterType, test as base } from 'playwright-bdd';
 
 import type { FakeCycle } from '@/testing/mocks/cycles';
-import { fakePlatform } from '@/testing/mocks/platform';
+import { fakePlatform, type FakeFlowHistory } from '@/testing/mocks/platform';
 
 import { DashboardPages } from './dashboard-pages';
 import { routeToFakes } from './fake-network';
 
-/** What a scenario remembers between its steps. */
+/** What a scenario remembers between its steps: the histories wait for the user who owns their flow. */
 export type ScenarioMemory = {
   account: string;
   environments: string[];
   flow: string;
   cycles: FakeCycle[];
+  histories: Map<string, FakeFlowHistory>;
 };
 
 type Fixtures = {
@@ -35,7 +36,7 @@ export const test = base.extend<Fixtures>({
     await use(new DashboardPages(page));
   },
   memory: async ({}, use) => {
-    await use({ account: '', environments: [], flow: '', cycles: [] });
+    await use({ account: '', environments: [], flow: '', cycles: [], histories: new Map() });
   },
 });
 

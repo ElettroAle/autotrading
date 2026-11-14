@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { summaryOf, type FakeCycle } from './cycles';
+import { InvalidPeriod, statisticsOf } from './flow-statistics';
 import { fakePlatform, type FakeFlow, type FakeUser } from './platform';
 
 const BEARER = 'Bearer ';
@@ -147,5 +148,21 @@ export const handlers = [
     withUser(request, (user) =>
       withFlow(user, String(params.flowId), (cycles) => cycleAt(cycles, String(params.plannedAt))),
     ),
+  ),
+  http.get('*/flows/:flowId/statistics', ({ request, params }) =>
+    withUser(request, (user) => {
+      const flow = user.flows.find((candidate) => candidate.id === params.flowId);
+      if (flow === undefined) {
+        return problem(404, 'Not Found', 'flusso non trovato');
+      }
+      try {
+        return HttpResponse.json(statisticsOf(flow.history, new URL(request.url).searchParams));
+      } catch (error) {
+        if (error instanceof InvalidPeriod) {
+          return problem(400, 'Bad Request', error.message);
+        }
+        throw error;
+      }
+    }),
   ),
 ];

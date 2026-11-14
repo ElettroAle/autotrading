@@ -5,7 +5,30 @@ import type { FakeCycle } from './cycles';
  * cycles of each flow and the Telegram chats. Unit tests and scenarios prepare it; the fake identity provider and
  * the fake API read it.
  */
-export type FakeFlow = { readonly id: string; readonly name: string; readonly status: string };
+/** A position the flow closed: its result after the fees, the fees and the instant of the closing. */
+export type FakeClosedPosition = {
+  readonly netPnl: number;
+  readonly fees: number;
+  readonly closedAt: Date;
+};
+
+/** A call of the flow to the model: its cost in USD and the instant of its cycle. */
+export type FakeModelCall = { readonly costUsd: number; readonly plannedAt: Date };
+
+/** What a flow did: the positions it closed and the calls it made to the model. */
+export type FakeFlowHistory = {
+  readonly closedPositions: FakeClosedPosition[];
+  readonly modelCalls: FakeModelCall[];
+};
+
+export type FakeFlow = {
+  readonly id: string;
+  readonly name: string;
+  readonly status: string;
+  readonly history: FakeFlowHistory;
+};
+
+export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
 
 /** A Telegram chat: Telegram numbers it, the scenarios name it, and it keeps what it received. */
 export type FakeChat = { readonly name: string; readonly id: number; readonly received: string[] };
@@ -59,12 +82,16 @@ export const fakePlatform = {
     state.users.set(account, { account, hasUserRole, tenantId: `tenant-${account}`, flows: [] });
   },
 
-  addFlow(account: string, name: string): FakeFlow {
+  hasUser(account: string): boolean {
+    return state.users.has(account);
+  },
+
+  addFlow(account: string, name: string, history: FakeFlowHistory = emptyHistory()): FakeFlow {
     const user = state.users.get(account);
     if (user === undefined) {
       throw new Error(`unknown fake user ${account}`);
     }
-    const flow = { id: flowIdOf(name), name, status: 'attivo' };
+    const flow = { id: flowIdOf(name), name, status: 'attivo', history };
     user.flows.push(flow);
     return flow;
   },

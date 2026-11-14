@@ -1,6 +1,8 @@
 import { useParams } from 'react-router';
 
 import { PageLayout } from '@/components/layouts/page-layout';
+import { PeriodSelector } from '@/components/ui/period-selector/period-selector';
+import { FlowStatistics } from '@/features/flow-statistics/components/flow-statistics';
 import { FlowView } from '@/features/flows/components/flow-view';
 
 export const FlowRoute = () => {
@@ -8,6 +10,8 @@ export const FlowRoute = () => {
   return (
     <PageLayout title="Flusso">
       <FlowView flowId={flowId} />
+      <PeriodSelector />
+      <FlowStatistics flowId={flowId} />
     </PageLayout>
   );
 };
