@@ -60,10 +60,10 @@ def _run_report(directory: Path, *, samples: str | None, docker: bool = True) ->
     assert bash is not None, "bash runs the scripts of the installation"
     bin_directory = directory / "bin"
     bin_directory.mkdir()
-    if docker:
-        fake = bin_directory / "docker"
-        fake.write_text(FAKE_DOCKER, encoding="utf-8", newline="\n")
-        fake.chmod(0o755)
+    # Without an answering docker the fake still shadows a real one, as on the runner: it fails like a stuck daemon.
+    fake = bin_directory / "docker"
+    fake.write_text(FAKE_DOCKER if docker else "#!/usr/bin/env bash\nexit 1\n", encoding="utf-8", newline="\n")
+    fake.chmod(0o755)
     if samples is not None:
         (directory / "resource-samples.txt").write_text(samples, encoding="utf-8", newline="\n")
     environment = {
