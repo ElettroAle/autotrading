@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import { ErrorMessage } from '@/components/ui/error-message';
@@ -24,7 +25,13 @@ const FlowStatus = ({ flow }: { flow: Flow }) => {
   return <p className="text-slate-600">Stato: {flow.status}</p>;
 };
 
-export const FlowView = ({ flowId }: { flowId: string }) => {
+type FlowViewProps = {
+  readonly flowId: string;
+  /** What the page offers on the flow once read, composed by the app from other features. */
+  readonly renderCommands: (flow: Flow) => ReactNode;
+};
+
+export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
   const flows = useFlows();
   const accounts = useAccounts();
   if (flows.isPending) {
@@ -67,6 +74,7 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
         <ExportStrategyButton flowId={flow.id} />
         {flow.status === DRAFT_STATUS ? <StartFlowButton flowId={flow.id} /> : null}
       </div>
+      {renderCommands(flow)}
       {flow.status === DRAFT_STATUS ? (
         <DraftAssignmentForm flowId={flow.id} accounts={accountsOfTenant} />
       ) : null}

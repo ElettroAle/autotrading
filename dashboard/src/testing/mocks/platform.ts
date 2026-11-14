@@ -140,11 +140,36 @@ export class FakeRefusal extends Error {
   }
 }
 
+/** The commands of the API on a flow besides the start, as their paths name them (R1.1.4-R1.1.6). */
+export const FAKE_FLOW_COMMANDS = ['pause', 'resume', 'stop', 'archive'] as const;
+
+export type FakeFlowCommand = (typeof FAKE_FLOW_COMMANDS)[number];
+
+type Transition = {
+  readonly from: readonly string[];
+  readonly to: string;
+  readonly refusal: (status: string) => string;
+};
+
+const refusedFor =
+  (name: string) =>
+  (status: string): string =>
+    `comando ${name} non ammesso per un flusso ${status}`;
+
 const TOKEN_PREFIX = 'fake-access-token-';
 const DRAFT = 'bozza';
 const STOPPED = 'fermo';
 const ACTIVE = 'attivo';
 const ARCHIVED = 'archiviato';
+const PAUSED = 'in pausa';
+
+// The transitions of the domain of the API, with the reasons it gives (R1.1.4-R1.1.6).
+const TRANSITIONS: Record<FakeFlowCommand, Transition> = {
+  pause: { from: [ACTIVE], to: PAUSED, refusal: refusedFor('pausa') },
+  resume: { from: [PAUSED], to: ACTIVE, refusal: refusedFor('riprendi') },
+  stop: { from: [ACTIVE, PAUSED], to: STOPPED, refusal: refusedFor('ferma') },
+  archive: { from: [STOPPED], to: ARCHIVED, refusal: () => 'si archivia solo un flusso fermo' },
+};
 const TRADABLE_ASSETS = new Set(['BTC', 'ETH', 'SOL']);
 
 export const FIRST_CONFIGURATION: FakeConfiguration = {
@@ -279,6 +304,19 @@ const missingOf = (flow: FakeFlow): string[] =>
     flow.allocatedCapital === null ? 'capitale allocato' : '',
     flow.assets.length === 0 ? 'asset' : '',
   ].filter((part) => part !== '');
+
+// Bug 244: a stopped flow starts only if its capital fits in what the other flows of its account leave free.
+const requireFreeCapitalFor = (user: FakeUser, flow: FakeFlow): void => {
+  const account = user.accounts.find((candidate) => candidate.id === flow.accountId);
+  if (account === undefined) {
+    return;
+  }
+  const own = holdsAccount(flow) ? (flow.allocatedCapital ?? 0) : 0;
+  const free = freeCapital(user, account) + own;
+  if ((flow.allocatedCapital ?? 0) > free) {
+    throw new FakeRefusal(422, `capitale allocato oltre il capitale libero: ${free} USDC`);
+  }
+};
 
 const listed = (parts: string[]): string =>
   parts.length === 1
@@ -587,7 +625,22 @@ export const fakePlatform = {
         `asset già assegnati al flusso ${holder.name} sullo stesso conto: ${shared.join(', ')}`,
       );
     }
+    requireFreeCapitalFor(user, flow);
     flow.status = ACTIVE;
+    return flow;
+  },
+
+  /** A command of the user on the flow, refused as the API refuses it; the stop closes every position (R1.1.4-R1.1.6). */
+  command(user: FakeUser, flowId: string, command: FakeFlowCommand): FakeFlow {
+    const flow = flowOf(user, flowId);
+    const transition = TRANSITIONS[command];
+    if (!transition.from.includes(flow.status)) {
+      throw new FakeRefusal(409, transition.refusal(flow.status));
+    }
+    if (command === 'stop') {
+      state.openPositions.delete(flow.id);
+    }
+    flow.status = transition.to;
     return flow;
   },
 

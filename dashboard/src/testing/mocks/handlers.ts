@@ -4,8 +4,10 @@ import { apiInstant, summaryOf, type FakeCycle } from './cycles';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
+  FAKE_FLOW_COMMANDS,
   FakeRefusal,
   fakePlatform,
+  type FakeFlowCommand,
   type FakeConfiguration,
   type FakeAccount,
   type FakeEquityPoint,
@@ -160,6 +162,12 @@ const historyResponse = <T>(
       return HttpResponse.json({ [key]: found, next });
     }),
   );
+
+// The stop answers with its outcome, the other commands with the flow (R1.1.4-R1.1.6).
+const commandResponse = (flow: FakeFlow, command: FakeFlowCommand) =>
+  command === 'stop'
+    ? HttpResponse.json({ flow: flowResponse(flow), left_open: [] })
+    : HttpResponse.json(flowResponse(flow));
 
 const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
   [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
@@ -337,8 +345,13 @@ export const handlers = [
       ),
     ),
   ),
+  // Archived flows answer only when asked for, as on the API (R1.1.6).
   http.get('*/flows', ({ request }) =>
-    withUser(request, (user) => HttpResponse.json(user.flows.map(flowResponse))),
+    withUser(request, (user) => {
+      const archived = new URL(request.url).searchParams.get('archived') === 'true';
+      const listed = user.flows.filter((flow) => (flow.status === 'archiviato') === archived);
+      return HttpResponse.json(listed.map(flowResponse));
+    }),
   ),
   http.get('*/flows/overview', ({ request }) =>
     withUser(request, (user) =>
@@ -502,6 +515,13 @@ export const handlers = [
   http.post('*/flows/:flowId/start', ({ request, params }) =>
     withUser(request, (user) =>
       HttpResponse.json(flowResponse(fakePlatform.start(user, String(params.flowId)))),
+    ),
+  ),
+  ...FAKE_FLOW_COMMANDS.map((command) =>
+    http.post(`*/flows/:flowId/${command}`, ({ request, params }) =>
+      withUser(request, (user) =>
+        commandResponse(fakePlatform.command(user, String(params.flowId), command), command),
+      ),
     ),
   ),
   http.get('*/flows/:flowId/state', ({ request, params }) =>

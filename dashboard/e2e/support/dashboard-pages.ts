@@ -155,6 +155,22 @@ export class DashboardPages {
     return this.page.getByRole('link', { name: 'Registra un conto' });
   }
 
+  flowStatus(): Locator {
+    return this.page.getByText(/^Stato: /);
+  }
+
+  /** A command of the flow, by the word the scenarios use for it, whatever its case. */
+  flowCommand(name: string): Locator {
+    return this.page
+      .getByRole('group', { name: 'Comandi del flusso' })
+      .getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
+  }
+
+  /** The confirmation the dashboard asks before a command, by its title. */
+  confirmation(title: string): Locator {
+    return this.page.getByRole('group', { name: title });
+  }
+
   cycleRows(): Locator {
     return this.page.getByRole('table', { name: 'Cicli' }).locator('tbody tr');
   }
