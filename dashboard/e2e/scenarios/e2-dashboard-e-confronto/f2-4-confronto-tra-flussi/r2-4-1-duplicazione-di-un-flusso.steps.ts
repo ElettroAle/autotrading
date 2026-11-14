@@ -84,14 +84,6 @@ When(
   },
 );
 
-Then(
-  'il flusso {string} è nello stato {string}',
-  async ({ dashboard }, flow: string, status: string) => {
-    await expect(dashboard.status(status)).toBeVisible();
-    expect(fakePlatform.flowNamed(flow).status).toBe(status);
-  },
-);
-
 Then("l'avvio è rifiutato con il motivo {string}", async ({ dashboard }, reason: string) => {
   await expect(dashboard.alert()).toHaveText(`Avvio rifiutato: ${reason}`);
 });

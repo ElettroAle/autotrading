@@ -87,23 +87,6 @@ When(
   },
 );
 
-When(
-  '{string} avvia il flusso {string}',
-  async ({ dashboard, memory }, account: string, flow: string) => {
-    expectSignedIn(memory, account);
-    await openFlow(dashboard, flow);
-    await runCommand(dashboard, memory, account, flow, 'avvia');
-  },
-);
-
-Then(
-  'il flusso {string} è nello stato {string}',
-  async ({ dashboard }, flow: string, status: string) => {
-    await expect(dashboard.flowStatus()).toHaveText(`Stato: ${status}`);
-    expect(fakePlatform.flowNamed(flow).status).toBe(status);
-  },
-);
-
 Then(
   'la conferma dice che la posizione su {string} sarà chiusa',
   async ({ dashboard }, asset: string) => {
