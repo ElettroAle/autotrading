@@ -27,6 +27,9 @@ class ChangeFlowStatusUseCase:
 
     A draft starts only with account, capital and assets assigned, an account still of the tenant, its capital within
     the free capital read now and no asset already used by another flow of the account (R2.4.1, ADR 0124).
+
+    A stopped flow starts only with its capital within the free capital of its account read now, its own capital left
+    out: the balance may have dropped while it was stopped (RF-02.05, ADR 0142). A resumed flow asks for no capital.
     """
 
     def __init__(
@@ -39,17 +42,18 @@ class ChangeFlowStatusUseCase:
     def execute(self, command: ChangeFlowStatusCommand) -> Flow:
         current = self._flows.get(command.flow_id)
         flow = current.after(command.command)
-        if current.status is FlowStatus.DRAFT:
-            self._require_startable(flow)
+        if command.command is FlowAction.START:
+            self._require_startable(current.status, flow)
         self._record_status(flow)
         operations.info("stato del flusso cambiato", extra={"flow_id": str(flow.id.value), "status": flow.status.name})
         return flow
 
-    def _require_startable(self, flow: Flow) -> None:
+    def _require_startable(self, status: FlowStatus, flow: Flow) -> None:
         account_id = flow.assigned_account_id
         account = read_flow_account(self._accounts, account_id)
-        others = self._flows.list()
-        require_assets_free(account_id, flow.configuration.assets, others, excluding=flow.id)
+        others = [other for other in self._flows.list() if other.id != flow.id]
+        if status is FlowStatus.DRAFT:
+            require_assets_free(account_id, flow.configuration.assets, others)
         free_capital = FreeCapital.of_account(account.balance, account.currency, account_id, others)
         free_capital.require_room_for(flow.configuration.assigned_capital)
 

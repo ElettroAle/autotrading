@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
@@ -11,7 +12,7 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import IdentityProvider
 from tests.support.lifecycle_steps import hold_position
-from tests.support.platform import Platform
+from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
@@ -261,6 +262,25 @@ def test_a_flow_of_another_tenant_or_a_missing_version_is_not_found(client_of: C
         409,
         {"detail": "comando pausa non ammesso per un flusso fermo"},
     )
+
+
+def test_a_stopped_flow_above_the_free_capital_of_now_answers_with_the_reason(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    credentials = new_credentials()
+    platform.hyperliquid.accept(credentials)
+    platform.register_account("anna", registration(ACCOUNT, HYPERLIQUID, credentials))
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    platform.hyperliquid.accept(credentials, amount=Decimal(300))
+
+    response = anna.post(f"/flows/{flow_id}/start")
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "capitale allocato oltre il capitale libero: 300 USDC"},
+    )
+    assert anna.get("/flows").json()[0]["status"] == "fermo"
 
 
 def test_a_stop_answers_the_flow_stopped_and_the_positions_left_open(client_of: Client, platform: Platform) -> None:
