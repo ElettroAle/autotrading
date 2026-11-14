@@ -28,6 +28,7 @@ from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_repository import FlowStore
 
@@ -109,6 +110,9 @@ class InMemoryCycleRepositoryAdapter:
             if record.flow_id == flow_id and record.cost is not None
         ]
 
+    def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
+        return [cost for cost in self.costs(flow_id) if window.contains(cost.planned_at)]
+
 
 class InMemoryCycleHistoryAdapter:
     """The cycles of every tenant, bound to one like the real adapter under row level security."""
@@ -126,6 +130,9 @@ class InMemoryCycleHistoryAdapter:
 
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         return self._cycles.costs(flow_id) if self._owns(flow_id) else []
+
+    def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
+        return self._cycles.costs_within(flow_id, window) if self._owns(flow_id) else []
 
     def _owns(self, flow_id: UUID) -> bool:
         return any(flow.id.value == flow_id for flow in self._flows.of(self._tenant_id))

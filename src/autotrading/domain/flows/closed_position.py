@@ -78,5 +78,10 @@ class ClosedPosition(TenantOwned):
         return self.margin * self.leverage * move * sign
 
     @property
+    def net_pnl(self) -> Decimal:
+        """The result after the fees: what decides whether the position was won, lost or even (R2.2.6)."""
+        return self.pnl - self.fees
+
+    @property
     def pnl_percent_of_margin(self) -> Decimal:
         return self.pnl / self.margin * PERCENT

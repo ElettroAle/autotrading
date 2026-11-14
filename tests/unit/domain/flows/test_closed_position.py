@@ -113,3 +113,7 @@ def test_a_reported_loss_is_kept_as_reported() -> None:
 
 def test_a_reported_result_of_zero_is_a_result() -> None:
     assert replace(POSITION, realized_pnl=Decimal(0)).pnl == Decimal(0)
+
+
+def test_the_net_result_is_the_result_less_the_fees() -> None:
+    assert POSITION.net_pnl == Decimal("1.92")

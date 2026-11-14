@@ -207,3 +207,31 @@ class InvalidCallCostError(DomainError):
 class InvalidPageNumberError(DomainError):
     def __init__(self) -> None:
         super().__init__("numero di pagina non valido: le pagine partono da 1")
+
+
+class InvalidStatisticsPeriodError(DomainError):
+    """A period of the statistics the user cannot have meant (R2.2.6)."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"periodo non valido: {reason}")
+        self.reason = reason
+
+
+class UnknownStatisticsPeriodError(InvalidStatisticsPeriodError):
+    def __init__(self, periods: tuple[str, ...]) -> None:
+        super().__init__("scegliere tra " + ", ".join(periods))
+
+
+class DaysOutsideRangeError(InvalidStatisticsPeriodError):
+    def __init__(self) -> None:
+        super().__init__("i giorni valgono solo per un intervallo")
+
+
+class RangeDaysRequiredError(InvalidStatisticsPeriodError):
+    def __init__(self) -> None:
+        super().__init__("un intervallo ha il giorno iniziale e il giorno finale")
+
+
+class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
+    def __init__(self) -> None:
+        super().__init__("il giorno iniziale è successivo al giorno finale")

@@ -22,6 +22,7 @@ from autotrading.domain.flows.cycle_record import (
 )
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -131,6 +132,7 @@ def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     assert other.newest(flow_id, 0, 50) == []
     assert other.at(flow_id, PLANNED) is None
     assert other.costs(flow_id) == []
+    assert other.costs_within(flow_id, TimeWindow()) == []
 
 
 def test_a_tenant_cannot_record_a_cycle_of_a_flow_of_another_tenant(database: Engine) -> None:
@@ -157,3 +159,16 @@ def test_a_session_without_tenant_sees_no_cycle(database: Engine) -> None:
 
     with database.begin() as connection:
         assert connection.execute(text("SELECT count(*) FROM cycles")).scalar_one() == 0
+
+
+def test_the_costs_within_a_window_are_those_of_the_cycles_planned_from_its_start_to_its_end(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    instants = [PLANNED + timedelta(minutes=15 * index) for index in range(4)]
+    for instant in instants:
+        repository.record(CycleRecord(flow_id, instant, CycleOutcome.COMPLETED, cost=CallCost(1, 1, Decimal("0.01"))))
+
+    window = TimeWindow(since=instants[1], until=instants[3])
+
+    assert [cost.planned_at for cost in repository.costs_within(flow_id, window)] == instants[1:3]
+    assert [cost.planned_at for cost in repository.costs_within(flow_id, TimeWindow())] == instants

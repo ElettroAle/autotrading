@@ -10,6 +10,7 @@ from sqlalchemy import Connection, Engine, RowMapping, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import cycles
+from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.application.flows.errors import UnrecordableDocumentError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import (
@@ -21,6 +22,7 @@ from autotrading.domain.flows.cycle_record import (
 )
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]
@@ -94,9 +96,12 @@ class SqlAlchemyCycleRepositoryAdapter:
         return None if row is None else record_of(row)
 
     def costs(self, flow_id: UUID) -> list[CycleCost]:
+        return self.costs_within(flow_id, TimeWindow())
+
+    def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
         query = (
             select(cycles.c.planned_at, cycles.c.input_tokens, cycles.c.output_tokens, cycles.c.cost_usd)
-            .where(cycles.c.flow_id == flow_id, cycles.c.input_tokens.is_not(None))
+            .where(cycles.c.flow_id == flow_id, cycles.c.input_tokens.is_not(None), within(cycles.c.planned_at, window))
             .order_by(cycles.c.planned_at)
         )
         with self._transaction() as connection:

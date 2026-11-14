@@ -8,9 +8,11 @@ from uuid import UUID
 from sqlalchemy import Connection, Engine, RowMapping, func, insert, select
 
 from autotrading.adapters.outbound.sqlalchemy.tables import closed_positions
+from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -47,9 +49,12 @@ class SqlAlchemyClosedPositionRepositoryAdapter:
             connection.execute(insert(closed_positions).values(row_of(position)))
 
     def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]:
+        return self.closed_within(flow_id, TimeWindow())
+
+    def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
         query = (
             select(closed_positions)
-            .where(closed_positions.c.flow_id == flow_id.value)
+            .where(closed_positions.c.flow_id == flow_id.value, within(closed_positions.c.closed_at, window))
             .order_by(closed_positions.c.closed_at.desc())
         )
         with self._transaction() as connection:
