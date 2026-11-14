@@ -3,12 +3,14 @@
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import FlowNameInUseError, FlowNotFoundError, FlowVersionNotFoundError
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -16,6 +18,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
+from autotrading.domain.flows.free_capital import allocated_capital_of_account
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -71,6 +74,9 @@ class InMemoryFlowRepositoryAdapter:
 
     def model_uses(self) -> tuple[ModelUse, ...]:
         return tuple(ModelUse(flow.name.value, flow.model_provider, flow.status.not_stopped) for flow in self.list())
+
+    def allocated_capital(self, account_id: AccountId) -> Decimal:
+        return allocated_capital_of_account(account_id.value, self.list())
 
     def get(self, flow_id: FlowId) -> Flow:
         flow = next((flow for flow in self.list() if flow.id == flow_id), None)

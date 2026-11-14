@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.accounts.account_details import AccountDetails
+from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.account_id import AccountId
@@ -18,7 +18,7 @@ scenarios("E0-esecuzione-verificata/F0.1-accesso-alla-piattaforma/R0.1.3-isolame
 
 @dataclass
 class Requests:
-    listed: dict[str, list[AccountDetails]] = field(default_factory=dict)
+    listed: dict[str, list[AccountSummary]] = field(default_factory=dict)
     refused: dict[str, AutotradingError] = field(default_factory=dict)
     sealed_before: dict[str, SealedCredentials] = field(default_factory=dict)
 

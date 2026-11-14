@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router';
 
 import { paths } from '@/config/paths';
 
+import { AccountsRoute } from './routes/app/accounts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
@@ -24,6 +25,7 @@ export const routes: RouteObject[] = [
     element: <AppRoot />,
     children: [
       { index: true, element: <HomeRoute /> },
+      { path: paths.accounts.path, element: <AccountsRoute /> },
       { path: paths.flow.path, element: <FlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },

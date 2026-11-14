@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
+from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.accounts.account_details import AccountDetails
+from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
@@ -54,6 +56,27 @@ class AccountDetailsResponse(BaseModel):
         )
 
 
+class AccountSummaryResponse(AccountDetailsResponse):
+    """An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,
+    which the exchange gives at /accounts/{id}/state."""
+
+    network: str
+    allocated_capital: str
+    currency: str
+
+    @classmethod
+    def of_summary(cls, summary: AccountSummary) -> AccountSummaryResponse:
+        return cls(
+            id=str(summary.id.value),
+            name=summary.name.value,
+            exchange=summary.exchange.value,
+            has_credentials=summary.has_credentials,
+            network=summary.network.value,
+            allocated_capital=amount_text(summary.allocated_capital),
+            currency=summary.currency,
+        )
+
+
 class BalanceResponse(BaseModel):
     amount: str
     currency: str
@@ -91,14 +114,15 @@ def accounts_router(
     @router.get("")
     def list_accounts(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
-    ) -> list[AccountDetailsResponse]:
-        return [AccountDetailsResponse.of(details) for details in use_cases.list_accounts.execute()]
+    ) -> list[AccountSummaryResponse]:
+        return [AccountSummaryResponse.of_summary(summary) for summary in use_cases.list_accounts.execute()]
 
     @router.get("/{account_id}")
     def get_account(
         account_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> AccountDetailsResponse:
-        return AccountDetailsResponse.of(use_cases.get_account.execute(GetAccountCommand(AccountId(account_id))))
+    ) -> AccountSummaryResponse:
+        command = GetAccountCommand(AccountId(account_id))
+        return AccountSummaryResponse.of_summary(use_cases.get_account.execute(command))
 
     @router.put("/{account_id}/credentials")
     def replace_credentials(

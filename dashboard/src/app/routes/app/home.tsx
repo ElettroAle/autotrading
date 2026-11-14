@@ -6,6 +6,11 @@ import { FlowsList } from '@/features/flows/components/flows-list';
 
 export const HomeRoute = () => (
   <PageLayout title="I tuoi flussi">
+    <nav aria-label="Pagine" className="mb-4">
+      <Link to={paths.accounts.getHref()} className="text-blue-800 hover:underline">
+        I tuoi conti
+      </Link>
+    </nav>
     <FlowsList />
     <nav aria-label="Impostazioni" className="mt-6">
       <Link to={paths.notifications.getHref()} className="text-blue-800 hover:underline">

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
-from autotrading.application.accounts.account_details import AccountDetails
+from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.credentials import Credentials
@@ -23,7 +23,7 @@ class Seen:
 
     keyring: Keyring
     texts: list[str] = field(default_factory=list)
-    details: AccountDetails | None = None
+    details: AccountSummary | None = None
     owner: str = ""
     account: str = ""
 
