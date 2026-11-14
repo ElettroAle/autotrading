@@ -110,23 +110,35 @@ def test_the_flows_of_the_tenant_are_listed_and_the_free_capital_shrinks(client_
 @pytest.mark.parametrize(
     ("changes", "status", "reason"),
     [
-        ({"name": ""}, 422, "nome del flusso obbligatorio"),
-        ({"model": "openai/inesistente"}, 422, "modello non disponibile: openai/inesistente"),
-        ({"model_parameters": {"temperature": 3}}, 422, "parametro fuori dai valori ammessi: temperatura"),
-        ({"assets": ["XYZ"]}, 422, "asset non negoziabile sull'exchange: XYZ"),
-        ({"max_leverage": None}, 422, "la leva massima è obbligatoria"),
-        ({"allocated_capital": "1000.01"}, 422, "capitale allocato oltre il capitale libero: 1000 USDC"),
-        ({"account_id": str(uuid4())}, 404, "conto non trovato"),
+        ({"name": ""}, 422, {"detail": "nome del flusso obbligatorio", "field": "name"}),
+        (
+            {"model": "openai/inesistente"},
+            422,
+            {"detail": "modello non disponibile: openai/inesistente", "field": "model"},
+        ),
+        (
+            {"model_parameters": {"temperature": 3}},
+            422,
+            {"detail": "parametro fuori dai valori ammessi: temperatura", "field": "model_parameters"},
+        ),
+        ({"assets": ["XYZ"]}, 422, {"detail": "asset non negoziabile sull'exchange: XYZ", "field": "assets"}),
+        ({"max_leverage": None}, 422, {"detail": "la leva massima è obbligatoria", "field": "max_leverage"}),
+        (
+            {"allocated_capital": "1000.01"},
+            422,
+            {"detail": "capitale allocato oltre il capitale libero: 1000 USDC", "field": "allocated_capital"},
+        ),
+        ({"account_id": str(uuid4())}, 404, {"detail": "conto non trovato"}),
     ],
 )
-def test_an_invalid_configuration_answers_with_the_reason(
-    client_of: Client, platform: Platform, changes: dict[str, Any], status: int, reason: str
+def test_an_invalid_configuration_answers_with_the_reason_and_the_field_it_concerns(
+    client_of: Client, platform: Platform, changes: dict[str, Any], status: int, reason: dict[str, str]
 ) -> None:
     anna = client_of("anna")
 
     response = anna.post("/flows", json=a_request(platform, "anna", **changes))
 
-    assert (response.status_code, reason_of(response)) == (status, {"detail": reason})
+    assert (response.status_code, reason_of(response)) == (status, reason)
     assert anna.get("/flows").json() == []
 
 
@@ -136,7 +148,10 @@ def test_a_name_already_used_is_a_conflict(client_of: Client, platform: Platform
 
     response = anna.post("/flows", json=a_request(platform, "anna", allocated_capital="10"))
 
-    assert (response.status_code, reason_of(response)) == (409, {"detail": "nome già usato da un altro flusso"})
+    assert (response.status_code, reason_of(response)) == (
+        409,
+        {"detail": "nome già usato da un altro flusso", "field": "name"},
+    )
 
 
 def test_the_free_capital_of_an_account_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:
@@ -216,29 +231,33 @@ def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform)
 
 
 @pytest.mark.parametrize(
-    ("changes", "status", "reason"),
+    ("changes", "reason", "field"),
     [
-        ({"cycle_minutes": 0}, 422, "intervallo di ciclo fuori da 1-1440 minuti"),
-        ({"account_id": str(uuid4())}, 422, "il conto di un flusso non si cambia"),
-        ({"assets": ["XYZ"]}, 422, "asset non negoziabile sull'exchange: XYZ"),
-        ({"model": "openai/inesistente", "model_parameters": {}}, 422, "modello non disponibile: openai/inesistente"),
-        ({"sources": [{"name": "inesistente"}]}, 422, "fonte non disponibile: inesistente"),
+        ({"cycle_minutes": 0}, "intervallo di ciclo fuori da 1-1440 minuti", "cycle_minutes"),
+        ({"account_id": str(uuid4())}, "il conto di un flusso non si cambia", "account_id"),
+        ({"assets": ["XYZ"]}, "asset non negoziabile sull'exchange: XYZ", "assets"),
+        (
+            {"model": "openai/inesistente", "model_parameters": {}},
+            "modello non disponibile: openai/inesistente",
+            "model",
+        ),
+        ({"sources": [{"name": "inesistente"}]}, "fonte non disponibile: inesistente", "sources"),
         (
             {"max_leverage": 0, "max_margin_exposure_percent": "5", "max_value_exposure_percent": "5"},
-            422,
             "limite di rischio non valido: leva massima",
+            "max_leverage",
         ),
     ],
 )
-def test_an_invalid_change_answers_with_the_reason(
-    client_of: Client, platform: Platform, changes: dict[str, Any], status: int, reason: str
+def test_an_invalid_change_answers_with_the_reason_and_the_field_it_concerns(
+    client_of: Client, platform: Platform, changes: dict[str, Any], reason: str, field: str
 ) -> None:
     anna = client_of("anna")
     flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
 
     response = anna.patch(f"/flows/{flow_id}", json=changes)
 
-    assert (response.status_code, reason_of(response)) == (status, {"detail": reason})
+    assert (response.status_code, reason_of(response)) == (422, {"detail": reason, "field": field})
     assert anna.get("/flows").json()[0]["version"] == 1
 
 
@@ -321,7 +340,7 @@ def test_the_capital_of_a_flow_changes_with_its_history(client_of: Client, platf
     refused = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "1000.51"})
     assert (refused.status_code, reason_of(refused)) == (
         422,
-        {"detail": "capitale allocato oltre il capitale disponibile: 1000 USDC"},
+        {"detail": "capitale allocato oltre il capitale disponibile: 1000 USDC", "field": "allocated_capital"},
     )
 
 

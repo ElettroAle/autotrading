@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.domain.flows.errors import ExposureLimitRequiredError, InvalidRiskLimitError, MaxLeverageRequiredError
+from autotrading.domain.flows.flow_setting import FlowSetting
 
 HUNDRED = Decimal(100)
 LEVERAGE = "leva massima"
@@ -33,11 +34,11 @@ class RiskLimits:
         if self.max_margin_exposure_percent is None and self.max_value_exposure_percent is None:
             raise ExposureLimitRequiredError
         if self.max_leverage < 1:
-            raise InvalidRiskLimitError(LEVERAGE)
-        _require_percent(self.max_margin_exposure_percent, MARGIN_EXPOSURE)
-        _require_percent(self.max_value_exposure_percent, VALUE_EXPOSURE)
+            raise InvalidRiskLimitError(LEVERAGE, FlowSetting.MAX_LEVERAGE)
+        _require_percent(self.max_margin_exposure_percent, MARGIN_EXPOSURE, FlowSetting.MAX_MARGIN_EXPOSURE)
+        _require_percent(self.max_value_exposure_percent, VALUE_EXPOSURE, FlowSetting.MAX_VALUE_EXPOSURE)
 
 
-def _require_percent(percent: Decimal | None, label: str) -> None:
+def _require_percent(percent: Decimal | None, label: str, setting: FlowSetting) -> None:
     if percent is not None and not (percent.is_finite() and Decimal(0) < percent <= HUNDRED):
-        raise InvalidRiskLimitError(label)
+        raise InvalidRiskLimitError(label, setting)

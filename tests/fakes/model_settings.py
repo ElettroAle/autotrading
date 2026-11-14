@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 
 from autotrading.application.flows.errors import InvalidFlowSettingError
+from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.selections import ModelSelection
 
 
@@ -16,7 +17,7 @@ class FakeModelSettingsAdapter:
         self.asked.append(model)
         if model not in self.models:
             reason = f"modello non disponibile: {model}"
-            raise InvalidFlowSettingError(reason)
+            raise InvalidFlowSettingError(reason, FlowSetting.MODEL)
         return ModelSelection(
             model, {"temperature": Decimal(1), **{key: str(value) for key, value in requested.items()}}
         )

@@ -14,6 +14,7 @@ from autotrading.domain.agent.errors import (
 )
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.flows.errors import ModelRequiredError
+from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.selections import ModelSelection
 
 
@@ -33,14 +34,12 @@ class SelectModelUseCase:
             raise ModelRequiredError
         try:
             definition = self._definition_of(model)
+        except ModelNotAvailableError as error:
+            raise InvalidFlowSettingError(str(error), FlowSetting.MODEL) from error
+        try:
             parameters = definition.settings(requested)
-        except (
-            ModelNotAvailableError,
-            ParameterOutOfRangeError,
-            ParameterNotSupportedError,
-            UnknownParameterError,
-        ) as error:
-            raise InvalidFlowSettingError(str(error)) from error
+        except (ParameterOutOfRangeError, ParameterNotSupportedError, UnknownParameterError) as error:
+            raise InvalidFlowSettingError(str(error), FlowSetting.MODEL_PARAMETERS) from error
         if not self._keys.has_key(definition.provider):
             raise FlowProviderKeyMissingError(definition.provider.value)
         return ModelSelection(definition.name, parameters)
