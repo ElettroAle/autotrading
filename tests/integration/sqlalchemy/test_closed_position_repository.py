@@ -61,7 +61,17 @@ def test_the_closed_positions_read_back_from_the_most_recent_close(database: Eng
     repository.add(earlier)
     repository.add(later)
 
-    assert repository.of_flow(flow.id) == [later, earlier]
+    assert repository.newest(flow.id, 0, 10) == [later, earlier]
+
+
+def test_the_closed_positions_read_back_one_page_at_a_time(database: Engine) -> None:
+    flow = new_flow(database)
+    repository = SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id)
+    positions = [a_position(flow, timedelta(hours=hours)) for hours in (1, 2, 3, 4)]
+    for position in positions:
+        repository.add(position)
+
+    assert repository.newest(flow.id, 1, 2) == [positions[2], positions[1]]
 
 
 def test_a_closed_position_keeps_the_pnl_the_exchange_reported(database: Engine) -> None:
@@ -71,7 +81,7 @@ def test_a_closed_position_keeps_the_pnl_the_exchange_reported(database: Engine)
 
     repository.add(reported)
 
-    [read] = repository.of_flow(flow.id)
+    [read] = repository.newest(flow.id, 0, 10)
     assert (read, read.pnl) == (reported, Decimal("-4.2"))
 
 
@@ -79,7 +89,7 @@ def test_the_closed_positions_of_another_tenant_stay_invisible(database: Engine)
     flow, other = new_flow(database), new_flow(database)
     SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id).add(a_position(flow, timedelta(hours=1)))
 
-    assert SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id).of_flow(flow.id) == []
+    assert SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id).newest(flow.id, 0, 10) == []
 
 
 def test_a_session_without_tenant_sees_no_closed_position(database: Engine) -> None:

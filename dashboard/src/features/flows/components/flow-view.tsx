@@ -43,15 +43,23 @@ export const FlowView = ({ flowId }: { flowId: string }) => {
         {flow.name}
       </h2>
       <FlowStatus flow={flow} />
-      <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
-        Cicli del flusso
-      </Link>
-      <Link
-        to={paths.flowVersions.getHref(flow.id)}
-        className="mt-2 inline-block text-blue-800 hover:underline"
-      >
-        Versioni della configurazione
-      </Link>
+      <nav aria-label="Dati del flusso" className="mt-2 flex flex-wrap gap-4">
+        <Link to={paths.flowPositions.getHref(flow.id)} className="text-blue-800 hover:underline">
+          Posizioni aperte
+        </Link>
+        <Link
+          to={paths.flowClosedPositions.getHref(flow.id)}
+          className="text-blue-800 hover:underline"
+        >
+          Posizioni chiuse
+        </Link>
+        <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
+          Cicli del flusso
+        </Link>
+        <Link to={paths.flowVersions.getHref(flow.id)} className="text-blue-800 hover:underline">
+          Versioni della configurazione
+        </Link>
+      </nav>
       <FlowDetails flow={flow} accounts={accountsOfTenant} />
       <div className="mt-4 flex gap-3">
         <DuplicateFlowButton flowId={flow.id} />

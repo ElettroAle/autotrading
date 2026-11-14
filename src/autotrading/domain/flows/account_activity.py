@@ -4,6 +4,8 @@ from decimal import Decimal
 
 from autotrading.domain.flows.trade_intent import TradeSide
 
+PERCENT = Decimal(100)
+
 
 @dataclass(frozen=True, slots=True)
 class AccountPosition:
@@ -14,6 +16,15 @@ class AccountPosition:
     size: Decimal
     margin: Decimal
     unrealized_pnl: Decimal
+    leverage: int
+    entry_price: Decimal
+
+    @property
+    def unrealized_pnl_percent(self) -> Decimal | None:
+        """The unrealized PnL on the margin the position holds; without margin there is nothing to measure it on."""
+        if self.margin == 0:
+            return None
+        return self.unrealized_pnl / self.margin * PERCENT
 
 
 @dataclass(frozen=True, slots=True)

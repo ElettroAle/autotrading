@@ -24,6 +24,14 @@ export class DashboardPages {
     await this.open(`/flows/${encodeURIComponent(fakePlatform.flowNamed(name).id)}`);
   }
 
+  async openPositionsOf(flowName: string): Promise<void> {
+    await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/positions`);
+  }
+
+  async openClosedPositionsOf(flowName: string): Promise<void> {
+    await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/closed-positions`);
+  }
+
   async openCyclesOf(flowName: string): Promise<void> {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
@@ -105,6 +113,23 @@ export class DashboardPages {
 
   cycleRows(): Locator {
     return this.page.getByRole('table', { name: 'Cicli' }).locator('tbody tr');
+  }
+
+  openPositionRows(): Locator {
+    return this.page.getByRole('table', { name: 'Posizioni aperte' }).locator('tbody tr');
+  }
+
+  closedPositionRows(): Locator {
+    return this.page.getByRole('table', { name: 'Posizioni chiuse' }).locator('tbody tr');
+  }
+
+  /** The cell of a row under the column with the header: every cell carries its header, shown on small screens. */
+  cell(row: Locator, header: string): Locator {
+    return row.locator('td').filter({ has: this.page.getByText(header, { exact: true }) });
+  }
+
+  content(): Locator {
+    return this.page.getByRole('main');
   }
 
   nextPage(): Locator {

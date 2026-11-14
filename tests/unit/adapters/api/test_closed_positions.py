@@ -71,7 +71,7 @@ def test_the_closed_positions_of_a_flow_answer_with_their_result(client_of: Clie
     response = anna.get(f"/flows/{flow.id.value}/closed-positions")
 
     assert response.status_code == 200
-    assert response.json() == [
+    assert response.json()["positions"] == [
         {
             "asset": "BTC",
             "side": "long",
@@ -101,8 +101,33 @@ def test_the_closed_positions_answer_from_the_most_recent_close(client_of: Clien
 
     body = anna.get(f"/flows/{flow.id.value}/closed-positions").json()
 
-    assert [position["closed_at"] for position in body] == ["2026-11-12T13:00:00Z", "2026-11-12T11:00:00Z"]
-    assert {position["reason"] for position in body} == {"comando manuale"}
+    assert [position["closed_at"] for position in body["positions"]] == [
+        "2026-11-12T13:00:00Z",
+        "2026-11-12T11:00:00Z",
+    ]
+    assert {position["reason"] for position in body["positions"]} == {"comando manuale"}
+    assert (body["page"], body["has_next"]) == (1, False)
+
+
+def test_the_closed_positions_answer_in_pages_of_fifty(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.closed_positions.positions.extend(a_position(flow, timedelta(minutes=minutes)) for minutes in range(60))
+
+    first = anna.get(f"/flows/{flow.id.value}/closed-positions").json()
+    second = anna.get(f"/flows/{flow.id.value}/closed-positions", params={"page": 2}).json()
+
+    assert (first["page"], len(first["positions"]), first["has_next"]) == (1, 50, True)
+    assert (second["page"], len(second["positions"]), second["has_next"]) == (2, 10, False)
+
+
+def test_a_page_before_the_first_is_a_bad_request(client_of: Client, platform: Platform) -> None:
+    flow = flow_of(platform, "anna")
+
+    response = client_of("anna").get(f"/flows/{flow.id.value}/closed-positions", params={"page": 0})
+
+    assert response.status_code == 400
+    assert reason_of(response) == {"detail": "numero di pagina non valido: le pagine partono da 1"}
 
 
 def test_the_closed_positions_of_a_flow_of_another_user_do_not_exist(client_of: Client, platform: Platform) -> None:

@@ -20,7 +20,7 @@ EVERY_CYCLE = TimeWindow(None, None)
 
 
 def cycle_flow() -> CycleFlow:
-    position = AccountPosition("BTC", TradeSide.LONG, Decimal(1), Decimal(20), Decimal(3))
+    position = AccountPosition("BTC", TradeSide.LONG, Decimal(1), Decimal(20), Decimal(3), 1, Decimal(100))
     state = FlowState(FLOW.id, "USDC", Decimal(300), (position,), Decimal(4), Decimal(1), Decimal(0))
     return CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), ()), state)
 

@@ -31,6 +31,19 @@ describe('FlowView', () => {
     );
   });
 
+  it('leads to the open and the closed positions of the flow', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('link', { name: 'Posizioni aperte' })).toHaveAttribute(
+      'href',
+      '/flows/flow-alfa/positions',
+    );
+    expect(screen.getByRole('link', { name: 'Posizioni chiuse' })).toHaveAttribute(
+      'href',
+      '/flows/flow-alfa/closed-positions',
+    );
+  });
+
   it('says a flow outside the tenant of the user does not exist', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-omega' });
 

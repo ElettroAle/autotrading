@@ -10,6 +10,7 @@ import {
   type FakeFlow,
   type FakeUser,
 } from './platform';
+import type { FakeClosedPosition } from './positions';
 
 const BEARER = 'Bearer ';
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -18,6 +19,8 @@ const NO_LINKED_CHAT = 'nessuna chat collegata';
 export const TEST_NOTIFICATION = 'notifica di prova: le notifiche dei tuoi flussi arrivano qui';
 
 const CYCLES_PER_PAGE = 50;
+const CLOSED_POSITIONS_PER_PAGE = 50;
+const CURRENCY = 'USDC';
 
 // Answers as the API does: Problem Details, 401 without a valid token, 403 without the Utente role (R0.1.1).
 const problem = (status: number, title: string, detail: string) =>
@@ -91,6 +94,35 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
 
 const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
   [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
+
+const pageOf = (request: Request): number =>
+  Number(new URL(request.url).searchParams.get('page') ?? '1');
+
+const flowState = (flowId: string) => ({
+  flow_id: flowId,
+  currency: CURRENCY,
+  allocated_capital: '500',
+  available_liquidity: '300',
+  margin: '200',
+  unrealized_pnl: '12',
+  realized_pnl: '0',
+  fees: '0',
+  total_value: '512',
+  return_percent: '2.4',
+  positions: fakePlatform.openPositionsOf(flowId),
+});
+
+const closedPositionPage = (positions: FakeClosedPosition[], page: number) => {
+  const start = (page - 1) * CLOSED_POSITIONS_PER_PAGE;
+  const sorted = [...positions].sort(
+    (one, other) => Date.parse(other.closed_at) - Date.parse(one.closed_at),
+  );
+  return {
+    page,
+    has_next: sorted.length > start + CLOSED_POSITIONS_PER_PAGE,
+    positions: sorted.slice(start, start + CLOSED_POSITIONS_PER_PAGE),
+  };
+};
 
 const cyclePage = (cycles: FakeCycle[], page: number) => {
   const start = (page - 1) * CYCLES_PER_PAGE;
@@ -200,12 +232,7 @@ export const handlers = [
   ),
   http.get('*/flows/:flowId/cycles', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>
-      HttpResponse.json(
-        cyclePage(
-          fakePlatform.cyclesOf(flow.id),
-          Number(new URL(request.url).searchParams.get('page') ?? '1'),
-        ),
-      ),
+      HttpResponse.json(cyclePage(fakePlatform.cyclesOf(flow.id), pageOf(request))),
     ),
   ),
   http.get('*/flows/:flowId/versions', ({ request, params }) =>
@@ -310,6 +337,16 @@ export const handlers = [
   http.post('*/flows/:flowId/start', ({ request, params }) =>
     withUser(request, (user) =>
       HttpResponse.json(flowResponse(fakePlatform.start(user, String(params.flowId)))),
+    ),
+  ),
+  http.get('*/flows/:flowId/state', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) => HttpResponse.json(flowState(flow.id))),
+  ),
+  http.get('*/flows/:flowId/closed-positions', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json(
+        closedPositionPage(fakePlatform.closedPositionsOf(flow.id), pageOf(request)),
+      ),
     ),
   ),
 ];

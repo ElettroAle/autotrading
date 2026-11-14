@@ -92,10 +92,6 @@ Given(
   },
 );
 
-Given('che il flusso {string} non ha posizioni chiuse', async ({ memory }, flow: string) => {
-  historyOf(memory, flow);
-});
-
 When(
   '{string} apre le statistiche del flusso {string}',
   async ({ dashboard, memory }, account: string, flow: string) => {

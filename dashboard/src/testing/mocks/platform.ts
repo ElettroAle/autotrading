@@ -1,10 +1,12 @@
 import type { FakeCycle } from './cycles';
+// The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
+import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 
 /**
  * The platform behind the fakes: the users of the identity provider, their role, the accounts and the flows of their
- * tenant, the cycles of each flow and the Telegram chats. Unit tests and scenarios prepare it; the fake identity
- * provider and the fake API read it. The commands follow the rules of the API, so the dashboard meets the same
- * refusals (R2.4.1, ADR 0124).
+ * tenant, the cycles and the open and closed positions of each flow and the Telegram chats. Unit tests and scenarios
+ * prepare it; the fake identity provider and the fake API read it. The commands follow the rules of the API, so the
+ * dashboard meets the same refusals (R2.4.1, ADR 0124).
  */
 /** A position the flow closed: its result after the fees, the fees and the instant of the closing. */
 export type FakeClosedPosition = {
@@ -145,6 +147,8 @@ const state = {
   linkedChats: new Map<string, FakeChat>(),
   linkCodes: new Map<string, FakeLinkCode>(),
   cycles: new Map<string, FakeCycle[]>(),
+  openPositions: new Map<string, FakeOpenPosition[]>(),
+  closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
 };
@@ -214,6 +218,8 @@ export const fakePlatform = {
     state.linkedChats.clear();
     state.linkCodes.clear();
     state.cycles.clear();
+    state.openPositions.clear();
+    state.closedPositions.clear();
     state.signingIn = undefined;
     state.sessionsExpired = false;
   },
@@ -285,6 +291,24 @@ export const fakePlatform = {
   /** The equity a cycle of the flow recorded at its planned instant (R2.2.3). */
   recordEquity(name: string, plannedAt: Date, equity: number): void {
     fakePlatform.flowNamed(name).equity.push({ plannedAt, equity });
+  },
+
+  /** The positions the flow with the name holds now on the exchange. */
+  holdPositions(flowName: string, positions: FakeOpenPosition[]): void {
+    state.openPositions.set(flowIdOf(flowName), positions);
+  },
+
+  openPositionsOf(flowId: string): FakeOpenPosition[] {
+    return state.openPositions.get(flowId) ?? [];
+  },
+
+  /** The positions the flow with the name closed, in any order: the fake API serves them from the most recent. */
+  recordClosedPositions(flowName: string, positions: ClosedPositionAnswer[]): void {
+    state.closedPositions.set(flowIdOf(flowName), positions);
+  },
+
+  closedPositionsOf(flowId: string): ClosedPositionAnswer[] {
+    return state.closedPositions.get(flowId) ?? [];
   },
 
   flowNamed(name: string): FakeFlow {

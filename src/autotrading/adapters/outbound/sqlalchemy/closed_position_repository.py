@@ -48,8 +48,17 @@ class SqlAlchemyClosedPositionRepositoryAdapter:
         with self._transaction() as connection:
             connection.execute(insert(closed_positions).values(row_of(position)))
 
-    def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]:
-        return self.closed_within(flow_id, TimeWindow())
+    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
+        # The identifier breaks ties of the instant, so a position never shows on two pages.
+        query = (
+            select(closed_positions)
+            .where(closed_positions.c.flow_id == flow_id.value)
+            .order_by(closed_positions.c.closed_at.desc(), closed_positions.c.id)
+            .offset(offset)
+            .limit(limit)
+        )
+        with self._transaction() as connection:
+            return [position_of(row) for row in connection.execute(query).mappings()]
 
     def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
         query = (

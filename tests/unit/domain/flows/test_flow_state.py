@@ -119,7 +119,7 @@ def test_a_bigger_position_on_the_account_than_the_flow_expects_is_a_mismatch() 
 
 def test_a_short_position_is_compared_with_its_sign() -> None:
     flow = flow_on("BTC")
-    short = AccountPosition("BTC", TradeSide.SHORT, Decimal(1), Decimal(0), Decimal(0))
+    short = AccountPosition("BTC", TradeSide.SHORT, Decimal(1), Decimal(0), Decimal(0), 1, Decimal(100))
 
     assert (
         FlowState.attributed(

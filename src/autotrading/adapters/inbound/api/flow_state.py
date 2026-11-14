@@ -5,12 +5,39 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from autotrading.adapters.inbound.api.account_activity import ActivityPositionResponse
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand
+from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
+
+
+class FlowPositionResponse(BaseModel):
+    """An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin."""
+
+    asset: str
+    side: str
+    size: str
+    leverage: str
+    entry_price: str
+    margin: str
+    unrealized_pnl: str
+    unrealized_pnl_percent: str | None
+
+    @classmethod
+    def of(cls, position: AccountPosition) -> FlowPositionResponse:
+        percent = position.unrealized_pnl_percent
+        return cls(
+            asset=position.asset,
+            side=position.side.value,
+            size=amount_text(position.size),
+            leverage=str(position.leverage),
+            entry_price=amount_text(position.entry_price),
+            margin=amount_text(position.margin),
+            unrealized_pnl=amount_text(position.unrealized_pnl),
+            unrealized_pnl_percent=None if percent is None else amount_text(percent),
+        )
 
 
 class FlowStateResponse(BaseModel):
@@ -26,7 +53,7 @@ class FlowStateResponse(BaseModel):
     fees: str
     total_value: str
     return_percent: str
-    positions: list[ActivityPositionResponse]
+    positions: list[FlowPositionResponse]
 
     @classmethod
     def of(cls, state: FlowState) -> FlowStateResponse:
@@ -41,7 +68,7 @@ class FlowStateResponse(BaseModel):
             fees=amount_text(state.fees),
             total_value=amount_text(state.total_value),
             return_percent=amount_text(state.return_percent),
-            positions=[ActivityPositionResponse.of(position) for position in state.positions],
+            positions=[FlowPositionResponse.of(position) for position in state.positions],
         )
 
 

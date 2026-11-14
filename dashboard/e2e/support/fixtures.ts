@@ -64,4 +64,18 @@ defineParameterType({
   transformer: (time: string) => time,
 });
 
+// An amount as the scenarios write it, in Italian with its sign (+12, 0,01), handed over as the API writes it (12, 0.01).
+defineParameterType({
+  name: 'amount',
+  regexp: /[+-]?\d+(?:,\d+)?/,
+  transformer: (amount: string) => amount.replace('+', '').replace(',', '.'),
+});
+
+// A percent as the dashboard shows it, +5,00%.
+defineParameterType({
+  name: 'percent',
+  regexp: /[+-]?\d+(?:,\d+)?%/,
+  transformer: (percent: string) => percent,
+});
+
 export const { Given, When, Then } = createBdd(test);
