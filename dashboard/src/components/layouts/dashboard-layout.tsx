@@ -98,7 +98,7 @@ const NavigationGroupLinks = ({ group }: { group: NavigationGroup }) => {
 /**
  * A page of the data of the user: navigation at the side on a wide screen, folded into a menu under 768 pixels, and
  * the data of the page reread on request or by itself (ADR 0119). The menu gathers the areas in groups and marks the
- * area of the page, its sub-pages included (ADR 0155).
+ * area of the page, its sub-pages included (ADR 0158).
  */
 export const DashboardLayout = ({ title, children }: { title: string; children: ReactNode }) => {
   const [menuOpen, setMenuOpen] = useState(false);
