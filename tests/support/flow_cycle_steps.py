@@ -156,7 +156,7 @@ def flow_state(  # noqa: PLR0917 - one argument per value of the step
 
 def show_activity(flow_cycles: FlowCycles, flow: str, held: AccountPosition) -> None:
     """The same position as the activity of the account shows it: the state of the flow is attributed from it."""
-    address = flow_cycles.credentials_of(flow).account_address
+    address = flow_cycles.credentials_of(flow).value("account_address")
     flow_cycles.platform.activity_reader.activities[address] = an_activity(positions=(held,))
     signed = held.size if held.side is TradeSide.LONG else -held.size
     flow_cycles.platform.ledger.expect(flow_cycles.flow(flow).id, held.asset, signed)
@@ -185,7 +185,7 @@ def flow_return(flow_cycles: FlowCycles, flow: str, percent: str) -> None:
     exchange.revoke(credentials)
     exchange.accept(credentials, amount=BALANCE)
     exchange.open_position(credentials, replace(held, unrealized_pnl=pnl))
-    [shown] = flow_cycles.platform.activity_reader.activities[credentials.account_address].positions
+    [shown] = flow_cycles.platform.activity_reader.activities[credentials.value("account_address")].positions
     show_activity(flow_cycles, flow, replace(shown, unrealized_pnl=pnl))
 
 

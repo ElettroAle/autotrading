@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, InvalidModelUsageError
@@ -6,6 +7,8 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import PROVIDER_SEPARATOR, ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParameter, RangeParameter
 from autotrading.domain.agent.model_usage import ModelPrices
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD, ProviderKeyField
+from autotrading.domain.agent.provider_name import ProviderName
 
 CHAT_MODE = "chat"
 # LiteLLM tells whether a model takes a temperature, not its range: the range is the one of the OpenAI API it speaks,
@@ -22,6 +25,25 @@ UNDESCRIBED = (TypeError, ValueError, InvalidOperation, InvalidModelDefinitionEr
 type Entry = Mapping[str, object]
 type ModelMap = Mapping[str, Entry]
 type SupportedParameters = Callable[[str, str], Sequence[str] | None]
+# The variables of the environment the library would read to call a model: each names a parameter of its call.
+type RequiredKeys = Callable[[str], Sequence[str]]
+
+# The parameters of the call of the library a key may carry, as the user reads them: the same for every provider.
+FIELD_LABELS: Mapping[str, str] = {
+    "api_key": "Chiave API",
+    "api_base": "Indirizzo dell'API",
+    "api_version": "Versione dell'API",
+}
+SECRET_WORDS = ("key", "secret", "token")
+
+
+@dataclass(frozen=True, slots=True)
+class _ModelLibrary:
+    """What the library tells of its models: the map, the parameters of each and the keys its call needs."""
+
+    model_map: ModelMap
+    parameters_of: SupportedParameters
+    required_keys: RequiredKeys
 
 
 class LiteLlmModelCatalogAdapter:
@@ -29,19 +51,28 @@ class LiteLlmModelCatalogAdapter:
 
     Enabling a provider is a setting of the adapter: every chat model the map knows for it becomes selectable, with no
     list kept by hand. The map comes with the version of the library, so it is read once and asks nothing on the
-    network; the catalog does not depend on any key.
+    network; the catalog does not depend on any key. The fields of the key of each provider are the ones the library
+    requires to call its models, never a list kept by hand (R2.3.9, ADR 0159).
     """
 
-    def __init__(self, model_map: ModelMap, parameters_of: SupportedParameters, providers: frozenset[str]) -> None:
-        self._model_map = model_map
-        self._parameters_of = parameters_of
+    def __init__(self, library: _ModelLibrary, providers: frozenset[str]) -> None:
+        self._model_map = library.model_map
+        self._parameters_of = library.parameters_of
         self._providers = providers
+        self._required_keys = library.required_keys
         self._catalog: ModelCatalog | None = None
 
     def catalog(self) -> ModelCatalog:
         if self._catalog is None:
-            self._catalog = ModelCatalog(self._definitions())
+            models = tuple(self._definitions())
+            self._catalog = ModelCatalog(models, self._key_fields(models))
         return self._catalog
+
+    def _key_fields(self, models: Sequence[ModelDefinition]) -> dict[ProviderName, tuple[ProviderKeyField, ...]]:
+        first_of: dict[ProviderName, ModelDefinition] = {}
+        for model in models:
+            first_of.setdefault(model.provider, model)
+        return {provider: _fields_of(provider, self._required_keys(model.name)) for provider, model in first_of.items()}
 
     def definition_of(self, model: str) -> ModelDefinition:
         return self.catalog().find(model)
@@ -97,3 +128,15 @@ def _number(value: object) -> Decimal:
     if isinstance(value, bool) or not isinstance(value, int | float | str):
         raise InvalidModelUsageError
     return Decimal(str(value))
+
+
+def _fields_of(provider: ProviderName, variables: Sequence[str]) -> tuple[ProviderKeyField, ...]:
+    """Each variable names a parameter of the call: OPENAI_API_KEY is the api_key of an OpenAI model."""
+    fields = tuple(_field_of(provider, variable) for variable in variables)
+    return fields or (API_KEY_FIELD,)
+
+
+def _field_of(provider: ProviderName, variable: str) -> ProviderKeyField:
+    name = variable.lower().removeprefix(provider.value.lower() + "_")
+    secret = any(word in name for word in SECRET_WORDS)
+    return ProviderKeyField(name, FIELD_LABELS.get(name, name), secret=secret)

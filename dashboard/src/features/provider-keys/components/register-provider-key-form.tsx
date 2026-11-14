@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
-import { FormAlert, SecretField } from '@/components/ui/form/input-field';
+import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
+import { FormAlert } from '@/components/ui/form/input-field';
 import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -13,9 +14,9 @@ import {
   type ProviderKeyInput,
 } from '../api/register-provider-key';
 
-const FIELDS = ['provider', 'key'] as const;
+const FIELDS = ['provider'] as const;
 
-const EMPTY_FORM: ProviderKeyInput = { provider: '', key: '' };
+const EMPTY_FORM: ProviderKeyInput = { provider: '', key: {} };
 
 // A provider whose key is registered is not chosen here: its key is replaced from the list (R2.3.2).
 const optionOf = ({ name, key_registered }: ModelProvider): SelectOption =>
@@ -24,8 +25,8 @@ const optionOf = ({ name, key_registered }: ModelProvider): SelectOption =>
     : { value: name, label: name };
 
 /**
- * Registers the key of a provider of the catalog of the models (R2.3.8), without asking the provider about it
- * (R1.4.1).
+ * Registers the key of a provider of the catalog of the models (R2.3.8), with the fields that provider declares
+ * (R2.3.9), without asking the provider about it (R1.4.1).
  */
 export const RegisterProviderKeyForm = () => {
   const registration = useRegisterProviderKey();
@@ -34,6 +35,7 @@ export const RegisterProviderKeyForm = () => {
   const [registered, setRegistered] = useState<string | null>(null);
   const {
     register,
+    control,
     handleSubmit,
     reset,
     resetField,
@@ -42,7 +44,12 @@ export const RegisterProviderKeyForm = () => {
   } = useForm<ProviderKeyInput>({
     resolver: zodResolver(providerKeyInputSchema),
     defaultValues: EMPTY_FORM,
+    // The fields of another provider leave the values with their inputs: only those of the chosen one are sent.
+    shouldUnregister: true,
   });
+  const chosenProvider = useWatch({ control, name: 'provider' });
+  const fields =
+    providers.data?.find((provider) => provider.name === chosenProvider)?.key_fields ?? [];
 
   const onSubmit = handleSubmit((input) => {
     setRegistered(null);
@@ -52,8 +59,12 @@ export const RegisterProviderKeyForm = () => {
         setRegistered(key.provider);
       },
       onError: (error) => {
-        resetField('key');
-        showRefusal(error, setError, (field) => FIELDS.find((known) => known === field));
+        fields.filter((field) => field.secret).forEach((field) => resetField(`key.${field.name}`));
+        showRefusal(error, setError, (field) =>
+          declaredFieldOf(fields, field) === undefined
+            ? FIELDS.find((known) => known === field)
+            : `key.${field}`,
+        );
       },
       onSettled: () => registration.reset(),
     });
@@ -82,7 +93,11 @@ export const RegisterProviderKeyForm = () => {
           error={errors.provider}
           {...register('provider')}
         />
-        <SecretField label="Chiave" error={errors.key} {...register('key')} />
+        <DeclaredFields
+          fields={fields}
+          registerField={(name) => register(`key.${name}`)}
+          reasonOf={(name) => errors.key?.[name]?.message}
+        />
         <button
           type="submit"
           disabled={registration.isPending || !providers.isSuccess}

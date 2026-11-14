@@ -54,7 +54,7 @@ def cycle_fills_of(flow_cycles: FlowCycles, flow: str, realized_pnl: Decimal, fe
     order, owner = uuid4(), flow_cycles.flow(flow)
     platform = flow_cycles.platform
     platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
-    address = flow_cycles.credentials_of(flow).account_address
+    address = flow_cycles.credentials_of(flow).value("account_address")
     # An opening and its closing: the position the flow expects is the one the exchange shows, none (ADR 0064).
     opening = a_fill("BTC", order, fill_id=f"{order}-1", executed_at=OPENED_AT)
     closing = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee, fill_id=f"{order}-2", size=Decimal(-1))

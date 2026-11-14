@@ -12,7 +12,8 @@ paths:
   (circa 200 MiB per processo), la carica il `worker` quando compone il gateway. `litellm_adapters()` la compone solo
   `create_worker_application`; l'`api` chiede il catalogo al `worker` (ADR 0149, `tech-worker.md`). Nessun adapter per
   fornitore.
-- **Chiave dell'utente solo nella chiamata del suo flusso** (RF-01.05, ADR 0029): `api_key` di quella sola
+- **Chiave dell'utente solo nella chiamata del suo flusso** (RF-01.05, ADR 0029): i campi della chiave (`api_key`
+  e gli altri che `validate_environment` chiede per il modello, ADR 0159) come parametri di quella sola
   `litellm.completion`. Nessuna chiave dei fornitori della piattaforma. La chiave non compare in log, errori, `repr` né
   nella causa di un errore: gli errori della libreria portano la richiesta e si rilanciano senza causa; un messaggio che
   ripete la chiave la maschera (`ProviderKey.redact`).

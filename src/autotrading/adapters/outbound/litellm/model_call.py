@@ -85,10 +85,11 @@ def _request(model: str, key: ProviderKey, settings: Settings, messages: tuple[M
     request: dict[str, object] = {
         "model": model,
         "messages": [{"role": _role(message), "content": message.content} for message in messages],
-        "api_key": key.secret,
         "max_tokens": int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS))),
         "response_format": JSON_ANSWER,
     }
+    # The key travels as the parameters its provider declared, by name, in this call only (ADR 0159).
+    request.update(key.values)
     temperature = settings.get("temperature")
     if temperature is not None:
         request["temperature"] = float(Decimal(temperature))

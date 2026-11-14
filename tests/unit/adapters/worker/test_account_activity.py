@@ -34,7 +34,7 @@ def answering(status: int, body: object) -> WorkerAccountActivityAdapter:
 
 def test_the_activity_read_by_the_worker_arrives_unchanged(worker: Worker) -> None:
     account = worker.saved_account()
-    address = worker.vault[account.credentials.ciphertext][2].account_address
+    address = worker.vault[account.credentials.ciphertext][2].value("account_address")
     activity = an_activity(
         balance=Decimal("1012.5"),
         positions=(

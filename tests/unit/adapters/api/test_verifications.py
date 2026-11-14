@@ -95,7 +95,7 @@ def test_a_failed_run_is_still_the_answer(platform: Platform, client_of: Client,
 def test_an_account_with_btc_open_does_not_start(
     platform: Platform, client_of: Client, account_id: str, credentials: Credentials
 ) -> None:
-    access = TradingAccess(HYPERLIQUID, credentials.account_address, credentials.secret_key)
+    access = TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
     platform.order_exchange.hold(access, HeldPosition("BTC", Direction.SHORT, Decimal("0.001"), 4))
 
     response = client_of("anna").post(f"/accounts/{account_id}/verifications")

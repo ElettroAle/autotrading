@@ -5,13 +5,9 @@ import { readData, useApiClient } from '@/lib/api-client';
 
 import { ACCOUNTS_QUERY_KEY } from './get-accounts';
 
-const REQUIRED = 'Campo obbligatorio';
-
-// Only presence: the API checks the credentials with the exchange before saving them (R0.2.4, ADR 0130).
-export const credentialsInputSchema = z.object({
-  account_address: z.string().trim().min(1, REQUIRED),
-  secret_key: z.string().min(1, REQUIRED),
-});
+// The fields the exchange of the account declares: the API names the missing one by its label and checks the
+// credentials with the exchange before saving them (R0.2.4, R2.3.9, ADR 0130).
+export const credentialsInputSchema = z.object({ credentials: z.record(z.string(), z.string()) });
 
 export type CredentialsInput = z.infer<typeof credentialsInputSchema>;
 
@@ -20,7 +16,7 @@ const replacedAccountSchema = z.object({ id: z.string(), name: z.string() });
 
 type CredentialsReplacement = {
   readonly accountId: string;
-  readonly credentials: CredentialsInput;
+  readonly credentials: CredentialsInput['credentials'];
 };
 
 /** Replaces the credentials of an account; like the registration, it leaves nothing in the cache (ADR 0130). */
@@ -32,7 +28,7 @@ export const useReplaceCredentials = () => {
       readData(
         await api.PUT('/accounts/{account_id}/credentials', {
           params: { path: { account_id: accountId } },
-          body: credentials,
+          body: { credentials },
         }),
         replacedAccountSchema,
       ),

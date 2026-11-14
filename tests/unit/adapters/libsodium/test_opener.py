@@ -16,7 +16,6 @@ from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.application.verification.errors import VerificationCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
-from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.sealed_address import SealedAddress
@@ -25,8 +24,9 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.verification.verification_access import SealedVerificationAccess, VerificationAccess
 from tests.support.accounts import an_account
+from tests.support.credentials import hyperliquid_credentials
 
-CREDENTIALS = Credentials("0x1111111111111111111111111111111111111111", "0x" + "cd" * 32)
+CREDENTIALS = hyperliquid_credentials("0x1111111111111111111111111111111111111111", "0x" + "cd" * 32)
 TENANT = TenantId.new()
 
 
@@ -136,7 +136,7 @@ def test_opens_the_access_of_the_orders_for_the_same_tenant_and_account(
 ) -> None:
     access = opener.open_access(sealed_access_of(sealed_account(private_key)))
 
-    assert access == TradingAccess("Hyperliquid", CREDENTIALS.account_address, CREDENTIALS.secret_key)
+    assert access == TradingAccess("Hyperliquid", CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
 
 
 def test_the_access_of_another_account_is_not_opened(
@@ -167,7 +167,7 @@ def sealed_address_of(account: Account) -> SealedAddress:
 def test_opens_only_the_address_for_the_flows_of_the_same_tenant_and_account(
     opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
 ) -> None:
-    assert opener.open_address(sealed_address_of(sealed_account(private_key))) == CREDENTIALS.account_address
+    assert opener.open_address(sealed_address_of(sealed_account(private_key))) == CREDENTIALS.value("account_address")
 
 
 def test_the_address_of_another_account_is_not_opened(
@@ -193,7 +193,7 @@ def test_opens_the_access_of_the_cycle_for_the_same_tenant_and_account(
 ) -> None:
     access = opener.open_cycle_access(sealed_address_of(sealed_account(private_key)))
 
-    assert access == CycleAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key)
+    assert access == CycleAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
 
 
 def test_the_cycle_access_of_another_account_is_not_opened(
@@ -206,8 +206,12 @@ def test_the_cycle_access_of_another_account_is_not_opened(
 
 
 def test_the_cycle_access_hides_address_and_secret() -> None:
-    assert CREDENTIALS.secret_key not in repr(CycleAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key))
-    assert CREDENTIALS.account_address not in repr(CycleAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key))
+    assert CREDENTIALS.value("secret_key") not in repr(
+        CycleAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
+    )
+    assert CREDENTIALS.value("account_address") not in repr(
+        CycleAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
+    )
 
 
 def sealed_verification_of(account: Account) -> SealedVerificationAccess:
@@ -223,7 +227,7 @@ def test_opens_the_access_of_the_verification_for_the_same_tenant_and_account(
 ) -> None:
     access = opener.open_verification(sealed_verification_of(sealed_account(private_key)))
 
-    assert access == VerificationAccess(CREDENTIALS.account_address, CREDENTIALS.secret_key)
+    assert access == VerificationAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
 
 
 def test_the_verification_access_of_another_account_is_not_opened(
@@ -264,8 +268,8 @@ def test_every_opening_records_tenant_account_key_version_and_outcome_never_the_
     assert "versione 1" in message
     assert "riuscita" in message
     assert record.created > 0
-    assert CREDENTIALS.secret_key not in message
-    assert CREDENTIALS.account_address not in message
+    assert CREDENTIALS.value("secret_key") not in message
+    assert CREDENTIALS.value("account_address") not in message
 
 
 def test_a_refused_opening_is_recorded_as_refused(

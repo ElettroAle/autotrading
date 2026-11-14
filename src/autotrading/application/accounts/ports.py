@@ -5,6 +5,7 @@ from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.account_state import AccountState
+from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 
@@ -12,6 +13,10 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 class ExchangePort(Protocol):
     def is_real(self) -> bool:
         """True when the adapter is configured on the network that moves real money (Bug 277)."""
+        ...
+
+    def credential_fields(self) -> tuple[CredentialField, ...]:
+        """The data the exchange asks to operate an account, in the order the user gives them (R2.3.9)."""
         ...
 
     def read_state(self, credentials: Credentials) -> AccountState:

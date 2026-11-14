@@ -2,7 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
-import { FormAlert, InputField, SecretField } from '@/components/ui/form/input-field';
+import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
+import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField } from '@/components/ui/form/select-field';
 import { isRealMoney, RealMoneyNotice } from '@/components/ui/real-money';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
@@ -14,18 +15,14 @@ import {
   type AccountRegistrationInput,
 } from '../api/register-account';
 
-const FIELDS = ['name', 'exchange', 'account_address', 'secret_key'] as const;
+const FIELDS = ['name', 'exchange'] as const;
 
-const EMPTY_FORM: AccountRegistrationInput = {
-  name: '',
-  exchange: '',
-  account_address: '',
-  secret_key: '',
-};
+const EMPTY_FORM: AccountRegistrationInput = { name: '', exchange: '', credentials: {} };
 
 /**
- * Registers an account on an exchange the API supports (R2.3.8): the API checks the credentials with the exchange
- * before saving them (R0.2.1), and the form warns when the chosen exchange trades real money (ADR 0157).
+ * Registers an account on an exchange the API supports (R2.3.8), asking the data that exchange declares (R2.3.9): the
+ * API checks the credentials with the exchange before saving them (R0.2.1), and the form warns when the chosen
+ * exchange trades real money (ADR 0157).
  */
 export const RegisterAccountForm = () => {
   const registration = useRegisterAccount();
@@ -43,9 +40,12 @@ export const RegisterAccountForm = () => {
   } = useForm<AccountRegistrationInput>({
     resolver: zodResolver(accountRegistrationInputSchema),
     defaultValues: EMPTY_FORM,
+    // The fields of another exchange leave the values with their inputs: only those of the chosen one are sent.
+    shouldUnregister: true,
   });
   const chosenExchange = useWatch({ control, name: 'exchange' });
-  const network = exchanges.data?.find((exchange) => exchange.name === chosenExchange)?.network;
+  const exchange = exchanges.data?.find((supported) => supported.name === chosenExchange);
+  const fields = exchange?.fields ?? [];
 
   const onSubmit = handleSubmit((input) => {
     setRegistered(null);
@@ -55,8 +55,14 @@ export const RegisterAccountForm = () => {
         setRegistered(account.name);
       },
       onError: (error) => {
-        resetField('secret_key');
-        showRefusal(error, setError, (field) => FIELDS.find((known) => known === field));
+        fields
+          .filter((field) => field.secret)
+          .forEach((field) => resetField(`credentials.${field.name}`));
+        showRefusal(error, setError, (field) =>
+          declaredFieldOf(fields, field) === undefined
+            ? FIELDS.find((known) => known === field)
+            : `credentials.${field}`,
+        );
       },
       onSettled: () => registration.reset(),
     });
@@ -86,16 +92,11 @@ export const RegisterAccountForm = () => {
           error={errors.exchange}
           {...register('exchange')}
         />
-        {isRealMoney(network) && <RealMoneyNotice subject="Il conto" />}
-        <InputField
-          label="Indirizzo del conto"
-          error={errors.account_address}
-          {...register('account_address')}
-        />
-        <SecretField
-          label="Chiave dell'API wallet"
-          error={errors.secret_key}
-          {...register('secret_key')}
+        {isRealMoney(exchange?.network) && <RealMoneyNotice subject="Il conto" />}
+        <DeclaredFields
+          fields={fields}
+          registerField={(name) => register(`credentials.${name}`)}
+          reasonOf={(name) => errors.credentials?.[name]?.message}
         />
         <button
           type="submit"

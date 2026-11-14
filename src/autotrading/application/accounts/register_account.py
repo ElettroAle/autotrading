@@ -18,8 +18,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 class RegisterAccountCommand:
     name: str
     exchange: str
-    account_address: str = field(repr=False)
-    secret_key: str = field(repr=False)
+    credentials: Mapping[str, str] = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,11 +45,12 @@ class RegisterAccountUseCase:
     def execute(self, command: RegisterAccountCommand) -> AccountRegistration:
         name = AccountName(command.name)
         exchange_name = ExchangeName(command.exchange)
-        credentials = Credentials(command.account_address, command.secret_key)
         exchange = supported_exchange(self._exchanges, exchange_name)
+        fields = exchange.credential_fields()
+        credentials = Credentials.declared(fields, command.credentials)
         self._require_free(name)
         balance = read_state_proving(exchange, credentials).balance
-        account = self._sealed_account(name, exchange_name, credentials)
+        account = self._sealed_account(name, exchange_name, credentials, ExchangeAccount.of(credentials, fields))
         self._accounts.add(account)
         operations.info("conto registrato", extra={"account_id": str(account.id.value)})
         return AccountRegistration(account, balance)
@@ -59,7 +59,9 @@ class RegisterAccountUseCase:
         if self._accounts.name_in_use(name):
             raise AccountNameInUseError(name)
 
-    def _sealed_account(self, name: AccountName, exchange: ExchangeName, credentials: Credentials) -> Account:
+    def _sealed_account(
+        self, name: AccountName, exchange: ExchangeName, credentials: Credentials, exchange_account: ExchangeAccount
+    ) -> Account:
         account_id = AccountId.new()
         sealed = self._sealer.seal(account_id, credentials)
-        return Account(account_id, self._tenant_id, name, exchange, ExchangeAccount.of(credentials), sealed)
+        return Account(account_id, self._tenant_id, name, exchange, exchange_account, sealed)

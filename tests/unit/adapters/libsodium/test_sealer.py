@@ -5,10 +5,10 @@ from nacl.public import PrivateKey, SealedBox
 
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.domain.accounts.account_id import AccountId
-from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.credentials import hyperliquid_credentials
 
-CREDENTIALS = Credentials("0x1111111111111111111111111111111111111111", "0x" + "cd" * 32)
+CREDENTIALS = hyperliquid_credentials("0x1111111111111111111111111111111111111111", "0x" + "cd" * 32)
 
 
 @pytest.fixture
@@ -25,8 +25,8 @@ def test_only_the_private_key_opens_what_was_sealed_with_tenant_and_account(priv
     assert json.loads(SealedBox(private_key).decrypt(sealed.ciphertext)) == {
         "tenant_id": str(tenant_id.value),
         "account_id": str(account_id.value),
-        "account_address": CREDENTIALS.account_address,
-        "secret_key": CREDENTIALS.secret_key,
+        "account_address": CREDENTIALS.value("account_address"),
+        "secret_key": CREDENTIALS.value("secret_key"),
     }
 
 
@@ -36,7 +36,7 @@ def test_the_sealed_text_carries_the_key_version_and_never_the_secret(private_ke
     sealed = sealer.seal(AccountId.new(), CREDENTIALS)
 
     assert sealed.key_version == 7
-    assert CREDENTIALS.secret_key.encode() not in sealed.ciphertext
+    assert CREDENTIALS.value("secret_key").encode() not in sealed.ciphertext
 
 
 def test_sealing_twice_gives_different_texts(private_key: PrivateKey) -> None:

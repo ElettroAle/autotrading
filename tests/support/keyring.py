@@ -3,6 +3,7 @@
 from secrets import token_hex
 
 from autotrading.domain.accounts.credentials import Credentials
+from tests.support.credentials import hyperliquid_credentials
 from tests.support.platform import new_credentials
 
 
@@ -13,7 +14,7 @@ class Keyring:
 
     def __getitem__(self, label: str) -> Credentials:
         if label not in self._by_label:
-            self._by_label[label] = Credentials(self._address, f"0x{token_hex(32)}")
+            self._by_label[label] = hyperliquid_credentials(self._address, f"0x{token_hex(32)}")
         return self._by_label[label]
 
     @staticmethod

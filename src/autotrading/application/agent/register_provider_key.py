@@ -1,7 +1,8 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError
-from autotrading.application.agent.model_gateways import ModelCatalogs
+from autotrading.application.agent.model_gateways import ModelCatalogs, joined_catalog
 from autotrading.application.agent.ports import (
     ProviderKeyRegistration,
     ProviderKeyRepositoryPort,
@@ -17,7 +18,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 @dataclass(frozen=True, slots=True)
 class RegisterProviderKeyCommand:
     provider: str
-    key: str = field(repr=False)
+    key: Mapping[str, str] = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +42,7 @@ class RegisterProviderKeyUseCase:
 
     def execute(self, command: RegisterProviderKeyCommand) -> ProviderKeyRegistration:
         provider = supported_provider(self._services.catalogs, command.provider)
-        key = ProviderKey(command.key)
+        key = ProviderKey.declared(joined_catalog(self._services.catalogs).key_fields_of(provider), command.key)
         self._require_none_for(provider)
         sealed = self._services.sealer.seal(provider, key)
         registration = self._keys.add(RegisteredProviderKey(self._tenant_id, provider, sealed))

@@ -24,6 +24,7 @@ class SodiumProviderKeySealerAdapter:
         return f"SodiumProviderKeySealerAdapter(key_version={self._key_version})"
 
     def seal(self, provider: ProviderName, key: ProviderKey) -> SealedProviderKey:
-        document = {"tenant_id": str(self._tenant_id.value), "provider": provider.value, "key": key.secret}
+        # Each field keeps the name its provider declares: the opener reads them back without knowing any (ADR 0159).
+        document = {"tenant_id": str(self._tenant_id.value), "provider": provider.value, "fields": dict(key.values)}
         plaintext = json.dumps(document, separators=(",", ":")).encode()
         return SealedProviderKey(self._key_version, self._box.encrypt(plaintext))

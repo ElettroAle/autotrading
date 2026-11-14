@@ -333,7 +333,7 @@
           "conti"
         ],
         "summary": "List Supported Exchanges",
-        "description": "The exchanges an account can be registered on, each with the network it trades on (ADR 0152, ADR 0157).",
+        "description": "The exchanges an account can be registered on, each with its network and the fields of its credentials\n(ADR 0152, ADR 0157, ADR 0158).",
         "operationId": "list_supported_exchanges_exchanges_get",
         "responses": {
           "200": {
@@ -3404,15 +3404,12 @@
             "title": "Exchange",
             "default": ""
           },
-          "account_address": {
-            "type": "string",
-            "title": "Account Address",
-            "default": ""
-          },
-          "secret_key": {
-            "type": "string",
-            "title": "Secret Key",
-            "default": ""
+          "credentials": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Credentials"
           }
         },
         "type": "object",
@@ -3837,17 +3834,37 @@
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
       },
+      "CredentialFieldResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "secret": {
+            "type": "boolean",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "secret"
+        ],
+        "title": "CredentialFieldResponse"
+      },
       "CredentialsReplacementRequest": {
         "properties": {
-          "account_address": {
-            "type": "string",
-            "title": "Account Address",
-            "default": ""
-          },
-          "secret_key": {
-            "type": "string",
-            "title": "Secret Key",
-            "default": ""
+          "credentials": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Credentials"
           }
         },
         "type": "object",
@@ -4144,12 +4161,20 @@
           "network": {
             "type": "string",
             "title": "Network"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/CredentialFieldResponse"
+            },
+            "type": "array",
+            "title": "Fields"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "network"
+          "network",
+          "fields"
         ],
         "title": "ExchangeResponse"
       },
@@ -6083,6 +6108,29 @@
         ],
         "title": "PositionResponse"
       },
+      "ProviderKeyFieldResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "secret": {
+            "type": "boolean",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "secret"
+        ],
+        "title": "ProviderKeyFieldResponse"
+      },
       "ProviderKeyRegistrationRequest": {
         "properties": {
           "provider": {
@@ -6091,9 +6139,11 @@
             "default": ""
           },
           "key": {
-            "type": "string",
-            "title": "Key",
-            "default": ""
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Key"
           }
         },
         "type": "object",
@@ -6102,9 +6152,11 @@
       "ProviderKeyReplacementRequest": {
         "properties": {
           "key": {
-            "type": "string",
-            "title": "Key",
-            "default": ""
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Key"
           }
         },
         "type": "object",
@@ -6138,12 +6190,20 @@
           "key_registered": {
             "type": "boolean",
             "title": "Key Registered"
+          },
+          "key_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderKeyFieldResponse"
+            },
+            "type": "array",
+            "title": "Key Fields"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "key_registered"
+          "key_registered",
+          "key_fields"
         ],
         "title": "ProviderResponse"
       },

@@ -7,11 +7,13 @@ import httpx
 
 from autotrading.application.agent.errors import ModelCatalogUnavailableError
 from autotrading.application.flows.errors import FlowModelCatalogUnavailableError
-from autotrading.domain.agent.errors import InvalidModelDefinitionError, InvalidModelUsageError
+from autotrading.domain.agent.errors import InvalidModelDefinitionError, InvalidModelUsageError, ProviderRequiredError
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParameter, RangeParameter
 from autotrading.domain.agent.model_usage import ModelPrices
+from autotrading.domain.agent.provider_key_field import ProviderKeyField
+from autotrading.domain.agent.provider_name import ProviderName
 
 # The name of the gateway of the worker whose catalog this is: the API offers it under the same name (ADR 0149).
 GATEWAY_NAME = "litellm"
@@ -26,6 +28,7 @@ UNEXPECTED_SHAPE = (
     InvalidOperation,
     InvalidModelDefinitionError,
     InvalidModelUsageError,
+    ProviderRequiredError,
 )
 
 
@@ -42,6 +45,12 @@ class _ParameterBody(TypedDict):
 class _PricesBody(TypedDict):
     input_per_million: str
     output_per_million: str
+
+
+class _KeyFieldBody(TypedDict):
+    name: str
+    label: str
+    secret: bool
 
 
 class _ModelBody(TypedDict):
@@ -105,10 +114,23 @@ def _catalog_of(document: object) -> ModelCatalog:
     models = document.get("models") if isinstance(document, Mapping) else None
     if not isinstance(models, list):
         raise ModelCatalogUnavailableError
+    key_fields = document.get("key_fields") if isinstance(document, Mapping) else None
+    if not isinstance(key_fields, Mapping):
+        raise ModelCatalogUnavailableError
     try:
-        return ModelCatalog(_definition_of(cast("_ModelBody", model)) for model in models)
+        return ModelCatalog(
+            (_definition_of(cast("_ModelBody", model)) for model in models),
+            {
+                ProviderName(str(provider)): tuple(_key_field_of(cast("_KeyFieldBody", field)) for field in fields)
+                for provider, fields in key_fields.items()
+            },
+        )
     except UNEXPECTED_SHAPE as error:
         raise ModelCatalogUnavailableError from error
+
+
+def _key_field_of(field: _KeyFieldBody) -> ProviderKeyField:
+    return ProviderKeyField(str(field["name"]), str(field["label"]), secret=field["secret"] is True)
 
 
 def _definition_of(model: _ModelBody) -> ModelDefinition:

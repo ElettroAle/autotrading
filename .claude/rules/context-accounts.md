@@ -19,6 +19,8 @@ paths:
 
 - Le credenziali non compaiono mai in risposte, log, errori o eccezioni: il tipo che le contiene ha
   un `__repr__` che le maschera.
+- Le credenziali sono una mappa sui campi che l'adapter dell'exchange dichiara (`ExchangePort.credential_fields()`,
+  R2.3.9, ADR 0158): domain, API e dashboard non nominano i dati di un exchange.
 - Alla registrazione e alla sostituzione le credenziali si controllano leggendo il saldo prima di
   salvarle (R0.2.1, R0.2.4). Nessun controllo sui permessi di prelievo.
 - Il conto non ha un attributo test/reale: la rete la dichiara la configurazione dell'adapter del suo exchange

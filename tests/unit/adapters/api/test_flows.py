@@ -40,7 +40,7 @@ def client_of(platform: Platform) -> Client:
         person = platform.directory.person(user)
         person.roles.add("Utente")
         client = TestClient(api, headers={"Authorization": f"Bearer {provider.token_for(person)}"})
-        client.post("/provider-keys", json={"provider": "openrouter", "key": KEY})
+        client.post("/provider-keys", json={"provider": "openrouter", "key": {"api_key": KEY}})
         return client
 
     return client

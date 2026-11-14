@@ -47,7 +47,7 @@ def answering(status: int, body: object) -> WorkerVerificationAdapter:
 
 def access_of(worker: Worker, account: Account) -> TradingAccess:
     credentials = worker.vault[account.credentials.ciphertext][2]
-    return TradingAccess(HYPERLIQUID, credentials.account_address, credentials.secret_key)
+    return TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
 
 
 def test_the_run_of_the_worker_arrives_unchanged(worker: Worker) -> None:

@@ -8,6 +8,7 @@ from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.credentials import HYPERLIQUID_FIELDS, hyperliquid_credentials
 
 ADDRESS = "0x1111111111111111111111111111111111111111"
 SECRET = "0x" + "ab" * 32
@@ -24,6 +25,6 @@ def an_account(
         tenant_id,
         AccountName(name),
         ExchangeName("Hyperliquid"),
-        ExchangeAccount.of(credentials or Credentials(ADDRESS, SECRET)),
+        ExchangeAccount.of(credentials or hyperliquid_credentials(ADDRESS, SECRET), HYPERLIQUID_FIELDS),
         sealed or SealedCredentials(1, b"sealed"),
     )

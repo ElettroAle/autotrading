@@ -38,13 +38,12 @@ def register(client: TestClient, **body: Any) -> httpx2.Response:
     return response
 
 
-def accepted_body(platform: Platform, name: str = "test-1") -> dict[str, str]:
+def accepted_body(platform: Platform, name: str = "test-1") -> dict[str, Any]:
     credentials = platform.accepted_credentials()
     return {
         "name": name,
         "exchange": HYPERLIQUID,
-        "account_address": credentials.account_address,
-        "secret_key": credentials.secret_key,
+        "credentials": dict(credentials.values),
     }
 
 
@@ -66,14 +65,15 @@ def test_the_answer_never_carries_the_credentials(client: TestClient, platform: 
 
     text = register(client, **body).text
 
-    assert body["secret_key"] not in text
-    assert body["account_address"] not in text
+    assert body["credentials"]["secret_key"] not in text
+    assert body["credentials"]["account_address"] not in text
 
 
 def test_rejected_credentials_report_the_reason_and_the_exchange_message(
     client: TestClient, platform: Platform
 ) -> None:
-    body = accepted_body(platform) | {"secret_key": "0x" + "ee" * 32}
+    body = accepted_body(platform)
+    body["credentials"]["secret_key"] = "0x" + "ee" * 32
 
     response = register(client, **body)
 
@@ -112,7 +112,7 @@ def test_an_unreachable_exchange_asks_to_retry(client: TestClient, platform: Pla
 
 @pytest.mark.parametrize(
     ("missing", "reason"),
-    [("name", "nome obbligatorio"), ("exchange", "exchange obbligatorio"), ("secret_key", "credenziali obbligatorio")],
+    [("name", "nome obbligatorio"), ("exchange", "exchange obbligatorio"), ("credentials", "credenziali obbligatorio")],
 )
 def test_missing_data_is_named(client: TestClient, platform: Platform, missing: str, reason: str) -> None:
     body = accepted_body(platform)
@@ -123,20 +123,49 @@ def test_missing_data_is_named(client: TestClient, platform: Platform, missing: 
     assert (response.status_code, reason_of(response)) == (422, {"detail": reason})
 
 
+def test_a_missing_field_of_the_exchange_is_named_by_its_label(client: TestClient, platform: Platform) -> None:
+    """R2.3.9: the reason names the field the exchange declares, and the answer points at it."""
+    body = accepted_body(platform)
+    del body["credentials"]["secret_key"]
+
+    response = register(client, **body)
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "chiave dell'API wallet obbligatorio", "field": "secret_key"},
+    )
+
+
+def test_a_field_the_exchange_does_not_declare_is_refused(client: TestClient, platform: Platform) -> None:
+    body = accepted_body(platform)
+    body["credentials"]["memo"] = "x"
+
+    response = register(client, **body)
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "campo delle credenziali non previsto: memo", "field": "memo"},
+    )
+
+
 def test_a_malformed_request_never_echoes_what_was_sent(client: TestClient) -> None:
     secret = "0x" + "ab" * 32
 
-    response = register(client, name="test-1", exchange=HYPERLIQUID, account_address="0x1", secret_key={"k": secret})
+    response = register(
+        client, name="test-1", exchange=HYPERLIQUID, credentials={"account_address": "0x1", "secret_key": {"k": secret}}
+    )
 
     assert response.status_code == 422
     assert secret not in response.text
-    assert response.json()["errors"][0]["loc"] == ["body", "secret_key"]
+    assert response.json()["errors"][0]["loc"] == ["body", "credentials", "secret_key"]
 
 
 def test_the_request_representation_never_shows_the_credentials() -> None:
-    body = {"name": "test-1", "exchange": HYPERLIQUID, "account_address": "0xaddr", "secret_key": "0xsk"}
+    request = AccountRegistrationRequest(
+        name="test-1", exchange=HYPERLIQUID, credentials={"account_address": "0xaddr", "secret_key": "0xsk"}
+    )
 
-    shown = repr(AccountRegistrationRequest(**body))
+    shown = repr(request)
 
     assert "0xaddr" not in shown
     assert "0xsk" not in shown

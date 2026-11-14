@@ -56,11 +56,26 @@ class WorkerModelResponse(BaseModel):
         )
 
 
+class WorkerProviderKeyFieldResponse(BaseModel):
+    name: str
+    label: str
+    secret: bool
+
+
 class WorkerModelCatalogResponse(BaseModel):
-    """The catalog of the gateways of the worker as the API rebuilds it, prices included (ADR 0149)."""
+    """The catalog of the gateways of the worker as the API rebuilds it, prices and fields of the keys included
+    (ADR 0149, ADR 0159)."""
 
     models: list[WorkerModelResponse]
+    key_fields: dict[str, list[WorkerProviderKeyFieldResponse]]
 
     @classmethod
     def of(cls, catalog: ModelCatalog) -> WorkerModelCatalogResponse:
-        return cls(models=[WorkerModelResponse.of(model) for model in catalog.models])
+        key_fields = {
+            provider.value: [
+                WorkerProviderKeyFieldResponse(name=field.name, label=field.label, secret=field.secret)
+                for field in fields
+            ]
+            for provider, fields in catalog.declared_key_fields.items()
+        }
+        return cls(models=[WorkerModelResponse.of(model) for model in catalog.models], key_fields=key_fields)

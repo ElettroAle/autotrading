@@ -54,7 +54,7 @@ def account_id(platform: Platform, client_of: Client, credentials: Credentials) 
 
 
 def holding(platform: Platform, credentials: Credentials) -> None:
-    access = TradingAccess(HYPERLIQUID, credentials.account_address, credentials.secret_key)
+    access = TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
     platform.order_exchange.hold(access, LONG_BTC)
 
 

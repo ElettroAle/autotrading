@@ -87,6 +87,7 @@ from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapte
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
+from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.procedure_orders import procedure_orders
@@ -96,7 +97,7 @@ STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
 
 
 def new_credentials() -> Credentials:
-    return Credentials(account_address=f"0x{token_hex(20)}", secret_key=f"0x{token_hex(32)}")
+    return hyperliquid_credentials(account_address=f"0x{token_hex(20)}", secret_key=f"0x{token_hex(32)}")
 
 
 class Platform:
@@ -297,4 +298,4 @@ class Platform:
 
 
 def registration(name: str, exchange: str, credentials: Credentials) -> RegisterAccountCommand:
-    return RegisterAccountCommand(name, exchange, credentials.account_address, credentials.secret_key)
+    return RegisterAccountCommand(name, exchange, credentials.values)

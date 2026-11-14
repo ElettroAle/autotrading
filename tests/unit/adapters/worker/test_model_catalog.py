@@ -27,6 +27,8 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, RangeParameter
 from autotrading.domain.agent.model_usage import ModelPrices
+from autotrading.domain.agent.provider_key_field import API_KEY_FIELD, ProviderKeyField
+from autotrading.domain.agent.provider_name import ProviderName
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.support.installation import WORKER_TOKEN, installation_configuration
 from tests.support.served_in_memory import served_in_memory
@@ -44,7 +46,11 @@ SONNET = ModelDefinition(
 REASONER = ModelDefinition(
     "deepseek/deepseek-reasoner", (RangeParameter("max_tokens", Decimal(1), Decimal(32768), Decimal(8192), whole=True),)
 )
-MODELS = ModelCatalog((SONNET, REASONER))
+AZURE_FIELDS = (
+    ProviderKeyField("api_key", "Chiave API", secret=True),
+    ProviderKeyField("api_base", "Indirizzo dell'API", secret=False),
+)
+MODELS = ModelCatalog((SONNET, REASONER), {ProviderName("anthropic"): AZURE_FIELDS})
 
 
 class Clock:
@@ -93,6 +99,18 @@ def test_the_catalog_of_the_worker_reaches_the_api_with_its_parameters_and_price
     assert adapter.catalog().models == (SONNET, REASONER)
 
 
+def test_the_fields_of_the_key_of_each_provider_reach_the_api() -> None:
+    """R2.3.9, ADR 0159: the library that declares them lives in the worker only."""
+    adapter, _ = adapter_on(worker_of(InMemoryModelCatalogAdapter(MODELS)))
+
+    catalog = adapter.catalog()
+
+    assert (catalog.key_fields_of(ProviderName("anthropic")), catalog.key_fields_of(ProviderName("deepseek"))) == (
+        AZURE_FIELDS,
+        (API_KEY_FIELD,),
+    )
+
+
 def test_the_catalog_is_asked_with_the_token_of_the_machine_and_a_timeout() -> None:
     adapter, worker = adapter_on(worker_of(InMemoryModelCatalogAdapter(MODELS)))
 
@@ -137,21 +155,43 @@ def test_a_worker_that_does_not_give_its_catalog_makes_it_unavailable(answers: W
     "body",
     [
         ["not", "a", "catalog"],
-        {"models": 3},
-        {"models": [{"name": "anthropic/claude"}]},
-        {"models": [{"name": "nameless", "parameters": [], "prices": None}]},
-        {"models": [{"name": "a/b", "parameters": [{"key": "temperature", "kind": "dial"}], "prices": None}]},
-        {"models": [{"name": "a/b", "parameters": [], "prices": {"input_per_million": "-1"}}]},
+        {"models": 3, "key_fields": {}},
+        {"models": [{"name": "anthropic/claude"}], "key_fields": {}},
+        {"models": [{"name": "nameless", "parameters": [], "prices": None}], "key_fields": {}},
+        {
+            "models": [{"name": "a/b", "parameters": [{"key": "temperature", "kind": "dial"}], "prices": None}],
+            "key_fields": {},
+        },
+        {"models": [{"name": "a/b", "parameters": [], "prices": {"input_per_million": "-1"}}], "key_fields": {}},
         {
             "models": [
                 {"name": "a/b", "parameters": [], "prices": None},
                 {"name": "a/b", "parameters": [], "prices": None},
-            ]
+            ],
+            "key_fields": {},
         },
     ],
     ids=["list", "models-not-a-list", "model-without-fields", "bad-name", "unknown-kind", "bad-prices", "repeated"],
 )
 def test_an_answer_in_another_shape_makes_the_catalog_unavailable(body: object) -> None:
+    with pytest.raises(ModelCatalogUnavailableError):
+        answering(200, body).catalog()
+
+
+VALID_MODELS: list[dict[str, object]] = [{"name": "a/b", "parameters": [], "prices": None}]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"models": VALID_MODELS},
+        {"models": VALID_MODELS, "key_fields": []},
+        {"models": VALID_MODELS, "key_fields": {"a": [{"name": "api_key"}]}},
+        {"models": VALID_MODELS, "key_fields": {"": [{"name": "api_key", "label": "Chiave", "secret": True}]}},
+    ],
+    ids=["without-key-fields", "key-fields-not-a-map", "field-without-label", "nameless-provider"],
+)
+def test_key_fields_in_another_shape_make_the_catalog_unavailable(body: object) -> None:
     with pytest.raises(ModelCatalogUnavailableError):
         answering(200, body).catalog()
 

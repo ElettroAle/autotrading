@@ -8,15 +8,16 @@ from autotrading.application.accounts.errors import ExchangeRejectedCredentialsE
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.domain.errors import AutotradingError
 from tests.fakes.exchange import REDACTED_REJECTION
+from tests.support.credentials import credentials_of
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 from tests.support.steps import quoted
 
 scenarios("E0-esecuzione-verificata/F0.2-conti-di-trading/R0.2.1-registrazione-di-un-conto.feature")
 
 MISSING_DATA = {
-    "nome": RegisterAccountCommand(" ", HYPERLIQUID, "0xabc", "0xdef"),
-    "exchange": RegisterAccountCommand("test-5", "", "0xabc", "0xdef"),
-    "credenziali": RegisterAccountCommand("test-5", HYPERLIQUID, "", ""),
+    "nome": RegisterAccountCommand(" ", HYPERLIQUID, credentials_of("0xabc", "0xdef")),
+    "exchange": RegisterAccountCommand("test-5", "", credentials_of("0xabc", "0xdef")),
+    "credenziali": RegisterAccountCommand("test-5", HYPERLIQUID, credentials_of("", "")),
 }
 
 
