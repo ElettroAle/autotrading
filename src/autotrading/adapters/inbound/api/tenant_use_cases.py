@@ -4,6 +4,7 @@ from datetime import datetime
 
 from autotrading.application.accounts.get_account import GetAccountUseCase
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
+from autotrading.application.accounts.list_supported_exchanges import ListSupportedExchangesUseCase
 from autotrading.application.accounts.ports import (
     AccountRepositoryPort,
     AccountStatePort,
@@ -147,6 +148,7 @@ class TenantUseCases:
 
     register_account: RegisterAccountUseCase
     list_accounts: ListAccountsUseCase
+    list_supported_exchanges: ListSupportedExchangesUseCase
     get_account: GetAccountUseCase
     replace_credentials: ReplaceCredentialsUseCase
     read_account_state: ReadAccountStateUseCase
@@ -208,6 +210,7 @@ class TenantUseCases:
             list_accounts=ListAccountsUseCase(
                 accounts, ports.allocated_capital, ports.environment, ports.settlement_currency
             ),
+            list_supported_exchanges=ListSupportedExchangesUseCase(exchanges),
             get_account=GetAccountUseCase(
                 accounts, ports.allocated_capital, ports.environment, ports.settlement_currency
             ),

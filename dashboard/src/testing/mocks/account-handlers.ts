@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import {
   EXCHANGE_REFUSAL,
   FAKE_EXCHANGE,
+  FAKE_SUPPORTED_EXCHANGES,
   REJECTED_SECRET_KEY,
   fakePlatform,
   type FakeAccount,
@@ -97,6 +98,13 @@ const withAccount = (
 };
 
 export const accountHandlers = [
+  http.get('*/exchanges', ({ request }) =>
+    withUser(request, () =>
+      fakePlatform.listsExchanges()
+        ? HttpResponse.json(FAKE_SUPPORTED_EXCHANGES)
+        : problem(500, 'Internal Server Error', 'errore interno'),
+    ),
+  ),
   http.get('*/accounts', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json(user.accounts.map((account) => accountResponse(user, account))),

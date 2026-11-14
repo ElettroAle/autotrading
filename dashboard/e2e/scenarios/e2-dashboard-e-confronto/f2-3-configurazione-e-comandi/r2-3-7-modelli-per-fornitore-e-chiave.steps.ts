@@ -9,12 +9,6 @@ import { Given, Then, When, type ScenarioMemory } from '../../../support/fixture
 const ACCOUNT_NAME = 'principale';
 const PROVIDER_KEYS_LINK = 'Chiavi dei fornitori IA';
 
-const ensureUser = (account: string): void => {
-  if (!fakePlatform.hasUser(account)) {
-    fakePlatform.giveAccountTo(account, ACCOUNT_NAME, 500);
-  }
-};
-
 // The user signs in once, on the form of a new flow: the sign-in brings the user back to the page asked for.
 const openNewFlowAs = async (
   dashboard: DashboardPages,
@@ -40,23 +34,6 @@ Given(
   'che il catalogo contiene i modelli {string} e {string}',
   async ({}, first: string, second: string) => {
     expect(FAKE_MODELS.map((model) => model.name)).toEqual(expect.arrayContaining([first, second]));
-  },
-);
-
-Given(
-  'che {string} ha registrato la chiave del fornitore {string}',
-  async ({}, account: string, provider: string) => {
-    ensureUser(account);
-    fakePlatform.saveProviderKey(account, provider, '2026-11-14T09:00:00+00:00');
-    expect(fakePlatform.providerKeyOf(account, provider)).toBeDefined();
-  },
-);
-
-Given(
-  'che {string} non ha registrato la chiave del fornitore {string}',
-  async ({}, account: string, provider: string) => {
-    ensureUser(account);
-    expect(fakePlatform.providerKeyOf(account, provider)).toBeUndefined();
   },
 );
 

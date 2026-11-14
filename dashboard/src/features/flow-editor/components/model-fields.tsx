@@ -2,6 +2,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 
 import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
+import { SelectField, type SelectOptionGroup } from '@/components/ui/form/select-field';
 import { paths } from '@/config/paths';
 import { reasonOf } from '@/lib/form-errors';
 
@@ -41,8 +42,14 @@ const ParameterField = ({ parameter }: { parameter: ModelParameter }) => {
   );
 };
 
-const groupLabelOf = (group: ModelGroup): string =>
-  `${group.provider} · chiave ${group.keyRegistered ? 'registrata' : 'mancante'}`;
+const choicesOf = (group: ModelGroup): SelectOptionGroup => ({
+  label: `${group.provider} · chiave ${group.keyRegistered ? 'registrata' : 'mancante'}`,
+  options: group.models.map((model) => ({
+    value: model.name,
+    label: model.name,
+    disabled: !model.selectable,
+  })),
+});
 
 type ModelFieldsProps = {
   readonly models: Model[];
@@ -69,33 +76,17 @@ export const ModelFields = ({ models, providers, currentModel }: ModelFieldsProp
   return (
     <fieldset className="min-w-0 space-y-2">
       <legend className="font-semibold">Modello</legend>
-      <FormField id="flow-model" label="Modello" error={errors.model?.message}>
-        {(props) => (
-          <select
-            {...props}
-            {...register('model', {
-              // The parameters belong to the model: a new model starts from its own defaults.
-              onChange: () => setValue('model_parameters', {}),
-            })}
-            className={FORM_CONTROL}
-          >
-            <option value="">Scegli un modello</option>
-            {groups.map((group) => (
-              <optgroup key={group.provider} label={groupLabelOf(group)}>
-                {group.models.map((candidate) => (
-                  <option
-                    key={candidate.name}
-                    value={candidate.name}
-                    disabled={!candidate.selectable}
-                  >
-                    {candidate.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        )}
-      </FormField>
+      <SelectField
+        id="flow-model"
+        label="Modello"
+        placeholder="Scegli un modello"
+        choices={groups.map(choicesOf)}
+        error={errors.model}
+        {...register('model', {
+          // The parameters belong to the model: a new model starts from its own defaults.
+          onChange: () => setValue('model_parameters', {}),
+        })}
+      />
       {missesProviderKey(groups) && (
         <p className="text-sm text-slate-600">
           I modelli di un fornitore senza chiave non si possono scegliere:{' '}

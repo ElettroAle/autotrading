@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
+import { FAKE_EXCHANGE, REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
 import { formatAmount } from '@/utils/format-amount';
 
 import type { DashboardPages } from '../../../support/dashboard-pages';
@@ -28,6 +28,7 @@ const registerAccount = async (
   memory.secret = secretKey;
   const form = dashboard.page.getByRole('region', { name: 'Nuovo conto' });
   await dashboard.field('Nome', form).fill(name);
+  await dashboard.field('Exchange', form).selectOption(FAKE_EXCHANGE);
   await dashboard.field('Indirizzo del conto', form).fill(VALID_ADDRESS);
   await dashboard.field("Chiave dell'API wallet", form).fill(secretKey);
   await form.getByRole('button', { name: 'Registra il conto' }).click();

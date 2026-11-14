@@ -17,6 +17,8 @@ const form = () => screen.getByRole('region', { name: 'Nuovo conto' });
 const fillAndSend = async ({ name = 'principale', secretKey = SECRET_KEY } = {}) => {
   const region = await screen.findByRole('region', { name: 'Nuovo conto' });
   await userEvent.type(within(region).getByLabelText('Nome'), name);
+  await within(region).findByRole('option', { name: 'hyperliquid' });
+  await userEvent.selectOptions(within(region).getByLabelText('Exchange'), 'hyperliquid');
   await userEvent.type(within(region).getByLabelText('Indirizzo del conto'), ADDRESS);
   await userEvent.type(within(region).getByLabelText(SECRET_LABEL), secretKey);
   await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
@@ -38,7 +40,33 @@ describe('RegisterAccountForm', () => {
     expect(await screen.findByRole('cell', { name: 'principale' })).toBeInTheDocument();
     expect(within(form()).getByLabelText('Nome')).toHaveValue('');
     expect(within(form()).getByLabelText(SECRET_LABEL)).toHaveValue('');
-    expect(within(form()).getByLabelText('Exchange')).toHaveValue('hyperliquid');
+    expect(within(form()).getByLabelText('Exchange')).toHaveValue('');
+  });
+
+  it('offers only the exchanges the API supports, none chosen at first', async () => {
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    const exchange = within(region).getByRole('combobox', { name: 'Exchange' });
+    expect(await within(exchange).findByRole('option', { name: 'hyperliquid' })).toBeEnabled();
+    expect(
+      within(exchange)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Scegli un exchange', 'hyperliquid']);
+    expect(exchange).toHaveValue('');
+  });
+
+  it('tells the list of the exchanges is not available and sends nothing', async () => {
+    fakePlatform.stopListingExchanges();
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    expect(await within(region).findByRole('alert')).toHaveTextContent(
+      'Impossibile leggere gli exchange supportati: errore interno',
+    );
+    expect(within(region).getByLabelText('Exchange')).toBeDisabled();
+    expect(within(region).getByRole('button', { name: 'Registra il conto' })).toBeDisabled();
   });
 
   it('leaves the credentials neither in the page nor in the cache of the data', async () => {
@@ -98,8 +126,8 @@ describe('RegisterAccountForm', () => {
     server.use(http.post('*/accounts', sent));
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+    await within(region).findByRole('option', { name: 'hyperliquid' });
 
-    await userEvent.clear(within(region).getByLabelText('Exchange'));
     await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
 
     for (const label of ['Nome', 'Exchange', 'Indirizzo del conto', SECRET_LABEL]) {

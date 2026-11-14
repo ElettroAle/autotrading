@@ -15,7 +15,8 @@ const form = () => screen.getByRole('region', { name: 'Nuova chiave' });
 
 const registerKey = async (provider: string, key = KEY) => {
   const region = await screen.findByRole('region', { name: 'Nuova chiave' });
-  await userEvent.type(within(region).getByLabelText('Fornitore'), provider);
+  await within(region).findByRole('option', { name: provider });
+  await userEvent.selectOptions(within(region).getByLabelText('Fornitore'), provider);
   await userEvent.type(within(region).getByLabelText('Chiave'), key);
   await userEvent.click(within(region).getByRole('button', { name: 'Registra la chiave' }));
 };
@@ -37,7 +38,8 @@ describe('ProviderKeysList', () => {
     const registeredAt = within(item).getByLabelText('Data di registrazione');
     expect(registeredAt).toHaveAttribute('datetime', EARLIER);
     expect(registeredAt).toHaveTextContent('01/11/2026, 09:00:00');
-    expect(screen.queryByText('anthropic')).not.toBeInTheDocument();
+    const keys = screen.getByRole('list', { name: 'Chiavi dei fornitori IA' });
+    expect(within(keys).queryByText('anthropic')).not.toBeInTheDocument();
   });
 
   it('says the user has no key yet', async () => {
@@ -197,15 +199,73 @@ describe('RegisterProviderKeyForm', () => {
   });
 
   it('shows the reason of a refusal at the head of the form and empties the key', async () => {
+    server.use(
+      http.post('*/provider-keys', () =>
+        HttpResponse.json({ detail: 'fornitore non supportato: openai' }, { status: 422 }),
+      ),
+    );
     await renderApp({ account: 'anna', url: PROVIDER_KEYS });
 
-    await registerKey('mistral');
+    await registerKey('openai');
 
     expect(await within(form()).findByRole('alert')).toHaveTextContent(
-      'fornitore non supportato: mistral',
+      'fornitore non supportato: openai',
     );
-    expect(within(form()).getByLabelText('Fornitore')).toHaveValue('mistral');
+    expect(within(form()).getByLabelText('Fornitore')).toHaveValue('openai');
     expect(within(form()).getByLabelText('Chiave')).toHaveValue('');
+  });
+
+  it('offers the providers of the catalog of the models, none chosen at first', async () => {
+    await renderApp({ account: 'anna', url: PROVIDER_KEYS });
+    const region = await screen.findByRole('region', { name: 'Nuova chiave' });
+
+    const provider = within(region).getByRole('combobox', { name: 'Fornitore' });
+    expect(await within(provider).findByRole('option', { name: 'openrouter' })).toBeEnabled();
+    expect(
+      within(provider)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Scegli un fornitore', 'openrouter', 'openai', 'anthropic']);
+    expect(provider).toHaveValue('');
+  });
+
+  it('shows a provider whose key is registered as such, and it cannot be chosen', async () => {
+    fakePlatform.saveProviderKey('anna', 'openrouter', EARLIER);
+    await renderApp({ account: 'anna', url: PROVIDER_KEYS });
+    const region = await screen.findByRole('region', { name: 'Nuova chiave' });
+
+    expect(
+      await within(region).findByRole('option', { name: 'openrouter · chiave già registrata' }),
+    ).toBeDisabled();
+    expect(within(region).getByRole('option', { name: 'anthropic' })).toBeEnabled();
+  });
+
+  it('shows the provider of a key just registered as registered, and as free once it is removed', async () => {
+    await renderApp({ account: 'anna', url: PROVIDER_KEYS });
+
+    await registerKey('anthropic');
+
+    expect(
+      await within(form()).findByRole('option', { name: 'anthropic · chiave già registrata' }),
+    ).toBeDisabled();
+    const item = await keyItem('anthropic');
+    await userEvent.click(within(item).getByRole('button', { name: 'Rimuovi' }));
+    await userEvent.click(within(item).getByRole('button', { name: 'Conferma la rimozione' }));
+    expect(await within(form()).findByRole('option', { name: 'anthropic' })).toBeEnabled();
+  });
+
+  it('tells the list of the providers is not available and sends nothing', async () => {
+    server.use(
+      http.get('*/models', () => HttpResponse.json({ detail: 'errore interno' }, { status: 500 })),
+    );
+    await renderApp({ account: 'anna', url: PROVIDER_KEYS });
+    const region = await screen.findByRole('region', { name: 'Nuova chiave' });
+
+    expect(await within(region).findByRole('alert')).toHaveTextContent(
+      'Impossibile leggere i fornitori IA: errore interno',
+    );
+    expect(within(region).getByLabelText('Fornitore')).toBeDisabled();
+    expect(within(region).getByRole('button', { name: 'Registra la chiave' })).toBeDisabled();
   });
 
   it('asks for the provider and the key before sending anything', async () => {
@@ -213,6 +273,7 @@ describe('RegisterProviderKeyForm', () => {
     server.use(http.post('*/provider-keys', sent));
     await renderApp({ account: 'anna', url: PROVIDER_KEYS });
     const region = await screen.findByRole('region', { name: 'Nuova chiave' });
+    await within(region).findByRole('option', { name: 'openrouter' });
 
     await userEvent.click(within(region).getByRole('button', { name: 'Registra la chiave' }));
 
