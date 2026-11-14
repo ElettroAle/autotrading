@@ -64,8 +64,12 @@ from autotrading.application.notifications.ports import (
     BotStartLinkPort,
     LinkCodeRepositoryPort,
     LinkedChatRepositoryPort,
+    NotifierPort,
 )
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
+from autotrading.application.notifications.send_linked_chat_test_notification import (
+    SendLinkedChatTestNotificationUseCase,
+)
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import ManualClosingRecorderPort, PositionClosingPort
@@ -105,6 +109,7 @@ class TenantPorts:
     link_codes: LinkCodeRepositoryPort
     bot_identity: BotStartLinkPort
     linked_chats: LinkedChatRepositoryPort
+    notifier: NotifierPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
     cycle_history: CycleHistoryPort
@@ -139,6 +144,7 @@ class TenantUseCases:
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
+    send_test_notification: SendLinkedChatTestNotificationUseCase
     modify_flow: ModifyFlowUseCase
     get_flow_version: GetFlowVersionUseCase
     compare_flow_versions: CompareFlowVersionsUseCase
@@ -190,6 +196,7 @@ class TenantUseCases:
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.bot_identity, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
+            send_test_notification=SendLinkedChatTestNotificationUseCase(ports.linked_chats, ports.notifier),
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),

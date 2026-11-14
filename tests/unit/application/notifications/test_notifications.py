@@ -4,7 +4,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
-from autotrading.application.notifications.errors import BotUnreachableError, ChatNotLinkedError
+from autotrading.application.notifications.errors import (
+    BotUnreachableError,
+    ChatNotLinkedError,
+    NoLinkedChatToTestError,
+)
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.link_chat import (
     HOW_TO_LINK,
@@ -16,6 +20,9 @@ from autotrading.application.notifications.link_chat import (
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.request_link_code import IssuedLinkCode, RequestLinkCodeUseCase
+from autotrading.application.notifications.send_linked_chat_test_notification import (
+    SendLinkedChatTestNotificationUseCase,
+)
 from autotrading.application.notifications.send_test_notification import (
     SendTestNotificationCommand,
     SendTestNotificationUseCase,
@@ -96,6 +103,10 @@ class Telegram:
 
     def ask_for_test(self, chat_id: ChatId) -> None:
         self.test_notification().execute(SendTestNotificationCommand(chat_id))
+
+    def ask_for_test_from_dashboard(self, tenant_id: TenantId) -> None:
+        chats = InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)
+        SendLinkedChatTestNotificationUseCase(chats, self.notify_for(tenant_id)).execute()
 
 
 class RecordingLinkCodeLookupAdapter(InMemoryLinkCodeLookupAdapter):
@@ -394,3 +405,24 @@ def test_a_test_notification_telegram_does_not_take_is_recorded_like_a_real_one(
     [record] = caplog.records
     assert record.getMessage() == "invio della notifica fallito"
     assert record.__dict__["subject"] == "notifica di prova"
+
+
+def test_a_test_from_the_dashboard_reaches_the_linked_chat_of_the_tenant_only(telegram: Telegram) -> None:
+    telegram.send(CHAT, telegram.request_code(ANNA))
+    telegram.send(OTHER_CHAT, telegram.request_code(BRUNO))
+
+    telegram.ask_for_test_from_dashboard(ANNA)
+
+    assert telegram.messenger.received_by(CHAT) == [LINKED, TEST_TEXT]
+    assert telegram.messenger.received_by(OTHER_CHAT) == [LINKED]
+
+
+def test_a_test_from_the_dashboard_without_a_linked_chat_is_a_conflict_and_sends_nothing(telegram: Telegram) -> None:
+    telegram.send(OTHER_CHAT, telegram.request_code(BRUNO))
+
+    with pytest.raises(NoLinkedChatToTestError, match=r"^nessuna chat collegata$") as raised:
+        telegram.ask_for_test_from_dashboard(ANNA)
+
+    assert raised.value.status_code == 409
+    assert isinstance(raised.value, ChatNotLinkedError)
+    assert telegram.messenger.received_by(OTHER_CHAT) == [LINKED]

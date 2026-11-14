@@ -12,6 +12,10 @@ export const paths = {
     path: '/flows/:flowId',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}`,
   },
+  notifications: {
+    path: '/notifications',
+    getHref: () => '/notifications',
+  },
   flowCycles: {
     path: '/flows/:flowId/cycles',
     getHref: (flowId: string, page = 1) =>

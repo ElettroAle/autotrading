@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.notifications.request_link_code import IssuedLinkCode
+from autotrading.domain.notifications.linked_chat import LinkedChat
 
 
 class LinkCodeResponse(BaseModel):
@@ -23,7 +24,14 @@ class LinkCodeResponse(BaseModel):
 
 
 class LinkedChatResponse(BaseModel):
+    """Whether the tenant has a linked chat, and which one as Telegram numbers it, for the dashboard to show it."""
+
     linked: bool
+    chat_id: int | None
+
+    @classmethod
+    def of(cls, chat: LinkedChat | None) -> LinkedChatResponse:
+        return cls(linked=chat is not None, chat_id=None if chat is None else chat.chat_id.value)
 
 
 def telegram_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
@@ -35,10 +43,14 @@ def telegram_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIR
 
     @router.get("/chat")
     def read_linked_chat(use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> LinkedChatResponse:
-        return LinkedChatResponse(linked=use_cases.get_linked_chat.execute() is not None)
+        return LinkedChatResponse.of(use_cases.get_linked_chat.execute())
 
     @router.delete("/chat", status_code=status.HTTP_204_NO_CONTENT)
     def unlink_chat(use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> None:
         use_cases.unlink_chat.execute()
+
+    @router.post("/test-notification", status_code=status.HTTP_204_NO_CONTENT)
+    def send_test_notification(use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> None:
+        use_cases.send_test_notification.execute()
 
     return router

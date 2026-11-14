@@ -66,12 +66,12 @@ def test_without_an_active_bot_the_link_is_null(client_of: Client) -> None:
 
 def test_the_chat_reads_as_linked_once_the_bot_received_the_code(platform: Platform, client_of: Client) -> None:
     anna = client_of("anna")
-    assert anna.get("/telegram/chat").json() == {"linked": False}
+    assert anna.get("/telegram/chat").json() == {"linked": False, "chat_id": None}
 
     platform.link_chat().execute(LinkChatCommand(CHAT, anna.post("/telegram/link-code").json()["code"]))
 
-    assert anna.get("/telegram/chat").json() == {"linked": True}
-    assert client_of("bruno").get("/telegram/chat").json() == {"linked": False}
+    assert anna.get("/telegram/chat").json() == {"linked": True, "chat_id": CHAT.value}
+    assert client_of("bruno").get("/telegram/chat").json() == {"linked": False, "chat_id": None}
 
 
 def test_unlinking_answers_with_no_content(platform: Platform, client_of: Client) -> None:
@@ -81,7 +81,7 @@ def test_unlinking_answers_with_no_content(platform: Platform, client_of: Client
     response = anna.delete("/telegram/chat")
 
     assert response.status_code == 204
-    assert anna.get("/telegram/chat").json() == {"linked": False}
+    assert anna.get("/telegram/chat").json() == {"linked": False, "chat_id": None}
 
 
 def test_unlinking_without_a_chat_is_not_found(client_of: Client) -> None:
@@ -91,6 +91,26 @@ def test_unlinking_without_a_chat_is_not_found(client_of: Client) -> None:
     assert reason_of(response) == {"detail": "nessuna chat collegata"}
 
 
+def test_a_test_notification_reaches_the_linked_chat_by_the_road_of_the_real_ones(
+    platform: Platform, client_of: Client
+) -> None:
+    anna = client_of("anna")
+    platform.link_chat().execute(LinkChatCommand(CHAT, anna.post("/telegram/link-code").json()["code"]))
+
+    response = anna.post("/telegram/test-notification")
+
+    assert response.status_code == 204
+    assert platform.messenger.received_by(CHAT)[-1] == "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
+
+
+def test_a_test_notification_without_a_linked_chat_is_a_conflict(platform: Platform, client_of: Client) -> None:
+    response = client_of("anna").post("/telegram/test-notification")
+
+    assert response.status_code == 409
+    assert reason_of(response) == {"detail": "nessuna chat collegata"}
+    assert platform.messenger.sent == []
+
+
 def test_the_telegram_functions_need_a_login(platform: Platform, client_of: Client) -> None:
     client_of("anna")
     anonymous = TestClient(
@@ -98,3 +118,4 @@ def test_the_telegram_functions_need_a_login(platform: Platform, client_of: Clie
     )
 
     assert anonymous.post("/telegram/link-code").status_code == 401
+    assert anonymous.post("/telegram/test-notification").status_code == 401

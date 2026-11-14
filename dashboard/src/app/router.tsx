@@ -6,6 +6,7 @@ import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { FlowRoute } from './routes/app/flow';
 import { HomeRoute } from './routes/app/home';
+import { NotificationsRoute } from './routes/app/notifications';
 import { AppRoot } from './routes/app/root';
 import { LoginRoute } from './routes/login';
 import { NotFoundRoute } from './routes/not-found';
@@ -21,6 +22,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <HomeRoute /> },
       { path: paths.flow.path, element: <FlowRoute /> },
+      { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
     ],

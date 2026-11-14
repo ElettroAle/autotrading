@@ -204,6 +204,7 @@ class Platform:
             link_codes=InMemoryLinkCodeRepositoryAdapter(self.link_codes, tenant_id),
             bot_identity=FakeBotIdentityAdapter(self.bot_username),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            notifier=self.worker_for(tenant_id).notify,
             clock=lambda: self.now,
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),

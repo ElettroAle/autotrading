@@ -8,6 +8,12 @@ class ChatNotLinkedError(ApplicationError):
         super().__init__("nessuna chat collegata")
 
 
+class NoLinkedChatToTestError(ChatNotLinkedError):
+    """A test asked from the dashboard has no chat to reach: the user must link one first (R2.3.6)."""
+
+    status_code = 409
+
+
 class MessageNotDeliveredError(ApplicationError):
     """Telegram did not take the message: the notification is lost and recorded, the caller goes on (R1.8.2)."""
 

@@ -70,4 +70,56 @@ describe('createApiClient', () => {
       message: 'Bad Gateway',
     });
   });
+
+  it('posts to the API with the access token of the user and reads the answer', async () => {
+    server.use(
+      http.post('http://localhost:3000/codes', ({ request }) =>
+        request.headers.get('Authorization') === 'Bearer token-1'
+          ? HttpResponse.json([{ name: 'beta' }], { status: 201 })
+          : HttpResponse.json([], { status: 401 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    expect(await api.post('/codes', itemsSchema)).toEqual([{ name: 'beta' }]);
+  });
+
+  it.each(['POST', 'DELETE'] as const)(
+    'sends a %s without content with the access token of the user',
+    async (method) => {
+      const received: string[] = [];
+      server.use(
+        http.all('http://localhost:3000/chat', ({ request }) => {
+          received.push(`${request.method} ${request.headers.get('Authorization') ?? ''}`);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      const { api } = clientWith();
+
+      await expect(api.send(method, '/chat')).resolves.toBeUndefined();
+      expect(received).toEqual([`${method} Bearer token-1`]);
+    },
+  );
+
+  it('tells the reason of a command the API refuses', async () => {
+    server.use(
+      http.post('*/chat', () =>
+        HttpResponse.json({ detail: 'nessuna chat collegata' }, { status: 409 }),
+      ),
+    );
+    const { api } = clientWith();
+
+    await expect(api.send('POST', '/chat')).rejects.toMatchObject({
+      status: 409,
+      message: 'nessuna chat collegata',
+    });
+  });
+
+  it('sends the user to sign in again when the API no longer accepts the token of a command', async () => {
+    server.use(http.delete('*/chat', () => HttpResponse.json({}, { status: 401 })));
+    const { api, onSessionExpired } = clientWith();
+
+    await expect(api.send('DELETE', '/chat')).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(onSessionExpired).toHaveBeenCalledOnce();
+  });
 });

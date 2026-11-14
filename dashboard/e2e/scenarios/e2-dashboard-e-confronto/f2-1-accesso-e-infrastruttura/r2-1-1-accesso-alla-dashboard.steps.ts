@@ -38,10 +38,6 @@ Then('non vede il flusso {string}', async ({ dashboard }, flow: string) => {
   await expect(dashboard.page.getByText(flow, { exact: true })).toHaveCount(0);
 });
 
-Then('la dashboard mostra {string}', async ({ dashboard }, message: string) => {
-  await expect(dashboard.alert()).toHaveText(message);
-});
-
 Then('non mostra alcun dato', async ({ dashboard }) => {
   await expect(dashboard.alert()).toBeVisible();
   await expect(dashboard.flows()).toHaveCount(0);

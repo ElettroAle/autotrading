@@ -2,9 +2,24 @@ import type { FakeCycle } from './cycles';
 
 /**
  * The platform behind the fakes: the users of the identity provider, their role, the flows of their tenant and the
- * cycles of each flow. Unit tests and scenarios prepare it; the fake identity provider and the fake API read it.
+ * cycles of each flow and the Telegram chats. Unit tests and scenarios prepare it; the fake identity provider and
+ * the fake API read it.
  */
 export type FakeFlow = { readonly id: string; readonly name: string; readonly status: string };
+
+/** A Telegram chat: Telegram numbers it, the scenarios name it, and it keeps what it received. */
+export type FakeChat = { readonly name: string; readonly id: number; readonly received: string[] };
+
+export type FakeLinkCode = {
+  readonly code: string;
+  readonly expiresAt: string;
+  readonly link: string;
+};
+
+export const FAKE_LINK_CODE = 'K7M2Q9XA';
+export const FAKE_BOT_LINK = 'https://t.me/autotrading_bot?start=';
+const LINK_CODE_MINUTES = 15;
+const FIRST_CHAT_ID = 1001;
 
 export type FakeUser = {
   readonly account: string;
@@ -17,6 +32,9 @@ const TOKEN_PREFIX = 'fake-access-token-';
 
 const state = {
   users: new Map<string, FakeUser>(),
+  chats: new Map<string, FakeChat>(),
+  linkedChats: new Map<string, FakeChat>(),
+  linkCodes: new Map<string, FakeLinkCode>(),
   cycles: new Map<string, FakeCycle[]>(),
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
@@ -29,6 +47,9 @@ export const accessTokenOf = (account: string): string => `${TOKEN_PREFIX}${acco
 export const fakePlatform = {
   reset(): void {
     state.users.clear();
+    state.chats.clear();
+    state.linkedChats.clear();
+    state.linkCodes.clear();
     state.cycles.clear();
     state.signingIn = undefined;
     state.sessionsExpired = false;
@@ -74,6 +95,41 @@ export const fakePlatform = {
       throw new Error(`unknown fake flow ${name}`);
     }
     return flow;
+  },
+
+  /** The chat with the name, as Telegram knows it: the same name is always the same chat. */
+  chatNamed(name: string): FakeChat {
+    const known = state.chats.get(name);
+    if (known !== undefined) {
+      return known;
+    }
+    const chat = { name, id: FIRST_CHAT_ID + state.chats.size, received: [] };
+    state.chats.set(name, chat);
+    return chat;
+  },
+
+  /** What the bot does once the chat sends it a valid code of the user (R1.8.1). */
+  linkChat(account: string, chatName: string): void {
+    state.linkedChats.set(account, fakePlatform.chatNamed(chatName));
+  },
+
+  linkedChatOf(account: string): FakeChat | undefined {
+    return state.linkedChats.get(account);
+  },
+
+  unlinkChat(account: string): boolean {
+    return state.linkedChats.delete(account);
+  },
+
+  issueLinkCode(account: string, now: Date): FakeLinkCode {
+    const expiresAt = new Date(now.getTime() + LINK_CODE_MINUTES * 60_000).toISOString();
+    const issued = { code: FAKE_LINK_CODE, expiresAt, link: `${FAKE_BOT_LINK}${FAKE_LINK_CODE}` };
+    state.linkCodes.set(account, issued);
+    return issued;
+  },
+
+  linkCodeOf(account: string): FakeLinkCode | undefined {
+    return state.linkCodes.get(account);
   },
 
   userOfToken(token: string): FakeUser | undefined {
