@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 
 import { apiInstant, summaryOf, type FakeCycle } from './cycles';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
+import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
   FakeRefusal,
   fakePlatform,
@@ -133,6 +134,31 @@ const withAccountOnExchange = (
   }
   return respond(account);
 };
+
+// A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
+const refusedOr = (respond: () => Response): Response => {
+  try {
+    return respond();
+  } catch (error) {
+    if (error instanceof InvalidPeriod || error instanceof InvalidSearch) {
+      return problem(400, 'Bad Request', error.message);
+    }
+    throw error;
+  }
+};
+
+/** A page of a history of the tenant of the user, under the key the API gives it (R2.5.1, ADR 0138). */
+const historyResponse = <T>(
+  request: Request,
+  rowsOf: (records: FakeRecords) => readonly FakeHistoryRow<T>[],
+  key: string,
+) =>
+  withUser(request, (user) =>
+    refusedOr(() => {
+      const { found, next } = historyPage(rowsOf(user.records), new URL(request.url).searchParams);
+      return HttpResponse.json({ [key]: found, next });
+    }),
+  );
 
 const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
   [...cycles].sort((one, other) => Date.parse(other.planned_at) - Date.parse(one.planned_at));
@@ -314,6 +340,15 @@ export const handlers = [
           .map((flow) => overviewOf(user, flow)),
       ),
     ),
+  ),
+  http.get('*/history/cycles', ({ request }) =>
+    historyResponse(request, (records) => records.cycles, 'cycles'),
+  ),
+  http.get('*/history/closed-positions', ({ request }) =>
+    historyResponse(request, (records) => records.closedPositions, 'positions'),
+  ),
+  http.get('*/history/orders', ({ request }) =>
+    historyResponse(request, (records) => records.orders, 'orders'),
   ),
   http.post('*/telegram/link-code', ({ request }) =>
     withUser(request, (user) => {

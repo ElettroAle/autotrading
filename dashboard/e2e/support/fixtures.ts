@@ -21,6 +21,7 @@ export type ScenarioMemory = {
   compared: number[];
   freeCapital: number | undefined;
   answerStatus: number | undefined;
+  secondVersionFrom: number;
 };
 
 type Fixtures = {
@@ -55,6 +56,7 @@ export const test = base.extend<Fixtures>({
       compared: [],
       freeCapital: undefined,
       answerStatus: undefined,
+      secondVersionFrom: 1,
     });
   },
 });

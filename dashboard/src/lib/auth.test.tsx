@@ -90,7 +90,7 @@ describe('acquireAccessToken', () => {
 });
 
 describe('ProtectedRoute', () => {
-  const openProtectedPage = async (account?: string) => {
+  const openProtectedPage = async (account?: string, page = '/flows/alfa') => {
     const client = await authClientFor(account);
     const router = createMemoryRouter(
       [
@@ -104,7 +104,7 @@ describe('ProtectedRoute', () => {
         },
         { path: '/login', element: <p>pagina di accesso</p> },
       ],
-      { initialEntries: ['/flows/alfa'] },
+      { initialEntries: [page] },
     );
     render(
       <AuthProvider client={client} scope={SCOPE}>
@@ -125,5 +125,12 @@ describe('ProtectedRoute', () => {
 
     expect(await screen.findByText('pagina di accesso')).toBeInTheDocument();
     expect(router.state.location.search).toBe('?returnTo=%2Fflows%2Falfa');
+  });
+
+  it('remembers the query string of the page too, as the filters of a page live there', async () => {
+    const router = await openProtectedPage(undefined, '/flows/alfa?period=7d');
+
+    expect(await screen.findByText('pagina di accesso')).toBeInTheDocument();
+    expect(router.state.location.search).toBe('?returnTo=%2Fflows%2Falfa%3Fperiod%3D7d');
   });
 });

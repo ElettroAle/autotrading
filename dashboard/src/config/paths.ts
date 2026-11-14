@@ -20,6 +20,11 @@ export const paths = {
     path: '/notifications',
     getHref: () => '/notifications',
   },
+  // Tab and filters ride in the query string, so a search of the history has a link of its own (ADR 0139).
+  history: {
+    path: '/history',
+    getHref: () => '/history',
+  },
   flowCycles: {
     path: '/flows/:flowId/cycles',
     getHref: (flowId: string, page = 1) =>
