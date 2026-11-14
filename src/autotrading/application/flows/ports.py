@@ -697,7 +697,10 @@ class EquitySnapshotRepositoryPort(Protocol):
     """Bound to the tenant of the request or of the cycle: it never shows the equity of a flow of another tenant."""
 
     def record(self, snapshot: EquitySnapshot) -> None:
-        """Adds the equity of a cycle; a cycle already recorded keeps its first equity (ADR 0120)."""
+        """Adds the equity of a cycle; a cycle already recorded keeps its first equity (ADR 0120).
+
+        Raises CrossTenantAccessError for the equity of a flow of another tenant.
+        """
         ...
 
     def of_flow(self, flow_id: UUID, window: TimeWindow) -> list[EquitySnapshot]:

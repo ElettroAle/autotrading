@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import Engine, func, select, text
-from sqlalchemy.exc import IntegrityError, ProgrammingError
+from sqlalchemy.exc import ProgrammingError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
@@ -12,6 +12,7 @@ from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import 
 )
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
+from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.statistics_period import TimeWindow
@@ -109,7 +110,7 @@ def test_a_tenant_cannot_record_the_equity_of_the_flow_of_another_tenant(databas
     _, flow_id = new_flow(database)
     other_tenant, _ = new_flow(database)
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(CrossTenantAccessError):
         SqlAlchemyEquitySnapshotRepositoryAdapter(database, other_tenant).record(snapshot(flow_id, PLANNED))
 
 

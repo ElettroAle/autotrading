@@ -7,8 +7,10 @@ from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, Select, func, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import equity_snapshots
+from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -40,8 +42,12 @@ class SqlAlchemyEquitySnapshotRepositoryAdapter:
             .values(row_of(snapshot, self._tenant_id))
             .on_conflict_do_nothing(index_elements=KEY)
         )
-        with self._transaction() as connection:
-            connection.execute(statement)
+        try:
+            with self._transaction() as connection:
+                connection.execute(statement)
+        except IntegrityError as error:
+            # The key (flow_id, tenant_id) of the flow admits only a flow of the tenant of the adapter.
+            raise CrossTenantAccessError from error
 
     def of_flow(self, flow_id: UUID, window: TimeWindow) -> list[EquitySnapshot]:
         with self._transaction() as connection:
