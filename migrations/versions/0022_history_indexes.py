@@ -17,7 +17,7 @@ depends_on = None
 # The pages read the rows of the tenant, of one flow or of all of them, from the most recent instant (ADR 0138).
 INDEXES = (
     ("cycles_of_tenant", "cycles", ["tenant_id", "planned_at DESC", "flow_id DESC"]),
-    ("closed_positions_of_flow", "closed_positions", ["tenant_id", "flow_id", "closed_at DESC", "id DESC"]),
+    ("closed_positions_of_flow_newest", "closed_positions", ["tenant_id", "flow_id", "closed_at DESC", "id DESC"]),
     ("closed_positions_of_tenant", "closed_positions", ["tenant_id", "closed_at DESC", "id DESC"]),
     ("orders_of_flow", "orders", ["tenant_id", "flow_id", "created_at DESC", "id DESC"]),
     ("orders_of_tenant", "orders", ["tenant_id", "created_at DESC", "id DESC"]),
