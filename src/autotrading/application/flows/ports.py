@@ -40,6 +40,7 @@ from autotrading.domain.flows.operations import Operation, OperationsOwner, Oper
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -481,6 +482,10 @@ class ClosedPositionRepositoryPort(Protocol):
 
     def of_flow(self, flow_id: FlowId) -> list[ClosedPosition]: ...
 
+    def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
+        """The closed positions of the flow whose closing falls in the window (R2.2.6)."""
+        ...
+
 
 class PositionClosedNoticePort(Protocol):
     def execute(self, flow_name: str, asset: str, pnl: Decimal) -> None:
@@ -884,6 +889,10 @@ class CycleHistoryPort(Protocol):
 
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         """The cost of every cycle of the flow that called the model."""
+        ...
+
+    def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
+        """The cost of every cycle of the flow that called the model, planned in the window (R2.2.6)."""
         ...
 
 

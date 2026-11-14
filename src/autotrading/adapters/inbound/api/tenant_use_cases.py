@@ -56,6 +56,7 @@ from autotrading.application.flows.ports import (
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -161,6 +162,7 @@ class TenantUseCases:
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
+    read_flow_statistics: ReadFlowStatisticsUseCase
     list_flow_overviews: ListFlowOverviewsUseCase
 
     @classmethod
@@ -218,6 +220,9 @@ class TenantUseCases:
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
+            read_flow_statistics=ReadFlowStatisticsUseCase(
+                ports.flows, ports.closed_positions, ports.cycle_history, ports.clock
+            ),
             list_flow_overviews=ListFlowOverviewsUseCase(
                 ports.flow_summaries, ports.cycle_history, ports.environment, ports.clock
             ),

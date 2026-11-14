@@ -15,6 +15,7 @@ from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchem
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.user_id import UserId
@@ -87,3 +88,25 @@ def test_a_session_without_tenant_sees_no_closed_position(database: Engine) -> N
 
     with database.begin() as connection:
         assert connection.execute(text("SELECT count(*) FROM closed_positions")).scalar_one() == 0
+
+
+def test_the_closed_positions_within_a_window_are_those_closed_from_its_start_to_its_end(database: Engine) -> None:
+    flow = new_flow(database)
+    repository = SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id)
+    before, first, last, after = (a_position(flow, timedelta(hours=hours)) for hours in (1, 2, 3, 4))
+    for position in (before, first, last, after):
+        repository.add(position)
+
+    window = TimeWindow(since=first.closing.at, until=after.closing.at)
+
+    assert repository.closed_within(flow.id, window) == [last, first]
+    assert repository.closed_within(flow.id, TimeWindow()) == [after, last, first, before]
+
+
+def test_the_closed_positions_within_a_window_of_another_tenant_stay_invisible(database: Engine) -> None:
+    flow, other = new_flow(database), new_flow(database)
+    SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id).add(a_position(flow, timedelta(hours=1)))
+
+    repository = SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id)
+
+    assert repository.closed_within(flow.id, TimeWindow()) == []
