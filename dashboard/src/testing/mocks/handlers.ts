@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
-import { FAKE_MODELS, FAKE_SOURCES } from './catalogs';
+import { FAKE_MODELS, FAKE_SOURCES, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, summaryOf, type FakeCycle } from './cycles';
 import {
   changeAllocatedCapital,
@@ -331,6 +331,9 @@ export const handlers = [
         models: FAKE_MODELS,
       }),
     ),
+  ),
+  http.get('*/assets', ({ request }) =>
+    withUser(request, () => HttpResponse.json(FAKE_TRADABLE_ASSETS)),
   ),
   http.get('*/sources', ({ request }) => withUser(request, () => HttpResponse.json(FAKE_SOURCES))),
   http.get('*/sources/:name', ({ request, params }) =>

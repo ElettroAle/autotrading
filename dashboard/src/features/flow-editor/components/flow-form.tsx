@@ -7,8 +7,10 @@ import { showRefusal } from '@/lib/form-errors';
 import type { Account } from '../api/get-accounts';
 import type { Model } from '../api/get-model-catalog';
 import type { Source } from '../api/get-sources';
+import { useTradableAssets } from '../api/get-tradable-assets';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
+import { AssetFields } from './asset-fields';
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
 
@@ -37,6 +39,8 @@ export const FlowForm = ({
   onSave,
 }: FlowFormProps) => {
   const form = useForm<FlowFormValues>({ resolver: zodResolver(flowFormSchema), values });
+  // Without the list of the tradable assets the user cannot choose them: the form waits for it (ADR 0147).
+  const tradable = useTradableAssets();
   const {
     register,
     handleSubmit,
@@ -87,16 +91,7 @@ export const FlowForm = ({
             </select>
           )}
         </FormField>
-        <FormField id="flow-assets" label="Asset" error={errors.assets?.message}>
-          {(control) => (
-            <input
-              {...control}
-              {...register('assets')}
-              placeholder="BTC, ETH"
-              className={FORM_CONTROL}
-            />
-          )}
-        </FormField>
+        <AssetFields />
         <FormField
           id="flow-cycle-minutes"
           label="Intervallo del ciclo in minuti"
@@ -188,7 +183,7 @@ export const FlowForm = ({
         </label>
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !tradable.isSuccess}
           className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50"
         >
           {submitLabel}

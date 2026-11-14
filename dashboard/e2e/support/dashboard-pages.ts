@@ -299,6 +299,20 @@ export class DashboardPages {
     return scope.getByLabel(label, { exact: true });
   }
 
+  /** Chooses an asset of the flow as a user does: typing its name and picking it among the tradable ones. */
+  async chooseAsset(asset: string): Promise<void> {
+    await this.field('Asset').fill(asset);
+    await this.page
+      .getByRole('list', { name: 'Asset negoziabili' })
+      .getByRole('button', { name: asset, exact: true })
+      .click();
+  }
+
+  /** The assets chosen for the flow, each a label the user can remove. */
+  chosenAssets(): Locator {
+    return this.page.getByRole('list', { name: 'Asset scelti' }).getByRole('listitem');
+  }
+
   /** The key of the provider in the list of the keys. */
   providerKey(provider: string): Locator {
     return this.page

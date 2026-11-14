@@ -11,10 +11,21 @@ const MODEL = 'openrouter/deepseek-chat';
 
 const field = (label: string) => screen.getByLabelText(label, { exact: true });
 
+/** Chooses an asset as a user does: typing part of its name and picking it among the tradable ones. */
+const chooseAsset = async (search: string, asset: string) => {
+  await userEvent.type(field('Asset'), search);
+  await userEvent.click(
+    within(screen.getByRole('list', { name: 'Asset negoziabili' })).getByRole('button', {
+      name: asset,
+    }),
+  );
+};
+
 const fillValidFlow = async ({ capital = '300' }: { capital?: string } = {}) => {
   await userEvent.type(await screen.findByLabelText('Nome'), 'alfa');
   await userEvent.selectOptions(field('Conto'), 'principale');
-  await userEvent.type(field('Asset'), 'BTC, eth');
+  await chooseAsset('bt', 'BTC');
+  await chooseAsset('eth', 'ETH');
   await userEvent.clear(field('Intervallo del ciclo in minuti'));
   await userEvent.type(field('Intervallo del ciclo in minuti'), '30');
   await userEvent.click(screen.getByRole('checkbox', { name: 'indicatori' }));
@@ -61,6 +72,64 @@ describe('CreateFlow', () => {
     expect(screen.getByRole('checkbox', { name: 'notizie' })).toHaveAccessibleDescription(
       'Le notizie recenti sugli asset del flusso.',
     );
+  });
+
+  it('offers the assets the API lists, filtered by what the user types', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await userEvent.type(await screen.findByLabelText('Asset'), 's');
+
+    const offered = within(screen.getByRole('list', { name: 'Asset negoziabili' }));
+    expect(offered.getAllByRole('button').map((button) => button.textContent)).toEqual(['SOL']);
+  });
+
+  it('shows the chosen assets as labels the user can remove, and offers them no more', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+    await screen.findByLabelText('Asset');
+
+    await chooseAsset('btc', 'BTC');
+    await chooseAsset('e', 'ETH');
+    const chosen = within(screen.getByRole('list', { name: 'Asset scelti' }));
+    expect(chosen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'BTC×',
+      'ETH×',
+    ]);
+    expect(field('Asset')).toHaveValue('');
+    await userEvent.type(field('Asset'), 'btc');
+    expect(screen.queryByRole('list', { name: 'Asset negoziabili' })).toBeNull();
+
+    await userEvent.click(chosen.getByRole('button', { name: 'Togli BTC' }));
+    expect(chosen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['ETH×']);
+  });
+
+  it('chooses with Enter the asset typed in full, without sending the form', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await userEvent.type(await screen.findByLabelText('Asset'), 'eth{Enter}');
+    await userEvent.type(field('Asset'), 'zzz{Enter}');
+
+    const chosen = within(screen.getByRole('list', { name: 'Asset scelti' }));
+    expect(chosen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['ETH×']);
+    expect(field('Asset')).toHaveValue('zzz');
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+  });
+
+  it('says why the assets cannot be chosen when the API cannot list them, and sends nothing', async () => {
+    server.use(
+      http.get('*/assets', () =>
+        HttpResponse.json(
+          { detail: 'exchange non raggiungibile, riprovare' },
+          { status: 503, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Impossibile leggere gli asset negoziabili: exchange non raggiungibile, riprovare',
+    );
+    expect(field('Asset')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Crea il flusso' })).toBeDisabled();
   });
 
   it('builds the parameters of the chosen model from the catalog, starting again for a new model', async () => {

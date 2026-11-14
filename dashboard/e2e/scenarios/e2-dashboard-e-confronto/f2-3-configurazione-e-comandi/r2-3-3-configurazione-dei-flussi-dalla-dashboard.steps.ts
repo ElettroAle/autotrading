@@ -34,7 +34,9 @@ const fillNewFlow = async (dashboard: DashboardPages, flow: NewFlow): Promise<vo
   await dashboard.openNewFlow();
   await dashboard.field('Nome').fill(flow.name);
   await dashboard.field('Conto').selectOption({ label: flow.account });
-  await dashboard.field('Asset').fill(flow.assets);
+  for (const asset of flow.assets.split(',').map((name) => name.trim())) {
+    await dashboard.chooseAsset(asset);
+  }
   await dashboard.field('Intervallo del ciclo in minuti').fill(String(flow.minutes));
   for (const source of flow.sources) {
     await dashboard.page.getByRole('checkbox', { name: source.name, exact: true }).check();
@@ -177,9 +179,8 @@ When(
       flowOnAccount(memory, name, { assets: ['BTC'], allocated_capital: '100' });
     }
     await dashboard.openFlowEditor(name);
-    const assets = dashboard.field('Asset');
-    await expect(assets).toHaveValue('BTC');
-    await assets.fill(`BTC, ${asset}`);
+    await expect(dashboard.chosenAssets()).toHaveText(['BTC×']);
+    await dashboard.chooseAsset(asset);
     await dashboard.button(SAVE).click();
   },
 );

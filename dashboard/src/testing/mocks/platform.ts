@@ -1,3 +1,4 @@
+import { FAKE_TRADABLE_ASSETS } from './catalogs';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
@@ -236,7 +237,7 @@ const TRANSITIONS: Record<FakeFlowCommand, Transition> = {
   stop: { from: [ACTIVE, PAUSED], to: STOPPED, refusal: refusedFor('ferma') },
   archive: { from: [STOPPED], to: ARCHIVED, refusal: () => 'si archivia solo un flusso fermo' },
 };
-const TRADABLE_ASSETS = new Set(['BTC', 'ETH', 'SOL']);
+const TRADABLE_ASSETS = new Set(FAKE_TRADABLE_ASSETS);
 
 export const FIRST_CONFIGURATION: FakeConfiguration = {
   assets: ['BTC'],

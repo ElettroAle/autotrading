@@ -30,6 +30,9 @@ export type FakeSource = {
   readonly parameters: FakeSourceParameter[];
 };
 
+/** The assets the exchange of the fake installation trades now, as the API lists them: by name (ADR 0147). */
+export const FAKE_TRADABLE_ASSETS: readonly string[] = ['BTC', 'ETH', 'SOL'];
+
 const TEMPERATURE: FakeModelParameter = {
   key: 'temperature',
   label: 'temperatura',
