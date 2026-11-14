@@ -10,6 +10,8 @@ Funzionalità: R2.1.3 Navigazione per voci di menu
   importazione, classifica) stanno nella pagina dei flussi. Sul telefono il menu resta nel pannello ripiegato
   (R2.1.2).
 
+  Fuori ambito: il cambio degli indirizzi delle pagine e la personalizzazione del menu da parte dell'utente.
+
   Scenario: Voci del menu raggruppate
     Quando "anna" apre la dashboard
     Allora il menu ha le voci "Flussi", "Conti", "Storico"
