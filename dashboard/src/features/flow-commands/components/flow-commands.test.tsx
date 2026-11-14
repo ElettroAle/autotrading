@@ -87,7 +87,7 @@ describe('FlowCommands', () => {
 
     await click('Stop');
 
-    const confirmation = await screen.findByRole('group', { name: STOP_CONFIRMATION });
+    const confirmation = await screen.findByRole('alertdialog', { name: STOP_CONFIRMATION });
     expect(await within(confirmation).findByText('La posizione su BTC sarà chiusa')).toBeVisible();
     expect(within(confirmation).getByText('La posizione su ETH sarà chiusa')).toBeVisible();
     expect(fakePlatform.flowNamed('alfa').status).toBe('attivo');
@@ -102,7 +102,7 @@ describe('FlowCommands', () => {
 
     expect(await screen.findByText('Stato: fermo')).toBeInTheDocument();
     expect(fakePlatform.openPositionsOf(alfa.id)).toEqual([]);
-    expect(screen.queryByRole('group', { name: STOP_CONFIRMATION })).toBeNull();
+    expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
     expect(await offeredCommands()).toEqual(['Avvia', 'Archivia']);
   });
 
@@ -112,7 +112,7 @@ describe('FlowCommands', () => {
     await click('Stop');
 
     expect(
-      await within(screen.getByRole('group', { name: STOP_CONFIRMATION })).findByText(
+      await within(screen.getByRole('alertdialog', { name: STOP_CONFIRMATION })).findByText(
         'Il flusso non ha posizioni aperte.',
       ),
     ).toBeVisible();
@@ -128,7 +128,7 @@ describe('FlowCommands', () => {
 
     await click('Stop');
 
-    const confirmation = screen.getByRole('group', { name: STOP_CONFIRMATION });
+    const confirmation = screen.getByRole('alertdialog', { name: STOP_CONFIRMATION });
     expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
       'Impossibile leggere i dati: exchange non raggiungibile',
     );
@@ -143,7 +143,7 @@ describe('FlowCommands', () => {
     await click('Stop');
     await click('Annulla');
 
-    expect(screen.queryByRole('group', { name: STOP_CONFIRMATION })).toBeNull();
+    expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
     expect(await offeredCommands()).toEqual(['Pausa', 'Stop']);
     expect(fakePlatform.flowNamed('alfa').status).toBe('attivo');
   });
@@ -154,7 +154,7 @@ describe('FlowCommands', () => {
 
     await click('Archivia');
 
-    expect(screen.getByRole('group', { name: ARCHIVE_CONFIRMATION })).toHaveTextContent(
+    expect(screen.getByRole('alertdialog', { name: ARCHIVE_CONFIRMATION })).toHaveTextContent(
       "L'archiviazione è definitiva: il flusso non si potrà più avviare né modificare. Un flusso fermo non ha posizioni aperte da gestire e il suo capitale allocato torna libero sul conto.",
     );
     expect(fakePlatform.flowNamed('alfa').status).toBe('fermo');
@@ -204,6 +204,6 @@ describe('FlowCommands', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Comando non riuscito: comando ferma non ammesso per un flusso fermo',
     );
-    expect(screen.queryByRole('group', { name: STOP_CONFIRMATION })).toBeNull();
+    expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
   });
 });

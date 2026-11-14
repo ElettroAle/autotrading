@@ -6,6 +6,7 @@ from sqlalchemy import Engine
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError, ProviderKeyNotFoundError
+from autotrading.application.agent.ports import ProviderKeyRegistration
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -87,3 +88,19 @@ def test_the_replacement_and_the_removal_change_the_key_of_the_tenant(database: 
     assert keys.list() == []
     with pytest.raises(ProviderKeyNotFoundError):
         keys.remove(OPENROUTER)
+
+
+def test_the_registration_and_the_replacement_answer_with_the_instant_the_database_saved(database: Engine) -> None:
+    anna = new_tenant(database)
+    keys = SqlAlchemyProviderKeyRepositoryAdapter(database, anna)
+
+    registration = keys.add(a_key(anna, OPENROUTER))
+    replacement = keys.replace(RegisteredProviderKey(anna, OPENROUTER, SealedProviderKey(2, b"new")))
+    keys.add(a_key(anna, ANTHROPIC))
+
+    assert registration.provider == replacement.provider == OPENROUTER
+    assert registration.registered_at.tzinfo is not None
+    assert replacement.registered_at >= registration.registered_at
+    assert [item for item in keys.registrations() if item.provider == OPENROUTER] == [replacement]
+    assert [item.provider for item in keys.registrations()] == [ANTHROPIC, OPENROUTER]
+    assert all(isinstance(item, ProviderKeyRegistration) for item in keys.registrations())

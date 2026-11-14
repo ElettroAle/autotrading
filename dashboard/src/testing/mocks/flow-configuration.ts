@@ -107,7 +107,7 @@ const modelOf = (user: FakeUser, name: unknown, parameters: unknown) => {
   if (model === undefined) {
     throw new Refusal(422, `modello non disponibile: ${requested}`, 'model');
   }
-  if (!user.providerKeys.has(model.provider)) {
+  if (!user.providerKeys.some((key) => key.provider === model.provider)) {
     throw new Refusal(
       422,
       `nessuna chiave registrata per il fornitore: ${model.provider}`,

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -10,7 +11,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.list_models import ListModelsUseCase, ProviderListing
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
-from autotrading.application.agent.ports import ModelUse
+from autotrading.application.agent.ports import ModelUse, ProviderKeyRegistration
 from autotrading.application.agent.register_provider_key import (
     ProviderKeyServices,
     RegisterProviderKeyCommand,
@@ -60,11 +61,11 @@ class Keys:
             FakeProviderKeySealerAdapter(self.tenant_id, self.vault),
         )
 
-    def register(self, provider: str, key: str) -> ProviderName:
+    def register(self, provider: str, key: str) -> ProviderKeyRegistration:
         use_case = RegisterProviderKeyUseCase(self.tenant_id, self.repository, self.services)
         return use_case.execute(RegisterProviderKeyCommand(provider, key))
 
-    def replace(self, provider: str, key: str) -> ProviderName:
+    def replace(self, provider: str, key: str) -> ProviderKeyRegistration:
         return ReplaceProviderKeyUseCase(self.repository, self.services).execute(
             ReplaceProviderKeyCommand(provider, key)
         )
@@ -87,7 +88,7 @@ def keys() -> Keys:
 
 def test_a_key_is_saved_sealed_for_the_tenant_without_asking_the_provider(keys: Keys) -> None:
 
-    assert keys.register(" OpenRouter ", "K-OR") == OPENROUTER
+    assert keys.register(" OpenRouter ", "K-OR").provider == OPENROUTER
 
     (registered,) = keys.store.keys
     assert (registered.tenant_id, registered.provider) == (keys.tenant_id, OPENROUTER)
@@ -121,7 +122,7 @@ def test_a_second_key_for_the_same_provider_is_refused(keys: Keys) -> None:
 def test_the_replacement_puts_the_new_key_in_place(keys: Keys) -> None:
     keys.register("openrouter", "K-OR")
 
-    assert keys.replace("openrouter", "K-OR2") == OPENROUTER
+    assert keys.replace("openrouter", "K-OR2").provider == OPENROUTER
 
     assert len(keys.store.keys) == 1
     assert keys.opened_key_of(OPENROUTER) == ProviderKey("K-OR2")
@@ -170,11 +171,31 @@ def test_the_removal_of_a_key_never_registered_is_refused(keys: Keys) -> None:
         keys.remove("openrouter")
 
 
-def test_the_list_names_the_providers_and_never_the_keys(keys: Keys) -> None:
-    keys.register("openrouter", "K-OR")
-    keys.register("anthropic", "K-AN")
+def test_the_list_names_the_providers_with_the_instant_of_registration_and_never_the_keys(keys: Keys) -> None:
+    openrouter = keys.register("openrouter", "K-OR")
+    anthropic = keys.register("anthropic", "K-AN")
 
-    assert ListProviderKeysUseCase(keys.repository).execute() == [ProviderName("anthropic"), OPENROUTER]
+    assert ListProviderKeysUseCase(keys.repository).execute() == [anthropic, openrouter]
+    assert (anthropic.provider, openrouter.provider) == (ProviderName("anthropic"), OPENROUTER)
+
+
+def test_the_registration_answers_with_the_instant_the_key_was_saved(keys: Keys) -> None:
+    keys.store.now = datetime(2026, 11, 14, 9, 30, tzinfo=UTC)
+
+    registration = keys.register("openrouter", "K-OR")
+
+    assert registration == ProviderKeyRegistration(OPENROUTER, datetime(2026, 11, 14, 9, 30, tzinfo=UTC))
+
+
+def test_the_replacement_answers_with_the_instant_of_the_new_key(keys: Keys) -> None:
+    keys.store.now = datetime(2026, 11, 1, 8, 0, tzinfo=UTC)
+    keys.register("openrouter", "K-OR")
+    keys.store.now = datetime(2026, 11, 14, 10, 7, tzinfo=UTC)
+
+    replacement = keys.replace("openrouter", "K-OR2")
+
+    assert replacement.registered_at == datetime(2026, 11, 14, 10, 7, tzinfo=UTC)
+    assert ListProviderKeysUseCase(keys.repository).execute() == [replacement]
 
 
 def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys: Keys) -> None:

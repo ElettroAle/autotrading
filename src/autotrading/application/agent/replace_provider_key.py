@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 
-from autotrading.application.agent.ports import ProviderKeyRepositoryPort
+from autotrading.application.agent.ports import ProviderKeyRegistration, ProviderKeyRepositoryPort
 from autotrading.application.agent.provider_keys import operations, registered_key, supported_provider
 from autotrading.application.agent.register_provider_key import ProviderKeyServices
 from autotrading.domain.agent.provider_key import ProviderKey
-from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 
 
@@ -24,11 +23,11 @@ class ReplaceProviderKeyUseCase:
         self._keys = keys
         self._services = services
 
-    def execute(self, command: ReplaceProviderKeyCommand) -> ProviderName:
+    def execute(self, command: ReplaceProviderKeyCommand) -> ProviderKeyRegistration:
         provider = supported_provider(self._services.gateways, command.provider)
         key = ProviderKey(command.key)
         current = registered_key(self._keys, provider)
         sealed = self._services.sealer.seal(provider, key)
-        self._keys.replace(RegisteredProviderKey(current.tenant_id, provider, sealed))
+        replacement = self._keys.replace(RegisteredProviderKey(current.tenant_id, provider, sealed))
         operations.info("chiave del fornitore sostituita", extra={"provider": provider.value})
-        return provider
+        return replacement

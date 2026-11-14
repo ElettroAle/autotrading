@@ -139,6 +139,14 @@ export const FAKE_BOT_LINK = 'https://t.me/autotrading_bot?start=';
 const LINK_CODE_MINUTES = 15;
 const FIRST_CHAT_ID = 1001;
 
+/** The key of a provider of models, as the API shows it: the provider and when the key was saved, never the key. */
+export type FakeProviderKey = { readonly provider: string; registeredAt: string };
+
+export const FAKE_EXCHANGE = 'hyperliquid';
+/** The secret key the exchange refuses, with the message it answers. */
+export const REJECTED_SECRET_KEY = '0xrifiutata';
+export const EXCHANGE_REFUSAL = 'User or API Wallet does not exist';
+
 export type FakeUser = {
   readonly account: string;
   readonly hasUserRole: boolean;
@@ -146,7 +154,7 @@ export type FakeUser = {
   readonly flows: FakeFlow[];
   readonly accounts: FakeAccount[];
   readonly records: FakeRecords;
-  readonly providerKeys: Set<string>;
+  readonly providerKeys: FakeProviderKey[];
 };
 
 export type FlowOptions = Partial<Omit<FakeFlow, 'id' | 'name' | 'accountId'>> & {
@@ -271,8 +279,6 @@ const state = {
 
 export const flowIdOf = (name: string): string => `flow-${name}`;
 
-export const accessTokenOf = (account: string): string => `${TOKEN_PREFIX}${account}`;
-
 const userNamed = (account: string): FakeUser => {
   const user = state.users.get(account);
   if (user === undefined) {
@@ -280,6 +286,8 @@ const userNamed = (account: string): FakeUser => {
   }
   return user;
 };
+
+export const accessTokenOf = (account: string): string => `${TOKEN_PREFIX}${account}`;
 
 const accountOf = (user: FakeUser, name: string): FakeAccount => {
   const existing = user.accounts.find((account) => account.name === name);
@@ -417,8 +425,25 @@ export const fakePlatform = {
       flows: [],
       accounts: [],
       records: emptyRecords(),
-      providerKeys: new Set(),
+      providerKeys: [],
     });
+  },
+
+  /** The key of the user for the provider, saved at the instant: a new instant on every replacement. */
+  saveProviderKey(account: string, provider: string, registeredAt: string): FakeProviderKey {
+    const user = userNamed(account);
+    const saved = user.providerKeys.find((key) => key.provider === provider);
+    if (saved !== undefined) {
+      saved.registeredAt = registeredAt;
+      return saved;
+    }
+    const created = { provider, registeredAt };
+    user.providerKeys.push(created);
+    return created;
+  },
+
+  providerKeyOf(account: string, provider: string): FakeProviderKey | undefined {
+    return userNamed(account).providerKeys.find((key) => key.provider === provider);
   },
 
   hasUser(account: string): boolean {
@@ -481,6 +506,16 @@ export const fakePlatform = {
     return freeCapital(user, account);
   },
 
+  /** The flows active or paused on the account, which its removal would stop (R1.1.8). */
+  operatingFlowsOf(user: FakeUser, account: FakeAccount): string[] {
+    return user.flows
+      .filter(
+        (flow) =>
+          flow.accountId === account.id && (flow.status === ACTIVE || flow.status === PAUSED),
+      )
+      .map((flow) => flow.name);
+  },
+
   /** From now on the exchange does not answer: what the API reads from it fails as on the API. */
   stopExchange(): void {
     state.exchangeReachable = false;
@@ -522,11 +557,6 @@ export const fakePlatform = {
 
   flowsOf(account: string): FakeFlow[] {
     return userNamed(account).flows;
-  },
-
-  /** The user registered a key for the provider: its models become selectable (R1.4.1). */
-  registerProviderKey(account: string, provider: string): void {
-    userNamed(account).providerKeys.add(provider);
   },
 
   /** The flow belongs to the account, which has the Utente role: both are created when missing. */

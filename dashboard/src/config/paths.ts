@@ -33,6 +33,10 @@ export const paths = {
     path: '/history',
     getHref: () => '/history',
   },
+  providerKeys: {
+    path: '/provider-keys',
+    getHref: () => '/provider-keys',
+  },
   flowCycles: {
     path: '/flows/:flowId/cycles',
     getHref: (flowId: string, page = 1) =>
