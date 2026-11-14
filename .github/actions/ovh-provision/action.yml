@@ -1,5 +1,5 @@
 name: ovh-provision
-description: Crea la macchina dell'installazione su OVH Public Cloud da cloud-init versionato; non duplica un'installazione esistente.
+description: Crea la macchina dell'installazione su OVH Public Cloud da cloud-init versionato; non duplica un'installazione esistente e la porta al tipo d'istanza dichiarato.
 inputs:
   environment:
     description: dev o prod
@@ -59,6 +59,44 @@ runs:
           echo "created=false" >> "$GITHUB_OUTPUT"
         else
           echo "created=true" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Porta la macchina esistente al tipo d'istanza dichiarato
+      if: ${{ steps.exists.outputs.created == 'false' }}
+      shell: bash
+      env:
+        OS_CLIENT_ID: ${{ inputs.client-id }}
+        OS_CLIENT_SECRET: ${{ inputs.client-secret }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        FLAVOR: ${{ inputs.flavor }}
+      # A resize keeps disk and data and reboots the machine, so it also recovers a machine that stopped answering
+      # (ADR 0144). The list shows the flavor name on every compute microversion, unlike the server details.
+      run: |
+        server="$(openstack server list --name "^autotrading-${ENVIRONMENT}\$" -f value -c ID -c Flavor)"
+        read -r id current <<< "$server"
+        if [ -z "$current" ]; then
+          echo "::error::tipo d'istanza della macchina ${id} non leggibile"
+          exit 1
+        fi
+        if [ "$current" = "$FLAVOR" ]; then
+          echo "::notice::installazione ${ENVIRONMENT} già sul tipo d'istanza ${FLAVOR}"
+          exit 0
+        fi
+        echo "::notice::installazione ${ENVIRONMENT} da ${current} a ${FLAVOR}"
+        openstack server resize --flavor "$FLAVOR" --wait "$id"
+        if [ "$(openstack server show "$id" -f value -c status)" = "VERIFY_RESIZE" ]; then
+          openstack server resize confirm "$id"
+        fi
+        for _ in $(seq 1 60); do
+          status="$(openstack server show "$id" -f value -c status)"
+          if [ "$status" = "ACTIVE" ] || [ "$status" = "ERROR" ]; then
+            break
+          fi
+          sleep 10
+        done
+        if [ "$status" != "ACTIVE" ]; then
+          fault="$(openstack server show "$id" -f json -c fault | jq -r '.fault.message // .fault // "nessun dettaglio"')"
+          echo "::error::OVH non ha ridimensionato la macchina (stato ${status}): ${fault}"
+          exit 1
         fi
     - name: Crea la macchina
       if: ${{ steps.exists.outputs.created == 'true' }}
