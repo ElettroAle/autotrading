@@ -1,4 +1,4 @@
-# ADR 0158 — Menu laterale a gruppi con la voce dell'area attiva
+# ADR 0160 — Menu laterale a gruppi con la voce dell'area attiva
 
 - Stato: proposta (14 novembre 2026)
 - Requisiti: R2.1.3 (Task 275)

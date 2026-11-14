@@ -1,13 +1,13 @@
-# ADR 0159 — Pagina dei flussi con azioni in testata, importazione su richiesta e vista classifica
+# ADR 0161 — Pagina dei flussi con azioni in testata, importazione su richiesta e vista classifica
 
 - Stato: proposta (14 novembre 2026)
 - Requisiti: R2.1.3 (Task 276)
-- Collegate: ADR 0158 (menu a gruppi), ADR 0119, ADR 0146 (campi entro la larghezza)
+- Collegate: ADR 0160 (menu a gruppi), ADR 0119, ADR 0146 (campi entro la larghezza)
 
 ## Contesto e problema
 
 La pagina dei flussi mostra in sequenza i collegamenti ad altre aree, il pulsante «Nuovo flusso», l'elenco, il modulo
-di importazione sempre aperto e la classifica come collegamento in fondo. Con il menu a gruppi (ADR 0158) i
+di importazione sempre aperto e la classifica come collegamento in fondo. Con il menu a gruppi (ADR 0160) i
 collegamenti ad altre aree escono; restano le azioni e le viste dei flussi.
 
 ## Fattori decisionali

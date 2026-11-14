@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router';
 
 export type View = { readonly name: string; readonly to: string };
 
-/** The views of one area, each a link with its own address, the view of the current page marked (ADR 0159). */
+/** The views of one area, each a link with its own address, the view of the current page marked (ADR 0161). */
 export const ViewTabs = ({ label, views }: { label: string; views: readonly View[] }) => {
   const { pathname } = useLocation();
   return (

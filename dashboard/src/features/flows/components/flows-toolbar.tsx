@@ -5,7 +5,7 @@ import { paths } from '@/config/paths';
 
 import { ImportStrategyForm } from './import-strategy-form';
 
-/** The actions on the flows: a new flow, and the import of a strategy opened on request (ADR 0159). */
+/** The actions on the flows: a new flow, and the import of a strategy opened on request (ADR 0161). */
 export const FlowsToolbar = () => {
   const [importOpen, setImportOpen] = useState(false);
   const importId = useId();
