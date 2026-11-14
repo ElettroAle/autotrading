@@ -2,6 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { FORM_CONTROL } from '@/components/ui/form/form-field';
+
 import type { Version } from '../api/get-flow-versions';
 
 const versionNumber = z.string().regex(/^\d+$/);
@@ -50,13 +52,13 @@ export const CompareVersionsForm = ({ versions, chosen, onCompare }: CompareVers
     >
       <label className="flex flex-col text-sm">
         Prima versione
-        <select {...register('first')} className="rounded border border-slate-300 px-2 py-1">
+        <select {...register('first')} className={FORM_CONTROL}>
           {options}
         </select>
       </label>
       <label className="flex flex-col text-sm">
         Seconda versione
-        <select {...register('second')} className="rounded border border-slate-300 px-2 py-1">
+        <select {...register('second')} className={FORM_CONTROL}>
           {options}
         </select>
       </label>

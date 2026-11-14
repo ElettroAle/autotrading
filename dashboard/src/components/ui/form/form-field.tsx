@@ -7,8 +7,13 @@ export type ControlProps = {
   readonly 'aria-invalid'?: true;
 };
 
-/** The look of a control of a form. */
-export const FORM_CONTROL = 'rounded border border-slate-300 px-2 py-1';
+const CONTROL_LOOK = 'w-full max-w-full min-w-0 rounded border border-slate-300 px-2 py-1';
+
+/** The look of a control of a form: as wide as the form, never wider, a long value cut short (ADR 0146). */
+export const FORM_CONTROL = `${CONTROL_LOOK} truncate`;
+
+/** The look of a control of a form that holds lines of text: as wide as the form, never wider (ADR 0146). */
+export const FORM_TEXT_AREA = CONTROL_LOOK;
 
 export const errorIdOf = (id: string): string => `${id}-error`;
 
@@ -32,7 +37,7 @@ type FormFieldProps = {
 
 /** A labelled control with the reason of a refusal beside it (R2.3.3). */
 export const FormField = ({ id, label, error, children }: FormFieldProps) => (
-  <div className="flex flex-col gap-1">
+  <div className="flex min-w-0 flex-col gap-1">
     <label htmlFor={id} className="text-sm font-medium">
       {label}
     </label>

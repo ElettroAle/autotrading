@@ -62,6 +62,12 @@ export const FAKE_MODELS: FakeModel[] = [
     ],
   },
   { name: 'openai/gpt-4o', provider: 'openai', parameters: [TEMPERATURE] },
+  // A name as long as the longest of a real catalog: the form must hold it on a phone (ADR 0146).
+  {
+    name: 'openrouter/nvidia/llama-3.1-nemotron-ultra-253b-v1-instruct-extended-reasoning-preview',
+    provider: 'openrouter',
+    parameters: [TEMPERATURE],
+  },
 ];
 
 export const FAKE_SOURCES: FakeSource[] = [

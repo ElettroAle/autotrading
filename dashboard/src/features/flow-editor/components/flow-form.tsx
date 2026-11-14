@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormProvider, useForm } from 'react-hook-form';
 
-import { FormField } from '@/components/ui/form/form-field';
+import { FORM_CONTROL, FORM_TEXT_AREA, FormField } from '@/components/ui/form/form-field';
 import { showRefusal } from '@/lib/form-errors';
 
 import type { Account } from '../api/get-accounts';
@@ -11,8 +11,6 @@ import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-
 
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
-
-const INPUT = 'rounded border border-slate-300 px-2 py-1';
 
 type FlowFormProps = {
   readonly values: FlowFormValues;
@@ -60,7 +58,7 @@ export const FlowForm = ({
         aria-label="Configurazione del flusso"
         noValidate
         onSubmit={(event) => void save(event)}
-        className="space-y-4 rounded border border-slate-200 bg-white p-4"
+        className="min-w-0 space-y-4 rounded border border-slate-200 bg-white p-4"
       >
         {errors.root?.server?.message !== undefined && (
           <p role="alert" className="text-red-700">
@@ -69,12 +67,17 @@ export const FlowForm = ({
         )}
         <FormField id="flow-name" label="Nome" error={errors.name?.message}>
           {(control) => (
-            <input {...control} {...register('name')} readOnly={nameFixed} className={INPUT} />
+            <input
+              {...control}
+              {...register('name')}
+              readOnly={nameFixed}
+              className={FORM_CONTROL}
+            />
           )}
         </FormField>
         <FormField id="flow-account" label="Conto" error={errors.account_id?.message}>
           {(control) => (
-            <select {...control} {...register('account_id')} className={INPUT}>
+            <select {...control} {...register('account_id')} className={FORM_CONTROL}>
               <option value="">Scegli un conto</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -86,7 +89,12 @@ export const FlowForm = ({
         </FormField>
         <FormField id="flow-assets" label="Asset" error={errors.assets?.message}>
           {(control) => (
-            <input {...control} {...register('assets')} placeholder="BTC, ETH" className={INPUT} />
+            <input
+              {...control}
+              {...register('assets')}
+              placeholder="BTC, ETH"
+              className={FORM_CONTROL}
+            />
           )}
         </FormField>
         <FormField
@@ -99,7 +107,7 @@ export const FlowForm = ({
               {...control}
               {...register('cycle_minutes')}
               inputMode="numeric"
-              className={INPUT}
+              className={FORM_CONTROL}
             />
           )}
         </FormField>
@@ -107,10 +115,15 @@ export const FlowForm = ({
         <ModelFields models={models} />
         <FormField id="flow-instructions" label="Istruzioni" error={errors.instructions?.message}>
           {(control) => (
-            <textarea {...control} {...register('instructions')} rows={4} className={INPUT} />
+            <textarea
+              {...control}
+              {...register('instructions')}
+              rows={4}
+              className={FORM_TEXT_AREA}
+            />
           )}
         </FormField>
-        <fieldset className="space-y-2">
+        <fieldset className="min-w-0 space-y-2">
           <legend className="font-semibold">Rischio</legend>
           <FormField
             id="flow-max-leverage"
@@ -122,7 +135,7 @@ export const FlowForm = ({
                 {...control}
                 {...register('max_leverage')}
                 inputMode="numeric"
-                className={INPUT}
+                className={FORM_CONTROL}
               />
             )}
           </FormField>
@@ -136,7 +149,7 @@ export const FlowForm = ({
                 {...control}
                 {...register('max_margin_exposure_percent')}
                 inputMode="decimal"
-                className={INPUT}
+                className={FORM_CONTROL}
               />
             )}
           </FormField>
@@ -150,7 +163,7 @@ export const FlowForm = ({
                 {...control}
                 {...register('max_value_exposure_percent')}
                 inputMode="decimal"
-                className={INPUT}
+                className={FORM_CONTROL}
               />
             )}
           </FormField>
@@ -165,7 +178,7 @@ export const FlowForm = ({
               {...control}
               {...register('allocated_capital')}
               inputMode="decimal"
-              className={INPUT}
+              className={FORM_CONTROL}
             />
           )}
         </FormField>
