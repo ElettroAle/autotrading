@@ -20,6 +20,10 @@ export class DashboardPages {
     await this.open(`/flows/${fakePlatform.flowNamed(name).id}`);
   }
 
+  async openCyclesOf(flowName: string): Promise<void> {
+    await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
+  }
+
   /** Signs in from the sign-in page: the account is the one typed on the page of the identity provider. */
   async signInAs(account: string): Promise<void> {
     await expect(this.signInButton()).toBeVisible();
@@ -59,6 +63,23 @@ export class DashboardPages {
 
   flowName(): Locator {
     return this.page.getByRole('heading', { level: 2 });
+  }
+
+  cycleRows(): Locator {
+    return this.page.getByRole('table', { name: 'Cicli' }).locator('tbody tr');
+  }
+
+  nextPage(): Locator {
+    return this.page.getByRole('link', { name: 'Pagina successiva' });
+  }
+
+  /** A section of the detail of a cycle, by the title it shows. */
+  section(title: string): Locator {
+    return this.page.getByRole('group', { name: title, exact: true });
+  }
+
+  failure(): Locator {
+    return this.page.getByRole('region', { name: 'Errore del ciclo' });
   }
 
   alert(): Locator {

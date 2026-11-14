@@ -18,6 +18,15 @@ describe('FlowView', () => {
     expect(screen.getByText('Stato: attivo')).toBeInTheDocument();
   });
 
+  it('leads to the cycles of the flow', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('link', { name: 'Cicli del flusso' })).toHaveAttribute(
+      'href',
+      '/flows/flow-alfa/cycles',
+    );
+  });
+
   it('says a flow outside the tenant of the user does not exist', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-omega' });
 
