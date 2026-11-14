@@ -77,4 +77,13 @@ def test_each_account_carries_the_network_its_exchange_is_configured_on(
 
     [summary] = list_accounts(store, flows, real=real)
 
-    assert summary.network is network
+    assert summary.network.kind is network
+
+
+def test_each_account_carries_the_name_its_exchange_gives_the_network(store: AccountStore, flows: FlowStore) -> None:
+    """R2.3.10: the account says on which network of its exchange it trades."""
+    store.accounts.append(an_account(ANNA))
+
+    [summary] = list_accounts(store, flows)
+
+    assert summary.network.name == "testnet"

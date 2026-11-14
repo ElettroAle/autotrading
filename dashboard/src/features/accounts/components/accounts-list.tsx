@@ -1,6 +1,7 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
+import { NetworkBadge } from '@/components/ui/network-notice';
 import { formatAmount } from '@/utils/format-amount';
 
 import { useAccountBalance } from '../api/get-account-state';
@@ -9,8 +10,6 @@ import { useFreeCapital } from '../api/get-free-capital';
 
 import { AccountActions } from './account-actions';
 import { ExchangeAmount } from './exchange-amount';
-
-const NETWORK_LABELS: Readonly<Record<string, string>> = { test: 'testnet', real: 'mainnet' };
 
 const Balance = ({ account }: { account: Account }) => (
   <ExchangeAmount reading={useAccountBalance(account.id)} unavailable="Saldo non disponibile" />
@@ -25,7 +24,12 @@ const FreeCapital = ({ account }: { account: Account }) => (
 
 const COLUMNS: DataTableColumn<Account>[] = [
   { header: 'Nome', cell: (account) => account.name },
-  { header: 'Rete', cell: (account) => NETWORK_LABELS[account.network] ?? account.network },
+  {
+    header: 'Rete',
+    cell: (account) => (
+      <NetworkBadge network={account.network} networkName={account.network_name} />
+    ),
+  },
   { header: 'Saldo', cell: (account) => <Balance account={account} /> },
   {
     header: 'Capitale allocato',

@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from autotrading.application.accounts.ports import ExchangePort
 from autotrading.application.accounts.verification import network_of
 from autotrading.domain.accounts.credential_field import CredentialField
+from autotrading.domain.accounts.declared_network import DeclaredNetwork
 from autotrading.domain.accounts.exchange_name import ExchangeName
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 
 
 @dataclass(frozen=True, slots=True)
 class SupportedExchange:
     name: str
-    network: ExchangeNetwork
+    network: DeclaredNetwork
     fields: tuple[CredentialField, ...]
 
 

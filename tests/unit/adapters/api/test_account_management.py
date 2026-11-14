@@ -73,6 +73,7 @@ def test_the_list_shows_the_accounts_of_the_tenant(client_of: Client, account_id
             "exchange": HYPERLIQUID,
             "has_credentials": True,
             "network": "test",
+            "network_name": "testnet",
             "allocated_capital": "0",
             "currency": "USDC",
         }
@@ -96,7 +97,12 @@ def test_the_list_carries_the_capital_the_flows_of_the_account_hold(
     details = client_of("anna").get(f"/accounts/{account_id}").json()
 
     assert (listed["allocated_capital"], listed["currency"]) == ("500", "USDC")
-    assert (details["network"], details["allocated_capital"], details["currency"]) == ("test", "500", "USDC")
+    assert (details["network"], details["network_name"], details["allocated_capital"], details["currency"]) == (
+        "test",
+        "testnet",
+        "500",
+        "USDC",
+    )
 
 
 def test_the_list_of_another_user_is_empty(client_of: Client, account_id: str) -> None:

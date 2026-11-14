@@ -35,6 +35,9 @@ TIMEOUT_SECONDS = 10.0
 PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
 INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
+# The names Hyperliquid gives its networks, the ones the installation declares (Bug 277, R2.3.10).
+TESTNET = "testnet"
+MAINNET = "mainnet"
 # The names match the keys of the credentials already sealed, so nothing saved needs migrating (ADR 0158).
 ACCOUNT_ADDRESS = "account_address"
 API_WALLET_KEY = "secret_key"
@@ -77,6 +80,9 @@ class HyperliquidExchangeAdapter:
 
     def is_real(self) -> bool:
         return bool(self._base_url == MAINNET_API_URL)
+
+    def network_name(self) -> str:
+        return MAINNET if self.is_real() else TESTNET
 
     def credential_fields(self) -> tuple[CredentialField, ...]:
         return CREDENTIAL_FIELDS

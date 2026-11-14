@@ -30,16 +30,16 @@ describe('AccountsList', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
 
     const row = await rowOf('principale');
-    expect(within(row).getByText('testnet')).toBeInTheDocument();
+    expect(within(row).getByText('TEST · testnet')).toBeInTheDocument();
     expect(await within(row).findByText('1000 USDC')).toBeInTheDocument();
     expect(within(row).getAllByText('500 USDC')).toHaveLength(2);
     expect(screen.queryByText('altrui')).not.toBeInTheDocument();
   });
 
   it.each([
-    ['real', 'mainnet'],
-    ['futura', 'futura'],
-  ])('names the network %s as %s', async (network, label) => {
+    ['real', 'REALE · sandbox'],
+    ['test', 'TEST · sandbox'],
+  ])('marks the network %s with the name the API gives it', async (network, label) => {
     server.use(
       http.get('*/accounts', () =>
         HttpResponse.json([
@@ -49,6 +49,7 @@ describe('AccountsList', () => {
             exchange: 'Hyperliquid',
             has_credentials: true,
             network,
+            network_name: 'sandbox',
             allocated_capital: '0',
             currency: 'USDC',
           },
@@ -75,7 +76,7 @@ describe('AccountsList', () => {
     const row = await rowOf('principale');
     expect(await within(row).findByText('Saldo non disponibile')).toBeInTheDocument();
     expect(await within(row).findByText('Capitale libero non disponibile')).toBeInTheDocument();
-    expect(within(row).getByText('testnet')).toBeInTheDocument();
+    expect(within(row).getByText('TEST · testnet')).toBeInTheDocument();
     expect(within(row).getByText('500 USDC')).toBeInTheDocument();
   });
 

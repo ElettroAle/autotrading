@@ -283,6 +283,7 @@ const state = {
   exchangeReachable: true,
   exchangesListed: true,
   exchangeNetwork: 'test' as FakeNetwork,
+  exchangeNetworkName: 'testnet',
   apiAnswers: true,
 };
 
@@ -426,6 +427,7 @@ export const fakePlatform = {
     state.exchangeReachable = true;
     state.exchangesListed = true;
     state.exchangeNetwork = 'test';
+    state.exchangeNetworkName = 'testnet';
     state.apiAnswers = true;
   },
 
@@ -547,12 +549,18 @@ export const fakePlatform = {
   },
 
   /** From now on the exchange is configured on this network, as the installation declares it (Bug 277). */
-  configureExchangeNetwork(network: FakeNetwork): void {
+  configureExchangeNetwork(network: FakeNetwork, name?: string): void {
     state.exchangeNetwork = network;
+    state.exchangeNetworkName = name ?? (network === 'real' ? 'mainnet' : 'testnet');
   },
 
   exchangeNetwork(): FakeNetwork {
     return state.exchangeNetwork;
+  },
+
+  /** The name the adapter of the exchange gives its network (R2.3.10). */
+  exchangeNetworkName(): string {
+    return state.exchangeNetworkName;
   },
 
   /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */

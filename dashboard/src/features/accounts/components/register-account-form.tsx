@@ -5,7 +5,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField } from '@/components/ui/form/select-field';
-import { isRealMoney, RealMoneyNotice } from '@/components/ui/real-money';
+import { NetworkNotice } from '@/components/ui/network-notice';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -92,7 +92,13 @@ export const RegisterAccountForm = () => {
           error={errors.exchange}
           {...register('exchange')}
         />
-        {isRealMoney(exchange?.network) && <RealMoneyNotice subject="Il conto" />}
+        {exchange && (
+          <NetworkNotice
+            subject="Il conto"
+            network={exchange.network}
+            networkName={exchange.network_name}
+          />
+        )}
         <DeclaredFields
           fields={fields}
           registerField={(name) => register(`credentials.${name}`)}
