@@ -65,10 +65,13 @@ export const paths = {
     path: '/ranking',
     getHref: () => '/ranking',
   },
-  // The overlaid curves of the flows chosen in the ranking, with its period and its flows in the query string
-  // (ADR 0136); the view comes with R2.4.3.
+  // The compared flows and the period travel in the query string, so the ranking links the comparison (ADR 0136).
   comparison: {
     path: '/comparison',
-    getHref: (search: string) => `/comparison?${search}`,
+    getHref: (flowIds: readonly string[], periodSearch = '') => {
+      const search = new URLSearchParams(periodSearch);
+      flowIds.forEach((flowId) => search.append('flow', flowId));
+      return `/comparison?${search.toString()}`;
+    },
   },
 } as const;

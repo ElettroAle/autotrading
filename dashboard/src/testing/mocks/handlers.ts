@@ -229,14 +229,25 @@ const cycleAt = (cycles: FakeCycle[], plannedAt: string): Response => {
     : HttpResponse.json(cycle);
 };
 
-const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => ({
-  // A draft has no capital, and no cycle yet (ADR 0124).
-  initial_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
-  points: flow.equity
+// The change of each point from the first point of the period, in percent with two decimals (ADR 0137).
+const changeText = (equity: number, first: number): string | null =>
+  first === 0 ? null : (((equity - first) / first) * 100).toFixed(2);
+
+const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => {
+  const points = flow.equity
     .filter((point: FakeEquityPoint) => admits(point.plannedAt))
-    .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime())
-    .map((point) => ({ planned_at: point.plannedAt.toISOString(), equity: String(point.equity) })),
-});
+    .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime());
+  const first = points[0]?.equity ?? 0;
+  return {
+    // A draft has no capital, and no cycle yet (ADR 0124).
+    initial_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
+    points: points.map((point) => ({
+      planned_at: point.plannedAt.toISOString(),
+      equity: String(point.equity),
+      change_percent: changeText(point.equity, first),
+    })),
+  };
+};
 
 // The parts the API compares, with the same names and texts (R1.1.3): the fake never compares in another way.
 const PARTS: [string, (configuration: FakeConfiguration) => string][] = [

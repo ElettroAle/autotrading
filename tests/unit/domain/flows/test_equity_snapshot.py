@@ -1,6 +1,6 @@
 """The equity of a flow at a cycle, from the state attributed to it (R2.2.3, ADR 0120)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountPosition
@@ -55,3 +55,36 @@ def test_the_equity_of_a_flow_starts_from_its_initial_capital() -> None:
     equity = FlowEquity(Decimal(300), (snapshot,))
 
     assert (equity.initial_capital, equity.snapshots) == (Decimal(300), (snapshot,))
+
+
+def a_snapshot_with_equity(equity: str, hours: int = 0) -> EquitySnapshot:
+    return EquitySnapshot(
+        FLOW_ID.value,
+        PLANNED_AT + timedelta(hours=hours),
+        Decimal(equity),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+    )
+
+
+def test_each_point_changes_in_percent_from_the_first_point_of_the_period() -> None:
+    first, second, third = (a_snapshot_with_equity(e, h) for h, e in enumerate(("200", "210", "190")))
+    equity = FlowEquity(Decimal(500), (first, second, third))
+
+    changes = [equity.change_percent(snapshot) for snapshot in equity.snapshots]
+
+    assert changes == [Decimal(0), Decimal(5), Decimal(-5)]
+
+
+def test_the_change_does_not_depend_on_the_initial_capital() -> None:
+    first, second = a_snapshot_with_equity("300"), a_snapshot_with_equity("330", 1)
+
+    assert FlowEquity(Decimal(100), (first, second)).change_percent(second) == Decimal(10)
+
+
+def test_the_change_is_not_defined_when_the_first_point_has_no_equity() -> None:
+    first, second = a_snapshot_with_equity("0"), a_snapshot_with_equity("10", 1)
+
+    assert FlowEquity(Decimal(0), (first, second)).change_percent(second) is None

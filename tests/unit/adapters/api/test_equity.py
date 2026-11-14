@@ -78,10 +78,44 @@ def test_the_equity_curve_answers_a_point_per_cycle_with_the_initial_capital(
     assert response.json() == {
         "initial_capital": "300.5",
         "points": [
-            {"planned_at": "2026-11-10T10:00:00Z", "equity": "312.1"},
-            {"planned_at": "2026-11-11T10:00:00Z", "equity": "296.1"},
+            {"planned_at": "2026-11-10T10:00:00Z", "equity": "312.1", "change_percent": "0.00"},
+            {"planned_at": "2026-11-11T10:00:00Z", "equity": "296.1", "change_percent": "-5.13"},
         ],
     }
+
+
+def test_the_change_starts_from_the_first_point_of_the_period(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    record(platform, "anna", flow_id, 40, "-100")
+    record(platform, "anna", flow_id, 20, "6.9")
+    record(platform, "anna", flow_id, 10, "37.8")
+
+    response = anna.get(f"/flows/{flow_id}/equity", params={"period": "30d"})
+
+    assert [point["change_percent"] for point in response.json()["points"]] == ["0.00", "10.00"]
+
+
+def test_the_change_is_null_when_the_first_point_has_no_equity(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    record(platform, "anna", flow_id, 2, "-302.1")
+    record(platform, "anna", flow_id, 1, "0")
+
+    response = anna.get(f"/flows/{flow_id}/equity")
+
+    assert [point["change_percent"] for point in response.json()["points"]] == [None, None]
+
+
+def test_no_change_reads_zero_even_from_a_negative_equity(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    record(platform, "anna", flow_id, 2, "-312.1")
+    record(platform, "anna", flow_id, 1, "-312.1")
+
+    response = anna.get(f"/flows/{flow_id}/equity")
+
+    assert [point["change_percent"] for point in response.json()["points"]] == ["0.00", "0.00"]
 
 
 def test_the_last_7_days_leave_the_older_cycles_out(client_of: Client, platform: Platform) -> None:

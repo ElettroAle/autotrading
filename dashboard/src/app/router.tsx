@@ -4,6 +4,7 @@ import { paths } from '@/config/paths';
 
 import { AccountsRoute } from './routes/app/accounts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
+import { ComparisonRoute } from './routes/app/comparison';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { EditFlowRoute } from './routes/app/edit-flow';
@@ -43,6 +44,7 @@ export const routes: RouteObject[] = [
       { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },
       { path: paths.flowPositions.path, element: <PositionsRoute /> },
       { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
+      { path: paths.comparison.path, element: <ComparisonRoute /> },
     ],
   },
   { path: '*', element: <NotFoundRoute /> },

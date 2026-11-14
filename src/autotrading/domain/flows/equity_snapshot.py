@@ -5,6 +5,8 @@ from uuid import UUID
 
 from autotrading.domain.flows.flow_state import FlowState
 
+HUNDRED = Decimal(100)
+
 
 @dataclass(frozen=True, slots=True)
 class EquitySnapshot:
@@ -49,3 +51,14 @@ class FlowEquity:
 
     initial_capital: Decimal | None
     snapshots: tuple[EquitySnapshot, ...]
+
+    def change_percent(self, snapshot: EquitySnapshot) -> Decimal | None:
+        """How much the equity of the point moved from the first point of the period, in percent (R2.4.3, ADR 0137).
+
+        Curves of flows with different capitals compare on this; it is not defined when the first point has no
+        equity to move from.
+        """
+        first = self.snapshots[0].equity
+        if first == 0:
+            return None
+        return (snapshot.equity - first) / first * HUNDRED
