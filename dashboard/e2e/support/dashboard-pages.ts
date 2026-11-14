@@ -250,6 +250,14 @@ export class DashboardPages {
     );
   }
 
+  /** A command of the bar on top of every page, a button or a link, by the words it shows. */
+  headerCommand(name: string): Locator {
+    return this.page
+      .getByRole('banner')
+      .getByRole('button', { name, exact: true })
+      .or(this.page.getByRole('banner').getByRole('link', { name, exact: true }));
+  }
+
   button(name: string): Locator {
     return this.page.getByRole('button', { name });
   }

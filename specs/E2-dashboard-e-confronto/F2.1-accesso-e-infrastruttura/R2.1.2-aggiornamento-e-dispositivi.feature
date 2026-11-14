@@ -8,7 +8,8 @@ Funzionalità: R2.1.2 Aggiornamento dei dati e uso da telefono
   Mentre una pagina è aperta, i suoi dati si rileggono ogni 30 secondi; un pulsante "Aggiorna" li rilegge
   subito (RF-23.10). La pagina mostra l'istante dell'ultimo aggiornamento. Se l'aggiornamento non riesce,
   restano visibili gli ultimi dati con l'avviso "Dati non aggiornati". Ogni pagina è utilizzabile su schermo
-  da computer e da telefono.
+  da computer e da telefono. Nelle pagine interne un comando "Indietro" in alto torna alla pagina precedente
+  della dashboard, o alla pagina principale se non ce n'è una; il nome "AutoTrading" porta alla pagina principale.
 
   Fuori ambito: aggiornamenti spinti dal server in tempo reale.
 
@@ -35,3 +36,20 @@ Funzionalità: R2.1.2 Aggiornamento dei dati e uso da telefono
   Scenario: Uso da telefono
     Quando "anna" apre la pagina del flusso "alfa" su uno schermo largo 390 pixel
     Allora tutti i contenuti sono leggibili senza scorrimento orizzontale
+
+  Scenario: Ritorno alla pagina precedente da telefono
+    Quando "anna" apre le versioni della configurazione dalla pagina del flusso "alfa" su uno schermo largo 390 pixel
+    E preme "Indietro"
+    Allora torna alla pagina del flusso "alfa"
+
+  Scenario: Ritorno alla pagina principale senza una pagina precedente
+    Quando "anna" preme "Indietro" sulla pagina del flusso "alfa" aperta direttamente
+    Allora torna alla pagina dei suoi flussi
+
+  Scenario: Il nome della piattaforma porta alla pagina principale
+    Quando "anna" preme "AutoTrading"
+    Allora torna alla pagina dei suoi flussi
+
+  Scenario: Nessun comando "Indietro" nella pagina principale
+    Quando "anna" preme "AutoTrading"
+    Allora in alto non c'è il comando "Indietro"
