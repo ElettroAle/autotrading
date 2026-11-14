@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
+from autotrading.application.agent.ports import ProviderKeyRegistration
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyCommand
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyCommand
-from autotrading.domain.agent.provider_name import ProviderName
 
 
 class ProviderKeyRegistrationRequest(BaseModel):
@@ -28,13 +28,14 @@ class ProviderKeyReplacementRequest(BaseModel):
 
 
 class ProviderKeyResponse(BaseModel):
-    """A registered key as its owner reads it: only the provider, never the key (R1.4.1)."""
+    """A registered key as its owner reads it: the provider and when it was saved, never the key (R1.4.1, ADR 0130)."""
 
     provider: str
+    registered_at: str
 
     @classmethod
-    def of(cls, provider: ProviderName) -> ProviderKeyResponse:
-        return cls(provider=provider.value)
+    def of(cls, registration: ProviderKeyRegistration) -> ProviderKeyResponse:
+        return cls(provider=registration.provider.value, registered_at=registration.registered_at.isoformat())
 
 
 def provider_keys_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
@@ -51,7 +52,7 @@ def provider_keys_router(use_cases_of_request: Callable[..., TenantUseCases]) ->
     def list_provider_keys(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> list[ProviderKeyResponse]:
-        return [ProviderKeyResponse.of(provider) for provider in use_cases.list_provider_keys.execute()]
+        return [ProviderKeyResponse.of(registration) for registration in use_cases.list_provider_keys.execute()]
 
     @router.put("/{provider}")
     def replace_provider_key(

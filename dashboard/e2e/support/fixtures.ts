@@ -9,7 +9,11 @@ import { routeToFakes } from './fake-network';
 /** A flow the background describes before the scenario names the user who owns it. */
 export type DescribedFlow = { readonly name: string; readonly versions: FakeVersion[] };
 
-/** What a scenario remembers between its steps: the histories wait for the user who owns their flow. */
+/**
+ * What a scenario remembers between its steps: the histories wait for the user who owns their flow, the secret typed
+ * in a form is looked for in the pages, the account or key acted on is named once, the instant a key was registered is
+ * compared with the next one.
+ */
 export type ScenarioMemory = {
   account: string;
   tradingAccount: string;
@@ -25,6 +29,11 @@ export type ScenarioMemory = {
   /** The strategy file the user has, as text, and the flows of the user before an import (R2.5.2). */
   strategyFile: string;
   flowsBefore: string[];
+  secret: string;
+  subject: string;
+  registeredAt: string;
+  /** The reason the refusal a step caused is expected to give. */
+  refusal: string;
 };
 
 type Fixtures = {
@@ -62,6 +71,10 @@ export const test = base.extend<Fixtures>({
       secondVersionFrom: 1,
       strategyFile: '',
       flowsBefore: [],
+      secret: '',
+      subject: '',
+      registeredAt: '',
+      refusal: '',
     });
   },
 });

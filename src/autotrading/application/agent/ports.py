@@ -28,18 +28,30 @@ class ProviderKeyOpenerPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderKeyRegistration:
+    """A provider the tenant has a key for, and the instant of its last registration or replacement (ADR 0130)."""
+
+    provider: ProviderName
+    registered_at: datetime
+
+
 class ProviderKeyRepositoryPort(Protocol):
     """Bound to the tenant of the request: it never sees the keys of another tenant."""
 
     def list(self) -> list[RegisteredProviderKey]: ...
 
+    def registrations(self) -> tuple[ProviderKeyRegistration, ...]:
+        """The providers of the keys of the tenant, by name, each with the instant its key was saved."""
+        ...
+
     def get(self, provider: ProviderName) -> RegisteredProviderKey | None: ...
 
-    def add(self, key: RegisteredProviderKey) -> None:
+    def add(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
         """Raises ProviderKeyAlreadyRegisteredError when the tenant already has a key for that provider."""
         ...
 
-    def replace(self, key: RegisteredProviderKey) -> None:
+    def replace(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
         """Raises ProviderKeyNotFoundError when the tenant has no key for that provider."""
         ...
 

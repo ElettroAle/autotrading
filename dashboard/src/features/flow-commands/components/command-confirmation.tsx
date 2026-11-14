@@ -1,50 +1,13 @@
-import type { ReactNode } from 'react';
-
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 
 import { useFlowState } from '../api/get-flow-state';
 
-type ConfirmationProps = {
-  readonly title: string;
-  readonly confirmLabel: string;
-  readonly pending: boolean;
-  readonly onConfirm: () => void;
-  readonly onCancel: () => void;
-  readonly children: ReactNode;
-};
-
-const Confirmation = ({
-  title,
-  confirmLabel,
-  pending,
-  onConfirm,
-  onCancel,
-  children,
-}: ConfirmationProps) => (
-  <div role="group" aria-label={title} className="space-y-2">
-    {children}
-    <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={onConfirm}
-        disabled={pending}
-        className="rounded bg-red-700 px-3 py-1.5 text-white disabled:opacity-50"
-      >
-        {confirmLabel}
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="rounded border border-slate-300 px-3 py-1.5"
-      >
-        Annulla
-      </button>
-    </div>
-  </div>
-);
-
-type CommandConfirmationProps = Omit<ConfirmationProps, 'title' | 'confirmLabel' | 'children'>;
+type CommandConfirmationProps = Omit<
+  Parameters<typeof ConfirmationDialog>[0],
+  'title' | 'confirmLabel' | 'children'
+>;
 
 // The positions come from the state of the flow read now: the stop closes every one of them (R1.1.5).
 const PositionsToClose = ({ flowId }: { flowId: string }) => {
@@ -76,15 +39,15 @@ export const StopConfirmation = ({
   flowId,
   ...props
 }: CommandConfirmationProps & { flowId: string }) => (
-  <Confirmation title="Conferma dello stop" confirmLabel="Conferma lo stop" {...props}>
+  <ConfirmationDialog title="Conferma dello stop" confirmLabel="Conferma lo stop" {...props}>
     <p>Il flusso smetterà di eseguire cicli.</p>
     <PositionsToClose flowId={flowId} />
-  </Confirmation>
+  </ConfirmationDialog>
 );
 
 // Only a stopped flow is archived, and the stop has already closed its positions (R1.1.6).
 export const ArchiveConfirmation = (props: CommandConfirmationProps) => (
-  <Confirmation
+  <ConfirmationDialog
     title="Conferma dell'archiviazione"
     confirmLabel="Conferma l'archiviazione"
     {...props}
@@ -93,5 +56,5 @@ export const ArchiveConfirmation = (props: CommandConfirmationProps) => (
       L&apos;archiviazione è definitiva: il flusso non si potrà più avviare né modificare. Un flusso
       fermo non ha posizioni aperte da gestire e il suo capitale allocato torna libero sul conto.
     </p>
-  </Confirmation>
+  </ConfirmationDialog>
 );

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,11 +15,15 @@ from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
 KEY = "K-OPENROUTER-TEST"
+REGISTERED_AT = datetime(2026, 11, 1, 8, 0, tzinfo=UTC)
+REPLACED_AT = datetime(2026, 11, 14, 10, 7, tzinfo=UTC)
 
 
 @pytest.fixture
 def platform() -> Platform:
-    return Platform()
+    platform = Platform()
+    platform.provider_keys.now = REGISTERED_AT
+    return platform
 
 
 @pytest.fixture
@@ -39,11 +44,11 @@ def client_of(platform: Platform) -> Client:
     return client
 
 
-def test_a_registered_key_answers_with_the_provider_only(client_of: Client) -> None:
+def test_a_registered_key_answers_with_the_provider_and_the_instant_only(client_of: Client) -> None:
     response = client_of("anna").post("/provider-keys", json={"provider": "openrouter", "key": KEY})
 
     assert response.status_code == 201
-    assert response.json() == {"provider": "openrouter"}
+    assert response.json() == {"provider": "openrouter", "registered_at": "2026-11-01T08:00:00+00:00"}
     assert KEY not in response.text
 
 
@@ -67,18 +72,22 @@ def test_a_second_key_for_the_provider_is_a_conflict(client_of: Client) -> None:
 def test_the_list_shows_only_the_providers_of_the_user(client_of: Client) -> None:
     client_of("anna").post("/provider-keys", json={"provider": "openrouter", "key": KEY})
 
-    assert client_of("anna").get("/provider-keys").json() == [{"provider": "openrouter"}]
+    assert client_of("anna").get("/provider-keys").json() == [
+        {"provider": "openrouter", "registered_at": "2026-11-01T08:00:00+00:00"}
+    ]
     assert client_of("bruno").get("/provider-keys").json() == []
 
 
-def test_the_replacement_answers_with_the_provider(client_of: Client) -> None:
+def test_the_replacement_answers_with_the_provider_and_the_new_instant(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     anna.post("/provider-keys", json={"provider": "openrouter", "key": KEY})
+    platform.provider_keys.now = REPLACED_AT
 
     response = anna.put("/provider-keys/openrouter", json={"key": KEY + "-new"})
 
     assert response.status_code == 200
-    assert response.json() == {"provider": "openrouter"}
+    assert response.json() == {"provider": "openrouter", "registered_at": "2026-11-14T10:07:00+00:00"}
+    assert anna.get("/provider-keys").json() == [response.json()]
 
 
 def test_the_replacement_of_a_key_never_registered_is_not_found(client_of: Client) -> None:

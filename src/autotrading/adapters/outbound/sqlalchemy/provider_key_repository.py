@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import provider_keys
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError, ProviderKeyNotFoundError
+from autotrading.application.agent.ports import ProviderKeyRegistration
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -13,6 +14,8 @@ from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 PRIMARY_KEY = "provider_keys_pkey"
+# The last registration or replacement of a key is the instant the database stamped on its row (ADR 0130).
+_REGISTRATION_COLUMNS = (provider_keys.c.provider, provider_keys.c.updated_at)
 
 
 class SqlAlchemyProviderKeyRepositoryAdapter:
@@ -27,6 +30,11 @@ class SqlAlchemyProviderKeyRepositoryAdapter:
         with self._transaction() as connection:
             return [_key_of(row) for row in connection.execute(query).mappings()]
 
+    def registrations(self) -> tuple[ProviderKeyRegistration, ...]:
+        query = select(*_REGISTRATION_COLUMNS).order_by(provider_keys.c.provider)
+        with self._transaction() as connection:
+            return tuple(_registration_of(row) for row in connection.execute(query).mappings())
+
     def has_key(self, provider: ProviderName) -> bool:
         """The flows context asks only whether the tenant can use the provider (R1.4.1)."""
         return self.get(provider) is not None
@@ -37,26 +45,30 @@ class SqlAlchemyProviderKeyRepositoryAdapter:
             row = connection.execute(query).mappings().one_or_none()
         return None if row is None else _key_of(row)
 
-    def add(self, key: RegisteredProviderKey) -> None:
+    def add(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
         self._require_own(key)
+        statement = insert(provider_keys).values(_row_of(key)).returning(*_REGISTRATION_COLUMNS)
         try:
             with self._transaction() as connection:
-                connection.execute(insert(provider_keys).values(_row_of(key)))
+                return _registration_of(connection.execute(statement).mappings().one())
         except IntegrityError as error:
             if PRIMARY_KEY in str(error.orig):
                 raise ProviderKeyAlreadyRegisteredError(key.provider) from error
             raise
 
-    def replace(self, key: RegisteredProviderKey) -> None:
+    def replace(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
         self._require_own(key)
         statement = (
             update(provider_keys)
             .where(provider_keys.c.provider == key.provider.value)
             .values(key_version=key.sealed.key_version, ciphertext=key.sealed.ciphertext, updated_at=func.now())
+            .returning(*_REGISTRATION_COLUMNS)
         )
         with self._transaction() as connection:
-            if connection.execute(statement).rowcount != 1:
-                raise ProviderKeyNotFoundError(key.provider)
+            row = connection.execute(statement).mappings().one_or_none()
+        if row is None:
+            raise ProviderKeyNotFoundError(key.provider)
+        return _registration_of(row)
 
     def remove(self, provider: ProviderName) -> None:
         statement = delete(provider_keys).where(provider_keys.c.provider == provider.value)
@@ -83,6 +95,10 @@ def _row_of(key: RegisteredProviderKey) -> dict[str, object]:
         "key_version": key.sealed.key_version,
         "ciphertext": key.sealed.ciphertext,
     }
+
+
+def _registration_of(row: RowMapping) -> ProviderKeyRegistration:
+    return ProviderKeyRegistration(ProviderName(row["provider"]), row["updated_at"])
 
 
 def _key_of(row: RowMapping) -> RegisteredProviderKey:

@@ -47,7 +47,8 @@ def register_key(platform: Platform, user: str, key: str, provider: str, outcome
 
 @then(quoted('"{user}" ha una chiave registrata per il fornitore "{provider}"'))
 def key_registered(platform: Platform, user: str, provider: str) -> None:
-    assert [name.value for name in platform.use_cases_of(user).list_provider_keys.execute()] == [provider]
+    registrations = platform.use_cases_of(user).list_provider_keys.execute()
+    assert [registration.provider.value for registration in registrations] == [provider]
 
 
 @then(quoted('la chiave "{key}" non compare nella risposta'))

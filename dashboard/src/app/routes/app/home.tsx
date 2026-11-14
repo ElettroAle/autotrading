@@ -25,7 +25,10 @@ export const HomeRoute = () => (
         Storico
       </Link>
     </nav>
-    <nav aria-label="Impostazioni" className="mt-6">
+    <nav aria-label="Impostazioni" className="mt-6 flex gap-4">
+      <Link to={paths.providerKeys.getHref()} className="text-blue-800 hover:underline">
+        Chiavi dei fornitori IA
+      </Link>
       <Link to={paths.notifications.getHref()} className="text-blue-800 hover:underline">
         Notifiche Telegram
       </Link>
