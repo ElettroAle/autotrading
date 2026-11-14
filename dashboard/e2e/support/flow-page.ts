@@ -31,5 +31,5 @@ export const onFlowsPage = async (
     memory.account = account;
     await dashboard.openAndSignInAs(account);
   }
-  await expect(dashboard.importForm()).toBeVisible();
+  await dashboard.openImport();
 };

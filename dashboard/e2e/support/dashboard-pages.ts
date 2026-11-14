@@ -388,6 +388,40 @@ export class DashboardPages {
     await this.page.getByRole('button', { name, exact: true }).click();
   }
 
+  /** The menu of the areas of the dashboard, at the side of every page of the data of the user (R2.1.3). */
+  menu(): Locator {
+    return this.page.getByRole('navigation', { name: 'Navigazione' });
+  }
+
+  /** An entry of the menu, by the words it shows. */
+  menuEntry(name: string): Locator {
+    return this.menu().getByRole('link', { name, exact: true });
+  }
+
+  /** A group of entries of the menu, by the heading it shows. */
+  menuGroup(name: string): Locator {
+    return this.menu().getByRole('list', { name, exact: true });
+  }
+
+  /** The views of the flows, the list and the ranking, on top of each of them. */
+  flowViews(): Locator {
+    return this.content().getByRole('navigation', { name: 'Viste dei flussi' });
+  }
+
+  /** The command of the page of the flows that opens and closes the import of a strategy. */
+  importCommand(): Locator {
+    return this.content().locator('button[aria-expanded]', { hasText: /^Importa$/ });
+  }
+
+  /** Opens the import of a strategy on the page of the flows, unless it is open already. */
+  async openImport(): Promise<void> {
+    await expect(this.importCommand()).toBeVisible();
+    if ((await this.importCommand().getAttribute('aria-expanded')) !== 'true') {
+      await this.importCommand().click();
+    }
+    await expect(this.importForm()).toBeVisible();
+  }
+
   importForm(): Locator {
     return this.page.getByRole('form', { name: 'Importazione di una strategia' });
   }

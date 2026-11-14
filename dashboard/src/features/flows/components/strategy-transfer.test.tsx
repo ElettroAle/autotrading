@@ -38,7 +38,8 @@ const exportedFromAlfa = (): FakeStrategyDocument =>
   fakePlatform.exportStrategy(fakePlatform.user('anna'), 'flow-alfa').document;
 
 const importAs = async (name: string, file: File) => {
-  const form = await screen.findByRole('form', { name: 'Importazione di una strategia' });
+  await userEvent.click(await screen.findByRole('button', { name: 'Importa', expanded: false }));
+  const form = screen.getByRole('form', { name: 'Importazione di una strategia' });
   if (name !== '') {
     await userEvent.type(within(form).getByLabelText('Nome del nuovo flusso'), name);
   }
@@ -153,7 +154,8 @@ describe('Strategy export and import', () => {
 
   it('asks for the name and for a file before reading it', async () => {
     await renderApp({ account: 'anna' });
-    const form = await screen.findByRole('form', { name: 'Importazione di una strategia' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Importa', expanded: false }));
+    const form = importForm();
 
     await userEvent.click(within(form).getByRole('button', { name: 'Importa' }));
 

@@ -5,7 +5,7 @@ import { fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
 
-const NOTIFICATIONS_TITLE = 'Notifiche Telegram';
+const NOTIFICATIONS_TITLE = 'Notifiche';
 const SEND_TEST = 'Invia notifica di prova';
 
 // The user acting in a step is the one the background signed in on the page of the notifications.

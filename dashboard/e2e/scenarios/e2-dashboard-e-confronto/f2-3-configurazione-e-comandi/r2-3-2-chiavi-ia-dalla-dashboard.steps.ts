@@ -5,7 +5,7 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
 
-const PROVIDER_KEYS_TITLE = 'Chiavi dei fornitori IA';
+const PROVIDER_KEYS_TITLE = 'Chiavi';
 const FIRST_KEY = 'chiave-prima';
 const NEW_KEY = 'chiave-nuova';
 // A registration of some days before: the replacement of the scenario is surely at another instant.
