@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { apiSearchOf, type Period } from '@/components/ui/period-selector/use-period';
 import { useApiClient } from '@/lib/api-client';
 
 // Amounts travel as text, so no precision is lost on the way (ADR 0018); the chart needs numbers.
@@ -19,22 +20,12 @@ const equitySchema = z
 
 export type FlowEquity = z.infer<typeof equitySchema>;
 
-/** The period of the curve: the whole life of the flow, the last days, or a range from a start to an end. */
-export type EquityPeriod =
-  | { readonly kind: 'lifetime' | '7d' | '30d' }
-  | { readonly kind: 'range'; readonly start: Date; readonly end: Date };
-
-export const equityPath = (flowId: string, period: EquityPeriod): string => {
-  const query = new URLSearchParams({ period: period.kind });
-  if (period.kind === 'range') {
-    query.set('from', period.start.toISOString());
-    query.set('to', period.end.toISOString());
-  }
-  return `/flows/${encodeURIComponent(flowId)}/equity?${query.toString()}`;
-};
+/** The path of the curve in the period, with the same periods as the statistics (ADR 0122). */
+export const equityPath = (flowId: string, period: Period): string =>
+  `/flows/${encodeURIComponent(flowId)}/equity?${apiSearchOf(period)}`;
 
 /** The equity curve of a flow of the tenant in the period: a point for each cycle (R2.2.3). */
-export const useFlowEquity = (flowId: string, period: EquityPeriod) => {
+export const useFlowEquity = (flowId: string, period: Period) => {
   const api = useApiClient();
   const path = equityPath(flowId, period);
   return useQuery({

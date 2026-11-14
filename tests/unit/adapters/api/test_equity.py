@@ -103,7 +103,7 @@ def test_a_range_reads_from_its_start_to_its_end(client_of: Client, platform: Pl
 
     response = anna.get(
         f"/flows/{flow_id}/equity",
-        params={"period": "range", "from": "2026-11-08T00:00:00Z", "to": "2026-11-09T00:00:00Z"},
+        params={"period": "range", "from": "2026-11-08", "to": "2026-11-08"},
     )
 
     assert [point["planned_at"] for point in response.json()["points"]] == ["2026-11-08T10:00:00Z"]
@@ -113,11 +113,11 @@ def test_a_range_without_its_end_is_refused(client_of: Client, platform: Platfor
     anna = client_of("anna")
     flow_id = flow_of(platform, "anna")
 
-    response = anna.get(f"/flows/{flow_id}/equity", params={"period": "range", "from": "2026-11-08T00:00:00Z"})
+    response = anna.get(f"/flows/{flow_id}/equity", params={"period": "range", "from": "2026-11-08"})
 
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert reason_of(response) == {
-        "detail": "intervallo dell'equity curve non valido: l'intervallo richiede inizio e fine"
+        "detail": "periodo non valido: un intervallo ha il giorno iniziale e il giorno finale"
     }
 
 
@@ -125,7 +125,7 @@ def test_an_unknown_period_is_refused(client_of: Client, platform: Platform) -> 
     anna = client_of("anna")
     flow_id = flow_of(platform, "anna")
 
-    assert anna.get(f"/flows/{flow_id}/equity", params={"period": "90d"}).status_code == 422
+    assert anna.get(f"/flows/{flow_id}/equity", params={"period": "90d"}).status_code == 400
 
 
 def test_a_flow_without_cycles_answers_no_point(client_of: Client, platform: Platform) -> None:

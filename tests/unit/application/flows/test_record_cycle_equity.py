@@ -5,9 +5,9 @@ from autotrading.application.flows.record_cycle_equity import RecordCycleEquityU
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
-from autotrading.domain.flows.equity_period import EquityWindow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
@@ -16,7 +16,7 @@ from tests.support.flows import a_flow
 PLANNED_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 TENANT = TenantId.new()
 FLOW = a_flow(TENANT)
-EVERY_CYCLE = EquityWindow(None, None)
+EVERY_CYCLE = TimeWindow(None, None)
 
 
 def cycle_flow() -> CycleFlow:

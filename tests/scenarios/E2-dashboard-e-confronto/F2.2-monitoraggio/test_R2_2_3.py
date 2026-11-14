@@ -12,9 +12,9 @@ from uuid import uuid4
 import pytest
 from pytest_bdd import given, parsers, scenario, then, when
 
-from autotrading.domain.flows.equity_period import EquityWindow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.statistics_period import TimeWindow
 from tests.fakes.cycles import FakeTransientError
 from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.activity import a_fill, a_position, an_activity
@@ -23,7 +23,7 @@ from tests.support.flow_cycles import FlowCycles, at
 
 FEATURE = "E2-dashboard-e-confronto/F2.2-monitoraggio/R2.2.3-equity-curve.feature"
 CYCLE = timedelta(minutes=15)
-EVERY_CYCLE = EquityWindow(None, None)
+EVERY_CYCLE = TimeWindow(None, None)
 
 
 @scenario(FEATURE, "Punto di equity registrato a ogni ciclo")

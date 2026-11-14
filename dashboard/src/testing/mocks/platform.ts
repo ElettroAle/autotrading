@@ -101,7 +101,14 @@ export const fakePlatform = {
     if (user === undefined) {
       throw new Error(`unknown fake user ${account}`);
     }
-    const flow = { id: flowIdOf(name), name, status: 'attivo', history, initialCapital, equity: [] };
+    const flow = {
+      id: flowIdOf(name),
+      name,
+      status: 'attivo',
+      history,
+      initialCapital,
+      equity: [],
+    };
     user.flows.push(flow);
     return flow;
   },

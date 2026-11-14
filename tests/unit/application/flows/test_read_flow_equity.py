@@ -6,9 +6,8 @@ import pytest
 
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityCommand, ReadFlowEquityUseCase
-from autotrading.domain.flows.equity_period import EquityPeriod
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
-from autotrading.domain.flows.errors import InvalidEquityRangeError
+from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -85,7 +84,7 @@ def test_the_last_30_days_leave_the_older_cycles_out(flows: FlowStore, store: Eq
     flow = a_flow_with_capital(flows)
     recorded(store, *(snapshot(flow, days, 300 + days) for days in (59, 31, 29, 1)))
 
-    equity = use_case(flows, store).execute(ReadFlowEquityCommand(flow.id.value, EquityPeriod.LAST_30_DAYS))
+    equity = use_case(flows, store).execute(ReadFlowEquityCommand(flow.id.value, "30d"))
 
     assert [item.planned_at for item in equity.snapshots] == [NOW - timedelta(days=29), NOW - timedelta(days=1)]
 
@@ -93,7 +92,8 @@ def test_the_last_30_days_leave_the_older_cycles_out(flows: FlowStore, store: Eq
 def test_a_range_gives_the_cycles_between_its_bounds(flows: FlowStore, store: EquitySnapshotStore) -> None:
     flow = a_flow_with_capital(flows)
     recorded(store, *(snapshot(flow, days, 300 + days) for days in (5, 4, 3, 2)))
-    command = ReadFlowEquityCommand(flow.id.value, EquityPeriod.RANGE, NOW - timedelta(days=4), NOW - timedelta(days=2))
+    first, last = (NOW - timedelta(days=4)).date(), (NOW - timedelta(days=3)).date()
+    command = ReadFlowEquityCommand(flow.id.value, "range", first, last)
 
     equity = use_case(flows, store).execute(command)
 
@@ -120,5 +120,5 @@ def test_an_unknown_flow_is_not_found(flows: FlowStore, store: EquitySnapshotSto
 
 
 def test_an_incomplete_range_is_refused_before_reading(flows: FlowStore, store: EquitySnapshotStore) -> None:
-    with pytest.raises(InvalidEquityRangeError):
-        use_case(flows, store).execute(ReadFlowEquityCommand(FlowId.new().value, EquityPeriod.RANGE))
+    with pytest.raises(InvalidStatisticsPeriodError):
+        use_case(flows, store).execute(ReadFlowEquityCommand(FlowId.new().value, "range"))

@@ -1,22 +1,22 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from autotrading.application.flows.ports import EquitySnapshotRepositoryPort, FlowRepositoryPort
-from autotrading.domain.flows.equity_period import EquityPeriod
 from autotrading.domain.flows.equity_snapshot import FlowEquity
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind
 
 
 @dataclass(frozen=True, slots=True)
 class ReadFlowEquityCommand:
-    """The flow and the period of its curve; a range needs its start, included, and its end, excluded."""
+    """The flow and the period of its curve, the same periods as the statistics (ADR 0122)."""
 
     flow_id: UUID
-    period: EquityPeriod = EquityPeriod.LIFETIME
-    start: datetime | None = None
-    end: datetime | None = None
+    period: str = StatisticsPeriodKind.ALL.value
+    first_day: date | None = None
+    last_day: date | None = None
 
 
 class ReadFlowEquityUseCase:
@@ -30,7 +30,7 @@ class ReadFlowEquityUseCase:
         self._clock = clock
 
     def execute(self, command: ReadFlowEquityCommand) -> FlowEquity:
-        window = command.period.window(self._clock(), command.start, command.end)
+        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
         flow = self._flows.get(FlowId(command.flow_id))
-        snapshots = self._equity.of_flow(flow.id.value, window)
+        snapshots = self._equity.of_flow(flow.id.value, period.window(self._clock()))
         return FlowEquity(flow.configuration.allocated_capital, tuple(snapshots))

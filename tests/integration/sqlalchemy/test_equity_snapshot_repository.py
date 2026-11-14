@@ -13,8 +13,8 @@ from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import 
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
-from autotrading.domain.flows.equity_period import EquityWindow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -24,7 +24,7 @@ from tests.support.flows import a_flow
 pytestmark = pytest.mark.integration
 
 PLANNED = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
-EVERY_CYCLE = EquityWindow(None, None)
+EVERY_CYCLE = TimeWindow(None, None)
 
 
 def new_flow(database: Engine) -> tuple[TenantId, UUID]:
@@ -70,7 +70,7 @@ def test_a_window_reads_from_its_start_included_to_its_end_excluded(database: En
     for days in range(4):
         equity.record(snapshot(flow_id, PLANNED + timedelta(days=days)))
 
-    found = equity.of_flow(flow_id, EquityWindow(PLANNED + timedelta(days=1), PLANNED + timedelta(days=3)))
+    found = equity.of_flow(flow_id, TimeWindow(PLANNED + timedelta(days=1), PLANNED + timedelta(days=3)))
 
     assert [item.planned_at for item in found] == [PLANNED + timedelta(days=1), PLANNED + timedelta(days=2)]
 

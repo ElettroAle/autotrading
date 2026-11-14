@@ -22,7 +22,6 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
-from autotrading.domain.flows.equity_period import EquityWindow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -701,7 +700,7 @@ class EquitySnapshotRepositoryPort(Protocol):
         """Adds the equity of a cycle; a cycle already recorded keeps its first equity (ADR 0120)."""
         ...
 
-    def of_flow(self, flow_id: UUID, window: EquityWindow) -> list[EquitySnapshot]:
+    def of_flow(self, flow_id: UUID, window: TimeWindow) -> list[EquitySnapshot]:
         """The equity of every cycle of the flow in the window, from the oldest planned instant."""
         ...
 

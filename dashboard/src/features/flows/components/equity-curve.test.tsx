@@ -28,7 +28,7 @@ describe('EquityCurve', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
     expect(within(await curve()).getAllByRole('img', { name: /^Equity / })).toHaveLength(3);
-    expect(screen.getByRole('combobox', { name: 'Periodo' })).toHaveValue('lifetime');
+    expect(screen.getByRole('combobox', { name: 'Periodo' })).toHaveValue('all');
   });
 
   it('colours the points against the initial capital of the flow', async () => {
@@ -64,7 +64,9 @@ describe('EquityCurve', () => {
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Periodo' }), 'Intervallo');
     expect(
-      screen.getByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      within(screen.getByRole('region', { name: 'Equity curve' })).getByText(
+        "Scegli il primo e l'ultimo giorno dell'intervallo.",
+      ),
     ).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Dal'), dayOf(daysAgo(6)));
     await userEvent.type(screen.getByLabelText('Al'), dayOf(daysAgo(4)));
@@ -73,7 +75,7 @@ describe('EquityCurve', () => {
     expect(screen.getByRole('img', { name: /^Equity 295 / })).toBeInTheDocument();
   });
 
-  it('asks for a range that starts before it ends', async () => {
+  it('tells why a range that ends before it starts is refused', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
     await screen.findByText('Nessun ciclo ancora eseguito');
 
@@ -81,8 +83,9 @@ describe('EquityCurve', () => {
     await userEvent.type(screen.getByLabelText('Dal'), dayOf(daysAgo(1)));
     await userEvent.type(screen.getByLabelText('Al'), dayOf(daysAgo(3)));
 
+    const panel = screen.getByRole('region', { name: 'Equity curve' });
     expect(
-      screen.getByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      await within(panel).findByText(/il giorno iniziale è successivo al giorno finale/),
     ).toBeInTheDocument();
   });
 

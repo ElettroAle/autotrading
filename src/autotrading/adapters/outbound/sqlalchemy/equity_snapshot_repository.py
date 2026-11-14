@@ -9,8 +9,8 @@ from sqlalchemy import Connection, Engine, RowMapping, Select, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import equity_snapshots
-from autotrading.domain.flows.equity_period import EquityWindow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]
@@ -43,7 +43,7 @@ class SqlAlchemyEquitySnapshotRepositoryAdapter:
         with self._transaction() as connection:
             connection.execute(statement)
 
-    def of_flow(self, flow_id: UUID, window: EquityWindow) -> list[EquitySnapshot]:
+    def of_flow(self, flow_id: UUID, window: TimeWindow) -> list[EquitySnapshot]:
         with self._transaction() as connection:
             return [snapshot_of(row) for row in connection.execute(of_flow_query(flow_id, window)).mappings()]
 
@@ -55,7 +55,7 @@ class SqlAlchemyEquitySnapshotRepositoryAdapter:
             yield connection
 
 
-def of_flow_query(flow_id: UUID, window: EquityWindow) -> Select[tuple[object, ...]]:
+def of_flow_query(flow_id: UUID, window: TimeWindow) -> Select[tuple[object, ...]]:
     query = select(equity_snapshots).where(equity_snapshots.c.flow_id == flow_id)
     if window.since is not None:
         query = query.where(equity_snapshots.c.planned_at >= window.since)

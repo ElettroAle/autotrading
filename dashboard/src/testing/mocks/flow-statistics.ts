@@ -41,6 +41,15 @@ const contains = (window: Window, instant: Date): boolean =>
   (window.since === undefined || instant.getTime() >= window.since) &&
   (window.until === undefined || instant.getTime() < window.until);
 
+/** Whether an instant falls in the period of the request, as the API reads it; a period it rejects throws. */
+export const periodAdmits = (
+  search: URLSearchParams,
+  now = Date.now(),
+): ((instant: Date) => boolean) => {
+  const window = windowOf(search, now);
+  return (instant) => contains(window, instant);
+};
+
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
 const averageText = (values: number[]): string | null =>

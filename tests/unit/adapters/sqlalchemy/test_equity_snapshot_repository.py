@@ -7,8 +7,8 @@ from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import 
     row_of,
     snapshot_of,
 )
-from autotrading.domain.flows.equity_period import EquityWindow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 PLANNED = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
@@ -34,12 +34,12 @@ def test_a_saved_snapshot_reads_back_the_same() -> None:
     assert snapshot_of(row_of(SNAPSHOT, TENANT)) == SNAPSHOT
 
 
-def compiled(window: EquityWindow) -> str:
+def compiled(window: TimeWindow) -> str:
     return str(of_flow_query(SNAPSHOT.flow_id, window))
 
 
 def test_the_curve_of_a_whole_life_reads_every_cycle_of_the_flow_from_the_oldest() -> None:
-    text = compiled(EquityWindow(None, None))
+    text = compiled(TimeWindow(None, None))
 
     assert "equity_snapshots.flow_id = " in text
     assert "planned_at >=" not in text
@@ -48,7 +48,7 @@ def test_the_curve_of_a_whole_life_reads_every_cycle_of_the_flow_from_the_oldest
 
 
 def test_the_curve_of_a_period_reads_the_cycles_between_its_bounds() -> None:
-    text = compiled(EquityWindow(PLANNED - timedelta(days=7), PLANNED))
+    text = compiled(TimeWindow(PLANNED - timedelta(days=7), PLANNED))
 
     assert "equity_snapshots.planned_at >= " in text
     assert "equity_snapshots.planned_at < " in text

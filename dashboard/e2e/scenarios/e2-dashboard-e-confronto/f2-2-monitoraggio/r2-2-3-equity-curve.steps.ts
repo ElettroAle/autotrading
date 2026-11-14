@@ -58,16 +58,6 @@ When(
   },
 );
 
-When(
-  '{string} sceglie il periodo {string}',
-  async ({ dashboard, memory }, account: string, period: string) => {
-    await dashboard.openFlow(memory.flow);
-    await dashboard.signInAs(account);
-    await expect(dashboard.equityCurve()).toBeVisible();
-    await dashboard.period().selectOption({ label: period });
-  },
-);
-
 Then(
   "i punti a {int} e {int} USDC sono nell'area verde",
   async ({ dashboard }, first: number, second: number) => {

@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityCommand
-from autotrading.domain.flows.equity_period import EquityPeriod
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot, FlowEquity
 
 
@@ -45,11 +44,11 @@ def equity_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRou
     def read_flow_equity(
         flow_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
-        period: EquityPeriod = EquityPeriod.LIFETIME,
-        start: Annotated[datetime | None, Query(alias="from")] = None,
-        end: Annotated[datetime | None, Query(alias="to")] = None,
+        period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
+        first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
+        last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
     ) -> FlowEquityResponse:
-        command = ReadFlowEquityCommand(flow_id, period, start, end)
+        command = ReadFlowEquityCommand(flow_id, period, first_day, last_day)
         return FlowEquityResponse.of(use_cases.read_flow_equity.execute(command))
 
     return router
