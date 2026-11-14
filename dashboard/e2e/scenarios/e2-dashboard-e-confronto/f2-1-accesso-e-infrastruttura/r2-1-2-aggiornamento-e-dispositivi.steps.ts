@@ -107,3 +107,46 @@ Then('tutti i contenuti sono leggibili senza scorrimento orizzontale', async ({ 
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
   }
 });
+
+When(
+  '{string} apre le versioni della configurazione dalla pagina del flusso {string} su uno schermo largo {int} pixel',
+  async ({ dashboard }, _account: string, flow: string, width: number) => {
+    await dashboard.page.setViewportSize({ width, height: PHONE_HEIGHT });
+    await expect(dashboard.flowName()).toHaveText(flow);
+    await dashboard.page.getByRole('link', { name: 'Versioni della configurazione' }).click();
+    await expect(dashboard.versions()).toBeVisible();
+  },
+);
+
+When('preme {string}', async ({ dashboard }, command: string) => {
+  await dashboard.headerCommand(command).click();
+});
+
+When(
+  '{string} preme {string} sulla pagina del flusso {string} aperta direttamente',
+  async ({ dashboard }, _account: string, command: string, flow: string) => {
+    await expect(dashboard.flowName()).toHaveText(flow);
+    await dashboard.headerCommand(command).click();
+  },
+);
+
+When('{string} preme {string}', async ({ dashboard }, _account: string, command: string) => {
+  await dashboard.headerCommand(command).click();
+});
+
+Then('torna alla pagina del flusso {string}', async ({ dashboard }, flow: string) => {
+  await expect(dashboard.flowName()).toHaveText(flow);
+  await expect(dashboard.page).toHaveURL(
+    new RegExp(`/dashboard/flows/${fakePlatform.flowNamed(flow).id}$`),
+  );
+});
+
+Then('torna alla pagina dei suoi flussi', async ({ dashboard }) => {
+  await expect(dashboard.flows()).toBeVisible();
+  await expect(dashboard.page).toHaveURL(/\/dashboard\/?$/);
+});
+
+Then("in alto non c'è il comando {string}", async ({ dashboard }, command: string) => {
+  await expect(dashboard.flows()).toBeVisible();
+  await expect(dashboard.headerCommand(command)).toHaveCount(0);
+});
