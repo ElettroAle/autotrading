@@ -1,6 +1,6 @@
 # ADR 0154 — Cartella temporanea scrivibile nei servizi in sola lettura
 
-- Stato: proposta (14 novembre 2026)
+- Stato: accettata (14 novembre 2026), decisione del proprietario
 - Requisiti: Bug 272 (Task 273)
 - Collegate: ADR 0148 (LiteLLM come libreria nel worker), ADR 0107 (forecaster con `/tmp` in tmpfs)
 

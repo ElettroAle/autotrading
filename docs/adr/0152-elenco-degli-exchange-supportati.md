@@ -1,6 +1,6 @@
 # ADR 0152 — Elenco degli exchange supportati esposto dall'API
 
-- Stato: proposta (14 novembre 2026)
+- Stato: accettata (14 novembre 2026), decisione del proprietario
 - Requisiti: R2.3.8 (Task 270)
 - Collegate: ADR 0147 (asset del flusso dall'elenco dell'API), ADR 0116 (dashboard senza logica propria), ADR 0027
 
