@@ -3,6 +3,8 @@
 # L'API ascolta solo sull'interfaccia locale: la espone Tailscale Serve, in HTTPS e solo nel tailnet (ADR 0013).
 # I segreti dei servizi sono file generati sulla macchina da prepare-installation.sh e montati in sola
 # lettura; mai variabili d'ambiente (ADR 0015).
+# Ogni servizio ha un limite di memoria tarato sul consumo misurato a ogni rilascio (ADR 0162, ADR 0165): un servizio che
+# sfora viene fermato e riavviato da Docker, gli altri servizi e la macchina restano raggiungibili.
 name: autotrading
 
 services:
@@ -23,6 +25,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    mem_limit: 384m
     restart: unless-stopped
 
   # Applica le migrazioni come proprietario del database, poi termina; l'API parte solo se sono riuscite.
@@ -43,6 +46,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    mem_limit: 256m
     restart: "no"
 
   # Previsioni dei prezzi con Prophet (docs/architecture.md §10, ADR 0107): immagine propria, solo sulla rete
@@ -93,6 +97,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    mem_limit: 768m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
@@ -133,6 +138,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    mem_limit: 384m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
@@ -162,6 +168,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    mem_limit: 128m
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/dashboard/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))"]
       interval: 10s

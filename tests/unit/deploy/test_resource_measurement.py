@@ -44,6 +44,11 @@ container autotrading-api-1 0.5GiB / 3.8GiB
 container autotrading-postgres-1 1.75GiB / 3.8GiB
 available 524288
 """
+# docker stats shows a restarting container, whose stats it cannot read, as a row of dashes.
+RESTARTING_SAMPLES = """container autotrading-api-1 120MiB / 3.8GiB
+container -- -- / --
+available 524288
+"""
 
 
 def _action() -> str:
@@ -189,3 +194,11 @@ def test_adr_0162_a_report_without_docker_still_succeeds(tmp_path: Path) -> None
 
     assert completed.returncode == 0, completed.stderr
     assert _row(completed.stdout, "autotrading-api-1") == ["512", "non misurato"]
+
+
+def test_adr_0165_a_restarting_container_is_not_a_row_of_the_report(tmp_path: Path) -> None:
+    completed = _run_report(tmp_path, samples=RESTARTING_SAMPLES)
+
+    assert completed.returncode == 0, completed.stderr
+    assert re.findall(r"^\| -- \|.*$", completed.stdout, re.MULTILINE) == []
+    assert _row(completed.stdout, "autotrading-api-1") == ["120", "180"]
