@@ -1,6 +1,7 @@
 import secrets
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
+from typing import cast
 
 import requests
 from eth_account import Account as EthereumAccount
@@ -49,6 +50,13 @@ ADDRESS_DIGITS = 40
 KEY_SHAPE = "attese 64 cifre esadecimali, con o senza 0x"
 INVALID_ADDRESS_MESSAGE = "indirizzo del conto non valido"
 ADDRESS_SHAPE = "atteso 0x seguito da 40 cifre esadecimali"
+# A signature proves the key, not the account: the exchange applies an action of an API wallet to the account that
+# approved it, whatever address the request names. The role of the signer ties it to the address (Bug 399).
+AGENT_ROLE = "agent"
+AGENT_NOT_AUTHORIZED_MESSAGE = "l'API wallet non è autorizzato per l'indirizzo del conto"
+SIGNER_IS_AGENT_MESSAGE = (
+    "l'indirizzo del conto è quello dell'API wallet: va indicato l'indirizzo del conto che lo ha approvato"
+)
 # The exchanges an account declares at registration: the use cases pick the adapter by this name (R2.3.11).
 EXCHANGE_NAME = "Hyperliquid"
 TESTNET_EXCHANGE_NAME = "Hyperliquid Testnet"
@@ -114,6 +122,7 @@ class HyperliquidExchangeAdapter:
             exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
             info = self._sdk.info(self._base_url, self._timeout)
+            _require_signer_of(info.user_role(wallet.address), wallet.address, address)
             perps = info.user_state(address)
             mode = info.query_user_abstraction_state(address)
             spot = info.spot_user_state(address)
@@ -235,6 +244,26 @@ def _require_accepted(response: object, credentials: Credentials) -> None:
         return
     message = response.get("response") if isinstance(response, Mapping) else response
     raise ExchangeRejectedCredentialsError(_masked(str(message), credentials))
+
+
+def _require_signer_of(role: object, signer: str, address: str) -> None:
+    # The account signs for itself only if it is no API wallet; an API wallet signs only for the account it serves.
+    try:
+        answer = cast("Mapping[str, object]", role)
+        declared = answer["role"]
+        served = cast("Mapping[str, object]", answer["data"])["user"] if declared == AGENT_ROLE else None
+    except (KeyError, TypeError) as error:
+        raise ExchangeUnavailableError from error
+    if signer.lower() == address.lower():
+        _require_not_agent(declared)
+        return
+    if not isinstance(served, str) or served.lower() != address.lower():
+        raise ExchangeRejectedCredentialsError(AGENT_NOT_AUTHORIZED_MESSAGE)
+
+
+def _require_not_agent(declared: object) -> None:
+    if declared == AGENT_ROLE:
+        raise ExchangeRejectedCredentialsError(SIGNER_IS_AGENT_MESSAGE)
 
 
 def _account_state_of(perps: object, mode: object, spot: object) -> AccountState:

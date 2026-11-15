@@ -20,4 +20,6 @@ paths:
 - Le eccezioni dell'SDK e di rete si traducono negli errori del contratto della porta
   (es. `ExchangeUnavailableError`, `ExchangeRejectedOrderError` con il motivo dell'exchange).
 - Le credenziali non compaiono in log, errori o repr.
+- La prova firmata non basta: il ruolo del firmatario (`userRole`) lo lega all'indirizzo del conto, che firma per sé
+  o tramite un API wallet approvato proprio per quell'indirizzo (ADR firmatario-autorizzato-per-l-indirizzo-del-conto).
 - I test contro testnet hanno il marker `testnet` e non fanno parte della suite di default.
