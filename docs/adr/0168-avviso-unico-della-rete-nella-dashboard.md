@@ -1,8 +1,8 @@
-# ADR 0163 — Avviso unico della rete nella dashboard
+# ADR 0168 — Avviso unico della rete nella dashboard
 
 - Stato: accettata (15 novembre 2026), decisione del proprietario
 - Requisiti: R2.3.10 (US 286, Task 288), R2.3.1, R2.3.4
-- Collegate: ADR 0162 (nome della rete dall'adapter), ADR 0157, ADR 0116
+- Collegate: ADR 0167 (nome della rete dall'adapter), ADR 0157, ADR 0116
 
 ## Contesto e problema
 

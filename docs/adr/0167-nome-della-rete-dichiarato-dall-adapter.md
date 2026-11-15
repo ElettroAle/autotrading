@@ -1,4 +1,4 @@
-# ADR 0162 — Nome della rete dichiarato dall'adapter dell'exchange
+# ADR 0167 — Nome della rete dichiarato dall'adapter dell'exchange
 
 - Stato: accettata (15 novembre 2026), decisione del proprietario
 - Requisiti: R2.3.10 (US 286, Task 287), R2.3.1, R2.2.1
