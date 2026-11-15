@@ -7,7 +7,7 @@ from nacl.exceptions import CryptoError
 from nacl.public import PrivateKey, SealedBox
 
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
-from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
+from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.application.verification.errors import VerificationCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
@@ -15,7 +15,6 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.cycle_access import CycleAccess
-from autotrading.domain.flows.errors import FlowCredentialsMissingError
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -68,7 +67,7 @@ class SodiumCredentialOpenerAdapter:
         if credentials is None:
             raise FlowCredentialsNotOpenedError
         if not names <= credentials.values.keys():
-            raise FlowCredentialsMissingError
+            raise FlowCredentialsFieldMissingError
         return AccountReference({name: credentials.values[name] for name in names})
 
     def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:

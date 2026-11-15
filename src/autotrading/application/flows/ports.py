@@ -338,7 +338,7 @@ class ReferenceOpenerPort(Protocol):
 
     def open_reference(self, sealed: SealedAddress, names: frozenset[str]) -> AccountReference:
         """The fields named, and no other; raises FlowCredentialsNotOpenedError when the sealed text is of another
-        account or no key opens it, and FlowCredentialsMissingError when a field named is not in it.
+        account or no key opens it, and FlowCredentialsFieldMissingError when a field named is not in it.
         """
         ...
 

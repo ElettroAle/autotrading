@@ -12,7 +12,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
 )
 from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.application.accounts.errors import CredentialsNotOpenedError
-from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
+from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.application.verification.errors import VerificationCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
@@ -20,7 +20,6 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.cycle_access import CycleAccess
-from autotrading.domain.flows.errors import FlowCredentialsMissingError
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -178,7 +177,7 @@ def test_opens_for_the_flows_only_the_fields_the_reader_names(
 def test_a_field_the_reader_names_but_the_credentials_lack_is_refused(
     opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
 ) -> None:
-    with pytest.raises(FlowCredentialsMissingError):
+    with pytest.raises(FlowCredentialsFieldMissingError):
         opener.open_reference(sealed_address_of(sealed_account(private_key)), frozenset({"passphrase"}))
 
 
