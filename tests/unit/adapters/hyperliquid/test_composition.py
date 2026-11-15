@@ -1,14 +1,17 @@
-"""The adapters of Hyperliquid on the network the installation declares, under the name the accounts carry (Bug 277)."""
+"""The adapters of Hyperliquid and Hyperliquid Testnet under the names the accounts carry (R2.3.11)."""
 
 from decimal import Decimal
 
 import pytest
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 
-from autotrading.adapters.configuration.errors import InvalidConfigurationError, MissingConfigurationError
+from autotrading.adapters.configuration.errors import InvalidConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters, hyperliquid_slippage_adapters
-from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.exchange import (
+    HyperliquidExchangeAdapter,
+    HyperliquidTestnetExchangeAdapter,
+)
 from autotrading.adapters.outbound.hyperliquid.market_data import (
     HyperliquidMarketDataAdapter,
     HyperliquidPriceHistoryAdapter,
@@ -16,60 +19,35 @@ from autotrading.adapters.outbound.hyperliquid.market_data import (
 from autotrading.domain.orders.errors import InvalidSlippageError
 from autotrading.domain.orders.slippage import Slippage
 
-NETWORK = "HYPERLIQUID_NETWORK"
-TESTNET = ConfigurationSource({NETWORK: "testnet"})
-MAINNET = ConfigurationSource({NETWORK: "mainnet"})
+REAL = "Hyperliquid"
+TEST = "Hyperliquid Testnet"
 
 
-@pytest.mark.parametrize("source", [TESTNET, MAINNET], ids=["testnet", "mainnet"])
-def test_every_adapter_is_on_the_network_the_installation_declares(source: ConfigurationSource) -> None:
-    adapters = hyperliquid_adapters(source)
-    accounts, markets, orders, activity, executions, prices, market = adapters
+def test_every_installation_offers_the_real_exchange_and_the_test_one_without_any_setting() -> None:
+    accounts, markets, orders, activity, executions, prices, market = hyperliquid_adapters()
 
     for by_exchange in (accounts, markets, orders, activity, executions):
-        assert list(by_exchange) == ["Hyperliquid"]
-    assert isinstance(accounts["Hyperliquid"], HyperliquidExchangeAdapter)
+        assert list(by_exchange) == [REAL, TEST]
+    assert type(accounts[REAL]) is HyperliquidExchangeAdapter
+    assert type(accounts[TEST]) is HyperliquidTestnetExchangeAdapter
     assert isinstance(prices, HyperliquidPriceHistoryAdapter)
     assert isinstance(market, HyperliquidMarketDataAdapter)
 
 
 @pytest.mark.parametrize(
-    ("source", "url", "real"),
-    [(TESTNET, TESTNET_API_URL, False), (MAINNET, MAINNET_API_URL, True)],
-    ids=["testnet", "mainnet"],
+    ("exchange", "url", "real"), [(REAL, MAINNET_API_URL, True), (TEST, TESTNET_API_URL, False)], ids=["real", "test"]
 )
-def test_accounts_assets_and_orders_go_to_the_declared_network(
-    source: ConfigurationSource, url: str, real: bool
-) -> None:
-    accounts, markets, orders, activity, *_ = hyperliquid_adapters(source)
+def test_each_exchange_reaches_its_own_network_for_every_use_of_an_account(exchange: str, url: str, real: bool) -> None:
+    accounts, markets, orders, activity, executions, *_ = hyperliquid_adapters()
 
-    assert accounts["Hyperliquid"].base_url == url
-    assert accounts["Hyperliquid"].is_real() is real
-    assert markets["Hyperliquid"].base_url == url
-    assert orders["Hyperliquid"].base_url == url
-    assert activity["Hyperliquid"].base_url == url
+    assert accounts[exchange].is_real() is real
+    assert {adapter[exchange].base_url for adapter in (accounts, markets, orders, activity, executions)} == {url}
 
 
-@pytest.mark.parametrize("text", [" testnet ", "TESTNET"])
-def test_the_declared_network_ignores_spaces_and_case(text: str) -> None:
-    accounts, *_ = hyperliquid_adapters(ConfigurationSource({NETWORK: text}))
+def test_the_market_sources_read_the_real_market() -> None:
+    *_, prices, market = hyperliquid_adapters()
 
-    assert accounts["Hyperliquid"].base_url == TESTNET_API_URL
-
-
-def test_the_network_is_never_deduced_from_the_installation() -> None:
-    with pytest.raises(MissingConfigurationError) as raised:
-        hyperliquid_adapters(ConfigurationSource({"APP_ENVIRONMENT": "dev"}))
-
-    assert raised.value.name == NETWORK
-
-
-@pytest.mark.parametrize("text", ["test", "real", "dev", "devnet"])
-def test_a_network_other_than_testnet_or_mainnet_is_an_invalid_configuration(text: str) -> None:
-    with pytest.raises(InvalidConfigurationError) as raised:
-        hyperliquid_adapters(ConfigurationSource({NETWORK: text}))
-
-    assert raised.value.name == NETWORK
+    assert (prices.base_url, market.base_url) == (MAINNET_API_URL, MAINNET_API_URL)
 
 
 SLIPPAGE = "ORDER_MAX_SLIPPAGE_PERCENT"

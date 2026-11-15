@@ -8,7 +8,10 @@ paths:
 # Adapter in uscita: Hyperliquid
 
 - Solo l'SDK ufficiale Hyperliquid, importato solo in questa cartella.
-- Mainnet o testnet si sceglie per configurazione dell'installazione, mai dedotto dalle credenziali.
+- Mainnet e testnet sono due exchange, «Hyperliquid» e «Hyperliquid Testnet», offerti in ogni installazione:
+  `HyperliquidTestnetExchangeAdapter` eredita da `HyperliquidExchangeAdapter` e ridefinisce solo rete e indirizzo
+  dell'API; gli altri adapter si costruiscono sull'indirizzo della testnet. Le fonti di mercato leggono la rete reale
+  (R2.3.11). Mai dedotto dalle credenziali.
 - Ogni ordine porta il `cloid` assegnato dalla piattaforma.
 - Ordini a mercato con lo scostamento massimo ricevuto dal caso d'uso.
 - La leva si imposta con il modo di margine ricevuto dal caso d'uso (`is_cross` dell'SDK vero solo per `CROSS`).

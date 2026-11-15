@@ -74,6 +74,10 @@ class HyperliquidPriceHistoryAdapter:
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidPriceHistoryAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
     def history(self, asset: str, days: int, now: datetime) -> Sequence[PricePoint]:
         try:
             info = self._sdk.info(self._base_url, self._timeout)
@@ -138,6 +142,10 @@ class HyperliquidMarketDataAdapter:
     @classmethod
     def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidMarketDataAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
 
     def timeframes(self) -> Sequence[Timeframe]:
         return tuple(Timeframe(minutes) for minutes in CANDLE_INTERVALS)
