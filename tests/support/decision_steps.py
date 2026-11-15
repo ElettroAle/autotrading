@@ -10,6 +10,7 @@ from decimal import Decimal
 from pytest_bdd import given, parsers, then
 
 from autotrading.domain.accounts.position import PositionSide
+from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
@@ -227,3 +228,17 @@ def all_discarded(flow_cycles: FlowCycles, reason: str) -> None:
 @then("il ciclo non invia ordini all'exchange")
 def no_orders(flow_cycles: FlowCycles) -> None:
     assert flow_cycles.platform.order_exchange.sent == []
+
+
+@then("la chiamata al modello chiede la risposta nel formato delle decisioni")
+def decisions_format_requested(flow_cycles: FlowCycles) -> None:
+    assert flow_cycles.model.calls
+    assert all(call.answer == DECISIONS_FORMAT for call in flow_cycles.model.calls)
+
+
+@then(quoted('il formato ammette solo le azioni "{actions}" e le direzioni "{directions}"'))
+def format_allows_only(flow_cycles: FlowCycles, actions: str, directions: str) -> None:
+    entry = json.loads(json.dumps(flow_cycles.model.calls[-1].answer.schema))["properties"]["decisioni"]["items"]
+    assert entry["properties"]["azione"]["enum"] == list(names_of(actions))
+    assert entry["properties"]["direzione"]["enum"] == [*names_of(directions), None]
+    assert entry["additionalProperties"] is False

@@ -36,6 +36,10 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
 - Formato della risposta, lettura delle decisioni, contesto e costo sono regole del domain (`AgentResponse`,
   `AgentContext`, `ModelUsage`, ADR 0038): le chiavi della risposta sono i nomi dei campi dei motivi di scarto.
+- Il modello riceve il formato delle decisioni come vincolo (`DECISIONS_FORMAT`, schema JSON rigido costruito dalle
+  chiavi di `AgentResponse`): `AskAgentUseCase` lo passa a `ModelCallPort.call` e l'adapter lo fa imporre al fornitore
+  dove il modello lo supporta. La lettura di `AgentResponse` resta il controllo finale (ADR
+  risposta-del-modello-con-schema-rigido).
 - La chiamata al modello passa dalla libreria LiteLLM nel solo `worker` (`adapters/outbound/litellm`, ADR 0148) o
   dall'API di OpenRouter (ADR 0109): la chiave dell'utente viaggia nella sola chiamata del suo flusso, nessuna
   chiave dei fornitori della piattaforma. 401/403 chiave non valida e 402 (o quota OpenAI esaurita) credito
