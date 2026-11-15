@@ -9,9 +9,8 @@ from autotrading.adapters.inbound.api.configuration import (
 )
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.adapters.inbound.api.worker import (
-    BotPolling,
-    CyclePolling,
     WorkerAnswers,
+    WorkerLoops,
     WorkerUseCases,
     create_worker_api,
 )
@@ -35,12 +34,11 @@ def api_adapters(
 def worker_api_adapters(
     source: ConfigurationSource,
     for_tenant: Callable[[TenantId], WorkerUseCases],
-    bot: BotPolling | None,
-    cycles: CyclePolling | None,
+    loops: WorkerLoops,
     answers: WorkerAnswers,
 ) -> ApiApplication:
     """The internal service of the worker, open only to the caller that holds the token of the machine."""
-    return create_worker_api(_worker_api_settings_of(source).token, for_tenant, bot, cycles, answers)
+    return create_worker_api(_worker_api_settings_of(source).token, for_tenant, loops, answers)
 
 
 def _authentication(

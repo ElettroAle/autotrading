@@ -1,0 +1,64 @@
+from uuid import UUID
+
+import pytest
+
+from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.errors import InvalidOutboxMessageError
+from autotrading.domain.notifications.linked_chat import LinkedChat
+from autotrading.domain.notifications.outbox_message import CHAT_MESSAGE, ChatMessage, OutboxMessage
+from autotrading.domain.notifications.outbox_message_id import OutboxMessageId
+from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.tenant_owned import TenantOwned
+
+TENANT = TenantId(UUID("4f6c1d0e-7a3b-4e59-9c2d-1b8e5f0a6c71"))
+CHAT = LinkedChat(TENANT, ChatId(-100123))
+
+
+def test_a_message_to_a_chat_belongs_to_the_tenant_of_the_chat() -> None:
+    message = OutboxMessage.to_chat(CHAT, "alfa: ciclo fallito, timeout")
+
+    assert message.tenant_id == TENANT
+    assert isinstance(message, TenantOwned)
+
+
+def test_a_message_to_a_chat_keeps_the_chat_and_the_text_for_its_integration() -> None:
+    message = OutboxMessage.to_chat(CHAT, "alfa: ciclo fallito, timeout")
+
+    assert message.integration == CHAT_MESSAGE
+    assert message.payload == {"chat_id": -100123, "text": "alfa: ciclo fallito, timeout"}
+
+
+def test_every_message_has_an_identity_of_its_own() -> None:
+    first, second = OutboxMessage.to_chat(CHAT, "uno"), OutboxMessage.to_chat(CHAT, "due")
+
+    assert first.id != second.id
+
+
+def test_a_message_to_a_chat_reads_back_its_chat_and_its_text() -> None:
+    message = OutboxMessage.to_chat(CHAT, "alfa: chiusa BTC")
+
+    assert message.chat_message() == ChatMessage(ChatId(-100123), "alfa: chiusa BTC")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"text": "senza chat"},
+        {"chat_id": -100123},
+        {"chat_id": "-100123", "text": "chat come testo"},
+        {"chat_id": -100123, "text": 7},
+    ],
+)
+def test_a_payload_without_a_chat_and_a_text_is_a_defect_that_never_heals(payload: dict[str, str | int]) -> None:
+    message = OutboxMessage(OutboxMessageId.new(), TENANT, CHAT_MESSAGE, payload)
+
+    with pytest.raises(InvalidOutboxMessageError, match=r"^messaggio in uscita senza chat o testo$") as raised:
+        message.chat_message()
+
+    assert raised.value.permanent
+
+
+def test_an_identity_is_read_back_from_its_text() -> None:
+    identity = OutboxMessageId.new()
+
+    assert OutboxMessageId.parse(str(identity.value)) == identity
