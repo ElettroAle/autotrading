@@ -34,7 +34,7 @@ Then('non vede il flusso {string}', async ({ dashboard }, flow: string) => {
 });
 
 Then('non mostra alcun dato', async ({ dashboard }) => {
-  await expect(dashboard.alert()).toBeVisible();
+  await expect(dashboard.warning('Accesso non consentito: manca il ruolo Utente')).toBeVisible();
   await expect(dashboard.flows()).toHaveCount(0);
   await expect(dashboard.flowLinks()).toHaveCount(0);
 });

@@ -1,15 +1,38 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type Request } from '@playwright/test';
 
 import { accessTokenOf, fakePlatform } from '@/testing/mocks/platform';
 
 const BASE_PATH = '/dashboard';
+const LOADING = 'Caricamento…';
+
+const isCallToServer = (request: Request): boolean => request.resourceType() === 'fetch';
 
 /** What a user sees and does in the dashboard, so the steps read as the scenario. */
 export class DashboardPages {
   readonly page: Page;
 
+  private requestsInFlight = 0;
+
   constructor(page: Page) {
     this.page = page;
+    page.on('request', (request) => this.countRequest(request, 1));
+    page.on('requestfinished', (request) => this.countRequest(request, -1));
+    page.on('requestfailed', (request) => this.countRequest(request, -1));
+  }
+
+  private countRequest(request: Request, change: number): void {
+    if (isCallToServer(request)) {
+      this.requestsInFlight += change;
+    }
+  }
+
+  /**
+   * Waits until the page has read its data: nothing shows as loading and no request is still unanswered. A step that
+   * makes the API fail waits for it, or a reading still on its way fails too and the page shows its error (Bug 289).
+   */
+  async waitUntilRead(): Promise<void> {
+    await expect(this.page.getByRole('status').filter({ hasText: LOADING })).toHaveCount(0);
+    await expect.poll(() => this.requestsInFlight).toBe(0);
   }
 
   async open(path = '/'): Promise<void> {
@@ -223,8 +246,9 @@ export class DashboardPages {
     return this.page.getByRole('region', { name: 'Errore del ciclo' });
   }
 
-  alert(): Locator {
-    return this.page.getByRole('alert');
+  /** An alert of the dashboard, by the words it shows: a page can show more than one at a time. */
+  warning(text: string): Locator {
+    return this.page.getByRole('alert').and(this.page.getByText(text, { exact: true }));
   }
 
   /** A message the dashboard tells the user, as an alert or as a status, with exactly this text. */
@@ -284,6 +308,26 @@ export class DashboardPages {
 
   historyTab(name: string): Locator {
     return this.page.getByRole('tab', { name });
+  }
+
+  // The page reads a change of its filters from the address it last showed: a change made before the page shows the
+  // previous one would start from the old address and undo it (Bug 289). Each change waits until the page shows it.
+
+  async openHistoryTab(name: string): Promise<void> {
+    await this.historyTab(name).click();
+    await expect(this.historyTab(name)).toHaveAttribute('aria-selected', 'true');
+  }
+
+  /** Chooses an option of a filter of the histories, by the label of both. */
+  async chooseFilter(label: string, option: string): Promise<void> {
+    await this.filter(label).selectOption({ label: option });
+    await expect(this.filter(label).locator('option:checked')).toHaveText(option);
+  }
+
+  /** Types the value of a field of the filters of the histories, by its label. */
+  async typeFilter(label: string, value: string): Promise<void> {
+    await this.filter(label).fill(value);
+    await expect(this.filter(label)).toHaveValue(value);
   }
 
   /** A filter of the histories, by the label it shows. */
