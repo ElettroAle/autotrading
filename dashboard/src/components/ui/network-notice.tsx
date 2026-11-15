@@ -21,10 +21,13 @@ export const RealMoneyNotice = ({ subject }: { readonly subject: string }) => (
 
 type TestNetworkNoticeProps = { readonly subject: string; readonly networkName: string };
 
-/** Said wherever an account or a flow trades on the test network of its exchange (R2.3.10). */
+/**
+ * Said wherever an account or a flow trades on the test network of its exchange (R2.3.10): the name of the network
+ * between quotes, as a name, so «rete di test "testnet"» does not read as a repeated word (R6.4.1).
+ */
 export const TestNetworkNotice = ({ subject, networkName }: TestNetworkNoticeProps) => (
   <p role="note" className="rounded bg-yellow-100 px-2 py-1 font-semibold text-yellow-900">
-    {subject} opererà sulla rete di test {networkName}, senza denaro reale
+    {`${subject} opererà sulla rete di test "${networkName}", senza denaro reale`}
   </p>
 );
 

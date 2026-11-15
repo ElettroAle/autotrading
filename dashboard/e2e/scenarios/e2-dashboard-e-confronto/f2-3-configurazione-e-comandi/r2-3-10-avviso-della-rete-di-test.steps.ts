@@ -13,7 +13,7 @@ const expectSignedIn = (memory: ScenarioMemory, account: string): void => {
 };
 
 const testNetworkNotice = (subject: string, networkName: string): string =>
-  `${subject} opererà sulla rete di test ${networkName}, senza denaro reale`;
+  `${subject} opererà sulla rete di test "${networkName}", senza denaro reale`;
 
 // An account of the user on the exchange, once the exchange is configured on the network the scenario names.
 const accountOn = async (

@@ -151,4 +151,25 @@ describe('FlowsList', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Dati non aggiornati');
     expect(screen.getByRole('link', { name: 'alfa' })).toBeInTheDocument();
   });
+
+  it('says once, above the flows, what the icons of the outcomes mean', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    fakePlatform.addFlow('anna', 'beta');
+    await renderApp({ account: 'anna' });
+
+    await screen.findByRole('list', { name: 'Flussi' });
+    const legend = screen.getByRole('list', { name: 'Legenda degli esiti' });
+    expect(
+      within(legend)
+        .getAllByRole('listitem')
+        .map((entry) => entry.textContent),
+    ).toEqual(['✓concluso', '✗fallito']);
+  });
+
+  it('shows no legend while the user has no flow', async () => {
+    await renderApp({ account: 'anna' });
+
+    await screen.findByText('Non hai ancora flussi.');
+    expect(screen.queryByRole('list', { name: 'Legenda degli esiti' })).not.toBeInTheDocument();
+  });
 });

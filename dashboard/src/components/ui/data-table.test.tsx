@@ -121,4 +121,14 @@ describe('DataTable', () => {
       expect(screen.getByRole('columnheader', { name: 'Nome' })).not.toHaveAttribute('aria-sort');
     });
   });
+
+  it('breaks a long word of a cell on a phone, where the cell is a line of a card', () => {
+    render(
+      <DataTable label="Frutti" columns={COLUMNS} rows={FRUITS} rowKey={(fruit) => fruit.name} />,
+    );
+
+    for (const cell of screen.getAllByRole('cell')) {
+      expect(cell).toHaveClass('max-md:wrap-anywhere');
+    }
+  });
 });

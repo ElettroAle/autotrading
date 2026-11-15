@@ -70,6 +70,20 @@ const UnlinkChat = () => {
   );
 };
 
+// The steps as the bot answers a chat that writes it without a code (R1.8.1, R6.4.1).
+const LinkSteps = () => (
+  <ol aria-label="Come collegare Telegram" className="mt-2 list-inside list-decimal space-y-1">
+    <li>Chiedi qui sotto il codice di collegamento: vale una sola volta e per poco tempo.</li>
+    <li>
+      Invia il codice al bot della piattaforma dalla tua chat Telegram, oppure apri il link che
+      compare insieme al codice.
+    </li>
+    <li>
+      Attendi la conferma del bot: da quel momento la chat riceve le notifiche dei tuoi flussi.
+    </li>
+  </ol>
+);
+
 export const LinkedChatPanel = () => {
   const chat = useLinkedChat();
   return (
@@ -82,7 +96,12 @@ export const LinkedChatPanel = () => {
       </h2>
       {chat.isPending && <Loading />}
       {chat.isError && <ErrorMessage error={chat.error} />}
-      {chat.isSuccess && chat.data.chat_id === null && <p role="status">Nessuna chat collegata</p>}
+      {chat.isSuccess && chat.data.chat_id === null && (
+        <>
+          <p role="status">Nessuna chat collegata</p>
+          <LinkSteps />
+        </>
+      )}
       {chat.isSuccess && chat.data.chat_id !== null && (
         <div className="space-y-3">
           <p role="status" aria-label="Chat collegata">

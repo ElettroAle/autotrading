@@ -7,7 +7,7 @@ export const ViewTabs = ({ label, views }: { label: string; views: readonly View
   const { pathname } = useLocation();
   return (
     <nav aria-label={label} className="mb-4 border-b border-slate-200">
-      <ul className="flex gap-1">
+      <ul className="flex flex-wrap gap-1">
         {views.map((view) => {
           const current = view.to === pathname;
           return (

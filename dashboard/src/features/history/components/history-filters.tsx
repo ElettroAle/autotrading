@@ -1,11 +1,12 @@
 import { useId, type ReactNode } from 'react';
 
+import { FILTER, FILTER_FIELD, FILTER_ROW } from '@/components/ui/filters';
 import { PeriodSelector } from '@/components/ui/period-selector/period-selector';
 
 import type { AccountOption, FlowOption } from '../api/get-history-options';
 import type { HistorySearch } from '../utils/history-search';
 
-const FIELD = 'rounded border border-slate-300 bg-white px-2 py-1 disabled:bg-slate-100';
+const FIELD = `${FILTER_FIELD} disabled:bg-slate-100`;
 const EVERY = '';
 
 type Choice = { readonly value: string; readonly label: string };
@@ -22,7 +23,7 @@ type FilterProps = {
 const Filter = ({ label, value, every, choices, choose, disabled = false }: FilterProps) => {
   const id = useId();
   return (
-    <>
+    <div className={FILTER}>
       <label htmlFor={id}>{label}</label>
       <select
         id={id}
@@ -38,13 +39,11 @@ const Filter = ({ label, value, every, choices, choose, disabled = false }: Filt
           </option>
         ))}
       </select>
-    </>
+    </div>
   );
 };
 
-const Row = ({ children }: { children: ReactNode }) => (
-  <div className="flex flex-wrap items-center gap-3">{children}</div>
-);
+const Row = ({ children }: { children: ReactNode }) => <div className={FILTER_ROW}>{children}</div>;
 
 // The versions of a flow go from 1 to the one in force; without a flow a version names nothing (ADR 0139).
 const versionsOf = (flow: FlowOption | undefined): Choice[] =>

@@ -4,6 +4,8 @@ import { accessTokenOf, fakePlatform } from '@/testing/mocks/platform';
 
 const BASE_PATH = '/dashboard';
 const LOADING = 'Caricamento…';
+// The title of the page of a flow before the page has read it, or when the flow does not exist.
+const UNREAD_FLOW_TITLE = /^Flusso$/;
 
 const isCallToServer = (request: Request): boolean => request.resourceType() === 'fetch';
 
@@ -176,8 +178,9 @@ export class DashboardPages {
     return this.flowSummary(name).getByRole('list', { name: 'Esito degli ultimi cicli' });
   }
 
+  /** The title of the page of a flow, its name, once the page has read the flow (R6.4.1). */
   flowName(): Locator {
-    return this.page.getByRole('heading', { level: 2 });
+    return this.pageHeading().filter({ hasNotText: UNREAD_FLOW_TITLE });
   }
 
   accountRow(name: string): Locator {

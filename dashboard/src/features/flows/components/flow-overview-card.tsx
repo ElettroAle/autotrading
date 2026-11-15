@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { paths } from '@/config/paths';
 import { formatAmount } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
@@ -27,7 +28,7 @@ const Fact = ({
 }) => (
   <div className="flex gap-2">
     <dt className="font-medium text-slate-600">{term}</dt>
-    <dd aria-label={term} className={className}>
+    <dd aria-label={term} className={`${DETAIL_VALUE} ${className}`}>
       {children}
     </dd>
   </div>

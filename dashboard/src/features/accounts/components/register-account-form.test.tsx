@@ -197,7 +197,7 @@ describe('RegisterAccountForm', () => {
     await chooseExchange(region);
 
     expect(within(region).getByRole('note')).toHaveTextContent(
-      'Il conto opererà sulla rete di test sandbox, senza denaro reale',
+      'Il conto opererà sulla rete di test "sandbox", senza denaro reale',
     );
   });
 });

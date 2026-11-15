@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 
+import { DESTRUCTIVE_COMMAND, PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
 import { fakePlatform, type FakeFlow } from '@/testing/mocks/platform';
 import { anOpenPosition } from '@/testing/mocks/positions';
 import { server } from '@/testing/mocks/server';
@@ -41,6 +42,24 @@ describe('FlowCommands', () => {
     await renderApp({ account: 'anna', url: FLOW_PAGE });
 
     expect(await offeredCommands()).toEqual(expected);
+  });
+
+  it.each([
+    ['fermo', 'Avvia', PRIMARY_COMMAND],
+    ['in pausa', 'Riprendi', PRIMARY_COMMAND],
+    ['fermo', 'Archivia', DESTRUCTIVE_COMMAND],
+    ['attivo', 'Pausa', SECONDARY_COMMAND],
+    ['attivo', 'Stop', SECONDARY_COMMAND],
+  ])('for a flow %s shows %s with the look of its weight', async (status, name, look) => {
+    alfa.status = status;
+    await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+    expect(
+      await within(await screen.findByRole('group', { name: 'Comandi del flusso' })).findByRole(
+        'button',
+        { name },
+      ),
+    ).toHaveAttribute('class', look);
   });
 
   it('pauses the flow and then offers to resume it', async () => {

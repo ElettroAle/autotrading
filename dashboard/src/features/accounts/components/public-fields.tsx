@@ -1,3 +1,4 @@
+import { DETAIL_VALUE } from '@/components/ui/details-list';
 import type { DeclaredField } from '@/components/ui/form/declared-fields';
 
 type PublicFieldsProps = {
@@ -21,7 +22,7 @@ export const PublicFields = ({ fields, values }: PublicFieldsProps) => {
           <dt className="text-slate-600">
             {fields.find((field) => field.name === name)?.label ?? name}
           </dt>
-          <dd className="break-all font-mono">{value}</dd>
+          <dd className={`${DETAIL_VALUE} font-mono`}>{value}</dd>
         </div>
       ))}
     </dl>

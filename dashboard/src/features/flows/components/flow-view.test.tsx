@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
@@ -12,10 +12,10 @@ describe('FlowView', () => {
     fakePlatform.addFlow('anna', 'alfa');
   });
 
-  it('shows the name and the status of the flow', async () => {
+  it('titles the page with the name of the flow and shows its status', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
-    expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('alfa');
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(screen.getByText('Stato: attivo')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Versioni della configurazione' })).toHaveAttribute(
       'href',
@@ -28,7 +28,7 @@ describe('FlowView', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
     expect(await screen.findByRole('note')).toHaveTextContent(
-      'Il flusso opererà sulla rete di test sandbox, senza denaro reale',
+      'Il flusso opererà sulla rete di test "sandbox", senza denaro reale',
     );
   });
 
@@ -36,7 +36,7 @@ describe('FlowView', () => {
     fakePlatform.configureExchangeNetwork('real');
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
-    expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('alfa');
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(screen.queryByText(/rete di test/)).not.toBeInTheDocument();
   });
 
@@ -71,10 +71,45 @@ describe('FlowView', () => {
     );
   });
 
-  it('says a flow outside the tenant of the user does not exist', async () => {
+  it('says a flow outside the tenant of the user does not exist, under the generic title', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-omega' });
 
     expect(await screen.findByText('Flusso non trovato.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Flusso$/);
+  });
+
+  it('shows the views of the flow as tabs, apart from the command that edits it', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    const views = await screen.findByRole('navigation', { name: 'Dati del flusso' });
+    expect(
+      within(views)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual([
+      'Posizioni aperte',
+      'Posizioni chiuse',
+      'Cicli del flusso',
+      'Versioni della configurazione',
+    ]);
+    const edit = screen.getByRole('link', { name: 'Modifica la configurazione' });
+    expect(views).not.toContainElement(edit);
+    expect(edit).toHaveClass('min-h-11');
+  });
+
+  it('shows the status and the warning of the network before views, commands and configuration', async () => {
+    fakePlatform.configureExchangeNetwork('test', 'sandbox');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    const status = await screen.findByText('Stato: attivo');
+    const notice = screen.getByRole('note');
+    const views = screen.getByRole('navigation', { name: 'Dati del flusso' });
+    const commands = await screen.findByRole('group', { name: 'Comandi del flusso' });
+    const configuration = screen.getByLabelText('Configurazione', { exact: true });
+    const order = [status, notice, views, commands, configuration];
+    order.slice(1).forEach((element, index) => {
+      expect(order[index]?.compareDocumentPosition(element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
   });
 
   it('tells why the flow could not be read', async () => {
@@ -95,7 +130,18 @@ describe('FlowView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Aggiorna' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Dati non aggiornati');
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('alfa');
+    expect(screen.getByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Cicli recenti' })).toHaveTextContent('09:45:00');
+  });
+
+  it('keeps a long name of a model within the configuration, breaking it where it does not fit', async () => {
+    fakePlatform.changeFlow('alfa', { model: 'openrouter/~deepseek/deepseek-flash-latest' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    const configuration = await screen.findByLabelText('Configurazione', { exact: true });
+    expect(configuration).toHaveClass('grid-cols-[max-content_minmax(0,1fr)]');
+    expect(
+      within(configuration).getByText('openrouter/~deepseek/deepseek-flash-latest'),
+    ).toHaveClass('min-w-0', 'wrap-anywhere');
   });
 });

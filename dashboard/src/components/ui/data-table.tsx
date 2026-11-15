@@ -89,7 +89,7 @@ export const DataTable = <T,>({
             {columns.map((column) => (
               <td
                 key={column.header}
-                className="flex gap-2 px-1 py-1 md:table-cell md:px-3 md:py-2"
+                className="flex gap-2 px-1 py-1 max-md:wrap-anywhere md:table-cell md:px-3 md:py-2"
               >
                 <span aria-hidden="true" className="font-medium text-slate-600 md:hidden">
                   {column.header}

@@ -14,7 +14,10 @@ export const onFlowPage = async (
     memory.account = account;
     await dashboard.openFlowAs(account, flow);
   }
-  const onTheFlow = await dashboard.flowName().filter({ hasText: flow }).isVisible();
+  // The pages of the flow name it too («Cicli di alfa»): only its own page has the name alone as its title.
+  const onTheFlow = await dashboard.page
+    .getByRole('heading', { level: 1, name: flow, exact: true })
+    .isVisible();
   if (!onTheFlow) {
     await dashboard.openFlow(flow);
   }

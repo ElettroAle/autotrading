@@ -14,7 +14,11 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 // The scenarios of the dashboard run on the .feature files of specs/, as pytest-bdd does for Python (ADR 0116).
 const testDir = defineBddConfig({
-  features: '../specs/E2-dashboard-e-confronto/**/*.feature',
+  // The dashboard on a phone (F6.4) runs with the scenarios of E2, on the same build and fakes.
+  features: [
+    '../specs/E2-dashboard-e-confronto/**/*.feature',
+    '../specs/E6-piattaforma-e-operativita/F6.4-dashboard-su-mobile/*.feature',
+  ],
   featuresRoot: '../specs',
   steps: ['e2e/support/fixtures.ts', 'e2e/support/**/*.steps.ts', 'e2e/scenarios/**/*.steps.ts'],
   tags: 'not @wip and not @pipeline',
@@ -34,7 +38,8 @@ export default defineConfig({
     timezoneId: TIME_ZONE,
     trace: 'retain-on-failure',
   },
-  // The scenarios on a desktop; the layout of the forms also on the width of a phone (ADR 0146).
+  // The scenarios on a desktop; the layout of the forms and of every page also on the width of a phone (ADR 0146,
+  // ADR liste-etichetta-valore-che-vanno-a-capo).
   projects: [
     { name: 'scenari', testDir, use: { ...devices['Desktop Chrome'] } },
     { name: 'telefono', testDir: './e2e/layout', use: { ...devices['Pixel 7'] } },
