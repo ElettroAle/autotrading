@@ -1,6 +1,7 @@
 # ADR outbox-delle-integrazioni-esterne-con-procrastinate — Outbox delle integrazioni esterne con procrastinate
 
-- Stato: accettata (15 novembre 2026), decisione del proprietario
+- Stato: accettata (15 novembre 2026), decisione del proprietario; numero di tentativi sostituito dall'ADR
+  ritentativi-dell-outbox-in-circa-sei-ore
 - Requisiti: Task T6.1.1 (377), Task 178; RF-24.01, R1.8.2, RNF-03
 - Collegate: sostituisce ADR 0110 (proposta, mai accettata); ADR 0092 (notifiche come passi espliciti dei casi d'uso),
   ADR 0089 (un adapter, una tecnologia), ADR 0104 (checkpointer di LangGraph nella cartella PostgreSQL), ADR 0112
