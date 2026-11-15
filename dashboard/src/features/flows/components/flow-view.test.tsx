@@ -23,6 +23,23 @@ describe('FlowView', () => {
     );
   });
 
+  it('warns that a flow on the test network trades no real money', async () => {
+    fakePlatform.configureExchangeNetwork('test', 'sandbox');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('note')).toHaveTextContent(
+      'Il flusso opererà sulla rete di test sandbox, senza denaro reale',
+    );
+  });
+
+  it('shows no warning of the test network for a flow on real money', async () => {
+    fakePlatform.configureExchangeNetwork('real');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('alfa');
+    expect(screen.queryByText(/rete di test/)).not.toBeInTheDocument();
+  });
+
   it('leads to the cycles of the flow', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 

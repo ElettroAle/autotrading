@@ -970,6 +970,8 @@ export interface components {
             has_credentials: boolean;
             /** Network */
             network: string;
+            /** Network Name */
+            network_name: string;
             /** Allocated Capital */
             allocated_capital: string;
             /** Currency */
@@ -1219,6 +1221,8 @@ export interface components {
             name: string;
             /** Network */
             network: string;
+            /** Network Name */
+            network_name: string;
             /** Fields */
             fields: components["schemas"]["CredentialFieldResponse"][];
         };

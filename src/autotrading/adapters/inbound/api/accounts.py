@@ -60,6 +60,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
     which the exchange gives at /accounts/{id}/state."""
 
     network: str
+    network_name: str
     allocated_capital: str
     currency: str
 
@@ -70,7 +71,8 @@ class AccountSummaryResponse(AccountDetailsResponse):
             name=summary.name.value,
             exchange=summary.exchange.value,
             has_credentials=summary.has_credentials,
-            network=summary.network.value,
+            network=summary.network.kind.value,
+            network_name=summary.network.name,
             allocated_capital=amount_text(summary.allocated_capital),
             currency=summary.currency,
         )

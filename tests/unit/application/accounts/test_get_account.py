@@ -8,6 +8,7 @@ from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.application.accounts.errors import AccountNotFoundError
 from autotrading.application.accounts.get_account import GetAccountCommand, GetAccountUseCase
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.accounts.declared_network import DeclaredNetwork
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -70,7 +71,7 @@ def test_an_account_of_the_tenant_is_found_with_network_and_allocated_capital(
 
     found = get_account(store, flows, account.id)
 
-    assert found == AccountSummary.of(account, Decimal(300), ExchangeNetwork.TEST, "USDC")
+    assert found == AccountSummary.of(account, Decimal(300), DeclaredNetwork.of(real=False, name="testnet"), "USDC")
 
 
 def test_an_account_on_an_exchange_configured_on_real_money_is_on_the_real_network(
@@ -79,7 +80,7 @@ def test_an_account_on_an_exchange_configured_on_real_money_is_on_the_real_netwo
     account = an_account(ANNA)
     store.accounts.append(account)
 
-    assert get_account(store, flows, account.id, real=True).network is ExchangeNetwork.REAL
+    assert get_account(store, flows, account.id, real=True).network == DeclaredNetwork(ExchangeNetwork.REAL, "mainnet")
 
 
 @pytest.mark.parametrize("whose", ["another tenant", "nobody"])

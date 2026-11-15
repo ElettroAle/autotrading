@@ -15,6 +15,10 @@ class ExchangePort(Protocol):
         """True when the adapter is configured on the network that moves real money (Bug 277)."""
         ...
 
+    def network_name(self) -> str:
+        """The name the exchange gives the network the adapter is configured on, as its users know it (R2.3.10)."""
+        ...
+
     def credential_fields(self) -> tuple[CredentialField, ...]:
         """The data the exchange asks to operate an account, in the order the user gives them (R2.3.9)."""
         ...

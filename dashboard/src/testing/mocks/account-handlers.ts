@@ -29,6 +29,7 @@ const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   exchange: FAKE_EXCHANGE,
   has_credentials: true,
   network: fakePlatform.exchangeNetwork(),
+  network_name: fakePlatform.exchangeNetworkName(),
   allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
   currency: CURRENCY,
 });
@@ -134,6 +135,7 @@ export const accountHandlers = [
             FAKE_SUPPORTED_EXCHANGES.map((name) => ({
               name,
               network: fakePlatform.exchangeNetwork(),
+              network_name: fakePlatform.exchangeNetworkName(),
               fields: CREDENTIAL_FIELDS,
             })),
           )

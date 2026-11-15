@@ -3,13 +3,14 @@ from decimal import Decimal, InvalidOperation
 
 from autotrading.adapters.configuration.errors import InvalidConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.outbound.hyperliquid.exchange import MAINNET, TESTNET
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.orders.slippage import Slippage
 
 SLIPPAGE = "ORDER_MAX_SLIPPAGE_PERCENT"
 NETWORK = "HYPERLIQUID_NETWORK"
 # The names Hyperliquid gives its networks: the installation declares one, nothing deduces it (Bug 277).
-NETWORKS = {"testnet": ExchangeNetwork.TEST, "mainnet": ExchangeNetwork.REAL}
+NETWORKS = {TESTNET: ExchangeNetwork.TEST, MAINNET: ExchangeNetwork.REAL}
 
 
 @dataclass(frozen=True, slots=True)

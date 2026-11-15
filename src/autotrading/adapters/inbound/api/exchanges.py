@@ -17,6 +17,7 @@ class CredentialFieldResponse(BaseModel):
 class ExchangeResponse(BaseModel):
     name: str
     network: str
+    network_name: str
     fields: list[CredentialFieldResponse]
 
     @classmethod
@@ -25,7 +26,12 @@ class ExchangeResponse(BaseModel):
             CredentialFieldResponse(name=field.name, label=field.label, secret=field.secret)
             for field in exchange.fields
         ]
-        return cls(name=exchange.name, network=exchange.network.value, fields=fields)
+        return cls(
+            name=exchange.name,
+            network=exchange.network.kind.value,
+            network_name=exchange.network.name,
+            fields=fields,
+        )
 
 
 def exchanges_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:

@@ -278,3 +278,8 @@ def test_declares_the_address_of_the_account_and_the_key_of_the_api_wallet() -> 
         CredentialField("account_address", "Indirizzo del conto", secret=False),
         CredentialField("secret_key", "Chiave dell'API wallet", secret=True),
     )
+
+
+@pytest.mark.parametrize(("testnet", "name"), [(True, "testnet"), (False, "mainnet")])
+def test_the_network_carries_the_name_hyperliquid_gives_it(testnet: bool, name: str) -> None:
+    assert HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=FakeSdk()).network_name() == name

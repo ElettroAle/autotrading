@@ -3503,6 +3503,10 @@
             "type": "string",
             "title": "Network"
           },
+          "network_name": {
+            "type": "string",
+            "title": "Network Name"
+          },
           "allocated_capital": {
             "type": "string",
             "title": "Allocated Capital"
@@ -3519,6 +3523,7 @@
           "exchange",
           "has_credentials",
           "network",
+          "network_name",
           "allocated_capital",
           "currency"
         ],
@@ -4162,6 +4167,10 @@
             "type": "string",
             "title": "Network"
           },
+          "network_name": {
+            "type": "string",
+            "title": "Network Name"
+          },
           "fields": {
             "items": {
               "$ref": "#/components/schemas/CredentialFieldResponse"
@@ -4174,6 +4183,7 @@
         "required": [
           "name",
           "network",
+          "network_name",
           "fields"
         ],
         "title": "ExchangeResponse"
