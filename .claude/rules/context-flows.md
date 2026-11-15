@@ -59,6 +59,9 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   appartengono a nessun flusso.
 - Stati e transizioni sono regole del domain: avvia da fermo, pausa da attivo, riprendi da in pausa,
   archivia solo da fermo; un flusso archiviato non si avvia e non si modifica (ADR 0036).
+- Un ciclo parte solo per un flusso attivo: `RunCycleUseCase` legge lo stato dentro il lock e, per un flusso non più
+  attivo, finisce senza leggere, decidere, ordinare né registrare nulla (Bug 373, ADR
+  guardia-dello-stato-del-flusso-nel-ciclo). Un ciclo già in corso si conclude.
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.
 - Lo stop chiude sempre le posizioni del flusso (decisione del proprietario: senza stop loss sull'exchange
   una posizione lasciata aperta non è protetta), dopo il ciclo in corso; ogni posizione chiusa entra nello

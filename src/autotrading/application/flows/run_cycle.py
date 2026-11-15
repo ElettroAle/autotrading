@@ -8,6 +8,7 @@ from autotrading.application.flows.ports import (
     ClockPort,
     CycleEquityPort,
     CycleFailureNoticePort,
+    CycleFlowActivityPort,
     CycleRepositoryPort,
     FlowLockPort,
     FlowPausePort,
@@ -25,8 +26,8 @@ class RunCycleCommand:
 
 @dataclass(frozen=True, slots=True)
 class CycleGuards:
-    """What keeps a planned cycle unique and alone, what pauses the flows on a permanent error and tells the user of
-    a failed cycle: everything but the lock bound to the tenant of the flow.
+    """What keeps a planned cycle unique and alone and only for an active flow, what pauses the flows on a permanent
+    error and tells the user of a failed cycle: everything but the lock bound to the tenant of the flow.
     """
 
     cycles: CycleRepositoryPort
@@ -34,6 +35,7 @@ class CycleGuards:
     pause: FlowPausePort
     clock: ClockPort
     failures: CycleFailureNoticePort
+    activity: CycleFlowActivityPort
 
 
 class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:
@@ -42,7 +44,8 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     Fail fast: no retry and no node after the failing one. The only handler of the errors of the cycle records the
     failed cycle and, for a permanent error, pauses the flows involved and raises the error anyway (R1.2.4).
     Every cycle that read the state of its flow, completed or failed, records the equity of the last state it read
-    (R2.2.3, ADR 0120).
+    (R2.2.3, ADR 0120). A cycle whose flow is no longer active when it starts runs nothing and leaves no trace: the
+    planner may still hold its job for a few seconds (Bug 373).
     """
 
     def __init__(self, graph: CycleGraph[S, D, C, A, O, E], guards: CycleGuards, equity: CycleEquityPort[S]) -> None:
@@ -54,6 +57,9 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         if not self._guards.cycles.claim(command.flow_id, command.planned_at):
             return None
         with self._guards.lock.hold(command.flow_id) as acquired:
+            # Read once the flow is held: a stop saves its status before waiting for the cycle under way.
+            if not self._guards.activity.execute(command.flow_id):
+                return None
             if not acquired:
                 return recorded(self._guards.cycles, CycleRecord.skipped(command.flow_id, command.planned_at))
             cycle = PlannedCycle(command.flow_id, command.schedule, command.planned_at)

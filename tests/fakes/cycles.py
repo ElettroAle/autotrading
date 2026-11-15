@@ -242,12 +242,23 @@ class FakeCycleEndAdapter:
         return self._flows.update(flow_id, anchor, executions)
 
 
+class FakeFlowActivityAdapter:
+    """Whether a flow runs cycles, from its status in the fake flows."""
+
+    def __init__(self, flows: FakeFlowsAdapter) -> None:
+        self._flows = flows
+
+    def execute(self, flow_id: UUID) -> bool:
+        return self._flows.flows[flow_id].status == ACTIVE
+
+
 class FakeFlowsAdapter:
     """The flows context as the cycle sees it: schedules, state, pause."""
 
     def __init__(self, failures: Failures) -> None:
         self.flows: dict[UUID, FakeFlow] = {}
         self.updates: list[tuple[UUID, Sequence[object]]] = []
+        self.reads: list[UUID] = []
         self._failures = failures
 
     def active_of_every_tenant(self) -> list[TenantScheduledFlow]:
@@ -258,6 +269,7 @@ class FakeFlowsAdapter:
         ]
 
     def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot:  # noqa: ARG002 - the signature of the port
+        self.reads.append(flow_id)
         self._failures.raise_if_failing(flow_id, CycleStep.READ_FLOW_STATE)
         flow = self.flows[flow_id]
         return FlowSnapshot(flow.sources, {"flow": flow.name, "positions": sorted(flow.positions)})
