@@ -56,13 +56,16 @@ def account_id(platform: Platform, client_of: Client, credentials: Credentials) 
 
 
 def rotated(platform: Platform, credentials: Credentials, *, accepted: bool = True) -> dict[str, dict[str, str]]:
+    """What the dashboard sends: only the secret field, the account address stays the one kept (Bug 401)."""
     new = hyperliquid_credentials(credentials.value("account_address"), "0x" + "cd" * 32)
     if accepted:
         platform.hyperliquid.accept(new)
-    return {"credentials": dict(new.values)}
+    return {"credentials": {"secret_key": new.value("secret_key")}}
 
 
-def test_the_list_shows_the_accounts_of_the_tenant(client_of: Client, account_id: str) -> None:
+def test_the_list_shows_the_accounts_of_the_tenant(
+    client_of: Client, account_id: str, credentials: Credentials
+) -> None:
     response = client_of("anna").get("/accounts")
 
     assert response.status_code == 200
@@ -76,6 +79,7 @@ def test_the_list_shows_the_accounts_of_the_tenant(client_of: Client, account_id
             "network_name": "testnet",
             "allocated_capital": "0",
             "currency": "USDC",
+            "public_fields": {"account_address": credentials.value("account_address")},
         }
     ]
 
@@ -110,14 +114,14 @@ def test_the_list_of_another_user_is_empty(client_of: Client, account_id: str) -
     assert client_of("bruno").get("/accounts").json() == []
 
 
-def test_the_details_declare_credentials_without_showing_them(
+def test_the_details_show_the_public_fields_and_only_declare_the_secret_ones(
     client_of: Client, account_id: str, credentials: Credentials
 ) -> None:
     response = client_of("anna").get(f"/accounts/{account_id}")
 
     assert response.status_code == 200
     assert response.json()["has_credentials"] is True
-    assert credentials.value("account_address") not in response.text
+    assert response.json()["public_fields"] == {"account_address": credentials.value("account_address")}
     assert credentials.value("secret_key") not in response.text
 
 
@@ -154,10 +158,10 @@ def test_rejected_credentials_answer_with_the_redacted_message_of_the_exchange(
         "detail": "credenziali rifiutate dall'exchange",
         "exchange_message": REDACTED_REJECTION,
     }
-    assert body["credentials"]["account_address"] not in response.text.lower()
+    assert body["credentials"]["secret_key"] not in response.text.lower()
 
 
-def test_credentials_of_another_exchange_account_are_refused(
+def test_a_public_field_sent_in_a_replacement_is_refused_by_its_label(
     client_of: Client, platform: Platform, account_id: str
 ) -> None:
     other = platform.accepted_credentials()
@@ -166,8 +170,11 @@ def test_credentials_of_another_exchange_account_are_refused(
     response = client_of("anna").put(f"/accounts/{account_id}/credentials", json=body)
 
     assert (response.status_code, reason_of(response)) == (
-        422,
-        {"detail": "le credenziali appartengono a un altro conto dell'exchange"},
+        400,
+        {
+            "detail": "indirizzo del conto non si sostituisce: per cambiarlo rimuovi il conto e registrane uno nuovo",
+            "field": "account_address",
+        },
     )
 
 

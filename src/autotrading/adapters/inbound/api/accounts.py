@@ -38,12 +38,14 @@ class CredentialsReplacementRequest(BaseModel):
 
 
 class AccountDetailsResponse(BaseModel):
-    """An account as its owner reads it: credentials are only declared present, never returned (R0.2.3)."""
+    """An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the
+    public fields the exchange declares are shown by name (Bug 401)."""
 
     id: str
     name: str
     exchange: str
     has_credentials: bool
+    public_fields: dict[str, str]
 
     @classmethod
     def of(cls, details: AccountDetails) -> AccountDetailsResponse:
@@ -52,6 +54,7 @@ class AccountDetailsResponse(BaseModel):
             name=details.name.value,
             exchange=details.exchange.value,
             has_credentials=details.has_credentials,
+            public_fields=dict(details.public_fields),
         )
 
 
@@ -71,6 +74,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
             name=summary.name.value,
             exchange=summary.exchange.value,
             has_credentials=summary.has_credentials,
+            public_fields=dict(summary.public_fields),
             network=summary.network.kind.value,
             network_name=summary.network.name,
             allocated_capital=amount_text(summary.allocated_capital),

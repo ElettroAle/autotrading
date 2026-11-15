@@ -10,6 +10,7 @@ from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.errors import AutotradingError
+from tests.support.credentials import API_WALLET_KEY
 from tests.support.keyring import Keyring
 from tests.support.platform import HYPERLIQUID, Platform, registration
 from tests.support.steps import quoted
@@ -55,14 +56,15 @@ def every_record(caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
 
 
 def contains(texts: list[str], label: str, keyring: Keyring) -> bool:
-    credentials = keyring[label]
-    secrets = (credentials.value("account_address").lower(), credentials.value("secret_key").lower())
-    return any(secret in text.lower() for text in texts for secret in secrets)
+    # The account address is a public field the exchange declares, kept in clear and shown on the account (Bug 401,
+    # ADR campi-pubblici-del-conto-conservati-in-chiaro): what must never show is the secret field.
+    secret = keyring[label].value(API_WALLET_KEY).lower()
+    return any(secret in text.lower() for text in texts)
 
 
 def replace(platform: Platform, seen: Seen, credentials: Credentials) -> AutotradingError | None:
     account = platform.account_named(seen.owner, seen.account)
-    command = ReplaceCredentialsCommand(account.id, credentials.values)
+    command = ReplaceCredentialsCommand(account.id, {API_WALLET_KEY: credentials.value(API_WALLET_KEY)})
     try:
         platform.use_cases_of(seen.owner).replace_credentials.execute(command)
     except AutotradingError as error:

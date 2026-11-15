@@ -46,6 +46,9 @@ accounts = Table(
     Column("name", Text, nullable=False),
     Column("exchange", Text, nullable=False),
     Column("exchange_account_fingerprint", Text, nullable=False),
+    # The fields the exchange declares public, in clear; empty for an account registered before they were kept
+    # (Bug 401, ADR campi-pubblici-del-conto-conservati-in-chiaro).
+    Column("exchange_account_public_fields", JSON),
     # Empty once the account is removed: the row stays for its history, the credentials do not (ADR 0025).
     Column("credentials_key_version", Integer),
     Column("credentials_ciphertext", LargeBinary),

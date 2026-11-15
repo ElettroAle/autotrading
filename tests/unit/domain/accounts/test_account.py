@@ -60,3 +60,22 @@ def test_replacing_the_credentials_keeps_everything_else() -> None:
         account.exchange,
         account.exchange_account,
     )
+
+
+def test_the_public_fields_of_the_same_exchange_account_are_kept_on_the_account() -> None:
+    # An account registered before its public fields were kept gets them at its next replacement (Bug 401).
+    account = an_account(TenantId.new())
+    kept = exchange_account_of(ADDRESS, OTHER_SECRET)
+    legacy = account.with_exchange_account(ExchangeAccount(kept.fingerprint))
+
+    restored = legacy.with_exchange_account(kept)
+
+    assert restored.exchange_account.public_fields == {"account_address": ADDRESS}
+    assert (restored.id, restored.credentials) == (account.id, account.credentials)
+
+
+def test_the_public_fields_of_another_exchange_account_are_refused() -> None:
+    account = an_account(TenantId.new())
+
+    with pytest.raises(CredentialsOfAnotherAccountError):
+        account.with_exchange_account(exchange_account_of(ADDRESS.replace("1", "2"), OTHER_SECRET))

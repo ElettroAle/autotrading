@@ -41,7 +41,7 @@ def get_account(store: AccountStore, flows: FlowStore, account_id: AccountId, *,
     return use_case.execute(GetAccountCommand(account_id))
 
 
-def test_details_name_the_account_and_say_only_that_credentials_are_present() -> None:
+def test_details_name_the_account_its_public_fields_and_say_only_that_secrets_are_present() -> None:
     account = an_account(ANNA)
 
     details = AccountDetails.of(account)
@@ -52,7 +52,7 @@ def test_details_name_the_account_and_say_only_that_credentials_are_present() ->
         account.exchange,
         True,
     )
-    assert ADDRESS not in repr(details)
+    assert details.public_fields == {"account_address": ADDRESS}
     assert SECRET not in repr(details)
 
 

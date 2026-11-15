@@ -2,6 +2,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { NetworkBadge } from '@/components/ui/network-notice';
+import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { formatAmount } from '@/utils/format-amount';
 
 import { useAccountBalance } from '../api/get-account-state';
@@ -10,6 +11,7 @@ import { useFreeCapital } from '../api/get-free-capital';
 
 import { AccountActions } from './account-actions';
 import { ExchangeAmount } from './exchange-amount';
+import { PublicFields } from './public-fields';
 
 const Balance = ({ account }: { account: Account }) => (
   <ExchangeAmount reading={useAccountBalance(account.id)} unavailable="Saldo non disponibile" />
@@ -22,8 +24,16 @@ const FreeCapital = ({ account }: { account: Account }) => (
   />
 );
 
+const AccountOnExchange = ({ account }: { account: Account }) => {
+  const exchanges = useSupportedExchanges();
+  const fields =
+    exchanges.data?.find((exchange) => exchange.name === account.exchange)?.fields ?? [];
+  return <PublicFields fields={fields} values={account.public_fields} />;
+};
+
 const COLUMNS: DataTableColumn<Account>[] = [
   { header: 'Nome', cell: (account) => account.name },
+  { header: "Conto sull'exchange", cell: (account) => <AccountOnExchange account={account} /> },
   {
     header: 'Rete',
     cell: (account) => (

@@ -1,11 +1,15 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.application.accounts.account_summary import AccountSummary
+from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.errors import AutotradingError
+from tests.support.credentials import ACCOUNT_ADDRESS, API_WALLET_KEY
 from tests.support.keyring import Keyring
 from tests.support.platform import HYPERLIQUID, Platform, registration
 from tests.support.steps import quoted
@@ -18,14 +22,23 @@ class Replacement:
     platform: Platform
     keyring: Keyring
     failures: list[AutotradingError] = field(default_factory=list)
+    read: list[AccountSummary] = field(default_factory=list)
 
-    def attempt(self, user: str, account: str, credentials: Credentials) -> None:
+    def attempt(self, user: str, account: str, values: dict[str, str]) -> None:
         saved = self.platform.account_named(user, account)
-        command = ReplaceCredentialsCommand(saved.id, credentials.values)
+        command = ReplaceCredentialsCommand(saved.id, values)
         try:
             self.platform.use_cases_of(user).replace_credentials.execute(command)
         except AutotradingError as error:
             self.failures.append(error)
+
+    def details(self, user: str, account: str) -> AccountSummary:
+        saved = self.platform.account_named(user, account)
+        return self.platform.use_cases_of(user).get_account.execute(GetAccountCommand(saved.id))
+
+
+def secret_fields_of(credentials: Credentials) -> dict[str, str]:
+    return {API_WALLET_KEY: credentials.value(API_WALLET_KEY)}
 
 
 @pytest.fixture
@@ -50,15 +63,38 @@ def user_has_account(platform: Platform, keyring: Keyring, user: str, account: s
     platform.register_account(user, registration(account, HYPERLIQUID, keyring[label]))
 
 
-@when(quoted('"{user}" sostituisce le credenziali del conto "{account}" con "{label}" che l\'exchange accetta'))
-def replace_with_accepted(replacement: Replacement, user: str, account: str, label: str) -> None:
+@given(quoted('che il conto "{account}" non conserva i suoi campi pubblici'))
+def account_without_public_fields(platform: Platform, account: str) -> None:
+    store = platform.accounts.accounts
+    (index,) = [position for position, saved in enumerate(store) if saved.name.value == account]
+    # An account registered before the public fields were kept: only the digest of its exchange account (ADR 0019).
+    store[index] = replace(store[index], exchange_account=ExchangeAccount(store[index].exchange_account.fingerprint))
+
+
+@when(
+    quoted('"{user}" sostituisce i campi segreti del conto "{account}" con quelli di "{label}" che l\'exchange accetta')
+)
+def replace_secrets_accepted(replacement: Replacement, user: str, account: str, label: str) -> None:
     replacement.platform.hyperliquid.accept(replacement.keyring[label])
-    replacement.attempt(user, account, replacement.keyring[label])
+    replacement.attempt(user, account, secret_fields_of(replacement.keyring[label]))
 
 
-@when(quoted('"{user}" sostituisce le credenziali del conto "{account}" con "{label}" che l\'exchange rifiuta'))
-def replace_with_rejected(replacement: Replacement, user: str, account: str, label: str) -> None:
-    replacement.attempt(user, account, replacement.keyring[label])
+@when(
+    quoted('"{user}" sostituisce i campi segreti del conto "{account}" con quelli di "{label}" che l\'exchange rifiuta')
+)
+def replace_secrets_rejected(replacement: Replacement, user: str, account: str, label: str) -> None:
+    replacement.attempt(user, account, secret_fields_of(replacement.keyring[label]))
+
+
+@when(
+    quoted(
+        '"{user}" sostituisce le credenziali del conto "{account}" '
+        'con tutte le credenziali di "{label}" che l\'exchange accetta'
+    )
+)
+def replace_all_accepted(replacement: Replacement, user: str, account: str, label: str) -> None:
+    replacement.platform.hyperliquid.accept(replacement.keyring[label])
+    replacement.attempt(user, account, dict(replacement.keyring[label].values))
 
 
 @when(
@@ -70,7 +106,18 @@ def replace_with_rejected(replacement: Replacement, user: str, account: str, lab
 def replace_with_another_exchange_account(replacement: Replacement, user: str, account: str) -> None:
     credentials = Keyring.of_another_exchange_account()
     replacement.platform.hyperliquid.accept(credentials)
-    replacement.attempt(user, account, credentials)
+    replacement.attempt(user, account, dict(credentials.values))
+
+
+@when(quoted('"{user}" legge il conto "{account}"'))
+def read_account(replacement: Replacement, user: str, account: str) -> None:
+    replacement.read.append(replacement.details(user, account))
+
+
+@then(quoted('il conto "{account}" mostra i campi pubblici di "{label}"'))
+def shows_public_fields(replacement: Replacement, keyring: Keyring, account: str, label: str) -> None:
+    details = replacement.details("anna", account)
+    assert dict(details.public_fields) == {ACCOUNT_ADDRESS: keyring[label].value(ACCOUNT_ADDRESS)}
 
 
 @then(quoted('il conto "{account}" usa le credenziali "{label}"'))
