@@ -1,6 +1,6 @@
 # ADR 0110 — Outbox delle integrazioni esterne: libreria pronta o tabella propria
 
-- Stato: proposta (13 novembre 2026), in attesa della decisione del proprietario
+- Stato: sostituita dall'ADR outbox-delle-integrazioni-esterne-con-procrastinate (15 novembre 2026)
 - Requisiti: RF-24.01, R1.8.2, RNF-03; Task T0.0.2 (178)
 - Collegate: ADR 0092 (notifiche come passi espliciti dei casi d'uso), ADR 0089 (un adapter, una tecnologia),
   ADR 0042 (cicli nel worker, lettura del pianificatore fra i tenant), ADR 0022 (ordini con `cloid`)

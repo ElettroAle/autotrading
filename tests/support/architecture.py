@@ -131,8 +131,9 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     # OpenRouter is reached on its own API with the transport of the platform (ADR 0109).
     "adapters/outbound/openrouter": frozenset({"httpx"}),
     "adapters/outbound/rss": frozenset({"httpx"}),
-    # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle.
-    "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy", "psycopg"}),
+    # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle; procrastinate is the
+    # queue of the outbox on the same database (ADR outbox-delle-integrazioni-esterne-con-procrastinate).
+    "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy", "psycopg", "procrastinate"}),
     "adapters/outbound/system_clock": frozenset(),
     "adapters/outbound/telegram": frozenset({"httpx"}),
     "adapters/outbound/threads": frozenset(),

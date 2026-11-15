@@ -4,8 +4,14 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 
-from autotrading.adapters.inbound.api.worker import BotPolling, CyclePolling, create_worker_api
-from autotrading.application.notifications.errors import BotUnreachableError
+from autotrading.adapters.inbound.api.worker import (
+    BotPolling,
+    CyclePolling,
+    OutboxProcessing,
+    WorkerLoops,
+    create_worker_api,
+)
+from autotrading.application.notifications.errors import BotUnreachableError, OutboxUnavailableError
 from tests.support.worker import TOKEN, Worker
 
 
@@ -55,7 +61,7 @@ def test_the_bot_runs_in_the_background_while_the_worker_is_up() -> None:
         stopped.wait(0.01)
 
     worker = Worker()
-    with TestClient(create_worker_api(TOKEN, worker.for_tenant, BotPolling(answer_round))) as client:
+    with TestClient(create_worker_api(TOKEN, worker.for_tenant, WorkerLoops(bot=BotPolling(answer_round)))) as client:
         assert answered.wait(5)
         assert client.get("/health").json() == {"status": "ok"}
         [bot] = [thread for thread in threading.enumerate() if thread.name == "telegram-bot"]
@@ -108,7 +114,9 @@ def test_the_cycles_and_the_bot_run_together_while_the_worker_is_up() -> None:
 
     with TestClient(
         create_worker_api(
-            TOKEN, Worker().for_tenant, BotPolling(answered.set, 0.01), CyclePolling(planned.set, pause_seconds=0.01)
+            TOKEN,
+            Worker().for_tenant,
+            WorkerLoops(BotPolling(answered.set, 0.01), CyclePolling(planned.set, pause_seconds=0.01)),
         )
     ):
         assert planned.wait(5)
@@ -118,3 +126,42 @@ def test_the_cycles_and_the_bot_run_together_while_the_worker_is_up() -> None:
     for loop in loops:
         loop.join(5)
         assert not loop.is_alive()
+
+
+def test_the_outbox_is_processed_again_after_a_pause_when_its_processing_ends(caplog: pytest.LogCaptureFixture) -> None:
+    runs: list[int] = []
+    waits: list[float] = []
+
+    class Stopping(threading.Event):
+        def wait(self, timeout: float | None = None) -> bool:
+            waits.append(timeout or 0.0)
+            if len(runs) == 2:
+                self.set()
+            return False
+
+    def process() -> None:
+        runs.append(1)
+        if len(runs) == 1:
+            raise OutboxUnavailableError
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
+        OutboxProcessing(process, pause_seconds=4.0).run(Stopping())
+
+    assert runs == [1, 1]
+    assert waits == [4.0, 4.0]
+    assert [record.getMessage() for record in caplog.records] == ["consegna dei messaggi in uscita interrotta"]
+
+
+def test_the_outbox_is_processed_in_the_background_while_the_worker_is_up() -> None:
+    processed = threading.Event()
+
+    with TestClient(
+        create_worker_api(
+            TOKEN, Worker().for_tenant, WorkerLoops(outbox=OutboxProcessing(processed.set, pause_seconds=0.01))
+        )
+    ):
+        assert processed.wait(5)
+        [outbox] = [thread for thread in threading.enumerate() if thread.name == "outbox"]
+
+    outbox.join(5)
+    assert not outbox.is_alive()
