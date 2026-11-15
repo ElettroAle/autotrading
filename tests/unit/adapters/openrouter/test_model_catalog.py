@@ -21,7 +21,7 @@ def entry(identifier: str, **overrides: object) -> dict[str, object]:
         "context_length": 163840,
         "architecture": {"output_modalities": ["text"]},
         "pricing": {"prompt": "0.0000003", "completion": "0.0000012"},
-        "supported_parameters": ["max_tokens", "temperature", "reasoning", "response_format"],
+        "supported_parameters": ["max_tokens", "temperature", "reasoning", "response_format", "structured_outputs"],
         "top_provider": {"context_length": 163840, "max_completion_tokens": 8192},
         **overrides,
     }
@@ -81,7 +81,7 @@ def test_a_model_of_openrouter_becomes_a_model_of_the_catalog_with_its_parameter
 
 
 def test_a_model_without_temperature_or_reasoning_offers_only_the_length_of_the_answer() -> None:
-    plain = entry("x/plain", supported_parameters=["max_tokens"])
+    plain = entry("x/plain", supported_parameters=["max_tokens", "structured_outputs"])
 
     (model,) = catalog_on(OpenRouter([plain])).catalog().models
 
@@ -102,6 +102,14 @@ def test_a_free_model_costs_nothing() -> None:
     (model,) = catalog_on(OpenRouter([free])).catalog().models
 
     assert model.prices == ModelPrices(Decimal(0), Decimal(0))
+
+
+def test_a_model_that_cannot_answer_in_a_strict_format_is_not_in_the_catalog() -> None:
+    loose = entry("x/loose", supported_parameters=["max_tokens", "response_format"])
+
+    catalog = catalog_on(OpenRouter([loose, entry("x/strict")])).catalog()
+
+    assert [model.name for model in catalog.models] == ["openrouter/x/strict"]
 
 
 def test_a_model_that_does_not_answer_in_text_is_not_in_the_catalog() -> None:

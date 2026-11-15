@@ -11,6 +11,10 @@ def _completion(**_request: object) -> object:
     return None
 
 
+def _supports_response_schema(_model: str) -> bool:
+    return True
+
+
 def _parameters_of(_model: str, _provider: str) -> Sequence[str] | None:
     return None
 
@@ -21,7 +25,11 @@ def _required_keys(_model: str) -> Sequence[str]:
 
 def test_the_gateway_makes_the_call_and_the_catalog_of_the_library_always_the_same() -> None:
     gateway = LiteLlmModelGatewayAdapter(
-        _completion, _ModelLibrary({}, _parameters_of, _required_keys), frozenset({"openai"}), 120.0
+        _completion,
+        _supports_response_schema,
+        _ModelLibrary({}, _parameters_of, _required_keys),
+        frozenset({"openai"}),
+        120.0,
     )
 
     assert isinstance(gateway.model_call(), LiteLlmModelCallAdapter)

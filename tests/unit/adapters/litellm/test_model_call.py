@@ -16,6 +16,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.ports import ModelReply
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.answer_format import AnswerFormat
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -31,6 +32,8 @@ SETTINGS: dict[str, ParameterValue] = {
     "reasoning_effort": "alto",
 }
 ANSWER = '{"decisioni": []}'
+FORMAT = AnswerFormat("decisioni", {"type": "object", "properties": {}, "required": [], "additionalProperties": False})
+STRICT_FORMAT = {"type": "json_schema", "json_schema": {"name": "decisioni", "strict": True, "schema": FORMAT.schema}}
 USAGE: dict[str, object] = {"prompt_tokens": 2000, "completion_tokens": 500, "total_tokens": 2500}
 CHOICES: list[dict[str, object]] = [
     {"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": ANSWER}}
@@ -46,8 +49,10 @@ def response(**fields: object) -> litellm.ModelResponse:
 class Library:
     """The completion of the library, recording what it is asked and answering or failing as told."""
 
-    def __init__(self, answer: object = None, failure: Failure | None = None) -> None:
+    def __init__(self, answer: object = None, failure: Failure | None = None, strict: bool = True) -> None:
         self.requests: list[dict[str, object]] = []
+        self.asked_formats: list[str] = []
+        self._strict = strict
         self._answer = response() if answer is None else answer
         self._failure = failure
 
@@ -57,14 +62,21 @@ class Library:
             raise self._failure()
         return self._answer
 
+    def supports_response_schema(self, model: str) -> bool:
+        self.asked_formats.append(model)
+        return self._strict
+
     @property
     def sent(self) -> dict[str, object]:
         return self.requests[0]
 
 
+def adapter_on(library: Library) -> LiteLlmModelCallAdapter:
+    return LiteLlmModelCallAdapter(library.completion, library.supports_response_schema, TIMEOUT_SECONDS)
+
+
 def call(library: Library, model: str, settings: dict[str, ParameterValue] | None = None) -> ModelReply:
-    adapter = LiteLlmModelCallAdapter(library.completion, TIMEOUT_SECONDS)
-    return adapter.call(model, KEY, SETTINGS if settings is None else settings, MESSAGES)
+    return adapter_on(library).call(model, KEY, SETTINGS if settings is None else settings, MESSAGES, FORMAT)
 
 
 def failing(failure: Failure) -> Library:
@@ -97,7 +109,7 @@ def test_every_provider_gets_the_same_request_of_the_openai_api_with_the_key_of_
         "api_key": KEY.value("api_key"),
         "max_tokens": 2048,
         "temperature": 0.7,
-        "response_format": {"type": "json_object"},
+        "response_format": STRICT_FORMAT,
         "reasoning_effort": "high",
         "drop_params": True,
         "num_retries": 0,
@@ -105,12 +117,22 @@ def test_every_provider_gets_the_same_request_of_the_openai_api_with_the_key_of_
     }
 
 
+def test_a_model_the_library_declares_without_a_strict_format_is_asked_for_any_json() -> None:
+    """ADR risposta-del-modello-con-schema-rigido: a capability the library declares, never a branch per provider."""
+    library = Library(strict=False)
+
+    call(library, "deepseek/deepseek-chat")
+
+    assert library.asked_formats == ["deepseek/deepseek-chat"]
+    assert library.sent["response_format"] == {"type": "json_object"}
+
+
 def test_every_field_of_the_key_travels_as_the_parameter_of_the_call_it_names() -> None:
     """R2.3.9, ADR 0159: a provider that asks more than the key gets each field by its name, in this call only."""
     library = Library()
     key = ProviderKey({"api_key": "K-AZURE", "api_base": "https://models.example.test", "api_version": "2026-01"})
 
-    LiteLlmModelCallAdapter(library.completion, TIMEOUT_SECONDS).call("azure/gpt-4o", key, SETTINGS, MESSAGES)
+    adapter_on(library).call("azure/gpt-4o", key, SETTINGS, MESSAGES, FORMAT)
 
     assert {name: library.sent[name] for name in ("api_key", "api_base", "api_version")} == dict(key.values)
 
