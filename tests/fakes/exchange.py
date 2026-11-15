@@ -34,8 +34,9 @@ def rejection_message(credentials: Credentials) -> str:
 class FakeExchangeAdapter:
     """An exchange that knows which credentials it accepts and the state of each account behind them."""
 
-    def __init__(self, *, real: bool = False) -> None:
+    def __init__(self, *, real: bool = False, network_name: str | None = None) -> None:
         self._real = real
+        self._network_name = network_name or ("mainnet" if real else "testnet")
         self.fields: tuple[CredentialField, ...] = HYPERLIQUID_FIELDS
         self._states: dict[Credentials, AccountState] = {}
         self.reachable = True
@@ -45,6 +46,9 @@ class FakeExchangeAdapter:
 
     def is_real(self) -> bool:
         return self._real
+
+    def network_name(self) -> str:
+        return self._network_name
 
     def credential_fields(self) -> tuple[CredentialField, ...]:
         return self.fields

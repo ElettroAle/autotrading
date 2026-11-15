@@ -48,7 +48,8 @@ Then(
     allocated: number,
     free: number,
   ) => {
-    await expectShown(dashboard.accountCell(name, 'Rete'), network);
+    // The network carries its kind beside the name the exchange gives it (R2.3.10).
+    await expectShown(dashboard.accountCell(name, 'Rete'), `TEST · ${network}`);
     await expectShown(dashboard.accountCell(name, 'Saldo'), `${balance} USDC`);
     await expectShown(dashboard.accountCell(name, 'Capitale allocato'), `${allocated} USDC`);
     await expectShown(dashboard.accountCell(name, 'Capitale libero'), `${free} USDC`);

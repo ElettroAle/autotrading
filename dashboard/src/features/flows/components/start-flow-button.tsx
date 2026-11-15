@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { RealMoneyStartConfirmation } from '@/components/ui/real-money';
+import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 
 import { useStartFlow } from '../api/start-flow';
 

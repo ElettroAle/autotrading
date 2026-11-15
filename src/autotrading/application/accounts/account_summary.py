@@ -4,8 +4,8 @@ from decimal import Decimal
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
+from autotrading.domain.accounts.declared_network import DeclaredNetwork
 from autotrading.domain.accounts.exchange_name import ExchangeName
-from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,13 +19,13 @@ class AccountSummary:
     name: AccountName
     exchange: ExchangeName
     has_credentials: bool
-    network: ExchangeNetwork
+    network: DeclaredNetwork
     allocated_capital: Decimal
     currency: str
 
     @classmethod
     def of(
-        cls, account: Account, allocated_capital: Decimal, network: ExchangeNetwork, currency: str
+        cls, account: Account, allocated_capital: Decimal, network: DeclaredNetwork, currency: str
     ) -> AccountSummary:
         return cls(
             account.id,

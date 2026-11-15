@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
-const accountsSchema = z.array(z.object({ id: z.string(), name: z.string(), network: z.string() }));
+const accountsSchema = z.array(
+  z.object({ id: z.string(), name: z.string(), network: z.string(), network_name: z.string() }),
+);
 
 export type Account = z.infer<typeof accountsSchema>[number];
 

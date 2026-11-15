@@ -82,3 +82,12 @@ def test_the_exchanges_are_described_among_the_routes_of_the_accounts(client_of:
     operation = client_of("anna").get("/openapi.json").json()["paths"]["/exchanges"]["get"]
 
     assert operation["tags"] == ["conti"]
+
+
+def test_lists_each_exchange_with_the_name_its_adapter_gives_the_network(platform: Platform, client_of: Client) -> None:
+    """R2.3.10: the dashboard names the network without knowing any exchange."""
+    platform.exchanges[HYPERLIQUID] = FakeExchangeAdapter(network_name="sandbox")
+
+    [exchange] = client_of("anna").get("/exchanges").json()
+
+    assert (exchange["network"], exchange["network_name"]) == ("test", "sandbox")

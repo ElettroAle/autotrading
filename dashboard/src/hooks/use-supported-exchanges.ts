@@ -6,7 +6,12 @@ import { readData, useApiClient } from '@/lib/api-client';
 const declaredFieldSchema = z.object({ name: z.string(), label: z.string(), secret: z.boolean() });
 
 const supportedExchangesSchema = z.array(
-  z.object({ name: z.string(), network: z.string(), fields: z.array(declaredFieldSchema) }),
+  z.object({
+    name: z.string(),
+    network: z.string(),
+    network_name: z.string(),
+    fields: z.array(declaredFieldSchema),
+  }),
 );
 
 export type SupportedExchange = z.infer<typeof supportedExchangesSchema>[number];

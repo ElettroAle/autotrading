@@ -11,6 +11,7 @@ export const accountSchema = z.object({
   exchange: z.string(),
   has_credentials: z.boolean(),
   network: z.string(),
+  network_name: z.string(),
   allocated_capital: z.string(),
   currency: z.string(),
 });

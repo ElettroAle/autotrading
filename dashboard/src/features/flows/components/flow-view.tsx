@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
-import { isRealMoney } from '@/components/ui/real-money';
+import { isRealMoney, TestNetworkNotice } from '@/components/ui/network-notice';
 import { paths } from '@/config/paths';
 
 import { useAccounts } from '../api/get-accounts';
@@ -49,14 +49,16 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
     return <p>Flusso non trovato.</p>;
   }
   const accountsOfTenant = accounts.data ?? [];
-  const realMoney = isRealMoney(
-    accountsOfTenant.find((account) => account.id === flow.account_id)?.network,
-  );
+  const account = accountsOfTenant.find((candidate) => candidate.id === flow.account_id);
+  const realMoney = isRealMoney(account?.network);
   return (
     <section aria-labelledby="flow-name" className="rounded border border-slate-200 bg-white p-4">
       <h2 id="flow-name" className="text-xl font-semibold break-words">
         {flow.name}
       </h2>
+      {account !== undefined && !realMoney ? (
+        <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
+      ) : null}
       <FlowStatus flow={flow} />
       <nav aria-label="Dati del flusso" className="mt-2 flex flex-wrap gap-4">
         <Link to={paths.flowPositions.getHref(flow.id)} className="text-blue-800 hover:underline">

@@ -184,12 +184,15 @@ describe('RegisterAccountForm', () => {
     expect(fakePlatform.user('anna').accounts).toEqual([]);
   });
 
-  it('says nothing of real money for an exchange on the test network', async () => {
+  it('warns that the chosen exchange trades on the test network the API names, without real money', async () => {
+    fakePlatform.configureExchangeNetwork('test', 'sandbox');
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const region = await screen.findByRole('region', { name: 'Nuovo conto' });
 
     await chooseExchange(region);
 
-    expect(within(region).queryByRole('note')).not.toBeInTheDocument();
+    expect(within(region).getByRole('note')).toHaveTextContent(
+      'Il conto opererà sulla rete di test sandbox, senza denaro reale',
+    );
   });
 });

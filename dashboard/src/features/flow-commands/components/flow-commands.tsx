@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ErrorMessage } from '@/components/ui/error-message';
-import { RealMoneyStartConfirmation } from '@/components/ui/real-money';
+import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 import { paths } from '@/config/paths';
 
 import { useRunFlowCommand } from '../api/run-flow-command';
