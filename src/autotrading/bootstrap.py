@@ -469,7 +469,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
-        (source.environment(), hyperliquid_adapters(source)),
+        (source.environment(), hyperliquid_adapters()),
         worker_adapters(source),
         (catalogs, catalogs),
     )
@@ -482,7 +482,7 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     environment = source.environment()
     opener, provider_key_opener = libsodium_opening_adapters(source)
     slippage = hyperliquid_slippage_adapters(source)
-    hyperliquid = hyperliquid_adapters(source)
+    hyperliquid = hyperliquid_adapters()
     engine = sqlalchemy_adapters(source)
     messenger, inbox, start_link = telegram_adapters(source)
     for_tenant = worker_use_cases(engine, opener, (environment, hyperliquid), slippage, messenger)

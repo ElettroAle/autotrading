@@ -16,6 +16,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     TIMEOUT_SECONDS,
     HyperliquidExchangeAdapter,
     HyperliquidSdkAdapter,
+    HyperliquidTestnetExchangeAdapter,
 )
 from autotrading.application.accounts.errors import (
     CredentialFieldMalformedError,
@@ -260,13 +261,21 @@ def test_an_account_state_of_unexpected_shape_is_unavailable(state: object) -> N
         read(FakeSdk(state=state))
 
 
-@pytest.mark.parametrize(("testnet", "url"), [(True, TESTNET_API_URL), (False, MAINNET_API_URL)])
-def test_the_network_follows_the_installation(testnet: bool, url: str) -> None:
+def test_the_real_exchange_reads_the_account_on_the_real_network() -> None:
     sdk = FakeSdk()
 
-    HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=sdk).read_state(CREDENTIALS)
+    HyperliquidExchangeAdapter(sdk=sdk).read_state(CREDENTIALS)
 
-    assert sdk.calls[0][1][1] == url
+    assert sdk.calls[0][1][1] == MAINNET_API_URL
+
+
+def test_the_test_exchange_reads_the_account_on_the_testnet_the_same_way() -> None:
+    sdk = FakeSdk()
+
+    state = HyperliquidTestnetExchangeAdapter(sdk=sdk).read_state(CREDENTIALS)
+
+    assert sdk.calls[0][1][1] == TESTNET_API_URL
+    assert state == read(FakeSdk())
 
 
 VERIFICATION_ACCESS = VerificationAccess({"account_address": ADDRESS, "secret_key": WALLET.key.hex()})
@@ -338,9 +347,16 @@ def test_declares_the_address_of_the_account_and_the_key_of_the_api_wallet() -> 
     )
 
 
-@pytest.mark.parametrize(("testnet", "name"), [(True, "testnet"), (False, "mainnet")])
-def test_the_network_carries_the_name_hyperliquid_gives_it(testnet: bool, name: str) -> None:
-    assert HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=FakeSdk()).network_name() == name
+@pytest.mark.parametrize(
+    ("adapter", "real", "name"),
+    [(HyperliquidExchangeAdapter, True, "mainnet"), (HyperliquidTestnetExchangeAdapter, False, "testnet")],
+)
+def test_each_exchange_declares_its_network_with_the_name_hyperliquid_gives_it(
+    adapter: type[HyperliquidExchangeAdapter], real: bool, name: str
+) -> None:
+    exchange = adapter(sdk=FakeSdk())
+
+    assert (exchange.is_real(), exchange.network_name()) == (real, name)
 
 
 @pytest.mark.parametrize("missing", ["account_address", "secret_key"])

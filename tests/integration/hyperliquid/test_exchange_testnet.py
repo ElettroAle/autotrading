@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from eth_account import Account as EthereumAccount
 
-from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidTestnetExchangeAdapter
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError
 from autotrading.domain.accounts.credentials import Credentials
 from tests.support.credentials import hyperliquid_credentials
@@ -29,7 +29,7 @@ def credentials() -> Credentials:
 
 
 def test_approved_credentials_read_the_account_value(credentials: Credentials) -> None:
-    balance = HyperliquidExchangeAdapter.for_network(testnet=True).read_state(credentials).balance
+    balance = HyperliquidTestnetExchangeAdapter().read_state(credentials).balance
 
     assert balance.currency == "USDC"
     assert balance.amount >= 0
@@ -39,6 +39,6 @@ def test_a_wallet_not_approved_for_the_account_is_rejected_by_the_exchange(crede
     stranger = hyperliquid_credentials(credentials.value("account_address"), EthereumAccount.create().key.hex())
 
     with pytest.raises(ExchangeRejectedCredentialsError) as raised:
-        HyperliquidExchangeAdapter.for_network(testnet=True).read_state(stranger)
+        HyperliquidTestnetExchangeAdapter().read_state(stranger)
 
     assert raised.value.exchange_message

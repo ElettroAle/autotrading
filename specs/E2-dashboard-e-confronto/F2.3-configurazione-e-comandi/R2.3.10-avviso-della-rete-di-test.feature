@@ -8,7 +8,7 @@ Funzionalità: R2.3.10 Avviso della rete di test
   La rete e il suo nome li dichiara l'adapter dell'exchange; la dashboard non conosce alcun exchange e mostra ciò
   che l'API restituisce. Rete di test: avviso giallo; rete reale: avviso rosso.
 
-  Fuori ambito: scelta della rete dalla dashboard (resta configurazione dell'installazione).
+  La rete si sceglie scegliendo l'exchange alla registrazione del conto (R2.3.11).
 
   Contesto:
     Dato che "anna" è nella pagina dei conti
