@@ -1,6 +1,6 @@
 # ADR 0160 — Menu laterale a gruppi con la voce dell'area attiva
 
-- Stato: proposta (14 novembre 2026)
+- Stato: accettata (14 novembre 2026), decisione del proprietario
 - Requisiti: R2.1.3 (Task 275)
 - Collegate: ADR 0119 (layout con menu laterale ripiegato sul telefono), ADR 0145 (comando Indietro), ADR 0116
 
