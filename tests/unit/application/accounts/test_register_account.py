@@ -5,6 +5,7 @@ import pytest
 
 from autotrading.application.accounts.errors import (
     AccountNameInUseError,
+    CredentialFieldMalformedError,
     ExchangeRejectedCredentialsError,
     ExchangeUnavailableError,
     UnsupportedExchangeError,
@@ -81,6 +82,20 @@ def test_rejected_credentials_save_nothing_and_keep_the_exchange_message(
         use_case.execute(registration("test-2", HYPERLIQUID, new_credentials()))
 
     assert raised.value.exchange_message == REDACTED_REJECTION
+    assert store.accounts == []
+
+
+def test_a_field_of_the_wrong_shape_keeps_its_name_and_its_reason_masked(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    command = registration("test-3", HYPERLIQUID, new_credentials())
+    address = command.credentials["account_address"]
+    exchange.refusal = CredentialFieldMalformedError("secret_key", f"chiave non valida per {address}")
+
+    with pytest.raises(CredentialFieldMalformedError) as raised:
+        use_case.execute(command)
+
+    assert raised.value.details == {"exchange_message": "chiave non valida per ***", "field": "secret_key"}
     assert store.accounts == []
 
 

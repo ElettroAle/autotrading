@@ -43,6 +43,7 @@ class FakeExchangeAdapter:
         self.requests: list[Credentials] = []
         self.shown: dict[Credentials, list[AccountState]] = {}
         self._orders: FakeOrderExchangeAdapter | None = None
+        self.refusal: ExchangeRejectedCredentialsError | None = None
 
     def is_real(self) -> bool:
         return self._real
@@ -79,6 +80,8 @@ class FakeExchangeAdapter:
         self.requests.append(credentials)
         if not self.reachable:
             raise ExchangeUnavailableError
+        if self.refusal is not None:
+            raise self.refusal
         state = self._states.get(credentials)
         if state is None:
             raise ExchangeRejectedCredentialsError(rejection_message(credentials))

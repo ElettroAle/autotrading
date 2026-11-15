@@ -37,7 +37,22 @@ describe('DeclaredFields', () => {
     render(<Form />);
 
     expect(screen.getByLabelText("Chiave dell'API wallet")).toHaveAttribute('type', 'password');
-    expect(screen.getByLabelText("Chiave dell'API wallet")).toHaveAttribute('autocomplete', 'off');
+    expect(screen.getByLabelText("Chiave dell'API wallet")).toHaveAttribute(
+      'autocomplete',
+      'new-password',
+    );
+  });
+
+  it('keeps browser and password managers from filling any declared field (Bug 387)', () => {
+    render(<Form />);
+
+    for (const label of ['Indirizzo del conto', "Chiave dell'API wallet"]) {
+      const input = screen.getByLabelText(label);
+      expect(input).toHaveAttribute('data-lpignore', 'true');
+      expect(input).toHaveAttribute('data-1p-ignore', 'true');
+      expect(input).toHaveAttribute('data-bwignore', 'true');
+    }
+    expect(screen.getByLabelText('Indirizzo del conto')).toHaveAttribute('autocomplete', 'off');
   });
 
   it('shows the reason of a refusal beside its field', () => {

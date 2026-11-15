@@ -3,7 +3,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
-import { FAKE_EXCHANGE, REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
+import {
+  EXCHANGE_REFUSAL,
+  FAKE_EXCHANGE,
+  REJECTED_SECRET_KEY,
+  fakePlatform,
+} from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
@@ -96,7 +101,7 @@ describe('RegisterAccountForm', () => {
     await fillAndSend({ name: 'rifiutato', secretKey: REJECTED_SECRET_KEY });
 
     expect(await within(form()).findByRole('alert')).toHaveTextContent(
-      "credenziali rifiutate dall'exchange",
+      `credenziali rifiutate dall'exchange: ${EXCHANGE_REFUSAL}`,
     );
     expect(within(form()).getByLabelText(SECRET_LABEL)).toHaveValue('');
     expect(within(form()).getByLabelText('Nome')).toHaveValue('rifiutato');

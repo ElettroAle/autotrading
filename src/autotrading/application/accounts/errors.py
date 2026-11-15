@@ -37,6 +37,26 @@ class ExchangeRejectedCredentialsError(ApplicationError):
     def details(self) -> Mapping[str, object]:
         return {"exchange_message": self.exchange_message}
 
+    def with_exchange_message(self, exchange_message: str) -> ExchangeRejectedCredentialsError:
+        """The same refusal with another text, as when the values of the credentials are masked in it."""
+        return ExchangeRejectedCredentialsError(exchange_message)
+
+
+class CredentialFieldMalformedError(ExchangeRejectedCredentialsError):
+    """A value whose shape the exchange can never accept, refused before reaching it with the field it concerns and
+    what is wrong in its shape, never a character of it (Bug 387)."""
+
+    def __init__(self, field: str, exchange_message: str) -> None:
+        super().__init__(exchange_message)
+        self.field = field
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {**super().details, "field": self.field}
+
+    def with_exchange_message(self, exchange_message: str) -> CredentialFieldMalformedError:
+        return CredentialFieldMalformedError(self.field, exchange_message)
+
 
 class ExchangeUnavailableError(ApplicationError):
     status_code = 503
