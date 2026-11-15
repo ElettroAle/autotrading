@@ -109,6 +109,16 @@ def open_position(cycles: Cycles, flow: str, asset: str) -> None:
     cycles.flow(flow).positions.add(asset)
 
 
+@given(
+    parsers.re(
+        rf'^che il flusso "(?P<flow>[^"]+)" è (?P<status>in pausa|fermo|archiviato) alle {TIME}, prima che il '
+        r"pianificatore tolga il suo ciclo$"
+    )
+)
+def flow_left_active(cycles: Cycles, flow: str, status: str, instant: str) -> None:
+    cycles.leave(flow, status, instant)
+
+
 @given("che due esecutori dei cicli sono in funzione")
 def two_executors(cycles: Cycles) -> None:
     cycles.add_executor()
@@ -220,6 +230,11 @@ def cycle_starts_at(cycles: Cycles, instant: str) -> None:
     cycles.tick(instant)
 
 
+@when(parsers.re(rf'^il ciclo delle {TIME} del flusso "(?P<flow>[^"]+)" parte$'))
+def planned_cycle_fires(cycles: Cycles, instant: str, flow: str) -> None:
+    cycles.fire(flow, instant)
+
+
 @when(quoted('il flusso "{flow}" esegue un ciclo'))
 def flow_runs_cycle(cycles: Cycles, flow: str) -> None:
     cycles.run_now(flow)
@@ -283,6 +298,22 @@ def run_once(cycles: Cycles, instant: str, flow: str) -> None:
     cycles.scheduler.settle()
     assert [record.planned_at for record in cycles.records_of(flow)] == [at(instant)]
     assert cycles.agent.calls == [cycles.id_of(flow)]
+
+
+@then("il ciclo non legge lo stato del flusso, non chiama l'agente e non invia ordini")
+def nothing_done(cycles: Cycles) -> None:
+    assert (cycles.flows.reads, cycles.agent.calls, cycles.orders.sent) == ([], [], [])
+
+
+@then(
+    parsers.re(
+        rf'^nessun ciclo delle {TIME} del flusso "(?P<flow>[^"]+)" è registrato e nessun fallimento è notificato$'
+    )
+)
+def nothing_recorded(cycles: Cycles, instant: str, flow: str) -> None:
+    assert [record for record in cycles.records_of(flow) if record.planned_at == at(instant)] == []
+    assert cycles.failure_notices.told == []
+    assert cycles.equity.recorded == []
 
 
 @then("il ciclo registra i passi in quest'ordine:")

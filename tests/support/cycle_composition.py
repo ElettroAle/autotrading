@@ -34,6 +34,7 @@ from autotrading.application.flows.ports import (
     PlannedFlowsPort,
 )
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
+from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
@@ -149,6 +150,7 @@ def run_cycle_for(
         pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
         clock=services.clock,
         failures=ports.cycle_failure,
+        activity=ReadFlowActivityUseCase(ports.flows),
     )
     return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
 

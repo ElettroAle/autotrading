@@ -1,11 +1,14 @@
 import logging
 from collections.abc import Iterator
+from contextlib import AbstractContextManager
+from dataclasses import replace
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
 from autotrading.application.flows.ports import RiskReview
-from autotrading.application.flows.run_cycle import RunCycleCommand
+from autotrading.application.flows.run_cycle import RunCycleCommand, RunCycleUseCase
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -127,6 +130,45 @@ def test_a_cycle_planned_while_the_previous_runs_is_skipped(cycles: Cycles) -> N
     assert record == CycleRecord.skipped(cycles.id_of("alfa"), at("10:22:00"))
     assert cycles.records.records == [record]
     assert cycles.agent.calls == []
+
+
+@pytest.mark.parametrize("status", [PAUSED, "fermo", "archiviato"])
+def test_a_cycle_of_a_flow_no_longer_active_does_nothing_and_leaves_no_trace(cycles: Cycles, status: str) -> None:
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC"]
+    cycles.flow("alfa").status = status
+
+    assert run(cycles) is None
+    assert (cycles.flows.reads, cycles.agent.calls, cycles.orders.sent) == ([], [], [])
+    assert (cycles.records.records, cycles.failure_notices.told, cycles.equity.recorded) == ([], [], [])
+    assert cycles.flow("alfa").status == status
+
+
+def test_a_flow_stopped_while_its_previous_cycle_runs_records_no_skipped_cycle(cycles: Cycles) -> None:
+    cycles.flow("alfa").status = "fermo"
+    with cycles.lock.hold(cycles.id_of("alfa")):
+        record = run(cycles)
+
+    assert record is None
+    assert cycles.records.records == []
+
+
+class StopAtTheLockAdapter:
+    """The lock of the flow, with a stop that saves its status just before the cycle takes the lock."""
+
+    def __init__(self, cycles: Cycles) -> None:
+        self._cycles = cycles
+
+    def hold(self, flow_id: UUID) -> AbstractContextManager[bool]:
+        self._cycles.flow("alfa").status = "fermo"
+        return self._cycles.lock.hold(flow_id)
+
+
+def test_the_status_is_read_once_the_flow_is_held(cycles: Cycles) -> None:
+    guards = replace(cycles.guards(), lock=StopAtTheLockAdapter(cycles))
+    command = RunCycleCommand(cycles.id_of("alfa"), cycles.flow("alfa").schedule, at("10:22:00"))
+
+    assert RunCycleUseCase(cycles.graph(), guards, cycles.equity).execute(command) is None
+    assert (cycles.flows.reads, cycles.agent.calls, cycles.records.records) == ([], [], [])
 
 
 def test_the_lock_is_released_after_the_cycle(cycles: Cycles) -> None:
