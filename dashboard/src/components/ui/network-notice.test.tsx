@@ -39,17 +39,17 @@ describe('network notice', () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  it('says the subject trades on the test network the API names, without real money', () => {
+  it('says the subject trades on the test network the API names, quoted, without real money', () => {
     render(<TestNetworkNotice subject="Il conto" networkName="sandbox" />);
 
     expect(screen.getByRole('note')).toHaveTextContent(
-      'Il conto opererà sulla rete di test sandbox, senza denaro reale',
+      'Il conto opererà sulla rete di test "sandbox", senza denaro reale',
     );
   });
 
   it.each([
     ['real', 'Il conto opererà con denaro reale'],
-    ['test', 'Il conto opererà sulla rete di test sandbox, senza denaro reale'],
+    ['test', 'Il conto opererà sulla rete di test "sandbox", senza denaro reale'],
   ])('warns of the network %s', (network, text) => {
     render(<NetworkNotice subject="Il conto" network={network} networkName="sandbox" />);
 

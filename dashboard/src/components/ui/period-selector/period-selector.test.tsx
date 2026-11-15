@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 
+import { FILTER_FIELD } from '../filters';
+
 import { PeriodSelector } from './period-selector';
 import { apiSearchOf, isComplete, usePeriod, type Period } from './use-period';
 
@@ -60,6 +62,14 @@ describe('PeriodSelector', () => {
 
     expect(searchShown()).toBe('?period=range&from=2026-11-01&to=2026-11-03');
     expect(periodRead()).toEqual({ kind: 'range', from: '2026-11-01', to: '2026-11-03' });
+  });
+
+  it('makes every field as wide as a phone and as wide as its choices on a wide screen', () => {
+    renderAt('/flows/alfa?period=range&from=2026-11-01&to=2026-11-03');
+
+    for (const label of ['Periodo', 'Dal', 'Al']) {
+      expect(screen.getByLabelText(label)).toHaveClass(...FILTER_FIELD.split(' '));
+    }
   });
 
   it('forgets the days when a period other than a range is chosen', async () => {

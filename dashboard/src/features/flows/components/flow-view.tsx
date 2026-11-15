@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { isRealMoney, TestNetworkNotice } from '@/components/ui/network-notice';
+import { ViewTabs, type View } from '@/components/ui/view-tabs';
 import { paths } from '@/config/paths';
 
 import { useAccounts } from '../api/get-accounts';
@@ -26,6 +28,14 @@ const FlowStatus = ({ flow }: { flow: Flow }) => {
   }
   return <p className="text-slate-600">Stato: {flow.status}</p>;
 };
+
+// The views of the flow are pages of their own, apart from the commands that change it (R6.4.1).
+const flowViews = (flowId: string): View[] => [
+  { name: 'Posizioni aperte', to: paths.flowPositions.getHref(flowId) },
+  { name: 'Posizioni chiuse', to: paths.flowClosedPositions.getHref(flowId) },
+  { name: 'Cicli del flusso', to: paths.flowCycles.getHref(flowId) },
+  { name: 'Versioni della configurazione', to: paths.flowVersions.getHref(flowId) },
+];
 
 type FlowViewProps = {
   readonly flowId: string;
@@ -52,36 +62,20 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
   const account = accountsOfTenant.find((candidate) => candidate.id === flow.account_id);
   const realMoney = isRealMoney(account?.network);
   return (
-    <section aria-labelledby="flow-name" className="rounded border border-slate-200 bg-white p-4">
-      <h2 id="flow-name" className="text-xl font-semibold break-words">
-        {flow.name}
-      </h2>
-      {account !== undefined && !realMoney ? (
-        <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
-      ) : null}
-      <FlowStatus flow={flow} />
-      <nav aria-label="Dati del flusso" className="mt-2 flex flex-wrap gap-4">
-        <Link to={paths.flowPositions.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Posizioni aperte
-        </Link>
-        <Link
-          to={paths.flowClosedPositions.getHref(flow.id)}
-          className="text-blue-800 hover:underline"
-        >
-          Posizioni chiuse
-        </Link>
-        <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Cicli del flusso
-        </Link>
-        <Link to={paths.flowVersions.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Versioni della configurazione
-        </Link>
-        <Link to={paths.editFlow.getHref(flow.id)} className="text-blue-800 hover:underline">
+    <section aria-label={flow.name} className="rounded border border-slate-200 bg-white p-4">
+      <div className="space-y-2">
+        <FlowStatus flow={flow} />
+        {account !== undefined && !realMoney ? (
+          <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
+        ) : null}
+      </div>
+      <div className="mt-3">
+        <ViewTabs label="Dati del flusso" views={flowViews(flow.id)} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Link to={paths.editFlow.getHref(flow.id)} className={SECONDARY_COMMAND}>
           Modifica la configurazione
         </Link>
-      </nav>
-      <FlowDetails flow={flow} accounts={accountsOfTenant} />
-      <div className="mt-4 flex gap-3">
         <DuplicateFlowButton flowId={flow.id} />
         <ExportStrategyButton flowId={flow.id} />
         {flow.status === DRAFT_STATUS ? (
@@ -90,6 +84,7 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
       </div>
       {renderCommands(flow, realMoney)}
       <RecentCycles flowId={flow.id} />
+      <FlowDetails flow={flow} accounts={accountsOfTenant} />
       {flow.status === DRAFT_STATUS ? (
         <DraftAssignmentForm flowId={flow.id} accounts={accountsOfTenant} />
       ) : null}

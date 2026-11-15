@@ -1,3 +1,5 @@
+import { SECONDARY_COMMAND } from '@/components/ui/commands';
+
 import { useExportFlowStrategy } from '../api/export-flow-strategy';
 
 import { CommandRefusal } from './command-refusal';
@@ -11,7 +13,7 @@ export const ExportStrategyButton = ({ flowId }: { flowId: string }) => {
         type="button"
         disabled={exportStrategy.isPending}
         onClick={() => exportStrategy.mutate(flowId)}
-        className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100"
+        className={SECONDARY_COMMAND}
       >
         Esporta
       </button>

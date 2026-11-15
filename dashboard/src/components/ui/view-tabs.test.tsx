@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
@@ -48,5 +48,12 @@ describe('ViewTabs', () => {
       'aria-current',
       'page',
     );
+  });
+
+  it('wraps the views on a narrow screen instead of pushing the page wider', () => {
+    openAt('/');
+
+    const views = screen.getByRole('navigation', { name: 'Viste dei flussi' });
+    expect(within(views).getByRole('list')).toHaveClass('flex-wrap');
   });
 });

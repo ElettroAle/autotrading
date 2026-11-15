@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { FILTER_FIELD } from '@/components/ui/filters';
 import {
   aHistoryCycle,
   aHistoryOrder,
@@ -64,6 +65,15 @@ describe('HistoryView', () => {
       'href',
       '/flows/flow-alfa/cycles/2026-11-03T11%3A00%3A00Z',
     );
+  });
+
+  it('makes every filter as wide as a phone and as wide as its choices on a wide screen', async () => {
+    await renderApp({ account: 'anna', url: '/history' });
+
+    const filters = await screen.findByRole('group', { name: 'Filtri' });
+    for (const label of ['Flusso', 'Versione', 'Conto', 'Asset']) {
+      expect(within(filters).getByLabelText(label)).toHaveClass(...FILTER_FIELD.split(' '));
+    }
   });
 
   it('enables the version only with a flow, and shows only the cycles of the version chosen', async () => {

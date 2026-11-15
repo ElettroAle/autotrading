@@ -8,6 +8,23 @@ const ICON_BY_OUTCOME: Readonly<Record<string, { icon: string; style: string }>>
 };
 const OTHER_OUTCOME = { icon: '–', style: 'bg-slate-100 text-slate-700' };
 
+/** What the icons of the outcomes mean, said once above the flows (R6.4.1). */
+export const OutcomesLegend = () => (
+  <ul aria-label="Legenda degli esiti" className="mb-2 flex flex-wrap gap-4 text-sm text-slate-600">
+    {Object.entries(ICON_BY_OUTCOME).map(([outcome, { icon, style }]) => (
+      <li key={outcome} className="flex items-center gap-1">
+        <span
+          aria-hidden="true"
+          className={`flex h-6 w-6 items-center justify-center rounded font-bold ${style}`}
+        >
+          {icon}
+        </span>
+        {outcome}
+      </li>
+    ))}
+  </ul>
+);
+
 /** The outcome of the last cycles of a flow from the most recent, as icons with a text for every reader (R2.2.2). */
 export const RecentOutcomes = ({ outcomes }: { outcomes: CycleOutcome[] }) => {
   if (outcomes.length === 0) {

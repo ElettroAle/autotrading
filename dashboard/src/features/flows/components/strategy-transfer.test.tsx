@@ -96,7 +96,7 @@ describe('Strategy export and import', () => {
     await importAs('alfa bis', fileOf(JSON.stringify(exportedFromAlfa())));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/flows/flow-alfa%20bis'));
-    expect(await screen.findByRole('heading', { level: 2, name: 'alfa bis' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa bis' })).toBeVisible();
     expect(screen.getByText('Bozza')).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Assegnazione della bozza' })).toBeInTheDocument();
     expect(fakePlatform.flowNamed('alfa bis').sources).toEqual([{ name: 'indicatori', weight: 2 }]);

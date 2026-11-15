@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 
+import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { paths } from '@/config/paths';
@@ -24,15 +25,15 @@ const CycleFailureView = ({ failure }: { failure: Failure }) => (
     <dl className="space-y-1 text-sm">
       <div className="flex gap-2">
         <dt className="font-medium">Passo</dt>
-        <dd>{failure.step}</dd>
+        <dd className={DETAIL_VALUE}>{failure.step}</dd>
       </div>
       <div className="flex gap-2">
         <dt className="font-medium">Tipo</dt>
-        <dd>{failure.error_type}</dd>
+        <dd className={DETAIL_VALUE}>{failure.error_type}</dd>
       </div>
       <div className="flex gap-2">
         <dt className="font-medium">Motivo</dt>
-        <dd className="break-words whitespace-pre-wrap">{failure.message}</dd>
+        <dd className={`${DETAIL_VALUE} whitespace-pre-wrap`}>{failure.message}</dd>
       </div>
     </dl>
   </section>

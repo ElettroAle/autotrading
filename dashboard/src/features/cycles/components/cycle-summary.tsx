@@ -1,3 +1,4 @@
+import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { formatInstant } from '@/utils/format-instant';
 
 import type { Cycle } from '../api/get-cycle';
@@ -23,7 +24,7 @@ const costOf = ({ cost }: Cycle): string => {
 const Term = ({ term, children }: { term: string; children: string }) => (
   <div className="flex gap-2">
     <dt className="font-medium text-slate-600">{term}</dt>
-    <dd>{children}</dd>
+    <dd className={DETAIL_VALUE}>{children}</dd>
   </div>
 );
 

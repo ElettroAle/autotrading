@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
+import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { usePeriod } from '@/components/ui/period-selector/use-period';
@@ -31,7 +32,7 @@ const Statistic = ({ label, children }: { label: string; children: ReactNode }) 
       <dt id={id} className="text-slate-600">
         {label}
       </dt>
-      <dd aria-labelledby={id} className="font-medium">
+      <dd aria-labelledby={id} className={`${DETAIL_VALUE} font-medium`}>
         {children}
       </dd>
     </div>

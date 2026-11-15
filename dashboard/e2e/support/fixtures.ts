@@ -38,6 +38,8 @@ export type ScenarioMemory = {
   periodPage: string;
   /** The time a new cycle of the flow concluded, as the page should show it (R2.1.2). */
   newCycleAt: string;
+  /** What spilled past the screen on each page the user opened, by the name of the page (R6.4.1). */
+  spilledByPage: Map<string, string[]>;
 };
 
 type Fixtures = {
@@ -81,6 +83,7 @@ export const test = base.extend<Fixtures>({
       refusal: '',
       periodPage: '',
       newCycleAt: '',
+      spilledByPage: new Map(),
     });
   },
 });

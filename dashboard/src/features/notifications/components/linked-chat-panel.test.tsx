@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
@@ -117,5 +117,28 @@ describe('LinkedChatPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Impossibile leggere i dati: errore interno',
     );
+  });
+
+  it('explains how to link a chat with the code while none is linked', async () => {
+    await renderApp({ account: 'anna', url: NOTIFICATIONS });
+
+    const steps = await screen.findByRole('list', { name: 'Come collegare Telegram' });
+    expect(
+      within(steps)
+        .getAllByRole('listitem')
+        .map((step) => step.textContent),
+    ).toEqual([
+      'Chiedi qui sotto il codice di collegamento: vale una sola volta e per poco tempo.',
+      'Invia il codice al bot della piattaforma dalla tua chat Telegram, oppure apri il link che compare insieme al codice.',
+      'Attendi la conferma del bot: da quel momento la chat riceve le notifiche dei tuoi flussi.',
+    ]);
+  });
+
+  it('no longer explains how to link a chat once one is linked', async () => {
+    fakePlatform.linkChat('anna', 'anna_tg');
+    await renderApp({ account: 'anna', url: NOTIFICATIONS });
+
+    await screen.findByLabelText('Chat collegata');
+    expect(screen.queryByRole('list', { name: 'Come collegare Telegram' })).not.toBeInTheDocument();
   });
 });

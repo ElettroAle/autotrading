@@ -54,7 +54,7 @@ describe('Draft flows', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Duplica' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/flows/flow-alfa%20(copia)'));
-    expect(await screen.findByRole('heading', { level: 2, name: 'alfa (copia)' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa (copia)' })).toBeVisible();
     expect(screen.getByText('Bozza')).toBeInTheDocument();
     expect(detail('Versione')).toBe('1');
     expect(detail('Fonti')).toBe('indicatori (peso 2)');

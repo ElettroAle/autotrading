@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import { DESTRUCTIVE_COMMAND, PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 import { paths } from '@/config/paths';
@@ -16,6 +17,15 @@ const LABELS: Readonly<Record<FlowCommand, string>> = {
   resume: 'Riprendi',
   stop: 'Stop',
   archive: 'Archivia',
+};
+
+// The command that sets the flow running leads, the archiving cannot be undone (R6.4.1).
+const STYLES: Readonly<Record<FlowCommand, string>> = {
+  start: PRIMARY_COMMAND,
+  resume: PRIMARY_COMMAND,
+  pause: SECONDARY_COMMAND,
+  stop: SECONDARY_COMMAND,
+  archive: DESTRUCTIVE_COMMAND,
 };
 
 type ConfirmedCommand = Extract<FlowCommand, 'stop' | 'archive' | 'start'>;
@@ -64,14 +74,14 @@ export const FlowCommands = ({ flowId, status, realMoney }: FlowCommandsProps) =
   return (
     <div className="mt-3 space-y-2">
       {confirming === null && (
-        <div role="group" aria-label="Comandi del flusso" className="flex gap-2">
+        <div role="group" aria-label="Comandi del flusso" className="flex flex-wrap gap-2">
           {commandsAllowedIn(status).map((command) => (
             <button
               key={command}
               type="button"
               onClick={() => request(command)}
               disabled={run.isPending}
-              className="rounded border border-slate-300 px-3 py-1.5 disabled:opacity-50"
+              className={STYLES[command]}
             >
               {LABELS[command]}
             </button>

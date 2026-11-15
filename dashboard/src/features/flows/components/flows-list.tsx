@@ -4,6 +4,7 @@ import { Loading } from '@/components/ui/loading';
 import { useFlowOverviews } from '../api/get-flow-overviews';
 
 import { FlowOverviewCard } from './flow-overview-card';
+import { OutcomesLegend } from './recent-outcomes';
 
 /** The flows in use of the user, each at a glance (R2.2.2). */
 export const FlowsList = () => {
@@ -19,15 +20,18 @@ export const FlowsList = () => {
     return <p>Non hai ancora flussi.</p>;
   }
   return (
-    <ul
-      aria-label="Flussi"
-      className="divide-y divide-slate-200 rounded border border-slate-200 bg-white"
-    >
-      {flows.data.map((flow) => (
-        <li key={flow.id} className="px-4 py-3">
-          <FlowOverviewCard flow={flow} />
-        </li>
-      ))}
-    </ul>
+    <>
+      <OutcomesLegend />
+      <ul
+        aria-label="Flussi"
+        className="divide-y divide-slate-200 rounded border border-slate-200 bg-white"
+      >
+        {flows.data.map((flow) => (
+          <li key={flow.id} className="px-4 py-3">
+            <FlowOverviewCard flow={flow} />
+          </li>
+        ))}
+      </ul>
+    </>
   );
 };
