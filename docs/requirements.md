@@ -4,7 +4,7 @@
 > - **gli scenari di accettazione** in [`specs/`](../specs), un file `.feature` per User Story, in cartelle per Epic e Feature (`specs/E<n>-…/F<n>.<m>-…/R<n>.<m>.<k>-….feature`);
 > - **le descrizioni** di Epic, Feature e User Story sulla board Azure DevOps (progetto AutoTrading).
 >
-> Le fasi F0-F5 di questo documento corrispondono alle Epic E0-E5. Dove questo documento e gli scenari divergono, valgono gli scenari: le decisioni prese durante la scrittura del backlog (per esempio ambienti `dev`/`prod`, accesso solo tramite ruolo Entra, credenziali leggibili solo dal servizio) non sono riportate qui.
+> Le epiche E0-E5 di questo documento sono le Epic omonime della board. Dove questo documento e gli scenari divergono, valgono gli scenari: le decisioni prese durante la scrittura del backlog (per esempio ambienti `dev`/`prod`, accesso solo tramite ruolo Entra, credenziali leggibili solo dal servizio) non sono riportate qui.
 
 **Stato:** raw di partenza (ex bozza 0.3), con le decisioni dell'intervista e della revisione del 7-8 novembre 2026 (sezione 11)
 **Data:** 8 novembre 2026
@@ -28,8 +28,8 @@ Il documento è ricavato dalle trascrizioni di una serie di cinque video YouTube
 Convenzioni usate nel testo:
 
 - **RF-xx.yy**: requisito funzionale. **RNF-xx**: requisito non funzionale.
-- **Priorità**: **M** (Must, necessario per la fase indicata), **S** (Should, atteso a breve), **C** (Could, evoluzione futura).
-- **Fase**: fase di rilascio in cui il requisito è previsto (sezione 8).
+- **Priorità**: **M** (Must, necessario per l'epica indicata), **S** (Should, atteso a breve), **C** (Could, evoluzione futura).
+- **Epica**: epica di rilascio in cui il requisito è previsto (sezione 8).
 - **[Vn] / [D] / [R]**: provenienza del requisito (video, decisione, ricerca su framework esterni in [`research/frameworks-evaluation.md`](research/frameworks-evaluation.md)).
 - **[PROPOSTA]**: requisito non presente nei video, aggiunto perché necessario a rendere il sistema sicuro o completo.
 - **[ASSUNZIONE]**: interpretazione di un punto non esplicito, da confermare.
@@ -170,245 +170,245 @@ Funzionalità registrate come candidate, con priorità bassa, da non sviluppare 
 
 ### 6.1 Utenti e tenant
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-01.01 | Ogni utente dispone di uno spazio (tenant) che contiene i suoi conti, flussi, configurazioni, dati registrati, risultati e impostazioni di notifica. | M | F1 | D |
-| RF-01.02 | Nessun dato di un tenant è visibile, interrogabile o modificabile da un altro utente. Ogni funzione della piattaforma opera sempre nel perimetro dell'utente autenticato. | M | F1 | D |
-| RF-01.03 | Ogni accesso alla piattaforma, programmatico o da dashboard, richiede autenticazione e identifica l'utente. | M | F1 | D |
-| RF-01.04 | Il proprietario della piattaforma abilita i nuovi utenti. Nella prima versione esiste un solo utente, il proprietario; la registrazione autonoma è un'evoluzione. | M / C | F1 / F5 | D |
-| RF-01.05 | Le credenziali dei conti (chiavi dell'exchange) e dei servizi (fornitori IA, fonti dati) di un utente sono conservate nel suo tenant e usate solo per i suoi flussi. | M | F1 | D, [PROPOSTA] |
-| RF-01.06 | Le classifiche e i confronti tra flussi (RF-03.06) riguardano solo i flussi dell'utente. | M | F2 | D |
+| RF-01.01 | Ogni utente dispone di uno spazio (tenant) che contiene i suoi conti, flussi, configurazioni, dati registrati, risultati e impostazioni di notifica. | M | E1 | D |
+| RF-01.02 | Nessun dato di un tenant è visibile, interrogabile o modificabile da un altro utente. Ogni funzione della piattaforma opera sempre nel perimetro dell'utente autenticato. | M | E1 | D |
+| RF-01.03 | Ogni accesso alla piattaforma, programmatico o da dashboard, richiede autenticazione e identifica l'utente. | M | E1 | D |
+| RF-01.04 | Il proprietario della piattaforma abilita i nuovi utenti. Nella prima versione esiste un solo utente, il proprietario; la registrazione autonoma è un'evoluzione. | M / C | E1 / E5 | D |
+| RF-01.05 | Le credenziali dei conti (chiavi dell'exchange) e dei servizi (fornitori IA, fonti dati) di un utente sono conservate nel suo tenant e usate solo per i suoi flussi. | M | E1 | D, [PROPOSTA] |
+| RF-01.06 | Le classifiche e i confronti tra flussi (RF-03.06) riguardano solo i flussi dell'utente. | M | E2 | D |
 
 ### 6.2 Conti di trading
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-02.01 | L'utente registra uno o più **conti di trading**, ciascuno con: nome, exchange, ambiente (test o reale), credenziali. | M | F0 | D |
-| RF-02.02 | Ogni flusso è assegnato a un conto. Più flussi possono condividere lo stesso conto, oppure l'utente può dedicare un conto a ciascun flusso quando l'exchange lo consente (sotto-conti, portafogli separati). La scelta è dell'utente. | M | F1 | D |
-| RF-02.03 | Per ogni conto la piattaforma legge dall'exchange saldo, liquidità disponibile e posizioni aperte. | M | F0 | V2, V4 |
-| RF-02.04 | Il saldo di un conto è ripartito in: capitale allocato ai flussi e capitale libero. La somma delle allocazioni non può superare il saldo. | M | F1 | D |
-| RF-02.05 | **Regola di conflitto**: due flussi assegnati allo stesso conto non possono avere asset in comune. La piattaforma rifiuta la creazione o la modifica di un flusso che violerebbe la regola, indicando il flusso in conflitto. Evoluzione: BL-03 netting. | M | F1 | D |
-| RF-02.06 | L'utente può collegare, modificare le credenziali e scollegare un conto. Lo scollegamento è possibile solo se nessun flusso attivo vi è assegnato. | M | F1 | [PROPOSTA] |
-| RF-02.07 | L'ambiente di ogni conto (test o reale) è sempre ben visibile. Registrare un conto sull'ambiente reale richiede una conferma esplicita. | M | F0 | [PROPOSTA] |
-| RF-02.08 | Il sistema verifica la validità delle credenziali di un conto al momento della registrazione e la segnala quando viene meno. | S | F1 | [PROPOSTA] |
+| RF-02.01 | L'utente registra uno o più **conti di trading**, ciascuno con: nome, exchange, ambiente (test o reale), credenziali. | M | E0 | D |
+| RF-02.02 | Ogni flusso è assegnato a un conto. Più flussi possono condividere lo stesso conto, oppure l'utente può dedicare un conto a ciascun flusso quando l'exchange lo consente (sotto-conti, portafogli separati). La scelta è dell'utente. | M | E1 | D |
+| RF-02.03 | Per ogni conto la piattaforma legge dall'exchange saldo, liquidità disponibile e posizioni aperte. | M | E0 | V2, V4 |
+| RF-02.04 | Il saldo di un conto è ripartito in: capitale allocato ai flussi e capitale libero. La somma delle allocazioni non può superare il saldo. | M | E1 | D |
+| RF-02.05 | **Regola di conflitto**: due flussi assegnati allo stesso conto non possono avere asset in comune. La piattaforma rifiuta la creazione o la modifica di un flusso che violerebbe la regola, indicando il flusso in conflitto. Evoluzione: BL-03 netting. | M | E1 | D |
+| RF-02.06 | L'utente può collegare, modificare le credenziali e scollegare un conto. Lo scollegamento è possibile solo se nessun flusso attivo vi è assegnato. | M | E1 | [PROPOSTA] |
+| RF-02.07 | L'ambiente di ogni conto (test o reale) è sempre ben visibile. Registrare un conto sull'ambiente reale richiede una conferma esplicita. | M | E0 | [PROPOSTA] |
+| RF-02.08 | Il sistema verifica la validità delle credenziali di un conto al momento della registrazione e la segnala quando viene meno. | S | E1 | [PROPOSTA] |
 
 ### 6.3 Flussi di trading
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-03.01 | L'utente può creare più flussi di trading, ciascuno con: nome, conto, asset, intervallo di ciclo, fornitore e modello IA con relativi parametri, fonti dati attive e relativi pesi, istruzioni dell'agente, regole di rischio, capitale allocato. | M | F1 | V1, D |
-| RF-03.02 | I flussi operano in parallelo e in modo indipendente: il comportamento, gli errori o le pause di un flusso non influenzano gli altri. | M | F1 | D |
-| RF-03.03 | Capitale, posizioni e risultati di ogni flusso sono **isolati** tramite la contabilità virtuale (sezione 6.13): le operazioni di un flusso non modificano la contabilità di un altro, e i risultati sono attribuibili al singolo flusso senza ambiguità, anche quando più flussi condividono lo stesso conto. | M | F1 | D |
-| RF-03.04 | L'utente può avviare, mettere in pausa, riprendere, fermare e archiviare ogni flusso. Pausa e stop sono distinti (vedi RF-22.01 e RF-22.02). | M | F1 | D |
-| RF-03.05 | L'utente può duplicare un flusso esistente per crearne una variante e confrontarla. | S | F2 | [PROPOSTA] |
-| RF-03.06 | Una classifica confronta i flussi dell'utente su: rendimento %, PnL, commissioni, win rate, numero di operazioni, drawdown massimo, costo del modello IA. | S | F2 | V1, D |
+| RF-03.01 | L'utente può creare più flussi di trading, ciascuno con: nome, conto, asset, intervallo di ciclo, fornitore e modello IA con relativi parametri, fonti dati attive e relativi pesi, istruzioni dell'agente, regole di rischio, capitale allocato. | M | E1 | V1, D |
+| RF-03.02 | I flussi operano in parallelo e in modo indipendente: il comportamento, gli errori o le pause di un flusso non influenzano gli altri. | M | E1 | D |
+| RF-03.03 | Capitale, posizioni e risultati di ogni flusso sono **isolati** tramite la contabilità virtuale (sezione 6.13): le operazioni di un flusso non modificano la contabilità di un altro, e i risultati sono attribuibili al singolo flusso senza ambiguità, anche quando più flussi condividono lo stesso conto. | M | E1 | D |
+| RF-03.04 | L'utente può avviare, mettere in pausa, riprendere, fermare e archiviare ogni flusso. Pausa e stop sono distinti (vedi RF-22.01 e RF-22.02). | M | E1 | D |
+| RF-03.05 | L'utente può duplicare un flusso esistente per crearne una variante e confrontarla. | S | E2 | [PROPOSTA] |
+| RF-03.06 | Una classifica confronta i flussi dell'utente su: rendimento %, PnL, commissioni, win rate, numero di operazioni, drawdown massimo, costo del modello IA. | S | E2 | V1, D |
 
 ### 6.4 Ciclo decisionale autonomo
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-04.01 | Ogni flusso attivo esegue automaticamente il proprio ciclo decisionale al proprio intervallo, 24 ore su 24, 7 giorni su 7, senza intervento umano. | M | F1 | V1, V4, D |
-| RF-04.02 | L'intervallo di ciclo è configurabile per flusso; valore iniziale suggerito 15 minuti. | M | F1 | V4, D |
-| RF-04.03 | Ogni ciclo esegue, nell'ordine: (1) lettura dello stato del capitale del flusso, (2) raccolta dei dati delle fonti attive, (3) composizione del contesto, (4) decisione dell'agente, (5) controllo del modulo di rischio, (6) esecuzione degli ordini risultanti, (7) aggiornamento della contabilità virtuale, (8) registrazione completa del ciclo. | M | F1 | V1, V4 |
-| RF-04.04 | La raccolta dati di un ciclo si conclude in un tempo nettamente inferiore all'intervallo; le fonti indipendenti vengono interrogate in parallelo, non in sequenza. | S | F1 | V3 |
-| RF-04.05 | Se una fonte dati non risponde, il ciclo prosegue con le fonti disponibili, il contesto indica all'agente quali dati mancano e il problema viene registrato. | M | F1 | [PROPOSTA] |
-| RF-04.06 | Il fallimento di un ciclo (errore dell'agente, dell'exchange o di rete) non impedisce l'esecuzione dei cicli successivi. | M | F1 | [PROPOSTA] |
-| RF-04.07 | Due cicli dello stesso flusso non si sovrappongono: se un ciclo è ancora in corso allo scadere dell'intervallo, il successivo viene saltato e l'evento registrato. | M | F1 | [PROPOSTA] |
-| RF-04.08 | Il contesto di ogni ciclo include l'ora corrente e il tempo trascorso dall'avvio del flusso. | S | F1 | V1 |
-| RF-04.09 | Dati di mercato comuni a più flussi (es. indicatori dello stesso asset nello stesso istante) possono essere riutilizzati, anche tra utenti diversi, purché ogni ciclo registri esattamente i dati che ha usato. | C | F5 | [PROPOSTA] |
+| RF-04.01 | Ogni flusso attivo esegue automaticamente il proprio ciclo decisionale al proprio intervallo, 24 ore su 24, 7 giorni su 7, senza intervento umano. | M | E1 | V1, V4, D |
+| RF-04.02 | L'intervallo di ciclo è configurabile per flusso; valore iniziale suggerito 15 minuti. | M | E1 | V4, D |
+| RF-04.03 | Ogni ciclo esegue, nell'ordine: (1) lettura dello stato del capitale del flusso, (2) raccolta dei dati delle fonti attive, (3) composizione del contesto, (4) decisione dell'agente, (5) controllo del modulo di rischio, (6) esecuzione degli ordini risultanti, (7) aggiornamento della contabilità virtuale, (8) registrazione completa del ciclo. | M | E1 | V1, V4 |
+| RF-04.04 | La raccolta dati di un ciclo si conclude in un tempo nettamente inferiore all'intervallo; le fonti indipendenti vengono interrogate in parallelo, non in sequenza. | S | E1 | V3 |
+| RF-04.05 | Se una fonte dati non risponde, il ciclo prosegue con le fonti disponibili, il contesto indica all'agente quali dati mancano e il problema viene registrato. | M | E1 | [PROPOSTA] |
+| RF-04.06 | Il fallimento di un ciclo (errore dell'agente, dell'exchange o di rete) non impedisce l'esecuzione dei cicli successivi. | M | E1 | [PROPOSTA] |
+| RF-04.07 | Due cicli dello stesso flusso non si sovrappongono: se un ciclo è ancora in corso allo scadere dell'intervallo, il successivo viene saltato e l'evento registrato. | M | E1 | [PROPOSTA] |
+| RF-04.08 | Il contesto di ogni ciclo include l'ora corrente e il tempo trascorso dall'avvio del flusso. | S | E1 | V1 |
+| RF-04.09 | Dati di mercato comuni a più flussi (es. indicatori dello stesso asset nello stesso istante) possono essere riutilizzati, anche tra utenti diversi, purché ogni ciclo registri esattamente i dati che ha usato. | C | E5 | [PROPOSTA] |
 
 ### 6.5 Fonti dati: requisiti comuni
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-05.01 | Ogni fonte dati (indicatori tecnici, pivot point, forecast, sentiment, notizie, whale, volumi e order book) è una capacità **indipendente** dalle altre, integrata attraverso un'interfaccia comune. | M | F1 | D |
-| RF-05.02 | **Selezione delle fonti**: per ogni flusso l'utente attiva o disattiva singolarmente ciascuna fonte disponibile. Una fonte disattivata non viene interrogata per quel flusso e non compare nel suo contesto. | M | F1 | D |
-| RF-05.03 | Aggiungere, sostituire o rimuovere una fonte non richiede modifiche al funzionamento delle altre fonti né del ciclo decisionale. Una nuova fonte diventa selezionabile nei flussi con la sola configurazione. | M | F1 | D |
-| RF-05.04 | Ogni fonte può avere parametri propri (es. numero di notizie, orizzonti del forecast), configurabili per flusso. | S | F1 | D, [PROPOSTA] |
-| RF-05.05 | Ogni fonte si applica automaticamente a tutti gli asset configurati nel flusso. | M | F1 | V3 |
-| RF-05.06 | Ogni valore raccolto viene registrato con il suo istante di riferimento, così da poterlo riutilizzare nei replay storici e nelle analisi. | M | F1 | V4, D |
-| RF-05.07 | L'elenco delle fonti disponibili, con i rispettivi parametri, è consultabile dall'utente. | M | F1 | [PROPOSTA] |
+| RF-05.01 | Ogni fonte dati (indicatori tecnici, pivot point, forecast, sentiment, notizie, whale, volumi e order book) è una capacità **indipendente** dalle altre, integrata attraverso un'interfaccia comune. | M | E1 | D |
+| RF-05.02 | **Selezione delle fonti**: per ogni flusso l'utente attiva o disattiva singolarmente ciascuna fonte disponibile. Una fonte disattivata non viene interrogata per quel flusso e non compare nel suo contesto. | M | E1 | D |
+| RF-05.03 | Aggiungere, sostituire o rimuovere una fonte non richiede modifiche al funzionamento delle altre fonti né del ciclo decisionale. Una nuova fonte diventa selezionabile nei flussi con la sola configurazione. | M | E1 | D |
+| RF-05.04 | Ogni fonte può avere parametri propri (es. numero di notizie, orizzonti del forecast), configurabili per flusso. | S | E1 | D, [PROPOSTA] |
+| RF-05.05 | Ogni fonte si applica automaticamente a tutti gli asset configurati nel flusso. | M | E1 | V3 |
+| RF-05.06 | Ogni valore raccolto viene registrato con il suo istante di riferimento, così da poterlo riutilizzare nei replay storici e nelle analisi. | M | E1 | V4, D |
+| RF-05.07 | L'elenco delle fonti disponibili, con i rispettivi parametri, è consultabile dall'utente. | M | E1 | [PROPOSTA] |
 
 ### 6.6 Fonte: dati di mercato e indicatori tecnici
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-06.01 | Per ogni asset sono disponibili il prezzo corrente e lo storico dei prezzi necessario al calcolo degli indicatori. | M | F1 | V2 |
-| RF-06.02 | Per ogni asset vengono calcolati almeno: EMA20, MA20, MACD, RSI a 7 e a 14 periodi, mid price, open interest, funding rate, volume. | M | F1 | V1, V3 |
-| RF-06.03 | Gli indicatori sono forniti come valori correnti e come serie recenti, su un timeframe di breve (allineato all'intervallo del flusso) e su uno di lungo periodo (es. 4 ore, con medie a 20 e 50 periodi). | M | F1 | V1, V3 |
-| RF-06.04 | L'insieme degli indicatori è estendibile; candidati futuri: livelli di Fibonacci, linee di Gann, analisi ciclica. | C | F5 | V4 |
+| RF-06.01 | Per ogni asset sono disponibili il prezzo corrente e lo storico dei prezzi necessario al calcolo degli indicatori. | M | E1 | V2 |
+| RF-06.02 | Per ogni asset vengono calcolati almeno: EMA20, MA20, MACD, RSI a 7 e a 14 periodi, mid price, open interest, funding rate, volume. | M | E1 | V1, V3 |
+| RF-06.03 | Gli indicatori sono forniti come valori correnti e come serie recenti, su un timeframe di breve (allineato all'intervallo del flusso) e su uno di lungo periodo (es. 4 ore, con medie a 20 e 50 periodi). | M | E1 | V1, V3 |
+| RF-06.04 | L'insieme degli indicatori è estendibile; candidati futuri: livelli di Fibonacci, linee di Gann, analisi ciclica. | C | E5 | V4 |
 
 ### 6.7 Fonte: pivot point
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-07.01 | Per ogni asset vengono calcolati i pivot point PP, R1, R2, S1, S2. | M | F1 | V3 |
-| RF-07.02 | All'agente vengono forniti la posizione del prezzo rispetto al PP (sopra o sotto, come indicazione di tendenza) e la distanza dal supporto e dalla resistenza più vicini. | M | F1 | V3 |
+| RF-07.01 | Per ogni asset vengono calcolati i pivot point PP, R1, R2, S1, S2. | M | E1 | V3 |
+| RF-07.02 | All'agente vengono forniti la posizione del prezzo rispetto al PP (sopra o sotto, come indicazione di tendenza) e la distanza dal supporto e dalla resistenza più vicini. | M | E1 | V3 |
 
 ### 6.8 Fonte: previsione dei prezzi (forecast)
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-08.01 | Per ogni asset viene prodotta una previsione del prezzo su più orizzonti; quelli iniziali sono 15 minuti e 1 ora. | M | F1 | V3, V4 |
-| RF-08.02 | Ogni previsione riporta ultimo prezzo, prezzo previsto, variazione percentuale prevista e orizzonte. | M | F1 | V3, V4 |
-| RF-08.03 | La profondità dello storico usato per la previsione è configurabile. | S | F1 | V5 |
-| RF-08.04 | Ogni previsione viene registrata per il confronto con il prezzo effettivo allo scadere dell'orizzonte (vedi 6.26). | M | F1 | V4, V5 |
-| RF-08.05 | Orizzonti più lunghi (giorni, settimane), necessari a un agente strategico (vedi 6.27). | C | F5 | V5 |
+| RF-08.01 | Per ogni asset viene prodotta una previsione del prezzo su più orizzonti; quelli iniziali sono 15 minuti e 1 ora. | M | E1 | V3, V4 |
+| RF-08.02 | Ogni previsione riporta ultimo prezzo, prezzo previsto, variazione percentuale prevista e orizzonte. | M | E1 | V3, V4 |
+| RF-08.03 | La profondità dello storico usato per la previsione è configurabile. | S | E1 | V5 |
+| RF-08.04 | Ogni previsione viene registrata per il confronto con il prezzo effettivo allo scadere dell'orizzonte (vedi 6.26). | M | E1 | V4, V5 |
+| RF-08.05 | Orizzonti più lunghi (giorni, settimane), necessari a un agente strategico (vedi 6.27). | C | E5 | V5 |
 
 ### 6.9 Fonte: sentiment di mercato
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-09.01 | A ogni ciclo viene rilevato l'indice di sentiment del mercato cripto (Fear & Greed), con valore numerico e classificazione testuale. | M | F1 | V3 |
+| RF-09.01 | A ogni ciclo viene rilevato l'indice di sentiment del mercato cripto (Fear & Greed), con valore numerico e classificazione testuale. | M | E1 | V3 |
 
 ### 6.10 Fonte: notizie
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-10.01 | A ogni ciclo vengono raccolte le notizie cripto più recenti (titolo, data e ora, sintesi o testo) e incluse nel contesto. | M | F1 | V1, V3 |
-| RF-10.02 | Il numero e l'età massima delle notizie incluse sono configurabili per flusso. | S | F1 | [PROPOSTA] |
-| RF-10.03 | Evoluzione: messaggi social di persone influenti per il mercato, anche specifici per asset. | C | F5 | V3 |
+| RF-10.01 | A ogni ciclo vengono raccolte le notizie cripto più recenti (titolo, data e ora, sintesi o testo) e incluse nel contesto. | M | E1 | V1, V3 |
+| RF-10.02 | Il numero e l'età massima delle notizie incluse sono configurabili per flusso. | S | E1 | [PROPOSTA] |
+| RF-10.03 | Evoluzione: messaggi social di persone influenti per il mercato, anche specifici per asset. | C | E5 | V3 |
 
 ### 6.11 Fonte: movimenti delle whale
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-11.01 | Vengono rilevati i grandi trasferimenti di criptovalute (data e ora, asset, quantità, controvalore, descrizione) e inclusi nel contesto. | S | F5 | V3 |
+| RF-11.01 | Vengono rilevati i grandi trasferimenti di criptovalute (data e ora, asset, quantità, controvalore, descrizione) e inclusi nel contesto. | S | E5 | V3 |
 
 ### 6.12 Fonte: volumi globali e order book
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-12.01 | All'agente vengono fornite informazioni su volumi e ordini aggregati di più exchange, non solo di quello su cui si opera, per capire se prevalgono acquisti o vendite. Quale dato dell'order book usare è da definire. | C | F5 | V3 |
+| RF-12.01 | All'agente vengono fornite informazioni su volumi e ordini aggregati di più exchange, non solo di quello su cui si opera, per capire se prevalgono acquisti o vendite. Quale dato dell'order book usare è da definire. | C | E5 | V3 |
 
 ### 6.13 Stato del capitale, posizioni e contabilità virtuale
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-13.01 | La piattaforma tiene per ogni flusso una **contabilità virtuale**: capitale allocato, liquidità disponibile, posizioni aperte, PnL realizzato e non realizzato, commissioni. È sempre tenuta, sia che il flusso condivida il conto con altri sia che ne abbia uno dedicato. | M | F1 | D |
-| RF-13.02 | A ogni ciclo l'agente riceve lo stato del **flusso** (dalla contabilità virtuale), non quello dell'intero conto: saldo, liquidità disponibile, valore complessivo e posizioni aperte del flusso. | M | F1 | V1, V4, D |
-| RF-13.03 | Per ogni posizione aperta sono noti: asset, direzione, dimensione, leva, prezzo di ingresso, PnL non realizzato, prezzo di liquidazione, exit plan dichiarato. | M | F1 | V1 |
-| RF-13.04 | Il contesto dell'agente include il rendimento percentuale del flusso dal suo avvio. | M | F1 | V1 |
-| RF-13.05 | Lo stato del capitale e delle posizioni del flusso viene salvato come istantanea a ogni ciclo. | M | F1 | V4, V5 |
-| RF-13.06 | **Riconciliazione**: a ogni ciclo, e comunque a intervalli regolari, la somma delle contabilità virtuali dei flussi di un conto (più il capitale libero) viene confrontata con il saldo e le posizioni reali letti dall'exchange. | M | F1 | D |
-| RF-13.07 | Uno scostamento oltre una soglia configurabile per conto genera un allarme all'utente e sospende le nuove aperture di tutti i flussi del conto, finché l'utente non conferma di aver verificato. Protegge da interventi manuali sull'exchange, liquidazioni non attese ed errori. | M | F3 | D, [PROPOSTA] |
-| RF-13.08 | Le posizioni trovate sull'exchange e non attribuibili ad alcun flusso vengono segnalate all'utente e non toccate dalla piattaforma. | S | F3 | [PROPOSTA] |
+| RF-13.01 | La piattaforma tiene per ogni flusso una **contabilità virtuale**: capitale allocato, liquidità disponibile, posizioni aperte, PnL realizzato e non realizzato, commissioni. È sempre tenuta, sia che il flusso condivida il conto con altri sia che ne abbia uno dedicato. | M | E1 | D |
+| RF-13.02 | A ogni ciclo l'agente riceve lo stato del **flusso** (dalla contabilità virtuale), non quello dell'intero conto: saldo, liquidità disponibile, valore complessivo e posizioni aperte del flusso. | M | E1 | V1, V4, D |
+| RF-13.03 | Per ogni posizione aperta sono noti: asset, direzione, dimensione, leva, prezzo di ingresso, PnL non realizzato, prezzo di liquidazione, exit plan dichiarato. | M | E1 | V1 |
+| RF-13.04 | Il contesto dell'agente include il rendimento percentuale del flusso dal suo avvio. | M | E1 | V1 |
+| RF-13.05 | Lo stato del capitale e delle posizioni del flusso viene salvato come istantanea a ogni ciclo. | M | E1 | V4, V5 |
+| RF-13.06 | **Riconciliazione**: a ogni ciclo, e comunque a intervalli regolari, la somma delle contabilità virtuali dei flussi di un conto (più il capitale libero) viene confrontata con il saldo e le posizioni reali letti dall'exchange. | M | E1 | D |
+| RF-13.07 | Uno scostamento oltre una soglia configurabile per conto genera un allarme all'utente e sospende le nuove aperture di tutti i flussi del conto, finché l'utente non conferma di aver verificato. Protegge da interventi manuali sull'exchange, liquidazioni non attese ed errori. | M | E3 | D, [PROPOSTA] |
+| RF-13.08 | Le posizioni trovate sull'exchange e non attribuibili ad alcun flusso vengono segnalate all'utente e non toccate dalla piattaforma. | S | E3 | [PROPOSTA] |
 
 ### 6.14 Pesi dei segnali
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-14.01 | Per ogni flusso l'utente assegna un peso di importanza a ciascuna fonte attiva. Il peso fa parte della configurazione del flusso, insieme alla selezione delle fonti (RF-05.02). | M | F1 | V3, V4, D |
-| RF-14.02 | I pesi vengono comunicati all'agente nel contesto, perché ne tenga conto nel ragionamento. | M | F1 | V3, D |
-| RF-14.03 | Se l'utente non indica i pesi, tutte le fonti attive hanno lo stesso peso. | M | F1 | [PROPOSTA] |
-| RF-14.04 | I pesi in vigore a ogni ciclo vengono registrati con le decisioni. | M | F1 | V3 |
+| RF-14.01 | Per ogni flusso l'utente assegna un peso di importanza a ciascuna fonte attiva. Il peso fa parte della configurazione del flusso, insieme alla selezione delle fonti (RF-05.02). | M | E1 | V3, V4, D |
+| RF-14.02 | I pesi vengono comunicati all'agente nel contesto, perché ne tenga conto nel ragionamento. | M | E1 | V3, D |
+| RF-14.03 | Se l'utente non indica i pesi, tutte le fonti attive hanno lo stesso peso. | M | E1 | [PROPOSTA] |
+| RF-14.04 | I pesi in vigore a ogni ciclo vengono registrati con le decisioni. | M | E1 | V3 |
 
 ### 6.15 Istruzioni dell'agente
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-15.01 | Le istruzioni dell'agente (ruolo, obiettivo, strategia, regole operative, formato della risposta) sono definite per flusso e modificabili tramite la configurazione del flusso. | M | F1 | V3, D |
-| RF-15.02 | Le istruzioni includono le regole operative vigenti: al massimo una posizione per asset, azioni consentite, intervallo di leva ammesso, formato obbligatorio della risposta. | M | F1 | V3, V4 |
+| RF-15.01 | Le istruzioni dell'agente (ruolo, obiettivo, strategia, regole operative, formato della risposta) sono definite per flusso e modificabili tramite la configurazione del flusso. | M | E1 | V3, D |
+| RF-15.02 | Le istruzioni includono le regole operative vigenti: al massimo una posizione per asset, azioni consentite, intervallo di leva ammesso, formato obbligatorio della risposta. | M | E1 | V3, V4 |
 
 ### 6.16 Modelli IA
 
 I modelli IA seguono lo stesso principio delle fonti dati: sono capacità ortogonali, integrate tramite un'interfaccia comune, scelte per flusso con la sola configurazione [D].
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-16.01 | Per ogni flusso l'utente sceglie il **fornitore**, il **modello** e i suoi **parametri** (es. livello di ragionamento, temperatura, limite di lunghezza della risposta) tra quelli disponibili. | M | F1 | V3, V4, D |
-| RF-16.02 | Ogni fornitore di modelli è integrato attraverso un'interfaccia comune. Aggiungere un fornitore o un modello non richiede modifiche al ciclo decisionale, alle fonti, al modulo di rischio né agli altri fornitori; il nuovo modello diventa selezionabile nei flussi con la sola configurazione. | M | F1 | D |
-| RF-16.03 | Cambiare modello o fornitore di un flusso è una modifica di configurazione (versionata, RF-21.03) e ha effetto dal ciclo successivo. | M | F1 | D |
-| RF-16.04 | Le credenziali dei fornitori appartengono all'utente (RF-01.05). | M | F1 | D |
-| RF-16.05 | L'elenco dei fornitori e dei modelli disponibili, con i parametri ammessi, è consultabile dall'utente. | M | F1 | [PROPOSTA] |
-| RF-16.06 | Il costo di ogni chiamata al modello viene registrato e accumulato per flusso; è visibile e confrontabile tra flussi (vedi RF-20.05). | S | F1 | V4 |
-| RF-16.07 | Un errore o una indisponibilità del fornitore fa fallire il ciclo (RF-04.06) senza eseguire ordini; l'evento è registrato. | M | F1 | [PROPOSTA] |
+| RF-16.01 | Per ogni flusso l'utente sceglie il **fornitore**, il **modello** e i suoi **parametri** (es. livello di ragionamento, temperatura, limite di lunghezza della risposta) tra quelli disponibili. | M | E1 | V3, V4, D |
+| RF-16.02 | Ogni fornitore di modelli è integrato attraverso un'interfaccia comune. Aggiungere un fornitore o un modello non richiede modifiche al ciclo decisionale, alle fonti, al modulo di rischio né agli altri fornitori; il nuovo modello diventa selezionabile nei flussi con la sola configurazione. | M | E1 | D |
+| RF-16.03 | Cambiare modello o fornitore di un flusso è una modifica di configurazione (versionata, RF-21.03) e ha effetto dal ciclo successivo. | M | E1 | D |
+| RF-16.04 | Le credenziali dei fornitori appartengono all'utente (RF-01.05). | M | E1 | D |
+| RF-16.05 | L'elenco dei fornitori e dei modelli disponibili, con i parametri ammessi, è consultabile dall'utente. | M | E1 | [PROPOSTA] |
+| RF-16.06 | Il costo di ogni chiamata al modello viene registrato e accumulato per flusso; è visibile e confrontabile tra flussi (vedi RF-20.05). | S | E1 | V4 |
+| RF-16.07 | Un errore o una indisponibilità del fornitore fa fallire il ciclo (RF-04.06) senza eseguire ordini; l'evento è registrato. | M | E1 | [PROPOSTA] |
 
 ### 6.17 Decisione dell'agente
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-17.01 | A ogni ciclo l'agente riceve il contesto completo del flusso (istruzioni, stato del capitale del flusso, dati per asset dalle fonti attive, pesi) e restituisce le decisioni in forma **strutturata** e leggibile dalla macchina. | M | F1 | V1, V3 |
-| RF-17.02 | A ogni ciclo l'agente restituisce **una decisione per ciascun asset** del flusso. | M | F1 | V1, D |
-| RF-17.03 | Le azioni ammesse per ogni asset sono: **apri** (long o short), **chiudi**, **mantieni** (hold). | M | F1 | V1, V4 |
-| RF-17.04 | Per un'apertura la decisione contiene: direzione, quota di capitale da impegnare (frazione del capitale del flusso), leva, ragionamento. | M | F1 | V3, V4 |
-| RF-17.05 | Per un'apertura la decisione contiene anche l'exit plan: prezzo obiettivo (take profit), prezzo di stop (stop loss), condizione di invalidazione. | S | F3 | V1, V5 |
-| RF-17.06 | Ogni decisione contiene un **punteggio di confidenza**. | S | F3 | V1 |
-| RF-17.07 | Per una decisione "mantieni" i campi operativi vengono ignorati. | M | F1 | V4 |
-| RF-17.08 | La chiusura è totale. La chiusura parziale è un'evoluzione futura. | M / C | F1 / F5 | V4 |
-| RF-17.09 | Il ragionamento dell'agente viene sempre conservato e reso visibile, anche per le decisioni "mantieni". | M | F1 | V1, V4 |
-| RF-17.10 | Una risposta non conforme al formato atteso viene scartata senza eseguire nulla e l'evento viene registrato. Se solo alcune decisioni sono malformate, si scartano quelle e si valutano le altre [ASSUNZIONE]. | M | F1 | V3 |
+| RF-17.01 | A ogni ciclo l'agente riceve il contesto completo del flusso (istruzioni, stato del capitale del flusso, dati per asset dalle fonti attive, pesi) e restituisce le decisioni in forma **strutturata** e leggibile dalla macchina. | M | E1 | V1, V3 |
+| RF-17.02 | A ogni ciclo l'agente restituisce **una decisione per ciascun asset** del flusso. | M | E1 | V1, D |
+| RF-17.03 | Le azioni ammesse per ogni asset sono: **apri** (long o short), **chiudi**, **mantieni** (hold). | M | E1 | V1, V4 |
+| RF-17.04 | Per un'apertura la decisione contiene: direzione, quota di capitale da impegnare (frazione del capitale del flusso), leva, ragionamento. | M | E1 | V3, V4 |
+| RF-17.05 | Per un'apertura la decisione contiene anche l'exit plan: prezzo obiettivo (take profit), prezzo di stop (stop loss), condizione di invalidazione. | S | E3 | V1, V5 |
+| RF-17.06 | Ogni decisione contiene un **punteggio di confidenza**. | S | E3 | V1 |
+| RF-17.07 | Per una decisione "mantieni" i campi operativi vengono ignorati. | M | E1 | V4 |
+| RF-17.08 | La chiusura è totale. La chiusura parziale è un'evoluzione futura. | M / C | E1 / E5 | V4 |
+| RF-17.09 | Il ragionamento dell'agente viene sempre conservato e reso visibile, anche per le decisioni "mantieni". | M | E1 | V1, V4 |
+| RF-17.10 | Una risposta non conforme al formato atteso viene scartata senza eseguire nulla e l'evento viene registrato. Se solo alcune decisioni sono malformate, si scartano quelle e si valutano le altre [ASSUNZIONE]. | M | E1 | V3 |
 
 ### 6.18 Gestione del rischio
 
 Il modulo di rischio è **indipendente dall'agente** e filtra ogni decisione prima dell'esecuzione, per proteggere il capitale da errori del modello [V3]. Tutti i limiti sono **parametri configurabili per flusso**, senza valori imposti dal sistema [D]. I limiti si applicano al capitale del **flusso** (contabilità virtuale), mai all'intero conto.
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-18.01 | Esposizione massima per singola operazione, come percentuale del capitale del flusso (esempio citato: 5%). Un'apertura oltre il limite viene **ridotta al limite** ed eseguita. | M | F1 | V3, D |
-| RF-18.02 | Leva massima. Una leva superiore viene **ridotta al massimo** consentito. | M | F1 | V3, V4, D |
-| RF-18.03 | Esposizione complessiva massima del flusso (somma delle posizioni aperte). Un'apertura che la supererebbe viene ridotta al margine residuo, o non eseguita se il margine residuo è nullo. | S | F3 | [PROPOSTA] |
-| RF-18.04 | Vengono bloccate le decisioni incoerenti con lo stato del flusso: apertura su un asset con posizione già aperta, chiusura di una posizione inesistente, asset fuori dal flusso, liquidità del flusso insufficiente. | M | F1 | V3, V4 |
-| RF-18.05 | Le aperture sotto l'importo minimo dell'exchange vengono gestite in modo deterministico (portate al minimo o non eseguite, secondo configurazione) e registrate. | M | F1 | V2 |
-| RF-18.06 | Ogni apertura ha stop loss e take profit attivi sull'exchange, così da proteggere la posizione anche tra un ciclo e l'altro. Se l'agente non li indica, si applicano valori predefiniti del flusso. | S | F3 | V5 |
-| RF-18.07 | Confidenza minima: le decisioni operative sotto soglia non vengono eseguite. | S | F3 | V1 |
-| RF-18.08 | Perdita massima: superata una soglia configurata (giornaliera e/o dal picco), il flusso sospende le nuove aperture e l'utente viene avvisato. | S | F3 | [PROPOSTA], D |
-| RF-18.09 | L'utente può chiudere con un unico comando tutte le posizioni di un flusso, di un conto o di tutti i suoi flussi. | S | F3 | [PROPOSTA] |
-| RF-18.10 | Ogni decisione ridotta o bloccata viene registrata con la decisione originale, quella eseguita e il motivo. | M | F1 | V3 |
+| RF-18.01 | Esposizione massima per singola operazione, come percentuale del capitale del flusso (esempio citato: 5%). Un'apertura oltre il limite viene **ridotta al limite** ed eseguita. | M | E1 | V3, D |
+| RF-18.02 | Leva massima. Una leva superiore viene **ridotta al massimo** consentito. | M | E1 | V3, V4, D |
+| RF-18.03 | Esposizione complessiva massima del flusso (somma delle posizioni aperte). Un'apertura che la supererebbe viene ridotta al margine residuo, o non eseguita se il margine residuo è nullo. | S | E3 | [PROPOSTA] |
+| RF-18.04 | Vengono bloccate le decisioni incoerenti con lo stato del flusso: apertura su un asset con posizione già aperta, chiusura di una posizione inesistente, asset fuori dal flusso, liquidità del flusso insufficiente. | M | E1 | V3, V4 |
+| RF-18.05 | Le aperture sotto l'importo minimo dell'exchange vengono gestite in modo deterministico (portate al minimo o non eseguite, secondo configurazione) e registrate. | M | E1 | V2 |
+| RF-18.06 | Ogni apertura ha stop loss e take profit attivi sull'exchange, così da proteggere la posizione anche tra un ciclo e l'altro. Se l'agente non li indica, si applicano valori predefiniti del flusso. | S | E3 | V5 |
+| RF-18.07 | Confidenza minima: le decisioni operative sotto soglia non vengono eseguite. | S | E3 | V1 |
+| RF-18.08 | Perdita massima: superata una soglia configurata (giornaliera e/o dal picco), il flusso sospende le nuove aperture e l'utente viene avvisato. | S | E3 | [PROPOSTA], D |
+| RF-18.09 | L'utente può chiudere con un unico comando tutte le posizioni di un flusso, di un conto o di tutti i suoi flussi. | S | E3 | [PROPOSTA] |
+| RF-18.10 | Ogni decisione ridotta o bloccata viene registrata con la decisione originale, quella eseguita e il motivo. | M | E1 | V3 |
 
 ### 6.19 Esecuzione degli ordini
 
 L'exchange è integrato attraverso un'interfaccia comune, come fonti e modelli: un flusso opera sull'exchange del proprio conto e aggiungere un exchange non richiede modifiche al resto [D].
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-19.01 | Il sistema apre posizioni long e short con la leva e la dimensione approvate dal modulo di rischio, sul conto del flusso. | M | F0 | V2, V4 |
-| RF-19.02 | Il sistema chiude le posizioni su decisione dell'agente o su comando dell'utente. | M | F0 | V4 |
-| RF-19.03 | Dopo ogni ordine il sistema verifica sull'exchange l'esito effettivo (posizione aperta o chiusa, prezzo, quantità, commissione), registra l'esito reale, non quello atteso, e aggiorna la contabilità virtuale del flusso. | M | F1 | V4, D |
-| RF-19.04 | Gli errori dell'exchange (importo minimo, saldo insufficiente, rifiuto) vengono gestiti senza interrompere il sistema e registrati con il messaggio originale. | M | F0 | V2 |
-| RF-19.05 | Una procedura di verifica esercita su un conto di test apertura, lettura dello stato e chiusura di una posizione; va eseguita prima di collegare un agente e dopo ogni modifica all'esecuzione. | M | F0 | V4 |
-| RF-19.06 | Le commissioni di ogni operazione vengono registrate e attribuite al flusso. | M | F1 | V1 |
-| RF-19.07 | Ogni ordine inviato all'exchange è riconducibile al flusso e al ciclo che lo hanno generato. | M | F1 | D, [PROPOSTA] |
+| RF-19.01 | Il sistema apre posizioni long e short con la leva e la dimensione approvate dal modulo di rischio, sul conto del flusso. | M | E0 | V2, V4 |
+| RF-19.02 | Il sistema chiude le posizioni su decisione dell'agente o su comando dell'utente. | M | E0 | V4 |
+| RF-19.03 | Dopo ogni ordine il sistema verifica sull'exchange l'esito effettivo (posizione aperta o chiusa, prezzo, quantità, commissione), registra l'esito reale, non quello atteso, e aggiorna la contabilità virtuale del flusso. | M | E1 | V4, D |
+| RF-19.04 | Gli errori dell'exchange (importo minimo, saldo insufficiente, rifiuto) vengono gestiti senza interrompere il sistema e registrati con il messaggio originale. | M | E0 | V2 |
+| RF-19.05 | Una procedura di verifica esercita su un conto di test apertura, lettura dello stato e chiusura di una posizione; va eseguita prima di collegare un agente e dopo ogni modifica all'esecuzione. | M | E0 | V4 |
+| RF-19.06 | Le commissioni di ogni operazione vengono registrate e attribuite al flusso. | M | E1 | V1 |
+| RF-19.07 | Ogni ordine inviato all'exchange è riconducibile al flusso e al ciclo che lo hanno generato. | M | E1 | D, [PROPOSTA] |
 
 ### 6.20 Registrazione e tracciabilità
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-20.01 | Per ogni ciclo vengono conservati: utente, flusso, conto, data e ora, ambiente, fornitore e modello IA, versione della configurazione, tutti i dati raccolti, il contesto completo inviato all'agente, la risposta integrale, le decisioni interpretate, l'esito del modulo di rischio, l'esito dell'esecuzione e l'istantanea della contabilità virtuale. | M | F1 | V4 |
-| RF-20.02 | Ogni operazione eseguita è collegata al ciclo e al contesto che l'hanno generata. | M | F1 | V4 |
-| RF-20.03 | Lo storico delle posizioni chiuse conserva: asset, direzione, leva, prezzo di apertura e di chiusura, durata, PnL in valore e percentuale, commissioni, motivo della chiusura (agente, stop loss, take profit, liquidazione, comando manuale, incasso). | M | F1 | V5 |
-| RF-20.04 | Lo storico è interrogabile per flusso, conto, periodo, asset e configurazione. | S | F2 | V5 |
-| RF-20.05 | Il costo di ogni chiamata al modello IA viene registrato e accumulato per flusso. | S | F1 | V4 |
-| RF-20.06 | Tutti i dati registrati sono consultabili dall'utente tramite l'interfaccia programmatica, prima e indipendentemente dalla dashboard. | M | F1 | D |
+| RF-20.01 | Per ogni ciclo vengono conservati: utente, flusso, conto, data e ora, ambiente, fornitore e modello IA, versione della configurazione, tutti i dati raccolti, il contesto completo inviato all'agente, la risposta integrale, le decisioni interpretate, l'esito del modulo di rischio, l'esito dell'esecuzione e l'istantanea della contabilità virtuale. | M | E1 | V4 |
+| RF-20.02 | Ogni operazione eseguita è collegata al ciclo e al contesto che l'hanno generata. | M | E1 | V4 |
+| RF-20.03 | Lo storico delle posizioni chiuse conserva: asset, direzione, leva, prezzo di apertura e di chiusura, durata, PnL in valore e percentuale, commissioni, motivo della chiusura (agente, stop loss, take profit, liquidazione, comando manuale, incasso). | M | E1 | V5 |
+| RF-20.04 | Lo storico è interrogabile per flusso, conto, periodo, asset e configurazione. | S | E2 | V5 |
+| RF-20.05 | Il costo di ogni chiamata al modello IA viene registrato e accumulato per flusso. | S | E1 | V4 |
+| RF-20.06 | Tutti i dati registrati sono consultabili dall'utente tramite l'interfaccia programmatica, prima e indipendentemente dalla dashboard. | M | E1 | D |
 
 ### 6.21 Configurazione e comandi (interfaccia programmatica)
 
 Per poter avviare e testare i flussi prima della dashboard, tutte le funzioni di configurazione, comando e consultazione sono esposte come **interfaccia programmatica**. La dashboard, quando arriverà, userà le stesse funzioni e non ne aggiungerà di proprie [D].
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-21.01 | Tramite l'interfaccia programmatica l'utente: registra e gestisce i conti; crea, modifica, duplica, avvia, mette in pausa, ferma e archivia i flussi; alloca e libera capitale; incassa; consulta fonti, fornitori e modelli disponibili; consulta stato, storico e dati registrati. | M | F1 | D |
-| RF-21.02 | Ogni funzione agisce solo sui dati dell'utente autenticato (RF-01.02). | M | F1 | D |
-| RF-21.03 | Ogni modifica alla configurazione di un flusso è **versionata**: si sa sempre quale versione era in vigore in ogni ciclo e si può confrontare con le precedenti. | M | F1 | D |
-| RF-21.04 | Una modifica alla configurazione ha effetto dal ciclo successivo, mai su un ciclo in corso. | M | F1 | [PROPOSTA] |
-| RF-21.05 | Una configurazione non valida (fonte o modello inesistente, conflitto di asset sul conto, allocazione oltre il saldo, limiti incoerenti) viene rifiutata con l'indicazione dell'errore, senza toccare la versione in vigore. | M | F1 | [PROPOSTA] |
-| RF-21.06 | La configurazione completa di un flusso può essere esportata e importata (per duplicarla, salvarla o condividerla con sé stessi su un altro conto). | S | F2 | [PROPOSTA] |
-| RF-21.07 | Tramite l'interfaccia programmatica l'utente lancia la chiusura di emergenza (RF-18.09) e la procedura di verifica dell'esecuzione (RF-19.05). | S | F3 | [PROPOSTA] |
+| RF-21.01 | Tramite l'interfaccia programmatica l'utente: registra e gestisce i conti; crea, modifica, duplica, avvia, mette in pausa, ferma e archivia i flussi; alloca e libera capitale; incassa; consulta fonti, fornitori e modelli disponibili; consulta stato, storico e dati registrati. | M | E1 | D |
+| RF-21.02 | Ogni funzione agisce solo sui dati dell'utente autenticato (RF-01.02). | M | E1 | D |
+| RF-21.03 | Ogni modifica alla configurazione di un flusso è **versionata**: si sa sempre quale versione era in vigore in ogni ciclo e si può confrontare con le precedenti. | M | E1 | D |
+| RF-21.04 | Una modifica alla configurazione ha effetto dal ciclo successivo, mai su un ciclo in corso. | M | E1 | [PROPOSTA] |
+| RF-21.05 | Una configurazione non valida (fonte o modello inesistente, conflitto di asset sul conto, allocazione oltre il saldo, limiti incoerenti) viene rifiutata con l'indicazione dell'errore, senza toccare la versione in vigore. | M | E1 | [PROPOSTA] |
+| RF-21.06 | La configurazione completa di un flusso può essere esportata e importata (per duplicarla, salvarla o condividerla con sé stessi su un altro conto). | S | E2 | [PROPOSTA] |
+| RF-21.07 | Tramite l'interfaccia programmatica l'utente lancia la chiusura di emergenza (RF-18.09) e la procedura di verifica dell'esecuzione (RF-19.05). | S | E3 | [PROPOSTA] |
 
 ### 6.22 Capitale e incasso
 
 Fermare un flusso non basta a incassare: le posizioni aperte restano a mercato e il capitale resta allocato. L'incasso è quindi un'azione distinta e sempre manuale [D].
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-22.01 | **Pausa**: il flusso non prende nuove decisioni; le posizioni aperte restano a mercato con le loro protezioni (stop loss, take profit). Alla ripresa il flusso riparte dal proprio stato. | M | F1 | D |
-| RF-22.02 | **Stop**: il flusso cessa di operare. Per le posizioni aperte l'utente sceglie, nella configurazione del flusso o al momento dello stop, se chiuderle subito o lasciarle gestire dalle sole protezioni sull'exchange. | M | F1 | D |
-| RF-22.03 | **Riduzione del capitale allocato**: l'utente può ridurre il capitale allocato a un flusso fino alla liquidità non impegnata in posizioni; la parte ridotta diventa capitale libero del conto. Può anche aumentarlo, entro il capitale libero disponibile. | M | F3 | D |
-| RF-22.04 | **Incasso dei profitti di un flusso**: con un unico comando l'utente chiude tutte le posizioni del flusso, riporta il capitale allocato al valore iniziale (o a un valore indicato) e libera la differenza. Se il flusso è in perdita il comando non libera nulla e lo segnala. | S | F3 | D |
-| RF-22.05 | Il capitale libero di un conto è visibile all'utente, distinto dal capitale allocato, e corrisponde all'unica parte prelevabile dall'exchange senza toccare i flussi. | M | F3 | D |
-| RF-22.06 | **Prelievo dall'exchange**: l'uscita di fondi dal conto verso un portafoglio esterno è un'azione manuale dell'utente, con conferma esplicita, mai avviata dalla piattaforma in autonomia. Può essere eseguita direttamente sull'exchange; se la piattaforma la offre, non supera mai il capitale libero. | S | F3 | D |
-| RF-22.07 | Ogni variazione di capitale allocato, incasso e prelievo è registrata con data, ora, importo e motivo, e compare nello storico del flusso e del conto. | M | F3 | D |
-| RF-22.08 | Le metriche di rendimento del flusso restano corrette dopo incassi e variazioni di capitale (il rendimento non cambia perché si è prelevato). | M | F3 | [PROPOSTA] |
+| RF-22.01 | **Pausa**: il flusso non prende nuove decisioni; le posizioni aperte restano a mercato con le loro protezioni (stop loss, take profit). Alla ripresa il flusso riparte dal proprio stato. | M | E1 | D |
+| RF-22.02 | **Stop**: il flusso cessa di operare. Per le posizioni aperte l'utente sceglie, nella configurazione del flusso o al momento dello stop, se chiuderle subito o lasciarle gestire dalle sole protezioni sull'exchange. | M | E1 | D |
+| RF-22.03 | **Riduzione del capitale allocato**: l'utente può ridurre il capitale allocato a un flusso fino alla liquidità non impegnata in posizioni; la parte ridotta diventa capitale libero del conto. Può anche aumentarlo, entro il capitale libero disponibile. | M | E3 | D |
+| RF-22.04 | **Incasso dei profitti di un flusso**: con un unico comando l'utente chiude tutte le posizioni del flusso, riporta il capitale allocato al valore iniziale (o a un valore indicato) e libera la differenza. Se il flusso è in perdita il comando non libera nulla e lo segnala. | S | E3 | D |
+| RF-22.05 | Il capitale libero di un conto è visibile all'utente, distinto dal capitale allocato, e corrisponde all'unica parte prelevabile dall'exchange senza toccare i flussi. | M | E3 | D |
+| RF-22.06 | **Prelievo dall'exchange**: l'uscita di fondi dal conto verso un portafoglio esterno è un'azione manuale dell'utente, con conferma esplicita, mai avviata dalla piattaforma in autonomia. Può essere eseguita direttamente sull'exchange; se la piattaforma la offre, non supera mai il capitale libero. | S | E3 | D |
+| RF-22.07 | Ogni variazione di capitale allocato, incasso e prelievo è registrata con data, ora, importo e motivo, e compare nello storico del flusso e del conto. | M | E3 | D |
+| RF-22.08 | Le metriche di rendimento del flusso restano corrette dopo incassi e variazioni di capitale (il rendimento non cambia perché si è prelevato). | M | E3 | [PROPOSTA] |
 
 ### 6.23 Dashboard
 
@@ -416,86 +416,86 @@ La dashboard è **privata**: ogni utente, previa autenticazione, vede e gestisce
 
 **Monitoraggio**
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-23.01 | Equity curve di ogni flusso, con linea e area in **verde** sopra il capitale iniziale e in **rosso** sotto. | M | F2 | V4 |
-| RF-23.02 | Capitale iniziale, capitale attuale e rendimento complessivo in percentuale, per flusso; saldo, capitale allocato e capitale libero, per conto. | M | F2 | V5, D |
-| RF-23.03 | Posizioni aperte: asset, direzione, leva, dimensione, prezzo di ingresso, PnL corrente, exit plan. | M | F2 | V4 |
-| RF-23.04 | Storico delle posizioni chiuse con prezzo di apertura e di chiusura, PnL in valore e in percentuale. | M | F2 | V5 |
-| RF-23.05 | Statistiche: operazioni vinte e perse, win rate, PnL medio di vincenti e perdenti, commissioni totali, numero di operazioni, costo del modello IA. | M | F2 | V1, V5 |
-| RF-23.06 | Elenco dei cicli recenti; per ciascuno si consultano decisioni, ragionamento completo, contesto inviato e risposta integrale dell'agente, con gli indicatori e le previsioni che le hanno motivate. | M | F2 | V4 |
-| RF-23.07 | Stato di ogni flusso: attivo, in pausa o fermo, ultima esecuzione, prossima esecuzione prevista, esito degli ultimi cicli, conto, ambiente, modello. | S | F2 | V4 |
-| RF-23.08 | Vista comparativa dei flussi (classifica, vedi RF-03.06) con le equity curve sovrapposte. | S | F2 | V1, D |
-| RF-23.09 | Stato della riconciliazione di ogni conto ed eventuali allarmi. | S | F3 | D |
-| RF-23.10 | I dati sono aggiornati a ogni ciclo e la dashboard può essere aggiornata su richiesta. | M | F2 | V5 |
+| RF-23.01 | Equity curve di ogni flusso, con linea e area in **verde** sopra il capitale iniziale e in **rosso** sotto. | M | E2 | V4 |
+| RF-23.02 | Capitale iniziale, capitale attuale e rendimento complessivo in percentuale, per flusso; saldo, capitale allocato e capitale libero, per conto. | M | E2 | V5, D |
+| RF-23.03 | Posizioni aperte: asset, direzione, leva, dimensione, prezzo di ingresso, PnL corrente, exit plan. | M | E2 | V4 |
+| RF-23.04 | Storico delle posizioni chiuse con prezzo di apertura e di chiusura, PnL in valore e in percentuale. | M | E2 | V5 |
+| RF-23.05 | Statistiche: operazioni vinte e perse, win rate, PnL medio di vincenti e perdenti, commissioni totali, numero di operazioni, costo del modello IA. | M | E2 | V1, V5 |
+| RF-23.06 | Elenco dei cicli recenti; per ciascuno si consultano decisioni, ragionamento completo, contesto inviato e risposta integrale dell'agente, con gli indicatori e le previsioni che le hanno motivate. | M | E2 | V4 |
+| RF-23.07 | Stato di ogni flusso: attivo, in pausa o fermo, ultima esecuzione, prossima esecuzione prevista, esito degli ultimi cicli, conto, ambiente, modello. | S | E2 | V4 |
+| RF-23.08 | Vista comparativa dei flussi (classifica, vedi RF-03.06) con le equity curve sovrapposte. | S | E2 | V1, D |
+| RF-23.09 | Stato della riconciliazione di ogni conto ed eventuali allarmi. | S | E3 | D |
+| RF-23.10 | I dati sono aggiornati a ogni ciclo e la dashboard può essere aggiornata su richiesta. | M | E2 | V5 |
 
 **Configurazione e comandi**
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-23.11 | Dalla dashboard l'utente esegue tutte le operazioni di configurazione e comando dell'interfaccia programmatica (RF-21.01): conti, flussi, fonti e pesi, modello, rischio, istruzioni, capitale, incasso. | M | F2 | D |
-| RF-23.12 | La dashboard mostra le versioni della configurazione di un flusso e permette di confrontarle. | S | F2 | D |
-| RF-23.13 | Dalla dashboard l'utente lancia la chiusura di emergenza (RF-18.09) e la procedura di verifica dell'esecuzione (RF-19.05). | S | F3 | [PROPOSTA] |
+| RF-23.11 | Dalla dashboard l'utente esegue tutte le operazioni di configurazione e comando dell'interfaccia programmatica (RF-21.01): conti, flussi, fonti e pesi, modello, rischio, istruzioni, capitale, incasso. | M | E2 | D |
+| RF-23.12 | La dashboard mostra le versioni della configurazione di un flusso e permette di confrontarle. | S | E2 | D |
+| RF-23.13 | Dalla dashboard l'utente lancia la chiusura di emergenza (RF-18.09) e la procedura di verifica dell'esecuzione (RF-19.05). | S | E3 | [PROPOSTA] |
 
 ### 6.24 Notifiche
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-24.01 | L'utente riceve notifiche su **Telegram** e via **email**, sui canali che ha configurato nel proprio tenant. | S | F1 (Telegram) / F3 (email) | D |
-| RF-24.02 | Notifiche essenziali, disponibili già nella fase senza dashboard: apertura e chiusura di posizioni, cicli falliti, errori dell'exchange o del fornitore IA. | S | F1 | D, [PROPOSTA] |
-| RF-24.03 | Altri eventi notificabili: attivazione di stop loss o take profit, liquidazioni, decisioni ridotte o bloccate dal rischio, raggiungimento della perdita massima, allarme di riconciliazione, incasso eseguito, fine di un replay. | S | F3 | [PROPOSTA], D |
-| RF-24.04 | Per ogni flusso e per ogni tipo di evento l'utente sceglie il canale (Telegram, email, entrambi, nessuno). | S | F3 | [PROPOSTA] |
-| RF-24.05 | Riepilogo periodico (es. giornaliero) dei risultati di tutti i flussi dell'utente via email. | C | F5 | [PROPOSTA] |
+| RF-24.01 | L'utente riceve notifiche su **Telegram** e via **email**, sui canali che ha configurato nel proprio tenant. | S | E1 (Telegram) / E3 (email) | D |
+| RF-24.02 | Notifiche essenziali, disponibili già nell'epica senza dashboard: apertura e chiusura di posizioni, cicli falliti, errori dell'exchange o del fornitore IA. | S | E1 | D, [PROPOSTA] |
+| RF-24.03 | Altri eventi notificabili: attivazione di stop loss o take profit, liquidazioni, decisioni ridotte o bloccate dal rischio, raggiungimento della perdita massima, allarme di riconciliazione, incasso eseguito, fine di un replay. | S | E3 | [PROPOSTA], D |
+| RF-24.04 | Per ogni flusso e per ogni tipo di evento l'utente sceglie il canale (Telegram, email, entrambi, nessuno). | S | E3 | [PROPOSTA] |
+| RF-24.05 | Riepilogo periodico (es. giornaliero) dei risultati di tutti i flussi dell'utente via email. | C | E5 | [PROPOSTA] |
 
 ### 6.25 Replay storico
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-25.01 | L'utente può eseguire un flusso, o una sua variante, su un periodo passato, simulando i cicli senza attendere il tempo reale. | S | F4 | D |
-| RF-25.02 | Il replay usa i dati registrati dai cicli reali (RF-05.06) e, dove mancano, dati storici delle fonti che li rendono disponibili. Le fonti senza storico vengono segnalate come assenti nel contesto. | S | F4 | D |
-| RF-25.03 | Nel replay l'agente vede solo i dati disponibili fino all'istante simulato, mai dati successivi. | M (per il replay) | F4 | [PROPOSTA] |
-| RF-25.04 | Le esecuzioni simulate applicano commissioni, importo minimo e un'ipotesi di scostamento di prezzo (slippage) configurabile; stop loss e take profit scattano sulla base dei prezzi storici. | S | F4 | [PROPOSTA] |
-| RF-25.05 | Prima di avviare un replay il sistema stima il numero di chiamate al modello IA e il relativo costo, e chiede conferma. | S | F4 | [PROPOSTA] |
-| RF-25.06 | I risultati di un replay sono presentati con le stesse metriche e viste dei flussi live e sono confrontabili tra loro e con i flussi live, ma sempre distinti da questi. | S | F4 | D |
+| RF-25.01 | L'utente può eseguire un flusso, o una sua variante, su un periodo passato, simulando i cicli senza attendere il tempo reale. | S | E4 | D |
+| RF-25.02 | Il replay usa i dati registrati dai cicli reali (RF-05.06) e, dove mancano, dati storici delle fonti che li rendono disponibili. Le fonti senza storico vengono segnalate come assenti nel contesto. | S | E4 | D |
+| RF-25.03 | Nel replay l'agente vede solo i dati disponibili fino all'istante simulato, mai dati successivi. | M (per il replay) | E4 | [PROPOSTA] |
+| RF-25.04 | Le esecuzioni simulate applicano commissioni, importo minimo e un'ipotesi di scostamento di prezzo (slippage) configurabile; stop loss e take profit scattano sulla base dei prezzi storici. | S | E4 | [PROPOSTA] |
+| RF-25.05 | Prima di avviare un replay il sistema stima il numero di chiamate al modello IA e il relativo costo, e chiede conferma. | S | E4 | [PROPOSTA] |
+| RF-25.06 | I risultati di un replay sono presentati con le stesse metriche e viste dei flussi live e sono confrontabili tra loro e con i flussi live, ma sempre distinti da questi. | S | E4 | D |
 
 ### 6.26 Analisi delle prestazioni
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-26.01 | **Valutazione del forecast**: per ogni asset e orizzonte si confronta la previsione con il prezzo effettivo allo scadere dell'orizzonte e si calcola l'errore medio assoluto. | S | F3 | V4, V5 |
-| RF-26.02 | Grafico previsione e prezzo reale nel tempo, correttamente allineati sullo stesso istante, con medie mobili e volumi. | S | F4 | V5 |
-| RF-26.03 | Individuazione degli scostamenti anomali tra previsione e realtà, con data e ora esatte, per correlarli a eventi esterni (notizie, whale). | S | F4 | V5 |
-| RF-26.04 | Analisi dei picchi di volatilità dell'equity: ricostruzione delle decisioni e dei movimenti di prezzo tra due cicli. | S | F4 | V5 |
-| RF-26.05 | **Valutazione dei segnali**: dai dati registrati si valuta a posteriori quali fonti avevano capacità predittiva, per orientare pesi e fonti attive. | C | F4 | V3 |
-| RF-26.06 | Metriche di comportamento per flusso: proporzione long/short, frequenza delle operazioni, durata media delle posizioni, esposizione, incidenza delle commissioni. | S | F4 | V1 |
+| RF-26.01 | **Valutazione del forecast**: per ogni asset e orizzonte si confronta la previsione con il prezzo effettivo allo scadere dell'orizzonte e si calcola l'errore medio assoluto. | S | E3 | V4, V5 |
+| RF-26.02 | Grafico previsione e prezzo reale nel tempo, correttamente allineati sullo stesso istante, con medie mobili e volumi. | S | E4 | V5 |
+| RF-26.03 | Individuazione degli scostamenti anomali tra previsione e realtà, con data e ora esatte, per correlarli a eventi esterni (notizie, whale). | S | E4 | V5 |
+| RF-26.04 | Analisi dei picchi di volatilità dell'equity: ricostruzione delle decisioni e dei movimenti di prezzo tra due cicli. | S | E4 | V5 |
+| RF-26.05 | **Valutazione dei segnali**: dai dati registrati si valuta a posteriori quali fonti avevano capacità predittiva, per orientare pesi e fonti attive. | C | E4 | V3 |
+| RF-26.06 | Metriche di comportamento per flusso: proporzione long/short, frequenza delle operazioni, durata media delle posizioni, esposizione, incidenza delle commissioni. | S | E4 | V1 |
 
 ### 6.27 Evoluzione multi-livello
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-27.01 | Un flusso può essere guidato da due agenti: uno **strategico** a bassa frequenza, che analizza il mercato su finestre lunghe (es. giornaliere o settimanali) e produce una "narrativa" o un indirizzo di fondo, e uno **esecutivo** a frequenza più alta (l'agente standard) che opera tenendone conto. | C | F5 | V4, V5 |
-| RF-27.02 | Il livello strategico è attivabile per flusso e ha configurazione propria: intervallo, fornitore e modello IA, fonti e timeframe lunghi, istruzioni. Il livello esecutivo resta configurato come oggi. | C | F5 | D |
-| RF-27.03 | La narrativa contiene, per ogni asset del flusso: orientamento di fondo (rialzista, ribassista, neutrale), livelli di prezzo rilevanti, direzioni da preferire o evitare, eventuali limiti suggeriti (es. leva massima), motivazione, validità. | C | F5 | V4, D |
-| RF-27.04 | La narrativa in vigore è inclusa nel contesto di ogni ciclo esecutivo e registrata con esso, così che per ogni decisione si sappia quale narrativa era attiva. | C | F5 | D |
-| RF-27.05 | La narrativa è, per impostazione predefinita, un **consiglio**: l'agente esecutivo può discostarsene motivando. In alternativa, per configurazione, è un **vincolo**: il modulo di rischio blocca le decisioni contrarie all'orientamento (es. short quando la narrativa indica long) e le registra come bloccate. | C | F5 | D |
-| RF-27.06 | Se la narrativa è assente o scaduta, l'agente esecutivo opera come in modalità agente unico e l'evento è registrato; il livello strategico viene rieseguito al suo prossimo intervallo. | C | F5 | D |
+| RF-27.01 | Un flusso può essere guidato da due agenti: uno **strategico** a bassa frequenza, che analizza il mercato su finestre lunghe (es. giornaliere o settimanali) e produce una "narrativa" o un indirizzo di fondo, e uno **esecutivo** a frequenza più alta (l'agente standard) che opera tenendone conto. | C | E5 | V4, V5 |
+| RF-27.02 | Il livello strategico è attivabile per flusso e ha configurazione propria: intervallo, fornitore e modello IA, fonti e timeframe lunghi, istruzioni. Il livello esecutivo resta configurato come oggi. | C | E5 | D |
+| RF-27.03 | La narrativa contiene, per ogni asset del flusso: orientamento di fondo (rialzista, ribassista, neutrale), livelli di prezzo rilevanti, direzioni da preferire o evitare, eventuali limiti suggeriti (es. leva massima), motivazione, validità. | C | E5 | V4, D |
+| RF-27.04 | La narrativa in vigore è inclusa nel contesto di ogni ciclo esecutivo e registrata con esso, così che per ogni decisione si sappia quale narrativa era attiva. | C | E5 | D |
+| RF-27.05 | La narrativa è, per impostazione predefinita, un **consiglio**: l'agente esecutivo può discostarsene motivando. In alternativa, per configurazione, è un **vincolo**: il modulo di rischio blocca le decisioni contrarie all'orientamento (es. short quando la narrativa indica long) e le registra come bloccate. | C | E5 | D |
+| RF-27.06 | Se la narrativa è assente o scaduta, l'agente esecutivo opera come in modalità agente unico e l'evento è registrato; il livello strategico viene rieseguito al suo prossimo intervallo. | C | E5 | D |
 
 ### 6.28 Feature avanzata: flusso multi-analista ("comitato")
 
 Idee riprese dai framework di ricerca DeepFund (HKUST) e TradingAgents, valutati in [`research/frameworks-evaluation.md`](research/frameworks-evaluation.md). Nessun codice di terzi viene adottato: il comitato è un modo alternativo di produrre la decisione per asset, tutto il resto del ciclo resta invariato [D].
 
-| ID | Requisito | Pri. | Fase | Fonte |
+| ID | Requisito | Pri. | Epica | Fonte |
 |----|-----------|------|------|-------|
-| RF-28.01 | Un flusso ha una **modalità di decisione**: "agente unico" (quella standard, sezione 6.17) oppure "comitato". La modalità fa parte della configurazione versionata del flusso. | C | F5 | D, R |
-| RF-28.02 | In modalità comitato il flusso ha un elenco configurabile di **analisti**; ciascuno ha: nome, fonti dati assegnate (sottoinsieme delle fonti attive del flusso), fornitore e modello IA, istruzioni, peso. | C | F5 | R |
-| RF-28.03 | Ogni analista produce, per ogni asset, un **segnale in schema unificato**: orientamento (rialzista, ribassista, neutrale), confidenza, motivazione. Lo schema è lo stesso per tutti gli analisti. | C | F5 | R |
-| RF-28.04 | **Dibattito** opzionale: due ruoli, uno rialzista e uno ribassista, discutono i segnali raccolti per un numero di round configurabile; ogni round è registrato. | C | F5 | R |
-| RF-28.05 | **Planner** opzionale: prima degli analisti, un agente sceglie, dato il contesto, quali analisti eseguire nel ciclo; la scelta e il motivo sono registrati. | C | F5 | R |
-| RF-28.06 | Un **gestore** riceve i segnali, i pesi degli analisti e l'eventuale esito del dibattito, e produce la decisione per asset nel formato standard (sezione 6.17). Da qui il ciclo prosegue come in modalità agente unico: rischio, esecuzione, contabilità, registrazione. | C | F5 | R |
-| RF-28.07 | Tutti i segnali, i round di dibattito, le scelte del planner e i costi per analista sono registrati con il ciclo e consultabili. | C | F5 | R |
-| RF-28.08 | Il costo stimato per ciclo della modalità comitato (numero di chiamate ai modelli) viene mostrato all'utente al salvataggio della configurazione. | C | F5 | [PROPOSTA] |
-| RF-28.09 | **Memoria delle decisioni**: l'agente (unico o gestore) riceve nel contesto le proprie decisioni precedenti sullo stesso asset e l'esito ottenuto, in numero configurabile. Applicabile anche alla modalità agente unico. | C | F5 | R |
-| RF-28.10 | Per ogni modello IA è registrata la **data di cutoff** dell'addestramento, se nota; nei replay e nei confronti tra modelli i periodi precedenti al cutoff sono segnalati come potenzialmente viziati. | C | F4 | R |
+| RF-28.01 | Un flusso ha una **modalità di decisione**: "agente unico" (quella standard, sezione 6.17) oppure "comitato". La modalità fa parte della configurazione versionata del flusso. | C | E5 | D, R |
+| RF-28.02 | In modalità comitato il flusso ha un elenco configurabile di **analisti**; ciascuno ha: nome, fonti dati assegnate (sottoinsieme delle fonti attive del flusso), fornitore e modello IA, istruzioni, peso. | C | E5 | R |
+| RF-28.03 | Ogni analista produce, per ogni asset, un **segnale in schema unificato**: orientamento (rialzista, ribassista, neutrale), confidenza, motivazione. Lo schema è lo stesso per tutti gli analisti. | C | E5 | R |
+| RF-28.04 | **Dibattito** opzionale: due ruoli, uno rialzista e uno ribassista, discutono i segnali raccolti per un numero di round configurabile; ogni round è registrato. | C | E5 | R |
+| RF-28.05 | **Planner** opzionale: prima degli analisti, un agente sceglie, dato il contesto, quali analisti eseguire nel ciclo; la scelta e il motivo sono registrati. | C | E5 | R |
+| RF-28.06 | Un **gestore** riceve i segnali, i pesi degli analisti e l'eventuale esito del dibattito, e produce la decisione per asset nel formato standard (sezione 6.17). Da qui il ciclo prosegue come in modalità agente unico: rischio, esecuzione, contabilità, registrazione. | C | E5 | R |
+| RF-28.07 | Tutti i segnali, i round di dibattito, le scelte del planner e i costi per analista sono registrati con il ciclo e consultabili. | C | E5 | R |
+| RF-28.08 | Il costo stimato per ciclo della modalità comitato (numero di chiamate ai modelli) viene mostrato all'utente al salvataggio della configurazione. | C | E5 | [PROPOSTA] |
+| RF-28.09 | **Memoria delle decisioni**: l'agente (unico o gestore) riceve nel contesto le proprie decisioni precedenti sullo stesso asset e l'esito ottenuto, in numero configurabile. Applicabile anche alla modalità agente unico. | C | E5 | R |
+| RF-28.10 | Per ogni modello IA è registrata la **data di cutoff** dell'addestramento, se nota; nei replay e nei confronti tra modelli i periodi precedenti al cutoff sono segnalati come potenzialmente viziati. | C | E4 | R |
 
 Nelle tabelle, **R** indica una fonte di ricerca citata in `research/frameworks-evaluation.md`.
 
@@ -520,38 +520,38 @@ Nelle tabelle, **R** indica una fonte di ricerca citata in `research/frameworks-
 
 ---
 
-## 8. Fasi di rilascio
+## 8. Epiche di rilascio
 
-Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima agente, fonti ed exchange con configurazione programmatica, poi la dashboard e il resto [D]. Tutte le fasi fino a F5 operano solo su **testnet** [D]. Il passaggio al reale non è una fase: è configurazione della rete dell'exchange (per installazione) e promozione in `prod`, per scelta esplicita del proprietario dopo alcuni mesi di sperimentazione e con capitale limitato [D].
+Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima agente, fonti ed exchange con configurazione programmatica, poi la dashboard e il resto [D]. Tutte le epiche fino a E5 operano solo su **testnet** [D]. Il passaggio al reale non è un'epica: è configurazione della rete dell'exchange (per installazione) e promozione in `prod`, per scelta esplicita del proprietario dopo alcuni mesi di sperimentazione e con capitale limitato [D].
 
-| Fase | Contenuto |
+| Epica | Contenuto |
 |------|-----------|
-| **F0. Esecuzione verificata** | Conti di trading su testnet (6.2); lettura di saldo e posizioni; apertura e chiusura di posizioni; procedura di verifica (RF-19.05). |
-| **F1. Flussi autonomi configurabili (senza dashboard)** | Tenant con un solo utente e autenticazione (6.1); flussi (6.3) e ciclo pianificato (6.4); fonti indicatori, pivot, forecast, sentiment e notizie con selezione per flusso e pesi (6.5-6.10, 6.14); contabilità virtuale per flusso e regola di conflitto sul conto (6.13, RF-02.05); fornitori e modelli IA tramite interfaccia comune (6.16); istruzioni e decisione per asset (6.15, 6.17); modulo di rischio di base (RF-18.01, 02, 04, 05, 10); esecuzione e registrazione completa (6.19, 6.20); configurazione versionata e comandi tramite interfaccia programmatica (6.21); pausa e stop (RF-22.01, 22.02); notifiche essenziali su Telegram (RF-24.02); riconciliazione di base (RF-13.06). |
-| **F2. Dashboard e confronto** | Dashboard privata con monitoraggio e configurazione (6.23); duplicazione dei flussi e classifica (RF-03.05, 03.06); interrogazione dello storico (RF-20.04); esportazione e importazione delle configurazioni. |
-| **F3. Rischio, capitale e qualità** | Exit plan, confidenza, stop loss e take profit sull'exchange, esposizione complessiva, perdita massima, chiusura di emergenza (6.18); allarmi di riconciliazione (RF-13.07, 13.08); riduzione del capitale, incasso dei profitti, capitale libero, prelievo (6.22); notifiche complete e scelta dei canali, email (6.24); valutazione del forecast (RF-26.01). |
-| **F4. Replay e analisi** | Replay storico (6.25); analisi delle prestazioni e valutazione dei segnali (6.26). |
-| **F5. Evoluzioni** | Fonti whale e volumi globali; agente multi-livello; flusso multi-analista (6.28); chiusure parziali; registrazione autonoma degli utenti; riuso dei dati di mercato tra flussi; riepiloghi periodici. |
+| **E0. Esecuzione verificata** | Conti di trading su testnet (6.2); lettura di saldo e posizioni; apertura e chiusura di posizioni; procedura di verifica (RF-19.05). |
+| **E1. Flussi autonomi configurabili (senza dashboard)** | Tenant con un solo utente e autenticazione (6.1); flussi (6.3) e ciclo pianificato (6.4); fonti indicatori, pivot, forecast, sentiment e notizie con selezione per flusso e pesi (6.5-6.10, 6.14); contabilità virtuale per flusso e regola di conflitto sul conto (6.13, RF-02.05); fornitori e modelli IA tramite interfaccia comune (6.16); istruzioni e decisione per asset (6.15, 6.17); modulo di rischio di base (RF-18.01, 02, 04, 05, 10); esecuzione e registrazione completa (6.19, 6.20); configurazione versionata e comandi tramite interfaccia programmatica (6.21); pausa e stop (RF-22.01, 22.02); notifiche essenziali su Telegram (RF-24.02); riconciliazione di base (RF-13.06). |
+| **E2. Dashboard e confronto** | Dashboard privata con monitoraggio e configurazione (6.23); duplicazione dei flussi e classifica (RF-03.05, 03.06); interrogazione dello storico (RF-20.04); esportazione e importazione delle configurazioni. |
+| **E3. Rischio, capitale e qualità** | Exit plan, confidenza, stop loss e take profit sull'exchange, esposizione complessiva, perdita massima, chiusura di emergenza (6.18); allarmi di riconciliazione (RF-13.07, 13.08); riduzione del capitale, incasso dei profitti, capitale libero, prelievo (6.22); notifiche complete e scelta dei canali, email (6.24); valutazione del forecast (RF-26.01). |
+| **E4. Replay e analisi** | Replay storico (6.25); analisi delle prestazioni e valutazione dei segnali (6.26). |
+| **E5. Evoluzioni** | Fonti whale e volumi globali; agente multi-livello; flusso multi-analista (6.28); chiusure parziali; registrazione autonoma degli utenti; riuso dei dati di mercato tra flussi; riepiloghi periodici. |
 | **Backlog** | BL-01 spot, BL-02 copy-trading, BL-03 netting tra flussi. |
 
 ---
 
 ## 9. Criteri di accettazione principali
 
-- **CA-01 (F0)**: su un conto di test la procedura di verifica apre una posizione long con leva 2 su BTC, ne legge lo stato e la chiude; saldo e posizioni letti dopo ogni passo coincidono con quanto mostrato dall'exchange.
-- **CA-02 (F1)**: un flusso esegue almeno 7 giorni consecutivi di cicli pianificati in test, con meno dell'1% di cicli falliti [ASSUNZIONE sulla soglia] e nessuna sovrapposizione.
-- **CA-03 (F1)**: per un qualsiasi ciclo scelto a caso si ricostruiscono contesto completo, configurazione in vigore, risposta dell'agente, esito del rischio e dell'esecuzione.
-- **CA-04 (F1)**: una risposta malformata non produce mai ordini; una leva o un'esposizione oltre i limiti produce sempre un ordine ridotto ai limiti, registrato come tale.
-- **CA-05 (F1)**: tramite la sola interfaccia programmatica, senza dashboard, si crea un flusso, si modificano fonti attive, pesi e modello, lo si avvia e si consultano i cicli registrati; la modifica crea una nuova versione e ha effetto dal ciclo successivo.
-- **CA-06 (F1)**: disattivando una fonte in un flusso, dal ciclo successivo quella fonte non viene interrogata per quel flusso e non compare nel contesto; gli altri flussi non ne risentono.
-- **CA-07 (F1)**: cambiando fornitore e modello IA di un flusso tramite configurazione, il ciclo successivo usa il nuovo modello senza altre modifiche; il modello usato è registrato in ogni ciclo.
-- **CA-08 (F1)**: con due flussi sullo stesso conto e asset disgiunti, la contabilità virtuale di ciascuno coincide con le proprie operazioni e la somma delle due più il capitale libero coincide con il saldo del conto; un tentativo di assegnare lo stesso asset a entrambi viene rifiutato.
-- **CA-09 (F2)**: ogni funzione della dashboard produce lo stesso risultato della corrispondente funzione programmatica; un utente non vede mai conti, flussi o dati di un altro utente.
-- **CA-10 (F3)**: ogni posizione aperta ha stop loss e take profit attivi sull'exchange entro il ciclo in cui viene aperta.
-- **CA-11 (F3)**: superata la perdita massima configurata, il flusso non apre nuove posizioni e arriva una notifica su Telegram ed email.
-- **CA-12 (F3)**: il comando di incasso su un flusso in profitto chiude le posizioni, riporta il capitale allocato al valore iniziale e aumenta il capitale libero della differenza; il rendimento storico del flusso resta invariato.
-- **CA-13 (F3)**: una posizione aperta a mano sull'exchange, fuori dalla piattaforma, produce un allarme di riconciliazione e sospende le nuove aperture dei flussi di quel conto.
-- **CA-14 (F4)**: un replay di un periodo passato non usa mai dati successivi all'istante simulato e produce le stesse metriche dei flussi live.
+- **CA-01 (E0)**: su un conto di test la procedura di verifica apre una posizione long con leva 2 su BTC, ne legge lo stato e la chiude; saldo e posizioni letti dopo ogni passo coincidono con quanto mostrato dall'exchange.
+- **CA-02 (E1)**: un flusso esegue almeno 7 giorni consecutivi di cicli pianificati in test, con meno dell'1% di cicli falliti [ASSUNZIONE sulla soglia] e nessuna sovrapposizione.
+- **CA-03 (E1)**: per un qualsiasi ciclo scelto a caso si ricostruiscono contesto completo, configurazione in vigore, risposta dell'agente, esito del rischio e dell'esecuzione.
+- **CA-04 (E1)**: una risposta malformata non produce mai ordini; una leva o un'esposizione oltre i limiti produce sempre un ordine ridotto ai limiti, registrato come tale.
+- **CA-05 (E1)**: tramite la sola interfaccia programmatica, senza dashboard, si crea un flusso, si modificano fonti attive, pesi e modello, lo si avvia e si consultano i cicli registrati; la modifica crea una nuova versione e ha effetto dal ciclo successivo.
+- **CA-06 (E1)**: disattivando una fonte in un flusso, dal ciclo successivo quella fonte non viene interrogata per quel flusso e non compare nel contesto; gli altri flussi non ne risentono.
+- **CA-07 (E1)**: cambiando fornitore e modello IA di un flusso tramite configurazione, il ciclo successivo usa il nuovo modello senza altre modifiche; il modello usato è registrato in ogni ciclo.
+- **CA-08 (E1)**: con due flussi sullo stesso conto e asset disgiunti, la contabilità virtuale di ciascuno coincide con le proprie operazioni e la somma delle due più il capitale libero coincide con il saldo del conto; un tentativo di assegnare lo stesso asset a entrambi viene rifiutato.
+- **CA-09 (E2)**: ogni funzione della dashboard produce lo stesso risultato della corrispondente funzione programmatica; un utente non vede mai conti, flussi o dati di un altro utente.
+- **CA-10 (E3)**: ogni posizione aperta ha stop loss e take profit attivi sull'exchange entro il ciclo in cui viene aperta.
+- **CA-11 (E3)**: superata la perdita massima configurata, il flusso non apre nuove posizioni e arriva una notifica su Telegram ed email.
+- **CA-12 (E3)**: il comando di incasso su un flusso in profitto chiude le posizioni, riporta il capitale allocato al valore iniziale e aumenta il capitale libero della differenza; il rendimento storico del flusso resta invariato.
+- **CA-13 (E3)**: una posizione aperta a mano sull'exchange, fuori dalla piattaforma, produce un allarme di riconciliazione e sospende le nuove aperture dei flussi di quel conto.
+- **CA-14 (E4)**: un replay di un periodo passato non usa mai dati successivi all'istante simulato e produce le stesse metriche dei flussi live.
 
 ---
 
@@ -560,12 +560,12 @@ Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima 
 | # | Assunzione | Requisito |
 |---|------------|-----------|
 | A1 | Se solo alcune delle decisioni per asset sono malformate, si scartano quelle e si eseguono le altre (invece di scartare l'intero ciclo). | RF-17.10 |
-| A2 | Soglia di cicli falliti accettabile in F1: meno dell'1%. | CA-02 |
+| A2 | Soglia di cicli falliti accettabile in E1: meno dell'1%. | CA-02 |
 | A3 | Le credenziali di trading possono essere limitate senza facoltà di prelievo sull'exchange scelto. | RNF-05 |
 | A4 | Il primo flusso userà gli asset BTC, ETH, SOL con intervallo di 15 minuti, come nei video. | RF-03.01, RF-04.02 |
 | A5 | Nella prima versione l'unico utente è il proprietario; l'abilitazione di altri utenti avviene a mano dal proprietario, senza registrazione autonoma. | RF-01.04 |
 | A6 | Allo stop di un flusso, in assenza di scelta esplicita, le posizioni aperte vengono chiuse. | RF-22.02 |
-| A7 | Le notifiche Telegram essenziali sono utili già in F1, in assenza di dashboard. | RF-24.02 |
+| A7 | Le notifiche Telegram essenziali sono utili già in E1, in assenza di dashboard. | RF-24.02 |
 
 ---
 
