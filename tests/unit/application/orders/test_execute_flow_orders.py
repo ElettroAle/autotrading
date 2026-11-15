@@ -78,8 +78,8 @@ def test_an_opening_is_sized_at_the_market_with_its_leverage_and_slippage(
         SLIPPAGE,
         False,
     )
-    assert exchange.leverages[accesses.accesses[account_id].account_address, "BTC"] == 3
-    assert exchange.margins[accesses.accesses[account_id].account_address, "BTC"] is MarginMode.ISOLATED
+    assert exchange.leverages[accesses.accesses[account_id].value("account_address"), "BTC"] == 3
+    assert exchange.margins[accesses.accesses[account_id].value("account_address"), "BTC"] is MarginMode.ISOLATED
     assert (order.request.leverage, order.request.account_id, order.status) == (3, account_id, OrderStatus.FILLED)
 
 

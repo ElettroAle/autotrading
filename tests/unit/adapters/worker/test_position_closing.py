@@ -50,7 +50,7 @@ def answering(status: int, body: object) -> WorkerPositionClosingAdapter:
 
 def holding(worker: Worker, account: Account) -> None:
     credentials = worker.vault[account.credentials.ciphertext][2]
-    access = TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
+    access = TradingAccess(HYPERLIQUID, credentials.values)
     worker.order_exchange.hold(access, LONG_BTC)
 
 

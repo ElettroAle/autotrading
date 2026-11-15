@@ -7,7 +7,8 @@ from uuid import UUID
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 
 from autotrading.adapters.outbound.hyperliquid.activity import translated
-from autotrading.adapters.outbound.hyperliquid.exchange import TIMEOUT_SECONDS, HyperliquidSdkAdapter
+from autotrading.adapters.outbound.hyperliquid.exchange import ACCOUNT_ADDRESS, TIMEOUT_SECONDS, HyperliquidSdkAdapter
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
 
 # The exchange answers at most 2000 fills and 500 funding payments per request, and keeps only the 10000 most recent
@@ -71,7 +72,11 @@ class HyperliquidAccountExecutionsAdapter:
     def base_url(self) -> str:
         return self._base_url
 
-    def since(self, address: str, since: datetime | None) -> ExecutionsWindow:
+    def reference_fields(self) -> frozenset[str]:
+        return frozenset({ACCOUNT_ADDRESS})
+
+    def since(self, reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
+        address = reference.value(ACCOUNT_ADDRESS)
         start = FROM_THE_START if since is None else int(since.timestamp() * 1000)
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)

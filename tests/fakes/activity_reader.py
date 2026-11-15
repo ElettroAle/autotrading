@@ -8,8 +8,12 @@ from datetime import datetime
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
 from tests.support.activity import an_activity
+
+# The field the fake exchange finds an account by, as the adapter of a real exchange declares its own.
+ADDRESS_FIELD = "account_address"
 
 
 class FakeActivityReaderAdapter:
@@ -24,12 +28,17 @@ class FakeActivityReaderAdapter:
         self.unreachable_after_first_reading = False
         self.readings: list[tuple[str, datetime | None]] = []
 
-    def activity(self, address: str) -> AccountActivity:
+    def reference_fields(self) -> frozenset[str]:
+        return frozenset({ADDRESS_FIELD})
+
+    def activity(self, reference: AccountReference) -> AccountActivity:
+        address = reference.value(ADDRESS_FIELD)
         if not self.reachable:
             raise FlowExchangeUnavailableError
         return self.activities.get(address, an_activity())
 
-    def since(self, address: str, since: datetime | None) -> ExecutionsWindow:
+    def since(self, reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
+        address = reference.value(ADDRESS_FIELD)
         if not (self.reachable and self.executions_reachable):
             raise FlowExchangeUnavailableError
         self.readings.append((address, since))

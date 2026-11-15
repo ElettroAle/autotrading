@@ -16,8 +16,11 @@ from autotrading.application.flows.errors import FlowCredentialsNotOpenedError
 from autotrading.application.orders.errors import OrderCredentialsNotOpenedError
 from autotrading.application.verification.errors import VerificationCredentialsNotOpenedError
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.cycle_access import CycleAccess
+from autotrading.domain.flows.errors import FlowCredentialsMissingError
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -136,7 +139,7 @@ def test_opens_the_access_of_the_orders_for_the_same_tenant_and_account(
 ) -> None:
     access = opener.open_access(sealed_access_of(sealed_account(private_key)))
 
-    assert access == TradingAccess("Hyperliquid", CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
+    assert access == TradingAccess("Hyperliquid", CREDENTIALS.values)
 
 
 def test_the_access_of_another_account_is_not_opened(
@@ -164,10 +167,32 @@ def sealed_address_of(account: Account) -> SealedAddress:
     )
 
 
-def test_opens_only_the_address_for_the_flows_of_the_same_tenant_and_account(
+def test_opens_for_the_flows_only_the_fields_the_reader_names(
     opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
 ) -> None:
-    assert opener.open_address(sealed_address_of(sealed_account(private_key))) == CREDENTIALS.value("account_address")
+    reference = opener.open_reference(sealed_address_of(sealed_account(private_key)), frozenset({"account_address"}))
+
+    assert reference == AccountReference({"account_address": CREDENTIALS.value("account_address")})
+
+
+def test_a_field_the_reader_names_but_the_credentials_lack_is_refused(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    with pytest.raises(FlowCredentialsMissingError):
+        opener.open_reference(sealed_address_of(sealed_account(private_key)), frozenset({"passphrase"}))
+
+
+def test_the_fields_of_any_exchange_open_as_they_were_sealed(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    other = Credentials({"api_key": "k-1", "api_secret": "s-1", "passphrase": "p-1"})
+    account = an_account(TENANT)
+    sealer = SodiumCredentialSealerAdapter(bytes(private_key.public_key), 1, TENANT)
+    sealed = account.with_credentials(sealer.seal(account.id, other))
+
+    assert opener.open_access(sealed_access_of(sealed, "Other")) == TradingAccess("Other", other.values)
+    assert opener.open_cycle_access(sealed_address_of(sealed)) == CycleAccess(other.values)
+    assert opener.open_verification(sealed_verification_of(sealed)) == VerificationAccess(other.values)
 
 
 def test_the_address_of_another_account_is_not_opened(
@@ -176,7 +201,7 @@ def test_the_address_of_another_account_is_not_opened(
     moved = dataclasses.replace(sealed_address_of(sealed_account(private_key)), account_id=uuid4())
 
     with pytest.raises(FlowCredentialsNotOpenedError, match=r"^credenziali del conto non leggibili$"):
-        opener.open_address(moved)
+        opener.open_reference(moved, frozenset({"account_address"}))
 
 
 def test_an_address_sealed_with_an_unknown_key_is_not_opened(
@@ -185,7 +210,7 @@ def test_an_address_sealed_with_an_unknown_key_is_not_opened(
     unknown = dataclasses.replace(sealed_address_of(sealed_account(private_key)), key_version=9)
 
     with pytest.raises(FlowCredentialsNotOpenedError):
-        opener.open_address(unknown)
+        opener.open_reference(unknown, frozenset({"account_address"}))
 
 
 def test_opens_the_access_of_the_cycle_for_the_same_tenant_and_account(
@@ -193,7 +218,7 @@ def test_opens_the_access_of_the_cycle_for_the_same_tenant_and_account(
 ) -> None:
     access = opener.open_cycle_access(sealed_address_of(sealed_account(private_key)))
 
-    assert access == CycleAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
+    assert access == CycleAccess(CREDENTIALS.values)
 
 
 def test_the_cycle_access_of_another_account_is_not_opened(
@@ -206,12 +231,8 @@ def test_the_cycle_access_of_another_account_is_not_opened(
 
 
 def test_the_cycle_access_hides_address_and_secret() -> None:
-    assert CREDENTIALS.value("secret_key") not in repr(
-        CycleAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
-    )
-    assert CREDENTIALS.value("account_address") not in repr(
-        CycleAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
-    )
+    assert CREDENTIALS.value("secret_key") not in repr(CycleAccess(CREDENTIALS.values))
+    assert CREDENTIALS.value("account_address") not in repr(CycleAccess(CREDENTIALS.values))
 
 
 def sealed_verification_of(account: Account) -> SealedVerificationAccess:
@@ -227,7 +248,7 @@ def test_opens_the_access_of_the_verification_for_the_same_tenant_and_account(
 ) -> None:
     access = opener.open_verification(sealed_verification_of(sealed_account(private_key)))
 
-    assert access == VerificationAccess(CREDENTIALS.value("account_address"), CREDENTIALS.value("secret_key"))
+    assert access == VerificationAccess(CREDENTIALS.values)
 
 
 def test_the_verification_access_of_another_account_is_not_opened(
@@ -293,7 +314,7 @@ def test_the_opening_for_every_context_is_recorded_with_its_purpose(
 
     with caplog.at_level(logging.INFO, logger="autotrading.credentials"):
         opener.open_access(sealed_access_of(account))
-        opener.open_address(sealed_address_of(account))
+        opener.open_reference(sealed_address_of(account), frozenset({"account_address"}))
         opener.open_cycle_access(sealed_address_of(account))
         opener.open_verification(sealed_verification_of(account))
 

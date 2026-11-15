@@ -5,7 +5,9 @@ from autotrading.application.verification.errors import VerificationCredentialsN
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.cycle_access import CycleAccess
+from autotrading.domain.flows.errors import FlowCredentialsMissingError
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -40,9 +42,9 @@ class FakeCredentialOpenerAdapter:
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise OrderCredentialsNotOpenedError
         self.opened_accesses.append(sealed)
-        return TradingAccess(sealed.exchange, credentials.value("account_address"), credentials.value("secret_key"))
+        return TradingAccess(sealed.exchange, credentials.values)
 
-    def open_address(self, sealed: SealedAddress) -> str:
+    def open_reference(self, sealed: SealedAddress, names: frozenset[str]) -> AccountReference:
         opened = self._vault.get(sealed.ciphertext)
         if opened is None:
             raise FlowCredentialsNotOpenedError
@@ -50,7 +52,9 @@ class FakeCredentialOpenerAdapter:
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise FlowCredentialsNotOpenedError
         self.opened_addresses.append(sealed)
-        return credentials.value("account_address")
+        if not names <= credentials.values.keys():
+            raise FlowCredentialsMissingError
+        return AccountReference({name: credentials.values[name] for name in names})
 
     def open_cycle_access(self, sealed: SealedAddress) -> CycleAccess:
         opened = self._vault.get(sealed.ciphertext)
@@ -59,7 +63,7 @@ class FakeCredentialOpenerAdapter:
         tenant_id, account_id, credentials = opened
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise FlowCredentialsNotOpenedError
-        return CycleAccess(credentials.value("account_address"), credentials.value("secret_key"))
+        return CycleAccess(credentials.values)
 
     def open_verification(self, sealed: SealedVerificationAccess) -> VerificationAccess:
         opened = self._vault.get(sealed.ciphertext)
@@ -68,4 +72,4 @@ class FakeCredentialOpenerAdapter:
         tenant_id, account_id, credentials = opened
         if (tenant_id, account_id) != (sealed.tenant_id, AccountId(sealed.account_id)):
             raise VerificationCredentialsNotOpenedError
-        return VerificationAccess(credentials.value("account_address"), credentials.value("secret_key"))
+        return VerificationAccess(credentials.values)

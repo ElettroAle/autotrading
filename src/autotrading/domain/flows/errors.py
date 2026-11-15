@@ -269,3 +269,10 @@ class RankingWithoutEquityError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("nessun ciclo del flusso nel periodo della classifica")
+
+
+class FlowCredentialsMissingError(DomainError):
+    """The opened credentials of the account lack a field its exchange reads (Bug 284)."""
+
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto incomplete")

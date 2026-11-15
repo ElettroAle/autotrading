@@ -211,7 +211,7 @@ def test_the_network_follows_the_installation(testnet: bool, url: str) -> None:
     assert sdk.calls[0][1][1] == url
 
 
-VERIFICATION_ACCESS = VerificationAccess(ADDRESS, WALLET.key.hex())
+VERIFICATION_ACCESS = VerificationAccess({"account_address": ADDRESS, "secret_key": WALLET.key.hex()})
 
 
 def test_the_verification_reads_balance_margin_and_positions_proving_the_signer() -> None:
@@ -243,7 +243,7 @@ def test_an_exchange_that_does_not_answer_is_a_failed_verification_step() -> Non
     assert raised.value.message == "exchange non raggiungibile, riprovare"
 
 
-CYCLE_ACCESS = CycleAccess(ADDRESS, WALLET.key.hex())
+CYCLE_ACCESS = CycleAccess({"account_address": ADDRESS, "secret_key": WALLET.key.hex()})
 
 
 def test_the_cycle_reads_margin_and_positions_proving_the_signer() -> None:

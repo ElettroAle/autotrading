@@ -19,7 +19,7 @@ from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
-from tests.support.credentials import HYPERLIQUID_FIELDS, hyperliquid_credentials
+from tests.support.credentials import HYPERLIQUID_FIELDS
 
 # What the user reads of a refusal: the text of the exchange with the address masked (R0.2.3).
 REDACTED_REJECTION = "User or API Wallet *** does not exist."
@@ -84,7 +84,7 @@ class FakeExchangeAdapter:
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         try:
-            state = self.read_state(hyperliquid_credentials(access.account_address, access.secret_key))
+            state = self.read_state(Credentials(access.fields))
         except ExchangeRejectedCredentialsError as error:
             raise VerificationCredentialsRejectedError from error
         except ExchangeUnavailableError as error:
@@ -98,7 +98,7 @@ class FakeExchangeAdapter:
 
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:
         try:
-            state = self.read_state(hyperliquid_credentials(access.account_address, access.secret_key))
+            state = self.read_state(Credentials(access.fields))
         except ExchangeRejectedCredentialsError as error:
             raise FlowCredentialsRefusedError from error
         except ExchangeUnavailableError as error:

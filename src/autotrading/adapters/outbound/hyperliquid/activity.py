@@ -9,6 +9,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
+    ACCOUNT_ADDRESS,
     MARGIN_CURRENCY,
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
@@ -16,6 +17,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
 
 FROM_THE_START = 0
@@ -61,7 +63,11 @@ class HyperliquidAccountActivityAdapter:
     def base_url(self) -> str:
         return self._base_url
 
-    def activity(self, address: str) -> AccountActivity:
+    def reference_fields(self) -> frozenset[str]:
+        return frozenset({ACCOUNT_ADDRESS})
+
+    def activity(self, reference: AccountReference) -> AccountActivity:
+        address = reference.value(ACCOUNT_ADDRESS)
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)
             state = user_state_of(info.user_state(address))

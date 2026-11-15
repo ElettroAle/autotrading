@@ -102,7 +102,7 @@ class HyperliquidExchangeAdapter:
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
         try:
-            state = self.read_state(_credentials_of(access.account_address, access.secret_key))
+            state = self.read_state(Credentials(access.fields))
         except ExchangeRejectedCredentialsError as error:
             raise VerificationCredentialsRejectedError from error
         except ExchangeUnavailableError as error:
@@ -120,7 +120,7 @@ class HyperliquidExchangeAdapter:
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:
         """The same reading for the cycle of a flow: a refusal pauses the flows of the account (R1.2.4)."""
         try:
-            state = self.read_state(_credentials_of(access.account_address, access.secret_key))
+            state = self.read_state(Credentials(access.fields))
         except ExchangeRejectedCredentialsError as error:
             raise FlowCredentialsRefusedError from error
         except ExchangeUnavailableError as error:
@@ -196,7 +196,3 @@ def _decimal(value: object) -> Decimal:
 def _masked(message: str, credentials: Credentials) -> str:
     # The message of the exchange goes back to the user; the credentials it may echo never do (R0.2.3).
     return credentials.redact(message)
-
-
-def _credentials_of(account_address: str, secret_key: str) -> Credentials:
-    return Credentials({ACCOUNT_ADDRESS: account_address, API_WALLET_KEY: secret_key})
