@@ -18,7 +18,7 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
 | Orchestrazione dell'agente | **LangGraph** | Grafo tipizzato con fan-out parallelo delle fonti; stessa base per comitato (6.28) e doppio timeframe (6.27). |
 | Accesso ai modelli | **Libreria LiteLLM** nel `worker` | API unica OpenAI-compatible verso oltre 100 fornitori (OpenAI, Anthropic, DeepSeek, Gemini, xAI, Mistral, Kimi, Groq, Azure OpenAI, Bedrock, Vertex, OpenRouter, Ollama) **[doc]**, usata in-process dal solo `worker` (ADR 0148). Nessuna chiave della piattaforma: ogni chiamata porta la chiave dell'utente del flusso (RF-01.05). Catalogo dei modelli dalla mappa dei modelli della libreria per i fornitori abilitati, che l'`api` chiede al `worker` (ADR 0149); OpenRouter è chiamato direttamente, col catalogo dal suo elenco pubblico (ADR 0109). Cambio modello = configurazione (RF-16). |
 | Identità | **OIDC generico**, primo IdP Entra ID | L'applicazione conosce solo issuer, client id e claim; Entra ID è sostituibile con qualunque IdP OIDC. Vedi 7.1 per i limiti con utenti esterni. |
-| Dashboard | **React + TypeScript** (fase F2) | Frontend separato che consuma la stessa API programmatica di F1. |
+| Dashboard | **React + TypeScript** (epica E2) | Frontend separato che consuma la stessa API programmatica di E1. |
 | Budget | Nessun vincolo ora | I costi vengono misurati per flusso (RNF-09) e decisi dopo. |
 
 ---
@@ -31,7 +31,7 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
                  │                                                            │
   Utente ──OIDC──┤  ┌──────────┐   ┌───────────┐   ┌──────────┐  ┌────────┐  │
   (browser,      │  │ dashboard│──▶│    api    │──▶│ postgres │◀─│ worker │  │
-   CLI, script)  │  │ (F2)     │   │ (FastAPI) │   │          │  │        │  │
+   CLI, script)  │  │ (E2)     │   │ (FastAPI) │   │          │  │        │  │
                  │  └──────────┘   └───────────┘   └──────────┘  └───┬────┘  │
                  │                                                   │       │
                  │                                             ┌─────┴─────┐ │
@@ -45,13 +45,13 @@ Questo documento traduce i requisiti funzionali in scelte tecniche. Le decisioni
 
 Cinque container, tutti sostituibili e tutti senza dipendenze da un cloud specifico:
 
-| Container | Ruolo | Fase |
+| Container | Ruolo | Epica |
 |-----------|-------|------|
-| `postgres` | Unico stato persistente. | F0 |
-| `api` | Interfaccia programmatica (RF-21): autenticazione OIDC, tenancy, configurazione versionata, comandi, consultazione. Serve anche la dashboard statica in F2. | F0 |
-| `worker` | Pianificatore e ciclo decisionale dei flussi (RF-04), esecuzione ordini, contabilità virtuale, riconciliazione, notifiche; chiamata ai modelli IA con la libreria LiteLLM e catalogo dei suoi modelli per l'`api` (ADR 0148, ADR 0149). | F1 |
-| `forecaster` | Servizio interno per le previsioni Prophet (RF-08), isolato perché pesante (cmdstan) e condivisibile tra flussi. | F1 |
-| `dashboard` | Build statica React, servita da `api` o da un server statico. | F2 |
+| `postgres` | Unico stato persistente. | E0 |
+| `api` | Interfaccia programmatica (RF-21): autenticazione OIDC, tenancy, configurazione versionata, comandi, consultazione. Serve anche la dashboard statica in E2. | E0 |
+| `worker` | Pianificatore e ciclo decisionale dei flussi (RF-04), esecuzione ordini, contabilità virtuale, riconciliazione, notifiche; chiamata ai modelli IA con la libreria LiteLLM e catalogo dei suoi modelli per l'`api` (ADR 0148, ADR 0149). | E1 |
+| `forecaster` | Servizio interno per le previsioni Prophet (RF-08), isolato perché pesante (cmdstan) e condivisibile tra flussi. | E1 |
+| `dashboard` | Build statica React, servita da `api` o da un server statico. | E2 |
 
 `api` e `worker` sono lo stesso pacchetto Python avviato con comandi diversi: condividono modello di dominio, repository e adapter.
 
@@ -113,7 +113,7 @@ Tutte le tabelle di dominio hanno `tenant_id`; l'API filtra sempre per il tenant
 
 Il catalogo dei modelli (fornitori, modelli, parametri ammessi; RF-16.05) non è una tabella: lo legge l'adapter `litellm` del `worker` dalla mappa dei modelli della libreria (ADR 0148), e l'`api` lo chiede al `worker` (ADR 0149); l'adapter `openrouter` lo legge dall'elenco pubblico di OpenRouter (ADR 0109).
 
-Serie temporali (`source_samples`, `equity_snapshots`, `forecasts`) partizionate per mese. TimescaleDB non necessario in F1; opzione futura, resta PostgreSQL.
+Serie temporali (`source_samples`, `equity_snapshots`, `forecasts`) partizionate per mese. TimescaleDB non necessario in E1; opzione futura, resta PostgreSQL.
 
 ---
 
@@ -162,7 +162,7 @@ class DataSource(Protocol):
     def render(self, samples: list[SourceSample], weight: float) -> str   # testo per il contesto
 ```
 
-Fonti F1: `indicators` (candele dall'exchange, calcolo con pandas-ta), `pivots`, `forecast` (chiama `forecaster`), `sentiment` (CoinMarketCap Fear & Greed), `news` (RSS). F5: `whales`, `volumes`.
+Fonti E1: `indicators` (candele dall'exchange, calcolo con pandas-ta), `pivots`, `forecast` (chiama `forecaster`), `sentiment` (CoinMarketCap Fear & Greed), `news` (RSS). E5: `whales`, `volumes`.
 
 ### 6.2 Modello IA
 
@@ -257,7 +257,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 
 ---
 
-## 11. Replay storico (F4)
+## 11. Replay storico (E4)
 
 - Stesso grafo, con due sostituzioni per iniezione: `clock` simulato e `ExchangeAdapter = simulated` (commissioni, importo minimo, slippage, trigger su candele storiche, RF-25.04).
 - Fonti con `supports_history=True` ricevono `at` simulato; le altre risultano assenti nel contesto (RF-25.02). Garanzia di **nessun dato futuro**: il repository di `source_samples` filtra per `reference_time <= at` (RF-25.03).
@@ -267,7 +267,7 @@ Decisioni dell'8 novembre 2026; gli scenari di riferimento sono in `specs/E0-ese
 
 ## 12. Deployment e costi
 
-### 12.1 Decisione per F0-F1 (8 novembre 2026)
+### 12.1 Decisione per E0-E1 (8 novembre 2026)
 
 **Hosting: OVH Public Cloud** (decisione del 9 novembre 2026, ADR 0008; sostituisce la VPS Hetzner, i cui piani condivisi non sono più disponibili). Per ora solo l'installazione `dev`, istanza `d2-2` (1 vCPU, 2 GB, circa €5,71/mese, prezzi di novembre 2026 da verificare all'ordine) in regione `SBG5` (ADR 0013; `GRA11` era senza capacità per `d2-2`), Ubuntu 24.04, Docker Engine, `docker compose`, PostgreSQL in container. Si passa a `d2-4` (2 vCPU, 4 GB, circa €11,44/mese) cambiando una variabile quando arrivano worker e forecaster. Creazione della macchina dalla pipeline con la CLI OpenStack e un service account IAM.
 
@@ -281,7 +281,7 @@ Alternative scartate e perché:
 - **Fly.io, Render, Koyeb, Railway**: 8-35 €/mese, ogni servizio fattura a parte.
 - **Azure Container Apps**: 30-45 €/mese con PostgreSQL gestito; scala a zero inutile con worker e gateway sempre attivi.
 
-Configurazione del nodo (F0):
+Configurazione del nodo (E0):
 
 1. Ubuntu LTS, utente non root, nessuna connessione accettata da Internet: accesso solo dal tailnet Tailscale del proprietario con Tailscale SSH (nessuna chiave SSH, `sshd` spento), `ufw` aperto solo sull'interfaccia `tailscale0`; aggiornamenti automatici di sicurezza (ADR 0013).
 2. Docker Engine + plugin compose; immagini da GHCR.
@@ -291,13 +291,13 @@ Configurazione del nodo (F0):
 
 **Ambienti e deploy.** Due installazioni identiche, `dev` (reti di test degli exchange) e `prod`, ciascuna sulla propria VPS con la propria coppia di chiavi delle credenziali. Il deploy passa **sempre** dalla pipeline GitHub Actions, con runner ospitati da GitHub: build e pubblicazione delle immagini su GHCR, poi aggiornamento via Tailscale SSH: il job entra nel tailnet con la propria identità OIDC, senza chiavi né segreti. Environment GitHub `dev` e `prod` con segreti separati; `prod` richiede approvazione. Action di terzi fissate per hash di commit; ramo `main` protetto.
 
-**Backup**: in F0 non serve. Da F1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su OVH Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot dell'istanza. Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
+**Backup**: in E0 non serve. Da E1, quando i flussi accumulano giorni di cicli (CA-02 richiede 7 giorni), un `pg_dump` notturno in un volume locale più copia su OVH Object Storage o altro storage S3-compatible (pochi centesimi al mese), oppure snapshot dell'istanza. Cosa si perderebbe senza: storico dei cicli, configurazioni versionate, contabilità virtuale, dati per il replay. Nessun denaro, perché il saldo vero sta sull'exchange.
 
-### 12.2 Dopo F1
+### 12.2 Dopo E1
 
 - Lo stesso `compose.yaml` gira su una VM Azure nel tenant del proprietario (10-20 €) o, con le stesse immagini, su Azure Container Apps con PostgreSQL gestito (30-45 €). Nessun cambio di codice.
 - Immagini pubblicate su GHCR dalla CI.
-- LLM: 96 cicli/giorno × asset × costo per chiamata, misurato in F1 prima di scegliere il modello di lungo periodo.
+- LLM: 96 cicli/giorno × asset × costo per chiamata, misurato in E1 prima di scegliere il modello di lungo periodo.
 - **CI**: GitHub Actions: ruff, mypy, pytest (unit sul rischio e sulla contabilità, integrazione con PostgreSQL in servizio), build immagini. Boards su ADO con `AB#id` nei commit.
 
 ---
@@ -306,28 +306,28 @@ Configurazione del nodo (F0):
 
 | # | Punto | Mitigazione / decisione da prendere |
 |---|-------|--------------------------------------|
-| T1 | Hyperliquid testnet: faucet, disponibilità ordini trigger, liquidità dei mercati. | Verificare in F0 con la procedura RF-19.05. |
+| T1 | Hyperliquid testnet: faucet, disponibilità ordini trigger, liquidità dei mercati. | Verificare in E0 con la procedura RF-19.05. |
 | T2 | LangGraph e LangChain evolvono velocemente (versioni major frequenti). | Fissare le versioni; isolare l'uso in `graph/`; il dominio non importa LangChain. |
 | T3 | Prophet: immagine pesante (cmdstan), addestramento lento con storici lunghi. | Servizio separato, cache dei modelli, riaddestramento a intervalli, non a ogni ciclo. |
 | T4 | Costo LLM con più flussi e comitato. | Costo di ogni chiamata registrato nel ciclo del flusso (R1.4.6); stima prima del salvataggio della configurazione (RF-28.08). |
 | T5 | Entra ID per utenti esterni self-service. | Entra ID workforce con inviti finché bastano; External ID o altro IdP OIDC dopo, senza cambi nell'app. |
 | T6 | Scadenza API wallet (180 giorni). | Campo `expires_at` sul conto, notifica 14 giorni prima. |
-| T7 | Nonce con più worker. | Un API wallet per replica; in F1 una sola replica. |
+| T7 | Nonce con più worker. | Un API wallet per replica; in E1 una sola replica. |
 | T8 | Fonti esterne instabili (feed RSS, endpoint non ufficiali). | Isolamento per nodo, timeout, campione mancante registrato; chiusura della fonte se non praticabile (principio dei requisiti). |
-| T9 | Nodo singolo OVH: nessuna ridondanza, disco locale. | Accettato in testnet; `pg_dump` notturno su storage esterno da F1; lo stesso compose gira altrove in caso di guasto. |
+| T9 | Nodo singolo OVH: nessuna ridondanza, disco locale. | Accettato in testnet; `pg_dump` notturno su storage esterno da E1; lo stesso compose gira altrove in caso di guasto. |
 | T10 | Sviluppo locale sulla VM del proprietario senza Docker. | Sviluppare con Python locale contro PostgreSQL sul nodo OVH (porte via tunnel SSH), oppure installare WSL2/Docker se la virtualizzazione annidata è disponibile. |
 
 ---
 
-## 14. Piano tecnico delle prime fasi
+## 14. Piano tecnico delle prime epiche
 
-**F0. Esecuzione verificata**
+**E0. Esecuzione verificata**
 1. Scheletro repo, `compose.yaml` con `postgres` e `api`, Alembic, modello `tenants/users/accounts`.
 2. Adapter `hyperliquid` su testnet: stato conto, candele, leva, apertura e chiusura con `cloid`, ordini trigger.
 3. Comando `verify-execution` (RF-19.05) che apre, legge e chiude; registra ordini e fill.
 4. Autenticazione OIDC su `api` con un solo utente abilitato.
 
-**F1. Flussi autonomi senza dashboard**
+**E1. Flussi autonomi senza dashboard**
 1. Modello dati completo (sezione 4), configurazione versionata, validazioni (RF-21.05), regola di conflitto.
 2. Libreria LiteLLM nel `worker`, catalogo modelli, client con output strutturato (ADR 0148).
 3. Fonti `indicators`, `pivots`, `sentiment`, `news`; `forecaster` con Prophet.
