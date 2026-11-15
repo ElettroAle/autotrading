@@ -35,6 +35,7 @@ TIMEOUT_SECONDS = 10.0
 PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
 INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
+MISSING_FIELD_MESSAGE = "credenziali del conto incomplete"
 # The names Hyperliquid gives its networks, the ones the installation declares (Bug 277, R2.3.10).
 TESTNET = "testnet"
 MAINNET = "mainnet"
@@ -95,7 +96,7 @@ class HyperliquidExchangeAdapter:
     def read_state(self, credentials: Credentials) -> AccountState:
         wallet = _wallet_of(credentials)
         try:
-            address = credentials.value(ACCOUNT_ADDRESS)
+            address = _field(credentials, ACCOUNT_ADDRESS)
             exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
             state = self._sdk.info(self._base_url, self._timeout).user_state(address)
@@ -149,9 +150,17 @@ class HyperliquidExchangeAdapter:
         )
 
 
+def _field(credentials: Credentials, name: str) -> str:
+    """A field the exchange needs; credentials without it are refused as the exchange would refuse them."""
+    found = credentials.values.get(name)
+    if found is None:
+        raise ExchangeRejectedCredentialsError(MISSING_FIELD_MESSAGE)
+    return found
+
+
 def _wallet_of(credentials: Credentials) -> LocalAccount:
     try:
-        wallet: LocalAccount = EthereumAccount.from_key(credentials.value(API_WALLET_KEY))
+        wallet: LocalAccount = EthereumAccount.from_key(_field(credentials, API_WALLET_KEY))
     except ValueError as error:
         raise ExchangeRejectedCredentialsError(INVALID_KEY_MESSAGE) from error
     return wallet

@@ -11,7 +11,7 @@ from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAdapter
-from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -72,9 +72,11 @@ class FakeSdk(HyperliquidSdkAdapter):
 
 
 def read(sdk: FakeSdk) -> Any:
-    return HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0).activity(
-        AccountReference({"account_address": ADDRESS})
-    )
+    return read_reference(sdk, AccountReference({"account_address": ADDRESS}))
+
+
+def read_reference(sdk: FakeSdk, reference: AccountReference) -> Any:
+    return HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0).activity(reference)
 
 
 def test_the_account_is_found_by_its_address_alone() -> None:
@@ -176,3 +178,12 @@ def test_an_answer_of_unexpected_shape_is_unavailable(sdk: FakeSdk) -> None:
 @pytest.mark.parametrize(("testnet", "url"), [(True, TESTNET_API_URL), (False, MAINNET_API_URL)])
 def test_the_activity_is_read_on_the_network_asked(*, testnet: bool, url: str) -> None:
     assert HyperliquidAccountActivityAdapter.for_network(testnet=testnet, sdk=FakeSdk()).base_url == url
+
+
+def test_a_reference_without_the_address_is_refused_before_reaching_the_exchange() -> None:
+    sdk = FakeSdk()
+
+    with pytest.raises(FlowCredentialsFieldMissingError):
+        read_reference(sdk, AccountReference({"wallet": ADDRESS}))
+
+    assert sdk.calls == []

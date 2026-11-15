@@ -365,7 +365,9 @@ class ActivityReaderPort(Protocol):
         ...
 
     def activity(self, reference: AccountReference) -> AccountActivity:
-        """Raises FlowExchangeUnavailableError when the exchange cannot be read."""
+        """Raises FlowExchangeUnavailableError when the exchange cannot be read, and FlowCredentialsFieldMissingError
+        when the reference lacks a field the reader declares.
+        """
         ...
 
 
@@ -434,7 +436,9 @@ class ExecutionsReaderPort(Protocol):
         ...
 
     def since(self, reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
-        """Raises FlowExchangeUnavailableError when the exchange cannot be read."""
+        """Raises FlowExchangeUnavailableError when the exchange cannot be read, and FlowCredentialsFieldMissingError
+        when the reference lacks a field the reader declares.
+        """
         ...
 
 

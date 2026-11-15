@@ -17,6 +17,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     API_WALLET_KEY,
     INVALID_KEY_MESSAGE,
     MIN_ORDER_VALUE,
+    MISSING_FIELD_MESSAGE,
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
 )
@@ -116,7 +117,7 @@ class HyperliquidOrderExchangeAdapter:
 
     def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
         with _translated(access):
-            state = self._sdk.info(self._base_url, self._timeout).user_state(access.value(ACCOUNT_ADDRESS))
+            state = self._sdk.info(self._base_url, self._timeout).user_state(_field(access, ACCOUNT_ADDRESS))
         return _held_position_of(state, coin)
 
     def set_leverage(self, access: TradingAccess, coin: str, leverage: int, margin: MarginMode) -> None:
@@ -136,13 +137,13 @@ class HyperliquidOrderExchangeAdapter:
     def find_order(self, access: TradingAccess, order: MarketOrder) -> Execution | None:
         with _translated(access):
             status = self._sdk.info(self._base_url, self._timeout).query_order_by_cloid(
-                access.value(ACCOUNT_ADDRESS), _cloid_of(order)
+                _field(access, ACCOUNT_ADDRESS), _cloid_of(order)
             )
         oid = _oid_of(status)
         return None if oid is None else self._execution(access, oid)
 
     def _exchange(self, access: TradingAccess) -> Exchange:
-        return self._sdk.exchange(_wallet_of(access), self._base_url, access.value(ACCOUNT_ADDRESS), self._timeout)
+        return self._sdk.exchange(_wallet_of(access), self._base_url, _field(access, ACCOUNT_ADDRESS), self._timeout)
 
     @staticmethod
     def _send(exchange: Exchange, order: MarketOrder) -> object:
@@ -153,7 +154,7 @@ class HyperliquidOrderExchangeAdapter:
 
     def _execution(self, access: TradingAccess, oid: int) -> Execution | None:
         with _translated(access):
-            fills = self._sdk.info(self._base_url, self._timeout).user_fills(access.value(ACCOUNT_ADDRESS))
+            fills = self._sdk.info(self._base_url, self._timeout).user_fills(_field(access, ACCOUNT_ADDRESS))
         return _execution_of(fills, oid)
 
 
@@ -170,9 +171,17 @@ def _translated(access: TradingAccess, on_timeout: type[Exception] = OrderExchan
         raise OrderExchangeUnavailableError from error
 
 
+def _field(access: TradingAccess, name: str) -> str:
+    """A field the exchange needs; an access without it is refused before reaching the exchange."""
+    found = access.fields.get(name)
+    if found is None:
+        raise ExchangeRejectedOrderError(MISSING_FIELD_MESSAGE)
+    return found
+
+
 def _wallet_of(access: TradingAccess) -> LocalAccount:
     try:
-        wallet: LocalAccount = EthereumAccount.from_key(access.value(API_WALLET_KEY))
+        wallet: LocalAccount = EthereumAccount.from_key(_field(access, API_WALLET_KEY))
     except ValueError as error:
         raise ExchangeRejectedOrderError(INVALID_KEY_MESSAGE) from error
     return wallet
