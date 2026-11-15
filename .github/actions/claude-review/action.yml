@@ -1,7 +1,8 @@
 name: claude-review
 description: >-
   Revisione AI della pull request contro CLAUDE.md e le rule che la pull request porta (ADR 0113). Apre un thread per ogni
-  violazione, chiude i propri thread corretti; fallisce se la revisione non si completa.
+  violazione, chiude i propri thread corretti; fallisce se la revisione non si completa o se restano suoi thread
+  aperti (Bug 298).
 inputs:
   token:
     description: Token OAuth dell'abbonamento Claude del proprietario (claude setup-token)
@@ -68,3 +69,14 @@ runs:
           presente nel diff, con `confirmed: true`. Il corpo è in italiano, inizia con `<!-- revisione-ai -->` e
           contiene: la regola violata citata testualmente con il file da cui viene, che cosa la viola sulla riga,
           che cosa cambiare. Un thread per violazione. Non scrivere commenti generali sulla pull request.
+    # The review fails while one of its threads is open: a check that stays green on a blocked pull request hides
+    # what to fix (Bug 298). The script comes from the pull request, next to this action.
+    - name: Thread della revisione aperti
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ github.repository }}
+        NUMBER: ${{ inputs.number }}
+      run: |
+        cd "$GITHUB_ACTION_PATH/../../.."
+        gh api graphql           -f query='query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { reviewThreads(first: 100) { nodes { isResolved path line comments(first: 1) { nodes { author { login } body } } } } } } }'           -F owner="${REPOSITORY%%/*}" -F name="${REPOSITORY##*/}" -F number="$NUMBER"           | python3 -m tools.review_threads

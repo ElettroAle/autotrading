@@ -35,7 +35,8 @@ Decisioni in `docs/adr/0001`-`0013`, `0084`, `0113` e `0114`. Requisiti in `spec
 - La revisione AI (`review / revisione`, ADR 0113) giudica ogni pull request con `CLAUDE.md` e le rule che
   la pull request porta e apre un thread per ogni violazione del codice; una modifica alle regole non è una
   violazione. Un suo thread lo chiude solo la revisione stessa, quando la violazione è corretta, o il
-  proprietario: mai un agente.
+  proprietario: mai un agente. Finché un suo thread resta aperto il controllo `review / revisione` fallisce
+  (Bug 298).
 - Ogni pull request verso `main` collega i suoi work item con `AB#<id>` nella descrizione (`quality / work item`,
   ADR 0084); esente solo `dependabot[bot]`.
 - Il deploy usa sempre il digest dell'immagine; la promozione non ricostruisce.
