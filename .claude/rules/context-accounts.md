@@ -21,6 +21,9 @@ paths:
   un `__repr__` che le maschera.
 - Le credenziali sono una mappa sui campi che l'adapter dell'exchange dichiara (`ExchangePort.credential_fields()`,
   R2.3.9, ADR 0158): domain, API e dashboard non nominano i dati di un exchange.
+- I valori delle credenziali perdono spazi agli estremi e caratteri di formato invisibili (Unicode `Cf`); l'adapter
+  dell'exchange ne controlla la forma prima di contattarlo e un valore di forma sbagliata è
+  `CredentialFieldMalformedError`, col campo e con che cosa non torna, mai un suo carattere (Bug 387).
 - Alla registrazione e alla sostituzione le credenziali si controllano leggendo il saldo prima di
   salvarle (R0.2.1, R0.2.4). Nessun controllo sui permessi di prelievo.
 - Il conto non ha un attributo test/reale: la rete la dichiara la configurazione dell'adapter del suo exchange

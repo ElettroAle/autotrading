@@ -93,3 +93,19 @@ def test_credentials_with_every_declared_field_empty_are_refused_as_a_whole() ->
         Credentials.declared(FIELDS, {"account_address": " ", "secret_key": ""})
 
     assert str(raised.value) == "credenziali obbligatorio"
+
+
+@pytest.mark.parametrize("invisible", ["\u200b", "\ufeff", "\u200d", "\u2060", "\u00ad"])
+def test_invisible_format_characters_copied_with_a_value_are_dropped(invisible: str) -> None:
+    pasted = f"{invisible}{SECRET[:10]}{invisible}{SECRET[10:]}{invisible}"
+
+    credentials = Credentials.declared(FIELDS, {"account_address": ADDRESS, "secret_key": pasted})
+
+    assert credentials.value("secret_key") == SECRET
+
+
+def test_a_value_made_only_of_invisible_characters_is_empty() -> None:
+    with pytest.raises(CredentialFieldRequiredError) as raised:
+        Credentials.declared(FIELDS, {"account_address": ADDRESS, "secret_key": "\u200b\ufeff"})
+
+    assert raised.value.field == "secret_key"

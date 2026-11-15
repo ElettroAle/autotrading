@@ -12,7 +12,11 @@ from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
-from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.accounts.errors import (
+    CredentialFieldMalformedError,
+    ExchangeRejectedCredentialsError,
+    ExchangeUnavailableError,
+)
 from autotrading.application.flows.errors import FlowCredentialsRefusedError, FlowExchangeUnavailableError
 from autotrading.application.verification.errors import (
     VerificationCredentialsRejectedError,
@@ -36,6 +40,15 @@ PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
 INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
 MISSING_FIELD_MESSAGE = "credenziali del conto incomplete"
+# The shapes of the two fields: a value of another shape is refused before reaching the exchange, saying what is wrong
+# in it and never a character of it (Bug 387).
+HEX_PREFIX = "0x"
+HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+KEY_DIGITS = 64
+ADDRESS_DIGITS = 40
+KEY_SHAPE = "attese 64 cifre esadecimali, con o senza 0x"
+INVALID_ADDRESS_MESSAGE = "indirizzo del conto non valido"
+ADDRESS_SHAPE = "atteso 0x seguito da 40 cifre esadecimali"
 # The names Hyperliquid gives its networks, the ones the installation declares (Bug 277, R2.3.10).
 TESTNET = "testnet"
 MAINNET = "mainnet"
@@ -94,9 +107,9 @@ class HyperliquidExchangeAdapter:
         return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     def read_state(self, credentials: Credentials) -> AccountState:
+        address = _address_of(credentials)
         wallet = _wallet_of(credentials)
         try:
-            address = _field(credentials, ACCOUNT_ADDRESS)
             exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
             state = self._sdk.info(self._base_url, self._timeout).user_state(address)
@@ -158,12 +171,40 @@ def _field(credentials: Credentials, name: str) -> str:
     return found
 
 
+def _address_of(credentials: Credentials) -> str:
+    address = _field(credentials, ACCOUNT_ADDRESS)
+    if not address.startswith(HEX_PREFIX) or not _hexadecimal(address.removeprefix(HEX_PREFIX), ADDRESS_DIGITS):
+        raise CredentialFieldMalformedError(
+            ACCOUNT_ADDRESS, f"{INVALID_ADDRESS_MESSAGE}: {ADDRESS_SHAPE}; {_shape_of(address)}"
+        )
+    return address
+
+
 def _wallet_of(credentials: Credentials) -> LocalAccount:
+    key = _field(credentials, API_WALLET_KEY)
+    if not _hexadecimal(_digits_of(key), KEY_DIGITS):
+        raise CredentialFieldMalformedError(API_WALLET_KEY, f"{INVALID_KEY_MESSAGE}: {KEY_SHAPE}; {_shape_of(key)}")
     try:
-        wallet: LocalAccount = EthereumAccount.from_key(_field(credentials, API_WALLET_KEY))
+        wallet: LocalAccount = EthereumAccount.from_key(key)
     except ValueError as error:
-        raise ExchangeRejectedCredentialsError(INVALID_KEY_MESSAGE) from error
+        # 64 hexadecimal digits that are no key of the curve, as zero.
+        raise CredentialFieldMalformedError(API_WALLET_KEY, INVALID_KEY_MESSAGE) from error
     return wallet
+
+
+def _digits_of(value: str) -> str:
+    return value[len(HEX_PREFIX) :] if value[: len(HEX_PREFIX)].lower() == HEX_PREFIX else value
+
+
+def _hexadecimal(digits: str, length: int) -> bool:
+    return len(digits) == length and set(digits) <= HEX_DIGITS
+
+
+def _shape_of(value: str) -> str:
+    """What is wrong in a value, told without any of its characters: its length and how many are no hex digits."""
+    foreign = sum(1 for character in _digits_of(value) if character not in HEX_DIGITS)
+    received = f"ricevuti {len(value)} caratteri"
+    return f"{received}, di cui {foreign} non esadecimali" if foreign else received
 
 
 def _unused_cloid() -> Cloid:

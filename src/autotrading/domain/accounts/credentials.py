@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -11,6 +12,7 @@ from autotrading.domain.accounts.errors import (
 )
 
 MASK = "***"
+INVISIBLE_FORMAT = "Cf"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +37,7 @@ class Credentials:
         unknown = sorted(name for name in values if name not in names)
         if unknown:
             raise UnknownCredentialFieldError(unknown[0])
-        if not any(values.get(credential_field.name, "").strip() for credential_field in declared):
+        if not any(_cleaned(values.get(credential_field.name, "")) for credential_field in declared):
             raise CredentialsRequiredError
         return cls({credential_field.name: _required(credential_field, values) for credential_field in declared})
 
@@ -61,7 +63,14 @@ class Credentials:
 
 
 def _required(credential_field: CredentialField, values: Mapping[str, str]) -> str:
-    value = values.get(credential_field.name, "").strip()
+    value = _cleaned(values.get(credential_field.name, ""))
     if not value:
         raise CredentialFieldRequiredError(credential_field.name, credential_field.label)
     return value
+
+
+def _cleaned(value: str) -> str:
+    # A value copied from a password manager or a web page can carry invisible format characters (zero-width space,
+    # byte order mark): no credential of any exchange contains them, and they make a right value look wrong (Bug 387).
+    visible = "".join(character for character in value if unicodedata.category(character) != INVISIBLE_FORMAT)
+    return visible.strip()

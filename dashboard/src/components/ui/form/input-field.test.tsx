@@ -22,12 +22,15 @@ describe('InputField', () => {
 });
 
 describe('SecretField', () => {
-  it('hides what is typed and asks the browser not to remember it (ADR 0130)', () => {
+  it('hides what is typed and keeps browser and password managers from filling it (ADR 0130, Bug 387)', () => {
     render(<SecretField label="Chiave" name="key" />);
 
     const input = screen.getByLabelText('Chiave');
     expect(input).toHaveAttribute('type', 'password');
-    expect(input).toHaveAttribute('autocomplete', 'off');
+    expect(input).toHaveAttribute('autocomplete', 'new-password');
+    expect(input).toHaveAttribute('data-lpignore', 'true');
+    expect(input).toHaveAttribute('data-1p-ignore', 'true');
+    expect(input).toHaveAttribute('data-bwignore', 'true');
   });
 });
 
