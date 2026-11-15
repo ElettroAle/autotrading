@@ -11,7 +11,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
-from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
 from autotrading.application.accounts.errors import (
     CredentialFieldMalformedError,
     ExchangeRejectedCredentialsError,
@@ -113,12 +113,15 @@ class HyperliquidExchangeAdapter:
         try:
             exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
-            state = self._sdk.info(self._base_url, self._timeout).user_state(address)
+            info = self._sdk.info(self._base_url, self._timeout)
+            perps = info.user_state(address)
+            mode = info.query_user_abstraction_state(address)
+            spot = info.spot_user_state(address)
         except ClientError as error:
             raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
-        return _account_state_of(state)
+        return _account_state_of(perps, mode, spot)
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
@@ -234,10 +237,10 @@ def _require_accepted(response: object, credentials: Credentials) -> None:
     raise ExchangeRejectedCredentialsError(_masked(str(message), credentials))
 
 
-def _account_state_of(state: object) -> AccountState:
+def _account_state_of(perps: object, mode: object, spot: object) -> AccountState:
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
-        read = user_state_of(state)
+        read = in_account_mode(user_state_of(perps), mode, spot)
     except (KeyError, TypeError, ValueError, InvalidOperation) as error:
         raise ExchangeUnavailableError from error
     return AccountState(
