@@ -258,8 +258,10 @@ vede rossa prima di diventare verde. Dettagli in `.claude/rules/tests.md`.
 
 ## Decisioni tecniche (ADR)
 
-Ogni decisione tecnica presa da un lavoro vive in `docs/adr/NNNN-titolo.md`: stato, requisiti,
-contesto, decisione, alternative scartate, conseguenze. Il Task sulla board cita le ADR del lavoro.
+Ogni decisione tecnica presa da un lavoro vive in `docs/adr/<titolo-in-kebab-case>.md`: stato, requisiti,
+contesto, decisione, alternative scartate, conseguenze. Un numero non si sceglie nel ramo: le ADR `NNNN-titolo.md`
+già integrate restano col loro numero, congelato a 0168 (ADR identita-delle-adr-indipendente-dal-ramo). Il Task
+sulla board cita le ADR del lavoro col loro percorso.
 Una ADR accettata non si riscrive: la si sostituisce con una nuova che la dichiara superata.
 
 ## Integrazione e rilascio
