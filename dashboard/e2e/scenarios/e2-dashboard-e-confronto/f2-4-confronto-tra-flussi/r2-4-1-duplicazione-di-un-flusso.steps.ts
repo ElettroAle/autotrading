@@ -85,7 +85,7 @@ When(
 );
 
 Then("l'avvio è rifiutato con il motivo {string}", async ({ dashboard }, reason: string) => {
-  await expect(dashboard.alert()).toHaveText(`Avvio rifiutato: ${reason}`);
+  await expect(dashboard.warning(`Avvio rifiutato: ${reason}`)).toBeVisible();
 });
 
 Then(
