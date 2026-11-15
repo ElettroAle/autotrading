@@ -1,7 +1,9 @@
 // ADR-0116: the dashboard follows the structure of bulletproof-react. ADR-0121: Recharts is the one chart library, used
 // only by the shared charts of src/components/charts. Every rule of eslint.architecture.js is red on an example that
-// breaks it and silent on one that respects it, and the dashboard itself breaks none. ADR-0166: the query string
-// changes only through the shared hook of src/hooks/use-search-change.ts, never with a function of the last render.
+// breaks it and silent on one that respects it. That the dashboard as a whole breaks none the required lint jobs verify
+// (npm run lint:architecture and npm run lint, which spreads the same rules), not a test bound by the speed of the
+// machine (Bug 397). ADR-0166: the query string changes only through the shared hook of src/hooks/use-search-change.ts,
+// never with a function of the last render.
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
@@ -17,9 +19,6 @@ const brokenRules = async (path: string, source: string): Promise<string[]> => {
 };
 
 const WARM_UP_TIMEOUT_MS = 60_000;
-// Linting every file of the dashboard grows with it and runs on shared CI machines: its time is bounded by the rules,
-// not by the default timeout of a single assertion (Bug 394).
-const WHOLE_DASHBOARD_TIMEOUT_MS = 60_000;
 
 // The first lint loads the TypeScript resolver and the import graph of the dashboard, generated client included: it is
 // paid once here, so no rule below is timed on it.
@@ -170,19 +169,6 @@ describe('ADR-0116, ADR-0121, ADR-0166: the structure of the dashboard', () => {
   it.each(CONFORMING)('is silent when %s', async (_rule, path, source) => {
     expect(await brokenRules(path, source)).toEqual([]);
   });
-
-  it(
-    'is respected by the dashboard',
-    async () => {
-      const results = await architecture.lintFiles(['src', 'server', 'e2e', 'architecture']);
-      const broken = results.flatMap((result) =>
-        result.messages.map((message) => `${result.filePath}:${message.line} ${message.ruleId}`),
-      );
-
-      expect(broken).toEqual([]);
-    },
-    WHOLE_DASHBOARD_TIMEOUT_MS,
-  );
 });
 
 describe('ADR-0119: one client for the API, generated from its OpenAPI document', () => {
