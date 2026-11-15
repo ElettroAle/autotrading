@@ -229,7 +229,7 @@ def test_a_transient_error_at_every_attempt_fails_the_message_after_the_last(dat
 
     outbox.process(delivery)
 
-    assert len(delivery.attempted) == MAXIMUM_ATTEMPTS == 8
+    assert len(delivery.attempted) == MAXIMUM_ATTEMPTS == 7
     assert stored(database, anna) == [("failed", MAXIMUM_ATTEMPTS, "sistema esterno non disponibile")]
 
 

@@ -20,9 +20,9 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 QUEUE = "outbox"
 TASK = "deliver_outbox_message"
-# Exponential backoff from 5 seconds, at most 8 attempts (ADR outbox-delle-integrazioni-esterne-con-procrastinate).
+# Exponential backoff from 5 seconds, at most 7 attempts: about 6 hours (ADR ritentativi-dell-outbox-in-circa-sei-ore).
 RETRY_BASE_SECONDS = 5
-MAXIMUM_ATTEMPTS = 8
+MAXIMUM_ATTEMPTS = 7
 PENDING, DELIVERED, FAILED = "pending", "delivered", "failed"
 
 operations = logging.getLogger("autotrading.notifications")

@@ -63,7 +63,7 @@ def _wait_after(attempts: int) -> float | None:
     return round((decision.retry_at - datetime.now(UTC)).total_seconds())
 
 
-def test_the_retries_back_off_exponentially_from_five_seconds_for_eight_attempts_at_most() -> None:
+def test_the_retries_back_off_exponentially_from_five_seconds_for_seven_attempts_at_most() -> None:
     waits = [_wait_after(attempts) for attempts in range(MAXIMUM_ATTEMPTS)]
 
-    assert waits == [5, 25, 125, 625, 3125, 15625, 78125, None]
+    assert waits == [5, 25, 125, 625, 3125, 15625, None]
