@@ -1,6 +1,7 @@
 // ADR-0116: the dashboard follows the structure of bulletproof-react. ADR-0121: Recharts is the one chart library, used
 // only by the shared charts of src/components/charts. Every rule of eslint.architecture.js is red on an example that
-// breaks it and silent on one that respects it, and the dashboard itself breaks none.
+// breaks it and silent on one that respects it, and the dashboard itself breaks none. ADR-0166: the query string
+// changes only through the shared hook of src/hooks/use-search-change.ts, never with a function of the last render.
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
@@ -79,6 +80,25 @@ const VIOLATING: ReadonlyArray<readonly [string, string, string]> = [
     'src/features/flows/components/flow-chart.tsx',
     "import * as d3 from 'd3';\n",
   ],
+  [
+    'ADR-0166: a hook changes the query string from the address of the last render',
+    'src/features/history/hooks/use-history-tab.ts',
+    "import { useSearchParams } from 'react-router';\n" +
+      'export const useHistoryTab = () => {\n' +
+      '  const [, setSearch] = useSearchParams();\n' +
+      "  return () => setSearch((current) => new URLSearchParams({ ...current, tab: 'orders' }));\n" +
+      '};\n',
+  ],
+  [
+    'ADR-0166: a component changes the query string with a function expression',
+    'src/features/flow-versions/components/flow-versions.tsx',
+    "import { useSearchParams } from 'react-router';\n" +
+      'export const FlowVersions = () => {\n' +
+      '  const [search, setSearchParams] = useSearchParams();\n' +
+      '  setSearchParams(function (current) { return current; });\n' +
+      '  return search.toString();\n' +
+      '};\n',
+  ],
   ['a file is not named in kebab-case', 'src/components/ui/EnvironmentLabel.tsx', 'export {};\n'],
   [
     'a folder is not named in kebab-case',
@@ -114,13 +134,32 @@ const CONFORMING: ReadonlyArray<readonly [string, string, string]> = [
     "import { renderApp } from '@/testing/test-utils';\n",
   ],
   [
+    'ADR-0166: a hook changes the query string through the shared hook',
+    'src/features/history/hooks/use-history-tab.ts',
+    "import { useSearchChange } from '@/hooks/use-search-change';\n" +
+      'export const useHistoryTab = () => {\n' +
+      '  const changeSearch = useSearchChange();\n' +
+      "  return () => changeSearch((current) => new URLSearchParams({ ...current, tab: 'orders' }));\n" +
+      '};\n',
+  ],
+  [
+    'ADR-0166: a component replaces the whole query string',
+    'src/features/flow-versions/components/flow-versions.tsx',
+    "import { useSearchParams } from 'react-router';\n" +
+      'export const FlowVersions = () => {\n' +
+      '  const [search, setSearchParams] = useSearchParams();\n' +
+      "  setSearchParams({ first: '1', second: '2' });\n" +
+      '  return search.toString();\n' +
+      '};\n',
+  ],
+  [
     'the server uses its own modules',
     'server/route-list.ts',
     "import { runtimeConfigFrom } from './runtime-config.ts';\n",
   ],
 ];
 
-describe('ADR-0116, ADR-0121: the structure of the dashboard', () => {
+describe('ADR-0116, ADR-0121, ADR-0166: the structure of the dashboard', () => {
   it.each(VIOLATING)('is red when %s', async (_rule, path, source) => {
     expect(await brokenRules(path, source)).not.toEqual([]);
   });

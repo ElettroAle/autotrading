@@ -1,7 +1,8 @@
 // The structure of the dashboard, from bulletproof-react (ADR 0116): dependencies flow one way, shared code ──> features
 // ──> app, no feature imports another, production never imports the testing code, the server and the application
 // never import each other. One chart library, Recharts, used only by the shared charts of src/components/charts
-// (ADR 0121). Every rule is proved red on a violating example in architecture/structure.test.ts.
+// (ADR 0121). The query string changes through the shared hook of src/hooks/use-search-change.ts, never with a function
+// of the last render (ADR 0166). Every rule is proved red on a violating example in architecture/structure.test.ts.
 import { readdirSync } from 'node:fs';
 
 import checkFile from 'eslint-plugin-check-file';
@@ -99,6 +100,57 @@ const RECHARTS_OUTSIDE_THE_CHARTS = {
     'Recharts si usa solo nei grafici condivisi di src/components/charts: le funzionalità passano i dati (ADR 0121)',
 };
 
+// React Router hands the function of setSearchParams the query string of the last render, not the last one asked for:
+// changes made before the page shows the previous one would overwrite each other (ADR 0166).
+const SEARCH_CHANGE = 'src/hooks/use-search-change.ts';
+
+const isFunction = (node) =>
+  node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
+
+const isSearchParamsSetter = (declarator) =>
+  declarator.init?.type === 'CallExpression' &&
+  declarator.init.callee.type === 'Identifier' &&
+  declarator.init.callee.name === 'useSearchParams' &&
+  declarator.id.type === 'ArrayPattern' &&
+  declarator.id.elements[1]?.type === 'Identifier';
+
+const noSearchChangeFromTheLastRender = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      fromTheLastRender:
+        "l'indirizzo si cambia con useSearchChange di src/hooks/use-search-change.ts: setSearchParams con una funzione parte dall'ultima resa e perde i cambi in rapida successione (ADR 0166)",
+    },
+  },
+  create: (context) => ({
+    VariableDeclarator(declarator) {
+      if (!isSearchParamsSetter(declarator)) {
+        return;
+      }
+      const setter = declarator.id.elements[1];
+      const variable = context.sourceCode
+        .getDeclaredVariables(declarator)
+        .find((declared) => declared.name === setter.name);
+      variable?.references
+        .map((reference) => reference.identifier)
+        .filter(
+          (identifier) =>
+            identifier.parent.type === 'CallExpression' &&
+            identifier.parent.callee === identifier &&
+            isFunction(identifier.parent.arguments[0]),
+        )
+        .forEach((identifier) =>
+          context.report({ node: identifier.parent, messageId: 'fromTheLastRender' }),
+        );
+    },
+  }),
+};
+
+const searchPlugin = {
+  rules: { 'no-search-change-from-the-last-render': noSearchChangeFromTheLastRender },
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -175,6 +227,12 @@ export default tseslint.config(
         { zones: [...APPLICATION_ZONES, NO_FAKES_IN_PRODUCTION] },
       ],
     },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [SEARCH_CHANGE],
+    plugins: { search: searchPlugin },
+    rules: { 'search/no-search-change-from-the-last-render': 'error' },
   },
   {
     files: TEST_FILES,
