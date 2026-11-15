@@ -21,7 +21,7 @@ VERIFICATION = OrderSource(OrderOrigin.VERIFICATION)
 
 
 def new_access(exchange: str = HYPERLIQUID) -> TradingAccess:
-    return TradingAccess(exchange, account_address=f"0x{token_hex(20)}", secret_key=f"0x{token_hex(32)}")
+    return TradingAccess(exchange, {"account_address": f"0x{token_hex(20)}", "secret_key": f"0x{token_hex(32)}"})
 
 
 @dataclass

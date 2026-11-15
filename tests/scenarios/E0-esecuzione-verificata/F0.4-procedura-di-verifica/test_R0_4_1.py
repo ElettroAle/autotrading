@@ -61,7 +61,7 @@ class Session:
 
     def access_of(self, account: str) -> TradingAccess:
         credentials = self.credentials[account]
-        return TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
+        return TradingAccess(HYPERLIQUID, credentials.values)
 
     def flow_named(self, name: str) -> Flow:
         (flow,) = [flow for flow in self.platform.flows.flows if flow.name.value == name]

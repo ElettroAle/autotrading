@@ -62,12 +62,12 @@ class FakeOrderExchangeAdapter:
         self.realized_on_close = REALIZED_ON_CLOSE
 
     def hold(self, access: TradingAccess, position: HeldPosition) -> None:
-        self.positions[access.account_address, position.coin] = position
+        self.positions[access.value("account_address"), position.coin] = position
 
     def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
         self.signers.append(access)
         self._require_reachable()
-        return self.positions.get((access.account_address, coin))
+        return self.positions.get((access.value("account_address"), coin))
 
     def market(self, access: TradingAccess, coin: str) -> Market:
         self.signers.append(access)
@@ -81,8 +81,8 @@ class FakeOrderExchangeAdapter:
         self._require_reachable()
         if self.leverage_rejection is not None:
             raise ExchangeRejectedOrderError(self.leverage_rejection)
-        self.leverages[access.account_address, coin] = leverage
-        self.margins[access.account_address, coin] = margin
+        self.leverages[access.value("account_address"), coin] = leverage
+        self.margins[access.value("account_address"), coin] = margin
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
         self.sent.append(order)
@@ -120,7 +120,7 @@ class FakeOrderExchangeAdapter:
         return execution
 
     def _move_position(self, access: TradingAccess, order: MarketOrder, size: Decimal) -> None:
-        key = (access.account_address, order.coin)
+        key = (access.value("account_address"), order.coin)
         current = self.positions.get(key)
         if order.reduce_only and current is not None:
             remaining = current.size - size

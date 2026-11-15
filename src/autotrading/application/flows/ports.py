@@ -11,6 +11,7 @@ from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
@@ -332,11 +333,13 @@ class SealedAddressPort(Protocol):
         ...
 
 
-class AddressOpenerPort(Protocol):
-    """In the worker: opens the sealed credentials of an account only to learn its address (ADR 0007)."""
+class ReferenceOpenerPort(Protocol):
+    """In the worker: opens the sealed credentials of an account only for the fields a reader asks (ADR 0044)."""
 
-    def open_address(self, sealed: SealedAddress) -> str:
-        """Raises FlowCredentialsNotOpenedError when the sealed text is of another account or no key opens it."""
+    def open_reference(self, sealed: SealedAddress, names: frozenset[str]) -> AccountReference:
+        """The fields named, and no other; raises FlowCredentialsNotOpenedError when the sealed text is of another
+        account or no key opens it, and FlowCredentialsFieldMissingError when a field named is not in it.
+        """
         ...
 
 
@@ -355,9 +358,13 @@ class CycleAccountReaderPort(Protocol):
 
 
 class ActivityReaderPort(Protocol):
-    """What an exchange shows of an address: positions, balance and movements (R1.6.1)."""
+    """What an exchange shows of an account: positions, balance and movements (R1.6.1)."""
 
-    def activity(self, address: str) -> AccountActivity:
+    def reference_fields(self) -> frozenset[str]:
+        """The names of the fields of the credentials the reader needs to find the account on its exchange."""
+        ...
+
+    def activity(self, reference: AccountReference) -> AccountActivity:
         """Raises FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
 
@@ -420,9 +427,13 @@ class AccountExecutionsPort(Protocol):
 
 
 class ExecutionsReaderPort(Protocol):
-    """The executions and the funding an exchange still holds of an address since a moment (ADR 0063)."""
+    """The executions and the funding an exchange still holds of an account since a moment (ADR 0063)."""
 
-    def since(self, address: str, since: datetime | None) -> ExecutionsWindow:
+    def reference_fields(self) -> frozenset[str]:
+        """The names of the fields of the credentials the reader needs to find the account on its exchange."""
+        ...
+
+    def since(self, reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
         """Raises FlowExchangeUnavailableError when the exchange cannot be read."""
         ...
 

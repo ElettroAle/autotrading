@@ -33,7 +33,7 @@ from autotrading.domain.orders.trading_access import TradingAccess
 BASE_URL = "https://api.hyperliquid-testnet.xyz"
 WALLET = EthereumAccount.create()
 ADDRESS = "0xAbCdEf0000000000000000000000000000000001"
-ACCESS = TradingAccess("Hyperliquid", ADDRESS, WALLET.key.hex())
+ACCESS = TradingAccess("Hyperliquid", {"account_address": ADDRESS, "secret_key": WALLET.key.hex()})
 OID = 77747314
 META = {
     "universe": [
@@ -288,7 +288,9 @@ def test_an_invalid_key_is_refused_before_reaching_the_exchange() -> None:
     sdk = FakeSdk()
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(sdk).place_market_order(TradingAccess("Hyperliquid", ADDRESS, "not-a-key"), an_order())
+        adapter(sdk).place_market_order(
+            TradingAccess("Hyperliquid", {"account_address": ADDRESS, "secret_key": "not-a-key"}), an_order()
+        )
 
     assert raised.value.exchange_message == INVALID_KEY_MESSAGE
     assert calls_named(sdk, "market_open") == []

@@ -58,3 +58,10 @@ class VerificationInProgressError(VerificationNotStartedError):
     def __init__(self, coin: str) -> None:
         super().__init__(f"procedura di verifica già in corso su {coin}")
         self.coin = coin
+
+
+class VerificationCredentialsMissingError(DomainError):
+    """The opened credentials of the account lack a field its exchange reads (Bug 284)."""
+
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto incomplete")

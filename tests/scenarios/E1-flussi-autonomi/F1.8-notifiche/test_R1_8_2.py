@@ -71,7 +71,7 @@ def opening(asset: str, leverage: int = 3) -> dict[str, object]:
 
 def access_of(flow_cycles: FlowCycles, flow: str) -> TradingAccess:
     credentials = flow_cycles.credentials_of(flow)
-    return TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
+    return TradingAccess(HYPERLIQUID, credentials.values)
 
 
 def open_position(flow_cycles: FlowCycles, flow: str, asset: str, leverage: int = 3) -> None:

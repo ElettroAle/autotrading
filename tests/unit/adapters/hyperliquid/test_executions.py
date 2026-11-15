@@ -18,6 +18,7 @@ from autotrading.adapters.outbound.hyperliquid.executions import (
     HyperliquidAccountExecutionsAdapter,
 )
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.ledger import Execution, FundingPayment
 
 ADDRESS = "0x00000000000000000000000000000000000000Aa"
@@ -74,7 +75,15 @@ class FakeSdk(HyperliquidSdkAdapter):
 
 
 def read(sdk: FakeSdk, since: datetime | None = SINCE) -> Any:
-    return HyperliquidAccountExecutionsAdapter("https://exchange.invalid", sdk, 3.0).since(ADDRESS, since)
+    return HyperliquidAccountExecutionsAdapter("https://exchange.invalid", sdk, 3.0).since(
+        AccountReference({"account_address": ADDRESS}), since
+    )
+
+
+def test_the_executions_are_found_by_the_address_alone() -> None:
+    adapter = HyperliquidAccountExecutionsAdapter("https://exchange.invalid", FakeSdk(), 3.0)
+
+    assert adapter.reference_fields() == frozenset({"account_address"})
 
 
 def test_an_execution_carries_what_the_ledger_needs() -> None:

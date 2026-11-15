@@ -49,7 +49,7 @@ class Session:
 
     def access_of(self, account: str) -> TradingAccess:
         credentials = self.credentials[account]
-        return TradingAccess(HYPERLIQUID, credentials.value("account_address"), credentials.value("secret_key"))
+        return TradingAccess(HYPERLIQUID, credentials.values)
 
     def closing_execution(self) -> Execution:
         return self.platform.order_exchange.executions[self.platform.order_exchange.sent[-1].id]
@@ -93,7 +93,10 @@ def user_asks_to_open(session: Session, user: str, coin: str, account: str) -> N
 @then(quoted('sull\'exchange il conto "{account}" non ha posizioni su "{coin}"'))
 def exchange_without_position(session: Session, account: str, coin: str) -> None:
     session.answer(200)
-    assert session.platform.order_exchange.positions.get((session.access_of(account).account_address, coin)) is None
+    assert (
+        session.platform.order_exchange.positions.get((session.access_of(account).value("account_address"), coin))
+        is None
+    )
 
 
 @then("l'esito riporta il prezzo medio di chiusura")

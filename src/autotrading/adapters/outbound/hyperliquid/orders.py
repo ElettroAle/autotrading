@@ -13,6 +13,8 @@ from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
+    ACCOUNT_ADDRESS,
+    API_WALLET_KEY,
     INVALID_KEY_MESSAGE,
     MIN_ORDER_VALUE,
     TIMEOUT_SECONDS,
@@ -114,7 +116,7 @@ class HyperliquidOrderExchangeAdapter:
 
     def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
         with _translated(access):
-            state = self._sdk.info(self._base_url, self._timeout).user_state(access.account_address)
+            state = self._sdk.info(self._base_url, self._timeout).user_state(access.value(ACCOUNT_ADDRESS))
         return _held_position_of(state, coin)
 
     def set_leverage(self, access: TradingAccess, coin: str, leverage: int, margin: MarginMode) -> None:
@@ -134,13 +136,13 @@ class HyperliquidOrderExchangeAdapter:
     def find_order(self, access: TradingAccess, order: MarketOrder) -> Execution | None:
         with _translated(access):
             status = self._sdk.info(self._base_url, self._timeout).query_order_by_cloid(
-                access.account_address, _cloid_of(order)
+                access.value(ACCOUNT_ADDRESS), _cloid_of(order)
             )
         oid = _oid_of(status)
         return None if oid is None else self._execution(access, oid)
 
     def _exchange(self, access: TradingAccess) -> Exchange:
-        return self._sdk.exchange(_wallet_of(access), self._base_url, access.account_address, self._timeout)
+        return self._sdk.exchange(_wallet_of(access), self._base_url, access.value(ACCOUNT_ADDRESS), self._timeout)
 
     @staticmethod
     def _send(exchange: Exchange, order: MarketOrder) -> object:
@@ -151,7 +153,7 @@ class HyperliquidOrderExchangeAdapter:
 
     def _execution(self, access: TradingAccess, oid: int) -> Execution | None:
         with _translated(access):
-            fills = self._sdk.info(self._base_url, self._timeout).user_fills(access.account_address)
+            fills = self._sdk.info(self._base_url, self._timeout).user_fills(access.value(ACCOUNT_ADDRESS))
         return _execution_of(fills, oid)
 
 
@@ -170,7 +172,7 @@ def _translated(access: TradingAccess, on_timeout: type[Exception] = OrderExchan
 
 def _wallet_of(access: TradingAccess) -> LocalAccount:
     try:
-        wallet: LocalAccount = EthereumAccount.from_key(access.secret_key)
+        wallet: LocalAccount = EthereumAccount.from_key(access.value(API_WALLET_KEY))
     except ValueError as error:
         raise ExchangeRejectedOrderError(INVALID_KEY_MESSAGE) from error
     return wallet

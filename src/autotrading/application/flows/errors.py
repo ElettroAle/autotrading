@@ -65,6 +65,15 @@ class FlowCredentialsNotOpenedError(ApplicationError):
         super().__init__("credenziali del conto non leggibili")
 
 
+class FlowCredentialsFieldMissingError(ApplicationError):
+    """The opened credentials of the account lack a field the reader of its exchange names (Bug 284)."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("credenziali del conto incomplete")
+
+
 class FlowCredentialsRefusedError(ApplicationError):
     """The exchange refuses the credentials a cycle proves: the cycle names the account in the error it raises."""
 

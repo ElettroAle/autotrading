@@ -13,6 +13,7 @@ from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccoun
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAdapter
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
 
 
@@ -71,7 +72,15 @@ class FakeSdk(HyperliquidSdkAdapter):
 
 
 def read(sdk: FakeSdk) -> Any:
-    return HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0).activity(ADDRESS)
+    return HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0).activity(
+        AccountReference({"account_address": ADDRESS})
+    )
+
+
+def test_the_account_is_found_by_its_address_alone() -> None:
+    adapter = HyperliquidAccountActivityAdapter("https://exchange.invalid", FakeSdk(), 3.0)
+
+    assert adapter.reference_fields() == frozenset({"account_address"})
 
 
 def test_the_totals_and_the_positions_are_those_of_the_exchange() -> None:
