@@ -17,6 +17,9 @@ const brokenRules = async (path: string, source: string): Promise<string[]> => {
 };
 
 const WARM_UP_TIMEOUT_MS = 60_000;
+// Linting every file of the dashboard grows with it and runs on shared CI machines: its time is bounded by the rules,
+// not by the default timeout of a single assertion (Bug 394).
+const WHOLE_DASHBOARD_TIMEOUT_MS = 60_000;
 
 // The first lint loads the TypeScript resolver and the import graph of the dashboard, generated client included: it is
 // paid once here, so no rule below is timed on it.
@@ -168,14 +171,18 @@ describe('ADR-0116, ADR-0121, ADR-0166: the structure of the dashboard', () => {
     expect(await brokenRules(path, source)).toEqual([]);
   });
 
-  it('is respected by the dashboard', async () => {
-    const results = await architecture.lintFiles(['src', 'server', 'e2e', 'architecture']);
-    const broken = results.flatMap((result) =>
-      result.messages.map((message) => `${result.filePath}:${message.line} ${message.ruleId}`),
-    );
+  it(
+    'is respected by the dashboard',
+    async () => {
+      const results = await architecture.lintFiles(['src', 'server', 'e2e', 'architecture']);
+      const broken = results.flatMap((result) =>
+        result.messages.map((message) => `${result.filePath}:${message.line} ${message.ruleId}`),
+      );
 
-    expect(broken).toEqual([]);
-  });
+      expect(broken).toEqual([]);
+    },
+    WHOLE_DASHBOARD_TIMEOUT_MS,
+  );
 });
 
 describe('ADR-0119: one client for the API, generated from its OpenAPI document', () => {
