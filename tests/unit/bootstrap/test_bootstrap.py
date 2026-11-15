@@ -123,13 +123,6 @@ def test_application_refuses_to_start_with_an_unsupported_environment(tmp_path: 
     assert str(raised.value) == "ambiente non ammesso: sono ammessi dev e prod"
 
 
-def test_application_refuses_to_start_without_the_network_of_hyperliquid(tmp_path: Path) -> None:
-    with pytest.raises(MissingConfigurationError) as raised:
-        create_application(installation_configuration(tmp_path, HYPERLIQUID_NETWORK=""))
-
-    assert raised.value.name == "HYPERLIQUID_NETWORK"
-
-
 def test_environment_is_accepted_with_surrounding_spaces(tmp_path: Path) -> None:
     application = create_application(installation_configuration(tmp_path, APP_ENVIRONMENT=" dev\n"))
 
@@ -276,7 +269,6 @@ def test_the_worker_publishes_no_documentation(tmp_path: Path) -> None:
     "name",
     [
         "APP_ENVIRONMENT",
-        "HYPERLIQUID_NETWORK",
         "CREDENTIALS_PRIVATE_KEY_FILE",
         "WORKER_TOKEN_FILE",
         "DATABASE_PASSWORD_FILE",

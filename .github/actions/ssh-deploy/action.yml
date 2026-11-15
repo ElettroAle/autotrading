@@ -7,9 +7,6 @@ inputs:
   environment:
     description: dev o prod
     required: true
-  hyperliquid-network:
-    description: Rete di Hyperliquid dell'installazione, testnet o mainnet, dalla variabile dell'environment (Bug 277)
-    required: true
   version:
     description: Versione dichiarata dall'installazione
     required: true
@@ -57,7 +54,6 @@ runs:
         HOSTNAME_TS: ${{ inputs.hostname }}
         APP_ENVIRONMENT: ${{ inputs.environment }}
         APP_VERSION: ${{ inputs.version }}
-        HYPERLIQUID_NETWORK: ${{ inputs.hyperliquid-network }}
         API_IMAGE: ${{ inputs.image }}
         FORECASTER_IMAGE: ${{ inputs.forecaster-image }}
         DASHBOARD_IMAGE: ${{ inputs.dashboard-image }}
@@ -73,13 +69,12 @@ runs:
         ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
           -o BatchMode=yes)
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
-        # Public configuration only: issuer, audience, client id, scope and network are not secrets (ADR 0016, ADR 0155).
+        # Public configuration only: issuer, audience, client id and scope are not secrets (ADR 0016).
         {
           printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION"
           printf 'FORECASTER_IMAGE=%s\nDASHBOARD_IMAGE=%s\n' "$FORECASTER_IMAGE" "$DASHBOARD_IMAGE"
           printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
-          printf 'HYPERLIQUID_NETWORK=%s\n' "$HYPERLIQUID_NETWORK"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
         # Memory and disk of the installation, sampled from before the pull until the services are up, go to the summary
         # of the job (ADR 0162, Bug 252). The report runs on exit, so a failed release stops the sampling too; the measure

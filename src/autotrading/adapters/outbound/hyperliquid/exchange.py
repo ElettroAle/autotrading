@@ -49,7 +49,10 @@ ADDRESS_DIGITS = 40
 KEY_SHAPE = "attese 64 cifre esadecimali, con o senza 0x"
 INVALID_ADDRESS_MESSAGE = "indirizzo del conto non valido"
 ADDRESS_SHAPE = "atteso 0x seguito da 40 cifre esadecimali"
-# The names Hyperliquid gives its networks, the ones the installation declares (Bug 277, R2.3.10).
+# The exchanges an account declares at registration: the use cases pick the adapter by this name (R2.3.11).
+EXCHANGE_NAME = "Hyperliquid"
+TESTNET_EXCHANGE_NAME = "Hyperliquid Testnet"
+# The names Hyperliquid gives its networks (R2.3.10).
 TESTNET = "testnet"
 MAINNET = "mainnet"
 # The names match the keys of the credentials already sealed, so nothing saved needs migrating (ADR 0158).
@@ -82,7 +85,10 @@ class HyperliquidExchangeAdapter:
     """
 
     def __init__(
-        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+        self,
+        base_url: str = MAINNET_API_URL,
+        sdk: HyperliquidSdkAdapter | None = None,
+        timeout: float = TIMEOUT_SECONDS,
     ) -> None:
         self._base_url = base_url
         self._sdk = sdk or HyperliquidSdkAdapter()
@@ -93,18 +99,13 @@ class HyperliquidExchangeAdapter:
         return self._base_url
 
     def is_real(self) -> bool:
-        return bool(self._base_url == MAINNET_API_URL)
+        return True
 
     def network_name(self) -> str:
-        return MAINNET if self.is_real() else TESTNET
+        return MAINNET
 
     def credential_fields(self) -> tuple[CredentialField, ...]:
         return CREDENTIAL_FIELDS
-
-    @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidExchangeAdapter:
-        # The network is chosen by the installation, never deduced from the credentials.
-        return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
 
     def read_state(self, credentials: Credentials) -> AccountState:
         address = _address_of(credentials)
@@ -161,6 +162,20 @@ class HyperliquidExchangeAdapter:
                 for position in state.positions
             ),
         )
+
+
+class HyperliquidTestnetExchangeAdapter(HyperliquidExchangeAdapter):
+    """Hyperliquid Testnet, an exchange of its own an account can choose: the same exchange on the network of test,
+    without real money (R2.3.11, ADR hyperliquid-testnet-come-adapter-dedicato)."""
+
+    def __init__(self, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+        super().__init__(TESTNET_API_URL, sdk, timeout)
+
+    def is_real(self) -> bool:
+        return False
+
+    def network_name(self) -> str:
+        return TESTNET
 
 
 def _field(credentials: Credentials, name: str) -> str:

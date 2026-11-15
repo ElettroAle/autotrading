@@ -26,10 +26,10 @@ paths:
   `CredentialFieldMalformedError`, col campo e con che cosa non torna, mai un suo carattere (Bug 387).
 - Alla registrazione e alla sostituzione le credenziali si controllano leggendo il saldo prima di
   salvarle (R0.2.1, R0.2.4). Nessun controllo sui permessi di prelievo.
-- Il conto non ha un attributo test/reale: la rete la dichiara la configurazione dell'adapter del suo exchange
-  (`HYPERLIQUID_NETWORK`), mai il nome dell'installazione; `ExchangePort.is_real()` la dice ai casi d'uso (ADR 0155),
-  `ExchangePort.network_name()` con il nome che le dà l'exchange
-  (R2.3.10, ADR nome-della-rete-dichiarato-dall-adapter).
+- Il conto non ha un attributo test/reale: la rete è quella dell'exchange che il conto dichiara. Hyperliquid e
+  Hyperliquid Testnet sono due exchange offerti in ogni installazione, senza configurazione (R2.3.11, ADR
+  hyperliquid-testnet-come-adapter-dedicato); `ExchangePort.is_real()` dice la rete ai casi d'uso (ADR 0155),
+  `ExchangePort.network_name()` col nome che le dà l'exchange (R2.3.10, ADR nome-della-rete-dichiarato-dall-adapter).
 - La rimozione di un conto è un caso d'uso del contesto `flows` (`RemoveAccountWithFlowsUseCase`, ADR 0090):
   `accounts` definisce solo che cosa significa rimuovere (credenziali cancellate, conto nascosto, storico
   conservato, ADR 0025), realizzato da `SqlAlchemyAccountRepositoryAdapter.remove_account`.
