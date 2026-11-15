@@ -4,7 +4,7 @@
 > - **gli scenari di accettazione** in [`specs/`](../specs), un file `.feature` per User Story, in cartelle per Epic e Feature (`specs/E<n>-…/F<n>.<m>-…/R<n>.<m>.<k>-….feature`);
 > - **le descrizioni** di Epic, Feature e User Story sulla board Azure DevOps (progetto AutoTrading).
 >
-> Le fasi F0-F6 di questo documento corrispondono alle Epic E0-E6. Dove questo documento e gli scenari divergono, valgono gli scenari: le decisioni prese durante la scrittura del backlog (per esempio ambienti `dev`/`prod`, accesso solo tramite ruolo Entra, credenziali leggibili solo dal servizio) non sono riportate qui.
+> Le fasi F0-F5 di questo documento corrispondono alle Epic E0-E5. Dove questo documento e gli scenari divergono, valgono gli scenari: le decisioni prese durante la scrittura del backlog (per esempio ambienti `dev`/`prod`, accesso solo tramite ruolo Entra, credenziali leggibili solo dal servizio) non sono riportate qui.
 
 **Stato:** raw di partenza (ex bozza 0.3), con le decisioni dell'intervista e della revisione del 7-8 novembre 2026 (sezione 11)
 **Data:** 8 novembre 2026
@@ -522,7 +522,7 @@ Nelle tabelle, **R** indica una fonte di ricerca citata in `research/frameworks-
 
 ## 8. Fasi di rilascio
 
-Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima agente, fonti ed exchange con configurazione programmatica, poi la dashboard e il resto [D]. Tutte le fasi fino a F5 operano solo su **testnet** [D].
+Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima agente, fonti ed exchange con configurazione programmatica, poi la dashboard e il resto [D]. Tutte le fasi fino a F5 operano solo su **testnet** [D]. Il passaggio al reale non è una fase: è configurazione della rete dell'exchange (per installazione) e promozione in `prod`, per scelta esplicita del proprietario dopo alcuni mesi di sperimentazione e con capitale limitato [D].
 
 | Fase | Contenuto |
 |------|-----------|
@@ -532,7 +532,6 @@ Ordine deciso con l'obiettivo di **testare i flussi il prima possibile**: prima 
 | **F3. Rischio, capitale e qualità** | Exit plan, confidenza, stop loss e take profit sull'exchange, esposizione complessiva, perdita massima, chiusura di emergenza (6.18); allarmi di riconciliazione (RF-13.07, 13.08); riduzione del capitale, incasso dei profitti, capitale libero, prelievo (6.22); notifiche complete e scelta dei canali, email (6.24); valutazione del forecast (RF-26.01). |
 | **F4. Replay e analisi** | Replay storico (6.25); analisi delle prestazioni e valutazione dei segnali (6.26). |
 | **F5. Evoluzioni** | Fonti whale e volumi globali; agente multi-livello; flusso multi-analista (6.28); chiusure parziali; registrazione autonoma degli utenti; riuso dei dati di mercato tra flussi; riepiloghi periodici. |
-| **F6. Reale (opzionale)** | Dopo alcuni mesi di sperimentazione e per scelta esplicita: uno o più conti sull'ambiente reale con capitale limitato. |
 | **Backlog** | BL-01 spot, BL-02 copy-trading, BL-03 netting tra flussi. |
 
 ---
