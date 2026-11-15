@@ -7,6 +7,7 @@ import { Given, Then, When } from '../../../support/fixtures';
 const PHONE_HEIGHT = 844;
 const REFRESH_INTERVAL = '00:30';
 const CYCLE_BEFORE_OPENING = '09:45:00';
+const STALE_DATA = 'Dati non aggiornati';
 
 /** The instant of today at the time of the scenario, in the time zone the browser shares with the steps. */
 const instantAt = (time: string): Date => {
@@ -63,7 +64,9 @@ Then('la pagina mostra il nuovo ciclo', async ({ dashboard, memory }) => {
   await expect(dashboard.cycles()).toContainText(memory.newCycleAt);
 });
 
-Given("che l'interfaccia programmatica non risponde", () => {
+Given("che l'interfaccia programmatica non risponde", async ({ dashboard }) => {
+  await expect(dashboard.cycles()).toBeVisible();
+  await dashboard.waitUntilRead();
   fakePlatform.stopApi();
 });
 
@@ -72,13 +75,13 @@ When("arriva il momento dell'aggiornamento", async ({ dashboard }) => {
 });
 
 Then('la pagina mostra ancora i dati delle {word}', async ({ dashboard }, time: string) => {
-  await expect(dashboard.alert()).toBeVisible();
+  await expect(dashboard.warning(STALE_DATA)).toBeVisible();
   await expect(dashboard.lastUpdate()).toHaveText(`Ultimo aggiornamento: ${time}`);
   await expect(dashboard.cycles()).toContainText(CYCLE_BEFORE_OPENING);
 });
 
 Then("mostra l'avviso {string}", async ({ dashboard }, warning: string) => {
-  await expect(dashboard.alert()).toHaveText(warning);
+  await expect(dashboard.warning(warning)).toBeVisible();
 });
 
 When(
