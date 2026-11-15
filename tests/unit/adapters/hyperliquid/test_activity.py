@@ -49,6 +49,8 @@ class FakeSdk(HyperliquidSdkAdapter):
 
     state: Any = field(default_factory=lambda: STATE)
     ledger: Any = field(default_factory=list)
+    abstraction: Any = "default"
+    spot: Any = field(default_factory=lambda: {"balances": []})
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -65,6 +67,14 @@ class FakeSdk(HyperliquidSdkAdapter):
             raise self.failure
         self.calls.append(("user_state", address))
         return self.state
+
+    def query_user_abstraction_state(self, user: str) -> Any:
+        self.calls.append(("abstraction", user))
+        return self.abstraction
+
+    def spot_user_state(self, address: str) -> Any:
+        self.calls.append(("spot", address))
+        return self.spot
 
     def user_non_funding_ledger_updates(self, user: str, startTime: int) -> Any:  # noqa: N803 - the SDK names it
         self.calls.append(("user_non_funding_ledger_updates", (user, startTime)))
@@ -187,3 +197,17 @@ def test_a_reference_without_the_address_is_refused_before_reaching_the_exchange
         read_reference(sdk, AccountReference({"wallet": ADDRESS}))
 
     assert sdk.calls == []
+
+
+def test_a_unified_account_shows_the_usdc_it_holds_as_balance() -> None:
+    perps = {
+        "marginSummary": {"accountValue": "0.0"},
+        "withdrawable": "0.0",
+        "assetPositions": [],
+        "time": 1762941600000,
+    }
+    spot = {"balances": [{"coin": "USDC", "token": 0, "total": "999.0", "hold": "0.0", "entryNtl": "0.0"}]}
+
+    activity = read(FakeSdk(state=perps, abstraction="unifiedAccount", spot=spot))
+
+    assert (activity.balance, activity.available_margin) == (Decimal(999), Decimal(999))
