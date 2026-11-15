@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 
-import { fakePlatform } from '@/testing/mocks/platform';
+import { FAKE_ACCOUNT_ADDRESS, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
@@ -36,6 +36,14 @@ describe('AccountsList', () => {
     expect(screen.queryByText('altrui')).not.toBeInTheDocument();
   });
 
+  it('shows the public fields of the account with the labels the exchange gives them (Bug 401)', async () => {
+    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+
+    const row = await rowOf('principale');
+    expect(await within(row).findByText('Indirizzo del conto')).toBeInTheDocument();
+    expect(within(row).getByText(FAKE_ACCOUNT_ADDRESS)).toBeInTheDocument();
+  });
+
   it.each([
     ['real', 'REALE · sandbox'],
     ['test', 'TEST · sandbox'],
@@ -48,6 +56,7 @@ describe('AccountsList', () => {
             name: 'reale',
             exchange: 'Hyperliquid',
             has_credentials: true,
+            public_fields: {},
             network,
             network_name: 'sandbox',
             allocated_capital: '0',

@@ -886,7 +886,8 @@ export interface components {
         };
         /**
          * AccountDetailsResponse
-         * @description An account as its owner reads it: credentials are only declared present, never returned (R0.2.3).
+         * @description An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the
+         *     public fields the exchange declares are shown by name (Bug 401).
          */
         AccountDetailsResponse: {
             /** Id */
@@ -897,6 +898,10 @@ export interface components {
             exchange: string;
             /** Has Credentials */
             has_credentials: boolean;
+            /** Public Fields */
+            public_fields: {
+                [key: string]: string;
+            };
         };
         /** AccountReadingResponse */
         AccountReadingResponse: {
@@ -968,6 +973,10 @@ export interface components {
             exchange: string;
             /** Has Credentials */
             has_credentials: boolean;
+            /** Public Fields */
+            public_fields: {
+                [key: string]: string;
+            };
             /** Network */
             network: string;
             /** Network Name */

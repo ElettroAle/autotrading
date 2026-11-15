@@ -49,6 +49,21 @@ class UnknownCredentialFieldError(DomainError):
         return {"field": self.field}
 
 
+class PublicCredentialFieldNotReplaceableError(DomainError):
+    """A public field names the account on the exchange: another value is another account (R0.2.4, Bug 401)."""
+
+    def __init__(self, field: str, label: str) -> None:
+        # Only the first letter changes: the label may hold a name, as in "chiave dell'API wallet".
+        super().__init__(
+            f"{label[:1].lower()}{label[1:]} non si sostituisce: per cambiarlo rimuovi il conto e registrane uno nuovo"
+        )
+        self.field = field
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.field}
+
+
 class CredentialsOfAnotherAccountError(DomainError):
     status_code = 422
 

@@ -1,8 +1,8 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
-import { REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
+import { FAKE_ACCOUNT_ADDRESS, REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
@@ -10,6 +10,7 @@ const ACCOUNTS = '/accounts';
 const ADDRESS = '0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1';
 const SECRET_KEY = '0x7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c';
 const SECRET_LABEL = "Chiave dell'API wallet";
+const ADDRESS_LABEL = 'Indirizzo del conto';
 const CONFIRM_REMOVAL = 'Conferma la rimozione';
 
 const accountItem = async (name: string): Promise<HTMLElement> => {
@@ -31,7 +32,6 @@ const NO_ACCOUNT = 'Nessun conto registrato.';
 const replaceCredentials = async (name: string, secretKey: string) => {
   const item = await accountItem(name);
   await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
-  await userEvent.type(within(item).getByLabelText('Indirizzo del conto'), ADDRESS);
   await userEvent.type(within(item).getByLabelText(SECRET_LABEL), secretKey);
   await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
   return item;
@@ -65,6 +65,36 @@ describe('AccountActions', () => {
     expect(document.body.innerHTML).not.toContain(SECRET_KEY);
   });
 
+  it('asks only the secret fields and shows the public ones as registered (Bug 401)', async () => {
+    fakePlatform.addAccount('anna', 'principale');
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const item = await accountItem('principale');
+
+    await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
+
+    const form = within(item).getByRole('form', { name: 'Nuove credenziali del conto principale' });
+    expect(within(form).queryByLabelText(ADDRESS_LABEL)).not.toBeInTheDocument();
+    expect(within(form).getByText(FAKE_ACCOUNT_ADDRESS)).toBeInTheDocument();
+    expect(within(form).getByLabelText(SECRET_LABEL)).toBeInTheDocument();
+  });
+
+  it('asks every field of an account registered without its public fields, and keeps them', async () => {
+    fakePlatform.addAccount('anna', 'principale');
+    fakePlatform.forgetPublicFieldsOf('anna', 'principale');
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const item = await accountItem('principale');
+
+    await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
+    await userEvent.type(within(item).getByLabelText(ADDRESS_LABEL), ADDRESS);
+    await userEvent.type(within(item).getByLabelText(SECRET_LABEL), SECRET_KEY);
+    await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
+
+    expect(await within(item).findByRole('status')).toHaveTextContent(
+      'Credenziali del conto principale sostituite',
+    );
+    expect(await within(item).findByText(ADDRESS)).toBeInTheDocument();
+  });
+
   it('tells why the replacement was refused and empties the secret', async () => {
     fakePlatform.addAccount('anna', 'principale');
     await renderApp({ account: 'anna', url: ACCOUNTS });
@@ -77,7 +107,7 @@ describe('AccountActions', () => {
     expect(within(item).getByLabelText(SECRET_LABEL)).toHaveValue('');
   });
 
-  it('tells the credentials are missing when the replacement is sent empty, and can be cancelled', async () => {
+  it('tells beside the secret field it is missing when the replacement is sent empty, and can be cancelled', async () => {
     fakePlatform.addAccount('anna', 'principale');
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const item = await accountItem('principale');
@@ -85,7 +115,11 @@ describe('AccountActions', () => {
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
-    expect(await within(item).findByRole('alert')).toHaveTextContent('credenziali obbligatorio');
+    await waitFor(() =>
+      expect(within(item).getByLabelText(SECRET_LABEL)).toHaveAccessibleDescription(
+        "chiave dell'API wallet obbligatorio",
+      ),
+    );
     await userEvent.click(within(item).getByRole('button', { name: 'Annulla' }));
     expect(within(item).queryByLabelText(SECRET_LABEL)).not.toBeInTheDocument();
   });

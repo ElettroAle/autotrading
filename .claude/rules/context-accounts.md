@@ -26,6 +26,10 @@ paths:
   `CredentialFieldMalformedError`, col campo e con che cosa non torna, mai un suo carattere (Bug 387).
 - Alla registrazione e alla sostituzione le credenziali si controllano leggendo il saldo prima di
   salvarle (R0.2.1, R0.2.4). Nessun controllo sui permessi di prelievo.
+- I campi che l'adapter dichiara non segreti (l'indirizzo del conto) il conto li conserva in chiaro in
+  `ExchangeAccount.public_fields` e l'API li mostra; la sostituzione chiede solo i segreti e rifiuta un campo pubblico
+  con `PublicCredentialFieldNotReplaceableError`. Un conto registrato prima, senza campi pubblici, li chiede tutti e li
+  conserva (Bug 401, ADR campi-pubblici-del-conto-conservati-in-chiaro).
 - Il conto non ha un attributo test/reale: la rete è quella dell'exchange che il conto dichiara. Hyperliquid e
   Hyperliquid Testnet sono due exchange offerti in ogni installazione, senza configurazione (R2.3.11, ADR
   hyperliquid-testnet-come-adapter-dedicato); `ExchangePort.is_real()` dice la rete ai casi d'uso (ADR 0155),

@@ -83,7 +83,16 @@ export type FakeFlow = {
   readonly versions: FakeVersion[];
 };
 
-export type FakeAccount = { readonly id: string; readonly name: string; readonly balance: number };
+/**
+ * An account of the fake platform; its public credential fields are kept in clear, empty for an account registered
+ * before they were kept (Bug 401).
+ */
+export type FakeAccount = {
+  readonly id: string;
+  readonly name: string;
+  readonly balance: number;
+  publicFields: Record<string, string>;
+};
 
 /** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
 export type FakeFlowChanges = Partial<Omit<FakeFlow, 'id' | 'name'>>;
@@ -144,6 +153,11 @@ const FIRST_CHAT_ID = 1001;
 export type FakeProviderKey = { readonly provider: string; registeredAt: string };
 
 export const FAKE_EXCHANGE = 'Hyperliquid';
+// The account address every fake account is registered with, a public field of the exchange (Bug 401).
+export const FAKE_ACCOUNT_ADDRESS = '0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2';
+const registeredPublicFields = (): Record<string, string> => ({
+  account_address: FAKE_ACCOUNT_ADDRESS,
+});
 /** The exchanges the fake platform supports, as the API lists them (ADR 0152). */
 export const FAKE_SUPPORTED_EXCHANGES: readonly string[] = [FAKE_EXCHANGE];
 
@@ -304,7 +318,12 @@ const accountOf = (user: FakeUser, name: string): FakeAccount => {
   if (existing !== undefined) {
     return existing;
   }
-  const account = { id: `account-${name}`, name, balance: 1000 };
+  const account = {
+    id: `account-${name}`,
+    name,
+    balance: 1000,
+    publicFields: registeredPublicFields(),
+  };
   user.accounts.push(account);
   return account;
 };
@@ -502,12 +521,22 @@ export const fakePlatform = {
     return flow;
   },
 
+  /** The account was registered before its public fields were kept: a replacement asks them all (Bug 401). */
+  forgetPublicFieldsOf(account: string, name: string): void {
+    accountOf(userNamed(account), name).publicFields = {};
+  },
+
   /** The account belongs to the user, who has the Utente role: the user is created when missing. */
   giveAccountTo(account: string, name: string, balance: number): FakeAccount {
     if (!state.users.has(account)) {
       this.addUser(account, { hasUserRole: true });
     }
-    const created = { id: `account-${name}`, name, balance };
+    const created = {
+      id: `account-${name}`,
+      name,
+      balance,
+      publicFields: registeredPublicFields(),
+    };
     userNamed(account).accounts.push(created);
     return created;
   },

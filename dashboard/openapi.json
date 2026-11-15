@@ -3349,6 +3349,13 @@
           "has_credentials": {
             "type": "boolean",
             "title": "Has Credentials"
+          },
+          "public_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Public Fields"
           }
         },
         "type": "object",
@@ -3356,10 +3363,11 @@
           "id",
           "name",
           "exchange",
-          "has_credentials"
+          "has_credentials",
+          "public_fields"
         ],
         "title": "AccountDetailsResponse",
-        "description": "An account as its owner reads it: credentials are only declared present, never returned (R0.2.3)."
+        "description": "An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the\npublic fields the exchange declares are shown by name (Bug 401)."
       },
       "AccountReadingResponse": {
         "properties": {
@@ -3499,6 +3507,13 @@
             "type": "boolean",
             "title": "Has Credentials"
           },
+          "public_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Public Fields"
+          },
           "network": {
             "type": "string",
             "title": "Network"
@@ -3522,6 +3537,7 @@
           "name",
           "exchange",
           "has_credentials",
+          "public_fields",
           "network",
           "network_name",
           "allocated_capital",

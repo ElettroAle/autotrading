@@ -4,12 +4,14 @@ import { z } from 'zod';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
-// The credentials are only declared present, never returned (R0.2.3); the balance is read apart (ADR 0126).
+// The secret credentials are only declared present, never returned (R0.2.3); the public fields the exchange declares,
+// as the account address, are shown by name (Bug 401); the balance is read apart (ADR 0126).
 export const accountSchema = z.object({
   id: z.string(),
   name: z.string(),
   exchange: z.string(),
   has_credentials: z.boolean(),
+  public_fields: z.record(z.string(), z.string()),
   network: z.string(),
   network_name: z.string(),
   allocated_capital: z.string(),
