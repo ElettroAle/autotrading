@@ -70,6 +70,8 @@ class FakeSdk(HyperliquidSdkAdapter):
 
     cancel_answer: Any = field(default_factory=lambda: ACCEPTED)
     state: Any = field(default_factory=lambda: STATE)
+    abstraction: Any = "default"
+    spot: Any = field(default_factory=lambda: {"balances": []})
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -91,6 +93,16 @@ class FakeSdk(HyperliquidSdkAdapter):
         self.calls.append(("user_state", address))
         return self.state
 
+    def query_user_abstraction_state(self, user: str) -> Any:
+        self.calls.append(("abstraction", user))
+        if isinstance(self.abstraction, Exception):
+            raise self.abstraction
+        return self.abstraction
+
+    def spot_user_state(self, address: str) -> Any:
+        self.calls.append(("spot", address))
+        return self.spot
+
 
 def read(sdk: FakeSdk, credentials: Credentials = CREDENTIALS) -> AccountState:
     return HyperliquidExchangeAdapter(BASE_URL, sdk).read_state(credentials)
@@ -107,7 +119,7 @@ def test_reads_the_account_state_after_the_exchange_accepts_the_signer() -> None
         positions=(),
         read_at=datetime.fromtimestamp(READ_AT_MS / 1000, UTC),
     )
-    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state", "abstraction", "spot"]
     assert sdk.calls[0][1] == (WALLET.address, BASE_URL, ADDRESS, TIMEOUT_SECONDS)
     assert sdk.calls[3][1] == ADDRESS
 
@@ -289,7 +301,7 @@ def test_the_verification_reads_balance_margin_and_positions_proving_the_signer(
     assert reading == AccountReading(
         Decimal("1234.56"), Decimal("1000.5"), "USDC", (PositionReading("BTC", "long", Decimal("0.02"), 2),)
     )
-    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state", "abstraction", "spot"]
 
 
 def test_a_signer_refused_is_a_failed_verification_step_without_the_message_of_the_exchange() -> None:
@@ -322,7 +334,7 @@ def test_the_cycle_reads_margin_and_positions_proving_the_signer() -> None:
         "BTC", TradeSide.LONG, Decimal("0.02"), 2, Decimal("60000.0"), Decimal("12.5"), Decimal("31000.0")
     )
     assert account == CycleAccount("USDC", Decimal("1000.5"), (position,))
-    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state", "abstraction", "spot"]
 
 
 def test_a_signer_refused_is_a_refusal_of_the_credentials_of_the_flow() -> None:
@@ -391,3 +403,32 @@ def test_sixty_four_hex_digits_that_are_no_key_of_the_curve_are_refused_by_field
 
     assert (raised.value.field, raised.value.exchange_message) == ("secret_key", "chiave dell'API wallet non valida")
     assert sdk.calls == []
+
+
+UNIFIED_SPOT = {"balances": [{"coin": "USDC", "token": 0, "total": "999.0", "hold": "0.0", "entryNtl": "0.0"}]}
+EMPTY_PERPS = {
+    "marginSummary": {"accountValue": "0.0"},
+    "withdrawable": "0.0",
+    "assetPositions": [],
+    "time": READ_AT_MS,
+}
+
+
+def test_a_unified_account_reads_the_usdc_it_holds_as_balance_and_available_margin() -> None:
+    sdk = FakeSdk(state=EMPTY_PERPS, abstraction="unifiedAccount", spot=UNIFIED_SPOT)
+
+    state = read(sdk)
+
+    assert (state.balance, state.available_margin) == (Balance(Decimal(999), "USDC"), Balance(Decimal(999), "USDC"))
+    assert ("abstraction", ADDRESS) in sdk.calls
+    assert ("spot", ADDRESS) in sdk.calls
+
+
+@pytest.mark.parametrize("answer", ["spot", "abstraction"])
+def test_a_mode_or_spot_state_the_exchange_does_not_give_makes_it_unavailable(answer: str) -> None:
+    sdk = FakeSdk(abstraction="unifiedAccount", spot={"balances": [{"coin": "USDC"}]})
+    if answer == "abstraction":
+        sdk = FakeSdk(abstraction=ServerError(500, "down"))
+
+    with pytest.raises(ExchangeUnavailableError):
+        read(sdk)
