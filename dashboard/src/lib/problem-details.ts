@@ -7,6 +7,8 @@ export type FieldProblem = { readonly field: string | undefined; readonly reason
 const problemSchema = z.object({
   detail: z.string(),
   field: z.string().optional(),
+  // The reason the exchange gives for refusing the credentials, added to the reason of the API (Bug 387).
+  exchange_message: z.string().optional(),
   errors: z
     .array(z.object({ loc: z.array(z.union([z.string(), z.number()])), msg: z.string() }))
     .optional(),
@@ -27,7 +29,11 @@ export const problemDetailsOf = (body: unknown): ProblemDetails | undefined => {
   if (!parsed.success) {
     return undefined;
   }
-  const { detail, field, errors } = parsed.data;
+  const { field, errors, exchange_message: exchangeMessage } = parsed.data;
+  const detail =
+    exchangeMessage === undefined
+      ? parsed.data.detail
+      : `${parsed.data.detail}: ${exchangeMessage}`;
   if (errors !== undefined && errors.length > 0) {
     return {
       detail,

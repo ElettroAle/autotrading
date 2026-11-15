@@ -679,6 +679,12 @@ class CycleRepositoryPort(Protocol):
     def record(self, record: CycleRecord) -> None: ...
 
 
+class CycleFlowActivityPort(Protocol):
+    def execute(self, flow_id: UUID) -> bool:
+        """True while the flow runs cycles: read when its cycle starts, after the planner may have kept a stale job."""
+        ...
+
+
 class FlowLockPort(Protocol):
     def hold(self, flow_id: UUID) -> AbstractContextManager[bool]:
         """Holds the flow for one cycle, across processes; yields False at once when a cycle is still running."""

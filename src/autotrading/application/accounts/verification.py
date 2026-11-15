@@ -32,4 +32,4 @@ def read_state_proving(exchange: ExchangePort, credentials: Credentials) -> Acco
         return exchange.read_state(credentials)
     except ExchangeRejectedCredentialsError as error:
         # No chained cause: the original exception still holds the text before redaction.
-        raise ExchangeRejectedCredentialsError(credentials.redact(error.exchange_message)) from None
+        raise error.with_exchange_message(credentials.redact(error.exchange_message)) from None

@@ -26,6 +26,7 @@ from tests.fakes.cycles import (
     FakeCycleSchedulerAdapter,
     FakeCycleStartAdapter,
     FakeFlow,
+    FakeFlowActivityAdapter,
     FakeFlowsAdapter,
     FakeOrderAdapter,
     FakeRiskAdapter,
@@ -73,11 +74,11 @@ class Cycles:
         self.executors = [self._executor()]
 
     def run_cycle(self) -> RunCycleUseCase:
-        return RunCycleUseCase(
-            self.graph(),
-            CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices),
-            self.equity,
-        )
+        return RunCycleUseCase(self.graph(), self.guards(), self.equity)
+
+    def guards(self) -> CycleGuards:
+        activity = FakeFlowActivityAdapter(self.flows)
+        return CycleGuards(self.records, self.lock, self.flows, self.clock, self.failure_notices, activity)
 
     def graph(self) -> CycleGraph:
         steps = CycleSteps(
@@ -131,6 +132,16 @@ class Cycles:
 
     def pause(self, name: str) -> None:
         self.flow(name).status = PAUSED
+
+    def leave(self, name: str, status: str, instant: str) -> None:
+        """The flow leaves the active status at the instant, before the planner drops its job."""
+        self.clock.current = at(instant)
+        self.flow(name).status = status
+
+    def fire(self, name: str, instant: str) -> None:
+        """The job of the flow fires at its planned instant, as the scheduler would."""
+        self.clock.current = at(instant)
+        self.run_now(name)
 
     def set_interval(self, name: str, minutes: int) -> None:
         flow = self.flow(name)

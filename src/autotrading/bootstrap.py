@@ -122,6 +122,7 @@ from autotrading.application.flows.read_cycle_account import ReadCycleAccountUse
 from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
+from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
@@ -442,6 +443,7 @@ def cycle_of(
             ),
             clock=clock,
             failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
+            activity=ReadFlowActivityUseCase(flows),
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
         equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))
