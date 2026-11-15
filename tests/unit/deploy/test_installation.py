@@ -10,6 +10,10 @@ PREPARE = ROOT / "deploy" / "prepare-installation.sh"
 SERVICE = re.compile(r"^  ([a-z_-]+):\n((?:    .*\n|\s*\n)*)", re.MULTILINE)
 # A one-shot service is ready when it exits successfully, as its dependants require; it has no health to check.
 ONE_SHOT = 'restart: "no"'
+MEMORY_LIMIT = re.compile(r"^    mem_limit: (\d+)([mg])$", re.MULTILINE)
+# ADR 0165: the long-running services leave about 1.5 GiB of the 4 GiB machine to the system, Docker, Tailscale and
+# the pull of the images.
+LONG_RUNNING_MEMORY_BUDGET_MIB = 2560
 
 
 def _services() -> dict[str, str]:
@@ -70,3 +74,36 @@ def test_every_variable_the_compose_file_reads_is_written_by_the_release() -> No
     written = set(re.findall(r"([A-Z_][A-Z0-9_]*)=%s", DEPLOY_ACTION.read_text(encoding="utf-8")))
 
     assert sorted(read - written) == []
+
+
+def _memory_limits_mib() -> dict[str, int | None]:
+    limits: dict[str, int | None] = {}
+    for name, body in _services().items():
+        match = MEMORY_LIMIT.search(body)
+        limits[name] = int(match.group(1)) * (1024 if match.group(2) == "g" else 1) if match else None
+    return limits
+
+
+def test_adr_0165_every_service_declares_its_memory_limit() -> None:
+    unlimited = [name for name, limit in _memory_limits_mib().items() if limit is None]
+
+    assert unlimited == [], f"services without a mem_limit (ADR 0165): {unlimited}"
+
+
+def test_adr_0165_the_long_running_services_leave_memory_to_the_machine() -> None:
+    limits = _memory_limits_mib()
+    long_running = [name for name, body in _services().items() if ONE_SHOT not in body]
+    total = sum(limits[name] or 0 for name in long_running)
+
+    assert total <= LONG_RUNNING_MEMORY_BUDGET_MIB, f"long-running services limited to {total} MiB in total"
+
+
+def test_adr_0165_every_limit_is_the_one_tuned_on_the_measured_consumption() -> None:
+    assert _memory_limits_mib() == {
+        "postgres": 384,
+        "migrate": 256,
+        "forecaster": 768,
+        "worker": 768,
+        "api": 384,
+        "dashboard": 128,
+    }
