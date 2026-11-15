@@ -14,7 +14,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
 )
-from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reference import AccountReference
@@ -70,7 +70,11 @@ class HyperliquidAccountActivityAdapter:
         address = address_of(reference)
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)
-            state = user_state_of(info.user_state(address))
+            state = in_account_mode(
+                user_state_of(info.user_state(address)),
+                info.query_user_abstraction_state(address),
+                info.spot_user_state(address),
+            )
             ledger = info.user_non_funding_ledger_updates(address, FROM_THE_START)
             return AccountActivity(
                 currency=MARGIN_CURRENCY,
