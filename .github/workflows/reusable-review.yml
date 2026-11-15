@@ -1,5 +1,6 @@
 # Orchestratore della revisione AI obbligatoria (R0.5.1, ADR 0113). Il job è il controllo obbligatorio
-# "review / revisione" del ruleset di main; le violazioni diventano thread, che il ruleset chiede di risolvere.
+# "review / revisione" del ruleset di main; le violazioni diventano thread, che il ruleset chiede di risolvere,
+# e il job fallisce finché un suo thread resta aperto (Bug 298).
 name: reusable-review
 
 on:
@@ -55,7 +56,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: .review-action
-          sparse-checkout: .github/actions/claude-review
+          sparse-checkout: |
+            .github/actions/claude-review
+            tools
       - uses: ./.review-action/.github/actions/claude-review
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
