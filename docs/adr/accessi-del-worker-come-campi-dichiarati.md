@@ -1,4 +1,4 @@
-# ADR 0169 — Accessi del worker come campi dichiarati dall'exchange
+# ADR accessi-del-worker-come-campi-dichiarati — Accessi del worker come campi dichiarati dall'exchange
 
 - Stato: accettata (15 novembre 2026)
 - Requisiti: Bug 284 (Task 293), R2.3.9, R0.3.2, R0.4.1, R1.2.4, R1.6.1
