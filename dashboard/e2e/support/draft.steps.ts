@@ -43,9 +43,11 @@ When(
 Then(
   "l'avvio è rifiutato perché {string} è già usato dal flusso {string} sul conto {string}",
   async ({ dashboard }, asset: string, holder: string, accountName: string) => {
-    await expect(dashboard.alert()).toHaveText(
-      `Avvio rifiutato: asset già assegnati al flusso ${holder} sullo stesso conto: ${asset}`,
-    );
+    await expect(
+      dashboard.warning(
+        `Avvio rifiutato: asset già assegnati al flusso ${holder} sullo stesso conto: ${asset}`,
+      ),
+    ).toBeVisible();
     expect(fakePlatform.flowNamed(holder).accountId).toBe(
       fakePlatform.accountNamed(accountName).id,
     );

@@ -16,6 +16,7 @@ const YEAR = 2026;
 // Months of a JavaScript date count from 0.
 const NOVEMBER_INDEX = 10;
 const DAYS_OF_NOVEMBER = 30;
+const ORDERS_PER_PAGE = 50;
 
 /** A day of November at 11:00 UTC, noon in Italy: the day the page shows is the same in both. */
 const dayOfNovember = (day: number): Date => new Date(Date.UTC(YEAR, NOVEMBER_INDEX, day, 11));
@@ -107,8 +108,8 @@ When(
   '{string} interroga i cicli del flusso {string} con la versione {int}',
   async ({ dashboard }, account: string, flow: string, version: number) => {
     await openHistoryAs(dashboard, account);
-    await dashboard.filter('Flusso').selectOption({ label: flow });
-    await dashboard.filter('Versione').selectOption({ label: `Versione ${version}` });
+    await dashboard.chooseFilter('Flusso', flow);
+    await dashboard.chooseFilter('Versione', `Versione ${version}`);
   },
 );
 
@@ -116,11 +117,11 @@ When(
   '{string} interroga le posizioni chiuse con asset {string} dal {int} al {int} novembre',
   async ({ dashboard }, account: string, asset: string, first: number, last: number) => {
     await openHistoryAs(dashboard, account);
-    await dashboard.historyTab('Posizioni chiuse').click();
-    await dashboard.filter('Asset').selectOption({ label: asset });
-    await dashboard.period().selectOption({ label: 'Intervallo' });
-    await dashboard.filter('Dal').fill(isoDay(first));
-    await dashboard.filter('Al').fill(isoDay(last));
+    await dashboard.openHistoryTab('Posizioni chiuse');
+    await dashboard.chooseFilter('Asset', asset);
+    await dashboard.chooseFilter('Periodo', 'Intervallo');
+    await dashboard.typeFilter('Dal', isoDay(first));
+    await dashboard.typeFilter('Al', isoDay(last));
   },
 );
 
@@ -128,8 +129,8 @@ When(
   '{string} interroga gli ordini del conto {string}',
   async ({ dashboard }, account: string, accountName: string) => {
     await openHistoryAs(dashboard, account);
-    await dashboard.historyTab('Ordini').click();
-    await dashboard.filter('Conto').selectOption({ label: accountName });
+    await dashboard.openHistoryTab('Ordini');
+    await dashboard.chooseFilter('Conto', accountName);
   },
 );
 
@@ -166,9 +167,7 @@ Then(
     await expect(rows).toHaveCount(11);
     await expect(rows.first()).toContainText(shownDay(20));
     await expect(rows.last()).toContainText(shownDay(10));
-    for (const row of await rows.all()) {
-      await expect(row).toContainText(asset);
-    }
+    await expect(rows).toHaveText(Array.from({ length: 11 }, () => new RegExp(asset)));
   },
 );
 
@@ -176,27 +175,31 @@ Then(
   'ogni ordine mostra le sue esecuzioni con prezzo, quantità e commissioni',
   async ({ dashboard }) => {
     const rows = dashboard.historyRows('Ordini');
-    await expect(rows).toHaveCount(50);
-    for (const row of await rows.all()) {
-      await expect(row).toContainText('principale');
-      await row.getByText('2 esecuzioni').click();
-      const executions = row.getByRole('table', { name: 'Esecuzioni' }).locator('tbody tr');
-      await expect(executions).toHaveCount(2);
-      await expect(executions.first().locator('td')).toHaveText([
-        /\d/,
-        '91.000,5',
-        '0.015',
-        '0,41',
-      ]);
-      await expect(executions.last().locator('td')).toHaveText([/\d/, '91.001', '0.005', '0,14']);
-    }
+    await expect(rows).toHaveCount(ORDERS_PER_PAGE);
+    await expect(rows).toHaveText(Array.from({ length: ORDERS_PER_PAGE }, () => /principale/));
+    // Every action of a step costs a recording of the whole page in the trace: the executions of the 50 orders open
+    // with one click each in a single action, and each assertion reads all the tables at once (Bug 289).
+    const summaries = rows.getByText('2 esecuzioni');
+    await expect(summaries).toHaveCount(ORDERS_PER_PAGE);
+    await summaries.evaluateAll((all) =>
+      all.forEach((summary) => (summary as HTMLElement).click()),
+    );
+    const executions = rows.getByRole('table', { name: 'Esecuzioni' });
+    await expect(executions).toHaveCount(ORDERS_PER_PAGE);
+    await expect(executions.locator('tbody tr')).toHaveCount(2 * ORDERS_PER_PAGE);
+    await expect(executions.locator('tbody tr:first-child td')).toHaveText(
+      Array.from({ length: ORDERS_PER_PAGE }, () => [/\d/, '91.000,5', '0.015', '0,41']).flat(),
+    );
+    await expect(executions.locator('tbody tr:last-child td')).toHaveText(
+      Array.from({ length: ORDERS_PER_PAGE }, () => [/\d/, '91.001', '0.005', '0,14']).flat(),
+    );
   },
 );
 
 Then(
   "l'interrogazione è rifiutata con il motivo {string}",
   async ({ dashboard }, reason: string) => {
-    await expect(dashboard.alert()).toHaveText(`Interrogazione rifiutata: ${reason}`);
+    await expect(dashboard.warning(`Interrogazione rifiutata: ${reason}`)).toBeVisible();
   },
 );
 

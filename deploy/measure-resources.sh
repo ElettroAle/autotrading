@@ -48,6 +48,8 @@ container_table() {
       if (unit == "TiB" || unit == "TB") return usage * 1048576
       return usage + 0
     }
+    # docker stats shows a restarting container, whose stats it cannot read, as dashes: not a service (ADR 0165).
+    $2 == "--" { next }
     $1 == "container" { value = mebibytes($3); seen[$2] = 1; if (!($2 in peak) || value > peak[$2]) peak[$2] = value }
     $1 == "rest" { seen[$2] = 1; rest[$2] = mebibytes($3) }
     END {
