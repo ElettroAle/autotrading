@@ -7,6 +7,7 @@ from autotrading.application.agent.model_gateways import ModelGateways, gateway_
 from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.domain.agent.agent_context import AgentContext
 from autotrading.domain.agent.agent_response import AgentResponse
+from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -44,7 +45,9 @@ class AskAgentUseCase:
     def execute(self, command: AskAgentCommand) -> AgentAnswer:
         definition, gateway = gateway_of(self._gateways, command.model)
         key = self._key_of(definition.provider)
-        reply = gateway.model_call().call(definition.name, key, command.settings, command.context.messages())
+        reply = gateway.model_call().call(
+            definition.name, key, command.settings, command.context.messages(), DECISIONS_FORMAT
+        )
         return AgentAnswer(
             AgentResponse.read(reply.text, command.context.assets),
             reply.usage,

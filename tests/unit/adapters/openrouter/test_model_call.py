@@ -14,6 +14,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.ports import ModelReply
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.answer_format import AnswerFormat
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from tests.support.provider_key import api_key_of
@@ -27,6 +28,7 @@ SETTINGS: dict[str, ParameterValue] = {
     "reasoning_effort": "alto",
 }
 ANSWER = '{"decisioni": []}'
+FORMAT = AnswerFormat("decisioni", {"type": "object", "properties": {}, "required": [], "additionalProperties": False})
 TIMED_OUT, REFUSED = "timed out", "connection refused"
 USAGE: dict[str, object] = {"prompt_tokens": 2000, "completion_tokens": 500, "cost": 0.0031}
 REPLY: dict[str, object] = {"choices": [{"message": {"role": "assistant", "content": ANSWER}}], "usage": USAGE}
@@ -56,7 +58,7 @@ def adapter_on(openrouter: OpenRouter) -> OpenRouterModelCallAdapter:
 
 
 def call(openrouter: OpenRouter, settings: dict[str, ParameterValue] | None = None) -> ModelReply:
-    return adapter_on(openrouter).call(MODEL, KEY, SETTINGS if settings is None else settings, MESSAGES)
+    return adapter_on(openrouter).call(MODEL, KEY, SETTINGS if settings is None else settings, MESSAGES, FORMAT)
 
 
 def test_the_call_reaches_openrouter_with_the_key_of_the_user_and_its_own_reasoning_field() -> None:
@@ -71,7 +73,11 @@ def test_the_call_reaches_openrouter_with_the_key_of_the_user_and_its_own_reason
         "model": "deepseek/deepseek-chat",
         "messages": [{"role": "system", "content": "regole"}, {"role": "user", "content": '{"ora": "10:30"}'}],
         "max_tokens": 2048,
-        "response_format": {"type": "json_object"},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "decisioni", "strict": True, "schema": dict(FORMAT.schema)},
+        },
+        "provider": {"require_parameters": True},
         "temperature": 0.7,
         "reasoning": {"effort": "high"},
     }
@@ -150,7 +156,7 @@ def test_a_timeout_is_transient_and_never_carries_the_request() -> None:
 
     adapter = OpenRouterModelCallAdapter(httpx.Client(transport=httpx.MockTransport(slow)))
     with pytest.raises(ModelUnavailableError, match=r"tempo di risposta scaduto$") as raised:
-        adapter.call(MODEL, KEY, {}, MESSAGES)
+        adapter.call(MODEL, KEY, {}, MESSAGES, FORMAT)
 
     assert raised.value.__cause__ is None
 
@@ -161,6 +167,6 @@ def test_a_refused_connection_is_transient_and_never_carries_the_request() -> No
 
     adapter = OpenRouterModelCallAdapter(httpx.Client(transport=httpx.MockTransport(refuse)))
     with pytest.raises(ModelUnavailableError, match=r"ConnectError$") as raised:
-        adapter.call(MODEL, KEY, {}, MESSAGES)
+        adapter.call(MODEL, KEY, {}, MESSAGES, FORMAT)
 
     assert raised.value.__cause__ is None

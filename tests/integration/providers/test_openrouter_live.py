@@ -5,6 +5,7 @@ import pytest
 from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
 from autotrading.application.agent.errors import ModelKeyRejectedError
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from tests.support.provider_key import api_key_of
 
 pytestmark = pytest.mark.providers
@@ -23,4 +24,4 @@ def test_the_public_list_makes_the_catalog_and_a_made_up_key_is_refused() -> Non
     assert len(catalog.models) > SOME_MODELS
     assert free
     with pytest.raises(ModelKeyRejectedError):
-        gateway.model_call().call(free[0].name, MADE_UP_KEY, {}, MESSAGES)
+        gateway.model_call().call(free[0].name, MADE_UP_KEY, {}, MESSAGES, DECISIONS_FORMAT)
