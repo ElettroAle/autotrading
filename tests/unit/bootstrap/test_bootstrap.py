@@ -51,8 +51,8 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
-from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.accounts import an_account
 from tests.support.installation import (
     WORKER_TOKEN,
@@ -322,7 +322,7 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     opener = SodiumCredentialOpenerAdapter({})
     factory = worker_use_cases(
-        create_engine("sqlite://"), opener, dev_installation_on_testnet(), Slippage.default(), FakeMessengerAdapter()
+        create_engine("sqlite://"), opener, dev_installation_on_testnet(), Slippage.default(), InMemoryOutboxAdapter()
     )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())

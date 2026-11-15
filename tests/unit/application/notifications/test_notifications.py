@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.errors import (
     BotUnreachableError,
     ChatNotLinkedError,
@@ -47,6 +48,7 @@ from tests.fakes.linked_chat_repository import (
     LinkedChatStore,
 )
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
@@ -62,6 +64,9 @@ class Telegram:
         self.codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        # The worker of the outbox is up: a notification is delivered as soon as it is queued.
+        self.outbox = InMemoryOutboxAdapter()
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
         self.now = NOW
         self.bot = FakeBotIdentityAdapter("autotrading_bot")
 
@@ -90,7 +95,7 @@ class Telegram:
         return GetLinkedChatUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)).execute()
 
     def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
-        return NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger)
+        return NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox)
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:
         self.notify_for(tenant_id).execute(notification)
@@ -330,7 +335,10 @@ def test_a_notification_telegram_does_not_take_is_recorded_without_failing(
 
     [record] = caplog.records
     assert record.getMessage() == "invio della notifica fallito"
-    assert (record.__dict__["tenant_id"], record.__dict__["subject"]) == (str(ANNA.value), "alfa")
+    assert record.__dict__["tenant_id"] == str(ANNA.value)
+    assert [message.payload["text"] for message in telegram.outbox.in_state(OutboxState.PENDING)] == [
+        "alfa: ciclo fallito, timeout"
+    ]
 
 
 def test_every_message_but_the_test_command_is_a_link_attempt(telegram: Telegram) -> None:
@@ -404,7 +412,7 @@ def test_a_test_notification_telegram_does_not_take_is_recorded_like_a_real_one(
 
     [record] = caplog.records
     assert record.getMessage() == "invio della notifica fallito"
-    assert record.__dict__["subject"] == "notifica di prova"
+    assert [message.payload["text"] for message in telegram.outbox.in_state(OutboxState.PENDING)] == [TEST_TEXT]
 
 
 def test_a_test_from_the_dashboard_reaches_the_linked_chat_of_the_tenant_only(telegram: Telegram) -> None:

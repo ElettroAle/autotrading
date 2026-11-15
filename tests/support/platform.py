@@ -18,6 +18,7 @@ from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -74,6 +75,7 @@ from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.provider_keys import (
@@ -122,6 +124,9 @@ class Platform:
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        # The worker of the outbox is up: a notification is delivered as soon as it is queued.
+        self.outbox = InMemoryOutboxAdapter()
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
         self.bot_username: str | None = None
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
@@ -250,7 +255,7 @@ class Platform:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 
@@ -272,7 +277,7 @@ class Platform:
         inbox.waiting = [BotMessage(chat_id, text)]
         test_notification = SendTestNotificationUseCase(
             InMemoryLinkedChatLookupAdapter(self.chats),
-            lambda tenant_id: NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+            lambda tenant_id: NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             self.messenger,
         )
         AnswerBotMessagesUseCase(inbox, self.link_chat(), test_notification).execute()

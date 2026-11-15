@@ -42,9 +42,11 @@ BEARER_PREFIX = "bearer "
 BOT_PAUSE_SECONDS = 5.0
 # Well under the punctuality of a cycle (R1.2.1): a cycle starts within seconds of its planned instant.
 CYCLE_PAUSE_SECONDS = 5.0
+OUTBOX_PAUSE_SECONDS = 5.0
 
 bot_log = logging.getLogger("autotrading.notifications.bot")
 cycles_log = logging.getLogger("autotrading.cycles")
+outbox_log = logging.getLogger("autotrading.notifications")
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +136,45 @@ class CyclePolling:
             stopping.wait(self._pause_seconds)
 
 
-type BackgroundLoop = BotPolling | CyclePolling
+class OutboxProcessing:
+    """Delivers the messages of the outbox in a background thread while the worker is up (ADR
+    outbox-delle-integrazioni-esterne-con-procrastinate).
+
+    Processing lasts as long as the worker; when the queue cannot be served it is recorded and starts again after a
+    pause, so the database being away never stops the worker.
+    """
+
+    thread_name = "outbox"
+
+    def __init__(self, process: Callable[[], None], pause_seconds: float = OUTBOX_PAUSE_SECONDS) -> None:
+        self._process = process
+        self._pause_seconds = pause_seconds
+
+    def run(self, stopping: threading.Event) -> None:
+        while not stopping.is_set():
+            try:
+                self._process()
+            except AutotradingError:
+                outbox_log.warning("consegna dei messaggi in uscita interrotta", exc_info=True)
+            stopping.wait(self._pause_seconds)
+
+
+type BackgroundLoop = BotPolling | CyclePolling | OutboxProcessing
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerLoops:
+    """What the worker runs in the background while it is up: each loop only when the installation composes it."""
+
+    bot: BotPolling | None = None
+    cycles: CyclePolling | None = None
+    outbox: OutboxProcessing | None = None
+
+    def composed(self) -> list[BackgroundLoop]:
+        return [loop for loop in (self.bot, self.cycles, self.outbox) if loop is not None]
+
+
+NO_LOOPS = WorkerLoops()
 
 
 def background(loops: Sequence[BackgroundLoop]) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
@@ -160,8 +200,7 @@ class StartLinkResponse(BaseModel):
 def create_worker_api(
     token: str,
     for_tenant: Callable[[TenantId], WorkerUseCases],
-    bot: BotPolling | None = None,
-    cycles: CyclePolling | None = None,
+    loops: WorkerLoops = NO_LOOPS,
     answers: WorkerAnswers = NO_ANSWERS,
 ) -> FastAPI:
     """The internal service of the worker: reachable only by the API on the network of the installation (ADR 0021).
@@ -174,7 +213,7 @@ def create_worker_api(
         openapi_url=None,
         docs_url=None,
         redoc_url=None,
-        lifespan=background([loop for loop in (bot, cycles) if loop is not None]),
+        lifespan=background(loops.composed()),
     )
     install_error_responses(api)
 
