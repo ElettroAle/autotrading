@@ -138,6 +138,6 @@ def private_key_of(raw: bytes) -> PrivateKey:
 
 def _credentials_of(document: Mapping[str, object]) -> Credentials | None:
     values = {name: value for name, value in document.items() if name not in OWNER_KEYS}
-    if not values or not all(isinstance(value, str) for value in values.values()):
+    if not values or not all(isinstance(value, str) and value.strip() for value in values.values()):
         return None
     return Credentials({name: str(value) for name, value in values.items()})

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 
-from autotrading.adapters.outbound.hyperliquid.activity import translated
+from autotrading.adapters.outbound.hyperliquid.activity import address_of, translated
 from autotrading.adapters.outbound.hyperliquid.exchange import ACCOUNT_ADDRESS, TIMEOUT_SECONDS, HyperliquidSdkAdapter
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
@@ -76,7 +76,7 @@ class HyperliquidAccountExecutionsAdapter:
         return frozenset({ACCOUNT_ADDRESS})
 
     def since(self, reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
-        address = reference.value(ACCOUNT_ADDRESS)
+        address = address_of(reference)
         start = FROM_THE_START if since is None else int(since.timestamp() * 1000)
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)

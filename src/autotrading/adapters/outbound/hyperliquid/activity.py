@@ -15,7 +15,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     HyperliquidSdkAdapter,
 )
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
-from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -67,7 +67,7 @@ class HyperliquidAccountActivityAdapter:
         return frozenset({ACCOUNT_ADDRESS})
 
     def activity(self, reference: AccountReference) -> AccountActivity:
-        address = reference.value(ACCOUNT_ADDRESS)
+        address = address_of(reference)
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)
             state = user_state_of(info.user_state(address))
@@ -132,3 +132,11 @@ def _instant(milliseconds: int | str) -> datetime:
 
 def _decimal(value: object) -> Decimal:
     return Decimal(str(value))
+
+
+def address_of(reference: AccountReference) -> str:
+    """The address an account is read by; a reference without it is refused before reaching the exchange."""
+    found = reference.fields.get(ACCOUNT_ADDRESS)
+    if found is None:
+        raise FlowCredentialsFieldMissingError
+    return found

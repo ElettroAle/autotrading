@@ -12,6 +12,7 @@ from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
     INVALID_KEY_MESSAGE,
+    MISSING_FIELD_MESSAGE,
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
 )
@@ -363,3 +364,15 @@ def test_a_state_of_unexpected_shape_is_unavailable() -> None:
 def test_a_fault_reading_the_position_is_unavailable() -> None:
     with pytest.raises(OrderExchangeUnavailableError):
         adapter(FakeSdk(failure=ServerError(500, "down"))).position(ACCESS, "BTC")
+
+
+@pytest.mark.parametrize("missing", ["account_address", "secret_key"])
+def test_an_access_without_a_field_of_the_exchange_is_refused_before_reaching_it(missing: str) -> None:
+    sdk = FakeSdk()
+    fields = {name: value for name, value in ACCESS.fields.items() if name != missing}
+
+    with pytest.raises(ExchangeRejectedOrderError) as raised:
+        adapter(sdk).place_market_order(TradingAccess("Hyperliquid", fields), an_order())
+
+    assert raised.value.exchange_message == MISSING_FIELD_MESSAGE
+    assert calls_named(sdk, "market_open") == []

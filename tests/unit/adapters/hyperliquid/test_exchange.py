@@ -12,6 +12,7 @@ from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
     INVALID_KEY_MESSAGE,
+    MISSING_FIELD_MESSAGE,
     PROBE_COIN,
     TIMEOUT_SECONDS,
     HyperliquidExchangeAdapter,
@@ -283,3 +284,27 @@ def test_declares_the_address_of_the_account_and_the_key_of_the_api_wallet() -> 
 @pytest.mark.parametrize(("testnet", "name"), [(True, "testnet"), (False, "mainnet")])
 def test_the_network_carries_the_name_hyperliquid_gives_it(testnet: bool, name: str) -> None:
     assert HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=FakeSdk()).network_name() == name
+
+
+@pytest.mark.parametrize("missing", ["account_address", "secret_key"])
+def test_credentials_without_a_field_of_the_exchange_are_rejected_without_reaching_it(missing: str) -> None:
+    sdk = FakeSdk()
+    fields = {name: value for name, value in CREDENTIALS.values.items() if name != missing}
+
+    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
+        read(sdk, Credentials(fields))
+
+    assert raised.value.exchange_message == MISSING_FIELD_MESSAGE
+    assert sdk.calls == []
+
+
+def test_a_cycle_access_without_a_field_of_the_exchange_is_refused() -> None:
+    with pytest.raises(FlowCredentialsRefusedError):
+        HyperliquidExchangeAdapter(BASE_URL, FakeSdk()).cycle_reading(CycleAccess({"account_address": ADDRESS}))
+
+
+def test_a_verification_access_without_a_field_of_the_exchange_is_rejected() -> None:
+    with pytest.raises(VerificationCredentialsRejectedError):
+        HyperliquidExchangeAdapter(BASE_URL, FakeSdk()).verification_reading(
+            VerificationAccess({"account_address": ADDRESS})
+        )

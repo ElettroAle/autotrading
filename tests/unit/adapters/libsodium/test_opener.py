@@ -117,6 +117,21 @@ def test_a_plaintext_without_the_credentials_is_refused(
         opener.open(with_plaintext(account, private_key, plaintext))
 
 
+def test_a_plaintext_with_an_empty_field_is_refused_for_every_context(
+    opener: SodiumCredentialOpenerAdapter, private_key: PrivateKey
+) -> None:
+    account = an_account(TENANT)
+    document = {"tenant_id": str(TENANT.value), "account_id": str(account.id.value), "wallet": "0xabc", "signer": " "}
+    sealed = with_plaintext(account, private_key, json.dumps(document).encode())
+
+    with pytest.raises(OrderCredentialsNotOpenedError):
+        opener.open_access(sealed_access_of(sealed))
+    with pytest.raises(FlowCredentialsNotOpenedError):
+        opener.open_cycle_access(sealed_address_of(sealed))
+    with pytest.raises(VerificationCredentialsNotOpenedError):
+        opener.open_verification(sealed_verification_of(sealed))
+
+
 def test_a_private_key_of_the_wrong_length_is_refused() -> None:
     with pytest.raises(InvalidPrivateCredentialsKeyError):
         SodiumCredentialOpenerAdapter({1: b"short"})

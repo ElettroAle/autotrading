@@ -17,7 +17,7 @@ from autotrading.adapters.outbound.hyperliquid.executions import (
     FUNDING_PAGE,
     HyperliquidAccountExecutionsAdapter,
 )
-from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.ledger import Execution, FundingPayment
 
@@ -75,9 +75,11 @@ class FakeSdk(HyperliquidSdkAdapter):
 
 
 def read(sdk: FakeSdk, since: datetime | None = SINCE) -> Any:
-    return HyperliquidAccountExecutionsAdapter("https://exchange.invalid", sdk, 3.0).since(
-        AccountReference({"account_address": ADDRESS}), since
-    )
+    return read_reference(sdk, AccountReference({"account_address": ADDRESS}), since)
+
+
+def read_reference(sdk: FakeSdk, reference: AccountReference, since: datetime | None = SINCE) -> Any:
+    return HyperliquidAccountExecutionsAdapter("https://exchange.invalid", sdk, 3.0).since(reference, since)
 
 
 def test_the_executions_are_found_by_the_address_alone() -> None:
@@ -219,3 +221,12 @@ def test_the_executions_are_read_on_the_network_asked(*, testnet: bool, url: str
     adapter = HyperliquidAccountExecutionsAdapter.for_network(testnet=testnet, sdk=FakeSdk())
 
     assert adapter.base_url == url
+
+
+def test_a_reference_without_the_address_is_refused_before_reaching_the_exchange() -> None:
+    sdk = FakeSdk()
+
+    with pytest.raises(FlowCredentialsFieldMissingError):
+        read_reference(sdk, AccountReference({"wallet": ADDRESS}))
+
+    assert sdk.calls == []
