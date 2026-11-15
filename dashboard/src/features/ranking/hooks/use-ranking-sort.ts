@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { DataTableSort } from '@/components/ui/data-table';
+import { useSearchChange } from '@/hooks/use-search-change';
 
 import { DEFAULT_RANKING_SORT, isRankingSortKey } from '../utils/sort-ranking';
 
@@ -19,6 +20,14 @@ const nextSort = (current: DataTableSort, key: string): DataTableSort =>
     ? { key, direction: current.direction === 'ascending' ? 'descending' : 'ascending' }
     : { key, direction: 'descending' };
 
+// Without a sort, or with a column the ranking does not know, the order is the API's.
+const sortIn = (search: URLSearchParams): DataTableSort => {
+  const key = search.get(SORT);
+  return isRankingSortKey(key)
+    ? { key, direction: search.get(ORDER) === ASCENDING ? 'ascending' : 'descending' }
+    : DEFAULT_RANKING_SORT;
+};
+
 const withSort = (current: URLSearchParams, sort: DataTableSort): URLSearchParams => {
   const next = new URLSearchParams(current);
   next.delete(SORT);
@@ -32,19 +41,16 @@ const withSort = (current: URLSearchParams, sort: DataTableSort): URLSearchParam
 
 /**
  * The column and the order of the ranking live in the query string, so a sorted ranking has a link of its own
- * (ADR 0136); without them, or with a column the ranking does not know, the order is the API's.
+ * (ADR 0136); a column chosen twice in quick succession turns the order (ADR 0166).
  */
 export const useRankingSort = (): [DataTableSort, (key: string) => void] => {
-  const [search, setSearch] = useSearchParams();
-  const key = search.get(SORT);
-  const sort: DataTableSort = isRankingSortKey(key)
-    ? { key, direction: search.get(ORDER) === ASCENDING ? 'ascending' : 'descending' }
-    : DEFAULT_RANKING_SORT;
+  const [search] = useSearchParams();
+  const changeSearch = useSearchChange();
   const sortBy = useCallback(
     (chosen: string) => {
-      setSearch((current) => withSort(current, nextSort(sort, chosen)));
+      changeSearch((current) => withSort(current, nextSort(sortIn(current), chosen)));
     },
-    [setSearch, sort],
+    [changeSearch],
   );
-  return [sort, sortBy];
+  return [sortIn(search), sortBy];
 };

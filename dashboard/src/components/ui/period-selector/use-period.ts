@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { useSearchChange } from '@/hooks/use-search-change';
+
 /** The periods the API accepts, with the words the page shows (ADR 0122). */
 export const PERIODS = [
   { kind: 'all', label: 'Tutta la vita' },
@@ -51,19 +53,21 @@ export const isComplete = (period: Period): boolean =>
 
 /**
  * The period lives in the query string of the page, so it survives a reload and every panel of the page reads the
- * same one (ADR 0123). Without one, or with one the page does not know, it is the whole life.
+ * same one (ADR 0123); a period chosen right after another change of the page adds up to it (ADR 0166). Without
+ * one, or with one the page does not know, it is the whole life.
  */
 export const usePeriod = (): [Period, (period: Period) => void] => {
-  const [search, setSearch] = useSearchParams();
+  const [search] = useSearchParams();
+  const changeSearch = useSearchChange();
   const kind = search.get(PERIOD);
   const period: Period = isKind(kind)
     ? { kind, from: search.get(FROM) ?? '', to: search.get(TO) ?? '' }
     : { kind: 'all', from: '', to: '' };
   const choose = useCallback(
     (chosen: Period) => {
-      setSearch((current) => withPeriod(current, chosen));
+      changeSearch((current) => withPeriod(current, chosen));
     },
-    [setSearch],
+    [changeSearch],
   );
   return [period, choose];
 };
