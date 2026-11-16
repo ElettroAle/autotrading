@@ -72,3 +72,7 @@ class Notification:
     @classmethod
     def unattributable_movement(cls, account: str, amount: Amount) -> Notification:
         return cls(account, f"movimento non attribuibile di {amount}")
+
+    @classmethod
+    def reconciliation_alarm(cls, account: str, read: Amount, expected: Amount) -> Notification:
+        return cls(account, f"allarme di riconciliazione, saldo {read} invece di {expected}")

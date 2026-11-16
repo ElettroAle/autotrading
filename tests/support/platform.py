@@ -55,11 +55,13 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_forecasts import InMemoryFlowForecastsAdapter
 from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
+from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
     InMemoryLinkCodeRepositoryAdapter,
@@ -85,6 +87,7 @@ from tests.fakes.provider_keys import (
     ProviderKeyStore,
     ProviderKeyVault,
 )
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
 from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
@@ -140,6 +143,9 @@ class Platform:
         self.cycles = InMemoryCycleRepositoryAdapter()
         self.equity_snapshots = EquitySnapshotStore()
         self.histories: dict[TenantId, InMemoryFlowHistoryAdapter] = {}
+        # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
+        self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -223,9 +229,13 @@ class Platform:
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
             openings_suspensions=InMemoryOpeningsSuspensionAdapter(self.flows, tenant_id),
+            flow_forecasts=InMemoryFlowForecastsAdapter(self.forecasts_of(tenant_id)),
             historical_cycles=self.history_of(tenant_id),
             historical_closed_positions=self.history_of(tenant_id),
             historical_orders=self.history_of(tenant_id),
+            reconciliation=self.readings,
+            account_thresholds=accounts,
+            account_names=accounts,
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -234,6 +244,10 @@ class Platform:
     def history_of(self, tenant_id: TenantId) -> InMemoryFlowHistoryAdapter:
         """The histories of the tenant: each tenant reads its own store, as row level security does (R2.5.1)."""
         return self.histories.setdefault(tenant_id, InMemoryFlowHistoryAdapter(HistoryStore()))
+
+    def forecasts_of(self, tenant_id: TenantId) -> InMemoryForecastRepositoryAdapter:
+        """The forecasts the flows of the tenant recorded: each tenant reads its own, as row level security does."""
+        return self.forecasts.setdefault(tenant_id, InMemoryForecastRepositoryAdapter())
 
     def worker_for(self, tenant_id: TenantId) -> WorkerUseCases:
         """What the worker builds for a request of the API, with the opener only it holds."""

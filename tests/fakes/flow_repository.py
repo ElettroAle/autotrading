@@ -19,7 +19,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
-from autotrading.domain.flows.openings_suspension import NOT_SUSPENDED, OpeningsStatus
+from autotrading.domain.flows.openings_suspension import OpeningsStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -137,9 +137,7 @@ class InMemoryAutomaticPauseAdapter:
 
 
 class InMemoryFlowTimingAdapter:
-    """Bound to one tenant: the anchor, the pause reason, the first start and the openings the store keeps beside its
-    flows.
-    """
+    """Bound to one tenant: the anchor, the pause reason and the first start the store keeps beside its flows."""
 
     def __init__(self, store: FlowStore, tenant_id: TenantId) -> None:
         self._store = store
@@ -151,7 +149,6 @@ class InMemoryFlowTimingAdapter:
                 self._store.anchors.get(flow.id),
                 self._store.pause_reasons.get(flow.id),
                 self._store.first_starts.get(flow.id),
-                self._store.openings.get(flow.id, NOT_SUSPENDED),
             )
             for flow in self._store.of(self._tenant_id)
         }

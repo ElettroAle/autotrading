@@ -25,7 +25,6 @@ from autotrading.application.flows.list_flow_versions import ListFlowVersionsCom
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
-from autotrading.application.flows.read_flow_openings import ReadFlowOpeningsCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
@@ -37,7 +36,7 @@ from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.openings_resume import OpeningsResume
-from autotrading.domain.flows.openings_suspension import OpeningsSuspension
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension, OpeningsSuspensionCause
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
@@ -363,22 +362,25 @@ class FlowResponse(BaseModel):
 
 
 class OpeningsSuspensionResponse(BaseModel):
-    """The openings of a flow suspended for maximum loss: the threshold passed and when (R3.2.2)."""
+    """The openings of a flow suspended: the reason, since when, the cause and whether the user resumes them from the
+    flow, true only after a maximum loss (R3.2.2, R3.3.1).
+    """
 
     reason: str
     suspended_at: datetime
+    cause: OpeningsSuspensionCause
+    resumable: bool
 
     @classmethod
     def of(cls, suspension: OpeningsSuspension | None) -> OpeningsSuspensionResponse | None:
         if suspension is None:
             return None
-        return cls(reason=suspension.reason, suspended_at=suspension.suspended_at)
-
-
-class FlowOpeningsResponse(BaseModel):
-    """The suspension of the openings of the flow in force now, or null (R3.2.2)."""
-
-    suspension: OpeningsSuspensionResponse | None
+        return cls(
+            reason=suspension.reason,
+            suspended_at=suspension.suspended_at,
+            cause=suspension.cause,
+            resumable=suspension.resumable,
+        )
 
 
 class FreeCapitalResponse(BaseModel):
@@ -550,20 +552,14 @@ def flows_router(
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.assign_draft_flow.execute(request.command(flow_id)))
 
-    @router.get("/flows/{flow_id}/openings")
-    def read_flow_openings(
-        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> FlowOpeningsResponse:
-        suspension = use_cases.read_flow_openings.execute(ReadFlowOpeningsCommand(FlowId(flow_id)))
-        return FlowOpeningsResponse(suspension=OpeningsSuspensionResponse.of(suspension))
-
-    @router.post("/flows/{flow_id}/openings/resume")
+    @router.post("/flows/{flow_id}/openings/resume", status_code=204)
     def resume_flow_openings(
         flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> FlowOpeningsResponse:
-        """The user resumes the openings suspended for maximum loss (R3.2.2)."""
-        resumed = use_cases.resume_flow_openings.execute(ResumeFlowOpeningsCommand(FlowId(flow_id)))
-        return FlowOpeningsResponse(suspension=OpeningsSuspensionResponse.of(resumed.suspension))
+    ) -> None:
+        """The user resumes the openings suspended for maximum loss (R3.2.2); the suspension in force, of any cause,
+        reads in the state of the flow.
+        """
+        use_cases.resume_flow_openings.execute(ResumeFlowOpeningsCommand(FlowId(flow_id)))
 
     @router.post("/flows/{flow_id}/{action}")
     def change_flow_status(

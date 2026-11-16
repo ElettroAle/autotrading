@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -160,16 +160,16 @@ def test_the_statistics_of_a_row_are_those_of_the_period(platform: Platform) -> 
 def test_the_ranking_of_a_range_reads_its_days(platform: Platform) -> None:
     platform.flow("alfa", "100", "110", since=LONG_AGO)
     platform.flow("beta", "100", "120")
-    day = LONG_AGO.date()
-
-    rows = platform.use_case().execute(RankFlowsCommand("range", day, day))
+    rows = platform.use_case().execute(RankFlowsCommand("range", LONG_AGO, LONG_AGO))
 
     assert names(rows) == ["alfa"]
 
 
 def test_an_invalid_period_is_refused(platform: Platform) -> None:
     with pytest.raises(InvalidStatisticsPeriodError):
-        platform.use_case().execute(RankFlowsCommand("range", date(2026, 11, 3), date(2026, 11, 1)))
+        platform.use_case().execute(
+            RankFlowsCommand("range", datetime(2026, 11, 3, 10, tzinfo=UTC), datetime(2026, 11, 3, 9, tzinfo=UTC))
+        )
 
 
 def test_the_ranking_is_empty_without_flows(platform: Platform) -> None:

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK
 from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import (
@@ -30,7 +31,7 @@ def check(
     total_value: str | None = None,
     open_margin: str = "0",
     open_value: str = "0",
-    openings_suspended: bool = False,
+    openings_suspended: str | None = None,
 ) -> RiskCheck:
     limits = RiskLimits(
         max_leverage,
@@ -430,13 +431,13 @@ def test_brought_to_the_minimum_within_the_overall_residual_an_opening_passes() 
 
 
 def test_openings_suspended_for_maximum_loss_block_every_opening() -> None:
-    outcome = check(openings_suspended=True).outcome(opening("0.01", 2), EXCHANGE)
+    outcome = check(openings_suspended=MAXIMUM_LOSS_BLOCK).outcome(opening("0.01", 2), EXCHANGE)
 
     assert outcome == BlockedDecision("BTC", "apertura BTC non eseguita: aperture sospese per perdita massima")
 
 
 def test_openings_suspended_for_maximum_loss_still_let_closings_and_holds_through() -> None:
-    suspended = check(openings_suspended=True, open_assets=frozenset({"BTC"}))
+    suspended = check(openings_suspended=MAXIMUM_LOSS_BLOCK, open_assets=frozenset({"BTC"}))
 
     assert suspended.outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
     assert suspended.outcome(HoldIntent("ETH"), None) == HeldPosition("ETH")
@@ -446,3 +447,30 @@ def test_openings_are_not_suspended_unless_the_state_says_so() -> None:
     state = RiskState("USDC", Decimal(1000), Decimal(1000), frozenset(), Decimal(0), Decimal(0))
 
     assert not state.openings_suspended
+
+
+SUSPENDED = "allarme di riconciliazione sul conto test-1"
+
+
+def suspended_check(open_assets: frozenset[str] = frozenset()) -> RiskCheck:
+    limits = RiskLimits(50, Decimal(100))
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), open_assets, openings_suspended=SUSPENDED)
+    return RiskCheck(RiskPolicy(limits), state)
+
+
+def test_with_the_openings_suspended_an_opening_is_blocked_with_the_reason() -> None:
+    assert suspended_check().outcome(opening("0.03", 2, asset="ETH"), EXCHANGE) == BlockedDecision(
+        "ETH", f"apertura ETH non eseguita: {SUSPENDED}"
+    )
+
+
+def test_with_the_openings_suspended_a_close_is_still_approved() -> None:
+    assert suspended_check(frozenset({"BTC"})).outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
+
+
+def test_with_the_openings_suspended_a_hold_stays_a_hold() -> None:
+    assert suspended_check().outcome(HoldIntent("SOL"), None) == HeldPosition("SOL")
+
+
+def test_the_openings_are_not_suspended_unless_the_state_says_so() -> None:
+    assert check().outcome(opening("0.03", 2), EXCHANGE) == ApprovedOpening("BTC", TradeSide.LONG, Decimal(60), 2, ())

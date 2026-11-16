@@ -26,14 +26,14 @@ class ReviewCycleRiskUseCase:
         decisions: CycleDecisions,
     ) -> RiskReview[CycleOrder]:
         cycle_flow = decisions.flow
-        openings_suspended = self._loss_guard.execute(cycle_flow)
+        loss_suspension = self._loss_guard.execute(cycle_flow)
         command = CheckRiskCommand(
             tuple(
                 decision.intent_with(OpenIntent.of, CloseIntent, HoldIntent)
                 for decision in decisions.reply.response.decisions
             ),
             cycle_flow.configuration.risk_policy,
-            cycle_flow.risk_state(openings_suspended=openings_suspended),
+            cycle_flow.risk_state(loss_suspension=loss_suspension),
             cycle_flow.exchange,
         )
         outcomes = self._check_risk.execute(command)

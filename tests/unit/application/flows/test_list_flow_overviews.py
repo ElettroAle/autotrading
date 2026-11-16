@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -10,6 +9,7 @@ from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsC
 from autotrading.application.flows.ports import FlowSummary
 from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
@@ -17,14 +17,15 @@ from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.ledger import FlowTotals
-from autotrading.domain.flows.openings_resume import OpeningsResume
-from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -51,8 +52,15 @@ class Bench:
         self.ledger = InMemoryFlowLedgerAdapter()
         self.equity = InMemoryEquitySnapshotRepositoryAdapter(EquitySnapshotStore(), TENANT)
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
+        suspension = ReadOpeningsSuspensionUseCase(
+            flows,
+            InMemoryOpeningsSuspensionAdapter(self.store, TENANT),
+            InMemoryReconciliationRepositoryAdapter(),
+            FakeAccountThresholdsAdapter({ACCOUNT: "test-1"}),
+            lambda: NOW,
+        )
         results = ReadFlowResultsUseCase(
-            ReadFlowStateUseCase(flows, self.activity, self.ledger), self.equity, self.history, lambda: NOW
+            ReadFlowStateUseCase(flows, self.activity, self.ledger), suspension, self.equity, self.history, lambda: NOW
         )
         self.use_case = ListFlowOverviewsUseCase(self.summaries, self.history, results, "dev", lambda: NOW)
 
@@ -93,28 +101,6 @@ def test_an_active_flow_shows_its_last_cycle_and_the_next_planned_one(bench: Ben
     assert (overview.summary, overview.environment) == (active, "dev")
     assert overview.last_cycle == last
     assert overview.next_cycle_at == STARTED + timedelta(minutes=30)
-
-
-def test_a_flow_shows_the_suspension_of_its_openings_in_force_now(bench: Bench) -> None:
-    _, summary = bench.flow()
-    suspension = OpeningsSuspension("perdita giornaliera 6% oltre il 5%", STARTED)
-    bench.summaries.summaries[0] = replace(summary, openings=OpeningsStatus(suspension, None))
-
-    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
-
-    assert overview.openings_suspension == suspension
-
-
-def test_a_next_day_suspension_ended_before_now_is_not_shown(bench: Bench) -> None:
-    _, summary = bench.flow()
-    suspension = OpeningsSuspension("perdita dal picco 11% oltre il 10%", STARTED - timedelta(days=1))
-    bench.summaries.summaries[0] = replace(
-        summary, openings=OpeningsStatus(suspension, None), openings_resume=OpeningsResume.NEXT_DAY
-    )
-
-    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
-
-    assert overview.openings_suspension is None
 
 
 def test_a_flow_without_schedule_nor_cycles_has_neither_last_nor_next_cycle(bench: Bench) -> None:

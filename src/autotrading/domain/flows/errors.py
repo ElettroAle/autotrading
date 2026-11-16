@@ -261,19 +261,19 @@ class UnknownStatisticsPeriodError(InvalidStatisticsPeriodError):
         super().__init__("scegliere tra " + ", ".join(periods))
 
 
-class DaysOutsideRangeError(InvalidStatisticsPeriodError):
+class BoundsOutsideRangeError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
-        super().__init__("i giorni valgono solo per un intervallo")
+        super().__init__("inizio e fine valgono solo per un intervallo")
 
 
-class RangeDaysRequiredError(InvalidStatisticsPeriodError):
+class RangeBoundsRequiredError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
-        super().__init__("un intervallo ha il giorno iniziale e il giorno finale")
+        super().__init__("un intervallo ha l'inizio e la fine")
 
 
 class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
-        super().__init__("il giorno iniziale è successivo al giorno finale")
+        super().__init__("l'inizio è successivo alla fine")
 
 
 class InvalidCycleFilterError(DomainError):

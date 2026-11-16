@@ -18,6 +18,7 @@ from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.risk_outcome import ApprovedOpening, BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -111,9 +112,9 @@ class LossGuard:
         self.suspended = suspended
         self.guarded: list[CycleFlow] = []
 
-    def execute(self, flow: CycleFlow) -> bool:
+    def execute(self, flow: CycleFlow) -> OpeningsSuspension | None:
         self.guarded.append(flow)
-        return self.suspended
+        return OpeningsSuspension("perdita giornaliera 6% oltre il 5%", flow.started_at) if self.suspended else None
 
 
 class Actions:

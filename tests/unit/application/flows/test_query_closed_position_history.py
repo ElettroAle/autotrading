@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from autotrading.application.flows.query_closed_position_history import (
     QueryClosedPositionHistoryCommand,
@@ -18,7 +18,9 @@ def test_gives_the_positions_of_an_asset_closed_in_the_period() -> None:
     use_case = QueryClosedPositionHistoryUseCase(
         InMemoryFlowHistoryAdapter(HistoryStore(closed_positions=rows)), lambda: NOW
     )
-    period = StatisticsPeriod.named("range", date(2026, 11, 10), date(2026, 11, 20))
+    period = StatisticsPeriod.named(
+        "range", datetime(2026, 11, 10, tzinfo=UTC), datetime(2026, 11, 20, 23, 59, tzinfo=UTC)
+    )
 
     page = use_case.execute(QueryClosedPositionHistoryCommand(HistoryFilter(period=period, asset="ETH"), None))
 

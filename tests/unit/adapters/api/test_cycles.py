@@ -267,6 +267,8 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "openings_suspension": {
                 "reason": "perdita giornaliera 6% oltre il 5%",
                 "suspended_at": "2026-11-12T10:07:00Z",
+                "cause": "perdita_massima",
+                "resumable": True,
             },
             "model": flow.configuration.model.name,
             "version": flow.configuration.version,
@@ -352,7 +354,7 @@ def test_the_flows_in_use_refuse_a_period_the_user_cannot_have_meant(client_of: 
 
     assert (response.status_code, reason_of(response)) == (
         400,
-        {"detail": "periodo non valido: un intervallo ha il giorno iniziale e il giorno finale"},
+        {"detail": "periodo non valido: un intervallo ha l'inizio e la fine"},
     )
 
 
@@ -386,13 +388,32 @@ def test_the_cycles_are_filtered_by_outcome_decision_and_days(client_of: Client,
 
     body = anna.get(
         f"/flows/{flow_id}/cycles",
-        params={"outcome": "concluso", "decision": "apertura", "from": "2026-11-12", "to": "2026-11-12"},
+        params={
+            "outcome": "concluso",
+            "decision": "apertura",
+            "from": "2026-11-12T00:00:00Z",
+            "to": "2026-11-12T23:59:00Z",
+        },
     ).json()
 
     assert [cycle["planned_at"] for cycle in body["cycles"]] == ["2026-11-12T10:07:00Z"]
     assert body["total"] == 1
     failed = anna.get(f"/flows/{flow_id}/cycles", params={"outcome": "fallito"}).json()
     assert [cycle["outcome"] for cycle in failed["cycles"]] == ["fallito"]
+
+
+# ADR periodo-al-minuto: from and to are instants read to the minute, the minute of to included, UTC without a zone.
+def test_the_interval_of_the_cycles_holds_its_minutes(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    for minute in (0, 15, 30):
+        platform.cycles.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(minutes=minute)))
+
+    body = anna.get(
+        f"/flows/{flow_id}/cycles", params={"from": "2026-11-12T10:07:40Z", "to": "2026-11-12T10:22"}
+    ).json()
+
+    assert [cycle["planned_at"] for cycle in body["cycles"]] == ["2026-11-12T10:22:00Z", "2026-11-12T10:07:00Z"]
 
 
 # ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: an unknown value is a 400 error of the project.

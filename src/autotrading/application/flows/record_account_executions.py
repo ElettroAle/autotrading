@@ -9,7 +9,7 @@ from autotrading.application.flows.ports import (
     FlowRepositoryPort,
     PlatformOrdersPort,
 )
-from autotrading.domain.flows.ledger import AccountLedger, LedgerEntry, LedgerKeys
+from autotrading.domain.flows.ledger import AccountLedger, LedgerKeys
 
 # The exchange may publish an execution or a funding payment after a later one, and funding is paid at the turn of
 # every hour: the window starts an hour before the cursor, and what is recorded already is read once (ADR 0076).
@@ -26,6 +26,8 @@ class RecordAccountExecutionsUseCase:
     the last time enters the ledger, each execution given to its flow and added to its totals (ADR 0063).
 
     Only what is new is read and written: the cycle never reads the whole history, of the exchange or of the ledger.
+    The answer is what entered the ledger now, executions and funding, for the reconciliation to explain the balance
+    with (R3.3.1).
     """
 
     def __init__(
@@ -40,7 +42,7 @@ class RecordAccountExecutionsUseCase:
         self._orders = orders
         self._ledger = ledger
 
-    def execute(self, command: RecordAccountExecutionsCommand) -> tuple[LedgerEntry, ...]:
+    def execute(self, command: RecordAccountExecutionsCommand) -> AccountLedger:
         account_id = command.account_id
         cursor = self._ledger.cursor(account_id)
         since = None if cursor is None else cursor - OVERLAP
@@ -58,5 +60,5 @@ class RecordAccountExecutionsUseCase:
         )
         latest = ledger.latest
         if latest is None:
-            return ()
+            return ledger
         return self._ledger.record(account_id, ledger, latest)

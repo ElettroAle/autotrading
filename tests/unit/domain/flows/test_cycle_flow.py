@@ -9,6 +9,8 @@ from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
+from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK, OpeningsSuspension
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -94,9 +96,10 @@ def test_the_overall_exposure_of_the_risk_sums_the_margin_the_exchange_declares_
 
 def test_the_risk_carries_the_suspension_of_the_openings_the_guard_found() -> None:
     flow = cycle_flow(attributed(margin=Decimal(50)), Decimal(300))
+    suspension = OpeningsSuspension("perdita giornaliera 6% oltre il 5%", READ_AT)
 
-    assert flow.risk_state(openings_suspended=True).openings_suspended
-    assert not flow.risk_state().openings_suspended
+    assert flow.risk_state(loss_suspension=suspension).openings_suspended == MAXIMUM_LOSS_BLOCK
+    assert flow.risk_state().openings_suspended is None
 
 
 def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
@@ -111,3 +114,25 @@ def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
         Decimal("-18.00"),
         (PositionView("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(105), Decimal(5), Decimal(60)),),
     )
+
+
+def test_an_alarm_of_reconciliation_on_the_account_suspends_the_openings_of_the_flow() -> None:
+    alarm = ReconciliationAlarm(FLOW.assigned_account_id, Decimal(1000), Decimal(980), Decimal(2), READ_AT)
+
+    flow = replace(cycle_flow(attributed()), alarm=alarm)
+
+    assert flow.risk_state().openings_suspended == "allarme di riconciliazione sul conto test-1"
+
+
+def test_a_suspension_for_maximum_loss_comes_before_the_alarm_of_reconciliation() -> None:
+    alarm = ReconciliationAlarm(FLOW.assigned_account_id, Decimal(1000), Decimal(980), Decimal(2), READ_AT)
+    loss = OpeningsSuspension("perdita dal picco 11% oltre il 10%", READ_AT)
+
+    flow = replace(cycle_flow(attributed()), alarm=alarm)
+
+    assert flow.openings_suspension(loss) == loss
+    assert flow.openings_suspension(None) == alarm.suspension("test-1")
+
+
+def test_without_an_alarm_the_openings_are_not_suspended() -> None:
+    assert cycle_flow(attributed()).risk_state().openings_suspended is None

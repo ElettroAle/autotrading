@@ -40,7 +40,7 @@ class InMemoryFlowLedgerAdapter:
             ),
         )
 
-    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> tuple[LedgerEntry, ...]:
+    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
         recorded = self.entries.setdefault(account_id, [])
         known = {entry.execution.key for entry in recorded}
         added = tuple(entry for entry in ledger.entries if entry.execution.key not in known)
@@ -50,12 +50,13 @@ class InMemoryFlowLedgerAdapter:
                 self.totals[entry.flow_id] = self._of(entry.flow_id).with_execution(entry.execution)
         payments = self.funding.setdefault(account_id, [])
         paid = {entry.payment.key for entry in payments}
-        for payment in (entry for entry in ledger.funding if entry.payment.key not in paid):
+        new_payments = tuple(entry for entry in ledger.funding if entry.payment.key not in paid)
+        for payment in new_payments:
             payments.append(payment)
             if payment.flow_id is not None:
                 self.totals[payment.flow_id] = self._of(payment.flow_id).with_funding(payment.payment)
         self.cursors[account_id] = max(cursor, self.cursors.get(account_id, cursor))
-        return added
+        return AccountLedger(added, new_payments)
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         return {flow_id: self.totals[flow_id] for flow_id in flow_ids if flow_id in self.totals}

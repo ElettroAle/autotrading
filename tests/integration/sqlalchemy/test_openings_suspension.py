@@ -8,11 +8,9 @@ from sqlalchemy import Engine
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.openings_suspension import SqlAlchemyOpeningsSuspensionAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
-from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.openings_suspension import NOT_SUSPENDED, OpeningsStatus, OpeningsSuspension
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -75,12 +73,3 @@ def test_the_openings_of_a_flow_of_another_tenant_are_neither_read_nor_written(d
 
     assert stranger.status(flow_id) == NOT_SUSPENDED
     assert SqlAlchemyOpeningsSuspensionAdapter(database, tenant_id).status(flow_id) == OpeningsStatus(SUSPENSION, None)
-
-
-def test_the_timing_of_the_flows_carries_their_openings(database: Engine) -> None:
-    tenant_id, flow_id = new_flow(database)
-    SqlAlchemyOpeningsSuspensionAdapter(database, tenant_id).suspend(flow_id, SUSPENSION)
-
-    timing = SqlAlchemyFlowTimingAdapter(database, tenant_id).timings()[FlowId(flow_id)]
-
-    assert timing.openings == OpeningsStatus(SUSPENSION, None)

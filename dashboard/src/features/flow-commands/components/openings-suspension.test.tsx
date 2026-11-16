@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 
 import { fakePlatform, type FakeFlow } from '@/testing/mocks/platform';
+import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 import { problem } from '@/testing/mocks/responses';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
@@ -16,7 +17,8 @@ const suspend = (flow: FakeFlow): void => {
   flow.openingsSuspension = { reason: REASON, suspendedAt: '2026-11-14T09:00:00Z' };
 };
 
-// ADR perdita-massima-nella-dashboard: the suspension comes from the API, the command resumes it after a confirmation.
+// ADR perdita-massima-nella-dashboard: the suspension comes from the API, whatever its cause; the command resumes it
+// after a confirmation, only when the API says the user may.
 describe('OpeningsSuspension', () => {
   let alfa: FakeFlow;
 
@@ -81,14 +83,24 @@ describe('OpeningsSuspension', () => {
     expect(await screen.findByText(/le aperture di alfa non sono sospese/)).toBeInTheDocument();
   });
 
-  it('tells why the suspension could not be read', async () => {
-    server.use(
-      http.get('*/flows/:flowId/openings', () =>
-        problem(500, 'Internal Server Error', 'database non raggiungibile'),
-      ),
-    );
+  it('shows the suspension of an alarm of reconciliation with the same notice, without the resume', async () => {
+    fakeReconciliation.openAlarm(fakePlatform.accountOfFlow('alfa').id, 1000, 980, new Date());
     await renderApp({ account: 'anna', url: FLOW_PAGE });
 
-    expect(await screen.findByText(/database non raggiungibile/)).toBeInTheDocument();
+    const suspension = await screen.findByRole('region', { name: 'Aperture sospese' });
+    expect(within(suspension).getByRole('status')).toHaveTextContent(
+      'aperture sospese: allarme di riconciliazione sul conto principale',
+    );
+    expect(within(suspension).queryByRole('button', { name: RESUME })).not.toBeInTheDocument();
+  });
+
+  it('shows the maximum loss first when an alarm is open too, since the user can resume it', async () => {
+    suspend(alfa);
+    fakeReconciliation.openAlarm(fakePlatform.accountOfFlow('alfa').id, 1000, 980, new Date());
+    await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+    const suspension = await screen.findByRole('region', { name: 'Aperture sospese' });
+    expect(within(suspension).getByRole('status')).toHaveTextContent(`aperture sospese: ${REASON}`);
+    expect(within(suspension).getByRole('button', { name: RESUME })).toBeEnabled();
   });
 });

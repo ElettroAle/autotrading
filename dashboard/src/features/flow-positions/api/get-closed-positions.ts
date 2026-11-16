@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import type { ListDays } from '@/components/ui/period-selector/use-period';
+import type { ListInterval } from '@/components/ui/period-selector/use-period';
 import type { TableFilterValues } from '@/hooks/use-table-filters';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
@@ -36,11 +36,11 @@ export const useClosedPositions = (
   flowId: string,
   page: number,
   filters: TableFilterValues,
-  days: ListDays,
+  interval: ListInterval,
 ) => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('closed-positions', flowId, page, filters, days),
+    ...pageDataQuery('closed-positions', flowId, page, filters, interval),
     placeholderData: keepPreviousData,
     queryFn: async () =>
       readData(
@@ -52,7 +52,7 @@ export const useClosedPositions = (
               asset: filters.asset,
               side: filters.side,
               result: filters.result,
-              ...days,
+              ...interval,
             },
           },
         }),

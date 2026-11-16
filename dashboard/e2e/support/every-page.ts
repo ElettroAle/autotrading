@@ -10,6 +10,7 @@ import {
 } from '@/testing/mocks/history';
 import { fakePlatform, versionsWith, type FakeFlow } from '@/testing/mocks/platform';
 import { aClosedPosition, anOpenPosition } from '@/testing/mocks/positions';
+import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 
 import type { DashboardPages } from './dashboard-pages';
 
@@ -55,10 +56,13 @@ export const preparePagesWithLongWords = (
     aClosedPosition({ closedAt: new Date(DAY), reason: LONG_FAILURE }),
   ]);
   fakePlatform.saveProviderKey(account, LONG_PROVIDER, apiInstant(new Date(DAY)));
+  const accountId = flow.accountId ?? '';
+  fakeReconciliation.closedAlarm(accountId, new Date(DAY - 2 * HOUR), new Date(DAY - HOUR));
+  fakeReconciliation.openAlarm(accountId, 1000, 980, new Date(DAY));
   const owner = {
     flowId: flow.id,
     flow: flow.name,
-    accountId: flow.accountId ?? '',
+    accountId,
     account: LONG_ACCOUNT,
     version: flow.version,
   };
@@ -74,6 +78,7 @@ export const preparePagesWithLongWords = (
     home: paths.home.getHref(),
     login: paths.login.getHref(),
     accounts: paths.accounts.getHref(),
+    accountAlarms: paths.accountAlarms.getHref(accountId),
     newFlow: paths.newFlow.getHref(),
     flow: paths.flow.getHref(flow.id),
     editFlow: paths.editFlow.getHref(flow.id),
@@ -93,8 +98,9 @@ export const preparePagesWithLongWords = (
 /**
  * The elements of the page that go past the screen or out of their own box, by tag and text: a text wider than its
  * box spills over its neighbours even when the page does not scroll. Fields cut their value short on purpose
- * (ADR 0146), boxes that scroll their content, as the charts, keep it inside, and the text for screen readers is hidden
- * on purpose.
+ * (ADR 0146), boxes that scroll their content keep it inside, and the text for screen readers is hidden on purpose. A
+ * chart as wide as its room is measured through a box of no size on purpose, so it can shrink: its own width within its
+ * room is proven by e2e/layout/equity-curve-width.spec.ts (ADR equity-curve-larga-come-lo-schermo).
  */
 export const elementsOutOfTheirBox = async (dashboard: DashboardPages): Promise<string[]> =>
   dashboard.page.evaluate((width) => {
@@ -111,7 +117,8 @@ export const elementsOutOfTheirBox = async (dashboard: DashboardPages): Promise<
       return false;
     };
     const exempt = (element: HTMLElement): boolean =>
-      element.closest('input, select, textarea, .sr-only, svg') !== null ||
+      element.closest('input, select, textarea, .sr-only, svg, .recharts-responsive-container') !==
+        null ||
       getComputedStyle(element).display === 'contents' ||
       insideAScrollingBox(element);
     return [...document.body.querySelectorAll<HTMLElement>('*')]

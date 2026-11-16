@@ -26,6 +26,7 @@ from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -42,14 +43,13 @@ from autotrading.domain.flows.ledger import (
     AccountLedger,
     ExecutionsWindow,
     FlowTotals,
-    LedgerEntry,
     LedgerKeys,
     PlatformOrders,
 )
 from autotrading.domain.flows.loss_guard import LossReferences
-from autotrading.domain.flows.openings_resume import OpeningsResume
-from autotrading.domain.flows.openings_suspension import NOT_SUSPENDED, OpeningsStatus, OpeningsSuspension
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -404,6 +404,37 @@ class FlowAccountNamePort(Protocol):
         ...
 
 
+class AccountDeviationThresholdPort(Protocol):
+    """Bound to the tenant of the request: how far the balance of one of its accounts may go from the expected one,
+    from the accounts context (R3.3.1).
+    """
+
+    def deviation_threshold(self, account_id: UUID) -> Decimal:
+        """In percent of the expected balance; raises FlowAccountNotFoundError for an account the tenant does not
+        have.
+        """
+        ...
+
+
+class ReconciliationAlarmNoticePort(Protocol):
+    """In the worker: NotifyReconciliationAlarmUseCase (R3.3.1)."""
+
+    def execute(self, account_name: str, read_balance: Decimal, expected_balance: Decimal) -> None:
+        """Tells the user the balance of the account is not the expected one, once for each alarm."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ReconciliationAlarmPorts:
+    """What the reconciliation of an account needs to raise an alarm on its balance (R3.3.1): the threshold and the
+    name of the account, and who tells the user.
+    """
+
+    thresholds: AccountDeviationThresholdPort
+    accounts: FlowAccountNamePort
+    notice: ReconciliationAlarmNoticePort
+
+
 class UnattributablePositionNoticePort(Protocol):
     def execute(self, account_name: str, asset: str) -> None:
         """Tells the user the account holds a position no flow opened (R1.6.2)."""
@@ -460,8 +491,10 @@ class FlowLedgerPort(Protocol):
         """What of the account is recorded already from that moment on, to read the overlap of two windows once."""
         ...
 
-    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> tuple[LedgerEntry, ...]:
-        """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new."""
+    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
+        """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new,
+        executions and funding.
+        """
         ...
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
@@ -494,7 +527,9 @@ class PlatformOrdersPort(Protocol):
 
 
 class ReconciliationRepositoryPort(Protocol):
-    """Bound to the tenant of the request: the readings of its accounts and what no flow explains (R1.6.2)."""
+    """Bound to the tenant of the request: the readings of its accounts, what no flow explains (R1.6.2) and the alarms
+    on their balance (R3.3.1).
+    """
 
     def last_reading(self, account_id: UUID) -> AccountReading | None: ...
 
@@ -508,6 +543,24 @@ class ReconciliationRepositoryPort(Protocol):
 
     def resolve_positions(self, account_id: UUID, open_assets: frozenset[str]) -> None:
         """Closes the recorded positions no longer open: a new position on that asset is a new case."""
+        ...
+
+    def open_alarm(self, account_id: UUID) -> ReconciliationAlarm | None:
+        """The alarm of the account still waiting for the confirmation of the user, if any."""
+        ...
+
+    def open(self, alarm: ReconciliationAlarm) -> bool:
+        """Opens the alarm unless its account has one open already, also when two cycles of the account run together;
+        True when it is new.
+        """
+        ...
+
+    def confirm(self, account_id: UUID, at: datetime) -> bool:
+        """Closes the open alarm of the account, confirmed at that moment; False when the account has none open."""
+        ...
+
+    def alarms_of(self, account_id: UUID) -> list[ReconciliationAlarm]:
+        """Every alarm of the account, open and closed, the most recent first."""
         ...
 
 
@@ -767,6 +820,16 @@ class EquitySnapshotRepositoryPort(Protocol):
         ...
 
 
+class FlowForecastsPort(Protocol):
+    """Bound to the tenant of the request: the price forecasts its flows recorded, each with the actual price beside it
+    once read (R1.3.5, R3.6.1).
+    """
+
+    def expired_forecasts(self, flow_id: FlowId, now: datetime) -> list[EvaluatedForecast]:
+        """Every forecast of the flow whose horizon has expired by now, with its actual price or none."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class SourceAsk:
     """An active source of the flow as the cycle asks it: with the parameters, the assets and the interval of the flow
@@ -1008,9 +1071,9 @@ class OpeningsSuspendedNoticePort(Protocol):
 
 
 class FlowLossGuardPort(Protocol):
-    def execute(self, flow: CycleFlow) -> bool:
-        """Whether the openings of the flow of the cycle are suspended for maximum loss, suspending them when a
-        threshold is passed now (R3.2.2).
+    def execute(self, flow: CycleFlow) -> OpeningsSuspension | None:
+        """The suspension of the openings of the flow of the cycle for maximum loss in force, suspending them when a
+        threshold is passed now; None while they are not suspended (R3.2.2).
         """
         ...
 
@@ -1069,10 +1132,6 @@ class FlowSummary:
     model: str
     schedule: CycleSchedule | None
     version: int
-    # As saved beside the flow, with how they resume: whether the suspension is in force depends on the instant
-    # (R3.2.2).
-    openings: OpeningsStatus = NOT_SUSPENDED
-    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
 
 class FlowSummaryPort(Protocol):

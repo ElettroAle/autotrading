@@ -48,6 +48,4 @@ def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
         model=configuration.model.name,
         schedule=CycleSchedule.planned(flow.status.runs_cycles, timing.anchor, interval),
         version=configuration.version,
-        openings=timing.openings,
-        openings_resume=configuration.openings_resume,
     )

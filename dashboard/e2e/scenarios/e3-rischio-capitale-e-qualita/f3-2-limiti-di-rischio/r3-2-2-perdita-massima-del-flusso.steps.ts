@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 import { fakePlatform } from '@/testing/mocks/platform';
 
-import { Given, Then, When } from '../../../support/fixtures';
+import { Given, Then } from '../../../support/fixtures';
 
 // How the scenarios name the resume, as the API takes it (R3.2.2).
 const RESUMES: Readonly<Record<string, 'manual' | 'next_day'>> = {
@@ -41,14 +41,6 @@ Given(
     fakePlatform.changeFlow(flow, {
       openingsSuspension: { reason, suspendedAt: new Date().toISOString() },
     });
-  },
-);
-
-When(
-  '{string} apre il flusso {string} nella dashboard',
-  async ({ dashboard }, account: string, flow: string) => {
-    await dashboard.openFlowAs(account, flow);
-    await expect(dashboard.flowName()).toHaveText(flow);
   },
 );
 

@@ -5,6 +5,7 @@ from decimal import Decimal
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_state import ZERO, FlowState
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,17 +15,25 @@ class FlowResults:
 
     Both gains are measured in percent of the capital allocated now, the reference of the return of the flow (R2.2.2);
     the gain in the period goes from the equity recorded at the first cycle of the period to the one recorded at the
-    last, the same points the equity curve draws (R2.2.3).
+    last, the same points the equity curve draws (R2.2.3). The results also carry the suspension of the openings of
+    the flow, when they are suspended (R3.2.2, R3.3.2).
     """
 
     state: FlowState
     period_gain: Decimal
     failed_cycles: int
+    openings_suspension: OpeningsSuspension | None = None
 
     @classmethod
-    def of(cls, state: FlowState, period_equity: Sequence[EquitySnapshot], failed_cycles: int) -> FlowResults:
+    def of(
+        cls,
+        state: FlowState,
+        period_equity: Sequence[EquitySnapshot],
+        failed_cycles: int,
+        openings_suspension: OpeningsSuspension | None = None,
+    ) -> FlowResults:
         period_gain = period_equity[-1].equity - period_equity[0].equity if period_equity else ZERO
-        return cls(state, period_gain, failed_cycles)
+        return cls(state, period_gain, failed_cycles, openings_suspension)
 
     @property
     def currency(self) -> str:

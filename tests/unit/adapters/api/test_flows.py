@@ -323,22 +323,17 @@ def test_a_maximum_loss_out_of_range_is_refused_with_the_reason_and_the_field(
     )
 
 
-def test_the_suspension_of_the_openings_is_read_and_resumed_by_the_user(client_of: Client, platform: Platform) -> None:
+def test_the_suspension_of_the_openings_is_resumed_by_the_user(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
     platform.flows.openings[FlowId(UUID(flow_id))] = OpeningsStatus(
         OpeningsSuspension("perdita giornaliera 6% oltre il 5%", datetime(2026, 11, 12, 9, tzinfo=UTC)), None
     )
 
-    suspended = anna.get(f"/flows/{flow_id}/openings")
     resumed = anna.post(f"/flows/{flow_id}/openings/resume")
 
-    assert (suspended.status_code, suspended.json()) == (
-        200,
-        {"suspension": {"reason": "perdita giornaliera 6% oltre il 5%", "suspended_at": "2026-11-12T09:00:00Z"}},
-    )
-    assert (resumed.status_code, resumed.json()) == (200, {"suspension": None})
-    assert anna.get(f"/flows/{flow_id}/openings").json() == {"suspension": None}
+    assert resumed.status_code == 204
+    assert platform.flows.openings[FlowId(UUID(flow_id))].suspension is None
 
 
 def test_openings_not_suspended_are_not_resumed_and_another_tenant_finds_nothing(
@@ -348,7 +343,7 @@ def test_openings_not_suspended_are_not_resumed_and_another_tenant_finds_nothing
     flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
 
     refused = anna.post(f"/flows/{flow_id}/openings/resume")
-    stranger = client_of("bruno").get(f"/flows/{flow_id}/openings")
+    stranger = client_of("bruno").post(f"/flows/{flow_id}/openings/resume")
 
     assert (refused.status_code, reason_of(refused)) == (409, {"detail": "le aperture di alfa non sono sospese"})
     assert stranger.status_code == 404

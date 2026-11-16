@@ -119,6 +119,7 @@ from autotrading.application.flows.ports import (
     CycleDecisions,
     FlowAccountPorts,
     FlowModelsPort,
+    ReconciliationAlarmPorts,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
@@ -156,6 +157,7 @@ from autotrading.application.notifications.notify_openings_suspended import Noti
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
 from autotrading.application.notifications.notify_unattributable_movement import (
     NotifyUnattributableMovementUseCase,
@@ -283,9 +285,13 @@ def tenant_use_cases(
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
             openings_suspensions=SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
+            flow_forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
             historical_cycles=history,
             historical_closed_positions=history,
             historical_orders=history,
+            reconciliation=SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id),
+            account_thresholds=accounts,
+            account_names=accounts,
             environment=environment,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -379,12 +385,16 @@ def cycle_of(
             SqlAlchemyPlatformOrdersAdapter(engine, tenant_id),
             ledger,
         )
+        readings = SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id)
         reconcile_account = ReconcileAccountUseCase(
             flows,
             activity,
-            SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id),
+            readings,
             RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
             record_executions,
+            ReconciliationAlarmPorts(
+                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
             reconcile_account,
@@ -402,6 +412,7 @@ def cycle_of(
             SqlAlchemyFlowTimingAdapter(engine, tenant_id),
             ReadCycleAccountUseCase(accounts, accounts, opener, exchanges),
             ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger), reconcile_for_cycle),
+            readings,
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(

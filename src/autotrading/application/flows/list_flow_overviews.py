@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 
 from autotrading.application.flows.ports import CycleHistoryPort, FlowSummary, FlowSummaryPort
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand, ReadFlowResultsUseCase
@@ -19,8 +19,8 @@ class ListFlowOverviewsCommand:
     """The period of the results of every flow, the same periods as the statistics (ADR 0122, R6.4.2)."""
 
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,12 +34,15 @@ class FlowOverview:
     recent_cycles: tuple[CycleRecord, ...]
     next_cycle_at: datetime | None
     results: FlowResults | None
-    # In force now, None when the openings are not suspended for maximum loss (R3.2.2).
-    openings_suspension: OpeningsSuspension | None = None
 
     @property
     def last_cycle(self) -> CycleRecord | None:
         return self.recent_cycles[0] if self.recent_cycles else None
+
+    @property
+    def openings_suspension(self) -> OpeningsSuspension | None:
+        """The suspension of the openings in force now, of any cause; a draft never has one (R3.2.2, R3.3.1)."""
+        return None if self.results is None else self.results.openings_suspension
 
     @property
     def currency(self) -> str | None:
@@ -73,17 +76,16 @@ class ListFlowOverviewsUseCase:
         self._clock = clock
 
     def execute(self, command: ListFlowOverviewsCommand) -> list[FlowOverview]:
-        StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        StatisticsPeriod.named(command.period, command.since, command.until)
         now = self._clock()
         return [self._overview_of(summary, command, now) for summary in self._summaries.execute()]
 
     def _overview_of(self, summary: FlowSummary, command: ListFlowOverviewsCommand, now: datetime) -> FlowOverview:
         recent = tuple(self._history.newest(summary.flow_id, 0, RECENT_CYCLES))
         next_cycle_at = None if summary.schedule is None else summary.schedule.next_after(now)
-        suspension = summary.openings.at(now, summary.openings_resume).suspension
         if FlowStatus(summary.status) is FlowStatus.DRAFT:
-            return FlowOverview(summary, self._environment, recent, next_cycle_at, None, suspension)
+            return FlowOverview(summary, self._environment, recent, next_cycle_at, None)
         results = self._flow_results.execute(
-            ReadFlowResultsCommand(summary.flow_id, command.period, command.first_day, command.last_day)
+            ReadFlowResultsCommand(summary.flow_id, command.period, command.since, command.until)
         )
-        return FlowOverview(summary, self._environment, recent, next_cycle_at, results, suspension)
+        return FlowOverview(summary, self._environment, recent, next_cycle_at, results)

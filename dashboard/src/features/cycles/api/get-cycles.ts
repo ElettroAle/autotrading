@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import type { ListDays } from '@/components/ui/period-selector/use-period';
+import type { ListInterval } from '@/components/ui/period-selector/use-period';
 import type { TableFilterValues } from '@/hooks/use-table-filters';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
@@ -37,18 +37,18 @@ export const useCycles = (
   flowId: string,
   page: number,
   filters: TableFilterValues,
-  days: ListDays,
+  interval: ListInterval,
 ) => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('cycles', flowId, page, filters, days),
+    ...pageDataQuery('cycles', flowId, page, filters, interval),
     placeholderData: keepPreviousData,
     queryFn: async () =>
       readData(
         await api.GET('/flows/{flow_id}/cycles', {
           params: {
             path: { flow_id: flowId },
-            query: { page, outcome: filters.outcome, decision: filters.decision, ...days },
+            query: { page, outcome: filters.outcome, decision: filters.decision, ...interval },
           },
         }),
         cyclePageSchema,

@@ -31,17 +31,18 @@ class GuardFlowLossUseCase:
         self._notices = notices
         self._clock = clock
 
-    def execute(self, flow: CycleFlow) -> bool:
+    def execute(self, flow: CycleFlow) -> OpeningsSuspension | None:
         now = self._clock.now()
         status = self._status_at(flow, now)
         if status.suspension is not None:
-            return True
+            return status.suspension
         breach = self._breach(flow, status, now)
         if breach is None:
-            return False
-        self._openings.suspend(flow.flow.id.value, OpeningsSuspension(breach, now))
+            return None
+        suspension = OpeningsSuspension(breach, now)
+        self._openings.suspend(flow.flow.id.value, suspension)
         self._notices.execute(flow.flow.name.value, breach)
-        return True
+        return suspension
 
     def _status_at(self, flow: CycleFlow, now: datetime) -> OpeningsStatus:
         flow_id, resume = flow.flow.id.value, flow.configuration.openings_resume

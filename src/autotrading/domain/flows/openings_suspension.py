@@ -1,10 +1,24 @@
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 
 from autotrading.domain.flows.errors import OpeningsNotSuspendedError
 from autotrading.domain.flows.openings_resume import OpeningsResume
 
 ONE_DAY = timedelta(days=1)
+
+# What a cycle records for an opening not executed while the openings are suspended for maximum loss (R3.2.2).
+MAXIMUM_LOSS_BLOCK = "aperture sospese per perdita massima"
+
+
+class OpeningsSuspensionCause(StrEnum):
+    """Why the openings of a flow are suspended: a maximum loss passed (R3.2.2) or an alarm of reconciliation open on
+    its account (R3.3.1). Only the first one the user resumes from the flow; the second ends with the confirmation of
+    the account.
+    """
+
+    MAXIMUM_LOSS = "perdita_massima"
+    RECONCILIATION = "riconciliazione"
 
 
 def day_start(at: datetime) -> datetime:
@@ -14,12 +28,31 @@ def day_start(at: datetime) -> datetime:
 
 @dataclass(frozen=True, slots=True)
 class OpeningsSuspension:
-    """The openings of a flow suspended for maximum loss: the threshold passed, as the user reads it, and when
-    (R3.2.2).
+    """The openings of a flow suspended: the reason, as the user reads it, since when, and the cause (R3.2.2, R3.3.1).
+
+    One concept for every cause: the risk check blocks the openings, the API and the dashboard show it, the same way.
     """
 
     reason: str
     suspended_at: datetime
+    cause: OpeningsSuspensionCause = OpeningsSuspensionCause.MAXIMUM_LOSS
+
+    @property
+    def resumable(self) -> bool:
+        """Whether the user resumes the openings from the flow: only after a maximum loss."""
+        return self.cause is OpeningsSuspensionCause.MAXIMUM_LOSS
+
+    @property
+    def blocked_reason(self) -> str:
+        """What a cycle records for an opening it does not execute."""
+        if self.cause is OpeningsSuspensionCause.MAXIMUM_LOSS:
+            return MAXIMUM_LOSS_BLOCK
+        return self.reason
+
+    @staticmethod
+    def first_of(*suspensions: OpeningsSuspension | None) -> OpeningsSuspension | None:
+        """The suspension in force among the causes, the maximum loss first: the user can resume it at once."""
+        return next((suspension for suspension in suspensions if suspension is not None), None)
 
     def ends_at(self, resume: OpeningsResume) -> datetime | None:
         """The instant the suspension ends on its own: 00:00 UTC of the next day, never with the manual resume."""

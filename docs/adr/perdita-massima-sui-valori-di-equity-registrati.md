@@ -53,12 +53,18 @@ Opzione 1.
   sospensione e riferimenti (porte nuove in `application/flows/ports.py`, realizzate dall'adapter `sqlalchemy`),
   applica la ripresa "il giorno dopo" scaduta, valuta le soglie e, solo al passaggio da non sospeso a sospeso,
   salva la sospensione e avvisa "alfa: aperture sospese, <motivo>" attraverso una porta realizzata da un caso
-  d'uso di `notifications` (come la notifica di pausa). `RiskState` porta la sospensione: `RiskCheck` blocca ogni
-  apertura con "aperture sospese per perdita massima" e lascia passare chiusure e mantenimenti.
+  d'uso di `notifications` (come la notifica di pausa).
+- Un solo concetto di sospensione (decisione del proprietario, 16/11/2026): `OpeningsSuspension` porta motivo,
+  istante e causa (`OpeningsSuspensionCause`: perdita massima, riconciliazione di R3.3.1); solo la perdita massima è
+  `resumable`, la riconciliazione finisce con la conferma del conto. Con entrambe in vigore vale la perdita massima,
+  che l'utente può riprendere subito. `RiskState` porta un solo motivo delle aperture sospese: `RiskCheck`, unico
+  punto, blocca ogni apertura con "apertura <asset> non eseguita: <motivo>" ("aperture sospese per perdita massima"
+  per la perdita) e lascia passare chiusure e mantenimenti.
 - Ripresa: `ResumeFlowOpeningsUseCase` toglie la sospensione e segna la ripresa ora; senza sospensione in vigore
   solleva un errore tipizzato "le aperture di <flusso> non sono sospese" (409). Rotta `POST
-  /flows/{flow_id}/openings/resume`; dettaglio ed elenco dei flussi riportano la sospensione in vigore (motivo e
-  istante) o `null`.
+  /flows/{flow_id}/openings/resume` (204); lo stato del flusso e la panoramica dei flussi riportano in un solo campo
+  `openings_suspension` la sospensione in vigore (motivo, istante, causa, `resumable`) o `null`, letta da
+  `ReadOpeningsSuspensionUseCase` per ogni causa.
 - Configurazione nel documento JSON della versione con chiavi `NotRequired` (assenti = nessuna soglia, ripresa
   manuale), nelle richieste e risposte dell'API, nel documento della strategia e nel client OpenAPI rigenerato.
 

@@ -14,8 +14,6 @@ from autotrading.domain.flows.risk_outcome import (
 from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent
 from autotrading.domain.italian_text import money_text, number_text
 
-SUSPENDED_OPENINGS = "aperture sospese per perdita massima"
-
 
 @dataclass(frozen=True, slots=True)
 class RiskPolicy:
@@ -31,17 +29,17 @@ class RiskState:
 
     Quotas and percentage limits are measured on the money of the flow, not on the capital allocated to it: after
     losses the openings shrink, after gains they grow (ADR 0078). The margin and the value of its open positions are
-    what the overall exposure limits measure (R3.2.1). Openings suspended for maximum loss block every opening of the
-    cycle (R3.2.2).
+    what the overall exposure limits measure (R3.2.1). Suspended openings, for maximum loss (R3.2.2) or for an alarm
+    of reconciliation on the account (R3.3.1), block every opening of the cycle with the reason of the suspension.
     """
 
     currency: str
     funds: Decimal
     available_liquidity: Decimal
     open_assets: frozenset[str]
-    open_margin: Decimal
-    open_value: Decimal
-    openings_suspended: bool = False
+    open_margin: Decimal = Decimal(0)
+    open_value: Decimal = Decimal(0)
+    openings_suspended: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,8 +114,10 @@ class RiskCheck:
     def outcome(self, intent: TradeIntent, limits: AssetLimits | None) -> RiskOutcome:
         if isinstance(intent, CloseIntent):
             return self._close(intent)
-        if isinstance(intent, OpenIntent) and self._state.openings_suspended:
-            return BlockedDecision(intent.asset, f"apertura {intent.asset} non eseguita: {SUSPENDED_OPENINGS}")
+        if isinstance(intent, OpenIntent) and self._state.openings_suspended is not None:
+            return BlockedDecision(
+                intent.asset, f"apertura {intent.asset} non eseguita: {self._state.openings_suspended}"
+            )
         if isinstance(intent, OpenIntent) and limits is not None:
             return self._committed(self._open(intent, limits))
         return HeldPosition(intent.asset)

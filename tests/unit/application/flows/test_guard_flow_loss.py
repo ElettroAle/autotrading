@@ -54,7 +54,10 @@ class World:
     def guarded(self, value: str) -> bool:
         state = FlowState(self.flow.id, "USDC", CAPITAL, (), Decimal(value) - CAPITAL, Decimal(0), Decimal(0))
         account = CycleAccount("USDC", Decimal(5000), ())
-        return self.use_case.execute(CycleFlow(TENANT, self.flow, "test-1", "Hyperliquid", FIRST_START, account, state))
+        flow = CycleFlow(TENANT, self.flow, "test-1", "Hyperliquid", FIRST_START, account, state)
+        suspension = self.use_case.execute(flow)
+        assert suspension == self.status.at(NOW, self.flow.configuration.openings_resume).suspension
+        return suspension is not None
 
     @property
     def status(self) -> OpeningsStatus:

@@ -137,7 +137,7 @@ def test_a_range_reads_from_its_start_to_its_end(client_of: Client, platform: Pl
 
     response = anna.get(
         f"/flows/{flow_id}/equity",
-        params={"period": "range", "from": "2026-11-08", "to": "2026-11-08"},
+        params={"period": "range", "from": "2026-11-08T10:00Z", "to": "2026-11-08T10:00Z"},
     )
 
     assert [point["planned_at"] for point in response.json()["points"]] == ["2026-11-08T10:00:00Z"]
@@ -150,9 +150,7 @@ def test_a_range_without_its_end_is_refused(client_of: Client, platform: Platfor
     response = anna.get(f"/flows/{flow_id}/equity", params={"period": "range", "from": "2026-11-08"})
 
     assert response.status_code == 400
-    assert reason_of(response) == {
-        "detail": "periodo non valido: un intervallo ha il giorno iniziale e il giorno finale"
-    }
+    assert reason_of(response) == {"detail": "periodo non valido: un intervallo ha l'inizio e la fine"}
 
 
 def test_an_unknown_period_is_refused(client_of: Client, platform: Platform) -> None:

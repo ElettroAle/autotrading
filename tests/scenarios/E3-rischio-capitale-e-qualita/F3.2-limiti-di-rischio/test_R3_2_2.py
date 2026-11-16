@@ -15,7 +15,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
-from autotrading.application.flows.read_flow_openings import ReadFlowOpeningsCommand
+from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -112,7 +112,7 @@ class MaximumLoss:
     def suspension(self) -> OpeningsSuspension | None:
         self.flow_cycles.platform.now = self.now()
         use_cases = self.flow_cycles.platform.use_cases_of(self.user)
-        return use_cases.read_flow_openings.execute(ReadFlowOpeningsCommand(self.flow_id))
+        return use_cases.read_flow_results.execute(ReadFlowResultsCommand(self.flow_id.value)).openings_suspension
 
     def peak(self) -> Decimal:
         """The peak the guard of the losses measures from now, with the value of the flow now."""
