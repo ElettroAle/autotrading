@@ -16,7 +16,8 @@ class ReadFlowStateCommand:
 
 
 class ReadFlowStateUseCase:
-    """A flow's positions from what the exchange shows now, its money from its ledger (R1.6.1, ADR 0063)."""
+    """A flow's positions from what the exchange shows now, its money from its ledger, net of the profits it cashed out,
+    and the changes of its capital that chain its return (R1.6.1, ADR 0063, R3.4.1, R3.4.3)."""
 
     def __init__(self, flows: FlowRepositoryPort, activity: AccountActivityPort, ledger: FlowLedgerPort) -> None:
         self._flows = flows
@@ -27,4 +28,5 @@ class ReadFlowStateUseCase:
         flow = self._flows.get(command.flow_id)
         activity = self._activity.execute(flow.assigned_account_id)
         totals = self._ledger.totals_of((flow.id,)).get(flow.id) or FlowTotals(flow.id)
-        return FlowState.attributed(flow, activity, totals)
+        changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())
+        return FlowState.attributed(flow, activity, totals, changes)

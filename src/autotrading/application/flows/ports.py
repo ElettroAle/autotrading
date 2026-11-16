@@ -14,6 +14,7 @@ from autotrading.domain.flows.account_reconciliation import AccountReading, Outs
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.capital_history import AccountTransfer
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_access import CycleAccess
@@ -59,15 +60,6 @@ from autotrading.domain.tenancy.user_id import UserId
 
 if TYPE_CHECKING:
     from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
-
-
-@dataclass(frozen=True, slots=True)
-class FlowAccount:
-    """What a flow needs of its account: the exchange it trades on and the balance read from it now."""
-
-    exchange: str
-    balance: Decimal
-    currency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,7 +109,18 @@ class FlowRepositoryPort(Protocol):
         ...
 
     def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
-        """Saves, together, the version with the new capital and the change in its history. Raises FlowNotFoundError."""
+        """Saves, together, the version with the new capital, when the capital changes, and the change in its history.
+
+        A cash-out that keeps the capital records the change on the version in force (R3.4.1). Raises
+        FlowNotFoundError.
+        """
+        ...
+
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
+        """Every change of the capital of each of those flows, oldest first; a flow never changed has none.
+
+        They carry the profits cashed out (R3.4.1) and chain the return (R3.4.3). A flow of another tenant has none.
+        """
         ...
 
     def add_assignment(self, flow: Flow) -> None:
@@ -127,15 +130,16 @@ class FlowRepositoryPort(Protocol):
         """
         ...
 
-    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
-        """The changes of the capital allocated to the flow, oldest first. Raises FlowNotFoundError."""
+    def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
+        """The most recent changes of the capital of those flows in the window, at most `limit`, newest first (R3.4.2).
+
+        A flow of another tenant has none.
+        """
         ...
 
-
-@dataclass(frozen=True, slots=True)
-class FlowBalance:
-    amount: Decimal
-    currency: str
+    def count_capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> int:
+        """How many changes of the capital of those flows the window holds (R3.4.2)."""
+        ...
 
 
 class FlowAccountDirectoryPort(Protocol):
@@ -144,22 +148,6 @@ class FlowAccountDirectoryPort(Protocol):
     def exchange_of(self, account_id: UUID) -> str:
         """The exchange the account trades on. Raises FlowAccountNotFoundError for an account the tenant lacks."""
         ...
-
-
-class FlowAccountBalancePort(Protocol):
-    """Bound to the tenant of the request: the balance of an account, read now on its exchange (R0.2.2)."""
-
-    def balance_of(self, account_id: UUID) -> FlowBalance:
-        """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the balance cannot be read."""
-        ...
-
-
-@dataclass(frozen=True, slots=True)
-class FlowAccountPorts:
-    """Where a flow learns of its account: the accounts of the tenant, then the balance read now (ADR 0087)."""
-
-    directory: FlowAccountDirectoryPort
-    balances: FlowAccountBalancePort
 
 
 class FlowAccountPositionsPort(Protocol):
@@ -374,6 +362,34 @@ class ActivityReaderPort(Protocol):
         ...
 
 
+class AccountTransfersPort(Protocol):
+    """Bound to the tenant of the request: the deposits and withdrawals the exchange declares on one of its accounts.
+
+    Only the worker opens an account to read it on its exchange: in the API it is the client that asks the worker to
+    run ReadAccountTransfersUseCase (ADR 0007, ADR storico-delle-variazioni-di-capitale).
+    """
+
+    def transfers(self, account_id: UUID, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        """Every one in the window, never part of them: raises FlowAccountNotFoundError, or
+        FlowExchangeUnavailableError when the exchange cannot be read.
+        """
+        ...
+
+
+class TransfersReaderPort(Protocol):
+    """The deposits and withdrawals an exchange declares on an account (R3.4.2)."""
+
+    def reference_fields(self) -> frozenset[str]:
+        """The names of the fields of the credentials the reader needs to find the account on its exchange."""
+        ...
+
+    def transfers(self, reference: AccountReference, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        """Every one in the window. Raises FlowExchangeUnavailableError when the exchange cannot be read, and
+        FlowCredentialsFieldMissingError when the reference lacks a field the reader declares.
+        """
+        ...
+
+
 class FlowPausedNoticePort(Protocol):
     def execute(self, flow_name: str, reason: str) -> None:
         """Tells the user the flow paused on its own, with the reason (R1.2.4, R1.8.2)."""
@@ -498,6 +514,30 @@ class FlowLedgerPort(Protocol):
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         """The running totals of those flows; a flow without any execution yet has none."""
         ...
+
+
+class LedgerRecordingPort(Protocol):
+    """Bound to the tenant of the request: records in the ledger what the exchange added to an account (ADR 0063).
+
+    Only the worker reads the executions of an account: in the API it is the client that asks the worker to run
+    RecordAccountExecutionsUseCase (ADR 0007, ADR incasso-dei-profitti).
+    """
+
+    def record(self, account_id: UUID) -> None:
+        """Raises FlowAccountNotFoundError, FlowLedgerIncompleteError, or FlowExchangeUnavailableError."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class FlowAccountPorts:
+    """Where a flow learns of its account: the accounts of the tenant, what the exchange shows of them now and the
+    ledger of their flows, from which the free capital is measured (ADR 0087, ADR capitale-libero-al-netto-del-valore-
+    dei-flussi).
+    """
+
+    directory: FlowAccountDirectoryPort
+    activity: AccountActivityPort
+    ledger: FlowLedgerPort
 
 
 class FlowOperationsPort(Protocol):

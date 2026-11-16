@@ -19,7 +19,12 @@ export const FlowRoute = () => {
       <FlowView
         flowId={flowId}
         renderCommands={(flow, realMoney) => (
-          <FlowCommands flowId={flow.id} status={flow.status} realMoney={realMoney} />
+          <FlowCommands
+            flowId={flow.id}
+            flowName={flow.name}
+            status={flow.status}
+            realMoney={realMoney}
+          />
         )}
       >
         <PeriodSelector />

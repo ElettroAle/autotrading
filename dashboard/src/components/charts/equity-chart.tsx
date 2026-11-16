@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type ReactElement } from 'react';
 import { Link } from 'react-router';
 import {
   Area,
@@ -20,8 +20,17 @@ import {
 
 export type EquityPoint = { readonly plannedAt: string; readonly equity: number };
 
-/** Something that happened at an instant, drawn on the curve: its label names it, its destination tells it in full. */
-export type ChartEvent = { readonly instant: string; readonly label: string; readonly to: string };
+/**
+ * Something that happened at an instant, drawn on the curve: its label names it, its destination tells it in full. A
+ * failed cycle is a red cross (ADR cicli-falliti-sull-equity-curve), a change of the capital a violet diamond (ADR
+ * rendimento-composto-tra-le-variazioni-di-capitale).
+ */
+export type ChartEvent = {
+  readonly kind: 'failed-cycle' | 'capital-change';
+  readonly instant: string;
+  readonly label: string;
+  readonly to: string;
+};
 
 /** A drag on the chart: pressed, and the instants of its first and last point on the axis of time; empty with no drag. */
 export type Selection = {
@@ -34,7 +43,7 @@ type EquityChartProps = {
   readonly points: readonly EquityPoint[];
   /** The initial capital: the curve is green above it and red below it (RF-23.01). */
   readonly baseline: number;
-  /** The events marked on the curve with a red cross, a link to each (ADR cicli-falliti-sull-equity-curve). */
+  /** The events marked on the curve, each with the mark of its kind and a link to it. */
   readonly events?: readonly ChartEvent[];
   /** Called with the instants of the first and the last point of a drag on the chart, the earlier first. */
   readonly onSelect?: (from: string, to: string) => void;
@@ -44,6 +53,7 @@ type EquityDatum = EquityPoint & { readonly time: number };
 
 export const ABOVE_COLOR = '#16a34a';
 export const BELOW_COLOR = '#dc2626';
+export const CHANGE_COLOR = '#7c3aed';
 const SELECTION_COLOR = '#2563eb';
 // The width the chart starts from until the browser measures its room (ADR equity-curve-larga-come-lo-schermo).
 const INITIAL_WIDTH = 720;
@@ -167,6 +177,12 @@ const EquityDot = ({
 };
 
 const CROSS = `M${-MARK_SIZE},${-MARK_SIZE}L${MARK_SIZE},${MARK_SIZE}M${-MARK_SIZE},${MARK_SIZE}L${MARK_SIZE},${-MARK_SIZE}`;
+const DIAMOND = `M0,${-MARK_SIZE}L${MARK_SIZE},0L0,${MARK_SIZE}L${-MARK_SIZE},0Z`;
+
+const MARKS: Readonly<Record<ChartEvent['kind'], ReactElement>> = {
+  'failed-cycle': <path d={CROSS} stroke={BELOW_COLOR} strokeWidth={3} strokeLinecap="round" />,
+  'capital-change': <path d={DIAMOND} fill={CHANGE_COLOR} stroke="#ffffff" strokeWidth={1} />,
+};
 
 // Inside the chart, where its scales place each event on the curve at its instant.
 const EventMarks = ({
@@ -189,10 +205,15 @@ const EventMarks = ({
         const left = x(time) ?? 0;
         const top = y(equityAt(points, time)) ?? 0;
         return (
-          <Link key={event.instant} to={event.to} aria-label={event.label}>
+          <Link
+            key={`${event.kind}-${event.instant}`}
+            to={event.to}
+            aria-label={event.label}
+            data-instant={event.instant}
+          >
             <g transform={`translate(${left} ${top})`}>
               <circle r={MARK_TOUCH_RADIUS} fill="transparent" />
-              <path d={CROSS} stroke={BELOW_COLOR} strokeWidth={3} strokeLinecap="round" />
+              {MARKS[event.kind]}
             </g>
           </Link>
         );
@@ -214,10 +235,11 @@ const domainOf = (
 
 /**
  * The equity curve of a flow, a point for each cycle on an axis of time, green above the initial capital and red below
- * (ADR 0121), with the events of the page as red crosses (ADR cicli-falliti-sull-equity-curve). A drag from a point to
- * another, with the mouse or a finger, chooses an interval (ADR intervallo-trascinando-sull-equity-curve). The chart is
- * as wide as its room, never wider, with fewer dates and smaller points as they crowd (ADR
- * equity-curve-larga-come-lo-schermo).
+ * (ADR 0121), with the events of the page marked on their instants: failed cycles as red crosses (ADR
+ * cicli-falliti-sull-equity-curve), changes of the capital as violet diamonds (ADR
+ * rendimento-composto-tra-le-variazioni-di-capitale). A drag from a point to another, with the mouse or a finger,
+ * chooses an interval (ADR intervallo-trascinando-sull-equity-curve). The chart is as wide as its room, never wider,
+ * with fewer dates and smaller points as they crowd (ADR equity-curve-larga-come-lo-schermo).
  */
 export const EquityChart = ({ points, baseline, events = [], onSelect }: EquityChartProps) => {
   const id = `equity-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;

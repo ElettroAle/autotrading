@@ -14,6 +14,8 @@ from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAda
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reference import AccountReference
+from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
 
 
@@ -79,8 +81,15 @@ class FakeSdk(HyperliquidSdkAdapter):
         self.calls.append(("spot", address))
         return self.spot
 
-    def user_non_funding_ledger_updates(self, user: str, startTime: int) -> Any:  # noqa: N803 - the SDK names it
-        self.calls.append(("user_non_funding_ledger_updates", (user, startTime)))
+    def user_non_funding_ledger_updates(
+        self,
+        user: str,
+        startTime: int,  # noqa: N803 - the SDK names it
+        endTime: int | None = None,  # noqa: N803 - the SDK names it
+    ) -> Any:
+        if self.failure is not None:
+            raise self.failure
+        self.calls.append(("user_non_funding_ledger_updates", (user, startTime, endTime)))
         return self.ledger
 
 
@@ -131,7 +140,7 @@ def test_the_activity_is_read_on_the_address_without_signing() -> None:
 
     assert ("info", ("https://exchange.invalid", 3.0)) in sdk.calls
     assert ("user_state", ADDRESS) in sdk.calls
-    assert ("user_non_funding_ledger_updates", (ADDRESS, 0)) in sdk.calls
+    assert ("user_non_funding_ledger_updates", (ADDRESS, 0, None)) in sdk.calls
     assert all(call[0] != "exchange" for call in sdk.calls)
 
 
@@ -225,3 +234,77 @@ def test_a_unified_account_shows_the_usdc_it_holds_as_balance() -> None:
     activity = read(FakeSdk(state=perps, abstraction="unifiedAccount", spot=spot))
 
     assert (activity.balance, activity.available_margin) == (Decimal(999), Decimal(999))
+
+
+# R3.4.2, ADR storico-delle-variazioni-di-capitale: the deposits and withdrawals of the history of an account.
+DEPOSITED = {"time": 1762941000000, "hash": "0x1", "delta": {"type": "deposit", "usdc": "500.5"}}
+EVER = TimeWindow()
+WITHDRAWN = {"time": 1762944600000, "hash": "0x2", "delta": {"type": "withdraw", "usdc": "300", "fee": "1"}}
+
+
+def transfers_of(sdk: FakeSdk, window: TimeWindow = EVER) -> tuple[AccountTransfer, ...]:
+    adapter = HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0)
+    return adapter.transfers(AccountReference({"account_address": ADDRESS}), window)
+
+
+def test_the_deposits_and_withdrawals_are_those_the_exchange_declares_with_their_instant() -> None:
+    assert transfers_of(FakeSdk(ledger=[DEPOSITED, WITHDRAWN])) == (
+        AccountTransfer(datetime(2025, 11, 12, 9, 50, tzinfo=UTC), Decimal("500.5"), TransferDirection.DEPOSIT),
+        AccountTransfer(datetime(2025, 11, 12, 10, 50, tzinfo=UTC), Decimal(300), TransferDirection.WITHDRAWAL),
+    )
+
+
+@pytest.mark.parametrize(
+    "delta",
+    [
+        {"type": "internalTransfer", "usdc": "10", "destination": OTHER},
+        {"type": "accountClassTransfer", "usdc": "3", "toPerp": True},
+        {"type": "liquidation", "accountValue": "3"},
+    ],
+)
+def test_a_ledger_update_that_is_neither_a_deposit_nor_a_withdrawal_is_left_out(delta: dict[str, Any]) -> None:
+    assert transfers_of(FakeSdk(ledger=[{"time": 1, "hash": "0x3", "delta": delta}])) == ()
+
+
+def test_the_window_is_asked_to_the_exchange_and_its_end_is_excluded() -> None:
+    sdk = FakeSdk(ledger=[DEPOSITED, WITHDRAWN])
+    window = TimeWindow(datetime(2025, 11, 12, 9, tzinfo=UTC), datetime(2025, 11, 12, 10, 50, tzinfo=UTC))
+
+    (transfer,) = transfers_of(sdk, window)
+
+    assert transfer.direction is TransferDirection.DEPOSIT
+    assert ("user_non_funding_ledger_updates", (ADDRESS, 1762938000000, 1762944600000)) in sdk.calls
+    assert all(call[0] not in {"exchange", "user_state"} for call in sdk.calls)
+
+
+def test_without_a_window_every_transfer_is_asked_from_the_start() -> None:
+    sdk = FakeSdk(ledger=[])
+
+    transfers_of(sdk)
+
+    assert ("user_non_funding_ledger_updates", (ADDRESS, 0, None)) in sdk.calls
+
+
+@pytest.mark.parametrize(
+    "sdk",
+    [
+        FakeSdk(failure=requests.ConnectionError("down")),
+        FakeSdk(ledger=[{"time": 1, "hash": "0x4", "delta": {"type": "deposit"}}]),
+        FakeSdk(ledger=None),
+    ],
+    ids=["out of reach", "deposit without amount", "no ledger"],
+)
+def test_transfers_that_cannot_be_read_whole_are_unavailable(sdk: FakeSdk) -> None:
+    with pytest.raises(FlowExchangeUnavailableError):
+        transfers_of(sdk)
+
+
+def test_the_transfers_of_a_reference_without_the_address_are_refused_before_reaching_the_exchange() -> None:
+    sdk = FakeSdk()
+
+    with pytest.raises(FlowCredentialsFieldMissingError):
+        HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0).transfers(
+            AccountReference({"wallet": ADDRESS}), TimeWindow()
+        )
+
+    assert sdk.calls == []

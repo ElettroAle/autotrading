@@ -21,6 +21,7 @@ class CloseReason(StrEnum):
     ACCOUNT_REMOVAL = "rimozione del conto"
     # Liquidations included: the platform sees the position gone without having closed it.
     OUTSIDE_PLATFORM = "chiusa fuori dalla piattaforma"
+    CASH_OUT = "incasso"
 
 
 @dataclass(frozen=True, slots=True)

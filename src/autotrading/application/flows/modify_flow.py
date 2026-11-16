@@ -6,7 +6,6 @@ from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
 from autotrading.application.flows.errors import AssetWithOpenPositionError
-from autotrading.application.flows.flow_account import read_flow_account
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
@@ -106,8 +105,8 @@ class ModifyFlowUseCase:
         )
 
     def _require_assets_admitted(self, flow: Flow, assets: tuple[str, ...]) -> None:
-        account = read_flow_account(self._checks.accounts, flow.assigned_account_id)
-        require_tradable(self._checks.markets, account.exchange, assets)
+        exchange = self._checks.accounts.directory.exchange_of(flow.assigned_account_id)
+        require_tradable(self._checks.markets, exchange, assets)
         require_assets_free(flow.assigned_account_id, assets, self._flows.list(), excluding=flow.id)
 
     def _require_removed_without_position(self, flow: Flow, assets: tuple[str, ...]) -> None:

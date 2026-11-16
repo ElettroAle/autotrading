@@ -414,7 +414,7 @@ def test_a_refused_command_leaves_the_status(flows: Flows) -> None:
 def test_a_stopped_flow_above_the_free_capital_of_now_does_not_start(flows: Flows) -> None:
     flow = flows.saved("alfa", capital=100)
     flows.saved("beta", assets=("ETH",), capital=100)
-    flows.accounts.balances[flows.account_id] = Decimal(150)
+    flows.accounts.set_balance(flows.account_id, Decimal(150))
 
     with pytest.raises(CapitalAboveFreeCapitalError) as refused:
         flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
@@ -428,7 +428,7 @@ def test_a_stopped_flow_above_the_free_capital_of_now_does_not_start(flows: Flow
 
 def test_a_stopped_flow_starts_on_the_free_capital_that_leaves_out_its_own(flows: Flows) -> None:
     flow = flows.saved(capital=100)
-    flows.accounts.balances[flows.account_id] = Decimal(150)
+    flows.accounts.set_balance(flows.account_id, Decimal(150))
 
     started = flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))
 

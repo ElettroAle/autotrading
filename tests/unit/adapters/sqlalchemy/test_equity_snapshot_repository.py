@@ -13,7 +13,9 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 PLANNED = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
 TENANT = TenantId.new()
-SNAPSHOT = EquitySnapshot(uuid4(), PLANNED, Decimal(300), Decimal(4), Decimal(3), Decimal(1), Decimal("-0.25"))
+SNAPSHOT = EquitySnapshot(
+    uuid4(), PLANNED, Decimal(300), Decimal(14), Decimal(3), Decimal(1), Decimal("-0.25"), cashed_profit=Decimal(10)
+)
 
 
 def test_a_snapshot_is_saved_with_its_equity_and_every_part_of_it() -> None:
@@ -23,10 +25,11 @@ def test_a_snapshot_is_saved_with_its_equity_and_every_part_of_it() -> None:
         "planned_at": PLANNED,
         "equity": Decimal("305.75"),
         "allocated_capital": Decimal(300),
-        "realized_pnl": Decimal(4),
+        "realized_pnl": Decimal(14),
         "unrealized_pnl": Decimal(3),
         "fees": Decimal(1),
         "funding": Decimal("-0.25"),
+        "cashed_profit": Decimal(10),
     }
 
 

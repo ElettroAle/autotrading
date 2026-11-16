@@ -5,8 +5,8 @@ Funzionalità: R1.1.7 Variazione del capitale allocato
   Voglio aumentare o ridurre il capitale allocato a un flusso in qualsiasi momento
   Perché la quota di conto su cui opera ogni flusso segua le mie scelte
 
-  Il capitale libero di un conto è il saldo letto dall'exchange meno la somma dei capitali allocati ai suoi flussi
-  non archiviati. Un aumento non supera il capitale libero del conto. Una riduzione non porta sotto zero la
+  Il capitale libero di un conto è il saldo letto dall'exchange meno il valore complessivo dei suoi flussi non
+  archiviati (R1.1.1). Un aumento non supera il capitale libero del conto. Una riduzione non porta sotto zero la
   liquidità disponibile del flusso: capitale allocato più PnL realizzato dai suoi ordini, meno le loro commissioni,
   meno il margine che l'exchange dichiara impegnato nelle sue posizioni aperte (R1.6.1). Il capitale minimo del
   flusso è quello che porta questa liquidità a zero.

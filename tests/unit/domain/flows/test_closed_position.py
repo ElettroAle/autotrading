@@ -69,6 +69,7 @@ def test_the_reasons_of_e1_speak_italian() -> None:
         "stop del flusso",
         "rimozione del conto",
         "chiusa fuori dalla piattaforma",
+        "incasso",
     ]
 
 
