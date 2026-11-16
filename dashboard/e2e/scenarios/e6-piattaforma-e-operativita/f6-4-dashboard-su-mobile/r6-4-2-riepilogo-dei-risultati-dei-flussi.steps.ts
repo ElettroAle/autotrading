@@ -77,6 +77,8 @@ Given(
   'che il flusso {string} ha guadagnato {amount} USDC in tutto',
   async ({}, flow: string, gain: string) => {
     gained(flow, Number(gain));
+    // A flow that gained has run a cycle, so the row of the outcomes the summary replaces would have something to show.
+    fakePlatform.recordCycles(flow, [aCompletedCycle(daysAgo(1))]);
   },
 );
 
@@ -117,13 +119,6 @@ When(
     await expect(dashboard.flowName()).toHaveText(flow);
   },
 );
-
-// The flow has run a cycle, so the row of the outcomes the summary replaces would have something to show.
-When("{string} apre l'elenco dei flussi", async ({ dashboard, memory }, account: string) => {
-  memory.account = account;
-  fakePlatform.recordCycles(memory.flow, [aCompletedCycle(daysAgo(1))]);
-  await dashboard.openAndSignInAs(account);
-});
 
 When(
   '{string} sceglie i cicli falliti nel riepilogo',

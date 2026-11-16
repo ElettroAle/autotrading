@@ -104,9 +104,14 @@ class Agent:
         return Reply(Response((Closing("BTC"),)))
 
 
+class Actions:
+    def execute(self) -> tuple[str, ...]:
+        return ("apri", "chiudi")
+
+
 def a_context() -> CycleContext:
     readings = [SourceReading("news", (SourceData("news", 2, None, {"titolo": "t"}),))]
-    return ComposeCycleContextUseCase(Composer(), Clock()).execute(
+    return ComposeCycleContextUseCase(Composer(), Actions(), Clock()).execute(
         FLOW.id.value, SNAPSHOT, readings, [AbsentSource("pivots", "fonte non disponibile")]
     )
 
@@ -117,9 +122,8 @@ def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_mi
     assert a_context().question == CycleQuestion(
         model=configuration.model.name,
         settings=configuration.model.parameters,
-        instructions=configuration.instructions,
+        system_prompt=configuration.rendered_system_prompt(("apri", "chiudi")),
         assets=configuration.assets,
-        max_leverage=configuration.risk_limits.max_leverage,
         started_at=CYCLE_FLOW.started_at,
         now=NOW,
         state=CYCLE_FLOW.state_view(),

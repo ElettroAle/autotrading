@@ -16,8 +16,10 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   catalogo dichiara per quel fornitore (`api_key` se non ne dichiara altri, R2.3.9, ADR 0159).
 - **Model catalog**: modelli disponibili con fornitore, nome, parametri ammessi, valori predefiniti e
   prezzi (R1.4.2).
-- **Agent context**: istruzioni del flusso, regole operative, ora, stato del flusso, dati delle fonti con
-  i pesi, dati mancanti (R1.4.3). Riguarda solo il flusso.
+- **Agent context**: system prompt del flusso già reso (istruzioni, regole operative e formato nel predefinito,
+  R1.4.8), ora, stato del flusso, dati delle fonti con i pesi, dati mancanti (R1.4.3). Riguarda solo il flusso.
+  `AgentContext` non ha testo di sistema cablato: lo scrive `flows`; `agent` dichiara solo le azioni ammesse
+  (`ListAgentActionsUseCase`) che il prompt nomina.
 - **Decision**: per ogni asset del flusso, `open` (long o short, quota dei soldi del flusso da 0 a 1, leva),
   `close` (sempre totale) o `hold`, con il ragionamento (R1.4.4).
 - **Non-conforming decision**: campo mancante, valore fuori tipo o intervallo, azione non ammessa, asset

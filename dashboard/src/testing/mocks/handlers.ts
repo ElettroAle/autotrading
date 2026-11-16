@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
-import { FAKE_MODELS, FAKE_SOURCES, FAKE_TRADABLE_ASSETS } from './catalogs';
+import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
 import {
   changeAllocatedCapital,
@@ -404,6 +404,9 @@ export const handlers = [
     withUser(request, () => HttpResponse.json(FAKE_TRADABLE_ASSETS)),
   ),
   http.get('*/sources', ({ request }) => withUser(request, () => HttpResponse.json(FAKE_SOURCES))),
+  http.get('*/flows/system-prompt', ({ request }) =>
+    withUser(request, () => HttpResponse.json(FAKE_SYSTEM_PROMPT)),
+  ),
   http.get('*/sources/:name', ({ request, params }) =>
     withUser(request, () => {
       const source = FAKE_SOURCES.find((candidate) => candidate.name === params.name);

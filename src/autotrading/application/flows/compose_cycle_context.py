@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from autotrading.application.flows.ports import (
+    AgentActionsPort,
     AgentPromptComposerPort,
     ClockPort,
     CycleContext,
@@ -19,8 +20,9 @@ class ComposeCycleContextUseCase:
     (R1.2.5, R1.4.3).
     """
 
-    def __init__(self, composer: AgentPromptComposerPort, clock: ClockPort) -> None:
+    def __init__(self, composer: AgentPromptComposerPort, actions: AgentActionsPort, clock: ClockPort) -> None:
         self._composer = composer
+        self._actions = actions
         self._clock = clock
 
     def execute(
@@ -35,9 +37,8 @@ class ComposeCycleContextUseCase:
         question = CycleQuestion(
             model=configuration.model.name,
             settings=configuration.model.parameters,
-            instructions=configuration.instructions,
+            system_prompt=configuration.rendered_system_prompt(tuple(self._actions.execute())),
             assets=configuration.assets,
-            max_leverage=configuration.risk_limits.max_leverage,
             started_at=cycle_flow.started_at,
             now=self._clock.now(),
             state=cycle_flow.state_view(),

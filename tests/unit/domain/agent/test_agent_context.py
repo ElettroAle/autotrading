@@ -27,9 +27,8 @@ FEAR = SourceData("sentiment-alternative-me", 3, None, {"valore": "29", "classif
 
 def context(**changes: object) -> AgentContext:
     values: dict[str, object] = {
-        "instructions": "Sei un trader prudente",
+        "system_prompt": "Sei un trader prudente su BTC, ETH",
         "assets": ("BTC", "ETH"),
-        "max_leverage": 5,
         "started_at": STARTED,
         "now": NOW,
         "state": STATE,
@@ -53,26 +52,8 @@ def user_document(agent_context: AgentContext) -> dict[str, object]:
     return document
 
 
-def test_the_system_message_has_the_instructions_and_the_operational_rules() -> None:
-    text = system_text(context())
-
-    assert text.startswith("Sei un trader prudente\n")
-    assert "- al massimo una posizione per asset;" in text
-    assert "- azioni ammesse: apri, chiudi, mantieni;" in text
-    assert "- leva da 1 a 5;" in text
-    assert "- una decisione per ciascun asset del flusso: BTC, ETH;" in text
-    assert '{"decisioni": [{"asset": "<asset>", "azione": "apri|chiudi|mantieni"' in text
-    assert '"quota": <frazione dei soldi del flusso da impegnare come margine, da 0 a 1>' in text
-
-
-def test_the_open_positions_are_valued_with_the_prices_of_the_exchange_of_the_account() -> None:
-    text = system_text(context())
-
-    assert (
-        "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato dello stato"
-        " del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da un'altra rete o piazza e"
-        " servono solo a stimare la direzione del mercato."
-    ) in text
+def test_the_system_message_is_the_system_prompt_the_flow_rendered() -> None:
+    assert system_text(context()) == "Sei un trader prudente su BTC, ETH"
 
 
 def test_the_user_message_has_the_time_and_the_time_since_the_start() -> None:

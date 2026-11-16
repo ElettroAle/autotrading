@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { readData, useApiClient } from '@/lib/api-client';
 
+import { promptPlaceholderSchema } from './get-system-prompt';
+
 // Numbers of the configuration travel as strings, so no precision is lost on the way (ADR 0018).
 export const flowSchema = z.object({
   id: z.string(),
@@ -28,6 +30,9 @@ export const flowSchema = z.object({
   }),
   allocated_capital: z.string().nullable(),
   bring_to_minimum: z.boolean(),
+  system_prompt: z.string(),
+  system_prompt_is_default: z.boolean(),
+  system_prompt_placeholders: z.array(promptPlaceholderSchema),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

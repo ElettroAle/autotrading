@@ -15,3 +15,4 @@ class FlowSetting(StrEnum):
     MAX_MARGIN_EXPOSURE = "max_margin_exposure_percent"
     MAX_VALUE_EXPOSURE = "max_value_exposure_percent"
     ALLOCATED_CAPITAL = "allocated_capital"
+    SYSTEM_PROMPT = "system_prompt"
