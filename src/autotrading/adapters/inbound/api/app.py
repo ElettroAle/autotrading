@@ -17,6 +17,7 @@ from autotrading.adapters.inbound.api.flow_ranking import flow_ranking_router
 from autotrading.adapters.inbound.api.flow_state import flow_state_router
 from autotrading.adapters.inbound.api.flow_statistics import flow_statistics_router
 from autotrading.adapters.inbound.api.flows import flows_router
+from autotrading.adapters.inbound.api.forecast_accuracy import forecast_accuracy_router
 from autotrading.adapters.inbound.api.history import history_router
 from autotrading.adapters.inbound.api.models import models_router
 from autotrading.adapters.inbound.api.operations import operations_router
@@ -112,6 +113,7 @@ def create_api(
     protected.include_router(flow_state_router(use_cases_of_request))
     protected.include_router(closed_positions_router(use_cases_of_request))
     protected.include_router(flow_statistics_router(use_cases_of_request))
+    protected.include_router(forecast_accuracy_router(use_cases_of_request))
     protected.include_router(operations_router(use_cases_of_request))
     protected.include_router(cycles_router(use_cases_of_request))
     protected.include_router(equity_router(use_cases_of_request))
