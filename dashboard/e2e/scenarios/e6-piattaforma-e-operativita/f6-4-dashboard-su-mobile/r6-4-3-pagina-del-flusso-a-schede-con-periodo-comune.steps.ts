@@ -93,6 +93,9 @@ const centreOf = async (locator: Locator): Promise<{ x: number; y: number }> => 
 };
 
 const dragOnTheCurve = async (dashboard: DashboardPages, first: number, last: number) => {
+  // The mouse reaches only what the screen shows: the user scrolls to the curve before dragging on it, as the commands
+  // above it may push it below the fold.
+  await dashboard.equityCurve().scrollIntoViewIfNeeded();
   const start = await centreOf(pointOfDay(dashboard, first));
   const end = await centreOf(pointOfDay(dashboard, last));
   const mouse = dashboard.page.mouse;
