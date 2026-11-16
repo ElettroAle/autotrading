@@ -11,7 +11,7 @@ class InvalidNotificationError(DomainError):
 class InvalidOutboxMessageError(DomainError):
     """A queued message that does not carry what its integration needs: no retry can ever deliver it."""
 
-    permanent = True
+    declared_permanent = True
 
     def __init__(self) -> None:
         super().__init__("messaggio in uscita senza chat o testo")

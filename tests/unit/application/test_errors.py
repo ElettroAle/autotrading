@@ -38,6 +38,8 @@ def test_an_error_of_the_key_of_a_provider_concerns_the_provider(error: Autotrad
     assert error.scope == ErrorScope(provider="openrouter")
 
 
-@pytest.mark.parametrize("error", [FlowCredentialsRejectedError("test-1", ACCOUNT), FlowLedgerIncompleteError(ACCOUNT)])
+@pytest.mark.parametrize(
+    "error", [FlowCredentialsRejectedError("test-1", ACCOUNT, "API wallet scaduto"), FlowLedgerIncompleteError(ACCOUNT)]
+)
 def test_an_error_of_the_account_concerns_the_account(error: AutotradingError) -> None:
     assert error.scope == ErrorScope(account_id=ACCOUNT)

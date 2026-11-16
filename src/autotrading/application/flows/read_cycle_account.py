@@ -53,6 +53,8 @@ class ReadCycleAccountUseCase:
             raise FlowExchangeUnavailableError
         try:
             account = reader.cycle_reading(self._opener.open_cycle_access(sealed))
-        except (FlowCredentialsNotOpenedError, FlowCredentialsRefusedError) as error:
-            raise FlowCredentialsRejectedError(name, account_id) from error
+        except FlowCredentialsNotOpenedError as error:
+            raise FlowCredentialsRejectedError(name, account_id, str(error)) from error
+        except FlowCredentialsRefusedError as error:
+            raise FlowCredentialsRejectedError(name, account_id, error.reason) from error
         return CycleAccountReading(name, sealed.exchange, account)

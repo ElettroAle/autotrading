@@ -46,7 +46,7 @@ class ModelKeyRejectedError(ApplicationError):
     """The provider refuses the key during a cycle: it repeats at every cycle until the user acts (R1.2.4)."""
 
     status_code = 422
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, provider: ProviderName) -> None:
         super().__init__(f"chiave del fornitore non valida: {provider.value}")
@@ -61,7 +61,7 @@ class ModelCreditExhaustedError(ApplicationError):
     """The account of the user at the provider has no credit left: it repeats until the user tops it up (R1.2.4)."""
 
     status_code = 402
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, provider: ProviderName) -> None:
         super().__init__(f"credito esaurito presso {provider.value}")
@@ -87,7 +87,7 @@ class ModelKeyMissingError(ApplicationError):
     """A flow runs on a provider the tenant has no key for: it repeats until the user registers one (R1.2.4)."""
 
     status_code = 422
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, provider: ProviderName) -> None:
         super().__init__(f"nessuna chiave registrata per il fornitore: {provider.value}")
@@ -102,7 +102,7 @@ class ProviderKeyNotOpenedError(ApplicationError):
     """The worker cannot open a sealed key: it repeats until the user registers the key again (ADR 0029)."""
 
     status_code = 500
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, provider: ProviderName) -> None:
         super().__init__(f"chiave del fornitore non leggibile: {provider.value}")

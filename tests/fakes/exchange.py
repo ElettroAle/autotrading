@@ -23,7 +23,20 @@ from tests.support.credentials import HYPERLIQUID_FIELDS
 
 # What the user reads of a refusal: the text of the exchange with the address masked (R0.2.3).
 REDACTED_REJECTION = "User or API Wallet *** does not exist."
+# What the exchange says with a limit of frequency: the code in the cause, not this text, decides it is transient.
+RATE_LIMITED_MESSAGE = "too many requests"
 READ_AT = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
+
+
+class TooManyRequestsResponse(Exception):  # noqa: N818 - the error the library of the exchange raises, not a project error
+    """What the library of the exchange raises for a limit of frequency: the code the base error reads in the cause
+    (ADR permanenza-decisa-dall-errore-base).
+    """
+
+    status_code = 429
+
+    def __init__(self) -> None:
+        super().__init__("429 too many requests")
 
 
 def rejection_message(credentials: Credentials) -> str:
@@ -44,6 +57,8 @@ class FakeExchangeAdapter:
         self.shown: dict[Credentials, list[AccountState]] = {}
         self._orders: FakeOrderExchangeAdapter | None = None
         self.refusal: ExchangeRejectedCredentialsError | None = None
+        self._refusal_reasons: dict[Credentials, str] = {}
+        self._rate_limited: set[Credentials] = set()
 
     def is_real(self) -> bool:
         return self._real
@@ -61,6 +76,7 @@ class FakeExchangeAdapter:
     def accept(self, credentials: Credentials, amount: Decimal = Decimal("1000.00")) -> None:
         balance = Balance(amount, "USDC")
         self._states[credentials] = AccountState(balance, balance, (), READ_AT)
+        self._refusal_reasons.pop(credentials, None)
 
     def open_position(self, credentials: Credentials, position: Position) -> None:
         state = self._states[credentials]
@@ -72,9 +88,15 @@ class FakeExchangeAdapter:
         state = self._states[credentials]
         self._states[credentials] = replace(state, available_margin=Balance(amount, state.balance.currency))
 
-    def revoke(self, credentials: Credentials) -> None:
-        """The key is deleted or expired on the exchange: from now on it is refused."""
+    def revoke(self, credentials: Credentials, reason: str | None = None) -> None:
+        """The key is deleted or expired on the exchange: from now on it is refused, with the reason given if any."""
         self._states.pop(credentials, None)
+        if reason is not None:
+            self._refusal_reasons[credentials] = reason
+
+    def limit_rate(self, credentials: Credentials) -> None:
+        """The exchange answers too many requests to every reading of the account, as its library raises it."""
+        self._rate_limited.add(credentials)
 
     def read_state(self, credentials: Credentials) -> AccountState:
         self.requests.append(credentials)
@@ -82,9 +104,12 @@ class FakeExchangeAdapter:
             raise ExchangeUnavailableError
         if self.refusal is not None:
             raise self.refusal
+        if credentials in self._rate_limited:
+            raise ExchangeRejectedCredentialsError(RATE_LIMITED_MESSAGE) from TooManyRequestsResponse()
         state = self._states.get(credentials)
         if state is None:
-            raise ExchangeRejectedCredentialsError(rejection_message(credentials))
+            reason = self._refusal_reasons.get(credentials, rejection_message(credentials))
+            raise ExchangeRejectedCredentialsError(reason)
         shown = replace(state, positions=(*state.positions, *self._traded_positions(credentials)))
         self.shown.setdefault(credentials, []).append(shown)
         return shown
@@ -107,7 +132,7 @@ class FakeExchangeAdapter:
         try:
             state = self.read_state(Credentials(access.fields))
         except ExchangeRejectedCredentialsError as error:
-            raise FlowCredentialsRefusedError from error
+            raise FlowCredentialsRefusedError(error.exchange_message) from error
         except ExchangeUnavailableError as error:
             raise FlowExchangeUnavailableError from error
         return CycleAccount(

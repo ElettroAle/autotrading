@@ -214,10 +214,16 @@ def flow_return(flow_cycles: FlowCycles, flow: str, percent: str) -> None:
     show_activity(flow_cycles, flow, replace(shown, unrealized_pnl=pnl))
 
 
-@given(quoted('che l\'exchange rifiuta le credenziali del conto "{account}"'))
-def credentials_rejected(flow_cycles: FlowCycles, account: str) -> None:
+@given(quoted('che l\'exchange rifiuta le credenziali del conto "{account}" perché "{reason}"'))
+def credentials_rejected(flow_cycles: FlowCycles, account: str, reason: str) -> None:
     tenant_id = next(iter(flow_cycles.credentials))[0]
-    flow_cycles.platform.hyperliquid.revoke(flow_cycles.credentials[tenant_id, account])
+    flow_cycles.platform.hyperliquid.revoke(flow_cycles.credentials[tenant_id, account], reason)
+
+
+@given(quoted('che l\'exchange risponde "troppe richieste" alla lettura del conto "{account}"'))
+def exchange_rate_limited(flow_cycles: FlowCycles, account: str) -> None:
+    tenant_id = next(iter(flow_cycles.credentials))[0]
+    flow_cycles.platform.hyperliquid.limit_rate(flow_cycles.credentials[tenant_id, account])
 
 
 @given(
@@ -334,6 +340,11 @@ def run_cycle_at(flow_cycles: FlowCycles, flow: str, clock: str) -> None:
 
 
 # Then: the cycle and the flows
+
+
+@then("il ciclo è registrato come fallito")
+def cycle_failed_without_reason(flow_cycles: FlowCycles) -> None:
+    assert flow_cycles.last_record("alfa").outcome is CycleOutcome.FAILED
 
 
 @then(quoted('il ciclo è registrato come fallito con il motivo "{reason}"'))
