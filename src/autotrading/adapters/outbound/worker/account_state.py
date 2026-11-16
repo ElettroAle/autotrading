@@ -34,6 +34,7 @@ class _PositionBody(TypedDict):
     size: str
     leverage: int
     entry_price: str
+    mark_price: str
     unrealized_pnl: str
     liquidation_price: str | None
 
@@ -136,6 +137,7 @@ def _position_of(position: _PositionBody) -> Position:
         size=Decimal(position["size"]),
         leverage=int(position["leverage"]),
         entry_price=Decimal(position["entry_price"]),
+        mark_price=Decimal(position["mark_price"]),
         unrealized_pnl=Decimal(position["unrealized_pnl"]),
         liquidation_price=None if liquidation is None else Decimal(liquidation),
     )

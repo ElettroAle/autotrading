@@ -24,7 +24,9 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.support.trading import HYPERLIQUID
 from tests.support.worker import Worker
 
-SHORT_ETH = Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("-4.2"), None)
+SHORT_ETH = Position(
+    "ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("3002.8"), Decimal("-4.2"), None
+)
 
 
 def reading_of(worker: Worker, tenant_id: TenantId, *, supported: bool = True) -> ReadAccountForVerificationUseCase:

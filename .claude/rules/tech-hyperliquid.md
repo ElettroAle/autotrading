@@ -12,6 +12,7 @@ paths:
   `HyperliquidTestnetExchangeAdapter` eredita da `HyperliquidExchangeAdapter` e ridefinisce solo rete e indirizzo
   dell'API; gli altri adapter si costruiscono sull'indirizzo della testnet. Le fonti di mercato leggono la rete reale
   (R2.3.11). Mai dedotto dalle credenziali.
+- Il prezzo di mercato di una posizione è `positionValue / |szi|` del `clearinghouseState` (R1.4.7).
 - Ogni ordine porta il `cloid` assegnato dalla piattaforma.
 - Ordini a mercato con lo scostamento massimo ricevuto dal caso d'uso.
 - La leva si imposta con il modo di margine ricevuto dal caso d'uso (`is_cross` dell'SDK vero solo per `CROSS`).

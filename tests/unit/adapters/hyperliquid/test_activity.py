@@ -17,13 +17,16 @@ from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
 
 
-def position(coin: str, size: str, *, margin: str, pnl: str, leverage: int = 5, entry: str = "60000") -> dict[str, Any]:
+def position(
+    coin: str, size: str, *, margin: str, pnl: str, leverage: int = 5, entry: str = "60000", mark: str = "61000"
+) -> dict[str, Any]:
     """A position as the clearinghouse state carries it, with the fields every reader of it requires."""
     return {
         "coin": coin,
         "szi": size,
         "leverage": {"type": "cross", "value": leverage},
         "entryPx": entry,
+        "positionValue": str(abs(Decimal(size)) * Decimal(mark)),
         "unrealizedPnl": pnl,
         "marginUsed": margin,
         "liquidationPx": None,
@@ -37,7 +40,7 @@ STATE = {
     "withdrawable": "862.5",
     "assetPositions": [
         {"position": position("BTC", "0.002", margin="100.0", pnl="12.5")},
-        {"position": position("ETH", "-0.5", margin="50", pnl="-3", leverage=3, entry="3000.5")},
+        {"position": position("ETH", "-0.5", margin="50", pnl="-3", leverage=3, entry="3000.5", mark="3001")},
     ],
     "time": 1762941600000,
 }
@@ -105,8 +108,19 @@ def test_the_totals_and_the_positions_are_those_of_the_exchange() -> None:
     )
     assert activity.read_at == datetime(2025, 11, 12, 10, 0, tzinfo=UTC)
     assert activity.positions == (
-        AccountPosition("BTC", TradeSide.LONG, Decimal("0.002"), Decimal("100.0"), Decimal("12.5"), 5, Decimal(60000)),
-        AccountPosition("ETH", TradeSide.SHORT, Decimal("0.5"), Decimal(50), Decimal(-3), 3, Decimal("3000.5")),
+        AccountPosition(
+            "BTC",
+            TradeSide.LONG,
+            Decimal("0.002"),
+            Decimal("100.0"),
+            Decimal("12.5"),
+            5,
+            Decimal(60000),
+            Decimal(61000),
+        ),
+        AccountPosition(
+            "ETH", TradeSide.SHORT, Decimal("0.5"), Decimal(50), Decimal(-3), 3, Decimal("3000.5"), Decimal(3001)
+        ),
     )
 
 
