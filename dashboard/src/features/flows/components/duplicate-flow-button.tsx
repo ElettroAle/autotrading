@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router';
 
+import { CommandRefusal } from '@/components/ui/command-refusal';
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { paths } from '@/config/paths';
 
 import { useDuplicateFlow } from '../api/duplicate-flow';
-
-import { CommandRefusal } from './command-refusal';
 
 /** Duplicates the flow and opens the draft, where the user assigns account, capital and assets (ADR 0125). */
 export const DuplicateFlowButton = ({ flowId }: { flowId: string }) => {

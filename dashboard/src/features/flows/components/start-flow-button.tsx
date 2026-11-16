@@ -1,11 +1,10 @@
 import { useState } from 'react';
 
+import { CommandRefusal } from '@/components/ui/command-refusal';
 import { PRIMARY_COMMAND } from '@/components/ui/commands';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 
 import { useStartFlow } from '../api/start-flow';
-
-import { CommandRefusal } from './command-refusal';
 
 type StartFlowButtonProps = { readonly flowId: string; readonly realMoney: boolean };
 

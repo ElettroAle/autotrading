@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 
+import { CommandRefusal } from '@/components/ui/command-refusal';
 import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { paths } from '@/config/paths';
 
@@ -10,8 +11,6 @@ import {
   useImportFlowStrategy,
   type ImportInput,
 } from '../api/import-flow-strategy';
-
-import { CommandRefusal } from './command-refusal';
 
 /** A strategy file becomes a new draft, opened for the assignment of account, capital and assets (ADR 0141). */
 export const ImportStrategyForm = () => {

@@ -22,6 +22,8 @@ export type FakeCycle = {
     readonly output_tokens: number;
     readonly cost_usd: string | null;
   } | null;
+  /** What started the cycle: its schedule, or the user who asked for it now (R6.5.2). */
+  readonly trigger: 'scheduled' | 'on_demand';
 };
 
 export const STEPS = {
@@ -175,6 +177,7 @@ export const aCompletedCycle = (
   absent_sources: [],
   documents: documentsOf(asset, exitPlan, confidence),
   cost: { input_tokens: 1200, output_tokens: 300, cost_usd: '0.0125' },
+  trigger: 'scheduled',
 });
 
 /** The same cycle stopped at the step: it keeps only what the steps before it produced (R1.2.3). */
@@ -202,4 +205,5 @@ export const summaryOf = (cycle: FakeCycle) => ({
   failure: cycle.failure,
   decisions:
     cycle.documents.find((document) => document.step === STEPS.agentDecision)?.content ?? null,
+  trigger: cycle.trigger,
 });

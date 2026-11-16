@@ -12,12 +12,16 @@ export const failureSchema = z.object({
   message: z.string(),
 });
 
+// What started the cycle: its schedule, or the user who asked for it now (R6.5.2).
+export const triggerSchema = z.string();
+
 const cycleSummarySchema = z.object({
   planned_at: z.string(),
   started_at: z.string().nullable(),
   outcome: z.string(),
   failure: failureSchema.nullable(),
   decisions: z.record(z.string(), z.unknown()).nullable(),
+  trigger: triggerSchema,
 });
 
 const cyclePageSchema = z.object({

@@ -1709,6 +1709,185 @@
         }
       }
     },
+    "/flows/{flow_id}/cycles": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Run Cycle Now",
+        "description": "A cycle of the flow now, run by the worker and answered when it ends (R6.5.2): a failed cycle is the\ncycle created, a flow not active or a cycle in progress a refusal.",
+        "operationId": "run_cycle_now_flows__flow_id__cycles_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "cicli"
+        ],
+        "summary": "List Cycles",
+        "operationId": "list_cycles_flows__flow_id__cycles_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "concluso o fallito",
+              "title": "Outcome"
+            },
+            "description": "concluso o fallito"
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "apertura, chiusura, mantenimento o nessuna",
+              "title": "Decision"
+            },
+            "description": "apertura, chiusura, mantenimento o nessuna"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "From"
+            },
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "To"
+            },
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CyclePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/duplicate": {
       "post": {
         "tags": [
@@ -3145,138 +3324,6 @@
                     "$ref": "#/components/schemas/FlowOverviewResponse"
                   },
                   "title": "Response List Flow Overviews Flows Overview Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/flows/{flow_id}/cycles": {
-      "get": {
-        "tags": [
-          "cicli"
-        ],
-        "summary": "List Cycles",
-        "operationId": "list_cycles_flows__flow_id__cycles_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "flow_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Flow Id"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "outcome",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "concluso o fallito",
-              "title": "Outcome"
-            },
-            "description": "concluso o fallito"
-          },
-          {
-            "name": "decision",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "apertura, chiusura, mantenimento o nessuna",
-              "title": "Decision"
-            },
-            "description": "apertura, chiusura, mantenimento o nessuna"
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
-              "title": "From"
-            },
-            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
-              "title": "To"
-            },
-            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CyclePageResponse"
                 }
               }
             }
@@ -5040,6 +5087,10 @@
                 "type": "null"
               }
             ]
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
           }
         },
         "type": "object",
@@ -5052,10 +5103,11 @@
           "steps",
           "absent_sources",
           "documents",
-          "cost"
+          "cost",
+          "trigger"
         ],
         "title": "CycleDetailResponse",
-        "description": "A cycle with everything recorded about it (R1.7.1)."
+        "description": "A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2)."
       },
       "CyclePageResponse": {
         "properties": {
@@ -5133,6 +5185,10 @@
               }
             ],
             "title": "Decisions"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
           }
         },
         "type": "object",
@@ -5141,10 +5197,11 @@
           "started_at",
           "outcome",
           "failure",
-          "decisions"
+          "decisions",
+          "trigger"
         ],
         "title": "CycleSummaryResponse",
-        "description": "A cycle in the list: its instants, its outcome and the decisions of the agent (R1.7.3)."
+        "description": "A cycle in the list: its instants, its outcome, the decisions of the agent and what started it (R1.7.3,\nR6.5.2)."
       },
       "DailyCostResponse": {
         "properties": {
@@ -6767,6 +6824,10 @@
             ],
             "title": "Decisions"
           },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger"
+          },
           "flow_id": {
             "type": "string",
             "format": "uuid",
@@ -6795,6 +6856,7 @@
           "outcome",
           "failure",
           "decisions",
+          "trigger",
           "flow_id",
           "flow",
           "version"

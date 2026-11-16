@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import { CommandRefusal } from '@/components/ui/command-refusal';
 import { DESTRUCTIVE_COMMAND, PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
@@ -9,6 +10,7 @@ import { formatAmount } from '@/utils/format-amount';
 
 import { useCashOutProfits, type CashOutOutcome } from '../api/cash-out-profits';
 import { useFlowState } from '../api/get-flow-state';
+import { useRunCycleNow } from '../api/run-cycle-now';
 import { useRunFlowCommand } from '../api/run-flow-command';
 import { hasProfits } from '../utils/cash-out-question';
 import { commandsAllowedIn, type FlowCommand } from '../utils/flow-transitions';
@@ -66,6 +68,9 @@ const CashOutResult = ({ outcome, currency }: CashOutResultProps) =>
     </p>
   );
 
+// Only an active flow runs cycles: the API refuses the others (R6.5.2).
+const ACTIVE = 'attivo';
+
 type FlowCommandsProps = {
   readonly flowId: string;
   readonly flowName: string;
@@ -78,6 +83,7 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
   const [confirming, setConfirming] = useState<Confirming | null>(null);
   const state = useFlowState(flowId);
   const cashOut = useCashOutProfits(flowId);
+  const cycleNow = useRunCycleNow(flowId);
   const navigate = useNavigate();
   const run = useRunFlowCommand(flowId, {
     onSuccess: (command) => {
@@ -112,7 +118,7 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
   // The cash-out is offered only on a flow worth more than its capital (ADR incasso-dei-profitti-nella-dashboard).
   const profitable =
     state.data !== undefined && hasProfits(state.data.total_value, state.data.allocated_capital);
-  const busy = run.isPending || cashOut.isPending;
+  const busy = run.isPending || cashOut.isPending || cycleNow.isPending;
 
   return (
     <div className="mt-3 space-y-2">
@@ -129,6 +135,16 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
               {LABELS[command]}
             </button>
           ))}
+          {status === ACTIVE && (
+            <button
+              type="button"
+              onClick={() => cycleNow.mutate()}
+              disabled={busy}
+              className={SECONDARY_COMMAND}
+            >
+              {cycleNow.isPending ? 'Ciclo in corso…' : 'Esegui ora'}
+            </button>
+          )}
           {profitable && (
             <button
               type="button"
@@ -164,6 +180,8 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
         <CashOutResult outcome={cashOut.data} currency={state.data?.currency ?? ''} />
       )}
       {cashOut.isError && <ErrorMessage error={cashOut.error} prefix="Incasso non riuscito" />}
+      {cycleNow.isSuccess && <p role="status">Ciclo eseguito: {cycleNow.data.outcome}.</p>}
+      <CommandRefusal refusal="Ciclo rifiutato" error={cycleNow.error} />
     </div>
   );
 };

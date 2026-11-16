@@ -51,6 +51,21 @@ describe('CycleView', () => {
     expect(within(steps).getAllByRole('listitem')).toHaveLength(8);
   });
 
+  // R6.5.2, ADR pulsante-esegui-ora-nella-pagina-del-flusso.
+  it('says a cycle the user asked for now was asked for', async () => {
+    await openCycle({ ...aCompletedCycle(PLANNED_AT), trigger: 'on_demand' });
+
+    const summary = await screen.findByRole('region', { name: 'Riepilogo del ciclo' });
+    expect(summary).toHaveTextContent('Avviosu richiesta');
+  });
+
+  it('says nothing of the start of a planned cycle', async () => {
+    await openCycle(aCompletedCycle(PLANNED_AT));
+
+    const summary = await screen.findByRole('region', { name: 'Riepilogo del ciclo' });
+    expect(summary).not.toHaveTextContent('su richiesta');
+  });
+
   it('shows each decision with its full reasoning, and the raw answer of the agent', async () => {
     await openCycle(aCompletedCycle(PLANNED_AT));
 

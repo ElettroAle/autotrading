@@ -17,6 +17,7 @@ import { searchWithPage } from '@/utils/page-number';
 
 import { useCycles, type CycleSummary } from '../api/get-cycles';
 import { decisionLabelsOf } from '../utils/cycle-documents';
+import { ON_DEMAND_LABEL } from '../utils/cycle-trigger';
 
 const NO_DECISION = '—';
 
@@ -61,8 +62,14 @@ const outcomeOf = (cycle: CycleSummary): string =>
 const decisionsOf = (cycle: CycleSummary): string =>
   decisionLabelsOf(cycle.decisions).join(', ') || NO_DECISION;
 
+// A cycle the user asked for now says so beside its instant (R6.5.2).
+const instantOf = (cycle: CycleSummary): string =>
+  cycle.trigger === 'on_demand'
+    ? `${formatInstant(cycle.planned_at)} · ${ON_DEMAND_LABEL}`
+    : formatInstant(cycle.planned_at);
+
 const COLUMNS: DataTableColumn<CycleSummary>[] = [
-  { header: 'Istante', cell: (cycle) => formatInstant(cycle.planned_at) },
+  { header: 'Istante', cell: instantOf },
   { header: 'Esito', cell: outcomeOf },
   { header: 'Decisioni', cell: decisionsOf },
 ];

@@ -11,6 +11,8 @@ import { renderApp } from '@/testing/test-utils';
 const FLOW_PAGE = '/flows/flow-alfa';
 const STOP_CONFIRMATION = 'Conferma dello stop';
 const ARCHIVE_CONFIRMATION = "Conferma dell'archiviazione";
+const RUN_NOW = 'Esegui ora';
+const CYCLE_IN_PROGRESS = 'un ciclo del flusso è già in corso';
 
 const commands = () => screen.getByRole('group', { name: 'Comandi del flusso' });
 
@@ -34,7 +36,7 @@ describe('FlowCommands', () => {
   });
 
   it.each([
-    ['attivo', ['Pausa', 'Stop']],
+    ['attivo', ['Pausa', 'Stop', RUN_NOW]],
     ['in pausa', ['Riprendi', 'Stop']],
     ['fermo', ['Avvia', 'Archivia']],
   ])('offers for a flow %s only the commands its status admits', async (status, expected) => {
@@ -50,6 +52,7 @@ describe('FlowCommands', () => {
     ['fermo', 'Archivia', DESTRUCTIVE_COMMAND],
     ['attivo', 'Pausa', SECONDARY_COMMAND],
     ['attivo', 'Stop', SECONDARY_COMMAND],
+    ['attivo', RUN_NOW, SECONDARY_COMMAND],
   ])('for a flow %s shows %s with the look of its weight', async (status, name, look) => {
     alfa.status = status;
     await renderApp({ account: 'anna', url: FLOW_PAGE });
@@ -188,7 +191,7 @@ describe('FlowCommands', () => {
     await click('Annulla');
 
     expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
-    expect(await offeredCommands()).toEqual(['Pausa', 'Stop']);
+    expect(await offeredCommands()).toEqual(['Pausa', 'Stop', RUN_NOW]);
     expect(fakePlatform.flowNamed('alfa').status).toBe('attivo');
   });
 
@@ -249,5 +252,57 @@ describe('FlowCommands', () => {
       'Comando non riuscito: comando ferma non ammesso per un flusso fermo',
     );
     expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
+  });
+
+  // R6.5.2, ADR pulsante-esegui-ora-nella-pagina-del-flusso.
+  describe('Esegui ora', () => {
+    it('runs a cycle of the active flow now, without asking, and says how it ended', async () => {
+      await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+      await click(RUN_NOW);
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Ciclo eseguito: concluso.');
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(fakePlatform.cyclesOf(alfa.id).map((cycle) => cycle.trigger)).toEqual(['on_demand']);
+    });
+
+    it('waits for the cycle with the command disabled, saying a cycle is under way', async () => {
+      server.use(
+        http.post('*/flows/:flowId/cycles', async () => {
+          await delay('infinite');
+          return new HttpResponse(null, { status: 201 });
+        }),
+      );
+      await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+      await click(RUN_NOW);
+
+      expect(await screen.findByRole('button', { name: 'Ciclo in corso…' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Pausa' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: RUN_NOW })).toBeNull();
+    });
+
+    it('shows the reason the API gives when a cycle of the flow is already under way', async () => {
+      fakePlatform.holdCycle('alfa');
+      await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+      await click(RUN_NOW);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        `Ciclo rifiutato: ${CYCLE_IN_PROGRESS}`,
+      );
+      expect(fakePlatform.cyclesOf(alfa.id)).toEqual([]);
+      expect(screen.getByRole('button', { name: RUN_NOW })).toBeEnabled();
+    });
+
+    it('reads the cycles of the flow again, showing the new one as asked for', async () => {
+      await renderApp({ account: 'anna', url: `${FLOW_PAGE}/cycles` });
+      expect(await screen.findByText('Nessun ciclo registrato.')).toBeInTheDocument();
+
+      await click(RUN_NOW);
+
+      const rows = within(await screen.findByRole('table', { name: 'Cicli' })).getAllByRole('row');
+      expect(rows.at(-1)).toHaveTextContent('su richiesta');
+    });
   });
 });
