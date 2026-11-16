@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from autotrading.application.flows.query_cycle_history import QueryCycleHistoryCommand, QueryCycleHistoryUseCase
 from autotrading.domain.flows.history import HistoryCursor, HistoryFilter
@@ -51,7 +51,9 @@ def test_reads_the_period_at_the_instant_of_the_clock() -> None:
 
 
 def test_gives_nothing_when_no_cycle_matches() -> None:
-    period = StatisticsPeriod.named("range", date(2026, 12, 1), date(2026, 12, 2))
+    period = StatisticsPeriod.named(
+        "range", datetime(2026, 12, 1, tzinfo=UTC), datetime(2026, 12, 2, 23, 59, tzinfo=UTC)
+    )
     use_case, _ = use_case_on(HistoryStore([a_cycle_row(FIRST)]))
 
     page = use_case.execute(QueryCycleHistoryCommand(HistoryFilter(period=period), None))

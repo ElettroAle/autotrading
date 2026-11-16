@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 from pytest_bdd import parsers
 
+from autotrading.application.flows.ports import ReconciliationAlarmPorts
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import (
@@ -25,12 +26,14 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import Execution, FlowTotals
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
+from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -70,8 +73,11 @@ class AttributionBench:
         self.read_state = ReadFlowStateUseCase(
             flows, self.exchange, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
         )
+        self.thresholds = FakeAccountThresholdsAdapter({})
+        self.alarm_notices = FakeReconciliationAlarmNoticeAdapter()
+        alarms = ReconciliationAlarmPorts(self.thresholds, self.thresholds, self.alarm_notices)
         self.reconcile = ReconcileAccountUseCase(
-            flows, self.exchange, self.readings, self.closed, self.record, self.closed_by_protection
+            flows, self.exchange, self.readings, self.closed, self.record, self.closed_by_protection, alarms
         )
         self.state: FlowState | None = None
         self.recomputed: FlowTotals | None = None
@@ -79,6 +85,7 @@ class AttributionBench:
     def account(self, name: str, balance: Decimal = Decimal(1000)) -> UUID:
         if name not in self.accounts:
             self.accounts[name] = uuid4()
+            self.thresholds.names[self.accounts[name]] = name
             self.exchange.activities[self.accounts[name]] = an_activity(balance=balance, available_margin=balance)
         return self.accounts[name]
 
@@ -125,9 +132,15 @@ class AttributionBench:
         """What a past cycle of the account recorded in the ledger."""
         self.record.execute(RecordAccountExecutionsCommand(account_id))
 
-    def previous_reading(self, account_id: UUID, open_assets: dict[str, frozenset[str]] | None = None) -> None:
+    def previous_reading(
+        self,
+        account_id: UUID,
+        open_assets: dict[str, frozenset[str]] | None = None,
+        reference_balance: Decimal | None = None,
+    ) -> None:
         assets = {self.flow(name).id: held for name, held in (open_assets or {}).items()}
-        self.readings.save_reading(AccountReading(account_id, READ_AT - timedelta(minutes=5), assets))
+        reading = AccountReading(account_id, READ_AT - timedelta(minutes=5), assets, reference_balance)
+        self.readings.save_reading(reading)
 
     def consult(self, name: str) -> None:
         self.state = self.read_state.execute(ReadFlowStateCommand(self.flow(name).id))

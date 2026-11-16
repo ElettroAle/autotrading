@@ -1,14 +1,17 @@
 """How a flow is doing at a glance (R6.4.2, ADR riepilogo-dei-risultati-nell-api)."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.tenancy.user_id import UserId
 
 FLOW_ID = FlowId.new()
 FIRST_CYCLE = datetime(2026, 11, 9, 10, 0, tzinfo=UTC)
@@ -35,6 +38,42 @@ def test_the_total_gain_is_the_value_of_the_flow_less_its_initial_capital_also_i
     results = FlowResults.of(a_state(realized=Decimal("2.5")), (), 0)
 
     assert (results.total_gain, results.total_gain_percent) == (Decimal("2.5"), Decimal("2.50"))
+
+
+def a_cash_out(hours: float, profit: Decimal, capital: Decimal = Decimal(100)) -> CapitalChange:
+    return CapitalChange(
+        FLOW_ID,
+        FIRST_CYCLE + timedelta(hours=hours),
+        capital,
+        capital,
+        UserId("anna"),
+        CapitalChangeReason.CASH_OUT,
+        profit,
+        value_before=capital + profit,
+        cashed_profit=profit,
+    )
+
+
+def test_the_total_gain_keeps_the_profits_cashed_out() -> None:
+    cashed_out = replace(a_state(realized=Decimal(30)), capital_changes=(a_cash_out(0, Decimal(30)),))
+
+    assert FlowResults.of(cashed_out, (), 0).total_gain == Decimal(30)
+
+
+def test_the_total_gain_in_percent_is_compounded_across_the_changes_of_the_capital() -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: 10% before the cash-out, then 5%.
+    cashed_out = replace(a_state(realized=Decimal(15)), capital_changes=(a_cash_out(0, Decimal(10)),))
+
+    assert FlowResults.of(cashed_out, (), 0).total_gain_percent == Decimal("15.50")
+
+
+def test_the_gain_in_the_period_leaves_out_the_money_the_changes_moved() -> None:
+    state = replace(a_state(realized=Decimal(15)), capital_changes=(a_cash_out(1.5, Decimal(10)),))
+    snapshots = (a_snapshot(0, Decimal(100)), a_snapshot(1, Decimal(110)), a_snapshot(2, Decimal(105)))
+
+    results = FlowResults.of(state, snapshots, 0)
+
+    assert (results.period_gain, results.period_gain_percent) == (Decimal(15), Decimal("15.00"))
 
 
 def test_a_loss_is_a_negative_total_gain() -> None:
@@ -67,3 +106,15 @@ def test_the_results_count_the_open_positions_and_keep_the_failed_cycles_and_the
     results = FlowResults.of(a_state(assets=("BTC", "ETH")), (), 2)
 
     assert (results.open_positions, results.failed_cycles, results.currency) == (2, 2, "USDC")
+
+
+def test_the_results_tell_why_the_openings_of_the_flow_are_suspended() -> None:
+    reason = "allarme di riconciliazione sul conto test-1"
+
+    results = FlowResults.of(a_state(), (), 0, openings_suspended=reason)
+
+    assert results.openings_suspended == reason
+
+
+def test_the_openings_are_not_suspended_unless_the_results_say_why() -> None:
+    assert FlowResults.of(a_state(), (), 0).openings_suspended is None

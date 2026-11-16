@@ -16,7 +16,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.free_capital import allocated_capital_of_account
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
@@ -195,6 +195,4 @@ def test_a_draft_assigned_to_the_account_leaves_its_assets_to_the_other_flows() 
 def test_a_draft_assigned_to_the_account_leaves_its_capital_free() -> None:
     draft = a_draft().assigned(ACCOUNT, Decimal(200), ("BTC",))
 
-    free_capital = FreeCapital.of_account(Decimal(1000), "USDC", ACCOUNT, [draft, a_strategy_flow()])
-
-    assert free_capital == FreeCapital(Decimal(700), "USDC")
+    assert allocated_capital_of_account(ACCOUNT, [draft, a_strategy_flow()]) == Decimal(300)

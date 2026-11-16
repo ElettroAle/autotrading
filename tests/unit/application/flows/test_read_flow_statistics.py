@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -94,12 +94,14 @@ def test_the_last_7_days_leave_out_what_happened_before(platform: Platform) -> N
     assert statistics.model_cost_usd == Decimal("0.20")
 
 
-def test_a_range_holds_its_first_and_last_day(platform: Platform) -> None:
+def test_a_range_holds_its_first_and_last_minute(platform: Platform) -> None:
     flow = platform.flow()
     for day in (9, 10, 12, 13):
         platform.close(flow, "1", datetime(2026, 11, day, 23, 59, tzinfo=UTC))
 
-    command = ReadFlowStatisticsCommand(flow.id.value, "range", date(2026, 11, 10), date(2026, 11, 12))
+    command = ReadFlowStatisticsCommand(
+        flow.id.value, "range", datetime(2026, 11, 10, tzinfo=UTC), datetime(2026, 11, 12, 23, 59, tzinfo=UTC)
+    )
     statistics = platform.use_case().execute(command)
 
     assert statistics.operations == 2

@@ -112,11 +112,11 @@ describe('ForecastAccuracy', () => {
     fakePlatform.addFlow('anna', 'alfa', { forecasts: [forecast(60500, 60000)] });
     await renderApp({
       account: 'anna',
-      url: '/flows/flow-alfa?period=range&from=2026-11-03&to=2026-11-01',
+      url: '/flows/flow-alfa?period=range&from=2026-11-03T10%3A00Z&to=2026-11-03T09%3A59Z',
     });
 
     expect(await within(await panel()).findByRole('alert')).toHaveTextContent(
-      'periodo non valido: il giorno iniziale è successivo al giorno finale',
+      "periodo non valido: l'inizio è successivo alla fine",
     );
   });
 });

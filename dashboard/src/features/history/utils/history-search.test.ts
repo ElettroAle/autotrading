@@ -59,9 +59,11 @@ describe('apiSearchOf', () => {
     );
   });
 
-  it('passes a range with its days', () => {
-    expect(apiSearchOf(EVERYTHING, { kind: 'range', from: '2026-11-10', to: '2026-11-20' })).toBe(
-      'period=range&from=2026-11-10&to=2026-11-20',
+  it('passes a range with its instants', () => {
+    const range = { kind: 'range', from: '2026-11-10T08:15Z', to: '2026-11-20T10:40Z' } as const;
+
+    expect(apiSearchOf(EVERYTHING, range)).toBe(
+      'period=range&from=2026-11-10T08%3A15Z&to=2026-11-20T10%3A40Z',
     );
   });
 

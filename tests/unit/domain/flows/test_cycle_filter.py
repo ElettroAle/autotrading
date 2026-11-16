@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -61,12 +61,16 @@ def test_an_unknown_decision_is_refused_with_the_choices() -> None:
     assert raised.value.status_code == 400
 
 
-def test_the_days_become_the_window_of_the_planned_instants() -> None:
-    criteria = CycleFilter.named(first_day=date(2026, 11, 1), last_day=date(2026, 11, 3))
+def test_the_minutes_of_the_interval_become_the_window_of_the_planned_instants() -> None:
+    criteria = CycleFilter.named(
+        since=datetime(2026, 11, 16, 9, 15, 20, tzinfo=UTC), until=datetime(2026, 11, 16, 11, 40, 5, tzinfo=UTC)
+    )
 
-    assert criteria.window == TimeWindow(datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 11, 4, tzinfo=UTC))
+    assert criteria.window == TimeWindow(
+        datetime(2026, 11, 16, 9, 15, tzinfo=UTC), datetime(2026, 11, 16, 11, 41, tzinfo=UTC)
+    )
 
 
-def test_a_last_day_before_the_first_is_refused() -> None:
+def test_an_end_before_the_start_is_refused() -> None:
     with pytest.raises(RangeEndingBeforeStartError):
-        CycleFilter.named(first_day=date(2026, 11, 3), last_day=date(2026, 11, 1))
+        CycleFilter.named(since=datetime(2026, 11, 3, 10, tzinfo=UTC), until=datetime(2026, 11, 3, 9, tzinfo=UTC))

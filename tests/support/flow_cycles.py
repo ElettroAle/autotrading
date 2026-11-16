@@ -17,7 +17,12 @@ from autotrading.application.flows.notify_unattributable import (
     UnattributableNotices,
 )
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
-from autotrading.application.flows.ports import CycleJob, ScheduledFlow, TenantScheduledFlow
+from autotrading.application.flows.ports import (
+    CycleJob,
+    ReconciliationAlarmPorts,
+    ScheduledFlow,
+    TenantScheduledFlow,
+)
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
@@ -38,6 +43,7 @@ from autotrading.application.notifications.notify_flow_paused import NotifyFlowP
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
 from autotrading.application.notifications.notify_unattributable_movement import (
     NotifyUnattributableMovementUseCase,
@@ -102,7 +108,6 @@ from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
 )
-from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.cycle_composition import (
@@ -166,7 +171,7 @@ class FlowCycles:
         self.credentials: dict[tuple[TenantId, str], Credentials] = {}
         self.users: dict[str, str] = {}
         self.running: threading.Thread | None = None
-        self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.readings = self.platform.readings
         self.equity_snapshots = EquitySnapshotStore()
 
     # The platform
@@ -203,6 +208,9 @@ class FlowCycles:
             RecordProtectionClosingUseCase(
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),
+            ReconciliationAlarmPorts(
+                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
             reconcile_account,
@@ -222,6 +230,7 @@ class FlowCycles:
             ReadCycleFlowStateUseCase(
                 ReadFlowStateUseCase(flows, activity, platform.ledger, exit_plans), reconcile_for_cycle
             ),
+            self.readings,
         )
         order_exchanges = {HYPERLIQUID: platform.order_exchange}
         execute_flow_orders = ExecuteFlowOrdersUseCase(

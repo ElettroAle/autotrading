@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -227,8 +227,9 @@ def test_the_cycles_are_filtered_by_outcome_decision_and_days_and_counted(databa
         failed.planned_at,
         nothing_decided.planned_at,
     ]
-    day = PLANNED.date()
-    assert matched(CycleFilter.named(outcome="concluso", decision="apertura", first_day=day, last_day=day)) == [
+    day = datetime.combine(PLANNED.date(), time(), tzinfo=UTC)
+    last_minute = day + timedelta(hours=23, minutes=59)
+    assert matched(CycleFilter.named(outcome="concluso", decision="apertura", since=day, until=last_minute)) == [
         opening.planned_at
     ]
     assert repository.count(flow_id, CycleFilter.named(outcome="concluso")) == 4

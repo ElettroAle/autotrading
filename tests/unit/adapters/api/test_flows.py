@@ -2,14 +2,16 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
+from tests.support.activity import a_fill
 from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import IdentityProvider
 from tests.support.lifecycle_steps import hold_position
@@ -459,12 +461,15 @@ def test_the_capital_of_a_flow_changes_with_its_history(client_of: Client, platf
     changed = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "700.50"})
 
     assert (changed.status_code, changed.json()["allocated_capital"], changed.json()["version"]) == (200, "700.5", 2)
-    (change,) = anna.get(f"/flows/{flow_id}/capital-changes").json()
+    (change,) = anna.get(f"/flows/{flow_id}/capital-changes").json()["changes"]
     assert change == {
         "changed_at": platform.now.isoformat().replace("+00:00", "Z"),
+        "flow_id": flow_id,
+        "flow": "alfa",
+        "reason": "aumento",
+        "amount": "300.5",
         "previous": "400",
         "new": "700.5",
-        "user_id": platform.directory.person("anna").object_id,
     }
     refused = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "1000.51"})
     assert (refused.status_code, reason_of(refused)) == (
@@ -473,12 +478,51 @@ def test_the_capital_of_a_flow_changes_with_its_history(client_of: Client, platf
     )
 
 
+def earned(platform: Platform, flow_id: str, pnl: str) -> None:
+    profit = a_fill("SOL", None, realized_pnl=Decimal(pnl), size=Decimal(0))
+    platform.ledger.add(account_id_of(platform, "anna"), FlowId(UUID(flow_id)), profit)
+
+
+def test_a_cash_out_answers_the_flow_the_capital_kept_and_what_it_freed(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    anna.post(f"/flows/{flow_id}/start")
+    earned(platform, flow_id, "118")
+
+    response = anna.post(f"/flows/{flow_id}/cash-out", json={"capital": "300"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["flow"]["id"], body["flow"]["status"], body["flow"]["allocated_capital"]) == (flow_id, "attivo", "300")
+    assert (body["freed"], body["capital"], body["left_open"]) == ("218", "300", [])
+
+
+def test_a_cash_out_without_a_body_keeps_the_capital_allocated_now(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    earned(platform, flow_id, "18.5")
+
+    response = anna.post(f"/flows/{flow_id}/cash-out")
+
+    assert (response.status_code, response.json()["freed"], response.json()["capital"]) == (200, "18.5", "400")
+
+
+def test_a_cash_out_of_a_flow_without_profits_is_a_conflict(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.post(f"/flows/{flow_id}/cash-out", json={})
+
+    assert (response.status_code, reason_of(response)) == (409, {"detail": "alfa non ha profitti da incassare"})
+
+
 def test_stop_and_capital_of_a_flow_of_another_tenant_are_not_found(client_of: Client, platform: Platform) -> None:
     flow_id = client_of("anna").post("/flows", json=a_request(platform, "anna")).json()["id"]
     bruno = client_of("bruno")
 
     for response in (
         bruno.post(f"/flows/{flow_id}/stop"),
+        bruno.post(f"/flows/{flow_id}/cash-out"),
         bruno.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "10"}),
         bruno.get(f"/flows/{flow_id}/capital-changes"),
     ):

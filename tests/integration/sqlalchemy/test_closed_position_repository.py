@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -145,8 +145,9 @@ def test_the_closed_positions_are_filtered_by_asset_side_result_after_the_fees_a
     assert matched(ClosedPositionFilter.named(result="persa")) == [lost_short]
     assert matched(ClosedPositionFilter.named(side="short", result="vinta")) == [won_short_reported]
     assert matched(ClosedPositionFilter.named(asset="ETH")) == [won_eth]
-    day = OPENED.date()
-    assert matched(ClosedPositionFilter.named(asset="BTC", result="vinta", first_day=day, last_day=day)) == [
+    day = datetime.combine(OPENED.date(), time(), tzinfo=UTC)
+    last_minute = day + timedelta(hours=23, minutes=59)
+    assert matched(ClosedPositionFilter.named(asset="BTC", result="vinta", since=day, until=last_minute)) == [
         won_short_reported,
         won_long,
     ]

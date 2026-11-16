@@ -78,10 +78,12 @@ class ForecastErrors:
     ) -> None:
         self.forecast(flow, ACTUAL + error, ACTUAL, horizon, expires_at)
 
-    def consult(self, user: str, flow: str, asset: str, horizon: str, days: tuple[date, date] | None = None) -> None:
+    def consult(
+        self, user: str, flow: str, asset: str, horizon: str, interval: tuple[datetime, datetime] | None = None
+    ) -> None:
         command = ReadForecastAccuracyCommand(self.flows[flow].id.value)
-        if days is not None:
-            command = ReadForecastAccuracyCommand(self.flows[flow].id.value, "range", *days)
+        if interval is not None:
+            command = ReadForecastAccuracyCommand(self.flows[flow].id.value, "range", *interval)
         self.seen = self.platform.use_cases_of(user).read_forecast_accuracy.execute(command)
         self.consulted = (asset, HORIZONS[horizon].minutes)
 
@@ -197,7 +199,9 @@ def forecasts_of_the_page(errors: ForecastErrors, flow: str) -> None:
 def consult_period(
     errors: ForecastErrors, *, user: str, flow: str, asset: str, horizon: str, first: str, last: str
 ) -> None:
-    errors.consult(user, flow, asset, horizon, (day(first), day(last)))
+    start = datetime.combine(day(first), datetime.min.time(), tzinfo=UTC)
+    end = datetime.combine(day(last), datetime.max.time(), tzinfo=UTC)
+    errors.consult(user, flow, asset, horizon, (start, end))
 
 
 @when(

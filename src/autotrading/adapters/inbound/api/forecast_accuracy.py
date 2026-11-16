@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from datetime import date
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
@@ -8,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyCommand
 from autotrading.domain.flows.forecast_accuracy import ForecastAccuracy
@@ -53,10 +53,10 @@ def forecast_accuracy_router(use_cases_of_request: Callable[..., TenantUseCases]
         flow_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
         period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
-        first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
-        last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
+        since: IntervalStart = None,
+        until: IntervalEnd = None,
     ) -> FlowForecastAccuracyResponse:
-        command = ReadForecastAccuracyCommand(flow_id, period, first_day, last_day)
+        command = ReadForecastAccuracyCommand(flow_id, period, since, until)
         accuracies = use_cases.read_forecast_accuracy.execute(command)
         return FlowForecastAccuracyResponse(forecasts=[ForecastAccuracyResponse.of(each) for each in accuracies])
 

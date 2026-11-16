@@ -22,7 +22,7 @@ from tests.support.postgres import database_migrated_to
 
 pytestmark = pytest.mark.integration
 
-BEFORE_THE_DEFAULTS = "0025"
+BEFORE_THE_DEFAULTS = "0028"
 DEFAULT_KEYS = ("default_stop_loss_percent", "default_take_profit_percent")
 
 

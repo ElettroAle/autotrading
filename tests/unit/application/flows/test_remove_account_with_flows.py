@@ -8,13 +8,14 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.errors import AccountToRemoveNotFoundError, FlowExchangeUnavailableError
 from autotrading.application.flows.ports import AccountRemovalPorts, PositionToClose
 from autotrading.application.flows.remove_account_with_flows import (
     RemoveAccountWithFlowsCommand,
     RemoveAccountWithFlowsUseCase,
 )
-from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
+from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
@@ -101,7 +102,7 @@ class Removal:
         repository = InMemoryFlowRepositoryAdapter(self.flows, TENANT)
         account_repository = InMemoryAccountRepositoryAdapter(self.accounts, TENANT)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed, TENANT)
-        stop_ports = StopPorts(
+        closing_ports = ClosingPorts(
             self.cycles,
             self.closings,
             OpeningOfEveryAsset(),
@@ -112,7 +113,7 @@ class Removal:
         self.use_case = RemoveAccountWithFlowsUseCase(
             repository,
             AccountRemovalPorts(self.positions, account_repository),
-            StopFlowUseCase(repository, stop_ports),
+            StopFlowUseCase(repository, CloseFlowPositionsUseCase(closing_ports)),
             ArchiveFlowUseCase(repository),
         )
 

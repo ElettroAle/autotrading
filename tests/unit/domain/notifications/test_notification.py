@@ -37,6 +37,10 @@ from autotrading.domain.tenancy.tenant_owned import TenantOwned
             Notification.unattributable_movement("conto-1", Amount(Decimal("12.5"), "USDC")),
             "conto-1: movimento non attribuibile di 12,50 USDC",
         ),
+        (
+            Notification.reconciliation_alarm("test-1", Amount(Decimal(980), "USDC"), Amount(Decimal(1000), "USDC")),
+            "test-1: allarme di riconciliazione, saldo 980 USDC invece di 1000 USDC",
+        ),
     ],
 )
 def test_each_event_names_its_subject_and_its_essential_values(notification: Notification, text: str) -> None:

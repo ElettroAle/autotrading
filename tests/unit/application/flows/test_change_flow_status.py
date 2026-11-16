@@ -51,7 +51,7 @@ def test_a_draft_sharing_an_asset_with_a_flow_of_its_account_does_not_start(draf
 
 def test_a_draft_above_the_free_capital_of_now_does_not_start(drafts: Drafts) -> None:
     draft = drafts.assigned_draft(capital=800)
-    drafts.accounts.balances[drafts.account_id] = Decimal(500)
+    drafts.accounts.set_balance(drafts.account_id, Decimal(500))
 
     with pytest.raises(CapitalAboveFreeCapitalError):
         drafts.start(draft)

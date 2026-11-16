@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
@@ -21,8 +21,8 @@ class RankFlowsCommand:
     """The period of the ranking, the same periods as the statistics (ADR 0122)."""
 
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 # A draft has never run and an archived flow is over: neither competes with the flows at work.
@@ -31,7 +31,7 @@ _OUT_OF_RANKING = frozenset({FlowStatus.DRAFT, FlowStatus.ARCHIVED})
 
 class RankFlowsUseCase:
     """The ranking of the flows of the tenant neither drafts nor archived with a cycle in the period, from the highest
-    return (R2.4.2, ADR 0135).
+    return compounded across the changes of the capital (R2.4.2, ADR 0135, R3.4.3).
     """
 
     def __init__(
@@ -49,7 +49,7 @@ class RankFlowsUseCase:
         self._clock = clock
 
     def execute(self, command: RankFlowsCommand) -> tuple[FlowRanking, ...]:
-        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        period = StatisticsPeriod.named(command.period, command.since, command.until)
         window = period.window(self._clock())
         return ranked_by_return(self._rankings(window))
 
@@ -60,7 +60,9 @@ class RankFlowsUseCase:
             snapshots = self._equity.of_flow(flow.id.value, window)
             if not snapshots:
                 continue
-            yield FlowRanking.of(flow.id.value, flow.name.value, snapshots, self._statistics(flow, window))
+            changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())
+            statistics = self._statistics(flow, window)
+            yield FlowRanking.of(flow.id.value, flow.name.value, snapshots, statistics, changes)
 
     def _statistics(self, flow: Flow, window: TimeWindow) -> FlowStatistics:
         positions = self._positions.closed_within(flow.id, window)

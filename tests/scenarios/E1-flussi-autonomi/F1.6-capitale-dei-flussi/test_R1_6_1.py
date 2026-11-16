@@ -14,6 +14,7 @@ from autotrading.application.flows.list_account_operations import (
 )
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand, ListFlowOperationsUseCase
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import ExecutionKind, FlowTotals
 from autotrading.domain.flows.operations import FUNDING, AccountScope, OperationsPage, OperationsQuery
@@ -259,7 +260,7 @@ def total_value(bench: AttributionBench, a: str) -> None:
 
 @then(step(r'il flusso "{flow}" ha rendimento dall\'avvio del {a}%'))
 def return_since_start(bench: AttributionBench, a: str) -> None:
-    assert bench.consulted().return_percent == amount(a)
+    assert FlowReturn.of(bench.consulted()).percent == amount(a)
 
 
 @then(

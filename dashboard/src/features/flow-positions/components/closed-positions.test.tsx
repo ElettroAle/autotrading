@@ -198,7 +198,7 @@ describe('ClosedPositions', () => {
       fakePlatform.recordClosedPositions('alfa', closedBack(48));
       await renderApp({
         account: 'anna',
-        url: `${URL}?period=range&from=2026-11-13&to=2026-11-13`,
+        url: `${URL}?period=range&from=2026-11-13T00:00Z&to=2026-11-13T22:59Z`,
       });
 
       const rows = await rowsOf();
@@ -210,7 +210,7 @@ describe('ClosedPositions', () => {
       fakePlatform.recordClosedPositions('alfa', closedBack(1));
       await renderApp({
         account: 'anna',
-        url: `${URL}?period=range&from=2026-10-01&to=2026-10-02`,
+        url: `${URL}?period=range&from=2026-10-01T00:00Z&to=2026-10-02T23:59Z`,
       });
 
       expect(
@@ -219,10 +219,10 @@ describe('ClosedPositions', () => {
     });
 
     it('waits for both days of a range', async () => {
-      await renderApp({ account: 'anna', url: `${URL}?period=range&to=2026-10-02` });
+      await renderApp({ account: 'anna', url: `${URL}?period=range&to=2026-10-02T23:59Z` });
 
       expect(
-        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+        await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
       ).toBeInTheDocument();
     });
   });

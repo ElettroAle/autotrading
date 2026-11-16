@@ -197,7 +197,7 @@ def test_the_cycles_go_in_pages_after_the_cursor(database: Engine, anna: TenantH
 
 
 def test_the_closed_positions_of_an_asset_closed_in_a_period(database: Engine, anna: TenantHistory) -> None:
-    period = StatisticsPeriod.named("range", day(10).date(), day(20).date())
+    period = StatisticsPeriod.named("range", day(10, hour=0), day(20, hour=23))
 
     found = anna.adapter(database).closed_positions(query_of(HistoryFilter(period=period, asset="ETH")))
 

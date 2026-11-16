@@ -2,7 +2,7 @@
 errore-medio-della-previsione-nell-api).
 """
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -97,11 +97,13 @@ def test_the_last_days_count_the_forecasts_expired_in_them(platform: Platform) -
     assert accuracy.mean_absolute_error == Decimal(300)
 
 
-def test_a_range_counts_the_forecasts_expired_in_its_days(platform: Platform) -> None:
+def test_a_range_counts_the_forecasts_expired_in_its_minutes(platform: Platform) -> None:
     flow = platform.flow()
     platform.forecast(flow, "60900", "60000", datetime(2026, 11, 10, 11, tzinfo=UTC))
     platform.forecast(flow, "60300", "60000", datetime(2026, 11, 15, 11, tzinfo=UTC))
-    command = ReadForecastAccuracyCommand(flow.id.value, "range", date(2026, 11, 14), date(2026, 11, 16))
+    command = ReadForecastAccuracyCommand(
+        flow.id.value, "range", datetime(2026, 11, 15, 10, 59, tzinfo=UTC), datetime(2026, 11, 15, 11, tzinfo=UTC)
+    )
 
     (accuracy,) = platform.use_case().execute(command)
 

@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.errors import RankingWithoutEquityError
+from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_statistics import FlowStatistics
 
 PERCENT = Decimal(100)
@@ -14,9 +16,10 @@ PERCENT = Decimal(100)
 class FlowRanking:
     """A row of the ranking of the flows over a period (R2.4.2, ADR 0135).
 
-    The return goes from the first to the last equity of the period, and is not available when the first is not
-    positive. The maximum drawdown is the largest fall, in percent, of the equity from a previous positive peak of
-    the period. The rest are the statistics of the same period (R2.2.6).
+    The return goes from the first to the last equity of the period, compounded across the changes of the capital
+    between them (R3.4.3), and is not available when the first is not positive. The maximum drawdown is the largest
+    fall, in percent, of the equity from a previous positive peak of the period. The rest are the statistics of the
+    same period (R2.2.6).
     """
 
     flow_id: UUID
@@ -27,12 +30,18 @@ class FlowRanking:
 
     @classmethod
     def of(
-        cls, flow_id: UUID, flow_name: str, snapshots: Sequence[EquitySnapshot], statistics: FlowStatistics
+        cls,
+        flow_id: UUID,
+        flow_name: str,
+        snapshots: Sequence[EquitySnapshot],
+        statistics: FlowStatistics,
+        changes: Iterable[CapitalChange] = (),
     ) -> FlowRanking:
         if not snapshots:
             raise RankingWithoutEquityError
         curve = [snapshot.equity for snapshot in snapshots]
-        return cls(flow_id, flow_name, _return_of(curve), _max_drawdown_of(curve), statistics)
+        flow_return = FlowReturn.over(snapshots, changes).percent
+        return cls(flow_id, flow_name, flow_return, _max_drawdown_of(curve), statistics)
 
 
 def ranked_by_return(rankings: Iterable[FlowRanking]) -> tuple[FlowRanking, ...]:
@@ -43,13 +52,6 @@ def ranked_by_return(rankings: Iterable[FlowRanking]) -> tuple[FlowRanking, ...]
 def _by_return(ranking: FlowRanking) -> tuple[bool, Decimal, str]:
     unavailable = ranking.return_percent is None
     return unavailable, -(ranking.return_percent or Decimal(0)), ranking.flow_name
-
-
-def _return_of(curve: Sequence[Decimal]) -> Decimal | None:
-    first, last = curve[0], curve[-1]
-    if first <= 0:
-        return None
-    return (last - first) / first * PERCENT
 
 
 def _max_drawdown_of(curve: Iterable[Decimal]) -> Decimal:

@@ -423,3 +423,29 @@ def test_closes_and_updates_ignore_the_minimum_confidence() -> None:
 
     assert risk_check.outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
     assert isinstance(risk_check.outcome(update, EXCHANGE), ApprovedUpdate)
+
+
+SUSPENDED = "allarme di riconciliazione sul conto test-1"
+
+
+def suspended_check(open_assets: frozenset[str] = frozenset()) -> RiskCheck:
+    limits = RiskLimits(50, Decimal(100))
+    positions = {asset: TradeSide.LONG for asset in open_assets}
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), positions, openings_suspended=SUSPENDED)
+    return RiskCheck(RiskPolicy(limits), state)
+
+
+def test_with_the_openings_suspended_an_opening_is_blocked_with_the_reason() -> None:
+    assert suspended_check().outcome(opening("0.03", 2, asset="ETH"), EXCHANGE) == BlockedDecision("ETH", SUSPENDED)
+
+
+def test_with_the_openings_suspended_a_close_is_still_approved() -> None:
+    assert suspended_check(frozenset({"BTC"})).outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
+
+
+def test_with_the_openings_suspended_a_hold_stays_a_hold() -> None:
+    assert suspended_check().outcome(HoldIntent("SOL"), None) == HeldPosition("SOL")
+
+
+def test_the_openings_are_not_suspended_unless_the_state_says_so() -> None:
+    assert check().outcome(opening("0.03", 2), EXCHANGE) == ApprovedOpening("BTC", TradeSide.LONG, Decimal(60), 2, ())

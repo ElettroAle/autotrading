@@ -108,6 +108,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/deviation-threshold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Deviation Threshold */
+        put: operations["set_deviation_threshold_accounts__account_id__deviation_threshold_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{account_id}/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Account Reconciliation */
+        get: operations["read_account_reconciliation_accounts__account_id__reconciliation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{account_id}/reconciliation/alarms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reconciliation Alarms */
+        get: operations["list_reconciliation_alarms_accounts__account_id__reconciliation_alarms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{account_id}/reconciliation/confirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Reconciliation */
+        post: operations["confirm_reconciliation_accounts__account_id__reconciliation_confirmation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exchanges": {
         parameters: {
             query?: never;
@@ -476,6 +544,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/cash-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cash Out Profits */
+        post: operations["cash_out_profits_flows__flow_id__cash_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/allocated-capital": {
         parameters: {
             query?: never;
@@ -486,23 +571,6 @@ export interface paths {
         get?: never;
         /** Change Allocated Capital */
         put: operations["change_allocated_capital_flows__flow_id__allocated_capital_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/flows/{flow_id}/capital-changes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Capital Changes */
-        get: operations["list_capital_changes_flows__flow_id__capital_changes_get"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -590,6 +658,40 @@ export interface paths {
         };
         /** Read Free Capital */
         get: operations["read_free_capital_accounts__account_id__free_capital_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/capital-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Capital Changes */
+        get: operations["list_capital_changes_flows__flow_id__capital_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{account_id}/capital-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Account Capital Changes */
+        get: operations["list_account_capital_changes_accounts__account_id__capital_changes_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -948,6 +1050,18 @@ export interface components {
             /** Positions */
             positions: components["schemas"]["PositionReadingResponse"][];
         };
+        /**
+         * AccountReconciliationResponse
+         * @description Whether the balance of the account is the expected one: aligned without an open alarm (R3.3.1).
+         */
+        AccountReconciliationResponse: {
+            /** Aligned */
+            aligned: boolean;
+            /** Threshold Percent */
+            threshold_percent: string;
+            last_comparison: components["schemas"]["BalanceComparisonResponse"] | null;
+            open_alarm: components["schemas"]["ReconciliationAlarmResponse"] | null;
+        };
         /** AccountRegistrationRequest */
         AccountRegistrationRequest: {
             /**
@@ -1027,6 +1141,23 @@ export interface components {
             /** Currency */
             currency: string;
         };
+        /**
+         * BalanceComparisonResponse
+         * @description The last comparison of the balance of the account; amounts as strings (ADR 0018).
+         */
+        BalanceComparisonResponse: {
+            /**
+             * Compared At
+             * Format: date-time
+             */
+            compared_at: string;
+            /** Expected Balance */
+            expected_balance: string;
+            /** Read Balance */
+            read_balance: string;
+            /** Deviation Percent */
+            deviation_percent: string;
+        };
         /** BalanceResponse */
         BalanceResponse: {
             /** Amount */
@@ -1043,24 +1174,73 @@ export interface components {
             /** Cost Usd */
             cost_usd: string | null;
         };
+        /**
+         * CapitalChangePageResponse
+         * @description A page of the history of the capital, from the most recent row, with how many rows the period holds (R3.4.2).
+         */
+        CapitalChangePageResponse: {
+            /** Page */
+            page: number;
+            /** Has Next */
+            has_next: boolean;
+            /** Total */
+            total: number;
+            /** Currency */
+            currency: string;
+            /** Changes */
+            changes: components["schemas"]["CapitalChangeResponse"][];
+        };
         /** CapitalChangeRequest */
         CapitalChangeRequest: {
             /** Allocated Capital */
             allocated_capital: number | string;
         };
-        /** CapitalChangeResponse */
+        /**
+         * CapitalChangeResponse
+         * @description A row of the history of the capital (R3.4.2): a deposit or a withdrawal of the account has no flow and no capital
+         *     before and after.
+         */
         CapitalChangeResponse: {
             /**
              * Changed At
              * Format: date-time
              */
             changed_at: string;
+            /** Flow Id */
+            flow_id: string | null;
+            /** Flow */
+            flow: string | null;
+            /** Reason */
+            reason: string;
+            /** Amount */
+            amount: string;
             /** Previous */
-            previous: string;
+            previous: string | null;
             /** New */
-            new: string;
-            /** User Id */
-            user_id: string;
+            new: string | null;
+        };
+        /**
+         * CashOutOutcomeResponse
+         * @description The flow after the cash-out, the money it freed and the positions not closed, each with its reason (R3.4.1).
+         *
+         *     With a position left open nothing is freed.
+         */
+        CashOutOutcomeResponse: {
+            flow: components["schemas"]["FlowResponse"];
+            /** Freed */
+            freed: string | null;
+            /** Capital */
+            capital: string | null;
+            /** Left Open */
+            left_open: components["schemas"]["PositionLeftOpenResponse"][];
+        };
+        /**
+         * CashOutRequest
+         * @description The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1).
+         */
+        CashOutRequest: {
+            /** Capital */
+            capital?: number | string | null;
         };
         /**
          * ClosedPositionPageResponse
@@ -1247,6 +1427,19 @@ export interface components {
             system_prompt: string;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+        };
+        /**
+         * DeviationThresholdRequest
+         * @description The threshold of the balance deviation of the account, in percent of the expected balance (R3.3.1).
+         */
+        DeviationThresholdRequest: {
+            /** Percent */
+            percent: number | string;
+        };
+        /** DeviationThresholdResponse */
+        DeviationThresholdResponse: {
+            /** Percent */
+            percent: string;
         };
         /** DifferenceResponse */
         DifferenceResponse: {
@@ -1598,7 +1791,7 @@ export interface components {
         /**
          * FlowStateResponse
          * @description The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
-         *     for (R6.4.2); amounts as strings (ADR 0018).
+         *     for (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018).
          */
         FlowStateResponse: {
             /**
@@ -1623,10 +1816,12 @@ export interface components {
             /** Total Value */
             total_value: string;
             /** Return Percent */
-            return_percent: string;
+            return_percent: string | null;
             /** Positions */
             positions: components["schemas"]["FlowPositionResponse"][];
             summary: components["schemas"]["FlowResultsResponse"];
+            /** Openings Suspended */
+            openings_suspended: string | null;
         };
         /**
          * FlowStatisticsResponse
@@ -2133,6 +2328,25 @@ export interface components {
             /** Key Fields */
             key_fields: components["schemas"]["ProviderKeyFieldResponse"][];
         };
+        /**
+         * ReconciliationAlarmResponse
+         * @description An alarm on the balance of the account: open until confirmed (R3.3.1).
+         */
+        ReconciliationAlarmResponse: {
+            /** Expected Balance */
+            expected_balance: string;
+            /** Read Balance */
+            read_balance: string;
+            /** Deviation Percent */
+            deviation_percent: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Confirmed At */
+            confirmed_at: string | null;
+        };
         /** RiskLimitsResponse */
         RiskLimitsResponse: {
             /** Max Leverage */
@@ -2633,6 +2847,132 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AccountStateResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_deviation_threshold_accounts__account_id__deviation_threshold_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviationThresholdRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviationThresholdResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_account_reconciliation_accounts__account_id__reconciliation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountReconciliationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reconciliation_alarms_accounts__account_id__reconciliation_alarms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationAlarmResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_reconciliation_accounts__account_id__reconciliation_confirmation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3349,6 +3689,41 @@ export interface operations {
             };
         };
     };
+    cash_out_profits_flows__flow_id__cash_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CashOutRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashOutOutcomeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     change_allocated_capital_flows__flow_id__allocated_capital_put: {
         parameters: {
             query?: never;
@@ -3371,37 +3746,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_capital_changes_flows__flow_id__capital_changes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CapitalChangeResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -3575,6 +3919,80 @@ export interface operations {
             };
         };
     };
+    list_capital_changes_flows__flow_id__capital_changes_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapitalChangePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_account_capital_changes_accounts__account_id__capital_changes_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapitalChangePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tradable_assets_assets_get: {
         parameters: {
             query?: never;
@@ -3607,9 +4025,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3649,9 +4067,9 @@ export interface operations {
                 side?: string | null;
                 /** @description vinta o persa, dal PnL al netto delle commissioni */
                 result?: string | null;
-                /** @description primo giorno della chiusura */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno della chiusura */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3687,9 +4105,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3725,9 +4143,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3903,9 +4321,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3942,9 +4360,9 @@ export interface operations {
                 outcome?: string | null;
                 /** @description apertura, chiusura, mantenimento o nessuna */
                 decision?: string | null;
-                /** @description primo giorno dell'intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno dell'intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -4043,9 +4461,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -4086,9 +4504,9 @@ export interface operations {
                 version?: number | null;
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
                 /** @description `next` della pagina precedente */
                 after?: string | null;
@@ -4129,9 +4547,9 @@ export interface operations {
                 version?: number | null;
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
                 /** @description `next` della pagina precedente */
                 after?: string | null;
@@ -4172,9 +4590,9 @@ export interface operations {
                 version?: number | null;
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
                 /** @description `next` della pagina precedente */
                 after?: string | null;
@@ -4210,9 +4628,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;

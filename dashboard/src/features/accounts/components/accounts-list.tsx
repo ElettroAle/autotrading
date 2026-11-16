@@ -12,6 +12,7 @@ import { useFreeCapital } from '../api/get-free-capital';
 import { AccountActions } from './account-actions';
 import { ExchangeAmount } from './exchange-amount';
 import { PublicFields } from './public-fields';
+import { ReconciliationStatus } from './reconciliation-status';
 
 const Balance = ({ account }: { account: Account }) => (
   <ExchangeAmount reading={useAccountBalance(account.id)} unavailable="Saldo non disponibile" />
@@ -46,6 +47,7 @@ const COLUMNS: DataTableColumn<Account>[] = [
     cell: (account) => `${formatAmount(account.allocated_capital)} ${account.currency}`,
   },
   { header: 'Capitale libero', cell: (account) => <FreeCapital account={account} /> },
+  { header: 'Riconciliazione', cell: (account) => <ReconciliationStatus account={account} /> },
   { header: 'Comandi', cell: (account) => <AccountActions account={account} /> },
 ];
 

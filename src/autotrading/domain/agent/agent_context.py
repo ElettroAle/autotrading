@@ -47,7 +47,8 @@ class FlowStateView:
     funds: Decimal
     available_liquidity: Decimal
     total_value: Decimal
-    return_percent: Decimal
+    # None when no return can be measured (R3.4.3).
+    return_percent: Decimal | None
     positions: tuple[PositionView, ...]
 
 
@@ -126,7 +127,7 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
         "soldi_del_flusso": str(state.funds),
         "liquidita_disponibile": str(state.available_liquidity),
         "valore_complessivo": str(state.total_value),
-        "rendimento_dall_avvio_percento": str(state.return_percent),
+        "rendimento_dall_avvio_percento": None if state.return_percent is None else str(state.return_percent),
         "posizioni_aperte": [_position_document(position) for position in state.positions],
     }
 

@@ -4,13 +4,13 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 
-from autotrading.application.flows.flow_account import read_flow_account
+from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import FlowAccountPorts, FlowRepositoryPort
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, require_increase_within, require_reduction_within
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.tenancy.user_id import UserId
 
 operations = logging.getLogger("autotrading.flows")
@@ -26,9 +26,10 @@ class ChangeAllocatedCapitalCommand:
 class ChangeAllocatedCapitalUseCase:
     """Raises or lowers the capital allocated to a flow in any status but archived (R1.1.7, ADR 0053).
 
-    A raise is checked against the balance of the account read now; a reduction against the state of the flow read
-    now (R1.6.1), so that its liquidity does not go below zero (ADR 0068). The new capital is the next configuration
-    version, so the cycle under way keeps its own.
+    A raise is checked against the free capital of the account read now; a reduction against the state of the flow
+    read now (R1.6.1), so that its liquidity does not go below zero (ADR 0068). The new capital is the next
+    configuration version, so the cycle under way keeps its own; the change records the value of the flow before it
+    (ADR incasso-dei-profitti).
     """
 
     def __init__(
@@ -49,8 +50,9 @@ class ChangeAllocatedCapitalUseCase:
         current = flow.configuration.assigned_capital
         if command.capital == current:
             return flow
-        self._require_admitted(flow, command.capital)
-        change = CapitalChange(flow.id, self._clock(), current, command.capital, command.user_id)
+        state = self._flow_state.execute(ReadFlowStateCommand(flow.id))
+        self._require_admitted(flow, state, command.capital)
+        change = CapitalChange.of(state, command.capital, self._clock(), command.user_id)
         self._flows.add_capital_change(changed, change)
         operations.info(
             "capitale allocato cambiato",
@@ -58,13 +60,10 @@ class ChangeAllocatedCapitalUseCase:
         )
         return changed
 
-    def _require_admitted(self, flow: Flow, capital: Decimal) -> None:
+    def _require_admitted(self, flow: Flow, state: FlowState, capital: Decimal) -> None:
         current = flow.configuration.assigned_capital
         if capital > current:
-            account_id = flow.assigned_account_id
-            account = read_flow_account(self._accounts, account_id)
-            free_capital = FreeCapital.of_account(account.balance, account.currency, account_id, self._flows.list())
+            free_capital = read_free_capital(self._flows, self._accounts, flow.assigned_account_id)
             require_increase_within(current, capital, free_capital)
             return
-        state = self._flow_state.execute(ReadFlowStateCommand(flow.id))
         require_reduction_within(replace(state, allocated_capital=capital))

@@ -1,10 +1,11 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
 from autotrading.application.flows.rank_flows import RankFlowsCommand, RankFlowsUseCase
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
@@ -14,6 +15,7 @@ from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
@@ -100,6 +102,26 @@ def test_the_ranking_goes_from_the_highest_return_of_the_whole_life(platform: Pl
     assert (rows[0].return_percent, rows[0].max_drawdown_percent) == (Decimal(20), Decimal(10))
 
 
+def test_the_return_of_a_flow_is_compounded_across_the_changes_of_its_capital(platform: Platform) -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: an increase of 900 at 1100, then 2100.
+    flow = platform.flow("alfa", "1000", "1100", "2100")
+    increase = CapitalChange(
+        flow.id,
+        RECENT + CYCLE + CYCLE / 2,
+        Decimal(1000),
+        Decimal(1900),
+        UserId("anna"),
+        CapitalChangeReason.INCREASE,
+        Decimal(900),
+        value_before=Decimal(1100),
+    )
+    platform.flows.capital_changes[flow.id] = [increase]
+
+    (row,) = platform.use_case().execute(RankFlowsCommand())
+
+    assert row.return_percent == Decimal("15.50")
+
+
 def test_the_ranking_leaves_out_the_archived_flows(platform: Platform) -> None:
     platform.flow("alfa", "100", "110")
     platform.flow("vecchio", "100", "300", status=FlowStatus.ARCHIVED)
@@ -160,16 +182,16 @@ def test_the_statistics_of_a_row_are_those_of_the_period(platform: Platform) -> 
 def test_the_ranking_of_a_range_reads_its_days(platform: Platform) -> None:
     platform.flow("alfa", "100", "110", since=LONG_AGO)
     platform.flow("beta", "100", "120")
-    day = LONG_AGO.date()
-
-    rows = platform.use_case().execute(RankFlowsCommand("range", day, day))
+    rows = platform.use_case().execute(RankFlowsCommand("range", LONG_AGO, LONG_AGO))
 
     assert names(rows) == ["alfa"]
 
 
 def test_an_invalid_period_is_refused(platform: Platform) -> None:
     with pytest.raises(InvalidStatisticsPeriodError):
-        platform.use_case().execute(RankFlowsCommand("range", date(2026, 11, 3), date(2026, 11, 1)))
+        platform.use_case().execute(
+            RankFlowsCommand("range", datetime(2026, 11, 3, 10, tzinfo=UTC), datetime(2026, 11, 3, 9, tzinfo=UTC))
+        )
 
 
 def test_the_ranking_is_empty_without_flows(platform: Platform) -> None:

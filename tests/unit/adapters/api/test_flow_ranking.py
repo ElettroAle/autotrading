@@ -138,18 +138,18 @@ def test_a_range_takes_its_days_from_from_and_to(client_of: Client, platform: Pl
     flow_of(platform, "anna", "beta", "100", "120")
     day = (platform.now - timedelta(days=20)).date().isoformat()
 
-    body = anna.get("/flows/ranking", params={"period": "range", "from": day, "to": day}).json()
+    body = anna.get("/flows/ranking", params={"period": "range", "from": f"{day}T00:00Z", "to": f"{day}T23:59Z"}).json()
 
     assert [row["flow_name"] for row in body] == ["alfa"]
 
 
 def test_an_invalid_period_answers_400_with_the_reason(client_of: Client) -> None:
-    params = {"period": "range", "from": "2026-11-03", "to": "2026-11-01"}
+    params = {"period": "range", "from": "2026-11-03T10:00Z", "to": "2026-11-03T09:59Z"}
 
     response = client_of("anna").get("/flows/ranking", params=params)
 
     assert response.status_code == 400
-    assert reason_of(response) == {"detail": "periodo non valido: il giorno iniziale è successivo al giorno finale"}
+    assert reason_of(response) == {"detail": "periodo non valido: l'inizio è successivo alla fine"}
 
 
 def test_the_ranking_shows_only_the_flows_of_the_user(client_of: Client, platform: Platform) -> None:

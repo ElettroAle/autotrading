@@ -24,3 +24,9 @@ describe('paths.flowCycles', () => {
     expect(paths.flowCycles.getHref('flow-alfa', page, outcome)).toBe(href);
   });
 });
+
+describe('paths.accountAlarms', () => {
+  it('leads to the alarms of the account', () => {
+    expect(paths.accountAlarms.getHref('account-test-1')).toBe('/accounts/account-test-1/alarms');
+  });
+});

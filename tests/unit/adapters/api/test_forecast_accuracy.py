@@ -122,14 +122,15 @@ def test_without_evaluated_forecasts_in_the_period_the_means_are_null(client_of:
     assert (entry["mean_absolute_error"], entry["mean_percent_error"], entry["evaluated"]) == (None, None, 0)
 
 
-def test_a_range_takes_its_days_from_from_and_to(client_of: Client, platform: Platform) -> None:
+def test_a_range_takes_its_minutes_from_from_and_to(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     flow = flow_of(platform, "anna")
     forecast(platform, flow, predicted="60900", actual="60000", age=timedelta(days=10))
     forecast(platform, flow, predicted="60300", actual="60000", age=timedelta(days=2))
-    day = (platform.now - timedelta(days=2)).date().isoformat()
+    expiry = platform.now - timedelta(days=2)
+    start, end = (expiry - timedelta(minutes=1)).isoformat(), expiry.isoformat()
 
-    params = {"period": "range", "from": day, "to": day}
+    params = {"period": "range", "from": start, "to": end}
     (entry,) = anna.get(f"/flows/{flow.id.value}/forecast-accuracy", params=params).json()["forecasts"]
 
     assert (entry["mean_absolute_error"], entry["evaluated"]) == ("300", 1)
@@ -146,11 +147,11 @@ def test_an_invalid_period_answers_400_with_the_reason(client_of: Client, platfo
     anna = client_of("anna")
     flow = flow_of(platform, "anna")
 
-    params = {"period": "range", "from": "2026-11-03", "to": "2026-11-01"}
+    params = {"period": "range", "from": "2026-11-03T10:00", "to": "2026-11-01T10:00"}
     response = anna.get(f"/flows/{flow.id.value}/forecast-accuracy", params=params)
 
     assert response.status_code == 400
-    assert reason_of(response) == {"detail": "periodo non valido: il giorno iniziale è successivo al giorno finale"}
+    assert reason_of(response) == {"detail": "periodo non valido: l'inizio è successivo alla fine"}
 
 
 def test_the_error_of_a_flow_of_another_user_does_not_exist(client_of: Client, platform: Platform) -> None:

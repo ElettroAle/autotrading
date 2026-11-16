@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.strategy_document import StrategyDocument,
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
+from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
@@ -20,14 +21,13 @@ from autotrading.application.flows.create_flow import CreateFlowCommand, SourceR
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
-from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.cash_out import CashOutOutcome
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
@@ -366,24 +366,35 @@ class StopOutcomeResponse(BaseModel):
         )
 
 
-class CapitalChangeRequest(BaseModel):
-    allocated_capital: Decimal
+class CashOutRequest(BaseModel):
+    """The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1)."""
+
+    capital: Decimal | None = None
 
 
-class CapitalChangeResponse(BaseModel):
-    changed_at: datetime
-    previous: str
-    new: str
-    user_id: str
+class CashOutOutcomeResponse(BaseModel):
+    """The flow after the cash-out, the money it freed and the positions not closed, each with its reason (R3.4.1).
+
+    With a position left open nothing is freed.
+    """
+
+    flow: FlowResponse
+    freed: str | None
+    capital: str | None
+    left_open: list[PositionLeftOpenResponse]
 
     @classmethod
-    def of(cls, change: CapitalChange) -> CapitalChangeResponse:
+    def of(cls, outcome: CashOutOutcome) -> CashOutOutcomeResponse:
         return cls(
-            changed_at=change.changed_at,
-            previous=amount_text(change.previous),
-            new=amount_text(change.new),
-            user_id=change.user_id.value,
+            flow=FlowResponse.of(outcome.flow),
+            freed=_amount(outcome.freed),
+            capital=_amount(outcome.flow.configuration.allocated_capital),
+            left_open=[PositionLeftOpenResponse.of(position) for position in outcome.left_open],
         )
+
+
+class CapitalChangeRequest(BaseModel):
+    allocated_capital: Decimal
 
 
 def flows_router(
@@ -461,6 +472,17 @@ def flows_router(
     ) -> StopOutcomeResponse:
         return StopOutcomeResponse.of(use_cases.stop_flow.execute(StopFlowCommand(FlowId(flow_id), user_id)))
 
+    @router.post("/flows/{flow_id}/cash-out")
+    def cash_out_profits(
+        flow_id: UUID,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        user_id: Annotated[UserId, Depends(user_of_request)],
+        request: CashOutRequest | None = None,
+    ) -> CashOutOutcomeResponse:
+        capital = None if request is None else request.capital
+        command = CashOutProfitsCommand(FlowId(flow_id), user_id, capital)
+        return CashOutOutcomeResponse.of(use_cases.cash_out_profits.execute(command))
+
     @router.put("/flows/{flow_id}/allocated-capital")
     def change_allocated_capital(
         flow_id: UUID,
@@ -470,13 +492,6 @@ def flows_router(
     ) -> FlowResponse:
         command = ChangeAllocatedCapitalCommand(FlowId(flow_id), request.allocated_capital, user_id)
         return FlowResponse.of(use_cases.change_allocated_capital.execute(command))
-
-    @router.get("/flows/{flow_id}/capital-changes")
-    def list_capital_changes(
-        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> list[CapitalChangeResponse]:
-        changes = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(FlowId(flow_id)))
-        return [CapitalChangeResponse.of(change) for change in changes]
 
     @router.post("/flows/{flow_id}/duplicate", status_code=status.HTTP_201_CREATED)
     def duplicate_flow(

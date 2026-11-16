@@ -149,14 +149,14 @@ def test_the_cycles_filtered_by_decision_are_those_where_the_agent_took_it(
     assert decided("nessuna") == [3, 2]
 
 
-def test_the_cycles_filtered_by_days_are_those_planned_within_them(
+def test_the_cycles_filtered_by_an_interval_are_those_planned_within_it(
     history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
 ) -> None:
     history.record(CycleRecord(FLOW, FIRST - timedelta(minutes=1), CycleOutcome.COMPLETED))
     record_cycles(history, 2)
     history.record(CycleRecord(FLOW, FIRST + timedelta(days=1), CycleOutcome.COMPLETED))
 
-    criteria = CycleFilter.named(first_day=FIRST.date(), last_day=FIRST.date())
+    criteria = CycleFilter.named(since=FIRST, until=FIRST + timedelta(minutes=1))
     command = ListCyclesCommand(FLOW, criteria=criteria)
     page = ListCyclesUseCase(directory, history).execute(command)
 

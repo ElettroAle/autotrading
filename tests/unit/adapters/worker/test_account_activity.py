@@ -8,8 +8,9 @@ import httpx
 import pytest
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
-from autotrading.adapters.outbound.worker.account_activity import WorkerAccountActivityAdapter
+from autotrading.adapters.outbound.worker.account_activity import TIMEOUT_SECONDS, WorkerAccountActivityAdapter
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.activity import a_movement, a_position, an_activity
 from tests.support.served_in_memory import served_in_memory
@@ -120,3 +121,17 @@ def test_a_refusal_of_the_worker_is_never_read_as_an_activity() -> None:
 
     with pytest.raises(FlowExchangeUnavailableError):
         answering(503, body).execute(uuid4())
+
+
+def test_the_calls_declare_their_own_timeout() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(httpx.codes.OK, json=[])
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://worker")
+    WorkerAccountActivityAdapter(client, TOKEN, TENANT).transfers(uuid4(), TimeWindow())
+
+    (request,) = seen
+    assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS

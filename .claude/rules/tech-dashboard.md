@@ -71,7 +71,7 @@ dati (`eslint.architecture.js`). Chiamate HTTP con `fetch`, dal client di `src/l
 - Unit test con Vitest + Testing Library accanto al modulo (`<modulo>.test.ts(x)`); l'API e l'identity provider sono i
   finti MSW di `src/testing/mocks`, che tengono lo stato della piattaforma finta (`fakePlatform`). MSAL è quello vero.
 - Scenari: i `.feature` dei requisiti della dashboard, elencati in `features` di `dashboard/playwright.config.ts` (oggi
-  `specs/E2-*`, `specs/E3-*/F3.6-*` e `specs/E6-*/F6.4-*`), eseguiti da `playwright-bdd` sulla build servita da `server/`, con il browser
+  `specs/E2-*`, `specs/E3-*` e `specs/E6-*/F6.4-*`), eseguiti da `playwright-bdd` sulla build servita da `server/`, con il browser
   instradato agli stessi finti MSW. Passi in `e2e/scenarios/<epic>/<feature>/<requisito>.steps.ts`, in kebab-case;
   passi condivisi e fixture in `e2e/support/`. Ogni `Allora` e ogni `E` ha la propria asserzione.
 - Ogni prova si vede rossa prima di diventare verde. Copertura di righe e rami oltre il 90% (`vitest --coverage`),

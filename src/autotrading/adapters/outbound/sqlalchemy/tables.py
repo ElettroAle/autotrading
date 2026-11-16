@@ -54,6 +54,8 @@ accounts = Table(
     Column("credentials_ciphertext", LargeBinary),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("removed_at", DateTime(timezone=True)),
+    # In percent of the expected balance, 1 unless the user sets another (R3.3.1).
+    Column("deviation_threshold", Numeric, nullable=False, server_default=text("1")),
     Index(
         "accounts_name_unique_in_tenant",
         "tenant_id",
@@ -179,6 +181,10 @@ flow_capital_changes = Table(
     Column("new_capital", Numeric, nullable=False),
     Column("user_id", Text, nullable=False),
     Column("version", Integer, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("amount", Numeric, nullable=False),
+    Column("value_before", Numeric),
+    Column("cashed_profit", Numeric, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     ForeignKeyConstraint(["flow_id", "version"], ["flow_versions.flow_id", "flow_versions.version"]),
 )
@@ -234,6 +240,7 @@ equity_snapshots = Table(
     Column("unrealized_pnl", Numeric, nullable=False),
     Column("fees", Numeric, nullable=False),
     Column("funding", Numeric, nullable=False),
+    Column("cashed_profit", Numeric, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     postgresql_partition_by="RANGE (planned_at)",
 )
@@ -301,6 +308,32 @@ account_readings = Table(
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
     Column("read_at", DateTime(timezone=True), nullable=False),
     Column("open_assets", JSON, nullable=False),
+    # The balance the next comparison starts from, and the comparison of this reading (R3.3.1): empty for a reading
+    # saved before the balances were compared, and the comparison for the first reading of an account.
+    Column("reference_balance", Numeric),
+    Column("expected_balance", Numeric),
+    Column("read_balance", Numeric),
+)
+
+# At most one alarm open per account, also with two cycles of the account together (R3.3.1).
+reconciliation_alarms = Table(
+    "reconciliation_alarms",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("expected_balance", Numeric, nullable=False),
+    Column("read_balance", Numeric, nullable=False),
+    Column("deviation_percent", Numeric, nullable=False),
+    Column("opened_at", DateTime(timezone=True), nullable=False),
+    Column("confirmed_at", DateTime(timezone=True)),
+    Index(
+        "reconciliation_alarms_open_unique",
+        "tenant_id",
+        "account_id",
+        unique=True,
+        postgresql_where=text("confirmed_at IS NULL"),
+    ),
 )
 
 # Recorded once while the case lasts: unique among the cases not resolved (R1.6.2, ADR 0045).

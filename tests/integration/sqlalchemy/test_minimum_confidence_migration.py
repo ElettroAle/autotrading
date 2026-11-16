@@ -23,7 +23,7 @@ from tests.support.postgres import database_migrated_to
 
 pytestmark = pytest.mark.integration
 
-BEFORE_THE_MINIMUM_CONFIDENCE = "0027"
+BEFORE_THE_MINIMUM_CONFIDENCE = "0030"
 MINIMUM_CONFIDENCE = "minimum_confidence"
 
 

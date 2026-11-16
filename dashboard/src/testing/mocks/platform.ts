@@ -3,6 +3,7 @@ import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
+import { fakeReconciliation } from './reconciliation';
 
 /**
  * The platform behind the fakes: the users of the identity provider, their role, the accounts and the flows of their
@@ -119,6 +120,21 @@ export type FakeAccount = {
   publicFields: Record<string, string>;
   /** The currency the account settles in, which the results of its flows are written in (R6.4.2). */
   currency: string;
+};
+
+/**
+ * A row of the history of the capital of an account, as the API answers it (R3.4.2): a change of the capital of one of
+ * its flows, or a deposit or a withdrawal of the account, which has no flow and no capital before and after.
+ */
+export type FakeCapitalChange = {
+  readonly accountId: string;
+  readonly changed_at: string;
+  readonly flow_id: string | null;
+  readonly flow: string | null;
+  readonly reason: string;
+  readonly amount: string;
+  readonly previous: string | null;
+  readonly new: string | null;
 };
 
 /** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
@@ -267,6 +283,12 @@ export const FAKE_FLOW_COMMANDS = ['pause', 'resume', 'stop', 'archive'] as cons
 
 export type FakeFlowCommand = (typeof FAKE_FLOW_COMMANDS)[number];
 
+/** The flow after a cash-out of its profits and what the cash-out freed (R3.4.1). */
+export type FakeCashOut = {
+  readonly flow: FakeFlow;
+  readonly freed: number;
+};
+
 type Transition = {
   readonly from: readonly string[];
   readonly to: string;
@@ -341,6 +363,8 @@ const state = {
   cycles: new Map<string, FakeCycle[]>(),
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
+  cashOuts: [] as string[],
+  capitalChanges: [] as FakeCapitalChange[],
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
   exchangeReachable: true,
@@ -496,6 +520,8 @@ export const fakePlatform = {
     state.cycles.clear();
     state.openPositions.clear();
     state.closedPositions.clear();
+    state.cashOuts.length = 0;
+    state.capitalChanges.length = 0;
     state.signingIn = undefined;
     state.sessionsExpired = false;
     state.exchangeReachable = true;
@@ -503,6 +529,7 @@ export const fakePlatform = {
     state.exchangeNetwork = 'test';
     state.exchangeNetworkName = 'testnet';
     state.apiAnswers = true;
+    fakeReconciliation.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
@@ -939,6 +966,45 @@ export const fakePlatform = {
     }
     flow.status = transition.to;
     return flow;
+  },
+
+  /**
+   * The cash-out of the profits of the flow, refused as the API refuses it: it closes every position, keeps the capital
+   * asked for, or the capital allocated now, and frees the rest of what the flow is worth (R3.4.1).
+   */
+  cashOut(user: FakeUser, flowId: string, capital: number | undefined): FakeCashOut {
+    const flow = flowOf(user, flowId);
+    const allocated = flow.allocatedCapital ?? 0;
+    if (flow.currentCapital <= allocated) {
+      throw new FakeRefusal(409, `${flow.name} non ha profitti da incassare`);
+    }
+    const kept = capital ?? allocated;
+    if (kept <= 0 || kept >= flow.currentCapital) {
+      throw new FakeRefusal(
+        400,
+        `il capitale indicato è maggiore di 0 e minore del valore del flusso, ${String(flow.currentCapital)} USDC`,
+      );
+    }
+    state.openPositions.delete(flow.id);
+    const freed = flow.currentCapital - kept;
+    flow.allocatedCapital = kept;
+    flow.currentCapital = kept;
+    state.cashOuts.push(flow.id);
+    return { flow, freed };
+  },
+
+  /** A row of the history of the capital, in any order: the fake API serves them from the most recent (R3.4.2). */
+  recordCapitalChange(change: FakeCapitalChange): void {
+    state.capitalChanges.push(change);
+  },
+
+  capitalChangesOfAccount(accountId: string): FakeCapitalChange[] {
+    return state.capitalChanges.filter((change) => change.accountId === accountId);
+  },
+
+  /** How many cash-outs of the flow with the name the fake API ran. */
+  cashOutsOf(flowName: string): number {
+    return state.cashOuts.filter((flowId) => flowId === flowIdOf(flowName)).length;
   },
 
   /** Time passes for the worker: every active flow runs one cycle per interval of its own. */
