@@ -160,7 +160,7 @@ describe('FlowView', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(
-      screen.getAllByText("Scegli il primo e l'ultimo giorno dell'intervallo.").length,
+      screen.getAllByText("Scegli l'inizio e la fine dell'intervallo.").length,
     ).toBeGreaterThan(0);
     expect(
       screen.queryByRole('region', { name: 'Riepilogo dei risultati' }),

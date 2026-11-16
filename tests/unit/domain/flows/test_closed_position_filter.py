@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -98,14 +98,21 @@ def test_the_asset_admits_only_positions_on_that_asset() -> None:
     assert not criteria.matches(a_position(asset="BTC"))
 
 
-def test_the_days_admit_the_positions_closed_within_them() -> None:
-    criteria = ClosedPositionFilter.named(first_day=date(2026, 11, 12), last_day=date(2026, 11, 12))
+def test_the_minutes_of_the_interval_admit_the_positions_closed_within_them() -> None:
+    criteria = ClosedPositionFilter.named(
+        since=datetime(2026, 11, 12, 9, 15, tzinfo=UTC), until=datetime(2026, 11, 12, 11, 40, tzinfo=UTC)
+    )
 
-    assert criteria.window == TimeWindow(datetime(2026, 11, 12, tzinfo=UTC), datetime(2026, 11, 13, tzinfo=UTC))
-    assert criteria.matches(a_position(closed_at=datetime(2026, 11, 12, 23, 59, tzinfo=UTC)))
-    assert not criteria.matches(a_position(closed_at=datetime(2026, 11, 13, tzinfo=UTC)))
+    assert criteria.window == TimeWindow(
+        datetime(2026, 11, 12, 9, 15, tzinfo=UTC), datetime(2026, 11, 12, 11, 41, tzinfo=UTC)
+    )
+    assert criteria.matches(a_position(closed_at=datetime(2026, 11, 12, 11, 40, 59, tzinfo=UTC)))
+    assert not criteria.matches(a_position(closed_at=datetime(2026, 11, 12, 11, 41, tzinfo=UTC)))
+    assert not criteria.matches(a_position(closed_at=datetime(2026, 11, 12, 9, 14, 59, tzinfo=UTC)))
 
 
-def test_a_last_day_before_the_first_is_refused() -> None:
+def test_an_end_before_the_start_is_refused() -> None:
     with pytest.raises(RangeEndingBeforeStartError):
-        ClosedPositionFilter.named(first_day=date(2026, 11, 3), last_day=date(2026, 11, 1))
+        ClosedPositionFilter.named(
+            since=datetime(2026, 11, 3, 10, tzinfo=UTC), until=datetime(2026, 11, 3, 9, tzinfo=UTC)
+        )

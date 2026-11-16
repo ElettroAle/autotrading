@@ -2,9 +2,18 @@ import { useId } from 'react';
 
 import { FILTER, FILTER_FIELD, FILTER_ROW } from '../filters';
 
-import { PERIODS, useMenuPeriod, type PeriodKind } from './use-period';
+import {
+  instantOfLocalInput,
+  localInputOf,
+  PERIODS,
+  useMenuPeriod,
+  type PeriodKind,
+} from './use-period';
 
-/** The period of the panels of a page: the same choice for statistics, equity curve and ranking (ADR 0123). */
+/**
+ * The period of the panels of a page: the same choice for statistics, equity curve and ranking (ADR 0123); a range
+ * takes the date and time of each end, in the time zone of the browser (ADR periodo-al-minuto).
+ */
 export const PeriodSelector = () => {
   const [period, choose] = useMenuPeriod();
   const id = useId();
@@ -31,20 +40,24 @@ export const PeriodSelector = () => {
             <label htmlFor={`${id}-from`}>Dal</label>
             <input
               id={`${id}-from`}
-              type="date"
+              type="datetime-local"
               className={FILTER_FIELD}
-              value={period.from}
-              onChange={(event) => choose({ ...period, from: event.target.value })}
+              value={localInputOf(period.from)}
+              onChange={(event) =>
+                choose({ ...period, from: instantOfLocalInput(event.target.value) })
+              }
             />
           </div>
           <div className={FILTER}>
             <label htmlFor={`${id}-to`}>Al</label>
             <input
               id={`${id}-to`}
-              type="date"
+              type="datetime-local"
               className={FILTER_FIELD}
-              value={period.to}
-              onChange={(event) => choose({ ...period, to: event.target.value })}
+              value={localInputOf(period.to)}
+              onChange={(event) =>
+                choose({ ...period, to: instantOfLocalInput(event.target.value) })
+              }
             />
           </div>
         </>

@@ -98,8 +98,9 @@ export const preparePagesWithLongWords = (
 /**
  * The elements of the page that go past the screen or out of their own box, by tag and text: a text wider than its
  * box spills over its neighbours even when the page does not scroll. Fields cut their value short on purpose
- * (ADR 0146), boxes that scroll their content, as the charts, keep it inside, and the text for screen readers is hidden
- * on purpose.
+ * (ADR 0146), boxes that scroll their content keep it inside, and the text for screen readers is hidden on purpose. A
+ * chart as wide as its room is measured through a box of no size on purpose, so it can shrink: its own width within its
+ * room is proven by e2e/layout/equity-curve-width.spec.ts (ADR equity-curve-larga-come-lo-schermo).
  */
 export const elementsOutOfTheirBox = async (dashboard: DashboardPages): Promise<string[]> =>
   dashboard.page.evaluate((width) => {
@@ -116,7 +117,8 @@ export const elementsOutOfTheirBox = async (dashboard: DashboardPages): Promise<
       return false;
     };
     const exempt = (element: HTMLElement): boolean =>
-      element.closest('input, select, textarea, .sr-only, svg') !== null ||
+      element.closest('input, select, textarea, .sr-only, svg, .recharts-responsive-container') !==
+        null ||
       getComputedStyle(element).display === 'contents' ||
       insideAScrollingBox(element);
     return [...document.body.querySelectorAll<HTMLElement>('*')]

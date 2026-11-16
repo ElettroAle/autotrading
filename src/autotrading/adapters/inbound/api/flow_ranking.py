@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
@@ -7,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.rank_flows import RankFlowsCommand
 from autotrading.domain.flows.flow_ranking import FlowRanking
@@ -54,10 +54,10 @@ def flow_ranking_router(use_cases_of_request: Callable[..., TenantUseCases]) -> 
     def rank_flows(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
         period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
-        first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
-        last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
+        since: IntervalStart = None,
+        until: IntervalEnd = None,
     ) -> list[FlowRankingResponse]:
-        command = RankFlowsCommand(period, first_day, last_day)
+        command = RankFlowsCommand(period, since, until)
         return [FlowRankingResponse.of(ranking) for ranking in use_cases.rank_flows.execute(command)]
 
     return router

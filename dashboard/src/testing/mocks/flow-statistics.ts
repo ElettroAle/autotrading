@@ -8,13 +8,33 @@ export type Window = { readonly since?: number; readonly until?: number };
 /** The answer of the API to a period it rejects, with the reason it gives (ADR 0122). */
 export class InvalidPeriod extends Error {}
 
-// The period of the API: the whole life, the last 7 or 30 days, or the days from `from` to `to`, both whole, in UTC.
+const MINUTE_MS = 60 * 1000;
+const ZONE = /(Z|[+-]\d{2}:?\d{2})$/;
+
+/**
+ * The minute of an instant of the query string, as the API reads it (ADR periodo-al-minuto): ISO 8601, in UTC without
+ * a zone, a date alone its midnight in UTC.
+ */
+export const minuteOf = (text: string): number => {
+  const withTime = text.includes('T') ? text : `${text}T00:00`;
+  const time = Date.parse(ZONE.test(withTime) ? withTime : `${withTime}Z`);
+  return time - (time % MINUTE_MS);
+};
+
+/** The window of the instants `from` and `to` of the query string, the minute of `to` included. */
+export const intervalWindowOf = (from: string | null, to: string | null): Window => ({
+  ...(from === null ? {} : { since: minuteOf(from) }),
+  ...(to === null ? {} : { until: minuteOf(to) + MINUTE_MS }),
+});
+
+// The period of the API: the whole life, the last 7 or 30 days, or the minutes from `from` to `to` (ADR
+// periodo-al-minuto).
 export const windowOf = (search: URLSearchParams, now: number): Window => {
   const period = search.get('period') ?? 'all';
   const from = search.get('from');
   const to = search.get('to');
   if (period !== 'range' && (from !== null || to !== null)) {
-    throw new InvalidPeriod('periodo non valido: i giorni valgono solo per un intervallo');
+    throw new InvalidPeriod('periodo non valido: inizio e fine valgono solo per un intervallo');
   }
   if (period === 'all') {
     return {};
@@ -27,14 +47,12 @@ export const windowOf = (search: URLSearchParams, now: number): Window => {
     throw new InvalidPeriod('periodo non valido: scegliere tra all, 7d, 30d, range');
   }
   if (from === null || to === null) {
-    throw new InvalidPeriod(
-      'periodo non valido: un intervallo ha il giorno iniziale e il giorno finale',
-    );
+    throw new InvalidPeriod("periodo non valido: un intervallo ha l'inizio e la fine");
   }
-  if (from > to) {
-    throw new InvalidPeriod('periodo non valido: il giorno iniziale è successivo al giorno finale');
+  if (minuteOf(from) > minuteOf(to)) {
+    throw new InvalidPeriod("periodo non valido: l'inizio è successivo alla fine");
   }
-  return { since: Date.parse(`${from}T00:00:00Z`), until: Date.parse(`${to}T00:00:00Z`) + DAY_MS };
+  return intervalWindowOf(from, to);
 };
 
 export const contains = (window: Window, instant: Date): boolean =>

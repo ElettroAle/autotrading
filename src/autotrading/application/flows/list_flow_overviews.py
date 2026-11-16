@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 
 from autotrading.application.flows.ports import CycleHistoryPort, FlowSummary, FlowSummaryPort
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand, ReadFlowResultsUseCase
@@ -18,8 +18,8 @@ class ListFlowOverviewsCommand:
     """The period of the results of every flow, the same periods as the statistics (ADR 0122, R6.4.2)."""
 
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +70,7 @@ class ListFlowOverviewsUseCase:
         self._clock = clock
 
     def execute(self, command: ListFlowOverviewsCommand) -> list[FlowOverview]:
-        StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        StatisticsPeriod.named(command.period, command.since, command.until)
         now = self._clock()
         return [self._overview_of(summary, command, now) for summary in self._summaries.execute()]
 
@@ -80,6 +80,6 @@ class ListFlowOverviewsUseCase:
         if FlowStatus(summary.status) is FlowStatus.DRAFT:
             return FlowOverview(summary, self._environment, recent, next_cycle_at, None)
         results = self._flow_results.execute(
-            ReadFlowResultsCommand(summary.flow_id, command.period, command.first_day, command.last_day)
+            ReadFlowResultsCommand(summary.flow_id, command.period, command.since, command.until)
         )
         return FlowOverview(summary, self._environment, recent, next_cycle_at, results)

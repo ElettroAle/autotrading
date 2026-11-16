@@ -12,7 +12,13 @@ import {
 } from './flow-configuration';
 import { rankingOf } from './flow-ranking';
 import { resultsOf } from './flow-results';
-import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
+import {
+  contains,
+  intervalWindowOf,
+  InvalidPeriod,
+  periodAdmits,
+  statisticsOf,
+} from './flow-statistics';
 import { forecastAccuracyOf } from './forecast-accuracy';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
@@ -193,19 +199,11 @@ const admits = (request: Request, name: string, value: string | undefined): bool
   return asked === null || asked === value;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// The days of the query string, both whole, in UTC, as the lists of the API read them (R6.4.4): a missing day does not
-// limit its side.
-const admitsDays = (request: Request, instant: string): boolean => {
+// The instants of the query string, to the minute, as the lists of the API read them (R6.4.4, ADR periodo-al-minuto): a
+// missing instant does not limit its side.
+const admitsInterval = (request: Request, instant: string): boolean => {
   const search = new URL(request.url).searchParams;
-  const from = search.get('from');
-  const to = search.get('to');
-  const time = Date.parse(instant);
-  return (
-    (from === null || time >= Date.parse(`${from}T00:00:00Z`)) &&
-    (to === null || time < Date.parse(`${to}T00:00:00Z`) + DAY_MS)
-  );
+  return contains(intervalWindowOf(search.get('from'), search.get('to')), new Date(instant));
 };
 
 const closedPositionPage = (positions: FakeClosedPosition[], request: Request) => {
@@ -217,7 +215,7 @@ const closedPositionPage = (positions: FakeClosedPosition[], request: Request) =
         admits(request, 'asset', position.asset) &&
         admits(request, 'side', position.side) &&
         admits(request, 'result', resultOf(position)) &&
-        admitsDays(request, position.closed_at),
+        admitsInterval(request, position.closed_at),
     )
     .sort((one, other) => Date.parse(other.closed_at) - Date.parse(one.closed_at));
   return {
@@ -308,7 +306,7 @@ const cyclePage = (cycles: FakeCycle[], request: Request) => {
     (cycle) =>
       admits(request, 'outcome', cycle.outcome) &&
       admitsDecision(request, cycle) &&
-      admitsDays(request, cycle.planned_at),
+      admitsInterval(request, cycle.planned_at),
   );
   return {
     page,

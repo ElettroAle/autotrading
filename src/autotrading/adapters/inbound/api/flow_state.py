@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -8,6 +7,7 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.domain.flows.account_activity import AccountPosition
@@ -90,10 +90,10 @@ def flow_state_router(use_cases_of_request: Callable[..., TenantUseCases]) -> AP
         flow_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
         period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
-        first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
-        last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
+        since: IntervalStart = None,
+        until: IntervalEnd = None,
     ) -> FlowStateResponse:
-        command = ReadFlowResultsCommand(flow_id, period, first_day, last_day)
+        command = ReadFlowResultsCommand(flow_id, period, since, until)
         return FlowStateResponse.of(use_cases.read_flow_results.execute(command))
 
     return router

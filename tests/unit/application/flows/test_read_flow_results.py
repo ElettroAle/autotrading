@@ -127,9 +127,9 @@ def test_a_range_reads_its_days(bench: Bench) -> None:
     flow = bench.flow()
     bench.cycle(flow, 3, CycleOutcome.FAILED)
     bench.cycle(flow, 1, CycleOutcome.FAILED)
-    day = (NOW - timedelta(days=3)).date()
+    instant = NOW - timedelta(days=3)
 
-    results = bench.use_case.execute(ReadFlowResultsCommand(flow.id.value, "range", day, day))
+    results = bench.use_case.execute(ReadFlowResultsCommand(flow.id.value, "range", instant, instant))
 
     assert results.failed_cycles == 1
 

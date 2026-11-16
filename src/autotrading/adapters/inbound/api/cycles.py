@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.application.flows.list_flow_overviews import FlowOverview, ListFlowOverviewsCommand
@@ -213,11 +214,11 @@ class FlowOverviewResponse(BaseModel):
 def cycle_filter_of(
     outcome: Annotated[str | None, Query(description="concluso o fallito")] = None,
     decision: Annotated[str | None, Query(description="apertura, chiusura, mantenimento o nessuna")] = None,
-    first_day: Annotated[date | None, Query(alias="from", description="primo giorno dell'intervallo")] = None,
-    last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno dell'intervallo")] = None,
+    since: IntervalStart = None,
+    until: IntervalEnd = None,
 ) -> CycleFilter:
     """The filters of the cycles of a flow, in any combination (R6.4.4)."""
-    return CycleFilter.named(outcome, decision, first_day, last_day)
+    return CycleFilter.named(outcome, decision, since, until)
 
 
 def cycles_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
@@ -227,10 +228,10 @@ def cycles_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRou
     def list_flow_overviews(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
         period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
-        first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
-        last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
+        since: IntervalStart = None,
+        until: IntervalEnd = None,
     ) -> list[FlowOverviewResponse]:
-        command = ListFlowOverviewsCommand(period, first_day, last_day)
+        command = ListFlowOverviewsCommand(period, since, until)
         return [FlowOverviewResponse.of(overview) for overview in use_cases.list_flow_overviews.execute(command)]
 
     @router.get("/flows/{flow_id}/cycles")

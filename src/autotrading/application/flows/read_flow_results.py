@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.flows.ports import CycleHistoryPort, EquitySnapshotRepositoryPort
@@ -20,8 +20,8 @@ class ReadFlowResultsCommand:
 
     flow_id: UUID
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 class ReadFlowResultsUseCase:
@@ -45,7 +45,7 @@ class ReadFlowResultsUseCase:
         self._clock = clock
 
     def execute(self, command: ReadFlowResultsCommand) -> FlowResults:
-        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        period = StatisticsPeriod.named(command.period, command.since, command.until)
         window = period.window(self._clock())
         flow_id = FlowId(command.flow_id)
         state = self._flow_state.execute(ReadFlowStateCommand(flow_id))

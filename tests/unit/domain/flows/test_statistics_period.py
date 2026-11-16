@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -20,18 +20,26 @@ def test_the_last_30_days_start_30_days_before_now() -> None:
     assert StatisticsPeriod.named("30d").window(NOW) == TimeWindow(since=NOW - timedelta(days=30))
 
 
-def test_a_range_covers_its_first_and_last_day_in_utc() -> None:
-    period = StatisticsPeriod.named("range", date(2026, 11, 1), date(2026, 11, 3))
+# ADR periodo-al-minuto: a range and its window hold the minutes from the start to the end, both whole, in UTC.
+def test_a_range_covers_its_minutes_from_the_first_to_the_last_both_whole() -> None:
+    period = StatisticsPeriod.named(
+        "range", datetime(2026, 11, 16, 9, 15, 42, tzinfo=UTC), datetime(2026, 11, 16, 11, 40, 7, tzinfo=UTC)
+    )
 
     assert period.window(NOW) == TimeWindow(
-        since=datetime(2026, 11, 1, tzinfo=UTC), until=datetime(2026, 11, 4, tzinfo=UTC)
+        since=datetime(2026, 11, 16, 9, 15, tzinfo=UTC), until=datetime(2026, 11, 16, 11, 41, tzinfo=UTC)
     )
 
 
-def test_a_range_of_one_day_is_valid() -> None:
-    period = StatisticsPeriod.named("range", date(2026, 11, 1), date(2026, 11, 1))
+def test_a_range_within_one_minute_is_valid() -> None:
+    period = StatisticsPeriod.named(
+        "range", datetime(2026, 11, 1, 9, 15, 30, tzinfo=UTC), datetime(2026, 11, 1, 9, 15, 10, tzinfo=UTC)
+    )
 
     assert period.kind is StatisticsPeriodKind.RANGE
+    assert period.window(NOW) == TimeWindow(
+        since=datetime(2026, 11, 1, 9, 15, tzinfo=UTC), until=datetime(2026, 11, 1, 9, 16, tzinfo=UTC)
+    )
 
 
 def test_an_unknown_period_is_rejected() -> None:
@@ -42,27 +50,27 @@ def test_an_unknown_period_is_rejected() -> None:
     assert str(raised.value) == "periodo non valido: scegliere tra all, 7d, 30d, range"
 
 
-@pytest.mark.parametrize(("first_day", "last_day"), [(None, date(2026, 11, 1)), (date(2026, 11, 1), None)])
-def test_a_range_needs_both_days(first_day: date | None, last_day: date | None) -> None:
+@pytest.mark.parametrize(("since", "until"), [(None, NOW), (NOW, None)])
+def test_a_range_needs_its_start_and_its_end(since: datetime | None, until: datetime | None) -> None:
     with pytest.raises(InvalidStatisticsPeriodError) as raised:
-        StatisticsPeriod.named("range", first_day, last_day)
+        StatisticsPeriod.named("range", since, until)
 
-    assert str(raised.value) == "periodo non valido: un intervallo ha il giorno iniziale e il giorno finale"
+    assert str(raised.value) == "periodo non valido: un intervallo ha l'inizio e la fine"
 
 
 def test_a_range_cannot_end_before_it_starts() -> None:
     with pytest.raises(InvalidStatisticsPeriodError) as raised:
-        StatisticsPeriod.named("range", date(2026, 11, 3), date(2026, 11, 1))
+        StatisticsPeriod.named("range", NOW, NOW - timedelta(minutes=1))
 
-    assert str(raised.value) == "periodo non valido: il giorno iniziale è successivo al giorno finale"
+    assert str(raised.value) == "periodo non valido: l'inizio è successivo alla fine"
 
 
 @pytest.mark.parametrize("name", ["all", "7d", "30d"])
-def test_only_a_range_takes_days(name: str) -> None:
+def test_only_a_range_takes_a_start_and_an_end(name: str) -> None:
     with pytest.raises(InvalidStatisticsPeriodError) as raised:
-        StatisticsPeriod.named(name, date(2026, 11, 1), None)
+        StatisticsPeriod.named(name, NOW, None)
 
-    assert str(raised.value) == "periodo non valido: i giorni valgono solo per un intervallo"
+    assert str(raised.value) == "periodo non valido: inizio e fine valgono solo per un intervallo"
 
 
 def test_a_window_holds_the_instants_from_its_start_included_to_its_end_excluded() -> None:
@@ -78,18 +86,44 @@ def test_a_window_without_bounds_holds_every_instant() -> None:
     assert TimeWindow().contains(datetime(2000, 1, 1, tzinfo=UTC))
 
 
-def test_the_window_of_days_covers_them_whole_in_utc() -> None:
-    assert TimeWindow.of_days(date(2026, 11, 1), date(2026, 11, 3)) == TimeWindow(
-        since=datetime(2026, 11, 1, tzinfo=UTC), until=datetime(2026, 11, 4, tzinfo=UTC)
+# ADR periodo-al-minuto: truncation to the minute, the minute of the end included, an instant without a zone in UTC.
+def test_the_window_of_minutes_truncates_both_instants_and_holds_the_minute_of_the_end() -> None:
+    window = TimeWindow.of_minutes(
+        datetime(2026, 11, 16, 9, 15, 59, 999999, tzinfo=UTC), datetime(2026, 11, 16, 11, 40, 1, tzinfo=UTC)
+    )
+
+    assert window == TimeWindow(
+        since=datetime(2026, 11, 16, 9, 15, tzinfo=UTC), until=datetime(2026, 11, 16, 11, 41, tzinfo=UTC)
+    )
+    assert window.contains(datetime(2026, 11, 16, 11, 40, 59, tzinfo=UTC))
+    assert not window.contains(datetime(2026, 11, 16, 11, 41, tzinfo=UTC))
+    assert not window.contains(datetime(2026, 11, 16, 9, 14, 59, tzinfo=UTC))
+
+
+def test_the_window_of_minutes_reads_an_instant_without_a_time_zone_in_utc() -> None:
+    assert TimeWindow.of_minutes(datetime(2026, 11, 16, 9, 15), datetime(2026, 11, 16, 11, 40)) == TimeWindow(
+        since=datetime(2026, 11, 16, 9, 15, tzinfo=UTC), until=datetime(2026, 11, 16, 11, 41, tzinfo=UTC)
     )
 
 
-def test_the_window_of_days_without_a_day_has_no_bound_on_that_side() -> None:
-    assert TimeWindow.of_days(None, date(2026, 11, 3)) == TimeWindow(until=datetime(2026, 11, 4, tzinfo=UTC))
-    assert TimeWindow.of_days(date(2026, 11, 1), None) == TimeWindow(since=datetime(2026, 11, 1, tzinfo=UTC))
-    assert TimeWindow.of_days(None, None) == TimeWindow()
+def test_the_window_of_minutes_moves_an_instant_of_another_time_zone_to_utc() -> None:
+    rome = timezone(timedelta(hours=1))
+
+    assert TimeWindow.of_minutes(datetime(2026, 11, 16, 10, 15, 30, tzinfo=rome), None) == TimeWindow(
+        since=datetime(2026, 11, 16, 9, 15, tzinfo=UTC)
+    )
 
 
-def test_the_window_of_days_ending_before_it_starts_is_refused() -> None:
+def test_the_window_of_minutes_without_an_instant_has_no_bound_on_that_side() -> None:
+    assert TimeWindow.of_minutes(None, datetime(2026, 11, 3, 8, 0, tzinfo=UTC)) == TimeWindow(
+        until=datetime(2026, 11, 3, 8, 1, tzinfo=UTC)
+    )
+    assert TimeWindow.of_minutes(datetime(2026, 11, 1, 8, 0, tzinfo=UTC), None) == TimeWindow(
+        since=datetime(2026, 11, 1, 8, 0, tzinfo=UTC)
+    )
+    assert TimeWindow.of_minutes(None, None) == TimeWindow()
+
+
+def test_the_window_of_minutes_ending_before_it_starts_is_refused() -> None:
     with pytest.raises(InvalidStatisticsPeriodError):
-        TimeWindow.of_days(date(2026, 11, 3), date(2026, 11, 2))
+        TimeWindow.of_minutes(datetime(2026, 11, 3, 8, 1, tzinfo=UTC), datetime(2026, 11, 3, 8, 0, 59, tzinfo=UTC))

@@ -164,7 +164,13 @@ def test_the_closed_positions_are_filtered_by_side_result_asset_and_days(client_
 
     body = anna.get(
         f"/flows/{flow.id.value}/closed-positions",
-        params={"side": "short", "result": "vinta", "asset": "BTC", "from": "2026-11-12", "to": "2026-11-12"},
+        params={
+            "side": "short",
+            "result": "vinta",
+            "asset": "BTC",
+            "from": "2026-11-12T00:00:00Z",
+            "to": "2026-11-12T23:59:00Z",
+        },
     ).json()
 
     assert [(position["side"], position["pnl"]) for position in body["positions"]] == [("short", "5")]
