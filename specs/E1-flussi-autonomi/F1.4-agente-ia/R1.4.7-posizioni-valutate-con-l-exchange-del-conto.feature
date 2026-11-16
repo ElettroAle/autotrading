@@ -10,6 +10,8 @@ Funzionalità: R1.4.7 Posizioni valutate con i prezzi dell'exchange del conto
   il PnL non realizzato. Le regole operative dicono all'agente che valuta e gestisce le posizioni aperte solo con
   questi valori; i dati delle fonti servono a stimare la direzione del mercato.
 
+  Fuori ambito: il prezzo di mercato nelle pagine della dashboard, uno stop loss sull'exchange.
+
   Contesto:
     Dato che "anna" ha il flusso "alfa" con asset "BTC" su un conto il cui exchange valuta BTC a 63400
     E che le fonti di mercato riportano per "BTC" il prezzo 64772
