@@ -27,6 +27,9 @@ export const flowFormSchema = z.object({
   max_value_exposure_percent: numberText,
   allocated_capital: numberText,
   bring_to_minimum: z.boolean(),
+  // The text the user wrote, kept apart from whether the flow follows the default of the platform (R1.4.8).
+  system_prompt: z.string(),
+  system_prompt_default: z.boolean(),
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
@@ -51,6 +54,8 @@ type SettingsRequest = {
   max_margin_exposure_percent: string | null;
   max_value_exposure_percent: string | null;
   bring_to_minimum: boolean;
+  // Null follows the default of the platform (R1.4.8).
+  system_prompt: string | null;
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -72,6 +77,8 @@ export const emptyFormValues = (): FlowFormValues => ({
   max_value_exposure_percent: '',
   allocated_capital: '',
   bring_to_minimum: false,
+  system_prompt: '',
+  system_prompt_default: true,
 });
 
 const decimalOf = (text: string): string => text.trim().replace(',', '.');
@@ -117,6 +124,7 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   max_margin_exposure_percent: decimalOrNull(values.max_margin_exposure_percent),
   max_value_exposure_percent: decimalOrNull(values.max_value_exposure_percent),
   bring_to_minimum: values.bring_to_minimum,
+  system_prompt: values.system_prompt_default ? null : values.system_prompt,
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -157,6 +165,8 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   max_value_exposure_percent: textOf(flow.risk_limits.max_value_exposure_percent),
   allocated_capital: flow.allocated_capital ?? '',
   bring_to_minimum: flow.bring_to_minimum,
+  system_prompt: flow.system_prompt_is_default ? '' : flow.system_prompt,
+  system_prompt_default: flow.system_prompt_is_default,
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>
@@ -164,6 +174,8 @@ const sameValue = (one: unknown, other: unknown): boolean =>
 
 const MODEL: keyof SettingsRequest = 'model';
 const MODEL_PARAMETERS: keyof SettingsRequest = 'model_parameters';
+// Its null is a value: back to the default of the platform, not a part left as it is (R1.4.8).
+const SYSTEM_PROMPT: keyof SettingsRequest = 'system_prompt';
 
 /**
  * Only the settings the user changed (R1.1.3): a part left out keeps the value in force, so an emptied one is not
@@ -173,7 +185,7 @@ export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
   const before = settingsOf(formValuesOf(flow));
   const after = settingsOf(values);
   const changed = (Object.keys(after) as (keyof SettingsRequest)[]).filter(
-    (key) => after[key] !== null && !sameValue(before[key], after[key]),
+    (key) => (after[key] !== null || key === SYSTEM_PROMPT) && !sameValue(before[key], after[key]),
   );
   const keys = changed.includes(MODEL) ? [...new Set([...changed, MODEL_PARAMETERS])] : changed;
   const settings = Object.fromEntries(keys.map((key) => [key, after[key]]));

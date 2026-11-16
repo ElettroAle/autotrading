@@ -47,9 +47,8 @@ class Source:
 class Question:
     model: str = "openrouter/deepseek-chat"
     settings: Mapping[str, Decimal | str] = field(default_factory=dict)
-    instructions: str = "Sei un trader"
+    system_prompt: str = "Sei un trader su BTC"
     assets: tuple[str, ...] = ("BTC",)
-    max_leverage: int = 5
     started_at: datetime = NOW
     now: datetime = NOW
     state: State = State()
@@ -61,9 +60,8 @@ def test_the_question_becomes_the_context_of_the_agent() -> None:
     context = ComposeAgentContextUseCase().execute(Question())
 
     assert context == AgentContext(
-        instructions="Sei un trader",
+        system_prompt="Sei un trader su BTC",
         assets=("BTC",),
-        max_leverage=5,
         started_at=NOW,
         now=NOW,
         state=FlowStateView(

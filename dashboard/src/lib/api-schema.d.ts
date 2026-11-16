@@ -357,6 +357,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/system-prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Default System Prompt */
+        get: operations["read_default_system_prompt_flows_system_prompt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}": {
         parameters: {
             query?: never;
@@ -1103,6 +1120,12 @@ export interface components {
             allocated_capital: string | null;
             /** Bring To Minimum */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt: string;
+            /** System Prompt Is Default */
+            system_prompt_is_default: boolean;
+            /** System Prompt Placeholders */
+            system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1183,6 +1206,16 @@ export interface components {
             day: string;
             /** Cost Usd */
             cost_usd: string;
+        };
+        /**
+         * DefaultSystemPromptResponse
+         * @description The system prompt a new flow starts with, and the placeholders it may use (R1.4.8).
+         */
+        DefaultSystemPromptResponse: {
+            /** System Prompt */
+            system_prompt: string;
+            /** System Prompt Placeholders */
+            system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
         };
         /** DifferenceResponse */
         DifferenceResponse: {
@@ -1301,6 +1334,8 @@ export interface components {
              * @default false
              */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * FlowEquityResponse
@@ -1342,6 +1377,8 @@ export interface components {
             max_value_exposure_percent?: number | string | null;
             /** Bring To Minimum */
             bring_to_minimum?: boolean | null;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * FlowOverviewResponse
@@ -1465,6 +1502,12 @@ export interface components {
             allocated_capital: string | null;
             /** Bring To Minimum */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt: string;
+            /** System Prompt Is Default */
+            system_prompt_is_default: boolean;
+            /** System Prompt Placeholders */
+            system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
         };
         /**
          * FlowStateResponse
@@ -1926,6 +1969,16 @@ export interface components {
             /** Liquidation Price */
             liquidation_price: string | null;
         };
+        /**
+         * PromptPlaceholderResponse
+         * @description A placeholder the system prompt may use, with what it stands for (R1.4.8).
+         */
+        PromptPlaceholderResponse: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+        };
         /** ProviderKeyFieldResponse */
         ProviderKeyFieldResponse: {
             /** Name */
@@ -2080,6 +2133,8 @@ export interface components {
              * @default false
              */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * StrategyBody
@@ -2104,6 +2159,8 @@ export interface components {
              * @default false
              */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * StrategyDocument
@@ -2956,6 +3013,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_default_system_prompt_flows_system_prompt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefaultSystemPromptResponse"];
                 };
             };
         };

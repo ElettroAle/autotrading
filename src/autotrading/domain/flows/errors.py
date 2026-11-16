@@ -290,4 +290,6 @@ class MalformedSystemPromptError(FlowSettingError):
     """A brace without its pair: a literal brace is written twice, {{ or }} (R1.4.8)."""
 
     def __init__(self) -> None:
-        super().__init__("parentesi graffa senza la sua coppia: per scriverla nel testo raddoppiala", FlowSetting.SYSTEM_PROMPT)
+        super().__init__(
+            "parentesi graffa senza la sua coppia: per scriverla nel testo raddoppiala", FlowSetting.SYSTEM_PROMPT
+        )

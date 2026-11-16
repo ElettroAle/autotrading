@@ -55,7 +55,6 @@ class SourceCycle:
         self.context = AgentContext(
             "istruzioni",
             self.assets,
-            10,
             STARTED_AT,
             collected_at,
             STATE,

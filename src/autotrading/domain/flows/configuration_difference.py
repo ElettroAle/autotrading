@@ -58,5 +58,8 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (VALUE_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_value_exposure_percent)),
     ("capitale allocato", lambda configuration: _money(configuration.allocated_capital)),
     ("porta al minimo", lambda configuration: "sì" if configuration.bring_to_minimum else "no"),
-    ("system prompt", lambda configuration: DEFAULT if configuration.system_prompt is None else configuration.system_prompt),
+    (
+        "system prompt",
+        lambda configuration: DEFAULT if configuration.system_prompt is None else configuration.system_prompt,
+    ),
 )

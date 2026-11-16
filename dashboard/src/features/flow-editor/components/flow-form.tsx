@@ -9,10 +9,12 @@ import { showRefusal } from '@/lib/form-errors';
 import type { Account } from '../api/get-accounts';
 import type { Model, Provider } from '../api/get-model-catalog';
 import type { Source } from '../api/get-sources';
+import type { DefaultSystemPrompt } from '../api/get-system-prompt';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
+import { SystemPromptField } from './system-prompt-field';
 
 type FlowFormProps = {
   readonly values: FlowFormValues;
@@ -20,6 +22,7 @@ type FlowFormProps = {
   readonly models: Model[];
   readonly providers: Provider[];
   readonly sources: Source[];
+  readonly systemPrompt: DefaultSystemPrompt;
   readonly submitLabel: string;
   /** Whether the name is fixed: the API changes every setting of a flow but its name (R1.1.3). */
   readonly nameFixed?: boolean;
@@ -36,6 +39,7 @@ export const FlowForm = ({
   models,
   providers,
   sources,
+  systemPrompt,
   submitLabel,
   nameFixed = false,
   onSave,
@@ -134,6 +138,7 @@ export const FlowForm = ({
             />
           )}
         </FormField>
+        <SystemPromptField systemPrompt={systemPrompt} />
         <fieldset className="min-w-0 space-y-2">
           <legend className="font-semibold">Rischio</legend>
           <FormField

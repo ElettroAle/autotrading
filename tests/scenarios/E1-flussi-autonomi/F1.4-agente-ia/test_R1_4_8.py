@@ -67,7 +67,12 @@ def shows_default(flow: Flow) -> None:
     )
 )
 def configured_flow(  # noqa: PLR0917 - one argument per value of the step
-    flow_cycles: FlowCycles, prompt_change: PromptChange, user: str, flow: str, assets: str, leverage: str,
+    flow_cycles: FlowCycles,
+    prompt_change: PromptChange,
+    user: str,
+    flow: str,
+    assets: str,
+    leverage: str,
     instructions: str,
 ) -> None:
     prompt_change.user = user
@@ -123,7 +128,7 @@ def placeholders_listed(names: str) -> None:
         assert f"{{{placeholder}}}" in DEFAULT_SYSTEM_PROMPT
 
 
-@then(quoted("il system prompt inviato all'agente è \"{prompt}\""))
+@then(quoted('il system prompt inviato all\'agente è "{prompt}"'))
 def prompt_sent(flow_cycles: FlowCycles, prompt: str) -> None:
     assert flow_cycles.system_text() == prompt
 

@@ -49,7 +49,12 @@ def test_the_default_uses_every_placeholder_and_renders_the_rules_and_the_format
     assert "- azioni ammesse: apri, chiudi, mantieni;" in rendered
     assert "- leva da 1 a 3;" in rendered
     assert "- una decisione per ciascun asset del flusso: BTC, ETH;" in rendered
-    assert "prezzo di mercato e PnL non realizzato" in rendered
+    assert (
+        "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato dello stato"
+        " del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da un'altra rete o piazza e"
+        " servono solo a stimare la direzione del mercato."
+    ) in rendered
+    assert '"quota": <frazione dei soldi del flusso da impegnare come margine, da 0 a 1>' in rendered
     assert '{"decisioni": [{"asset": "<asset>", "azione": "<una delle azioni ammesse>"' in rendered
 
 
