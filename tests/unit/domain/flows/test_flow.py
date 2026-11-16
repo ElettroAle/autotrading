@@ -70,29 +70,6 @@ def test_the_provider_of_a_flow_is_the_first_part_of_its_model() -> None:
     assert flow.model_provider == "openrouter"
 
 
-def test_the_free_capital_is_the_balance_less_the_flows_not_archived() -> None:
-    tenant_id = TenantId.new()
-    flows = [
-        a_flow(tenant_id, name="alfa", configuration=a_configuration(allocated_capital=Decimal(300))),
-        a_flow(tenant_id, name="beta", status=FlowStatus.ACTIVE, configuration=a_configuration()),
-        a_flow(tenant_id, name="gamma", status=FlowStatus.ARCHIVED, configuration=a_configuration()),
-    ]
-
-    assert FreeCapital.of(Decimal(1000), "USDC", flows) == FreeCapital(Decimal(600), "USDC")
-
-
-def test_the_free_capital_of_an_account_ignores_the_flows_of_other_accounts() -> None:
-    tenant_id, account_id = TenantId.new(), uuid4()
-    flows = [
-        a_flow(
-            tenant_id, name="alfa", account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(300))
-        ),
-        a_flow(tenant_id, name="beta", configuration=a_configuration(allocated_capital=Decimal(500))),
-    ]
-
-    assert FreeCapital.of_account(Decimal(1000), "USDC", account_id, flows) == FreeCapital(Decimal(700), "USDC")
-
-
 def test_the_allocated_capital_of_an_account_sums_its_flows_not_archived_only() -> None:
     tenant_id, account_id = TenantId.new(), uuid4()
     flows = [

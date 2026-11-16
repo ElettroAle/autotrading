@@ -1,4 +1,4 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from decimal import Decimal
 from typing import NotRequired, TypedDict, cast
@@ -18,7 +18,7 @@ from autotrading.application.flows.errors import (
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account_id import AccountId
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -143,7 +143,9 @@ class SqlAlchemyFlowRepositoryAdapter:
             raise CrossTenantAccessError
         self.get(flow.id)
         with self._transaction() as connection:
-            connection.execute(insert(flow_versions).values(_version_row_of(flow)))
+            # A cash-out that keeps the capital records the change on the version in force (R3.4.1).
+            if change.new != change.previous:
+                connection.execute(insert(flow_versions).values(_version_row_of(flow)))
             connection.execute(
                 insert(flow_capital_changes).values(
                     flow_id=flow.id.value,
@@ -153,8 +155,25 @@ class SqlAlchemyFlowRepositoryAdapter:
                     new_capital=change.new,
                     user_id=change.user_id.value,
                     version=flow.configuration.version,
+                    reason=change.reason.value,
+                    amount=change.amount,
+                    value_before=change.value_before,
+                    cashed_profit=change.cashed_profit,
                 )
             )
+
+    def cashed_profits_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, Decimal]:
+        wanted = [flow_id.value for flow_id in flow_ids]
+        if not wanted:
+            return {}
+        query = (
+            select(flow_capital_changes.c.flow_id, func.sum(flow_capital_changes.c.cashed_profit))
+            .where(flow_capital_changes.c.flow_id.in_(wanted))
+            .group_by(flow_capital_changes.c.flow_id)
+        )
+        with self._transaction() as connection:
+            rows = connection.execute(query).all()
+        return {FlowId(flow_id): Decimal(total) for flow_id, total in rows}
 
     def add_assignment(self, flow: Flow) -> None:
         """The account of the draft and its new version in one transaction: a draft never has one without the other."""
@@ -188,6 +207,10 @@ class SqlAlchemyFlowRepositoryAdapter:
                 Decimal(row["previous_capital"]),
                 Decimal(row["new_capital"]),
                 UserId(row["user_id"]),
+                CapitalChangeReason(row["reason"]),
+                Decimal(row["amount"]),
+                value_before=_decimal(row["value_before"]),
+                cashed_profit=Decimal(row["cashed_profit"]),
             )
             for row in rows
         )

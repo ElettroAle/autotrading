@@ -10,12 +10,13 @@ from autotrading.application.flows.change_allocated_capital import (
     ChangeAllocatedCapitalCommand,
     ChangeAllocatedCapitalUseCase,
 )
+from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand, ListCapitalChangesUseCase
 from autotrading.application.flows.ports import PositionToClose
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
-from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.errors import (
     ArchivedFlowNotModifiableError,
@@ -96,7 +97,9 @@ class Flows:
         self.repository = InMemoryFlowRepositoryAdapter(self.store, self.tenant_id)
         self.events: list[str] = []
         self.positions = ScriptedPositions(self.events)
-        self.accounts = FakeFlowAccountAdapter()
+        self.activity = FakeAccountActivityAdapter()
+        self.ledger = InMemoryFlowLedgerAdapter()
+        self.accounts = FakeFlowAccountAdapter(self.activity, self.ledger)
         self.account_id = uuid4()
         self.accounts.add(self.account_id, Decimal(1000))
         self.openings = ScriptedOpenings()
@@ -104,16 +107,16 @@ class Flows:
         self.notices = FakePositionClosedNoticeAdapter()
         self.stop = StopFlowUseCase(
             self.repository,
-            StopPorts(
-                RecordingCycles(self.events, self.repository),
-                self.positions,
-                self.openings,
-                InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
-                self.notices,
+            CloseFlowPositionsUseCase(
+                ClosingPorts(
+                    RecordingCycles(self.events, self.repository),
+                    self.positions,
+                    self.openings,
+                    InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
+                    self.notices,
+                )
             ),
         )
-        self.activity = FakeAccountActivityAdapter()
-        self.ledger = InMemoryFlowLedgerAdapter()
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
             self.accounts.ports(),
@@ -222,9 +225,17 @@ def test_a_raise_within_the_free_capital_becomes_the_next_version_and_its_change
     assert changed.configuration == replace(flow.configuration, version=2, allocated_capital=Decimal(900))
     assert flows.repository.get(flow.id) == changed
     assert flows.list_changes.execute(ListCapitalChangesCommand(flow.id)) == (
-        CapitalChange(flow.id, NOW, Decimal(400), Decimal(900), USER),
+        CapitalChange(
+            flow.id,
+            NOW,
+            Decimal(400),
+            Decimal(900),
+            USER,
+            CapitalChangeReason.INCREASE,
+            Decimal(500),
+            value_before=Decimal(400),
+        ),
     )
-    assert flows.activity.read == []
 
 
 def test_a_raise_beyond_the_capital_available_is_refused_and_nothing_changes(flows: Flows) -> None:

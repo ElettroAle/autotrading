@@ -1,5 +1,5 @@
 # language: it
-@R3.4.1 @wip
+@R3.4.1
 Funzionalità: R3.4.1 Incasso dei profitti
   Come utente
   Voglio incassare con un solo comando i profitti di un flusso

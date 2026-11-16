@@ -10,7 +10,6 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
-from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -102,7 +101,8 @@ def change_recorded(platform: Platform, lifecycle: Lifecycle, previous: str, new
     flow = flow_named(platform, lifecycle.user, name)
     changes = platform.use_cases_of(lifecycle.user).list_capital_changes.execute(ListCapitalChangesCommand(flow.id))
     user_id = platform.user_id_of(lifecycle.user)
-    assert changes == (CapitalChange(flow.id, platform.now, Decimal(previous), Decimal(new), user_id),)
+    recorded = [(change.flow_id, change.changed_at, change.previous, change.new, change.user_id) for change in changes]
+    assert recorded == [(flow.id, platform.now, Decimal(previous), Decimal(new), user_id)]
 
 
 @then(quoted('la variazione è rifiutata con il motivo "{reason}"'))

@@ -1,5 +1,6 @@
 """How a flow is doing at a glance (R6.4.2, ADR riepilogo-dei-risultati-nell-api)."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -35,6 +36,12 @@ def test_the_total_gain_is_the_value_of_the_flow_less_its_initial_capital_also_i
     results = FlowResults.of(a_state(realized=Decimal("2.5")), (), 0)
 
     assert (results.total_gain, results.total_gain_percent) == (Decimal("2.5"), Decimal("2.50"))
+
+
+def test_the_total_gain_keeps_the_profits_cashed_out() -> None:
+    cashed_out = replace(a_state(realized=Decimal(30)), cashed_profit=Decimal(30))
+
+    assert FlowResults.of(cashed_out, (), 0).total_gain == Decimal(30)
 
 
 def test_a_loss_is_a_negative_total_gain() -> None:

@@ -1,6 +1,6 @@
 """Fake of the repository of the flows: the database of every tenant, bound to one per request."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -104,8 +104,16 @@ class InMemoryFlowRepositoryAdapter:
         self._store.save_version(flow)
 
     def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
-        self.add_version(flow)
+        if change.new != change.previous:
+            self.add_version(flow)
         self._store.capital_changes.setdefault(flow.id, []).append(change)
+
+    def cashed_profits_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, Decimal]:
+        return {
+            flow_id: sum((change.cashed_profit for change in self._store.capital_changes[flow_id]), Decimal(0))
+            for flow_id in flow_ids
+            if flow_id in self._store.capital_changes
+        }
 
     def add_assignment(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), account_id=flow.account_id, configuration=flow.configuration))

@@ -13,7 +13,8 @@ from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchem
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -25,6 +26,25 @@ pytestmark = pytest.mark.integration
 USER = UserId("oid-anna")
 FIRST = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
 SECOND = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
+
+
+def a_change(flow_id: FlowId, at: datetime, previous: Decimal, new: Decimal) -> CapitalChange:
+    reason = CapitalChangeReason.INCREASE if new > previous else CapitalChangeReason.REDUCTION
+    return CapitalChange(flow_id, at, previous, new, USER, reason, abs(new - previous), value_before=previous)
+
+
+def a_cash_out(flow_id: FlowId, previous: Decimal, new: Decimal, value: Decimal) -> CapitalChange:
+    return CapitalChange(
+        flow_id,
+        SECOND,
+        previous,
+        new,
+        USER,
+        CapitalChangeReason.CASH_OUT,
+        value - new,
+        value_before=value,
+        cashed_profit=value - previous,
+    )
 
 
 def new_account(database: Engine) -> tuple[TenantId, UUID]:
@@ -43,15 +63,45 @@ def test_a_capital_change_saves_the_next_version_and_its_history_together(databa
     raised = flow.with_capital(Decimal("700.25"))
     lowered = raised.with_capital(Decimal(200))
 
-    repository.add_capital_change(raised, CapitalChange(flow.id, FIRST, Decimal(400), Decimal("700.25"), USER))
-    repository.add_capital_change(lowered, CapitalChange(flow.id, SECOND, Decimal("700.25"), Decimal(200), USER))
+    repository.add_capital_change(raised, a_change(flow.id, FIRST, Decimal(400), Decimal("700.25")))
+    repository.add_capital_change(lowered, a_change(flow.id, SECOND, Decimal("700.25"), Decimal(200)))
 
     assert repository.get(flow.id) == lowered
     assert repository.version(flow.id, 2).allocated_capital == Decimal("700.25")
     assert repository.capital_changes(flow.id) == (
-        CapitalChange(flow.id, FIRST, Decimal(400), Decimal("700.25"), USER),
-        CapitalChange(flow.id, SECOND, Decimal("700.25"), Decimal(200), USER),
+        a_change(flow.id, FIRST, Decimal(400), Decimal("700.25")),
+        a_change(flow.id, SECOND, Decimal("700.25"), Decimal(200)),
     )
+
+
+def test_a_cash_out_keeping_the_capital_is_recorded_on_the_version_in_force(database: Engine) -> None:
+    # ADR incasso-dei-profitti: reason, amount freed, value before and profit cashed out travel with the change.
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    flow = a_flow(tenant_id, account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(500)))
+    repository.add(flow)
+    cash_out = a_cash_out(flow.id, Decimal(500), Decimal(500), Decimal("618.5"))
+
+    repository.add_capital_change(flow, cash_out)
+
+    assert [version.number for version in repository.versions(flow.id)] == [1]
+    assert repository.capital_changes(flow.id) == (cash_out,)
+
+
+def test_the_profits_cashed_out_sum_up_by_flow(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    flow = a_flow(tenant_id, account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(500)))
+    never = a_flow(tenant_id, name="beta", account_id=account_id)
+    repository.add(flow)
+    repository.add(never)
+    lowered = flow.with_capital(Decimal(400))
+    repository.add_capital_change(lowered, a_cash_out(flow.id, Decimal(500), Decimal(400), Decimal(618)))
+    repository.add_capital_change(lowered, a_cash_out(flow.id, Decimal(400), Decimal(400), Decimal("430.5")))
+
+    assert repository.cashed_profits_of((flow.id, never.id)) == {flow.id: Decimal("148.5")}
+    assert repository.cashed_profits_of(()) == {}
+    assert SqlAlchemyFlowRepositoryAdapter(database, new_account(database)[0]).cashed_profits_of((flow.id,)) == {}
 
 
 def test_a_flow_without_changes_has_an_empty_history(database: Engine) -> None:
@@ -69,7 +119,7 @@ def test_the_history_of_another_tenant_is_never_read_nor_written(database: Engin
     flow = a_flow(anna, account_id=account_id)
     SqlAlchemyFlowRepositoryAdapter(database, anna).add(flow)
     theirs = SqlAlchemyFlowRepositoryAdapter(database, bruno)
-    change = CapitalChange(flow.id, FIRST, Decimal(100), Decimal(200), USER)
+    change = a_change(flow.id, FIRST, Decimal(100), Decimal(200))
 
     with pytest.raises(FlowNotFoundError):
         theirs.capital_changes(flow.id)
@@ -85,9 +135,7 @@ def test_a_recorded_change_is_never_changed_nor_deleted(database: Engine) -> Non
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
     flow = a_flow(tenant_id, account_id=account_id)
     repository.add(flow)
-    repository.add_capital_change(
-        flow.with_capital(Decimal(200)), CapitalChange(flow.id, FIRST, Decimal(100), Decimal(200), USER)
-    )
+    repository.add_capital_change(flow.with_capital(Decimal(200)), a_change(flow.id, FIRST, Decimal(100), Decimal(200)))
 
     for statement in ("UPDATE flow_capital_changes SET new_capital = 9", "DELETE FROM flow_capital_changes"):
         with database.begin() as connection:

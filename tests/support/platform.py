@@ -7,16 +7,19 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
+from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.flows.close_flow_positions import ClosingPorts
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
-from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -38,6 +41,7 @@ from autotrading.application.verification.run_exchange_verification import (
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
+from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
@@ -60,6 +64,7 @@ from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
+from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
     InMemoryLinkCodeRepositoryAdapter,
@@ -89,6 +94,7 @@ from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapte
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
+from tests.support.activity import an_activity
 from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.model_catalog import PLATFORM_MODELS
@@ -131,6 +137,7 @@ class Platform:
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
+        self.account_activity.unread = self.reading_on_exchange
         self.platform_orders = InMemoryPlatformOrdersAdapter()
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
@@ -178,7 +185,9 @@ class Platform:
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
         closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice)
+        closing_ports = ClosingPorts(
+            self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice
+        )
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -196,16 +205,19 @@ class Platform:
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountPorts(accounts, account_state),
+                accounts=FlowAccountPorts(accounts, self.account_activity, self.ledger),
                 markets=self.markets,
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
-            stop_ports=stop_ports,
+            closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=self.account_activity,
             flow_ledger=self.ledger,
+            ledger_recording=FakeLedgerRecordingAdapter(
+                RecordAccountExecutionsUseCase(flows, self.account_activity, self.platform_orders, self.ledger)
+            ),
             flow_operations=InMemoryFlowOperationsAdapter(
                 self.ledger,
                 lambda: [account.id.value for account in accounts.list()],
@@ -228,6 +240,17 @@ class Platform:
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         return TenantUseCases.on(tenant_id, ports)
+
+    def reading_on_exchange(self, account_id: UUID) -> AccountActivity:
+        """What the worker reads of an account no test set a reading for: its balance on the exchange, as the worker
+        reads it for the API (ADR 0044)."""
+        if not self.worker_reachable:
+            raise FlowExchangeUnavailableError
+        account = next((each for each in self.accounts.accounts if each.id.value == account_id), None)
+        if account is None:
+            return an_activity()
+        state = self.worker_for(account.tenant_id).read_exchange_state.execute(ReadExchangeStateCommand(account.id))
+        return an_activity(balance=state.balance.amount, available_margin=state.available_margin.amount)
 
     def history_of(self, tenant_id: TenantId) -> InMemoryFlowHistoryAdapter:
         """The histories of the tenant: each tenant reads its own store, as row level security does (R2.5.1)."""
@@ -257,6 +280,12 @@ class Platform:
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            record_account_executions=RecordAccountExecutionsUseCase(
+                InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+                self.platform_orders,
+                self.ledger,
+            ),
         )
 
     def link_chat(self) -> LinkChatUseCase:

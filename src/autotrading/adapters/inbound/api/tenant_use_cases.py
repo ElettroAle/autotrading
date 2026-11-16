@@ -28,8 +28,10 @@ from autotrading.application.agent.remove_provider_key import RemoveProviderKeyU
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.assign_draft_flow import AssignDraftFlowUseCase
+from autotrading.application.flows.cash_out_profits import CashOutPorts, CashOutProfitsUseCase
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
+from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.duplicate_flow import DuplicateFlowUseCase
@@ -63,6 +65,7 @@ from autotrading.application.flows.ports import (
     HistoricalClosedPositionsPort,
     HistoricalCyclesPort,
     HistoricalOrdersPort,
+    LedgerRecordingPort,
     RunningVerificationsPort,
 )
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
@@ -78,7 +81,7 @@ from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
-from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
+from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import (
     BotStartLinkPort,
@@ -122,10 +125,11 @@ class TenantPorts:
     running_verifications: RunningVerificationsPort
     flow_checks: FlowChecks
     flow_positions: FlowPositionsPort
-    stop_ports: StopPorts
+    closing_ports: ClosingPorts
     account_removal: AccountRemovalPorts
     account_activity: AccountActivityPort
     flow_ledger: FlowLedgerPort
+    ledger_recording: LedgerRecordingPort
     flow_operations: FlowOperationsPort
     link_codes: LinkCodeRepositoryPort
     bot_identity: BotStartLinkPort
@@ -181,6 +185,7 @@ class TenantUseCases:
     change_flow_status: ChangeFlowStatusUseCase
     archive_flow: ArchiveFlowUseCase
     stop_flow: StopFlowUseCase
+    cash_out_profits: CashOutProfitsUseCase
     change_allocated_capital: ChangeAllocatedCapitalUseCase
     list_capital_changes: ListCapitalChangesUseCase
     list_closed_positions: ListClosedPositionsUseCase
@@ -218,7 +223,7 @@ class TenantUseCases:
             remove_account_with_flows=RemoveAccountWithFlowsUseCase(
                 ports.flows,
                 ports.account_removal,
-                StopFlowUseCase(ports.flows, ports.stop_ports),
+                StopFlowUseCase(ports.flows, CloseFlowPositionsUseCase(ports.closing_ports)),
                 ArchiveFlowUseCase(ports.flows),
             ),
             close_position=ClosePositionUseCase(ports.position_closing, ports.manual_closings),
@@ -253,7 +258,16 @@ class TenantUseCases:
                 ports.flows, ports.running_verifications, ports.flow_checks.accounts
             ),
             archive_flow=ArchiveFlowUseCase(ports.flows),
-            stop_flow=StopFlowUseCase(ports.flows, ports.stop_ports),
+            stop_flow=StopFlowUseCase(ports.flows, CloseFlowPositionsUseCase(ports.closing_ports)),
+            cash_out_profits=CashOutProfitsUseCase(
+                ports.flows,
+                CashOutPorts(
+                    ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                    CloseFlowPositionsUseCase(ports.closing_ports),
+                    ports.ledger_recording,
+                    ports.clock,
+                ),
+            ),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
                 ports.flows,
                 ports.flow_checks.accounts,

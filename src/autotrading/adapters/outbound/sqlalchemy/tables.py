@@ -179,6 +179,10 @@ flow_capital_changes = Table(
     Column("new_capital", Numeric, nullable=False),
     Column("user_id", Text, nullable=False),
     Column("version", Integer, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("amount", Numeric, nullable=False),
+    Column("value_before", Numeric),
+    Column("cashed_profit", Numeric, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     ForeignKeyConstraint(["flow_id", "version"], ["flow_versions.flow_id", "flow_versions.version"]),
 )

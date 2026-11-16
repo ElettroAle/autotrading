@@ -89,6 +89,24 @@ class CapitalBelowFlowMinimumError(FlowSettingError):
         self.minimum = minimum
 
 
+class FlowWithoutProfitsError(DomainError):
+    """The flow is worth no more than its capital: a cash-out would close its positions and free nothing (R3.4.1)."""
+
+    status_code = 409
+
+    def __init__(self, flow_name: str) -> None:
+        super().__init__(f"{flow_name} non ha profitti da incassare")
+        self.flow_name = flow_name
+
+
+class CashOutCapitalOutOfRangeError(DomainError):
+    """The capital a cash-out leaves to the flow is above zero and below its value, or nothing is freed (R3.4.1)."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(f"il capitale indicato è maggiore di 0 e minore del valore del flusso, {value}")
+        self.value = value
+
+
 class FlowCommandNotAllowedError(DomainError):
     status_code = 409
 

@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.strategy_document import StrategyDocument,
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
+from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
@@ -28,6 +29,7 @@ from autotrading.application.flows.read_default_system_prompt import DefaultSyst
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.cash_out import CashOutOutcome
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
@@ -329,6 +331,33 @@ class StopOutcomeResponse(BaseModel):
         )
 
 
+class CashOutRequest(BaseModel):
+    """The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1)."""
+
+    capital: Decimal | None = None
+
+
+class CashOutOutcomeResponse(BaseModel):
+    """The flow after the cash-out, the money it freed and the positions not closed, each with its reason (R3.4.1).
+
+    With a position left open nothing is freed.
+    """
+
+    flow: FlowResponse
+    freed: str | None
+    capital: str | None
+    left_open: list[PositionLeftOpenResponse]
+
+    @classmethod
+    def of(cls, outcome: CashOutOutcome) -> CashOutOutcomeResponse:
+        return cls(
+            flow=FlowResponse.of(outcome.flow),
+            freed=_amount(outcome.freed),
+            capital=_amount(outcome.flow.configuration.allocated_capital),
+            left_open=[PositionLeftOpenResponse.of(position) for position in outcome.left_open],
+        )
+
+
 class CapitalChangeRequest(BaseModel):
     allocated_capital: Decimal
 
@@ -423,6 +452,17 @@ def flows_router(
         user_id: Annotated[UserId, Depends(user_of_request)],
     ) -> StopOutcomeResponse:
         return StopOutcomeResponse.of(use_cases.stop_flow.execute(StopFlowCommand(FlowId(flow_id), user_id)))
+
+    @router.post("/flows/{flow_id}/cash-out")
+    def cash_out_profits(
+        flow_id: UUID,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        user_id: Annotated[UserId, Depends(user_of_request)],
+        request: CashOutRequest | None = None,
+    ) -> CashOutOutcomeResponse:
+        capital = None if request is None else request.capital
+        command = CashOutProfitsCommand(FlowId(flow_id), user_id, capital)
+        return CashOutOutcomeResponse.of(use_cases.cash_out_profits.execute(command))
 
     @router.put("/flows/{flow_id}/allocated-capital")
     def change_allocated_capital(

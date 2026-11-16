@@ -44,9 +44,13 @@ class FlowState:
     fees: Decimal
     funding: Decimal
     expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
+    # The profits the user cashed out: they left the flow for the free capital of the account (R3.4.1).
+    cashed_profit: Decimal = ZERO
 
     @classmethod
-    def attributed(cls, flow: Flow, activity: AccountActivity, totals: FlowTotals) -> FlowState:
+    def attributed(
+        cls, flow: Flow, activity: AccountActivity, totals: FlowTotals, cashed_profit: Decimal = ZERO
+    ) -> FlowState:
         return cls(
             flow_id=flow.id,
             currency=activity.currency,
@@ -56,6 +60,7 @@ class FlowState:
             fees=totals.fees,
             funding=totals.funding,
             expected_positions=totals.positions,
+            cashed_profit=cashed_profit,
         )
 
     def position_mismatch(self) -> PositionMismatch | None:
@@ -77,11 +82,13 @@ class FlowState:
 
     @property
     def funds(self) -> Decimal:
-        """The money of the flow: the capital allocated plus what its closed trades earned, net of fees and funding.
+        """The money of the flow: the capital allocated plus what its closed trades earned, net of fees, funding and
+        the profits cashed out.
 
-        Quotas and percentage risk limits are measured on it (ADR 0078).
+        Quotas and percentage risk limits are measured on it (ADR 0078, ADR capitale-libero-al-netto-del-valore-dei-
+        flussi).
         """
-        return self.allocated_capital + self.realized_pnl - self.fees + self.funding
+        return self.allocated_capital + self.realized_pnl - self.fees + self.funding - self.cashed_profit
 
     @property
     def available_liquidity(self) -> Decimal:
@@ -90,6 +97,11 @@ class FlowState:
     @property
     def total_value(self) -> Decimal:
         return self.available_liquidity + self.margin + self.unrealized_pnl
+
+    @property
+    def pnl(self) -> Decimal:
+        """What the flow gained or lost in all, the profits it cashed out included (R3.4.3)."""
+        return self.total_value + self.cashed_profit - self.allocated_capital
 
     @property
     def return_percent(self) -> Decimal:

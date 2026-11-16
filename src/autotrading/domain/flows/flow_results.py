@@ -32,7 +32,7 @@ class FlowResults:
 
     @property
     def total_gain(self) -> Decimal:
-        return self.state.total_value - self.state.allocated_capital
+        return self.state.pnl
 
     @property
     def total_gain_percent(self) -> Decimal | None:

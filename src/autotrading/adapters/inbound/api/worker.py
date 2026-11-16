@@ -19,6 +19,10 @@ from autotrading.adapters.inbound.api.worker_model_catalog import WorkerModelCat
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.read_model_catalog import ReadModelCatalogUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.record_account_executions import (
+    RecordAccountExecutionsCommand,
+    RecordAccountExecutionsUseCase,
+)
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotInboxPort, BotStartLinkPort
 from autotrading.application.orders.close_exchange_position import (
@@ -58,6 +62,7 @@ class WorkerUseCases:
     run_exchange_verification: RunExchangeVerificationUseCase
     notify: NotifyUseCase
     read_account_activity: ReadAccountActivityUseCase
+    record_account_executions: RecordAccountExecutionsUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,6 +238,14 @@ def create_worker_api(
     def read_activity(tenant_id: UUID, account_id: UUID) -> AccountActivityResponse:
         command = account_id
         return AccountActivityResponse.of(for_tenant(TenantId(tenant_id)).read_account_activity.execute(command))
+
+    @api.post("/tenants/{tenant_id}/accounts/{account_id}/ledger", dependencies=[Depends(require_api)])
+    def record_ledger(tenant_id: UUID, account_id: UUID) -> dict[str, int]:
+        """What the exchange added to the account enters its ledger, for a command of the API (ADR incasso-dei-
+        profitti): only the worker reads the executions of an account."""
+        command = RecordAccountExecutionsCommand(account_id)
+        recorded = for_tenant(TenantId(tenant_id)).record_account_executions.execute(command)
+        return {"recorded": len(recorded)}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])
     def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: UserRequest) -> OrderOutcomeResponse:

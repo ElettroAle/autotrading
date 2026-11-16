@@ -157,3 +157,30 @@ def test_the_money_of_the_flow_is_the_capital_plus_realized_pnl_and_funding_less
     )
 
     assert state.funds == Decimal(533)
+
+
+def test_the_profits_cashed_out_leave_the_money_and_the_value_of_the_flow() -> None:
+    # ADR capitale-libero-al-netto-del-valore-dei-flussi: the money of the flow is net of what it cashed out.
+    flow = flow_on("BTC")
+    activity = an_activity(positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal(20)),))
+
+    state = FlowState.attributed(flow, activity, totals_of(flow, realized_pnl=Decimal(118)), Decimal(118))
+
+    assert (state.funds, state.available_liquidity, state.total_value) == (Decimal(500), Decimal(400), Decimal(520))
+
+
+def test_the_pnl_of_the_flow_keeps_the_profits_cashed_out() -> None:
+    flow = flow_on("BTC", capital=Decimal(400))
+    activity = an_activity(positions=(a_position("BTC", unrealized_pnl=Decimal(-10)),))
+
+    state = FlowState.attributed(flow, activity, totals_of(flow, realized_pnl=Decimal(118)), Decimal(118))
+
+    assert state.pnl == Decimal(108)
+
+
+def test_a_flow_never_cashed_out_has_its_whole_value() -> None:
+    flow = flow_on("BTC")
+
+    state = FlowState.attributed(flow, an_activity(), totals_of(flow, realized_pnl=Decimal(30)))
+
+    assert (state.cashed_profit, state.total_value, state.pnl) == (Decimal(0), Decimal(530), Decimal(30))
