@@ -43,9 +43,11 @@ When('un visitatore apre la dashboard senza entrare', async ({ dashboard }) => {
   await dashboard.open();
 });
 
+// The dashboard sends the visitor straight to the identity provider, which asks the credentials
+// (ADR accesso-persistente-con-cache-msal-in-localstorage).
 Then('viene portato/portata alla pagina di accesso', async ({ dashboard }) => {
-  await expect(dashboard.signInHeading()).toBeVisible();
-  await expect(dashboard.page).toHaveURL(/\/dashboard\/login(\?|$)/);
+  await expect(dashboard.credentialsPage()).toBeVisible();
+  await expect(dashboard.page).toHaveURL(/^https:\/\/login\.fake-idp\.test\//);
 });
 
 Given("che la dashboard è quella dell'installazione dev", async ({ dashboard }) => {
@@ -54,13 +56,14 @@ Given("che la dashboard è quella dell'installazione dev", async ({ dashboard })
 });
 
 When('{string} apre una qualsiasi pagina', async ({ dashboard, memory }, account: string) => {
-  await dashboard.open();
-  memory.environments.push((await dashboard.environment().textContent()) ?? '');
-  await dashboard.signInAs(account);
+  await dashboard.openAndSignInAs(account);
   await expect(dashboard.flows()).toBeVisible();
   memory.environments.push((await dashboard.environment().textContent()) ?? '');
   await dashboard.flows().getByRole('link').first().click();
   await expect(dashboard.flowName()).toBeVisible();
+  memory.environments.push((await dashboard.environment().textContent()) ?? '');
+  await dashboard.open('/login');
+  await expect(dashboard.signInHeading()).toBeVisible();
   memory.environments.push((await dashboard.environment().textContent()) ?? '');
 });
 
@@ -76,7 +79,8 @@ Given("che l'accesso di {string} è scaduto", async ({ dashboard }, account: str
   await dashboard.openAndSignInAs(account);
   await expect(dashboard.flows()).toBeVisible();
   fakePlatform.expireSessions();
-  await dashboard.page.clock.fastForward('02:00:00');
+  // The clock jumps past the access token: no rereading of the page starts the sign-in before the user opens a page.
+  await dashboard.page.clock.setSystemTime(new Date(Date.now() + 2 * 60 * 60 * 1000));
 });
 
 Then(

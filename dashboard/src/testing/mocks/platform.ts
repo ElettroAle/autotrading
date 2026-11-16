@@ -366,7 +366,9 @@ const state = {
   cashOuts: [] as string[],
   capitalChanges: [] as FakeCapitalChange[],
   signingIn: undefined as string | undefined,
-  sessionsExpired: false,
+  identityProviderSession: undefined as string | undefined,
+  credentialPagesShown: 0,
+  refreshTokensExpired: false,
   exchangeReachable: true,
   exchangesListed: true,
   exchangeNetwork: 'test' as FakeNetwork,
@@ -523,7 +525,9 @@ export const fakePlatform = {
     state.cashOuts.length = 0;
     state.capitalChanges.length = 0;
     state.signingIn = undefined;
-    state.sessionsExpired = false;
+    state.identityProviderSession = undefined;
+    state.credentialPagesShown = 0;
+    state.refreshTokensExpired = false;
     state.exchangeReachable = true;
     state.exchangesListed = true;
     state.exchangeNetwork = 'test';
@@ -1027,25 +1031,61 @@ export const fakePlatform = {
       : undefined;
   },
 
-  /** The account the user types on the sign-in page of the identity provider. */
+  /** The account the user types on the page of the credentials of the identity provider, used by the next sending. */
   signIn(account: string): void {
     state.signingIn = account;
   },
 
-  signingInAccount(): string | undefined {
-    return state.signingIn;
+  /** The account the user typed, once: a page of the credentials asked again waits for the user again. */
+  takeSigningInAccount(): string | undefined {
+    const account = state.signingIn;
+    state.signingIn = undefined;
+    return account;
   },
 
-  /** From now on the identity provider refuses to renew the tokens it issued: the user must sign in again. */
+  /** The account whose session the identity provider keeps after a sign-in, until it ends. */
+  startIdentityProviderSession(account: string): void {
+    state.identityProviderSession = account;
+  },
+
+  identityProviderSession(): string | undefined {
+    return state.identityProviderSession;
+  },
+
+  /** The session at the identity provider is over: the next sign-in asks the credentials (R6.5.1). */
+  endIdentityProviderSession(): void {
+    state.identityProviderSession = undefined;
+  },
+
+  countCredentialPage(): void {
+    state.credentialPagesShown += 1;
+  },
+
+  /** How many times the identity provider asked the credentials. */
+  credentialPagesShown(): number {
+    return state.credentialPagesShown;
+  },
+
+  /** From now on the identity provider refuses to renew the tokens it issued, while its session lives on (R6.5.1). */
+  expireRefreshTokens(): void {
+    state.refreshTokensExpired = true;
+  },
+
+  refreshTokensExpired(): boolean {
+    return state.refreshTokensExpired;
+  },
+
+  /** The access expired: the identity provider renews no token and its session is over, the user signs in again. */
   expireSessions(): void {
-    state.sessionsExpired = true;
+    state.refreshTokensExpired = true;
+    state.identityProviderSession = undefined;
   },
 
   restoreSessions(): void {
-    state.sessionsExpired = false;
+    state.refreshTokensExpired = false;
   },
 
   sessionsExpired(): boolean {
-    return state.sessionsExpired;
+    return state.refreshTokensExpired && state.identityProviderSession === undefined;
   },
 };
