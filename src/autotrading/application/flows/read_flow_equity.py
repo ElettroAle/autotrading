@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.flows.ports import EquitySnapshotRepositoryPort, FlowRepositoryPort
@@ -15,8 +15,8 @@ class ReadFlowEquityCommand:
 
     flow_id: UUID
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 class ReadFlowEquityUseCase:
@@ -30,7 +30,7 @@ class ReadFlowEquityUseCase:
         self._clock = clock
 
     def execute(self, command: ReadFlowEquityCommand) -> FlowEquity:
-        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        period = StatisticsPeriod.named(command.period, command.since, command.until)
         flow = self._flows.get(FlowId(command.flow_id))
         snapshots = self._equity.of_flow(flow.id.value, period.window(self._clock()))
         return FlowEquity(flow.configuration.allocated_capital, tuple(snapshots))

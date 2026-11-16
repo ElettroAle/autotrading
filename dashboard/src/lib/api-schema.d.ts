@@ -3564,9 +3564,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3606,9 +3606,9 @@ export interface operations {
                 side?: string | null;
                 /** @description vinta o persa, dal PnL al netto delle commissioni */
                 result?: string | null;
-                /** @description primo giorno della chiusura */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno della chiusura */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3644,9 +3644,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3682,9 +3682,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3860,9 +3860,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -3899,9 +3899,9 @@ export interface operations {
                 outcome?: string | null;
                 /** @description apertura, chiusura, mantenimento o nessuna */
                 decision?: string | null;
-                /** @description primo giorno dell'intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno dell'intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -4000,9 +4000,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;
@@ -4043,9 +4043,9 @@ export interface operations {
                 version?: number | null;
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
                 /** @description `next` della pagina precedente */
                 after?: string | null;
@@ -4086,9 +4086,9 @@ export interface operations {
                 version?: number | null;
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
                 /** @description `next` della pagina precedente */
                 after?: string | null;
@@ -4129,9 +4129,9 @@ export interface operations {
                 version?: number | null;
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
                 /** @description `next` della pagina precedente */
                 after?: string | null;
@@ -4167,9 +4167,9 @@ export interface operations {
             query?: {
                 /** @description all, 7d, 30d o range */
                 period?: string;
-                /** @description primo giorno di un intervallo */
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
-                /** @description ultimo giorno di un intervallo */
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 to?: string | null;
             };
             header?: never;

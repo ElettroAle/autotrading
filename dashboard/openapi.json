@@ -1839,16 +1839,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -1858,16 +1858,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -1987,16 +1987,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno della chiusura",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno della chiusura"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2006,16 +2006,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno della chiusura",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno della chiusura"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2085,16 +2085,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2104,16 +2104,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2183,16 +2183,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2202,16 +2202,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2699,16 +2699,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2718,16 +2718,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2835,16 +2835,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno dell'intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno dell'intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2854,16 +2854,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno dell'intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno dell'intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -3039,16 +3039,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3058,16 +3058,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -3196,16 +3196,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3215,16 +3215,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "after",
@@ -3371,16 +3371,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3390,16 +3390,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "after",
@@ -3546,16 +3546,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3565,16 +3565,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "after",
@@ -3652,16 +3652,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3671,16 +3671,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {

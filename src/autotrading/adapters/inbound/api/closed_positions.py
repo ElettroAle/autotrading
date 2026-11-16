@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
 from autotrading.domain.flows.closed_position import ClosedPosition
@@ -78,11 +79,11 @@ def closed_position_filter_of(
     asset: str | None = None,
     side: Annotated[str | None, Query(description="long o short")] = None,
     result: Annotated[str | None, Query(description="vinta o persa, dal PnL al netto delle commissioni")] = None,
-    first_day: Annotated[date | None, Query(alias="from", description="primo giorno della chiusura")] = None,
-    last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno della chiusura")] = None,
+    since: IntervalStart = None,
+    until: IntervalEnd = None,
 ) -> ClosedPositionFilter:
     """The filters of the closed positions of a flow, in any combination (R6.4.4)."""
-    return ClosedPositionFilter.named(asset, side, result, first_day, last_day)
+    return ClosedPositionFilter.named(asset, side, result, since, until)
 
 
 def closed_positions_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:

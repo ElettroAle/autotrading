@@ -13,14 +13,17 @@ export const PERIODS = [
 
 export type PeriodKind = (typeof PERIODS)[number]['kind'];
 
-/** A period of the page; `from` and `to` are the days of a range, empty until chosen. */
+/**
+ * A period of the page; `from` and `to` are the instants of a range, in UTC to the minute (`2026-11-16T09:15Z`), empty
+ * until chosen (ADR periodo-al-minuto).
+ */
 export type Period = { readonly kind: PeriodKind; readonly from: string; readonly to: string };
 
-/** The days of an interval chosen on a chart, both whole, as the API reads them. */
+/** The instants of an interval chosen on a chart, in UTC to the minute, as the API reads them. */
 export type Interval = { readonly from: string; readonly to: string };
 
-/** The days a list of the API is asked for, absent where the period does not limit. */
-export type ListDays = { readonly from?: string; readonly to?: string };
+/** The instants a list of the API is asked for, absent where the period does not limit. */
+export type ListInterval = { readonly from?: string; readonly to?: string };
 
 const PERIOD = 'period';
 const FROM = 'from';
@@ -41,7 +44,7 @@ const searchOf = (period: Period): URLSearchParams => {
   return search;
 };
 
-// The other parameters of the page stay; the whole life, the default, and the days not chosen yet leave no trace.
+// The other parameters of the page stay; the whole life, the default, and the ends not chosen yet leave no trace.
 // Another period shows other rows, so the lists start again from their first page.
 const withPeriod = (current: URLSearchParams, period: Period): URLSearchParams => {
   const next = new URLSearchParams(current);
@@ -76,7 +79,7 @@ const menuPeriodOf = (search: URLSearchParams): Period => {
     : { kind: 'all', from: '', to: '' };
 };
 
-// The days beside a period of the menu other than a range are an interval chosen on a chart: they win over the menu
+// The instants beside a period of the menu other than a range are an interval chosen on a chart: they win over the menu
 // until removed (ADR intervallo-trascinando-sull-equity-curve).
 const intervalOf = (search: URLSearchParams): Interval | undefined => {
   const from = search.get(FROM) ?? '';
@@ -92,39 +95,49 @@ const effectivePeriodOf = (search: URLSearchParams): Period => {
   return interval === undefined ? menuPeriodOf(search) : { kind: 'range', ...interval };
 };
 
-const dayOf = (instant: Date): string => instant.toISOString().slice(0, 10);
+// The instant of the address: UTC, to the minute, `2026-11-16T09:15Z` (ADR periodo-al-minuto).
+const minuteOf = (instant: Date): string => `${instant.toISOString().slice(0, 16)}Z`;
 
-const localDayOf = (instant: string): string => {
-  const date = new Date(instant);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-};
+const twoDigits = (value: number): string => String(value).padStart(2, '0');
 
-/** The query string of the API for the period: the days only for a range. */
+/** The query string of the API for the period: the instants only for a range. */
 export const apiSearchOf = (period: Period): string => searchOf(period).toString();
 
-/** A range waits for both its days before the panels read it. */
+/** A range waits for both its ends before the panels read it. */
 export const isComplete = (period: Period): boolean =>
   period.kind !== 'range' || (period.from !== '' && period.to !== '');
 
 /**
- * The days a list of the API (cycles, closed positions) is asked for in the period: the lists take days, so the last 7
- * or 30 days start from the whole day they begin in, and the list holds every row the period holds.
+ * The instants a list of the API (cycles, closed positions) is asked for in the period: the same minutes the other
+ * panels read, the last 7 or 30 days from now (ADR periodo-al-minuto).
  */
-export const listDaysOf = (period: Period, now: Date): ListDays => {
+export const listIntervalOf = (period: Period, now: Date): ListInterval => {
   if (period.kind === 'range') {
     return { from: period.from, to: period.to };
   }
   const days = LAST_DAYS[period.kind];
-  return days === undefined ? {} : { from: dayOf(new Date(now.getTime() - days * DAY_MS)) };
+  return days === undefined ? {} : { from: minuteOf(new Date(now.getTime() - days * DAY_MS)) };
 };
 
-/** The days of two instants of a chart, the earlier first, as the user reads them in the time zone of the browser. */
-export const daysOfInstants = (first: string, second: string): Interval => {
-  const [from = '', to = ''] = [localDayOf(first), localDayOf(second)].sort();
-  return { from, to };
+/** The minutes of two instants of a chart, the earlier first, in UTC (ADR periodo-al-minuto). */
+export const intervalOfInstants = (first: string, second: string): Interval => {
+  const [earlier = 0, later = 0] = [Date.parse(first), Date.parse(second)].sort((a, b) => a - b);
+  return { from: minuteOf(new Date(earlier)), to: minuteOf(new Date(later)) };
 };
+
+/** An instant of the address as a field of date and time shows it, in the time zone of the browser; empty if unread. */
+export const localInputOf = (instant: string): string => {
+  const date = new Date(instant);
+  if (instant === '' || Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const day = `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`;
+  return `${day}T${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
+};
+
+/** The date and time of a field, read in the time zone of the browser, as the instant of the address. */
+export const instantOfLocalInput = (value: string): string =>
+  value === '' ? '' : minuteOf(new Date(value));
 
 /**
  * The period of the menu, which lives in the query string of the page, so it survives a reload and every panel of the

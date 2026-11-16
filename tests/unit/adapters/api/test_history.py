@@ -110,7 +110,7 @@ def test_reads_the_period_of_a_range_of_days(platform: Platform, client_of: Clie
 
     response = client_of("anna").get(
         "/history/closed-positions",
-        params={"asset": "ETH", "period": "range", "from": "2026-11-10", "to": "2026-11-20"},
+        params={"asset": "ETH", "period": "range", "from": "2026-11-10T00:00Z", "to": "2026-11-20T23:59Z"},
     )
 
     positions = response.json()["positions"]

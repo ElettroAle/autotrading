@@ -1,7 +1,7 @@
 import base64
 import binascii
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.closed_positions import ClosedPositionResponse
 from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.errors import HistoryCursorInvalidError
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryCommand
@@ -163,10 +164,10 @@ def cursor_of(text: str) -> HistoryCursor:
 
 def period_of(
     period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
-    first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
-    last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
+    since: IntervalStart = None,
+    until: IntervalEnd = None,
 ) -> StatisticsPeriod:
-    return StatisticsPeriod.named(period, first_day, last_day)
+    return StatisticsPeriod.named(period, since, until)
 
 
 def criteria_of(

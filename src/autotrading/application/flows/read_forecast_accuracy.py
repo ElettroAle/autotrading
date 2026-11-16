@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.flows.ports import FlowForecastsPort, FlowRepositoryPort
@@ -13,8 +13,8 @@ from autotrading.domain.flows.statistics_period import StatisticsPeriod, Statist
 class ReadForecastAccuracyCommand:
     flow_id: UUID
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 class ReadForecastAccuracyUseCase:
@@ -26,7 +26,7 @@ class ReadForecastAccuracyUseCase:
         self._clock = clock
 
     def execute(self, command: ReadForecastAccuracyCommand) -> tuple[ForecastAccuracy, ...]:
-        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        period = StatisticsPeriod.named(command.period, command.since, command.until)
         flow = self._flows.get(FlowId(command.flow_id))
         now = self._clock()
         expired = self._forecasts.expired_forecasts(flow.id, now)

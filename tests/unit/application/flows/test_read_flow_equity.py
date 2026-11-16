@@ -92,7 +92,7 @@ def test_the_last_30_days_leave_the_older_cycles_out(flows: FlowStore, store: Eq
 def test_a_range_gives_the_cycles_between_its_bounds(flows: FlowStore, store: EquitySnapshotStore) -> None:
     flow = a_flow_with_capital(flows)
     recorded(store, *(snapshot(flow, days, 300 + days) for days in (5, 4, 3, 2)))
-    first, last = (NOW - timedelta(days=4)).date(), (NOW - timedelta(days=3)).date()
+    first, last = NOW - timedelta(days=4), NOW - timedelta(days=3)
     command = ReadFlowEquityCommand(flow.id.value, "range", first, last)
 
     equity = use_case(flows, store).execute(command)
