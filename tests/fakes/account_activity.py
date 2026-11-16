@@ -5,6 +5,7 @@ It also holds the executions and funding of each account, read since a moment as
 ports the worker realizes with its reading use cases, the activity and the executions of an account.
 """
 
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
 from typing import overload
@@ -30,6 +31,8 @@ class FakeAccountActivityAdapter:
         self.complete = True
         self.reachable = True
         self.read: list[UUID] = []
+        # What the exchange shows of an account the test set no reading for.
+        self.unread: Callable[[UUID], AccountActivity] = lambda _: an_activity()
 
     @overload
     def execute(self, account_id: UUID) -> AccountActivity: ...
@@ -48,7 +51,9 @@ class FakeAccountActivityAdapter:
         self.read.append(account_id)
         if not self.reachable:
             raise FlowExchangeUnavailableError
-        return self.activities.get(account_id, an_activity())
+        if account_id in self.activities:
+            return self.activities[account_id]
+        return self.unread(account_id)
 
     def since(self, account_id: UUID, since: datetime | None) -> ExecutionsWindow:
         if not self.reachable:

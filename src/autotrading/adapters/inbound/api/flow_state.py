@@ -15,6 +15,7 @@ from autotrading.application.flows.read_flow_results import ReadFlowResultsComma
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_return import FlowReturn
 
 
 class FlowPositionResponse(BaseModel):
@@ -48,8 +49,8 @@ class FlowPositionResponse(BaseModel):
             margin=amount_text(position.margin),
             unrealized_pnl=amount_text(position.unrealized_pnl),
             unrealized_pnl_percent=None if percent is None else amount_text(percent),
-            target_price=_price_text(plan.target),
-            stop_price=_price_text(plan.stop),
+            target_price=_optional_amount(plan.target),
+            stop_price=_optional_amount(plan.stop),
             invalidation=plan.invalidation,
         )
 
@@ -68,7 +69,8 @@ class FlowStateResponse(BaseModel):
     realized_pnl: str
     fees: str
     total_value: str
-    return_percent: str
+    # Compounded across the changes of the capital (R3.4.3); null when no return can be measured.
+    return_percent: str | None
     positions: list[FlowPositionResponse]
     summary: FlowResultsResponse
     openings_suspension: OpeningsSuspensionResponse | None
@@ -86,7 +88,7 @@ class FlowStateResponse(BaseModel):
             realized_pnl=amount_text(state.realized_pnl),
             fees=amount_text(state.fees),
             total_value=amount_text(state.total_value),
-            return_percent=amount_text(state.return_percent),
+            return_percent=_optional_amount(FlowReturn.of(state).percent),
             positions=[
                 FlowPositionResponse.of(position, state.exit_plan_of(position.asset)) for position in state.positions
             ],
@@ -112,5 +114,5 @@ def flow_state_router(use_cases_of_request: Callable[..., TenantUseCases]) -> AP
     return router
 
 
-def _price_text(price: Decimal | None) -> str | None:
-    return None if price is None else amount_text(price)
+def _optional_amount(value: Decimal | None) -> str | None:
+    return None if value is None else amount_text(value)

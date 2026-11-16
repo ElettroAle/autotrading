@@ -3,15 +3,15 @@
 One row per flow and asset: an executed opening replaces it, the closing of the position removes it.
 R3.1.1, ADR piano-di-uscita-nella-decisione-dell-agente.
 
-Revision ID: 0027
-Revises: 0026
+Revision ID: 0029
+Revises: 0028
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0027"
-down_revision = "0026"
+revision = "0029"
+down_revision = "0028"
 branch_labels = None
 depends_on = None
 

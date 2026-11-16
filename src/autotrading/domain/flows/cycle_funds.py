@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_state import ZERO, FlowState
-
-RETURN_PLACES = Decimal("0.01")
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,5 +23,6 @@ class CycleFunds:
         return self.attributed.total_value
 
     @property
-    def return_percent(self) -> Decimal:
-        return self.attributed.return_percent.quantize(RETURN_PLACES)
+    def return_percent(self) -> Decimal | None:
+        """The return the user consults, compounded across the changes of the capital (R3.4.3)."""
+        return FlowReturn.of(self.attributed).percent

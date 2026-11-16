@@ -8,7 +8,6 @@ from autotrading.application.accounts.errors import (
 )
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.application.flows.ports import FlowBalance
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_state import AccountState
 
@@ -24,10 +23,6 @@ class FakeAccountStateAdapter:
         if not self.reachable:
             raise WorkerUnavailableError
         return self._worker().execute(ReadExchangeStateCommand(account_id))
-
-    def balance_of(self, account_id: UUID) -> FlowBalance:
-        balance = self._state_for_flows(account_id).balance
-        return FlowBalance(balance.amount, balance.currency)
 
     def open_positions_of(self, account_id: UUID) -> tuple[str, ...]:
         return tuple(position.coin for position in self._state_for_flows(account_id).positions)

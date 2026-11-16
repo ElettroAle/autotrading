@@ -1,19 +1,38 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
-
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState, PositionMismatch
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
+
+
+def cashed_out(flow: Flow, *profits: Decimal) -> tuple[CapitalChange, ...]:
+    capital = flow.configuration.assigned_capital
+    return tuple(
+        CapitalChange(
+            flow.id,
+            datetime(2026, 11, 16, 10, minute, tzinfo=UTC),
+            capital,
+            capital,
+            UserId("anna"),
+            CapitalChangeReason.CASH_OUT,
+            profit,
+            value_before=capital + profit,
+            cashed_profit=profit,
+        )
+        for minute, profit in enumerate(profits)
+    )
 
 
 def flow_on(*assets: str, capital: Decimal = Decimal(500)) -> Flow:
@@ -61,7 +80,7 @@ def test_the_liquidity_is_the_capital_plus_the_realized_pnl_and_funding_less_fee
     assert state.available_liquidity == Decimal(433)
 
 
-def test_the_total_value_adds_margin_and_unrealized_pnl_and_the_return_compares_it_with_the_capital() -> None:
+def test_the_total_value_adds_margin_and_unrealized_pnl() -> None:
     flow = flow_on("BTC", "SOL")
     activity = an_activity(
         positions=(
@@ -75,16 +94,6 @@ def test_the_total_value_adds_margin_and_unrealized_pnl_and_the_return_compares_
     assert state.unrealized_pnl == Decimal(12)
     assert state.available_liquidity == Decimal(438)
     assert state.total_value == Decimal(550)
-    assert state.return_percent == Decimal(10)
-
-
-@pytest.mark.parametrize(("pnl", "expected"), [(Decimal(-50), Decimal(-10)), (Decimal(0), Decimal(0))])
-def test_the_return_is_negative_on_a_loss_and_zero_without_operations(pnl: Decimal, expected: Decimal) -> None:
-    flow = flow_on("BTC")
-
-    state = FlowState.attributed(flow, an_activity(), totals_of(flow, realized_pnl=pnl))
-
-    assert state.return_percent == expected
 
 
 def test_a_flow_without_operations_keeps_its_capital_in_the_currency_of_the_account() -> None:
@@ -178,3 +187,45 @@ def test_a_position_without_a_plan_has_the_empty_one() -> None:
     state = FlowState.attributed(flow, an_activity(positions=(a_position("BTC"),)), totals_of(flow))
 
     assert state.exit_plan_of("BTC") == ExitPlan()
+
+
+def test_the_profits_cashed_out_leave_the_money_and_the_value_of_the_flow() -> None:
+    # ADR capitale-libero-al-netto-del-valore-dei-flussi: the money of the flow is net of what it cashed out.
+    flow = flow_on("BTC")
+    activity = an_activity(positions=(a_position("BTC", margin=Decimal(100), unrealized_pnl=Decimal(20)),))
+
+    state = FlowState.attributed(
+        flow, activity, totals_of(flow, realized_pnl=Decimal(118)), capital_changes=cashed_out(flow, Decimal(118))
+    )
+
+    assert (state.funds, state.available_liquidity, state.total_value) == (Decimal(500), Decimal(400), Decimal(520))
+
+
+def test_the_pnl_of_the_flow_keeps_the_profits_cashed_out() -> None:
+    flow = flow_on("BTC", capital=Decimal(400))
+    activity = an_activity(positions=(a_position("BTC", unrealized_pnl=Decimal(-10)),))
+
+    state = FlowState.attributed(
+        flow, activity, totals_of(flow, realized_pnl=Decimal(118)), capital_changes=cashed_out(flow, Decimal(118))
+    )
+
+    assert state.pnl == Decimal(108)
+
+
+def test_a_flow_never_cashed_out_has_its_whole_value() -> None:
+    flow = flow_on("BTC")
+
+    state = FlowState.attributed(flow, an_activity(), totals_of(flow, realized_pnl=Decimal(30)))
+
+    assert (state.cashed_profit, state.total_value, state.pnl) == (Decimal(0), Decimal(530), Decimal(30))
+
+
+def test_the_profits_cashed_out_are_the_sum_of_those_of_its_changes() -> None:
+    flow = flow_on("BTC")
+    changes = cashed_out(flow, Decimal(100), Decimal("18.5"))
+
+    state = FlowState.attributed(
+        flow, an_activity(), totals_of(flow, realized_pnl=Decimal("118.5")), capital_changes=changes
+    )
+
+    assert (state.capital_changes, state.cashed_profit) == (changes, Decimal("118.5"))

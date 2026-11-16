@@ -25,6 +25,7 @@ class CloseReason(StrEnum):
     STOP_LOSS = "stop loss"
     TAKE_PROFIT = "take profit"
     PROTECTION_MISSING = "stop loss non piazzato"
+    CASH_OUT = "incasso"
 
 
 @dataclass(frozen=True, slots=True)

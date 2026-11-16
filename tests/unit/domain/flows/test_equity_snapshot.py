@@ -1,13 +1,16 @@
 """The equity of a flow at a cycle, from the state attributed to it (R2.2.3, ADR 0120)."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot, FlowEquity
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.tenancy.user_id import UserId
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 FLOW_ID = FlowId.new()
@@ -47,6 +50,27 @@ def test_the_equity_counts_the_funding_as_the_value_of_the_flow_does() -> None:
     snapshot = EquitySnapshot.of_state(PLANNED_AT, state)
 
     assert snapshot.equity == state.total_value == Decimal("305.5")
+
+
+def test_the_equity_leaves_out_the_profits_cashed_out_as_the_value_of_the_flow_does() -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: the curve after a cash-out starts again from the capital.
+    cash_out = CapitalChange(
+        FLOW_ID,
+        PLANNED_AT,
+        Decimal(300),
+        Decimal(300),
+        UserId("anna"),
+        CapitalChangeReason.CASH_OUT,
+        Decimal(3),
+        value_before=Decimal(303),
+        cashed_profit=Decimal(3),
+    )
+    state = replace(a_state(), capital_changes=(cash_out,))
+
+    snapshot = EquitySnapshot.of_state(PLANNED_AT, state)
+
+    assert (snapshot.cashed_profit, snapshot.equity) == (Decimal(3), state.total_value)
+    assert snapshot.equity == Decimal(300)
 
 
 def test_the_equity_of_a_flow_starts_from_its_initial_capital() -> None:

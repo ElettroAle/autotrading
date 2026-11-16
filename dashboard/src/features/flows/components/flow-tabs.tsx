@@ -12,6 +12,7 @@ export const FlowTabs = ({ flowId }: { flowId: string }) => {
     { name: 'Panoramica', to: `${paths.flow.getHref(flowId)}${periodSearch}` },
     { name: 'Posizioni chiuse', to: `${paths.flowClosedPositions.getHref(flowId)}${periodSearch}` },
     { name: 'Cicli', to: `${paths.flowCycles.getHref(flowId)}${periodSearch}` },
+    { name: 'Capitale', to: `${paths.flowCapital.getHref(flowId)}${periodSearch}` },
   ];
   return <ViewTabs label="Dati del flusso" views={views} />;
 };

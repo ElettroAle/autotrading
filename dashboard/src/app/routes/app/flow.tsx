@@ -22,7 +22,12 @@ export const FlowRoute = () => {
         renderCommands={(flow, realMoney) => (
           <>
             <OpeningsSuspension flowId={flow.id} />
-            <FlowCommands flowId={flow.id} status={flow.status} realMoney={realMoney} />
+            <FlowCommands
+              flowId={flow.id}
+              flowName={flow.name}
+              status={flow.status}
+              realMoney={realMoney}
+            />
           </>
         )}
       >

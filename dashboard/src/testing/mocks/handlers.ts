@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
+import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
 import {
@@ -191,13 +192,13 @@ const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
 const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
   flow_id: flow.id,
   currency: currencyOf(user, flow),
-  allocated_capital: '500',
+  allocated_capital: String(flow.allocatedCapital ?? 0),
   available_liquidity: '300',
   margin: '200',
   unrealized_pnl: '12',
   realized_pnl: '0',
   fees: '0',
-  total_value: '512',
+  total_value: String(flow.currentCapital),
   return_percent: '2.4',
   positions: fakePlatform.openPositionsOf(flow.id),
   summary: resultsSummaryOf(flow, request),
@@ -420,6 +421,7 @@ export const handlers = [
   ...accountHandlers,
   ...reconciliationHandlers,
   ...providerKeyHandlers,
+  ...capitalChangeHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json({ user_id: user.account, tenant_id: user.tenantId }),
@@ -680,6 +682,20 @@ export const handlers = [
       return new HttpResponse(null, { status: 204 });
     }),
   ),
+  http.post('*/flows/:flowId/cash-out', async ({ request, params }) => {
+    const body = (await request.json().catch(() => ({}))) as { capital?: string | null };
+    const capital =
+      body.capital === undefined || body.capital === null ? undefined : Number(body.capital);
+    return withUser(request, (user) => {
+      const { flow, freed } = fakePlatform.cashOut(user, String(params.flowId), capital);
+      return HttpResponse.json({
+        flow: flowResponse(flow),
+        freed: String(freed),
+        capital: String(flow.allocatedCapital),
+        left_open: [],
+      });
+    });
+  }),
   http.get('*/flows/:flowId/state', ({ request, params }) =>
     withUser(request, (user) => {
       const flow = user.flows.find((candidate) => candidate.id === params.flowId);

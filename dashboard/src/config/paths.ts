@@ -14,6 +14,11 @@ export const paths = {
     path: '/accounts',
     getHref: () => '/accounts',
   },
+  // The history of the capital of an account, reached from the page of the accounts (R3.4.2).
+  accountCapital: {
+    path: '/accounts/:accountId/capital',
+    getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/capital`,
+  },
   accountAlarms: {
     path: '/accounts/:accountId/alarms',
     getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/alarms`,
@@ -57,6 +62,10 @@ export const paths = {
       const query = search.toString();
       return `/flows/${encodeURIComponent(flowId)}/cycles${query === '' ? '' : `?${query}`}`;
     },
+  },
+  flowCapital: {
+    path: '/flows/:flowId/capital',
+    getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/capital`,
   },
   flowPositions: {
     path: '/flows/:flowId/positions',

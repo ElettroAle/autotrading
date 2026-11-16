@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 
 import { paths } from '@/config/paths';
+import { aCapitalChange } from '@/testing/mocks/capital-changes';
 import { aCompletedCycle, aFailedCycle, apiInstant, STEPS } from '@/testing/mocks/cycles';
 import {
   aHistoryCycle,
@@ -59,6 +60,7 @@ export const preparePagesWithLongWords = (
   const accountId = flow.accountId ?? '';
   fakeReconciliation.closedAlarm(accountId, new Date(DAY - 2 * HOUR), new Date(DAY - HOUR));
   fakeReconciliation.openAlarm(accountId, 1000, 980, new Date(DAY));
+  fakePlatform.recordCapitalChange(aCapitalChange(flow, 100, 123456789, new Date(DAY)));
   const owner = {
     flowId: flow.id,
     flow: flow.name,
@@ -78,6 +80,7 @@ export const preparePagesWithLongWords = (
     home: paths.home.getHref(),
     login: paths.login.getHref(),
     accounts: paths.accounts.getHref(),
+    accountCapital: paths.accountCapital.getHref(accountId),
     accountAlarms: paths.accountAlarms.getHref(accountId),
     newFlow: paths.newFlow.getHref(),
     flow: paths.flow.getHref(flow.id),
@@ -86,6 +89,7 @@ export const preparePagesWithLongWords = (
     history: paths.history.getHref(),
     providerKeys: paths.providerKeys.getHref(),
     flowCycles: paths.flowCycles.getHref(flow.id),
+    flowCapital: paths.flowCapital.getHref(flow.id),
     flowPositions: paths.flowPositions.getHref(flow.id),
     flowClosedPositions: paths.flowClosedPositions.getHref(flow.id),
     cycle: paths.cycle.getHref(flow.id, failed.planned_at),

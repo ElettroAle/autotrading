@@ -10,8 +10,10 @@ Funzionalità: R1.1.1 Creazione di un flusso
   L'intervallo di ciclo è un numero intero di minuti da 1 a 1440; senza indicazione vale 15 minuti.
   I limiti di rischio non hanno valori predefiniti: la leva massima è obbligatoria, e almeno uno dei due limiti
   di esposizione per operazione (sul margine impegnato o sul valore della posizione) è obbligatorio.
-  Il capitale allocato non supera il capitale libero del conto: saldo letto dall'exchange meno le allocazioni
-  degli altri flussi del conto.
+  Il capitale allocato non supera il capitale libero del conto: saldo letto dall'exchange meno il valore
+  complessivo degli altri flussi del conto. Il valore complessivo di un flusso è il capitale allocato più il PnL
+  realizzato e non realizzato, al netto di commissioni e funding, meno i profitti incassati (R3.4.1): guadagni e
+  perdite restano del flusso finché l'utente non li incassa.
   Un flusso appena creato è fermo: non esegue cicli finché l'utente non lo avvia.
   Una configurazione non valida è rifiutata per intero, con il motivo.
 
@@ -29,6 +31,11 @@ Funzionalità: R1.1.1 Creazione di un flusso
     Allora "anna" ha il flusso "alfa" nello stato "fermo"
     E il flusso "alfa" ha la versione di configurazione 1
     E il capitale libero del conto "test-1" è 600 USDC
+
+  Scenario: Il valore degli altri flussi non è capitale libero
+    Dato che sul conto "test-1" c'è anche il flusso attivo "beta" con capitale allocato 300 USDC e valore complessivo 370 USDC
+    Quando "anna" crea il flusso "alfa" con capitale allocato 700 USDC
+    Allora la creazione è rifiutata con il motivo "capitale allocato oltre il capitale libero: 630 USDC"
 
   Scenario: Intervallo di ciclo predefinito
     Quando "anna" crea il flusso "alfa" senza indicare l'intervallo di ciclo

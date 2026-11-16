@@ -1,14 +1,13 @@
 import logging
 from dataclasses import dataclass
 
-from autotrading.application.flows.flow_account import read_flow_account
+from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import FlowAccountPorts, FlowRepositoryPort, RunningVerificationsPort
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.free_capital import FreeCapital
 
 operations = logging.getLogger("autotrading.flows")
 
@@ -50,11 +49,11 @@ class ChangeFlowStatusUseCase:
 
     def _require_startable(self, status: FlowStatus, flow: Flow) -> None:
         account_id = flow.assigned_account_id
-        account = read_flow_account(self._accounts, account_id)
-        others = [other for other in self._flows.list() if other.id != flow.id]
+        # An account the tenant removed meanwhile is not found before anything of it is read.
+        self._accounts.directory.exchange_of(account_id)
         if status is FlowStatus.DRAFT:
-            require_assets_free(account_id, flow.configuration.assets, others)
-        free_capital = FreeCapital.of_account(account.balance, account.currency, account_id, others)
+            require_assets_free(account_id, flow.configuration.assets, self._flows.list(), excluding=flow.id)
+        free_capital = read_free_capital(self._flows, self._accounts, account_id, excluding=flow.id)
         free_capital.require_room_for(flow.configuration.assigned_capital)
 
     def _record_status(self, flow: Flow) -> None:

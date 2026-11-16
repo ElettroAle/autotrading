@@ -39,8 +39,16 @@ def new_flow(database: Engine) -> tuple[TenantId, UUID]:
 
 
 def snapshot(flow_id: UUID, planned_at: datetime, realized_pnl: str = "4") -> EquitySnapshot:
+    # The profits cashed out travel with the parts (ADR rendimento-composto-tra-le-variazioni-di-capitale).
     return EquitySnapshot(
-        flow_id, planned_at, Decimal(300), Decimal(realized_pnl), Decimal("3.5"), Decimal("1.25"), Decimal("-0.1")
+        flow_id,
+        planned_at,
+        Decimal(300),
+        Decimal(realized_pnl),
+        Decimal("3.5"),
+        Decimal("1.25"),
+        Decimal("-0.1"),
+        cashed_profit=Decimal("0.5"),
     )
 
 

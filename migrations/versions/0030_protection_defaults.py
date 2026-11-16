@@ -3,14 +3,14 @@
 A stop loss of 5% from the entry price and no take profit, the same a new flow gets; no new version is created.
 R3.1.2, ADR stop-loss-e-take-profit-predefiniti-del-flusso.
 
-Revision ID: 0028
-Revises: 0027
+Revision ID: 0030
+Revises: 0029
 """
 
 from alembic import op
 
-revision = "0028"
-down_revision = "0027"
+revision = "0030"
+down_revision = "0029"
 branch_labels = None
 depends_on = None
 

@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.capital_history import AccountTransfer
 
 
 class ActivityPositionResponse(BaseModel):
@@ -59,4 +60,20 @@ class AccountActivityResponse(BaseModel):
             positions=[ActivityPositionResponse.of(position) for position in activity.positions],
             movements=[ActivityMovementResponse.of(movement) for movement in activity.movements],
             read_at=activity.read_at.isoformat(),
+        )
+
+
+class AccountTransferResponse(BaseModel):
+    """A deposit or a withdrawal of an account, from the worker to the API for its history of the capital (R3.4.2)."""
+
+    transferred_at: str
+    amount: str
+    direction: str
+
+    @classmethod
+    def of(cls, transfer: AccountTransfer) -> AccountTransferResponse:
+        return cls(
+            transferred_at=transfer.transferred_at.isoformat(),
+            amount=str(transfer.amount),
+            direction=transfer.direction.value,
         )

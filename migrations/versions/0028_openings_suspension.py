@@ -3,15 +3,15 @@
 Beside the flow, under its row level security; empty for every flow until a threshold is passed. R3.2.2, ADR
 perdita-massima-sui-valori-di-equity-registrati.
 
-Revision ID: 0026
-Revises: 0025
+Revision ID: 0028
+Revises: 0027
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0026"
-down_revision = "0025"
+revision = "0028"
+down_revision = "0027"
 branch_labels = None
 depends_on = None
 

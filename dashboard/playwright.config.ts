@@ -14,11 +14,12 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 // The scenarios of the dashboard run on the .feature files of specs/, as pytest-bdd does for Python (ADR 0116).
 const testDir = defineBddConfig({
-  // The dashboard on a phone (F6.4) and what the requirements of E3 show in it run with the scenarios of E2, on the
-  // same build and fakes.
+  // The dashboard on a phone (F6.4) and what the requirements of E3 show in it (the exit plan, the risk limits, the
+  // reconciliation, the capital, the error of the forecasts) run with the scenarios of E2, on the same build and fakes.
   features: [
     '../specs/E2-dashboard-e-confronto/**/*.feature',
     '../specs/E3-rischio-capitale-e-qualita/**/*.feature',
+
     '../specs/E6-piattaforma-e-operativita/F6.4-dashboard-su-mobile/*.feature',
   ],
   featuresRoot: '../specs',

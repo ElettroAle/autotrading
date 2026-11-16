@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.errors import FlowNameInUseError
-from autotrading.application.flows.flow_account import read_flow_account
+from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import (
     FlowAccountPorts,
     FlowRepositoryPort,
@@ -19,7 +19,6 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_name import FlowName
-from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -89,11 +88,10 @@ class CreateFlowUseCase:
         name = FlowName(command.name)
         self._require_free(name)
         configuration = self._configuration(command)
-        account = read_flow_account(self._checks.accounts, command.account_id)
-        require_tradable(self._checks.markets, account.exchange, configuration.assets)
-        existing = self._flows.list()
-        require_assets_free(command.account_id, configuration.assets, existing)
-        free_capital = FreeCapital.of_account(account.balance, account.currency, command.account_id, existing)
+        exchange = self._checks.accounts.directory.exchange_of(command.account_id)
+        require_tradable(self._checks.markets, exchange, configuration.assets)
+        require_assets_free(command.account_id, configuration.assets, self._flows.list())
+        free_capital = read_free_capital(self._flows, self._checks.accounts, command.account_id)
         free_capital.require_room_for(configuration.assigned_capital)
         flow = Flow.created(self._tenant_id, command.account_id, name, configuration)
         self._flows.add(flow)

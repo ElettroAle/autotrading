@@ -2,6 +2,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { aCashOut } from '@/testing/mocks/capital-changes';
 import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
@@ -160,6 +161,38 @@ describe('EquityCurve', () => {
         'href',
         `/flows/flow-alfa/cycles/${encodeURIComponent(instant.toISOString())}`,
       );
+    });
+  });
+
+  // ADR rendimento-composto-tra-le-variazioni-di-capitale: every change of the capital of the period is marked on its
+  // instant with its reason and amount, and leads to the history of the capital.
+  describe('the changes of the capital, ADR rendimento-composto-tra-le-variazioni-di-capitale', () => {
+    it('marks every change of the period on its instant, over every page of the history', async () => {
+      const flow = fakePlatform.flowNamed('alfa');
+      const changes = Array.from({ length: 51 }, (_, index) =>
+        aCashOut(flow, 100 + index, daysAgo(1 + index / 100)),
+      );
+      changes.forEach((change) => fakePlatform.recordCapitalChange(change));
+      fakePlatform.recordEquity('alfa', daysAgo(3), 300);
+      fakePlatform.recordEquity('alfa', daysAgo(0.5), 305);
+      await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+      const chart = await curve();
+      await expect
+        .poll(() => within(chart).queryAllByRole('link', { name: /^incasso, / }))
+        .toHaveLength(51);
+      const first = within(chart).getByRole('link', { name: 'incasso, 100 USDC' });
+      expect(first).toHaveAttribute('data-instant', changes[0]?.changed_at);
+      expect(first).toHaveAttribute('href', '/flows/flow-alfa/capital');
+    });
+
+    it('marks no change outside the period', async () => {
+      fakePlatform.recordCapitalChange(aCashOut(fakePlatform.flowNamed('alfa'), 100, daysAgo(40)));
+      fakePlatform.recordEquity('alfa', daysAgo(3), 300);
+      await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
+      await curve();
+
+      expect(screen.queryAllByRole('link', { name: /^incasso, / })).toHaveLength(0);
     });
   });
 
