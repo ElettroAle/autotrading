@@ -117,7 +117,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
             "open_positions": 1,
             "failed_cycles": 0,
         },
-        "openings_suspended": None,
+        "openings_suspension": None,
     }
 
 
@@ -237,4 +237,9 @@ def test_the_state_of_a_flow_tells_why_its_openings_are_suspended(client_of: Cli
 
     state = anna.get(f"/flows/{flow.id.value}/state").json()
 
-    assert state["openings_suspended"] == "allarme di riconciliazione sul conto test-1"
+    assert state["openings_suspension"] == {
+        "reason": "allarme di riconciliazione sul conto test-1",
+        "suspended_at": "2026-11-14T12:00:00Z",
+        "cause": "riconciliazione",
+        "resumable": False,
+    }

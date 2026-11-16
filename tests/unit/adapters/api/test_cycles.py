@@ -27,6 +27,7 @@ from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -247,6 +248,9 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
     platform.ledger.totals[paused.id] = FlowTotals(paused.id, Decimal(0), Decimal("10.5"))
     platform.flows.flows.append(paused)
     platform.flows.pause_reasons[paused.id] = "credito esaurito presso openrouter"
+    platform.flows.openings[flow.id] = OpeningsStatus(
+        OpeningsSuspension("perdita giornaliera 6% oltre il 5%", PLANNED), None
+    )
     platform.flows.flows.append(a_flow(platform.tenant_of("bruno"), name="omega"))
 
     response = anna.get("/flows/overview")
@@ -260,6 +264,12 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "environment": "dev",
             "status": "attivo",
             "pause_reason": None,
+            "openings_suspension": {
+                "reason": "perdita giornaliera 6% oltre il 5%",
+                "suspended_at": "2026-11-12T10:07:00Z",
+                "cause": "perdita_massima",
+                "resumable": True,
+            },
             "model": flow.configuration.model.name,
             "version": flow.configuration.version,
             "last_cycle": {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
@@ -288,6 +298,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "environment": "dev",
             "status": "in pausa",
             "pause_reason": "credito esaurito presso openrouter",
+            "openings_suspension": None,
             "model": paused.configuration.model.name,
             "version": paused.configuration.version,
             "last_cycle": None,

@@ -53,7 +53,8 @@ class CashOutProfitsUseCase:
         flow = self._flows.get(command.flow_id)
         capital = cash_out_capital(flow.name.value, self._state_of(flow), command.capital)
         changed = flow.with_capital(capital)
-        left_open = self._ports.closings.execute(CloseFlowPositionsCommand(flow, command.user_id, CloseReason.CASH_OUT))
+        closing = CloseFlowPositionsCommand(flow, command.user_id, CloseReason.CASH_OUT)
+        left_open = self._ports.closings.execute(closing).left_open
         if left_open:
             return CashOutOutcome(flow, None, left_open)
         closed = self._state_after_closings(flow)

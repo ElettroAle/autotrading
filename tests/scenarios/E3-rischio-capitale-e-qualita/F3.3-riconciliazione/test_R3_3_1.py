@@ -1,6 +1,5 @@
 """The alarm on the balance of an account the cycles cannot explain (R3.3.1), on the cycles as the worker runs them."""
 
-import json
 from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -21,6 +20,7 @@ from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.support.activity import READ_AT, a_movement, an_activity
+from tests.support.decision_steps import answer, opening
 from tests.support.flow_cycles import FlowCycles
 from tests.support.notifications import chat_named
 from tests.support.platform import HYPERLIQUID
@@ -71,25 +71,6 @@ def exchange_shows(flow_cycles: FlowCycles, account: str, balance: Decimal, decl
     flow_cycles.platform.activity_reader.activities[address_of(flow_cycles, account)] = activity
 
 
-def answer(flow_cycles: FlowCycles, *decisions: dict[str, object]) -> None:
-    flow_cycles.model.text = json.dumps({"decisioni": list(decisions)})
-
-
-def opening(asset: str) -> dict[str, object]:
-    return {
-        "asset": asset,
-        "azione": "apri",
-        "direzione": "long",
-        "quota": 0.1,
-        "leva": 3,
-        "obiettivo": None,
-        "stop": None,
-        "invalidazione": None,
-        "confidenza": 70,
-        "ragionamento": "r",
-    }
-
-
 def next_cycle(flow_cycles: FlowCycles, flow: str) -> None:
     flow_cycles.clock.current += CYCLE
     flow_cycles.run(flow)
@@ -118,7 +99,7 @@ def openings_suspended(flow_cycles: FlowCycles, flow: str) -> bool:
     sent_before = len(flow_cycles.platform.order_exchange.sent)
     answer(flow_cycles, opening(asset))
     next_cycle(flow_cycles, flow)
-    reason = f"{ALARM_TEXT} sul conto {ACCOUNT_OF_FLOWS}"
+    reason = f"apertura {asset} non eseguita: {ALARM_TEXT} sul conto {ACCOUNT_OF_FLOWS}"
     suspended = blocked_reasons(flow_cycles, flow).get(asset) == reason
     assert suspended is (len(flow_cycles.platform.order_exchange.sent) == sent_before)
     return suspended
@@ -321,7 +302,7 @@ def not_opened(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
 
 @then(quoted('il ciclo di "{flow}" registra "apertura {asset} non eseguita: {reason}"'))
 def cycle_records_blocked(flow_cycles: FlowCycles, flow: str, asset: str, reason: str) -> None:
-    assert blocked_reasons(flow_cycles, flow) == {asset: reason}
+    assert blocked_reasons(flow_cycles, flow) == {asset: f"apertura {asset} non eseguita: {reason}"}
 
 
 @then(quoted('"{flow}" chiude la posizione su "{asset}"'))

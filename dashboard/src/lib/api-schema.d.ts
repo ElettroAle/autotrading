@@ -387,6 +387,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/emergency-closings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close In Emergency */
+        post: operations["close_in_emergency_flows_emergency_closings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/emergency-closings/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Emergency Closing */
+        get: operations["preview_emergency_closing_flows_emergency_closings_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows": {
         parameters: {
             query?: never;
@@ -626,6 +660,27 @@ export interface paths {
         /** Assign Draft Flow */
         put: operations["assign_draft_flow_flows__flow_id__assignment_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/openings/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Flow Openings
+         * @description The user resumes the openings suspended for maximum loss (R3.2.2); the suspension in force, of any cause,
+         *     reads in the state of the flow.
+         */
+        post: operations["resume_flow_openings_flows__flow_id__openings_resume_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1326,6 +1381,13 @@ export interface components {
             system_prompt_is_default: boolean;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+            /** Max Consecutive Failures */
+            max_consecutive_failures: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent: string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent: string | null;
+            openings_resume: components["schemas"]["OpeningsResume"];
             /** Default Stop Loss Percent */
             default_stop_loss_percent: string;
             /** Default Take Profit Percent */
@@ -1466,6 +1528,51 @@ export interface components {
             assets?: string[];
         };
         /**
+         * EmergencyClosingPreviewResponse
+         * @description The flows of the scope and the positions they hold now, for the confirmation (ADR chiusura-di-emergenza-nella-
+         *     dashboard).
+         */
+        EmergencyClosingPreviewResponse: {
+            /** Flows */
+            flows: number;
+            /** Positions */
+            positions: number;
+        };
+        /**
+         * EmergencyClosingRequest
+         * @description A flow, an account, or neither for every flow of the user (R3.2.3).
+         */
+        EmergencyClosingRequest: {
+            /** Flow Id */
+            flow_id?: string | null;
+            /** Account Id */
+            account_id?: string | null;
+        };
+        /** EmergencyClosingResponse */
+        EmergencyClosingResponse: {
+            /**
+             * Closed At
+             * Format: date-time
+             */
+            closed_at: string;
+            scope: components["schemas"]["EmergencyScopeResponse"];
+            /** Flows */
+            flows: components["schemas"]["FlowEmergencyOutcomeResponse"][];
+        };
+        /**
+         * EmergencyScopeKind
+         * @enum {string}
+         */
+        EmergencyScopeKind: "flow" | "account" | "all";
+        /** EmergencyScopeResponse */
+        EmergencyScopeResponse: {
+            kind: components["schemas"]["EmergencyScopeKind"];
+            /** Flow Id */
+            flow_id: string | null;
+            /** Account Id */
+            account_id: string | null;
+        };
+        /**
          * EquityPointResponse
          * @description A point of the curve: its equity and how much it moved from the first point of the period, in percent with two
          *     decimals, null when the first point has no equity (ADR 0137).
@@ -1551,6 +1658,10 @@ export interface components {
             max_margin_exposure_percent?: number | string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: number | string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: number | string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: number | string | null;
             /** Allocated Capital */
             allocated_capital: number | string;
             /**
@@ -1560,12 +1671,42 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: number | string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: number | string | null;
+            /** @default manual */
+            openings_resume: components["schemas"]["OpeningsResume"];
             /** Default Stop Loss Percent */
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+        };
+        /**
+         * FlowEmergencyOutcomeResponse
+         * @description What the closing did to one flow: the assets closed, the positions left open with the reason of the exchange,
+         *     the reason the whole flow failed, or the remark that it had nothing to close (R3.2.3).
+         */
+        FlowEmergencyOutcomeResponse: {
+            /**
+             * Flow Id
+             * Format: uuid
+             */
+            flow_id: string;
+            /** Flow Name */
+            flow_name: string;
+            /** Closed */
+            closed: string[];
+            /** Left Open */
+            left_open: components["schemas"]["PositionLeftOpenResponse"][];
+            /** Failure */
+            failure: string | null;
+            /** Remark */
+            remark: string | null;
         };
         /**
          * FlowEquityResponse
@@ -1614,10 +1755,21 @@ export interface components {
             max_margin_exposure_percent?: number | string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: number | string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: number | string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: number | string | null;
             /** Bring To Minimum */
             bring_to_minimum?: boolean | null;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: number | string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: number | string | null;
+            openings_resume?: components["schemas"]["OpeningsResume"] | null;
             /** Default Stop Loss Percent */
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
@@ -1646,6 +1798,7 @@ export interface components {
             status: string;
             /** Pause Reason */
             pause_reason: string | null;
+            openings_suspension: components["schemas"]["OpeningsSuspensionResponse"] | null;
             /** Model */
             model: string;
             /** Version */
@@ -1761,6 +1914,13 @@ export interface components {
             system_prompt_is_default: boolean;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+            /** Max Consecutive Failures */
+            max_consecutive_failures: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent: string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent: string | null;
+            openings_resume: components["schemas"]["OpeningsResume"];
             /** Default Stop Loss Percent */
             default_stop_loss_percent: string;
             /** Default Take Profit Percent */
@@ -1820,8 +1980,7 @@ export interface components {
             /** Positions */
             positions: components["schemas"]["FlowPositionResponse"][];
             summary: components["schemas"]["FlowResultsResponse"];
-            /** Openings Suspended */
-            openings_suspended: string | null;
+            openings_suspension: components["schemas"]["OpeningsSuspensionResponse"] | null;
         };
         /**
          * FlowStatisticsResponse
@@ -2124,6 +2283,40 @@ export interface components {
             };
         };
         /**
+         * OpeningsResume
+         * @description How the openings of a flow suspended for maximum loss resume (R3.2.2).
+         *
+         *     By hand unless the user chooses otherwise: the openings resume when the user confirms. The next day they resume on
+         *     their own at 00:00 UTC of the day after the suspension, and the user may still confirm before.
+         * @enum {string}
+         */
+        OpeningsResume: "manual" | "next_day";
+        /**
+         * OpeningsSuspensionCause
+         * @description Why the openings of a flow are suspended: a maximum loss passed (R3.2.2) or an alarm of reconciliation open on
+         *     its account (R3.3.1). Only the first one the user resumes from the flow; the second ends with the confirmation of
+         *     the account.
+         * @enum {string}
+         */
+        OpeningsSuspensionCause: "perdita_massima" | "riconciliazione";
+        /**
+         * OpeningsSuspensionResponse
+         * @description The openings of a flow suspended: the reason, since when, the cause and whether the user resumes them from the
+         *     flow, true only after a maximum loss (R3.2.2, R3.3.1).
+         */
+        OpeningsSuspensionResponse: {
+            /** Reason */
+            reason: string;
+            /**
+             * Suspended At
+             * Format: date-time
+             */
+            suspended_at: string;
+            cause: components["schemas"]["OpeningsSuspensionCause"];
+            /** Resumable */
+            resumable: boolean;
+        };
+        /**
          * OperationResponse
          * @description A row of the ledger (ADR 0063, ADR 0074): amounts as text without trailing zeros (ADR 0047).
          *
@@ -2355,6 +2548,10 @@ export interface components {
             max_margin_exposure_percent: string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent: string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent: string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent: string | null;
         };
         /** SourceParameterResponse */
         SourceParameterResponse: {
@@ -2456,6 +2653,14 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: number | string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: number | string | null;
+            /** @default manual */
+            openings_resume: components["schemas"]["OpeningsResume"];
             /** Default Stop Loss Percent */
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
@@ -2488,6 +2693,14 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: string | null;
+            /** @default manual */
+            openings_resume: components["schemas"]["OpeningsResume"];
             /** Default Stop Loss Percent */
             default_stop_loss_percent?: string | null;
             /** Default Take Profit Percent */
@@ -2549,6 +2762,10 @@ export interface components {
             max_margin_exposure_percent?: number | string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: number | string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: number | string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: number | string | null;
         };
         /** StrategyRiskLimits */
         "StrategyRiskLimits-Output": {
@@ -2558,6 +2775,10 @@ export interface components {
             max_margin_exposure_percent?: string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: string | null;
         };
         /** StrategySource */
         StrategySource: {
@@ -3377,6 +3598,71 @@ export interface operations {
             };
         };
     };
+    close_in_emergency_flows_emergency_closings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyClosingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyClosingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_emergency_closing_flows_emergency_closings_preview_get: {
+        parameters: {
+            query?: {
+                flow_id?: string | null;
+                account_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyClosingPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_flows_flows_get: {
         parameters: {
             query?: {
@@ -3844,6 +4130,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FlowResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_flow_openings_flows__flow_id__openings_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

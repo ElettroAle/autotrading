@@ -1,0 +1,332 @@
+"""R3.2.3: the emergency closing of a flow, of an account or of every flow, on the use cases of the API with the fake
+adapters (ADR chiusura-di-emergenza-per-ambito). playwright-bdd runs the confirmation of the dashboard on its build
+(ADR chiusura-di-emergenza-nella-dashboard); here the same scenario proves that the API gives the confirmation what it
+shows and closes nothing while the user chooses.
+"""
+
+from dataclasses import dataclass, field, replace
+from decimal import Decimal
+from uuid import UUID
+
+import pytest
+from pytest_bdd import given, scenarios, then, when
+
+from autotrading.application.flows.close_in_emergency import CloseInEmergencyCommand
+from autotrading.application.flows.errors import FlowNotFoundError
+from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
+from autotrading.application.flows.preview_emergency_closing import PreviewEmergencyClosingCommand
+from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
+from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.emergency_closing import EmergencyClosing, EmergencyScope, FlowEmergencyOutcome
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.market import Market
+from autotrading.domain.orders.order import Order
+from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_kind import ProtectionKind
+from autotrading.domain.orders.protection_order import ProtectionOrder
+from autotrading.domain.orders.trading_access import TradingAccess
+from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
+from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter
+from tests.support.flows import a_configuration, a_flow, account_id_of
+from tests.support.lifecycle_steps import hold_position
+from tests.support.orders import a_flow_order
+from tests.support.platform import Platform
+from tests.support.steps import quoted
+
+scenarios("E3-rischio-capitale-e-qualita/F3.2-limiti-di-rischio/R3.2.3-chiusura-di-emergenza.feature")
+
+STOP_PRICE = Decimal(95000)
+
+
+@dataclass
+class Emergency:
+    platform: Platform
+    user: str = ""
+    # The account of every flow of the scenario, by the name of the flow.
+    accounts: dict[str, str] = field(default_factory=dict)
+    owners: dict[str, str] = field(default_factory=dict)
+    assets: dict[str, str] = field(default_factory=dict)
+    closing: EmergencyClosing | None = None
+    error: AutotradingError | None = None
+    confirmation: str = ""
+    orders_before: int = 0
+
+    def flow(self, name: str) -> Flow:
+        owner = self.owners[name]
+        (flow,) = [flow for flow in self.platform.flows.of(self.platform.tenant_of(owner)) if flow.name.value == name]
+        return flow
+
+    def access(self, user: str, account: str) -> TradingAccess:
+        accounts = InMemoryAccountRepositoryAdapter(self.platform.accounts, self.platform.tenant_of(user))
+        opener = FakeCredentialOpenerAdapter(self.platform.vault)
+        account_id = self.platform.account_named(user, account).id.value
+        return OpenTradingAccessUseCase(accounts, opener).execute(OpenTradingAccessCommand(account_id))
+
+    def is_open(self, user: str, account: str, asset: str) -> bool:
+        address = self.access(user, account).value("account_address")
+        return (address, asset) in self.platform.order_exchange.positions
+
+    def flow_position_open(self, name: str) -> bool:
+        return self.is_open(self.owners[name], self.accounts[name], self.assets[name])
+
+    def add_flow(self, user: str, account: str, name: str, asset: str, *, held: bool = True) -> Flow:
+        account_id = account_id_of(self.platform, user, account)
+        configuration = a_configuration(assets=(asset,))
+        flow = a_flow(
+            self.platform.tenant_of(user),
+            name=name,
+            status=FlowStatus.ACTIVE,
+            account_id=account_id,
+            configuration=configuration,
+        )
+        self.platform.flows.flows.append(flow)
+        self.platform.flows.save_version(flow)
+        self.owners[name], self.accounts[name], self.assets[name] = user, account, asset
+        if held:
+            hold_position(self.platform, user, account, asset)
+            self.platform.orders_of(flow.tenant_id).add(_opening_order(account_id, flow, asset))
+        return flow
+
+    def launch(self, user: str, scope: EmergencyScope) -> None:
+        self.user = user
+        command = CloseInEmergencyCommand(scope, self.platform.user_id_of(user))
+        try:
+            self.closing = self.platform.use_cases_of(user).close_in_emergency.execute(command)
+        except AutotradingError as error:
+            self.error = error
+
+    def outcome_of(self, name: str) -> FlowEmergencyOutcome:
+        assert self.closing is not None, self.error
+        (outcome,) = [each for each in self.closing.outcomes if each.flow_name == name]
+        return outcome
+
+
+def _opening_order(account_id: UUID, flow: Flow, asset: str) -> Order:
+    order = a_flow_order(account_id, flow.id.value)
+    market_order = replace(order.request.market_order, coin=asset)
+    return replace(order, request=replace(order.request, market_order=market_order))
+
+
+@pytest.fixture
+def platform() -> Platform:
+    platform = Platform()
+    for asset, price in (("SOL", Decimal(200)), ("DOGE", Decimal("0.4"))):
+        platform.order_exchange.markets[asset] = Market(
+            asset, max_leverage=10, size_decimals=1, mid_price=price, min_order_value=Decimal(10)
+        )
+    return platform
+
+
+@pytest.fixture
+def emergency(platform: Platform) -> Emergency:
+    return Emergency(platform)
+
+
+@given(
+    quoted(
+        'che "{user}" ha sul conto "{account}" i flussi attivi "{first}" con una posizione su "{first_asset}" e '
+        '"{second}" con una posizione su "{second_asset}"'
+    )
+)
+def two_active_flows(  # noqa: PLR0917 - one argument per value of the step
+    emergency: Emergency, user: str, account: str, first: str, first_asset: str, second: str, second_asset: str
+) -> None:
+    emergency.add_flow(user, account, first, first_asset)
+    emergency.add_flow(user, account, second, second_asset)
+
+
+@given(quoted('che "{user}" ha sul conto "{account}" il flusso attivo "{name}" con una posizione su "{asset}"'))
+def one_active_flow(emergency: Emergency, user: str, account: str, name: str, asset: str) -> None:
+    emergency.add_flow(user, account, name, asset)
+
+
+@given(quoted('che "{user}" ha sul conto "{account}" anche il flusso attivo "{name}" senza posizioni'))
+def flow_without_positions(emergency: Emergency, user: str, account: str, name: str) -> None:
+    # On another account than the flow that trades it, the asset is free for this flow (R1.1.2).
+    emergency.add_flow(user, account, name, "ETH", held=False)
+
+
+@given(quoted('che la posizione di "{name}" su "{asset}" ha un ordine di stop loss sull\'exchange'))
+def stop_loss_on_exchange(emergency: Emergency, platform: Platform, name: str, asset: str) -> None:
+    flow, owner = emergency.flow(name), emergency.owners[name]
+    order = ProtectionOrder(asset, ProtectionKind.STOP_LOSS, Direction.LONG, STOP_PRICE)
+    order_id = platform.protection_exchange.place(emergency.access(owner, emergency.accounts[name]), order)
+    protection = PlacedProtection(
+        flow.assigned_account_id, flow.id.value, asset, order.kind, STOP_PRICE, order_id, order.client_order_id
+    )
+    InMemoryProtectionRepositoryAdapter(platform.protections, flow.tenant_id).add(protection)
+
+
+@given(quoted('che sul conto "{account}" c\'è una posizione su "{asset}" che nessun flusso possiede'))
+def position_of_no_flow(emergency: Emergency, platform: Platform, account: str, asset: str) -> None:
+    owner = emergency.owners[next(name for name, each in emergency.accounts.items() if each == account)]
+    hold_position(platform, owner, account, asset)
+
+
+@given(quoted('che l\'exchange rifiuta la chiusura su "{asset}" con "{message}"'))
+def closing_refused(platform: Platform, asset: str, message: str) -> None:
+    platform.order_exchange.closing_rejections[asset] = message
+
+
+@given(quoted('che il flusso "{name}" è in pausa con la posizione su "{asset}" aperta'))
+def flow_paused(emergency: Emergency, platform: Platform, name: str, asset: str) -> None:
+    flow = emergency.flow(name)
+    platform.flows.flows = [
+        replace(each, status=FlowStatus.PAUSED) if each.id == flow.id else each for each in platform.flows.flows
+    ]
+    assert emergency.is_open(emergency.owners[name], emergency.accounts[name], asset)
+
+
+@given(quoted('che "{user}" ha il flusso "{name}" con una posizione aperta'))
+def flow_of_another_tenant(emergency: Emergency, user: str, name: str) -> None:
+    emergency.add_flow(user, "test-1", name, "BTC")
+
+
+@when(quoted('"{user}" lancia la chiusura di emergenza del flusso "{name}"'))
+def launch_on_flow(emergency: Emergency, user: str, name: str) -> None:
+    emergency.launch(user, EmergencyScope(flow_id=emergency.flow(name).id))
+
+
+@when(quoted('"{user}" lancia la chiusura di emergenza del conto "{account}"'))
+def launch_on_account(emergency: Emergency, platform: Platform, user: str, account: str) -> None:
+    emergency.launch(user, EmergencyScope(account_id=platform.account_named(user, account).id.value))
+
+
+@when(quoted('"{user}" lancia la chiusura di emergenza di tutti i suoi flussi'))
+def launch_on_all(emergency: Emergency, user: str) -> None:
+    emergency.launch(user, EmergencyScope())
+
+
+@when(quoted('"{user}" sceglie nella dashboard la chiusura di emergenza del conto "{account}"'))
+def choose_on_account(emergency: Emergency, platform: Platform, user: str, account: str) -> None:
+    emergency.user = user
+    emergency.orders_before = len(platform.order_exchange.sent)
+    scope = EmergencyScope(account_id=platform.account_named(user, account).id.value)
+    preview = platform.use_cases_of(user).preview_emergency_closing.execute(PreviewEmergencyClosingCommand(scope))
+    emergency.confirmation = (
+        f"Chiudere {preview.positions} posizioni dei flussi del conto {account} e metterli in pausa?"
+    )
+
+
+@then(quoted('la posizione di "{name}" su "{asset}" è chiusa'))
+def position_closed(emergency: Emergency, name: str, asset: str) -> None:
+    assert emergency.closing is not None, emergency.error
+    assert asset in emergency.outcome_of(name).closed
+    assert not emergency.is_open(emergency.owners[name], emergency.accounts[name], asset)
+
+
+@then(quoted('il flusso "{name}" è in pausa con motivo "{reason}"'))
+def paused_with_reason(emergency: Emergency, platform: Platform, name: str, reason: str) -> None:
+    flow = emergency.flow(name)
+    assert flow.status is FlowStatus.PAUSED
+    assert platform.flows.pause_reasons.get(flow.id) == reason
+
+
+@then(quoted('i flussi "{first}" e "{second}" restano attivi con le loro posizioni'))
+def others_active(emergency: Emergency, first: str, second: str) -> None:
+    for name in (first, second):
+        assert emergency.flow(name).status is FlowStatus.ACTIVE
+        assert emergency.flow_position_open(name)
+
+
+@then(quoted('le posizioni di "{first}" e "{second}" sono chiuse'))
+def two_closed(emergency: Emergency, first: str, second: str) -> None:
+    for name in (first, second):
+        assert emergency.outcome_of(name).closed == (emergency.assets[name],)
+        assert not emergency.flow_position_open(name)
+
+
+@then(quoted('i flussi "{first}" e "{second}" sono in pausa con motivo "{reason}"'))
+def two_paused(emergency: Emergency, platform: Platform, first: str, second: str, reason: str) -> None:
+    for name in (first, second):
+        paused_with_reason(emergency, platform, name, reason)
+
+
+@then(quoted('il flusso "{name}" resta attivo con la sua posizione'))
+def still_active(emergency: Emergency, name: str) -> None:
+    assert emergency.flow(name).status is FlowStatus.ACTIVE
+    assert emergency.flow_position_open(name)
+
+
+@then(quoted('le posizioni di "{first}", "{second}" e "{third}" sono chiuse'))
+def three_closed(emergency: Emergency, first: str, second: str, third: str) -> None:
+    for name in (first, second, third):
+        assert emergency.outcome_of(name).closed == (emergency.assets[name],)
+        assert not emergency.flow_position_open(name)
+
+
+@then(quoted('i flussi "{first}", "{second}" e "{third}" sono in pausa con motivo "{reason}"'))
+def three_paused(  # noqa: PLR0917 - one argument per value of the step
+    emergency: Emergency, platform: Platform, first: str, second: str, third: str, reason: str
+) -> None:
+    for name in (first, second, third):
+        paused_with_reason(emergency, platform, name, reason)
+
+
+@then(quoted('sull\'exchange non resta alcun ordine di protezione di "{name}" su "{asset}"'))
+def no_protection_left(emergency: Emergency, platform: Platform, name: str, asset: str) -> None:
+    address = emergency.access(emergency.owners[name], emergency.accounts[name]).value("account_address")
+    assert platform.protection_exchange.cancelled
+    assert platform.protection_exchange.resting.get((address, asset), []) == []
+
+
+@then(quoted('lo storico delle posizioni chiuse di "{name}" contiene "{asset}" con motivo "{reason}"'))
+def history_reason(emergency: Emergency, platform: Platform, name: str, asset: str, reason: str) -> None:
+    command = ListClosedPositionsCommand(emergency.flow(name).id.value)
+    positions = platform.use_cases_of(emergency.owners[name]).list_closed_positions.execute(command).positions
+    assert [(position.asset, position.reason.value) for position in positions] == [(asset, reason)]
+
+
+@then(quoted('la posizione su "{asset}" resta aperta'))
+def position_of_no_flow_open(emergency: Emergency, asset: str) -> None:
+    assert emergency.closing is not None, emergency.error
+    assert emergency.is_open(emergency.user, "test-1", asset)
+    assert all(asset not in outcome.closed for outcome in emergency.closing.outcomes)
+
+
+@then(quoted('l\'esito riporta per "{name}" la posizione "{asset}" non chiusa con "{reason}"'))
+def left_open(emergency: Emergency, name: str, asset: str, reason: str) -> None:
+    left = emergency.outcome_of(name).left_open
+    assert [(position.asset, position.reason) for position in left] == [(asset, reason)]
+
+
+@then(quoted('il flusso "{name}" resta in pausa'))
+def still_paused(emergency: Emergency, platform: Platform, name: str) -> None:
+    flow = emergency.flow(name)
+    assert flow.status is FlowStatus.PAUSED
+    # Paused by the user before: the pause keeps its own reason, none.
+    assert platform.flows.pause_reasons.get(flow.id) is None
+
+
+@then(quoted('l\'esito riporta "{remark}"'))
+def remark(emergency: Emergency, remark: str) -> None:
+    assert emergency.closing is not None, emergency.error
+    (outcome,) = emergency.closing.outcomes
+    assert outcome.remark == remark
+
+
+@then(quoted('la dashboard chiede conferma con "{text}"'))
+def confirmation_asked(emergency: Emergency, text: str) -> None:
+    assert emergency.confirmation == text
+
+
+@then(quoted('nessuna posizione viene chiusa finché "{user}" non conferma'))
+def nothing_closed(emergency: Emergency, platform: Platform, user: str) -> None:
+    assert user == emergency.user
+    assert len(platform.order_exchange.sent) == emergency.orders_before
+    assert emergency.flow_position_open("alfa")
+    assert emergency.flow_position_open("beta")
+
+
+@then("il comando viene rifiutato come flusso inesistente")
+def refused_as_missing(emergency: Emergency) -> None:
+    assert emergency.closing is None
+    assert isinstance(emergency.error, FlowNotFoundError)
+
+
+@then(quoted('la posizione di "{name}" resta aperta'))
+def flow_position_still_open(emergency: Emergency, name: str) -> None:
+    assert emergency.flow_position_open(name)

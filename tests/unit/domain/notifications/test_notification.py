@@ -31,6 +31,10 @@ from autotrading.domain.tenancy.tenant_owned import TenantOwned
             Notification.flow_paused("alfa", "credito esaurito presso openrouter"),
             "alfa: in pausa, credito esaurito presso openrouter",
         ),
+        (
+            Notification.openings_suspended("alfa", "perdita giornaliera 6% oltre il 5%"),
+            "alfa: aperture sospese, perdita giornaliera 6% oltre il 5%",
+        ),
         (Notification.unattributable_position("conto-1", "SOL"), "conto-1: posizione non attribuibile su SOL"),
         (Notification.unattributable_fill("conto-1", "ETH"), "conto-1: esecuzione non attribuibile su ETH"),
         (

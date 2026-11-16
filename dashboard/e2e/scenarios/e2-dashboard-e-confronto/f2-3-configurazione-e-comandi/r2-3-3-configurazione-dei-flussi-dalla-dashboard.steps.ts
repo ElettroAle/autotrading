@@ -61,6 +61,8 @@ const flowOnAccount = (
       max_leverage: 3,
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: null,
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: null,
     },
     ...configuration,
   });

@@ -4,6 +4,7 @@ import { accountHandlers } from './account-handlers';
 import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
+import { emergencyClosingHandlers } from './emergency-closings';
 import {
   changeAllocatedCapital,
   createFlow,
@@ -27,6 +28,7 @@ import {
   FAKE_FLOW_COMMANDS,
   fakePlatform,
   type FakeFlowCommand,
+  type FakeOpeningsResume,
   type FakeConfiguration,
   type FakeEquityPoint,
   type FakeFlow,
@@ -81,6 +83,8 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
     max_leverage: configuration.maxLeverage,
     max_margin_exposure_percent: null,
     max_value_exposure_percent: null,
+    max_total_margin_exposure_percent: null,
+    max_total_value_exposure_percent: null,
   },
   default_stop_loss_percent: configuration.defaultStopLossPercent,
   default_take_profit_percent: configuration.defaultTakeProfitPercent,
@@ -89,6 +93,10 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   bring_to_minimum: false,
   system_prompt: configuration.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
   system_prompt_is_default: configuration.systemPrompt === null,
+  max_consecutive_failures: configuration.maxConsecutiveFailures,
+  max_daily_loss_percent: configuration.maxDailyLossPercent,
+  max_drawdown_percent: configuration.maxDrawdownPercent,
+  openings_resume: configuration.openingsResume,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
@@ -157,12 +165,23 @@ const currencyOf = (user: FakeUser, flow: FakeFlow): string =>
   user.accounts.find((account) => account.id === flow.accountId)?.currency ?? CURRENCY;
 
 // The openings of every flow of an account with an open alarm of reconciliation are suspended (R3.3.1).
-const openingsSuspendedOf = (user: FakeUser, flow: FakeFlow): string | null => {
+const alarmSuspensionOf = (user: FakeUser, flow: FakeFlow) => {
   const account = user.accounts.find((candidate) => candidate.id === flow.accountId);
   return account === undefined
     ? null
-    : fakeReconciliation.openingsSuspendedOf(account.id, account.name);
+    : fakeReconciliation.openingsSuspensionOf(account.id, account.name);
 };
+
+// One suspension of the openings, the maximum loss first since the user can resume it (R3.2.2, R3.3.1).
+const openingsSuspensionOf = (user: FakeUser, flow: FakeFlow) =>
+  flow.openingsSuspension === null
+    ? alarmSuspensionOf(user, flow)
+    : {
+        reason: flow.openingsSuspension.reason,
+        suspended_at: flow.openingsSuspension.suspendedAt,
+        cause: 'perdita_massima' as const,
+        resumable: true,
+      };
 
 const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
   resultsOf(
@@ -185,7 +204,7 @@ const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
   return_percent: '2.4',
   positions: fakePlatform.openPositionsOf(flow.id),
   summary: resultsSummaryOf(flow, request),
-  openings_suspended: openingsSuspendedOf(user, flow),
+  openings_suspension: openingsSuspensionOf(user, flow),
 });
 
 // The API counts a position won or lost by its result after the fees, as the statistics do (R6.4.4).
@@ -261,6 +280,7 @@ const overviewOf = (user: FakeUser, flow: FakeFlow, request: Request) => {
     environment: 'dev',
     status: flow.status,
     pause_reason: flow.pauseReason,
+    openings_suspension: openingsSuspensionOf(user, flow),
     model: flow.model,
     version: flow.version,
     last_cycle: newest === undefined ? null : outcomeOf(newest),
@@ -349,6 +369,14 @@ const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => {
   };
 };
 
+const percentText = (percent: string | null): string =>
+  percent === null ? 'nessuno' : `${percent}%`;
+
+const RESUME_LABELS: Readonly<Record<FakeOpeningsResume, string>> = {
+  manual: 'manuale',
+  next_day: 'il giorno dopo',
+};
+
 // The parts the API compares, with the same names and texts (R1.1.3): the fake never compares in another way.
 const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
   ['asset', (configuration) => configuration.assets.join(', ')],
@@ -358,6 +386,16 @@ const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
   ['leva massima', (configuration) => String(configuration.maxLeverage)],
   ['capitale allocato', (configuration) => configuration.allocatedCapital],
   ['system prompt', (configuration) => configuration.systemPrompt ?? 'predefinito'],
+  [
+    'cicli falliti consecutivi massimi',
+    (configuration) => String(configuration.maxConsecutiveFailures ?? 'nessuno'),
+  ],
+  [
+    'perdita giornaliera massima',
+    (configuration) => percentText(configuration.maxDailyLossPercent),
+  ],
+  ['perdita massima dal picco', (configuration) => percentText(configuration.maxDrawdownPercent)],
+  ['ripresa delle aperture', (configuration) => RESUME_LABELS[configuration.openingsResume]],
 ];
 
 const differences = (before: FakeConfiguration, after: FakeConfiguration) =>
@@ -382,6 +420,8 @@ const attachmentOf = (flowName: string): string => {
 type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
 
 export const handlers = [
+  // Before the routes of one flow, as on the API: the fixed path is not the identifier of a flow (R3.2.3).
+  ...emergencyClosingHandlers,
   ...accountHandlers,
   ...reconciliationHandlers,
   ...providerKeyHandlers,
@@ -635,6 +675,16 @@ export const handlers = [
         commandResponse(fakePlatform.command(user, String(params.flowId), command), command),
       ),
     ),
+  ),
+  // Only suspended openings resume, with the reason of the API otherwise (R3.2.2).
+  http.post('*/flows/:flowId/openings/resume', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) => {
+      if (flow.openingsSuspension === null) {
+        return problem(409, 'Conflict', `le aperture di ${flow.name} non sono sospese`);
+      }
+      flow.openingsSuspension = null;
+      return new HttpResponse(null, { status: 204 });
+    }),
   ),
   http.post('*/flows/:flowId/cash-out', async ({ request, params }) => {
     const body = (await request.json().catch(() => ({}))) as { capital?: string | null };
