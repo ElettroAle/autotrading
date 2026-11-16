@@ -669,6 +669,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/forecast-accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Forecast Accuracy */
+        get: operations["read_forecast_accuracy_flows__flow_id__forecast_accuracy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/operations": {
         parameters: {
             query?: never;
@@ -1357,6 +1374,15 @@ export interface components {
             points: components["schemas"]["EquityPointResponse"][];
         };
         /**
+         * FlowForecastAccuracyResponse
+         * @description The error of the forecasts of a flow in the period, one for every asset and horizon it forecast (ADR
+         *     errore-medio-della-previsione-nell-api).
+         */
+        FlowForecastAccuracyResponse: {
+            /** Forecasts */
+            forecasts: components["schemas"]["ForecastAccuracyResponse"][];
+        };
+        /**
          * FlowModificationRequest
          * @description Only the parts the user changes; the others keep the version in force (R1.1.3).
          */
@@ -1595,6 +1621,25 @@ export interface components {
             model_cost_usd: string;
             /** Model Calls Without Cost */
             model_calls_without_cost: number;
+        };
+        /**
+         * ForecastAccuracyResponse
+         * @description How much the forecasts of one asset and horizon missed in the period (R3.6.1): the mean absolute error as text
+         *     (ADR 0018), the mean percent error on the actual price with two decimals, null without evaluated forecasts.
+         */
+        ForecastAccuracyResponse: {
+            /** Asset */
+            asset: string;
+            /** Horizon Minutes */
+            horizon_minutes: number;
+            /** Mean Absolute Error */
+            mean_absolute_error: string | null;
+            /** Mean Percent Error */
+            mean_percent_error: string | null;
+            /** Evaluated */
+            evaluated: number;
+            /** Unevaluable */
+            unevaluable: number;
         };
         /** FreeCapitalResponse */
         FreeCapitalResponse: {
@@ -3619,6 +3664,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowStatisticsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_forecast_accuracy_flows__flow_id__forecast_accuracy_get: {
+        parameters: {
+            query?: {
+                /** @description all, 7d, 30d o range */
+                period?: string;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowForecastAccuracyResponse"];
                 };
             };
             /** @description Validation Error */

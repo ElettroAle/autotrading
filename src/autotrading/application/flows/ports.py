@@ -26,6 +26,7 @@ from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -761,6 +762,16 @@ class EquitySnapshotRepositoryPort(Protocol):
 
     def of_flow(self, flow_id: UUID, window: TimeWindow) -> list[EquitySnapshot]:
         """The equity of every cycle of the flow in the window, from the oldest planned instant."""
+        ...
+
+
+class FlowForecastsPort(Protocol):
+    """Bound to the tenant of the request: the price forecasts its flows recorded, each with the actual price beside it
+    once read (R1.3.5, R3.6.1).
+    """
+
+    def expired_forecasts(self, flow_id: FlowId, now: datetime) -> list[EvaluatedForecast]:
+        """Every forecast of the flow whose horizon has expired by now, with its actual price or none."""
         ...
 
 

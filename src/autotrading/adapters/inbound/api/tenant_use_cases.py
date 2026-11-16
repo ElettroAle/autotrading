@@ -55,6 +55,7 @@ from autotrading.application.flows.ports import (
     CycleHistoryPort,
     EquitySnapshotRepositoryPort,
     FlowDirectoryPort,
+    FlowForecastsPort,
     FlowLedgerPort,
     FlowOperationsPort,
     FlowPositionsPort,
@@ -76,6 +77,7 @@ from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
 from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
+from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
@@ -137,6 +139,7 @@ class TenantPorts:
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
+    flow_forecasts: FlowForecastsPort
     historical_cycles: HistoricalCyclesPort
     historical_closed_positions: HistoricalClosedPositionsPort
     historical_orders: HistoricalOrdersPort
@@ -192,6 +195,7 @@ class TenantUseCases:
     read_cycle: ReadCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
+    read_forecast_accuracy: ReadForecastAccuracyUseCase
     list_flow_overviews: ListFlowOverviewsUseCase
     read_flow_equity: ReadFlowEquityUseCase
     duplicate_flow: DuplicateFlowUseCase
@@ -272,6 +276,7 @@ class TenantUseCases:
             read_flow_statistics=ReadFlowStatisticsUseCase(
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock
             ),
+            read_forecast_accuracy=ReadForecastAccuracyUseCase(ports.flows, ports.flow_forecasts, ports.clock),
             list_flow_overviews=ListFlowOverviewsUseCase(
                 ports.flow_summaries,
                 ports.cycle_history,
