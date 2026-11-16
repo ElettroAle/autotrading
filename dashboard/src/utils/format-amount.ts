@@ -21,6 +21,9 @@ const GAIN = new Intl.NumberFormat(LOCALE, {
   signDisplay: 'exceptZero',
 });
 const USD = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+const PRICE_FROM_THOUSAND = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
+const PRICE_BELOW_THOUSAND = new Intl.NumberFormat(LOCALE, { maximumSignificantDigits: 6 });
+const THOUSAND = 1000;
 
 // Intl formats the decimal text itself, so no digit goes through a binary number on the way (ADR 0018).
 type DecimalText = `${number}`;
@@ -60,3 +63,12 @@ export const formatGain = (amount: string): string => GAIN.format(decimal(amount
 
 /** A cost in USD: cents always, and the fractions of a cent a model call can cost. */
 export const formatUsd = (amount: string): string => USD.format(decimal(amount));
+
+/**
+ * A price of the API rounded for reading (Bug 431): from 1000 on to at most two decimals, below to at most six
+ * significant digits. The API and the CSV keep every digit.
+ */
+export const formatPrice = (price: string): string =>
+  (Math.abs(Number(price)) >= THOUSAND ? PRICE_FROM_THOUSAND : PRICE_BELOW_THOUSAND).format(
+    decimal(price),
+  );

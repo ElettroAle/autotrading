@@ -20,8 +20,9 @@ def a_position(
     size: Decimal = Decimal(1),
     leverage: int = 1,
     entry_price: Decimal = Decimal(100),
+    mark_price: Decimal = Decimal(100),
 ) -> AccountPosition:
-    return AccountPosition(asset, TradeSide.LONG, size, margin, unrealized_pnl, leverage, entry_price)
+    return AccountPosition(asset, TradeSide.LONG, size, margin, unrealized_pnl, leverage, entry_price, mark_price)
 
 
 def a_fill(

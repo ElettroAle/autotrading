@@ -4858,6 +4858,10 @@
             "type": "string",
             "title": "Entry Price"
           },
+          "mark_price": {
+            "type": "string",
+            "title": "Mark Price"
+          },
           "margin": {
             "type": "string",
             "title": "Margin"
@@ -4885,6 +4889,7 @@
           "size",
           "leverage",
           "entry_price",
+          "mark_price",
           "margin",
           "unrealized_pnl",
           "unrealized_pnl_percent"
@@ -6304,6 +6309,10 @@
             "type": "string",
             "title": "Entry Price"
           },
+          "mark_price": {
+            "type": "string",
+            "title": "Mark Price"
+          },
           "unrealized_pnl": {
             "type": "string",
             "title": "Unrealized Pnl"
@@ -6327,6 +6336,7 @@
           "size",
           "leverage",
           "entry_price",
+          "mark_price",
           "unrealized_pnl",
           "liquidation_price"
         ],

@@ -20,14 +20,16 @@ FLOW = a_flow(TENANT, configuration=replace(a_configuration(), assets=("BTC",), 
 
 
 def held(asset: str) -> CyclePosition:
-    return CyclePosition(asset, TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(5), Decimal(60))
+    return CyclePosition(asset, TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(105), Decimal(5), Decimal(60))
 
 
 def attributed(
     *, realized_pnl: Decimal = Decimal(0), fees: Decimal = Decimal(0), margin: Decimal = Decimal(0)
 ) -> FlowState:
     positions = (
-        (AccountPosition("BTC", TradeSide.LONG, Decimal(1), margin, Decimal(12), 1, Decimal(100)),) if margin else ()
+        (AccountPosition("BTC", TradeSide.LONG, Decimal(1), margin, Decimal(12), 1, Decimal(100), Decimal(112)),)
+        if margin
+        else ()
     )
     return FlowState(FLOW.id, "USDC", Decimal(500), positions, realized_pnl, fees, Decimal(0))
 
@@ -84,5 +86,5 @@ def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
         Decimal(300),
         Decimal(410),
         Decimal("-18.00"),
-        (PositionView("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(5), Decimal(60)),),
+        (PositionView("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(105), Decimal(5), Decimal(60)),),
     )

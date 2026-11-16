@@ -149,6 +149,31 @@ describe('HistoryView', () => {
     expect(screen.getByRole('row', { name: /principale/ })).toHaveTextContent('apertura long');
   });
 
+  it('writes the prices of positions and executions below 1000 to six significant digits (Bug 431)', async () => {
+    const position = aHistoryPosition(ALFA, 'BTC', dayOf(1));
+    records().closedPositions.push({
+      ...position,
+      body: { ...position.body, open_price: '0.123456789', close_price: '0.1240000001' },
+    });
+    records().orders.push(
+      aHistoryOrder(ALFA, 'BTC', dayOf(1), [anExecution(dayOf(1), '0.000123456789', '1', '0')]),
+    );
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/history?tab=closed-positions' });
+
+    const [row] = await rowsOf('Posizioni chiuse');
+    expect(within(row as HTMLElement).getByText('0,123457')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('0,124')).toBeInTheDocument();
+    await user.click(tab('Ordini'));
+    await rowsOf('Ordini');
+    await user.selectOptions(screen.getByLabelText('Conto'), 'principale');
+    await user.click(await screen.findByText('1 esecuzione'));
+    const [, execution] = within(screen.getByRole('table', { name: 'Esecuzioni' })).getAllByRole(
+      'row',
+    );
+    expect(within(execution as HTMLElement).getByText('0,000123457')).toBeInTheDocument();
+  });
+
   it('shows an order of no flow, a closing and an order without executions', async () => {
     const order = aHistoryOrder(ALFA, 'ETH', dayOf(2), []);
     const single = aHistoryOrder(ALFA, 'BTC', dayOf(1), [

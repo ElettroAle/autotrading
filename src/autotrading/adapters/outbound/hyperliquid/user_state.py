@@ -19,6 +19,7 @@ class _PositionEntry(TypedDict):
     szi: str
     leverage: _Leverage
     entryPx: str
+    positionValue: str
     unrealizedPnl: str
     marginUsed: str
     liquidationPx: NotRequired[str | None]
@@ -59,6 +60,7 @@ class _UserPosition:
     signed_size: Decimal
     leverage: int
     entry_price: Decimal
+    mark_price: Decimal
     unrealized_pnl: Decimal
     margin: Decimal
     liquidation_price: Decimal | None
@@ -76,7 +78,7 @@ class _UserState:
 
 
 def user_state_of(answer: object) -> _UserState:
-    """Raises KeyError, TypeError, ValueError or InvalidOperation on an answer of unexpected shape."""
+    """Raises KeyError, TypeError, ValueError or ArithmeticError on an answer of unexpected shape."""
     state = cast("_ClearinghouseState", answer)
     return _UserState(
         account_value=decimal_of(state["marginSummary"]["accountValue"]),
@@ -90,7 +92,7 @@ def in_account_mode(perps: _UserState, mode: object, spot: object) -> _UserState
     """The state with the balance of the account mode the exchange declares (Bug 392, ADR
     saldo-dalla-modalita-del-conto-hyperliquid). Under unified account and portfolio margin the USDC of the spot state
     is the balance of spot and perps: the open result adds to it, and what orders hold and isolated positions use is
-    not available. Raises KeyError, TypeError, ValueError or InvalidOperation on a spot state of unexpected shape.
+    not available. Raises KeyError, TypeError, ValueError or ArithmeticError on a spot state of unexpected shape.
     """
     if mode not in UNIFIED_MODES:
         return perps
@@ -113,8 +115,15 @@ def _position_of(position: _PositionEntry) -> _UserPosition:
         signed_size=decimal_of(position["szi"]),
         leverage=int(position["leverage"]["value"]),
         entry_price=decimal_of(position["entryPx"]),
+        mark_price=_mark_price_of(position),
         unrealized_pnl=decimal_of(position["unrealizedPnl"]),
         margin=decimal_of(position["marginUsed"]),
         liquidation_price=None if liquidation is None else decimal_of(liquidation),
         isolated=position["leverage"].get("type") == ISOLATED,
     )
+
+
+def _mark_price_of(position: _PositionEntry) -> Decimal:
+    # The value of the position is at the mark price of the exchange; an open position never has size zero, so a zero
+    # here is an answer of unexpected shape and the division fails as one.
+    return decimal_of(position["positionValue"]) / abs(decimal_of(position["szi"]))

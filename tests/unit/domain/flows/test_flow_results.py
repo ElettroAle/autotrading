@@ -18,7 +18,8 @@ def a_state(
     *, capital: Decimal = Decimal(100), realized: Decimal = Decimal(0), assets: tuple[str, ...] = ()
 ) -> FlowState:
     positions = tuple(
-        AccountPosition(asset, TradeSide.LONG, Decimal(1), Decimal(20), Decimal(0), 1, Decimal(10)) for asset in assets
+        AccountPosition(asset, TradeSide.LONG, Decimal(1), Decimal(20), Decimal(0), 1, Decimal(10), Decimal(10))
+        for asset in assets
     )
     return FlowState(FLOW_ID, "USDC", capital, positions, realized, Decimal(0), Decimal(0))
 
