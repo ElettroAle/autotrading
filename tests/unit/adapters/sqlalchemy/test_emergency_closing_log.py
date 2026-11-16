@@ -56,4 +56,6 @@ def test_the_scope_names_the_flow_or_nothing() -> None:
 def test_every_closing_has_its_own_identity() -> None:
     closing = EmergencyClosing(TENANT, EmergencyScope(), CLOSED_AT, ())
 
-    assert _row_of(closing)["id"] != _row_of(closing)["id"]
+    first, second = _row_of(closing), _row_of(closing)
+
+    assert first["id"] != second["id"]
