@@ -80,9 +80,9 @@ class AccountReconciliation:
     closed_outside: tuple[OutsideClosing, ...]
     reading: AccountReading
     open_assets: frozenset[str]
+    closed_by_protection: tuple[ProtectionClosing, ...] = ()
     comparison: BalanceComparison | None = None
     alarm: ReconciliationAlarm | None = None
-    closed_by_protection: tuple[ProtectionClosing, ...] = ()
 
     @classmethod
     def of(  # noqa: PLR0913, PLR0917 - the readings a reconciliation compares and the threshold it compares with
@@ -114,9 +114,9 @@ class AccountReconciliation:
             closed_outside=() if previous is None else _closed_outside(previous, reading, new_entries, activity),
             reading=reading,
             open_assets=activity.open_assets,
+            closed_by_protection=() if previous is None else _closed_by_protection(previous, reading, new_entries),
             comparison=comparison,
             alarm=alarm,
-            closed_by_protection=() if previous is None else _closed_by_protection(previous, reading, new_entries),
         )
 
 

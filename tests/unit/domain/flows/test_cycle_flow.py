@@ -77,8 +77,9 @@ def test_the_risk_measures_quotas_and_limits_on_the_money_of_the_flow() -> None:
     flow = cycle_flow(attributed(realized_pnl=Decimal(-100), fees=Decimal(2), margin=Decimal(50)), Decimal(300))
 
     assert flow.risk_state() == RiskState(
-        "USDC", Decimal(398), Decimal(300), frozenset({"BTC"}), Decimal(50), Decimal(112)
+        "USDC", Decimal(398), Decimal(300), {"BTC": TradeSide.LONG}, Decimal(50), Decimal(112)
     )
+    assert flow.risk_state().open_assets == frozenset({"BTC"})
 
 
 def test_the_overall_exposure_of_the_risk_sums_the_margin_the_exchange_declares_and_the_value_at_the_mark_price() -> (

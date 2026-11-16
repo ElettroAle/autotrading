@@ -55,8 +55,8 @@ class FlowState:
         flow: Flow,
         activity: AccountActivity,
         totals: FlowTotals,
-        exit_plans: Mapping[str, ExitPlan] = frozendict({}),
         capital_changes: Sequence[CapitalChange] = (),
+        exit_plans: Mapping[str, ExitPlan] = frozendict({}),
     ) -> FlowState:
         positions = flow.configuration.held(activity.positions, lambda position: position.asset)
         return cls(

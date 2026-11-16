@@ -67,7 +67,7 @@ class CycleFlow:
             currency=self.account.currency,
             funds=attributed.funds,
             available_liquidity=self.available_liquidity,
-            open_assets=frozenset(position.asset for position in self.positions),
+            open_positions=frozendict({position.asset: position.side for position in self.positions}),
             open_margin=attributed.margin,
             open_value=sum((position.size * position.mark_price for position in attributed.positions), Decimal(0)),
             openings_suspended=None if suspension is None else suspension.blocked_reason,

@@ -4,15 +4,15 @@ level security, and the closings they make in the history of the flows.
 A protection stays recorded once removed: its execution, read later from the exchange, still belongs to its flow.
 R3.1.2, ADR ordini-di-protezione-sull-exchange, ADR chiusure-per-protezione-nello-storico.
 
-Revision ID: 0031
-Revises: 0030
+Revision ID: 0030
+Revises: 0029
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0031"
-down_revision = "0030"
+revision = "0030"
+down_revision = "0029"
 branch_labels = None
 depends_on = None
 

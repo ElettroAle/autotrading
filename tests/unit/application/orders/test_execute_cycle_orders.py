@@ -15,6 +15,7 @@ from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrders
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
+from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import Order
@@ -31,6 +32,7 @@ from tests.support.trading import HYPERLIQUID, new_access
 FLOW_ID = uuid4()
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
 type Opened[T] = Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T]
+type Updated[T] = Callable[[str, Decimal | None, Decimal | None, bool], T]
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +44,7 @@ class Opening:
     stop: Decimal | None = None
     target: Decimal | None = None
 
-    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T]) -> T:  # noqa: ARG002
+    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T], updating: Updated[T]) -> T:  # noqa: ARG002
         return opening(self.asset, self.side, self.value, self.leverage, self.stop, self.target)
 
 
@@ -50,8 +52,19 @@ class Opening:
 class Closing:
     asset: str
 
-    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T]) -> T:  # noqa: ARG002
+    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T], updating: Updated[T]) -> T:  # noqa: ARG002
         return closing(self.asset)
+
+
+@dataclass(frozen=True, slots=True)
+class Update:
+    asset: str
+    stop: Decimal | None = None
+    target: Decimal | None = None
+    remove_target: bool = False
+
+    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T], updating: Updated[T]) -> T:  # noqa: ARG002
+        return updating(self.asset, self.stop, self.target, self.remove_target)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +73,7 @@ class CycleOrders:
     flow_id: UUID
     flow_name: str
     planned_at: datetime
-    orders: tuple[Opening | Closing, ...]
+    orders: tuple[Opening | Closing | Update, ...]
     assets: tuple[str, ...]
     default_stop_loss_percent: Decimal
     default_take_profit_percent: Decimal | None
@@ -99,8 +112,9 @@ class Bench:
         exchanges, protection_exchanges = {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}
         cancel = CancelProtectionsUseCase(access, protection_exchanges, self.protections)
         protect = ProtectFlowPositionUseCase(exchanges, protection_exchanges, self.protections, self.orders, slippage)
+        update = UpdateFlowProtectionUseCase(exchanges, protection_exchanges, self.protections)
         execute = ExecuteFlowOrdersUseCase(
-            access, exchanges, self.orders, slippage, FlowOrderProtection(protect, cancel)
+            access, exchanges, self.orders, slippage, FlowOrderProtection(protect, cancel, update)
         )
         protect_open = ProtectOpenPositionsUseCase(access, exchanges, protection_exchanges, self.protections)
         return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)
@@ -109,7 +123,7 @@ class Bench:
         position = HeldPosition(asset, Direction.LONG, Decimal("0.5"), 4, entry_price)
         self.exchange.hold(self.accesses.accesses[self.account_id], position)
 
-    def cycle(self, *orders: Opening | Closing, take_profit: Decimal | None = None) -> CycleOrders:
+    def cycle(self, *orders: Opening | Closing | Update, take_profit: Decimal | None = None) -> CycleOrders:
         return CycleOrders(
             self.account_id, FLOW_ID, "Trend BTC", PLANNED_AT, orders, ("BTC", "ETH"), Decimal(5), take_profit
         )
@@ -204,3 +218,39 @@ def test_a_closing_after_a_refused_stop_loss_is_followed_as_unprotected(bench: B
     assert opened[:2] == ("Trend BTC", "BTC")
     assert closed[:3] == (FLOW_ID, PLANNED_AT, "BTC")
     assert closed[-1] is True
+
+
+def test_an_update_replaces_the_stop_loss_within_the_default_stop_of_the_flow(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.use_case().execute(bench.cycle())
+
+    sent = bench.use_case().execute(bench.cycle(Update("ETH", stop=Decimal(2000), target=Decimal(3300))))
+
+    assert sent == (
+        ProtectionNote("ETH", "stop 2000 riportato a 2850: oltre lo stop predefinito del 5%"),
+        ProtectionNote("ETH", "obiettivo ETH da nessuno a 3300"),
+    )
+    assert [(each.kind, each.trigger_price) for each in bench.protections.placed(bench.account_id, "ETH")] == [
+        (ProtectionKind.STOP_LOSS, Decimal(2850)),
+        (ProtectionKind.TAKE_PROFIT, Decimal(3300)),
+    ]
+
+
+def test_an_update_ignores_the_default_take_profit_of_the_flow(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.use_case().execute(bench.cycle())
+
+    sent = bench.use_case().execute(bench.cycle(Update("ETH", stop=Decimal(2900)), take_profit=Decimal(10)))
+
+    assert sent == (ProtectionNote("ETH", "stop ETH da 2850 a 2900"),)
+    assert [each.kind for each in bench.protections.placed(bench.account_id, "ETH")] == [ProtectionKind.STOP_LOSS]
+
+
+def test_an_update_may_remove_the_take_profit(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.use_case().execute(bench.cycle())
+    bench.use_case().execute(bench.cycle(Update("ETH", target=Decimal(3300))))
+
+    sent = bench.use_case().execute(bench.cycle(Update("ETH", remove_target=True)))
+
+    assert sent == (ProtectionNote("ETH", "obiettivo ETH da 3300 a nessuno"),)

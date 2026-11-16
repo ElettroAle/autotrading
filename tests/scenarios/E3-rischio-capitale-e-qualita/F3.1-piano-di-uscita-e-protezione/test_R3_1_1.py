@@ -55,6 +55,7 @@ class Openings:
             "obiettivo": None,
             "stop": None,
             "invalidazione": None,
+            "confidenza": 70,
             "ragionamento": "rottura della resistenza",
         }
         flow_cycles.model.text = json.dumps({"decisioni": [{**decision, **plan}]})

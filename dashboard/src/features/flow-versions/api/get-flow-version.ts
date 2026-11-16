@@ -26,6 +26,7 @@ const configurationSchema = z.object({
   }),
   default_stop_loss_percent: z.string(),
   default_take_profit_percent: z.string().nullable(),
+  minimum_confidence: z.number().nullable(),
   allocated_capital: z.string().nullable(),
   bring_to_minimum: z.boolean(),
   system_prompt: z.string(),

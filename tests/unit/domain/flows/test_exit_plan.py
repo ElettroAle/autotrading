@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.domain.flows.exit_plan import DiscardedLevel, ExitPlan
+from autotrading.domain.flows.exit_plan import DiscardedLevel, ExitPlan, ExitPlanChange, PlacedLevels
 from autotrading.domain.flows.trade_side import TradeSide
 
 MARKET = Decimal(60000)
@@ -86,3 +86,44 @@ def test_prices_read_as_the_user_writes_them() -> None:
 
 def test_the_empty_plan_is_the_default() -> None:
     assert ExitPlan() == ExitPlan(None, None, None)
+
+
+def test_a_change_coherent_with_the_position_keeps_every_level() -> None:
+    change = ExitPlanChange(Decimal(68000), Decimal(62000), "chiusura sotto 61000")
+
+    assert change.coherent_with(TradeSide.LONG, Decimal(64000)) == (change, ())
+
+
+def test_a_change_loses_the_levels_incoherent_with_the_position_and_keeps_the_rest() -> None:
+    change = ExitPlanChange(Decimal(63000), Decimal(65000), "sotto 61000")
+
+    kept, discarded = change.coherent_with(TradeSide.LONG, Decimal(64000))
+
+    assert kept == ExitPlanChange(None, None, "sotto 61000")
+    assert discarded == (
+        DiscardedLevel(Decimal(63000), "obiettivo 63000 scartato: incoerente con long al prezzo 64000"),
+        DiscardedLevel(Decimal(65000), "stop 65000 scartato: incoerente con long al prezzo 64000"),
+    )
+
+
+def test_a_removal_of_the_target_has_nothing_to_discard() -> None:
+    change = ExitPlanChange(remove_target=True)
+
+    assert change.coherent_with(TradeSide.SHORT, Decimal(64000)) == (change, ())
+
+
+def test_the_plan_after_an_update_holds_the_levels_placed_and_the_new_invalidation() -> None:
+    plan = ExitPlan(Decimal(66000), Decimal(57000), "sotto 59000")
+    change = ExitPlanChange(stop=Decimal(62000), invalidation="sotto 61000", remove_target=True)
+
+    updated = plan.updated(change, PlacedLevels(Decimal(62000), None))
+
+    assert updated == ExitPlan(None, Decimal(62000), "sotto 61000")
+
+
+def test_the_plan_after_an_update_without_invalidation_keeps_the_one_in_force() -> None:
+    plan = ExitPlan(Decimal(66000), Decimal(57000), "sotto 59000")
+
+    updated = plan.updated(ExitPlanChange(target=Decimal(68000)), PlacedLevels(Decimal(57000), Decimal(68000)))
+
+    assert updated == ExitPlan(Decimal(68000), Decimal(57000), "sotto 59000")

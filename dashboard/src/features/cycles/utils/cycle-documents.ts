@@ -15,6 +15,8 @@ const decisionSchema = z.object({
   asset: z.string(),
   action: z.string(),
   reasoning: z.string(),
+  // The cycles recorded before the agent declared it have none (R3.1.4).
+  confidence: z.number().nullish(),
   opening: openingSchema.nullish(),
 });
 

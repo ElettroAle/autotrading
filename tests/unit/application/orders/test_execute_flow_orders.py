@@ -13,10 +13,11 @@ from autotrading.application.orders.execute_flow_orders import (
     FlowOrdersOutcome,
 )
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
+from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.errors import LeverageAboveMaximumError
 from autotrading.domain.orders.flow_link import FlowLink
-from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
+from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, FlowUpdate
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.order import OrderOrigin, OrderSource, OrderStatus
@@ -98,6 +99,7 @@ def a_use_case(
         FlowOrderProtection(
             ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, orders, SLIPPAGE),
             CancelProtectionsUseCase(accesses.use_case, protection_exchanges, protections),
+            UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
         ),
     )
 
@@ -427,3 +429,37 @@ def test_a_refused_closing_keeps_the_protections_of_the_position(
 
     assert protection_exchange.cancelled == []
     assert len(protections.placed(account_id, "ETH")) == 1
+
+
+def test_an_update_replaces_the_protection_and_sends_no_order(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    account_id: UUID,
+) -> None:
+    hold_eth(exchange, accesses, account_id)
+    update = FlowUpdate("ETH", ProtectionRequest(Decimal(98), None, Decimal(5), None), remove_target=False)
+
+    outcome = use_case.execute(command(account_id, update))
+
+    assert outcome == FlowOrdersOutcome((), (ProtectionNote("ETH", "stop ETH da nessuno a 98"),))
+    assert exchange.sent == []
+    assert [
+        (order.kind, order.trigger_price) for order in protection_exchange.of(address(accesses, account_id), "ETH")
+    ] == [(ProtectionKind.STOP_LOSS, Decimal(98))]
+
+
+def test_an_update_goes_after_the_closings_and_before_the_openings(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    account_id: UUID,
+) -> None:
+    hold_eth(exchange, accesses, account_id)
+    update = FlowUpdate("ETH", ProtectionRequest(Decimal(98), None, Decimal(5), None), remove_target=False)
+
+    use_case.execute(command(account_id, BTC, update))
+
+    assert [order.asset for order in protection_exchange.placed] == ["ETH", "BTC"]

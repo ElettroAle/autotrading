@@ -99,6 +99,11 @@ class InvalidDefaultTakeProfitError(FlowSettingError):
         super().__init__("il take profit predefinito è maggiore di 0", FlowSetting.DEFAULT_TAKE_PROFIT)
 
 
+class InvalidMinimumConfidenceError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("la confidenza minima va da 0 a 100", FlowSetting.MINIMUM_CONFIDENCE)
+
+
 class CapitalAboveFreeCapitalError(FlowSettingError):
     def __init__(self, free_capital: str) -> None:
         super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}", FlowSetting.ALLOCATED_CAPITAL)

@@ -283,6 +283,20 @@ export const FlowForm = ({
               />
             )}
           </FormField>
+          <FormField
+            id="flow-minimum-confidence"
+            label="Confidenza minima (0-100)"
+            error={errors.minimum_confidence?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('minimum_confidence')}
+                inputMode="numeric"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
         </fieldset>
         <FormField
           id="flow-allocated-capital"

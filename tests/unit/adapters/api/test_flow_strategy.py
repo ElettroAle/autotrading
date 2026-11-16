@@ -15,6 +15,7 @@ from autotrading.adapters.inbound.api.strategy_document import (
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow_strategy import FlowStrategy
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -95,6 +96,7 @@ def a_strategy() -> FlowStrategy:
         max_drawdown_percent=Decimal("12.5"),
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
+        minimum_confidence=MinimumConfidence(55),
     )
 
 
@@ -124,6 +126,7 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
             "openings_resume": "next_day",
             "default_stop_loss_percent": "3",
             "default_take_profit_percent": "9",
+            "minimum_confidence": 55,
         },
     }
 
@@ -163,6 +166,7 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         Decimal(200),
     )
     assert (command.default_stop_loss_percent, command.default_take_profit_percent) == (Decimal(3), Decimal(9))
+    assert command.minimum_confidence == 55
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:

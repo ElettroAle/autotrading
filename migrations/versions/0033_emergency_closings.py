@@ -5,16 +5,16 @@ A closing is history: it is written once, never changed nor deleted. The reasons
 closing and the cash-out, whose reason the history did not admit yet (R3.4.1).
 R3.2.3, ADR chiusura-di-emergenza-per-ambito.
 
-Revision ID: 0032
-Revises: 0031
+Revision ID: 0033
+Revises: 0032
 """
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0032"
-down_revision = "0031"
+revision = "0033"
+down_revision = "0032"
 branch_labels = None
 depends_on = None
 

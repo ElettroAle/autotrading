@@ -12,6 +12,7 @@ from autotrading.application.orders.execute_flow_orders import (
     FlowOrderProtection,
 )
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
+from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.flow_link import FlowLink
@@ -61,6 +62,7 @@ class FlowExecution:
         protection = FlowOrderProtection(
             ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, trading.orders, trading.slippage),
             CancelProtectionsUseCase(trading.accesses.use_case, protection_exchanges, protections),
+            UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
         )
         use_case = ExecuteFlowOrdersUseCase(
             trading.accesses.use_case, exchanges, trading.orders, trading.slippage, protection

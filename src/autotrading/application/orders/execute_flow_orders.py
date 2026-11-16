@@ -10,10 +10,14 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionCommand, ProtectFlowPositionUseCase
 from autotrading.application.orders.sending import send_order, supported_exchange
+from autotrading.application.orders.update_flow_protection import (
+    UpdateFlowProtectionCommand,
+    UpdateFlowProtectionUseCase,
+)
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_link import FlowLink
-from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, in_sending_order
+from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, FlowUpdate, in_sending_order
 from autotrading.domain.orders.margin_mode import MarginMode
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
@@ -57,10 +61,13 @@ class FlowOrdersOutcome:
 
 @dataclass(frozen=True, slots=True)
 class FlowOrderProtection:
-    """Who protects a position a flow opens, and who cancels what is left of it when the flow closes it (R3.1.2)."""
+    """Who protects a position a flow opens, who cancels what is left of it when the flow closes it (R3.1.2), and who
+    replaces it when the agent updates its exit plan (R3.1.3).
+    """
 
     protect: ProtectFlowPositionUseCase
     cancel: CancelProtectionsUseCase
+    update: UpdateFlowProtectionUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +88,8 @@ class ExecuteFlowOrdersUseCase:
 
     Each order is sent once and recorded at once with the outcome the exchange gave it (R0.3.3, R0.3.4): a refusal
     is an outcome and the next orders go on; an exchange that does not answer stops them and fails the cycle (R1.2.3).
-    An executed opening gets its protection on the exchange, an executed closing leaves none behind (R3.1.2).
+    An executed opening gets its protection on the exchange, an executed closing leaves none behind (R3.1.2); an
+    update replaces the protection of its position (R3.1.3).
     """
 
     def __init__(
@@ -108,7 +116,17 @@ class ExecuteFlowOrdersUseCase:
     def _executed(self, sending: _Sending, order: FlowOrder) -> FlowOrdersOutcome:
         if isinstance(order, FlowClosing):
             return self._closed(sending, order)
+        if isinstance(order, FlowUpdate):
+            return self._updated(sending, order)
         return self._opened(sending, order)
+
+    def _updated(self, sending: _Sending, update: FlowUpdate) -> FlowOrdersOutcome:
+        """An update sends no order: it replaces the protections the position has waiting (R3.1.3)."""
+        command = sending.command
+        notes = self._protection.update.execute(
+            UpdateFlowProtectionCommand(sending.access, command.account_id, command.flow_id, update)
+        )
+        return FlowOrdersOutcome(notes=notes)
 
     def _closed(self, sending: _Sending, closing: FlowClosing) -> FlowOrdersOutcome:
         position = sending.exchange.position(sending.access, closing.asset)

@@ -54,6 +54,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_history import SqlAlchemyFlow
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_protection_levels import SqlAlchemyFlowProtectionLevelsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
@@ -198,6 +199,7 @@ from autotrading.application.orders.protect_flow_position import ProtectFlowPosi
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
+from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
 from autotrading.application.sources.ports import (
     PriceForecasterPort,
@@ -507,6 +509,7 @@ def cycle_of(
                                 order_exchanges, protection_exchanges, protections, orders, slippage
                             ),
                             cancel_protections,
+                            UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
                         ),
                     ),
                     follow_flow_orders,
@@ -515,6 +518,7 @@ def cycle_of(
                 openings,
                 exit_plans,
                 flows,
+                SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
             ),
             end=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             journal=JsonCycleJournalAdapter(environment),

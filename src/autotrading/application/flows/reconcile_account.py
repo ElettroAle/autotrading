@@ -37,8 +37,8 @@ class ReconcileAccountUseCase:
 
     The new executions of the account enter the ledger first (ADR 0063). Every case is recorded once; a position
     of a flow closed outside the platform, or by its stop loss or take profit (R3.1.2), enters the history of the flow.
-    A balance beyond the threshold of the account opens an alarm, told to the user once while it stays open. Nothing
-    on the exchange is touched but the protections such a closing leaves, and the flows keep operating.
+    A balance beyond the threshold of the account opens an alarm, told to the user once while it stays open.
+    Nothing on the exchange is touched but the protections such a closing leaves, and the cycles keep running.
     """
 
     def __init__(  # noqa: PLR0913, PLR0917 - the readings it compares and where each outcome goes

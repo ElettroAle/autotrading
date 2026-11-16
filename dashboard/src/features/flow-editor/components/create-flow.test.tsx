@@ -181,6 +181,7 @@ describe('CreateFlow', () => {
       },
       default_stop_loss_percent: '5',
       default_take_profit_percent: null,
+      minimum_confidence: null,
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: FAKE_SYSTEM_PROMPT.system_prompt,

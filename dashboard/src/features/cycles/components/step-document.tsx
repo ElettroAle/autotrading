@@ -62,7 +62,7 @@ const ContextSection = ({ messages }: { messages: ContextMessage[] }) => (
   </CycleSection>
 );
 
-const PlanLevel = ({ term, value }: { term: string; value: string | null }) =>
+const DetailOf = ({ term, value }: { term: string; value: string | null }) =>
   value === null ? null : (
     <>
       <dt className="font-medium text-slate-600">{term}</dt>
@@ -70,21 +70,28 @@ const PlanLevel = ({ term, value }: { term: string; value: string | null }) =>
     </>
   );
 
-// The levels of the plan as the agent gave them, with the shared label-value list (ADR piano-di-uscita-nella-dashboard).
-const ExitPlanOf = ({ decision }: { decision: Decision }) => {
+// The confidence and the levels of the plan as the agent gave them, in one shared label-value list (ADR
+// piano-di-uscita-nella-dashboard, ADR confidenza-nella-dashboard).
+const DecisionDetailsOf = ({ decision }: { decision: Decision }) => {
   const plan = exitPlanOf(decision);
-  if (plan === undefined) {
+  const confidence = decision.confidence ?? null;
+  if (plan === undefined && confidence === null) {
     return null;
   }
   return (
-    <div role="group" aria-label={`Piano di uscita di ${decision.asset}`}>
+    <div role="group" aria-label={`Decisione su ${decision.asset}`}>
       <dl className={`${DETAILS_GRID} text-sm`}>
-        <PlanLevel
-          term="Obiettivo"
-          value={plan.target === null ? null : formatPrice(plan.target)}
-        />
-        <PlanLevel term="Stop" value={plan.stop === null ? null : formatPrice(plan.stop)} />
-        <PlanLevel term="Invalidazione" value={plan.invalidation} />
+        <DetailOf term="Confidenza" value={confidence === null ? null : String(confidence)} />
+        {plan !== undefined && (
+          <>
+            <DetailOf
+              term="Obiettivo"
+              value={plan.target === null ? null : formatPrice(plan.target)}
+            />
+            <DetailOf term="Stop" value={plan.stop === null ? null : formatPrice(plan.stop)} />
+            <DetailOf term="Invalidazione" value={plan.invalidation} />
+          </>
+        )}
       </dl>
     </div>
   );
@@ -97,7 +104,7 @@ const DecisionSections = ({ decision }: { decision: AgentDecision }) => (
       {decision.decisioni.map((each) => (
         <div key={each.asset}>
           <h3 className="font-medium">{decisionLabelOf(each)}</h3>
-          <ExitPlanOf decision={each} />
+          <DecisionDetailsOf decision={each} />
           <RecordedText text={each.reasoning} />
         </div>
       ))}

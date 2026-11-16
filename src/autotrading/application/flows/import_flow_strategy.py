@@ -10,6 +10,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -42,6 +43,7 @@ class ImportFlowStrategyCommand:
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
+    minimum_confidence: int | None = None
 
 
 class ImportFlowStrategyUseCase:
@@ -99,4 +101,5 @@ class ImportFlowStrategyUseCase:
             protection_defaults=ProtectionDefaults.of(
                 command.default_stop_loss_percent, command.default_take_profit_percent
             ),
+            minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
         )

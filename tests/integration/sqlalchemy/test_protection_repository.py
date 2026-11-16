@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import Engine
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_protection_levels import SqlAlchemyFlowProtectionLevelsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.protection_repository import SqlAlchemyProtectionRepositoryAdapter
@@ -14,6 +15,7 @@ from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchem
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.closed_position import CloseReason
+from autotrading.domain.flows.exit_plan import PlacedLevels
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import PlatformOrder
 from autotrading.domain.orders.client_order_id import ClientOrderId
@@ -86,3 +88,41 @@ def test_a_protection_of_a_flow_of_another_tenant_is_refused(database: Engine) -
         SqlAlchemyProtectionRepositoryAdapter(database, other_tenant).add(
             a_protection(account_id, flow_id, ProtectionKind.STOP_LOSS)
         )
+
+
+def test_a_replaced_protection_alone_is_removed_and_the_other_stays(database: Engine) -> None:
+    tenant_id, account_id, flow_id = new_flow(database)
+    protections = SqlAlchemyProtectionRepositoryAdapter(database, tenant_id)
+    stop = a_protection(account_id, flow_id, ProtectionKind.STOP_LOSS)
+    take_profit = a_protection(account_id, flow_id, ProtectionKind.TAKE_PROFIT)
+    for protection in (stop, take_profit):
+        protections.add(protection)
+
+    protections.remove(account_id, "BTC", ProtectionKind.STOP_LOSS)
+
+    assert protections.placed(account_id, "BTC") == (take_profit,)
+
+
+def test_the_levels_in_force_of_a_flow_are_those_of_its_protections_not_removed(database: Engine) -> None:
+    tenant_id, account_id, flow_id = new_flow(database)
+    protections = SqlAlchemyProtectionRepositoryAdapter(database, tenant_id)
+    levels = SqlAlchemyFlowProtectionLevelsAdapter(database, tenant_id)
+    replaced = a_protection(account_id, flow_id, ProtectionKind.TAKE_PROFIT)
+    protections.add(a_protection(account_id, flow_id, ProtectionKind.STOP_LOSS))
+    protections.add(replaced)
+    protections.remove(account_id, "BTC", ProtectionKind.TAKE_PROFIT)
+
+    assert levels.placed_levels(flow_id, "BTC") == PlacedLevels(Decimal("57000.5"), None)
+    assert levels.placed_levels(flow_id, "ETH") == PlacedLevels(None, None)
+
+
+def test_the_levels_of_a_tenant_are_invisible_to_another_tenant(database: Engine) -> None:
+    tenant_id, account_id, flow_id = new_flow(database)
+    other_tenant, _, _ = new_flow(database)
+    SqlAlchemyProtectionRepositoryAdapter(database, tenant_id).add(
+        a_protection(account_id, flow_id, ProtectionKind.STOP_LOSS)
+    )
+
+    assert SqlAlchemyFlowProtectionLevelsAdapter(database, other_tenant).placed_levels(flow_id, "BTC") == (
+        PlacedLevels(None, None)
+    )

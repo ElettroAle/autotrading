@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -37,6 +38,7 @@ CONFIGURATION = replace(
     max_drawdown_percent=Decimal(10),
     openings_resume=OpeningsResume.NEXT_DAY,
     protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
+    minimum_confidence=MinimumConfidence(60),
 )
 
 
@@ -66,6 +68,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "openings_resume": "next_day",
         "default_stop_loss_percent": "2.5",
         "default_take_profit_percent": "10",
+        "minimum_confidence": 60,
     }
 
 
@@ -152,6 +155,13 @@ def test_a_version_without_default_take_profit_reads_back_without_it() -> None:
 
     assert (document["default_stop_loss_percent"], document["default_take_profit_percent"]) == ("5", None)
     assert configuration_of(1, document).protection_defaults == ProtectionDefaults()
+
+
+def test_a_version_without_minimum_confidence_reads_back_without_it() -> None:
+    document = json.loads(json.dumps(document_of(replace(CONFIGURATION, minimum_confidence=None))))
+
+    assert document["minimum_confidence"] is None
+    assert configuration_of(1, document).minimum_confidence is None
 
 
 def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_back() -> None:

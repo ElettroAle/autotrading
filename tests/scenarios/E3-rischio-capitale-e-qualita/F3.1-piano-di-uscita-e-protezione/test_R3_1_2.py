@@ -78,6 +78,7 @@ class Protection:
             "obiettivo": None,
             "stop": None,
             "invalidazione": None,
+            "confidenza": 70,
             "ragionamento": "rottura della resistenza",
         }
         self.flow_cycles.model.text = json.dumps({"decisioni": [{**decision, **plan}]})
@@ -266,7 +267,7 @@ def exchange_executes(protection: Protection, kind: str, pnl: str) -> None:
 @when(quoted('l\'agente di "{flow}" decide di chiudere la posizione su "{asset}"'))
 def agent_closes(protection: Protection, flow: str, asset: str) -> None:
     flow_cycles = protection.flow_cycles
-    decision = {"asset": asset, "azione": "chiudi", "ragionamento": "obiettivo raggiunto"}
+    decision = {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "obiettivo raggiunto"}
     flow_cycles.model.text = json.dumps({"decisioni": [decision]})
     flow_cycles.run(flow, "10:30")
 

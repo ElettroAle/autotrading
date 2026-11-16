@@ -154,13 +154,12 @@ class Platform:
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
+        self.account_activity.unread = self.reading_on_exchange
+        self.account_transfers = FakeAccountTransfersAdapter()
         # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
         self.protection_exchange = FakeProtectionExchangeAdapter()
         self.protections = ProtectionStore()
-        self.account_activity.unread = self.reading_on_exchange
-        self.account_transfers = FakeAccountTransfersAdapter()
         self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
-
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))

@@ -75,6 +75,8 @@ class StrategyBody(BaseModel):
     # Missing in the files written before them: a stop loss of 5% and no take profit (R3.1.2).
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
+    # Missing in the files written before it: no minimum confidence (R3.1.4).
+    minimum_confidence: int | None = None
 
 
 class StrategyDocument(BaseModel):
@@ -116,6 +118,7 @@ class StrategyDocument(BaseModel):
                 openings_resume=strategy.openings_resume,
                 default_stop_loss_percent=strategy.protection_defaults.stop_loss_percent,
                 default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
+                minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
             ),
         )
 
@@ -143,6 +146,7 @@ class StrategyDocument(BaseModel):
             openings_resume=strategy.openings_resume,
             default_stop_loss_percent=strategy.default_stop_loss_percent,
             default_take_profit_percent=strategy.default_take_profit_percent,
+            minimum_confidence=strategy.minimum_confidence,
         )
 
     def _require_supported(self) -> None:

@@ -4,12 +4,16 @@ from dataclasses import dataclass
 from autotrading.domain.agent.agent_response import (
     ACTION,
     ASSET,
+    CONFIDENCE,
     DECISIONS,
     DIRECTION,
+    HIGHEST_CONFIDENCE,
     INVALIDATION,
     LEVERAGE,
+    LOWEST_CONFIDENCE,
     MARGIN_FRACTION,
     REASONING,
+    REMOVE_TARGET,
     STOP,
     TARGET,
 )
@@ -45,6 +49,8 @@ def _decisions_schema() -> Schema:
             TARGET: {"type": ["number", "null"]},
             STOP: {"type": ["number", "null"]},
             INVALIDATION: {"type": ["string", "null"]},
+            REMOVE_TARGET: {"type": "boolean"},
+            CONFIDENCE: {"type": "integer", "minimum": LOWEST_CONFIDENCE, "maximum": HIGHEST_CONFIDENCE},
             REASONING: {"type": "string"},
         }
     )

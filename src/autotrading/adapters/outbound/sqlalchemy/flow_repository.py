@@ -26,6 +26,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -80,6 +81,8 @@ class _ConfigurationDocument(TypedDict):
     # Every version has them: the migration gave the versions saved before a stop loss of 5% (R3.1.2).
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
+    # Every version has it: the migration gave the versions saved before none (R3.1.4).
+    minimum_confidence: int | None
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -314,6 +317,9 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         "openings_resume": configuration.openings_resume.value,
         "default_stop_loss_percent": str(configuration.protection_defaults.stop_loss_percent),
         "default_take_profit_percent": _text(configuration.protection_defaults.take_profit_percent),
+        "minimum_confidence": None
+        if configuration.minimum_confidence is None
+        else configuration.minimum_confidence.value,
     }
 
 
@@ -351,6 +357,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         protection_defaults=ProtectionDefaults(
             Decimal(document["default_stop_loss_percent"]), _decimal(document["default_take_profit_percent"])
         ),
+        minimum_confidence=MinimumConfidence.optional(document["minimum_confidence"]),
     )
 
 

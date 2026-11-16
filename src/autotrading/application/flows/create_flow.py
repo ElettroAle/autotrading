@@ -19,6 +19,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -64,6 +65,8 @@ class CreateFlowCommand:
     # None for the stop loss of the platform; no take profit unless given (R3.1.2).
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
+    # None for a flow without a minimum confidence (R3.1.4).
+    minimum_confidence: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +130,7 @@ class CreateFlowUseCase:
             protection_defaults=ProtectionDefaults.of(
                 command.default_stop_loss_percent, command.default_take_profit_percent
             ),
+            minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

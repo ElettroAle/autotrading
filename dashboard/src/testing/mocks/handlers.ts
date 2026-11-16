@@ -88,6 +88,7 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   },
   default_stop_loss_percent: configuration.defaultStopLossPercent,
   default_take_profit_percent: configuration.defaultTakeProfitPercent,
+  minimum_confidence: configuration.minimumConfidence,
   allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,
   system_prompt: configuration.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,

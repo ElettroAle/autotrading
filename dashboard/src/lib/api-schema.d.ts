@@ -1392,6 +1392,8 @@ export interface components {
             default_stop_loss_percent: string;
             /** Default Take Profit Percent */
             default_take_profit_percent: string | null;
+            /** Minimum Confidence */
+            minimum_confidence: number | null;
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1681,6 +1683,8 @@ export interface components {
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
             default_take_profit_percent?: number | string | null;
+            /** Minimum Confidence */
+            minimum_confidence?: number | null;
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -1770,6 +1774,8 @@ export interface components {
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
             default_take_profit_percent?: number | string | null;
+            /** Minimum Confidence */
+            minimum_confidence?: number | null;
         };
         /**
          * FlowOverviewResponse
@@ -1919,6 +1925,8 @@ export interface components {
             default_stop_loss_percent: string;
             /** Default Take Profit Percent */
             default_take_profit_percent: string | null;
+            /** Minimum Confidence */
+            minimum_confidence: number | null;
         };
         /**
          * FlowResultsResponse
@@ -2657,6 +2665,8 @@ export interface components {
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
             default_take_profit_percent?: number | string | null;
+            /** Minimum Confidence */
+            minimum_confidence?: number | null;
         };
         /**
          * StrategyBody
@@ -2695,6 +2705,8 @@ export interface components {
             default_stop_loss_percent?: string | null;
             /** Default Take Profit Percent */
             default_take_profit_percent?: string | null;
+            /** Minimum Confidence */
+            minimum_confidence?: number | null;
         };
         /**
          * StrategyDocument

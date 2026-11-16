@@ -3,7 +3,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
 
-from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.trade_side import TradeSide
 
 
@@ -50,7 +51,8 @@ class ApprovedOpening:
     def order_with[T](
         self,
         opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],
-        closing: Callable[[str], T],  # noqa: ARG002 - each outcome builds one of the two orders
+        closing: Callable[[str], T],  # noqa: ARG002 - each outcome builds one of the orders
+        updating: Callable[[str, Decimal | None, Decimal | None, bool], T],  # noqa: ARG002 - each outcome builds one of the orders
     ) -> T:
         """The order that executes the opening, built by whoever sends it: asset, side, value, leverage, and the stop
         and target of its exit plan that its protection follows (R3.1.2).
@@ -65,11 +67,35 @@ class ApprovedClose:
 
     def order_with[T](
         self,
-        opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],  # noqa: ARG002 - one of two
+        opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],  # noqa: ARG002 - one of the orders
         closing: Callable[[str], T],
+        updating: Callable[[str, Decimal | None, Decimal | None, bool], T],  # noqa: ARG002 - one of the orders
     ) -> T:
         """The order that executes the close, built by whoever sends it: a close is always total (R1.4.4)."""
         return closing(self.asset)
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovedUpdate:
+    """An update of the exit plan of an open position the risk check lets through, with only the levels coherent with
+    its side and the notes of those it discarded (R3.1.3).
+    """
+
+    asset: str
+    plan_change: ExitPlanChange
+    adjustments: tuple[Adjustment, ...]
+
+    def order_with[T](
+        self,
+        opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],  # noqa: ARG002 - one of the orders
+        closing: Callable[[str], T],  # noqa: ARG002 - one of the orders
+        updating: Callable[[str, Decimal | None, Decimal | None, bool], T],
+    ) -> T:
+        """The order that replaces the protection of the position, built by whoever sends it: asset, new stop, new
+        target and whether the target goes (R3.1.3).
+        """
+        change = self.plan_change
+        return updating(self.asset, change.stop, change.target, change.remove_target)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,15 +105,30 @@ class BlockedDecision:
     asset: str
     reason: str
 
+    @classmethod
+    def untradable(cls, asset: str) -> BlockedDecision:
+        return cls(asset, f"asset non negoziabile sull'exchange: {asset}")
+
+    @classmethod
+    def without_position(cls, asset: str) -> BlockedDecision:
+        return cls(asset, f"nessuna posizione aperta su {asset}")
+
+    @classmethod
+    def below_minimum_confidence(cls, asset: str, confidence: int, minimum: MinimumConfidence) -> BlockedDecision:
+        return cls(asset, f"apertura {asset} non eseguita: confidenza {confidence} sotto la minima {minimum}")
+
 
 @dataclass(frozen=True, slots=True)
 class HeldPosition:
     asset: str
 
 
-type RiskOutcome = ApprovedOpening | ApprovedClose | BlockedDecision | HeldPosition
+type RiskOutcome = ApprovedOpening | ApprovedClose | ApprovedUpdate | BlockedDecision | HeldPosition
+type ApprovedOutcome = ApprovedOpening | ApprovedClose | ApprovedUpdate
 
 
-def approved_of(outcomes: Iterable[RiskOutcome]) -> tuple[ApprovedOpening | ApprovedClose, ...]:
-    """Only the approved decisions become orders (R1.5.5)."""
-    return tuple(outcome for outcome in outcomes if isinstance(outcome, (ApprovedOpening, ApprovedClose)))
+def approved_of(outcomes: Iterable[RiskOutcome]) -> tuple[ApprovedOutcome, ...]:
+    """Only the approved decisions become orders (R1.5.5, R3.1.3)."""
+    return tuple(
+        outcome for outcome in outcomes if isinstance(outcome, (ApprovedOpening, ApprovedClose, ApprovedUpdate))
+    )

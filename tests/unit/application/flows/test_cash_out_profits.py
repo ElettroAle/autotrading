@@ -109,7 +109,7 @@ class Bench:
         self.exchange = Exchange(self.activity)
         self.cycles = Cycles()
         self.closed = ClosedPositionStore()
-        exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id)
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id)
         closings = CloseFlowPositionsUseCase(
             ClosingPorts(
                 self.cycles,
@@ -117,13 +117,13 @@ class Bench:
                 Openings(),
                 InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
                 FakePositionClosedNoticeAdapter(),
-                exit_plans,
+                self.exit_plans,
             )
         )
         self.recording = FakeLedgerRecordingAdapter(
             RecordAccountExecutionsUseCase(self.flows, self.activity, InMemoryPlatformOrdersAdapter(), self.ledger)
         )
-        flow_state = ReadFlowStateUseCase(self.flows, self.activity, self.ledger, exit_plans)
+        flow_state = ReadFlowStateUseCase(self.flows, self.activity, self.ledger, self.exit_plans)
         ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW)
         self.cash_out = CashOutProfitsUseCase(self.flows, ports)
 

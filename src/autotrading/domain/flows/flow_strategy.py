@@ -4,6 +4,7 @@ from decimal import Decimal
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -36,6 +37,8 @@ class FlowStrategy:
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
     # The protection of every opening, a risk rule like the limits (R3.1.2).
     protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
+    # The confidence an opening needs, a risk rule like the limits; none unless the strategy has one (R3.1.4).
+    minimum_confidence: MinimumConfidence | None = None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -52,6 +55,7 @@ class FlowStrategy:
             configuration.max_drawdown_percent,
             configuration.openings_resume,
             configuration.protection_defaults,
+            configuration.minimum_confidence,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -72,6 +76,7 @@ class FlowStrategy:
             max_drawdown_percent=self.max_drawdown_percent,
             openings_resume=self.openings_resume,
             protection_defaults=self.protection_defaults,
+            minimum_confidence=self.minimum_confidence,
         )
 
 

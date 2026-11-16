@@ -58,6 +58,7 @@ from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
+from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.agent_context import MessageRole
 from autotrading.domain.agent.provider_name import ProviderName
@@ -90,6 +91,7 @@ from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnap
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import (
     InMemoryAutomaticPauseAdapter,
     InMemoryFlowRepositoryAdapter,
@@ -244,6 +246,7 @@ class FlowCycles:
                     order_exchanges, protection_exchanges, protections, platform.orders_of(tenant_id), platform.slippage
                 ),
                 cancel_protections,
+                UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
             ),
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
@@ -270,6 +273,7 @@ class FlowCycles:
                 openings,
                 exit_plans,
                 flows,
+                InMemoryFlowProtectionLevelsAdapter(platform.protections, tenant_id),
             ),
             openings=openings,
             closed_positions=closed_positions,

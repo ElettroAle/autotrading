@@ -71,7 +71,6 @@ class Worker:
         self.protections = ProtectionStore()
         self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.ledger = InMemoryFlowLedgerAdapter()
-
         self.exchange.trades_on(self.order_exchange)
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:

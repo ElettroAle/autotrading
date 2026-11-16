@@ -188,6 +188,7 @@ def flow_opens_in_cycle(records: Records, flow: str, asset: str) -> None:
         "obiettivo": None,
         "stop": None,
         "invalidazione": None,
+        "confidenza": 70,
         "ragionamento": "r",
     }
     records.flow_cycles.model.text = json.dumps({"decisioni": [opening]})

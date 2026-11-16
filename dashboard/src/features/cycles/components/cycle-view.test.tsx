@@ -70,17 +70,17 @@ describe('CycleView', () => {
     );
 
     const decisions = await section('Decisioni e ragionamento');
-    const plan = within(decisions).getByRole('group', { name: 'Piano di uscita di BTC' });
+    const plan = within(decisions).getByRole('group', { name: 'Decisione su BTC' });
     expect(
       within(plan)
         .getAllByRole('term')
         .map((term) => term.textContent),
-    ).toEqual(['Obiettivo', 'Stop', 'Invalidazione']);
+    ).toEqual(['Confidenza', 'Obiettivo', 'Stop', 'Invalidazione']);
     expect(
       within(plan)
         .getAllByRole('definition')
         .map((value) => value.textContent),
-    ).toEqual(['63.000', '58.500,5', 'chiusura a 4 ore sotto 59000']);
+    ).toEqual(['75', '63.000', '58.500,5', 'chiusura a 4 ore sotto 59000']);
   });
 
   it('shows only the levels of the plan the agent gave', async () => {
@@ -88,16 +88,43 @@ describe('CycleView', () => {
       aCompletedCycle(PLANNED_AT, 'BTC', { target: null, stop: '58500', invalidation: null }),
     );
 
-    const plan = await screen.findByRole('group', { name: 'Piano di uscita di BTC' });
+    const plan = await screen.findByRole('group', { name: 'Decisione su BTC' });
     expect(within(plan).queryByText('Obiettivo')).not.toBeInTheDocument();
     expect(within(plan).getByText('Stop')).toBeInTheDocument();
   });
 
-  it('shows no plan for an opening without levels', async () => {
-    await openCycle(aCompletedCycle(PLANNED_AT));
+  it('shows the confidence of a decision without plan in the same list (R3.1.4)', async () => {
+    await openCycle(aCompletedCycle(PLANNED_AT, 'BTC', undefined, 40));
+
+    const details = await screen.findByRole('group', { name: 'Decisione su BTC' });
+    expect(
+      within(details)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual(['Confidenza']);
+    expect(within(details).getByRole('definition')).toHaveTextContent('40');
+  });
+
+  it('shows no details for a decision recorded before the confidence, without levels', async () => {
+    const cycle = aCompletedCycle(PLANNED_AT);
+    const withoutConfidence = {
+      ...cycle,
+      documents: cycle.documents.map((document) =>
+        document.step === STEPS.agentDecision
+          ? {
+              ...document,
+              content: {
+                ...document.content,
+                decisioni: [{ asset: 'BTC', action: 'apri', reasoning: reasoningOf('BTC') }],
+              },
+            }
+          : document,
+      ),
+    };
+    await openCycle(withoutConfidence);
 
     await section('Decisioni e ragionamento');
-    expect(screen.queryByRole('group', { name: /Piano di uscita/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /Decisione su/ })).not.toBeInTheDocument();
   });
 
   it('shows the discarded decisions and the assets the agent left out', async () => {

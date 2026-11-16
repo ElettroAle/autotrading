@@ -521,7 +521,7 @@ def operational_rules(flow_cycles: FlowCycles, lowest: str, highest: str) -> Non
     text = flow_cycles.system_text()
     assert f"- leva da {lowest} a {highest};" in text
     assert "- al massimo una posizione per asset;" in text
-    assert "- azioni ammesse: apri, chiudi, mantieni;" in text
+    assert "- azioni ammesse: apri, chiudi, mantieni, aggiorna;" in text
     assert '{"decisioni": [' in text
 
 

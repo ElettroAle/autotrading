@@ -13,6 +13,7 @@ from autotrading.domain.flows.errors import (
     SourceNotSelectedError,
 )
 from autotrading.domain.flows.flow_setting import FlowSetting
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_check import RiskPolicy
@@ -69,6 +70,8 @@ class FlowConfiguration:
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
     # A stop loss of 5% and no take profit unless the user chooses others; the existing flows got the same (R3.1.2).
     protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
+    # None unless the user sets one: every opening goes on whatever the confidence of the agent (R3.1.4).
+    minimum_confidence: MinimumConfidence | None = None
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]
@@ -119,7 +122,7 @@ class FlowConfiguration:
 
     @property
     def risk_policy(self) -> RiskPolicy:
-        return RiskPolicy(self.risk_limits, self.bring_to_minimum)
+        return RiskPolicy(self.risk_limits, self.bring_to_minimum, self.minimum_confidence)
 
 
 def _check_max_loss(percent: Decimal | None, setting: FlowSetting) -> None:

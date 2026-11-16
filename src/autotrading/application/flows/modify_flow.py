@@ -14,6 +14,7 @@ from autotrading.domain.flows.errors import AccountNotChangeableError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -65,6 +66,9 @@ class ModifyFlowCommand:
     default_take_profit_percent: Decimal | None = None
     # The default take profit taken away: the stop loss stays, it is mandatory (R3.1.2).
     remove_default_take_profit: bool = False
+    minimum_confidence: int | None = None
+    # The minimum confidence taken away: every opening goes on again whatever the confidence (R3.1.4).
+    remove_minimum_confidence: bool = False
 
 
 class ModifyFlowUseCase:
@@ -118,6 +122,7 @@ class ModifyFlowUseCase:
             ),
             openings_resume=current.openings_resume if command.openings_resume is None else command.openings_resume,
             protection_defaults=_protection_defaults(current.protection_defaults, command),
+            minimum_confidence=_minimum_confidence(current.minimum_confidence, command),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -174,6 +179,12 @@ def _protection_defaults(current: ProtectionDefaults, command: ModifyFlowCommand
             current.take_profit_percent, command.default_take_profit_percent, removed=command.remove_default_take_profit
         ),
     )
+
+
+def _minimum_confidence(current: MinimumConfidence | None, command: ModifyFlowCommand) -> MinimumConfidence | None:
+    if command.remove_minimum_confidence:
+        return None
+    return current if command.minimum_confidence is None else MinimumConfidence(command.minimum_confidence)
 
 
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:

@@ -175,7 +175,7 @@ def test_the_exit_plan_in_force_is_kept_only_for_the_positions_open() -> None:
     plan = ExitPlan(Decimal(130), Decimal(90), "chiusura sotto 95")
     stale = ExitPlan(stop=Decimal(10))
 
-    state = FlowState.attributed(flow, activity, totals_of(flow), {"BTC": plan, "SOL": stale})
+    state = FlowState.attributed(flow, activity, totals_of(flow), exit_plans={"BTC": plan, "SOL": stale})
 
     assert state.exit_plans == {"BTC": plan}
     assert state.exit_plan_of("BTC") == plan

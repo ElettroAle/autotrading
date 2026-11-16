@@ -106,7 +106,7 @@ Then(
 Then(
   'la decisione su {string} mostra obiettivo {int} e stop {int}',
   async ({ dashboard }, asset: string, target: number, stop: number) => {
-    const plan = dashboard.page.getByRole('group', { name: `Piano di uscita di ${asset}` });
+    const plan = dashboard.page.getByRole('group', { name: `Decisione su ${asset}` });
     await expect(plan).toContainText(`Obiettivo${formatPrice(String(target))}`);
     await expect(plan).toContainText(`Stop${formatPrice(String(stop))}`);
   },
