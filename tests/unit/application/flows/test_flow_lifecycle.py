@@ -31,6 +31,7 @@ from autotrading.domain.flows.errors import (
     AssetsAssignedToOtherFlowError,
     CapitalAboveFreeCapitalError,
     CycleIntervalOutOfRangeError,
+    ExposureLimitRequiredError,
     FlowCommandNotAllowedError,
     MaxConsecutiveFailuresOutOfRangeError,
     UnknownPromptPlaceholderError,
@@ -201,6 +202,47 @@ def test_a_change_without_maximum_of_consecutive_failures_keeps_the_one_in_force
     modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro"))
 
     assert modified.configuration.max_consecutive_failures == 3
+
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta:
+# the flag removes the limit, the domain refuses a version without any.
+def test_an_exposure_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_value_exposure_percent=Decimal(40)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_value_exposure=True))
+
+    assert (modified.configuration.version, modified.configuration.risk_limits) == (3, RiskLimits(5, Decimal(10)))
+
+
+def test_the_margin_exposure_is_removed_when_the_value_one_stays(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_value_exposure_percent=Decimal(40)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_margin_exposure=True))
+
+    assert modified.configuration.risk_limits == RiskLimits(5, None, Decimal(40))
+
+
+def test_an_exposure_is_replaced_while_the_other_is_removed(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(
+        ModifyFlowCommand(flow.id, max_value_exposure_percent=Decimal(30), remove_max_margin_exposure=True)
+    )
+
+    assert modified.configuration.risk_limits == RiskLimits(5, None, Decimal(30))
+
+
+def test_removing_both_exposures_is_refused_and_the_version_in_force_stays(flows: Flows) -> None:
+    flow = flows.saved()
+    with_both = flows.modify.execute(ModifyFlowCommand(flow.id, max_value_exposure_percent=Decimal(40)))
+
+    with pytest.raises(ExposureLimitRequiredError, match=r"^almeno un limite di esposizione è obbligatorio$"):
+        flows.modify.execute(
+            ModifyFlowCommand(flow.id, remove_max_margin_exposure=True, remove_max_value_exposure=True)
+        )
+
+    assert flows.current(flow) == with_both
 
 
 def test_a_written_system_prompt_is_saved_in_the_next_version(flows: Flows) -> None:

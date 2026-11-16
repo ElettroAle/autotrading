@@ -185,9 +185,27 @@ describe('changesOf', () => {
   });
 
   it('does not send a setting the user emptied, which the API would keep anyway', () => {
-    const values = { ...formValuesOf(FLOW), max_margin_exposure_percent: '' };
+    const values = { ...formValuesOf(FLOW), cycle_minutes: '', max_leverage: '' };
 
     expect(changesOf(FLOW, values)).toEqual({ settings: {} });
+  });
+
+  // ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta: the emptied limit goes as null, which the API reads as removed.
+  it('sends null for an exposure limit the user emptied, so the API removes it', () => {
+    const both: Flow = {
+      ...FLOW,
+      risk_limits: { ...FLOW.risk_limits, max_value_exposure_percent: '40' },
+    };
+    const withoutValue = { ...formValuesOf(both), max_value_exposure_percent: ' ' };
+    const withoutMargin = { ...formValuesOf(both), max_margin_exposure_percent: '' };
+
+    expect(changesOf(both, withoutValue)).toEqual({
+      settings: { max_value_exposure_percent: null },
+    });
+    expect(changesOf(both, withoutMargin)).toEqual({
+      settings: { max_margin_exposure_percent: null },
+    });
+    expect(changesOf(FLOW, formValuesOf(FLOW))).toEqual({ settings: {} });
   });
 
   it('sends a system prompt the user wrote, and null to go back to the default', () => {

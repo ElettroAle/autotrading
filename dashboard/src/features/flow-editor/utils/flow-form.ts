@@ -180,18 +180,24 @@ const sameValue = (one: unknown, other: unknown): boolean =>
 
 const MODEL: keyof SettingsRequest = 'model';
 const MODEL_PARAMETERS: keyof SettingsRequest = 'model_parameters';
-// Its null is a value: back to the default of the platform, not a part left as it is (R1.4.8).
-const SYSTEM_PROMPT: keyof SettingsRequest = 'system_prompt';
+// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3).
+const NULL_IS_A_VALUE = new Set<keyof SettingsRequest>([
+  'system_prompt',
+  'max_margin_exposure_percent',
+  'max_value_exposure_percent',
+]);
 
 /**
  * Only the settings the user changed (R1.1.3): a part left out keeps the value in force, so an emptied one is not
- * sent; a new model goes with its parameters, as they belong to it. The capital stays apart (R1.1.7).
+ * sent, unless its null says something; a new model goes with its parameters, as they belong to it. The capital
+ * stays apart (R1.1.7).
  */
 export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
   const before = settingsOf(formValuesOf(flow));
   const after = settingsOf(values);
   const changed = (Object.keys(after) as (keyof SettingsRequest)[]).filter(
-    (key) => (after[key] !== null || key === SYSTEM_PROMPT) && !sameValue(before[key], after[key]),
+    (key) =>
+      (after[key] !== null || NULL_IS_A_VALUE.has(key)) && !sameValue(before[key], after[key]),
   );
   const keys = changed.includes(MODEL) ? [...new Set([...changed, MODEL_PARAMETERS])] : changed;
   const settings = Object.fromEntries(keys.map((key) => [key, after[key]]));

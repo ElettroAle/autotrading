@@ -99,6 +99,7 @@ class FlowModificationRequest(BaseModel):
     sources: list[SourceSelectionRequest] | None = None
     instructions: str | None = None
     max_leverage: int | None = None
+    # A null sent on purpose removes the limit; a missing one keeps the version in force (R1.1.3).
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
@@ -123,9 +124,14 @@ class FlowModificationRequest(BaseModel):
             max_value_exposure_percent=self.max_value_exposure_percent,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
-            default_system_prompt=self.system_prompt is None and "system_prompt" in self.model_fields_set,
             max_consecutive_failures=self.max_consecutive_failures,
+            default_system_prompt=self._sent_as_null("system_prompt"),
+            remove_max_margin_exposure=self._sent_as_null("max_margin_exposure_percent"),
+            remove_max_value_exposure=self._sent_as_null("max_value_exposure_percent"),
         )
+
+    def _sent_as_null(self, field: str) -> bool:
+        return field in self.model_fields_set and getattr(self, field) is None
 
 
 class DraftAssignmentRequest(BaseModel):

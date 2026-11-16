@@ -44,6 +44,9 @@ class ModifyFlowCommand:
     # Back to the default of the platform, which None cannot say since None keeps the version in force (R1.4.8).
     default_system_prompt: bool = False
     max_consecutive_failures: int | None = None
+    # An exposure limit taken away, which None cannot say either (R1.1.3); at least one limit stays (R1.1.1).
+    remove_max_margin_exposure: bool = False
+    remove_max_value_exposure: bool = False
 
 
 class ModifyFlowUseCase:
@@ -138,10 +141,20 @@ def _system_prompt(current: str | None, command: ModifyFlowCommand) -> str | Non
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:
     return RiskLimits(
         current.max_leverage if command.max_leverage is None else command.max_leverage,
-        current.max_margin_exposure_percent
-        if command.max_margin_exposure_percent is None
-        else command.max_margin_exposure_percent,
-        current.max_value_exposure_percent
-        if command.max_value_exposure_percent is None
-        else command.max_value_exposure_percent,
+        _exposure(
+            current.max_margin_exposure_percent,
+            command.max_margin_exposure_percent,
+            removed=command.remove_max_margin_exposure,
+        ),
+        _exposure(
+            current.max_value_exposure_percent,
+            command.max_value_exposure_percent,
+            removed=command.remove_max_value_exposure,
+        ),
     )
+
+
+def _exposure(current: Decimal | None, sent: Decimal | None, *, removed: bool) -> Decimal | None:
+    if removed:
+        return None
+    return current if sent is None else sent
