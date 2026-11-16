@@ -6,9 +6,9 @@ import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import {
   isComplete,
-  listDaysOf,
+  listIntervalOf,
   usePeriod,
-  type ListDays,
+  type ListInterval,
 } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
@@ -68,19 +68,19 @@ const filtersFor = (assets: readonly string[]): TableFilter[] => [
 
 const countOf = (total: number): string => (total === 1 ? '1 posizione' : `${total} posizioni`);
 
-const emptyText = (filtered: boolean, days: ListDays): string => {
+const emptyText = (filtered: boolean, interval: ListInterval): string => {
   if (filtered) {
     return 'Nessuna posizione chiusa con questi filtri.';
   }
-  return days.from === undefined
+  return interval.from === undefined
     ? 'Nessuna posizione chiusa.'
     : 'Nessuna posizione chiusa nel periodo scelto.';
 };
 
-type PositionsInDaysProps = {
+type PositionsInIntervalProps = {
   readonly flowId: string;
   readonly page: number;
-  readonly days: ListDays;
+  readonly interval: ListInterval;
 };
 
 /**
@@ -88,11 +88,11 @@ type PositionsInDaysProps = {
  * the API (R2.2.5, R6.4.4). The currency comes from the state of the flow, read from the exchange: without it the
  * amounts still show, the history does not depend on the exchange (ADR 0143).
  */
-const PositionsInDays = ({ flowId, page, days }: PositionsInDaysProps) => {
+const PositionsInInterval = ({ flowId, page, interval }: PositionsInIntervalProps) => {
   const filters = filtersFor(useFlowAssets(flowId).data ?? []);
   const { values } = useTableFilters(filters);
   const [search] = useSearchParams();
-  const positions = useClosedPositions(flowId, page, values, days);
+  const positions = useClosedPositions(flowId, page, values, interval);
   const currency = useFlowState(flowId).data?.currency;
   if (positions.isPending) {
     return <Loading />;
@@ -109,7 +109,7 @@ const PositionsInDays = ({ flowId, page, days }: PositionsInDaysProps) => {
         columns={columnsIn(currency)}
         rows={positions.data.positions}
         rowKey={(position) => `${position.closed_at}-${position.asset}`}
-        empty={emptyText(filtered, days)}
+        empty={emptyText(filtered, interval)}
         filtering={{ filters, total: positions.data.total, countOf }}
       />
       <Pagination
@@ -131,5 +131,11 @@ export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number
       <p className="text-slate-600">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
     );
   }
-  return <PositionsInDays flowId={flowId} page={page} days={listDaysOf(period, new Date())} />;
+  return (
+    <PositionsInInterval
+      flowId={flowId}
+      page={page}
+      interval={listIntervalOf(period, new Date())}
+    />
+  );
 };

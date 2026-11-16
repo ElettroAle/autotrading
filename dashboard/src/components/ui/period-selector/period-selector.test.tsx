@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 
@@ -53,15 +53,28 @@ describe('PeriodSelector', () => {
     expect(screen.getByLabelText('Periodo')).toHaveDisplayValue('30 giorni');
   });
 
-  it('asks the days of a range and keeps them in the query string', async () => {
+  // ADR periodo-al-minuto: the menu asks the date and the time of each end, in the time zone of the browser.
+  it('asks the date and time of each end of a range and keeps them in UTC in the query string', async () => {
     renderAt('/flows/alfa');
 
     await userEvent.selectOptions(screen.getByLabelText('Periodo'), 'Intervallo');
-    await userEvent.type(screen.getByLabelText('Dal'), '2026-11-01');
-    await userEvent.type(screen.getByLabelText('Al'), '2026-11-03');
+    fireEvent.change(screen.getByLabelText('Dal'), { target: { value: '2026-11-01T09:15' } });
+    fireEvent.change(screen.getByLabelText('Al'), { target: { value: '2026-11-03T11:40' } });
 
-    expect(searchShown()).toBe('?period=range&from=2026-11-01&to=2026-11-03');
-    expect(periodRead()).toEqual({ kind: 'range', from: '2026-11-01', to: '2026-11-03' });
+    expect(screen.getByLabelText('Dal')).toHaveAttribute('type', 'datetime-local');
+    expect(searchShown()).toBe('?period=range&from=2026-11-01T08%3A15Z&to=2026-11-03T10%3A40Z');
+    expect(periodRead()).toEqual({
+      kind: 'range',
+      from: '2026-11-01T08:15Z',
+      to: '2026-11-03T10:40Z',
+    });
+  });
+
+  it('shows the ends of a range of the address in the time zone of the browser', () => {
+    renderAt('/flows/alfa?period=range&from=2026-11-01T08%3A15Z&to=2026-11-03T10%3A40Z');
+
+    expect(screen.getByLabelText('Dal')).toHaveValue('2026-11-01T09:15');
+    expect(screen.getByLabelText('Al')).toHaveValue('2026-11-03T11:40');
   });
 
   it('makes every field as wide as a phone and as wide as its choices on a wide screen', () => {

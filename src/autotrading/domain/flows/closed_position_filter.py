@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
 from enum import StrEnum
 
 from autotrading.domain.flows.closed_position import ClosedPosition
@@ -17,7 +17,7 @@ class PositionResult(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ClosedPositionFilter:
-    """What the user asks of the closed positions of a flow: asset, side, result and days of the close (R6.4.4).
+    """What the user asks of the closed positions of a flow: asset, side, result and minutes of the close (R6.4.4).
 
     A missing value does not narrow. An even position is neither won nor lost.
     """
@@ -33,10 +33,10 @@ class ClosedPositionFilter:
         asset: str | None = None,
         side: str | None = None,
         result: str | None = None,
-        first_day: date | None = None,
-        last_day: date | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> ClosedPositionFilter:
-        return cls(asset, _side_named(side), _result_named(result), TimeWindow.of_days(first_day, last_day))
+        return cls(asset, _side_named(side), _result_named(result), TimeWindow.of_minutes(since, until))
 
     def matches(self, position: ClosedPosition) -> bool:
         return (

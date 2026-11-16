@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
@@ -21,8 +21,8 @@ class RankFlowsCommand:
     """The period of the ranking, the same periods as the statistics (ADR 0122)."""
 
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 # A draft has never run and an archived flow is over: neither competes with the flows at work.
@@ -49,7 +49,7 @@ class RankFlowsUseCase:
         self._clock = clock
 
     def execute(self, command: RankFlowsCommand) -> tuple[FlowRanking, ...]:
-        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        period = StatisticsPeriod.named(command.period, command.since, command.until)
         window = period.window(self._clock())
         return ranked_by_return(self._rankings(window))
 

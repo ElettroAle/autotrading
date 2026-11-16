@@ -6,9 +6,9 @@ import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import {
   isComplete,
-  listDaysOf,
+  listIntervalOf,
   usePeriod,
-  type ListDays,
+  type ListInterval,
 } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
@@ -44,11 +44,13 @@ const CYCLE_FILTERS: readonly TableFilter[] = [
   },
 ];
 
-const emptyText = (filtered: boolean, days: ListDays): string => {
+const emptyText = (filtered: boolean, interval: ListInterval): string => {
   if (filtered) {
     return 'Nessun ciclo con questi filtri.';
   }
-  return days.from === undefined ? 'Nessun ciclo registrato.' : 'Nessun ciclo nel periodo scelto.';
+  return interval.from === undefined
+    ? 'Nessun ciclo registrato.'
+    : 'Nessun ciclo nel periodo scelto.';
 };
 
 const countOf = (total: number): string => (total === 1 ? '1 ciclo' : `${total} cicli`);
@@ -65,16 +67,16 @@ const COLUMNS: DataTableColumn<CycleSummary>[] = [
   { header: 'Decisioni', cell: decisionsOf },
 ];
 
-type CyclesInDaysProps = {
+type CyclesInIntervalProps = {
   readonly flowId: string;
   readonly page: number;
-  readonly days: ListDays;
+  readonly interval: ListInterval;
 };
 
-const CyclesInDays = ({ flowId, page, days }: CyclesInDaysProps) => {
+const CyclesInInterval = ({ flowId, page, interval }: CyclesInIntervalProps) => {
   const { values } = useTableFilters(CYCLE_FILTERS);
   const [search] = useSearchParams();
-  const cycles = useCycles(flowId, page, values, days);
+  const cycles = useCycles(flowId, page, values, interval);
   if (cycles.isPending) {
     return <Loading />;
   }
@@ -91,7 +93,7 @@ const CyclesInDays = ({ flowId, page, days }: CyclesInDaysProps) => {
         rows={cycles.data.cycles}
         rowKey={(cycle) => cycle.planned_at}
         rowHref={(cycle) => paths.cycle.getHref(flowId, cycle.planned_at)}
-        empty={emptyText(filtered, days)}
+        empty={emptyText(filtered, interval)}
         filtering={{ filters: CYCLE_FILTERS, total: cycles.data.total, countOf }}
       />
       <Pagination
@@ -114,5 +116,7 @@ export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) =
       <p className="text-slate-600">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
     );
   }
-  return <CyclesInDays flowId={flowId} page={page} days={listDaysOf(period, new Date())} />;
+  return (
+    <CyclesInInterval flowId={flowId} page={page} interval={listIntervalOf(period, new Date())} />
+  );
 };

@@ -152,11 +152,11 @@ describe('FlowRanking', () => {
   it('tells why the ranking could not be read', async () => {
     await renderApp({
       account: 'anna',
-      url: '/ranking?period=range&from=2026-11-03&to=2026-11-01',
+      url: '/ranking?period=range&from=2026-11-03T10%3A00Z&to=2026-11-03T09%3A59Z',
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'periodo non valido: il giorno iniziale è successivo al giorno finale',
+      "periodo non valido: l'inizio è successivo alla fine",
     );
   });
 

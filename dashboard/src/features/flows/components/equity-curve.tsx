@@ -2,9 +2,9 @@ import { EquityChart, type ChartEvent } from '@/components/charts/equity-chart';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import {
-  daysOfInstants,
+  intervalOfInstants,
   isComplete,
-  listDaysOf,
+  listIntervalOf,
   usePeriod,
   usePeriodInterval,
   type Period,
@@ -24,7 +24,7 @@ const failedCycleEvent = (flowId: string, plannedAt: string): ChartEvent => ({
 
 const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) => {
   const equity = useFlowEquity(flowId, period);
-  const failed = useFailedCycles(flowId, listDaysOf(period, new Date()));
+  const failed = useFailedCycles(flowId, listIntervalOf(period, new Date()));
   const { chooseInterval } = usePeriodInterval();
   if (equity.isPending) {
     return <Loading />;
@@ -41,7 +41,7 @@ const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) =>
         points={points}
         baseline={initialCapital}
         events={(failed.data ?? []).map((plannedAt) => failedCycleEvent(flowId, plannedAt))}
-        onSelect={(from, to) => chooseInterval(daysOfInstants(from, to))}
+        onSelect={(from, to) => chooseInterval(intervalOfInstants(from, to))}
       />
     );
   }

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -87,11 +87,15 @@ def test_accepts_a_version_of_a_flow() -> None:
 
 
 def test_the_query_reads_the_window_of_the_period_at_the_given_instant() -> None:
-    period = StatisticsPeriod.named("range", date(2026, 11, 10), date(2026, 11, 20))
+    period = StatisticsPeriod.named(
+        "range", datetime(2026, 11, 10, 8, 30, tzinfo=UTC), datetime(2026, 11, 20, 18, 45, tzinfo=UTC)
+    )
 
     query = HistoryQuery.of(HistoryFilter(period=period), NOW, None)
 
-    assert query.window == TimeWindow(datetime(2026, 11, 10, tzinfo=UTC), datetime(2026, 11, 21, tzinfo=UTC))
+    assert query.window == TimeWindow(
+        datetime(2026, 11, 10, 8, 30, tzinfo=UTC), datetime(2026, 11, 20, 18, 46, tzinfo=UTC)
+    )
     assert query.limit == HISTORY_PAGE_SIZE == 50
     assert query.after is None
 

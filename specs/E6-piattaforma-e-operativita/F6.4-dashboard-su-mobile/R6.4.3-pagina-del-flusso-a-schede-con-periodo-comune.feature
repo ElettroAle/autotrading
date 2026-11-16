@@ -10,7 +10,8 @@ Funzionalità: R6.4.3 Pagina del flusso a schede con periodo comune
   Il periodo sta sopra le schede e vale per tutte: Panoramica (riepilogo R6.4.2, equity curve, statistiche,
   posizioni aperte attuali), Posizioni chiuse e Cicli. Le posizioni aperte sono quelle attuali e lo dicono. Il
   periodo si sceglie dal menu (R2.2.8) oppure trascinando sull'equity curve da un istante a un altro, anche col
-  dito; un intervallo scelto così compare come etichetta "dal … al …" con il comando per toglierlo. Periodo,
+  dito, al minuto; un intervallo scelto così compare come etichetta "… – …" con data e ora di inizio e fine e il
+  comando per toglierlo. Periodo,
   intervallo e scheda stanno nell'indirizzo della pagina: ricaricare o tornare indietro li conserva. Ogni ciclo
   fallito compare sull'equity curve come un segno rosso riconoscibile, che porta al dettaglio del ciclo; i cicli
   conclusi non hanno segni. L'elenco dei cicli recenti nella pagina è tolto. Configurazione, versioni, modifica,
@@ -27,7 +28,7 @@ Funzionalità: R6.4.3 Pagina del flusso a schede con periodo comune
   Scenario: Intervallo trascinando sul grafico
     Quando "anna" trascina sull'equity curve dal 10 al 12 novembre 2026
     Allora riepilogo, grafico e statistiche valgono dal 10 al 12 novembre 2026
-    E compare l'etichetta "dal 10/11/2026 al 12/11/2026" con il comando per toglierla
+    E compare l'etichetta "10/11 10:15 – 12/11 10:15" con il comando per toglierla
 
   Scenario: Togliere l'intervallo
     Dato che "anna" ha scelto l'intervallo dal 10 al 12 novembre 2026

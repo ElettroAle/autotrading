@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
 from enum import StrEnum
 
 from autotrading.domain.flows.cycle_record import CycleOutcome
@@ -21,7 +21,7 @@ class CycleDecision(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CycleFilter:
-    """What the user asks of the cycles of a flow: outcome, decision and days of the planned instant (R6.4.4).
+    """What the user asks of the cycles of a flow: outcome, decision and minutes of the planned instant (R6.4.4).
 
     A missing value does not narrow; a cycle matches a decision when the agent took it on at least one asset, and
     matches none when the agent decided nothing, or the cycle never got to the agent.
@@ -36,10 +36,10 @@ class CycleFilter:
         cls,
         outcome: str | None = None,
         decision: str | None = None,
-        first_day: date | None = None,
-        last_day: date | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> CycleFilter:
-        return cls(_outcome_named(outcome), _decision_named(decision), TimeWindow.of_days(first_day, last_day))
+        return cls(_outcome_named(outcome), _decision_named(decision), TimeWindow.of_minutes(since, until))
 
 
 def _outcome_named(name: str | None) -> CycleOutcome | None:
