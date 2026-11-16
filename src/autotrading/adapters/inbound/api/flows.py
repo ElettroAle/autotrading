@@ -24,6 +24,7 @@ from autotrading.application.flows.list_capital_changes import ListCapitalChange
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
+from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -36,7 +37,7 @@ from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
-from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
+from autotrading.domain.flows.system_prompt import PromptPlaceholder
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -179,6 +180,16 @@ class DefaultSystemPromptResponse(BaseModel):
 
     system_prompt: str
     system_prompt_placeholders: list[PromptPlaceholderResponse]
+
+    @classmethod
+    def of(cls, default: DefaultSystemPrompt) -> DefaultSystemPromptResponse:
+        return cls(
+            system_prompt=default.template,
+            system_prompt_placeholders=[
+                PromptPlaceholderResponse(name=placeholder.value, description=placeholder.description)
+                for placeholder in default.placeholders
+            ],
+        )
 
 
 class ConfigurationResponse(BaseModel):
@@ -359,10 +370,10 @@ def flows_router(
         return FlowResponse.of(use_cases.import_flow_strategy.execute(document.command(name)))
 
     @router.get("/flows/system-prompt")
-    def read_default_system_prompt() -> DefaultSystemPromptResponse:
-        return DefaultSystemPromptResponse(
-            system_prompt=DEFAULT_SYSTEM_PROMPT, system_prompt_placeholders=PromptPlaceholderResponse.all()
-        )
+    def read_default_system_prompt(
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> DefaultSystemPromptResponse:
+        return DefaultSystemPromptResponse.of(use_cases.read_default_system_prompt.execute())
 
     @router.get("/flows")
     def list_flows(

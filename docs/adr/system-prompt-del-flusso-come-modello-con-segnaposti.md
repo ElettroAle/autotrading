@@ -38,6 +38,7 @@ in inglese descritti nel pannello della configurazione, senza ripetere in più p
   documento); una versione salvata prima la legge assente, cioè predefinita. Nessuna migrazione.
 - API: flusso e versione restituiscono `system_prompt` (modello in vigore), `system_prompt_is_default` e
   `system_prompt_placeholders` (nome e descrizione dal registro); `GET /flows/system-prompt` dà predefinito e segnaposti
+  (`ReadDefaultSystemPromptUseCase`)
   per un flusso nuovo. La creazione accetta il testo o `null`; la modifica tiene il prompt se il campo manca e torna al
   predefinito con `null` esplicito.
 - Il file della strategia (R2.5.2) porta il `system_prompt`, `null` per il predefinito.
