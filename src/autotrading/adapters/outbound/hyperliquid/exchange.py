@@ -37,6 +37,9 @@ from autotrading.domain.verification.verification_access import VerificationAcce
 # The exchange refuses any order below 10 USDC of value ("Order must have minimum value of $10").
 MIN_ORDER_VALUE = Decimal(10)
 TIMEOUT_SECONDS = 10.0
+# The SDK raises the same error for every 4xx; a limit of frequency passes by itself, so it is no refusal and pauses no
+# flow (ADR limite-di-frequenza-dell-exchange-come-indisponibilita).
+RATE_LIMITED_STATUS = 429
 PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
 INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
@@ -127,6 +130,7 @@ class HyperliquidExchangeAdapter:
             mode = info.query_user_abstraction_state(address)
             spot = info.spot_user_state(address)
         except ClientError as error:
+            _require_not_rate_limited(error)
             raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
@@ -238,6 +242,11 @@ def _shape_of(value: str) -> str:
 def _unused_cloid() -> Cloid:
     # Random 128 bits: it cannot match a client order id the platform assigned, so nothing is ever cancelled.
     return Cloid.from_int(secrets.randbits(128))
+
+
+def _require_not_rate_limited(error: ClientError) -> None:
+    if error.status_code == RATE_LIMITED_STATUS:
+        raise ExchangeUnavailableError from error
 
 
 def _require_accepted(response: object, credentials: Credentials) -> None:

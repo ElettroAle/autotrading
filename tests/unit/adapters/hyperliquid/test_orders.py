@@ -270,7 +270,11 @@ def test_a_timeout_outside_the_order_is_an_unavailable_exchange() -> None:
         adapter(FakeSdk(failure=requests.ReadTimeout())).market(ACCESS, "BTC")
 
 
-@pytest.mark.parametrize("failure", [ServerError(502, "bad gateway"), requests.ConnectionError()])
+@pytest.mark.parametrize(
+    "failure",
+    [ServerError(502, "bad gateway"), requests.ConnectionError(), ClientError(429, None, "null", None)],
+    ids=["server-error", "connection", "rate-limited"],
+)
 def test_a_fault_of_the_exchange_or_of_the_network_is_unavailable(failure: Exception) -> None:
     with pytest.raises(OrderExchangeUnavailableError):
         adapter(FakeSdk(failure=failure)).place_market_order(ACCESS, an_order())
@@ -283,6 +287,12 @@ def test_an_error_of_the_client_is_a_refusal_without_the_secret() -> None:
         adapter(FakeSdk(failure=failure)).place_market_order(ACCESS, an_order())
 
     assert raised.value.exchange_message == "bad signer ***"
+
+
+def test_a_rate_limit_of_the_exchange_on_a_reading_is_unavailable_not_a_refusal() -> None:
+    # ADR limite-di-frequenza-dell-exchange-come-indisponibilita: only a 429 among the errors of the client.
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(FakeSdk(failure=ClientError(429, None, "null", None))).market(ACCESS, "BTC")
 
 
 def test_an_invalid_key_is_refused_before_reaching_the_exchange() -> None:
