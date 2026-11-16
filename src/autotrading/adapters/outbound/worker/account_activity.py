@@ -14,6 +14,9 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, InvalidOperation)
 
+# The worker reads the activity and the transfers of the account on the exchange within the window.
+TIMEOUT_SECONDS = 30.0
+
 
 class _PositionBody(TypedDict):
     asset: str
@@ -88,6 +91,7 @@ class WorkerAccountActivityAdapter:
                 f"/tenants/{self._tenant_id.value}{path}",
                 params=params,
                 headers={"Authorization": f"Bearer {self._token}"},
+                timeout=TIMEOUT_SECONDS,
             )
         except httpx.HTTPError as error:
             raise FlowExchangeUnavailableError from error
