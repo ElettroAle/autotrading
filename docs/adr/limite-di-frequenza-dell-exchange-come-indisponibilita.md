@@ -1,6 +1,6 @@
 # ADR limite-di-frequenza-dell-exchange-come-indisponibilita — Limite di frequenza dell'exchange come indisponibilità
 
-- Stato: accettata (16 novembre 2026, approvata dal proprietario)
+- Stato: sostituita da ADR permanenza-decisa-dall-errore-base (16 novembre 2026)
 - Requisiti: Bug 443, Task 444; R1.2.3 (fallimento del ciclo col messaggio originale), R1.2.4 (errore permanente)
 - Collegate: `.claude/rules/tech-hyperliquid.md`, ADR 0027 (l'errore dichiara la propria risposta)
 
