@@ -319,6 +319,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Notification Email */
+        get: operations["read_notification_email_notifications_email_get"];
+        /** Set Notification Email */
+        put: operations["set_notification_email_notifications_email_put"];
+        post?: never;
+        /** Remove Notification Email */
+        delete: operations["remove_notification_email_notifications_email_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/email/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Test Email */
+        post: operations["send_test_email_notifications_email_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows": {
         parameters: {
             query?: never;
@@ -1853,6 +1889,25 @@ export interface components {
             };
         };
         /**
+         * NotificationEmailRequest
+         * @description The address the notifications go to by email; the platform checks its form (R3.5.2).
+         */
+        NotificationEmailRequest: {
+            /** Address */
+            address: string;
+        };
+        /**
+         * NotificationEmailResponse
+         * @description The address of the notifications by email, if any, and the warning that no email leaves when the
+         *     installation has no mail service (R3.5.2).
+         */
+        NotificationEmailResponse: {
+            /** Address */
+            address: string | null;
+            /** Warning */
+            warning: string | null;
+        };
+        /**
          * OperationResponse
          * @description A row of the ledger (ADR 0063, ADR 0074): amounts as text without trailing zeros (ADR 0047).
          *
@@ -2946,6 +3001,95 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    read_notification_email_notifications_email_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationEmailResponse"];
+                };
+            };
+        };
+    };
+    set_notification_email_notifications_email_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_notification_email_notifications_email_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    send_test_email_notifications_email_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
         };
     };

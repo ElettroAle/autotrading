@@ -1,8 +1,10 @@
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { LinkCodePanel } from '@/features/notifications/components/link-code-panel';
 import { LinkedChatPanel } from '@/features/notifications/components/linked-chat-panel';
+import { NotificationEmailPanel } from '@/features/notifications/components/notification-email-panel';
 
 const SECTION_HEADING_ID = 'telegram-notifications-heading';
+const EMAIL_HEADING_ID = 'email-notifications-heading';
 
 export const NotificationsRoute = () => (
   <DashboardLayout title="Notifiche">
@@ -12,6 +14,12 @@ export const NotificationsRoute = () => (
       </h2>
       <LinkedChatPanel />
       <LinkCodePanel />
+    </section>
+    <section aria-labelledby={EMAIL_HEADING_ID} className="mt-6 space-y-4">
+      <h2 id={EMAIL_HEADING_ID} className="text-lg font-semibold">
+        Notifiche email
+      </h2>
+      <NotificationEmailPanel />
     </section>
   </DashboardLayout>
 );

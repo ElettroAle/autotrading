@@ -14,6 +14,7 @@ import { rankingOf } from './flow-ranking';
 import { resultsOf } from './flow-results';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
+import { notificationEmailHandlers } from './notification-email-handlers';
 import {
   configurationOf,
   FAKE_FLOW_COMMANDS,
@@ -370,6 +371,7 @@ type AssignmentRequest = { account_id: string; allocated_capital: string; assets
 export const handlers = [
   ...accountHandlers,
   ...providerKeyHandlers,
+  ...notificationEmailHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json({ user_id: user.account, tenant_id: user.tenantId }),

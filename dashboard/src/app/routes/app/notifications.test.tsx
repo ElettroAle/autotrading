@@ -24,4 +24,18 @@ describe('NotificationsRoute', () => {
       within(section).getByRole('button', { name: 'Chiedi il codice di collegamento' }),
     ).toBeVisible();
   });
+
+  it('shows the section of the email notifications below the Telegram one', async () => {
+    fakePlatform.addUser('anna', { hasUserRole: true });
+    await renderApp({ account: 'anna', url: '/notifications' });
+
+    const section = await screen.findByRole('region', { name: 'Notifiche email' });
+    expect(await within(section).findByText('Nessun indirizzo email indicato')).toBeInTheDocument();
+    const regions = screen
+      .getAllByRole('region')
+      .map((region) => region.getAttribute('aria-labelledby'));
+    expect(regions.indexOf('email-notifications-heading')).toBeGreaterThan(
+      regions.indexOf('telegram-notifications-heading'),
+    );
+  });
 });

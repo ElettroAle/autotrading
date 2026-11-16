@@ -873,6 +873,110 @@
         ]
       }
     },
+    "/notifications/email": {
+      "get": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Read Notification Email",
+        "operationId": "read_notification_email_notifications_email_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEmailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Set Notification Email",
+        "operationId": "set_notification_email_notifications_email_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Remove Notification Email",
+        "operationId": "remove_notification_email_notifications_email_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/email/test": {
+      "post": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Send Test Email",
+        "operationId": "send_test_email_notifications_email_test_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/flows": {
       "post": {
         "tags": [
@@ -6180,6 +6284,53 @@
           "parameters"
         ],
         "title": "ModelSelectionResponse"
+      },
+      "NotificationEmailRequest": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address"
+        ],
+        "title": "NotificationEmailRequest",
+        "description": "The address the notifications go to by email; the platform checks its form (R3.5.2)."
+      },
+      "NotificationEmailResponse": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "warning"
+        ],
+        "title": "NotificationEmailResponse",
+        "description": "The address of the notifications by email, if any, and the warning that no email leaves when the\ninstallation has no mail service (R3.5.2)."
       },
       "OperationResponse": {
         "properties": {
