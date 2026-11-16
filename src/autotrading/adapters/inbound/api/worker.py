@@ -20,7 +20,10 @@ from autotrading.adapters.inbound.api.worker_model_catalog import WorkerModelCat
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.read_model_catalog import ReadModelCatalogUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
-from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
+from autotrading.application.flows.read_account_transfers import (
+    ReadAccountTransfersCommand,
+    ReadAccountTransfersUseCase,
+)
 from autotrading.application.flows.record_account_executions import (
     RecordAccountExecutionsCommand,
     RecordAccountExecutionsUseCase,
@@ -249,7 +252,9 @@ def create_worker_api(
     ) -> list[AccountTransferResponse]:
         """The deposits and withdrawals of the account in the window, for its history of the capital (ADR
         storico-delle-variazioni-di-capitale): only the worker opens an account to read it on its exchange."""
-        transfers = for_tenant(TenantId(tenant_id)).read_account_transfers.execute(account_id, TimeWindow(since, until))
+        transfers = for_tenant(TenantId(tenant_id)).read_account_transfers.execute(
+            ReadAccountTransfersCommand(account_id, TimeWindow(since, until))
+        )
         return [AccountTransferResponse.of(transfer) for transfer in transfers]
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/ledger", dependencies=[Depends(require_api)])

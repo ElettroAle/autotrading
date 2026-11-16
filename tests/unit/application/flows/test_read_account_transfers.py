@@ -7,7 +7,10 @@ from decimal import Decimal
 import pytest
 
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
+from autotrading.application.flows.read_account_transfers import (
+    ReadAccountTransfersCommand,
+    ReadAccountTransfersUseCase,
+)
 from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -36,7 +39,7 @@ def test_the_transfers_of_the_window_are_read_on_the_address_of_the_account() ->
     before = AccountTransfer(datetime(2026, 11, 1, 9, tzinfo=UTC), Decimal(300), TransferDirection.WITHDRAWAL)
     reader.declared[address] = [before, deposit]
 
-    assert transfers_on(worker, reader).execute(account.id.value, WINDOW) == (deposit,)
+    assert transfers_on(worker, reader).execute(ReadAccountTransfersCommand(account.id.value, WINDOW)) == (deposit,)
     assert reader.transfer_readings == [(address, WINDOW)]
 
 
@@ -45,7 +48,7 @@ def test_the_transfers_of_an_account_of_another_tenant_are_not_found() -> None:
     theirs = worker.saved_account(TenantId.new())
 
     with pytest.raises(FlowAccountNotFoundError):
-        transfers_on(worker, FakeActivityReaderAdapter()).execute(theirs.id.value, WINDOW)
+        transfers_on(worker, FakeActivityReaderAdapter()).execute(ReadAccountTransfersCommand(theirs.id.value, WINDOW))
 
 
 def test_an_exchange_without_a_reader_opens_no_credentials_and_cannot_be_read() -> None:
@@ -54,5 +57,5 @@ def test_an_exchange_without_a_reader_opens_no_credentials_and_cannot_be_read() 
     opener = FakeCredentialOpenerAdapter(worker.vault)
 
     with pytest.raises(FlowExchangeUnavailableError):
-        transfers_on(worker, None, opener).execute(account.id.value, WINDOW)
+        transfers_on(worker, None, opener).execute(ReadAccountTransfersCommand(account.id.value, WINDOW))
     assert opener.opened_addresses == []

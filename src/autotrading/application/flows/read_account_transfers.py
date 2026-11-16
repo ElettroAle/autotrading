@@ -1,10 +1,17 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
 from uuid import UUID
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import ReferenceOpenerPort, SealedAddressPort, TransfersReaderPort
 from autotrading.domain.flows.capital_history import AccountTransfer
 from autotrading.domain.flows.statistics_period import TimeWindow
+
+
+@dataclass(frozen=True, slots=True)
+class ReadAccountTransfersCommand:
+    account_id: UUID
+    window: TimeWindow
 
 
 class ReadAccountTransfersUseCase:
@@ -21,9 +28,9 @@ class ReadAccountTransfersUseCase:
         self._opener = opener
         self._readers = readers
 
-    def execute(self, account_id: UUID, window: TimeWindow) -> tuple[AccountTransfer, ...]:
-        sealed = self._accounts.sealed_address(account_id)
+    def execute(self, command: ReadAccountTransfersCommand) -> tuple[AccountTransfer, ...]:
+        sealed = self._accounts.sealed_address(command.account_id)
         reader = self._readers.get(sealed.exchange)
         if reader is None:
             raise FlowExchangeUnavailableError
-        return reader.transfers(self._opener.open_reference(sealed, reader.reference_fields()), window)
+        return reader.transfers(self._opener.open_reference(sealed, reader.reference_fields()), command.window)
