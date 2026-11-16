@@ -409,6 +409,13 @@ export class DashboardPages {
     return this.statistics().getByLabel(label, { exact: true });
   }
 
+  /** The error the panel of the forecasts shows beside an asset and a horizon, as «BTC · 1 ora» (R3.6.1). */
+  forecastError(label: string): Locator {
+    return this.page
+      .getByRole('region', { name: 'Errore della previsione' })
+      .getByLabel(label, { exact: true });
+  }
+
   equityCurve(): Locator {
     return this.page.getByRole('figure', { name: 'Equity curve' });
   }
