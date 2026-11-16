@@ -47,8 +47,9 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   risposta-del-modello-con-schema-rigido).
 - La chiamata al modello passa dalla libreria LiteLLM nel solo `worker` (`adapters/outbound/litellm`, ADR 0148) o
   dall'API di OpenRouter (ADR 0109): la chiave dell'utente viaggia nella sola chiamata del suo flusso, nessuna
-  chiave dei fornitori della piattaforma. 401/403 chiave non valida e 402 (o quota OpenAI esaurita) credito
-  esaurito sono permanenti, ogni altro errore è transitorio con il messaggio originale.
+  chiave dei fornitori della piattaforma. 401/403 chiave non valida e 402 credito
+  esaurito sono permanenti, ogni altro errore (429 compreso, ADR http-429-mai-permanente) è transitorio con il
+  messaggio originale.
 
 - La chiave non si verifica presso il fornitore alla registrazione né alla sostituzione: una chiave non valida
   emerge al primo ciclo come `ModelKeyRejectedError`, permanente (R1.2.4, ADR 0108).
