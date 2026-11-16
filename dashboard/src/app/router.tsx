@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router';
 
 import { paths } from '@/config/paths';
 
+import { AccountAlarmsRoute } from './routes/app/account-alarms';
+import { AccountCapitalRoute } from './routes/app/account-capital';
 import { AccountsRoute } from './routes/app/accounts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
 import { ComparisonRoute } from './routes/app/comparison';
@@ -9,6 +11,7 @@ import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { EditFlowRoute } from './routes/app/edit-flow';
 import { FlowRoute } from './routes/app/flow';
+import { FlowCapitalRoute } from './routes/app/flow-capital';
 import { FlowOverviewRoute } from './routes/app/flow-overview';
 import { FlowVersionsRoute } from './routes/app/flow-versions';
 import { HistoryRoute } from './routes/app/history';
@@ -33,6 +36,8 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <HomeRoute /> },
       { path: paths.accounts.path, element: <AccountsRoute /> },
+      { path: paths.accountCapital.path, element: <AccountCapitalRoute /> },
+      { path: paths.accountAlarms.path, element: <AccountAlarmsRoute /> },
       { path: paths.newFlow.path, element: <NewFlowRoute /> },
       // The tabs of the page of the flow live under its head and its period (R6.4.3).
       {
@@ -42,6 +47,7 @@ export const routes: RouteObject[] = [
           { index: true, element: <FlowOverviewRoute /> },
           { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
           { path: paths.flowCycles.path, element: <CyclesRoute /> },
+          { path: paths.flowCapital.path, element: <FlowCapitalRoute /> },
         ],
       },
       { path: paths.editFlow.path, element: <EditFlowRoute /> },

@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
@@ -12,6 +14,7 @@ import { useFreeCapital } from '../api/get-free-capital';
 import { AccountActions } from './account-actions';
 import { ExchangeAmount } from './exchange-amount';
 import { PublicFields } from './public-fields';
+import { ReconciliationStatus } from './reconciliation-status';
 
 const Balance = ({ account }: { account: Account }) => (
   <ExchangeAmount reading={useAccountBalance(account.id)} unavailable="Saldo non disponibile" />
@@ -31,7 +34,9 @@ const AccountOnExchange = ({ account }: { account: Account }) => {
   return <PublicFields fields={fields} values={account.public_fields} />;
 };
 
-const COLUMNS: DataTableColumn<Account>[] = [
+const columnsWith = (
+  renderCommands: (account: Account) => ReactNode,
+): DataTableColumn<Account>[] => [
   { header: 'Nome', cell: (account) => account.name },
   { header: "Conto sull'exchange", cell: (account) => <AccountOnExchange account={account} /> },
   {
@@ -46,11 +51,27 @@ const COLUMNS: DataTableColumn<Account>[] = [
     cell: (account) => `${formatAmount(account.allocated_capital)} ${account.currency}`,
   },
   { header: 'Capitale libero', cell: (account) => <FreeCapital account={account} /> },
-  { header: 'Comandi', cell: (account) => <AccountActions account={account} /> },
+  { header: 'Riconciliazione', cell: (account) => <ReconciliationStatus account={account} /> },
+  {
+    header: 'Comandi',
+    cell: (account) => (
+      <div className="space-y-2">
+        <AccountActions account={account} />
+        {renderCommands(account)}
+      </div>
+    ),
+  },
 ];
 
+type AccountsListProps = {
+  /** The commands another feature adds to each account, as the page composes them (R3.2.3). */
+  readonly renderCommands?: (account: Account) => ReactNode;
+};
+
+const NO_COMMANDS = (): ReactNode => null;
+
 /** Every account of the tenant with what the API says of it; what comes from the exchange may fail alone (ADR 0126). */
-export const AccountsList = () => {
+export const AccountsList = ({ renderCommands = NO_COMMANDS }: AccountsListProps) => {
   const accounts = useAccounts();
   if (accounts.isPending) {
     return <Loading />;
@@ -65,7 +86,7 @@ export const AccountsList = () => {
   return (
     <DataTable
       label="Conti"
-      columns={COLUMNS}
+      columns={columnsWith(renderCommands)}
       rows={accounts.data}
       rowKey={(account) => account.id}
     />

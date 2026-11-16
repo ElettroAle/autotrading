@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -5,11 +6,15 @@ import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.activity import a_position, an_activity
@@ -24,8 +29,9 @@ class Bench:
         self.store = FlowStore()
         self.activity = FakeAccountActivityAdapter()
         self.ledger = InMemoryFlowLedgerAdapter()
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
         self.use_case = ReadFlowStateUseCase(
-            InMemoryFlowRepositoryAdapter(self.store, TENANT), self.activity, self.ledger
+            InMemoryFlowRepositoryAdapter(self.store, TENANT), self.activity, self.ledger, self.exit_plans
         )
 
     def flow(self, *assets: str, tenant_id: TenantId = TENANT) -> Flow:
@@ -36,6 +42,20 @@ class Bench:
         )
         self.store.flows.append(flow)
         return flow
+
+
+def change_of(flow: Flow, minutes: int) -> CapitalChange:
+    return CapitalChange(
+        flow.id,
+        datetime(2026, 11, 16, 10, minutes, tzinfo=UTC),
+        Decimal(500),
+        Decimal(500),
+        UserId("anna"),
+        CapitalChangeReason.CASH_OUT,
+        Decimal(10),
+        value_before=Decimal(510),
+        cashed_profit=Decimal(10),
+    )
 
 
 @pytest.fixture
@@ -55,6 +75,18 @@ def test_the_state_of_a_flow_is_attributed_from_its_account(bench: Bench) -> Non
 
     assert [position.asset for position in state.positions] == ["BTC"]
     assert state.available_liquidity == Decimal(438)
+
+
+def test_each_open_position_carries_the_exit_plan_in_force(bench: Bench) -> None:
+    flow = bench.flow("BTC", "ETH")
+    plan = ExitPlan(Decimal(63000), Decimal(58500), "chiusura sotto 59000")
+    bench.exit_plans.save(flow.id, "BTC", plan)
+    bench.exit_plans.save(flow.id, "ETH", ExitPlan(stop=Decimal(1)))
+    bench.activity.activities[ACCOUNT] = an_activity(positions=(a_position("BTC", margin=Decimal(100)),))
+
+    state = bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+    assert state.exit_plans == {"BTC": plan}
 
 
 def test_a_flow_without_anything_in_the_ledger_has_its_capital(bench: Bench) -> None:
@@ -86,3 +118,17 @@ def test_an_exchange_out_of_reach_is_reported(bench: Bench) -> None:
 
     with pytest.raises(FlowExchangeUnavailableError):
         bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+
+def test_the_state_carries_the_changes_of_the_capital_of_the_flow_oldest_first(bench: Bench) -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: the changes chain the return of the flow.
+    flow, other = bench.flow("BTC"), bench.flow("ETH")
+    bench.activity.activities[ACCOUNT] = an_activity()
+    later, earlier = change_of(flow, minutes=30), change_of(flow, minutes=10)
+    bench.store.capital_changes[flow.id] = [later, earlier]
+    bench.store.capital_changes[other.id] = [change_of(other, minutes=20)]
+
+    state = bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+    assert state.capital_changes == (earlier, later)
+    assert state.cashed_profit == Decimal(20)

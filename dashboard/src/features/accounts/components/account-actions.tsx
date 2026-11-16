@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
+
+import { paths } from '@/config/paths';
 
 import type { Account } from '../api/get-accounts';
 
@@ -7,7 +10,8 @@ import { ReplaceCredentialsForm } from './replace-credentials-form';
 
 type Action = 'none' | 'replacing' | 'removing';
 
-/** The commands on an account: the replacement of its credentials and its removal (R2.3.1). */
+/** The commands on an account: the replacement of its credentials, its removal (R2.3.1) and its history of the capital
+ * (R3.4.2). */
 export const AccountActions = ({ account }: { readonly account: Account }) => {
   const [action, setAction] = useState<Action>('none');
   const [replaced, setReplaced] = useState(false);
@@ -32,6 +36,12 @@ export const AccountActions = ({ account }: { readonly account: Account }) => {
         >
           Rimuovi
         </button>
+        <Link
+          to={paths.accountCapital.getHref(account.id)}
+          className="rounded border border-slate-300 px-3 py-1.5 text-blue-800"
+        >
+          Storico del capitale
+        </Link>
       </div>
       {action === 'replacing' && (
         <ReplaceCredentialsForm

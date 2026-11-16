@@ -31,11 +31,19 @@ from autotrading.domain.tenancy.tenant_owned import TenantOwned
             Notification.flow_paused("alfa", "credito esaurito presso openrouter"),
             "alfa: in pausa, credito esaurito presso openrouter",
         ),
+        (
+            Notification.openings_suspended("alfa", "perdita giornaliera 6% oltre il 5%"),
+            "alfa: aperture sospese, perdita giornaliera 6% oltre il 5%",
+        ),
         (Notification.unattributable_position("conto-1", "SOL"), "conto-1: posizione non attribuibile su SOL"),
         (Notification.unattributable_fill("conto-1", "ETH"), "conto-1: esecuzione non attribuibile su ETH"),
         (
             Notification.unattributable_movement("conto-1", Amount(Decimal("12.5"), "USDC")),
             "conto-1: movimento non attribuibile di 12,50 USDC",
+        ),
+        (
+            Notification.reconciliation_alarm("test-1", Amount(Decimal(980), "USDC"), Amount(Decimal(1000), "USDC")),
+            "test-1: allarme di riconciliazione, saldo 980 USDC invece di 1000 USDC",
         ),
     ],
 )

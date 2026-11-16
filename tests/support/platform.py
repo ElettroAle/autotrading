@@ -7,16 +7,20 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
+from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
+from autotrading.application.flows.close_flow_positions import ClosingPorts
 from autotrading.application.flows.create_flow import FlowChecks
+from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
-from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
@@ -24,6 +28,7 @@ from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
@@ -38,6 +43,8 @@ from autotrading.application.verification.run_exchange_verification import (
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
+from autotrading.domain.flows.account_activity import AccountActivity
+from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
@@ -46,6 +53,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
+from tests.fakes.account_transfers import FakeAccountTransfersAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
 from tests.fakes.bot_inbox import FakeBotInboxAdapter
@@ -53,13 +61,23 @@ from tests.fakes.closed_position_repository import ClosedPositionStore, InMemory
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
+from tests.fakes.emergency_closing_log import InMemoryEmergencyClosingLogAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
+from tests.fakes.flow_forecasts import InMemoryFlowForecastsAdapter
 from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
+from tests.fakes.flow_repository import (
+    FlowStore,
+    InMemoryAutomaticPauseAdapter,
+    InMemoryFlowRepositoryAdapter,
+    InMemoryFlowTimingAdapter,
+)
+from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
+from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
     InMemoryLinkCodeRepositoryAdapter,
@@ -79,22 +97,27 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
     ProviderKeyStore,
     ProviderKeyVault,
 )
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
 from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
+from tests.support.activity import an_activity
 from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.model_catalog import PLATFORM_MODELS
@@ -140,14 +163,25 @@ class Platform:
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
-        self.platform_orders = InMemoryPlatformOrdersAdapter()
+        self.account_activity.unread = self.reading_on_exchange
+        self.account_transfers = FakeAccountTransfersAdapter()
+        # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
+        self.protection_exchange = FakeProtectionExchangeAdapter()
+        self.protections = ProtectionStore()
+        self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))
         self.closed_positions = ClosedPositionStore()
+        self.exit_plans = ExitPlanStore()
         self.cycles = InMemoryCycleRepositoryAdapter()
         self.equity_snapshots = EquitySnapshotStore()
         self.histories: dict[TenantId, InMemoryFlowHistoryAdapter] = {}
+        # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
+        self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
+        # The emergency closings of every tenant, as their record keeps them (R3.2.3).
+        self.emergency_closings: list[EmergencyClosing] = []
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -187,7 +221,10 @@ class Platform:
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
         closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice)
+        exit_plans = InMemoryExitPlanRepositoryAdapter(self.exit_plans, tenant_id)
+        closing_ports = ClosingPorts(
+            self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
+        )
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -195,7 +232,9 @@ class Platform:
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=position_closing,
-            manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
+            manual_closings=RecordManualClosingUseCase(
+                flows, flow_openings, closed_positions, closing_notice, exit_plans
+            ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
@@ -205,16 +244,20 @@ class Platform:
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountPorts(accounts, account_state),
+                accounts=FlowAccountPorts(accounts, self.account_activity, self.ledger),
                 markets=self.markets,
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(SOURCE_CATALOG),
             ),
             flow_positions=flow_positions,
-            stop_ports=stop_ports,
+            closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=self.account_activity,
+            account_transfers=self.account_transfers,
             flow_ledger=self.ledger,
+            ledger_recording=FakeLedgerRecordingAdapter(
+                RecordAccountExecutionsUseCase(flows, self.account_activity, self.platform_orders, self.ledger)
+            ),
             flow_operations=InMemoryFlowOperationsAdapter(
                 self.ledger,
                 lambda: [account.id.value for account in accounts.list()],
@@ -229,21 +272,44 @@ class Platform:
             outbox=self.outbox,
             clock=lambda: self.now,
             closed_positions=closed_positions,
+            exit_plans=exit_plans,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
+            openings_suspensions=InMemoryOpeningsSuspensionAdapter(self.flows, tenant_id),
+            flow_forecasts=InMemoryFlowForecastsAdapter(self.forecasts_of(tenant_id)),
             historical_cycles=self.history_of(tenant_id),
             historical_closed_positions=self.history_of(tenant_id),
             historical_orders=self.history_of(tenant_id),
+            reconciliation=self.readings,
+            account_thresholds=accounts,
+            account_names=accounts,
+            automatic_pause=InMemoryAutomaticPauseAdapter(self.flows, tenant_id),
+            emergency_closings=InMemoryEmergencyClosingLogAdapter(self.emergency_closings, tenant_id),
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         return TenantUseCases.on(tenant_id, ports)
 
+    def reading_on_exchange(self, account_id: UUID) -> AccountActivity:
+        """What the worker reads of an account no test set a reading for: its balance on the exchange, as the worker
+        reads it for the API (ADR 0044)."""
+        if not self.worker_reachable:
+            raise FlowExchangeUnavailableError
+        account = next((each for each in self.accounts.accounts if each.id.value == account_id), None)
+        if account is None:
+            return an_activity()
+        state = self.worker_for(account.tenant_id).read_exchange_state.execute(ReadExchangeStateCommand(account.id))
+        return an_activity(balance=state.balance.amount, available_margin=state.available_margin.amount)
+
     def history_of(self, tenant_id: TenantId) -> InMemoryFlowHistoryAdapter:
         """The histories of the tenant: each tenant reads its own store, as row level security does (R2.5.1)."""
         return self.histories.setdefault(tenant_id, InMemoryFlowHistoryAdapter(HistoryStore()))
+
+    def forecasts_of(self, tenant_id: TenantId) -> InMemoryForecastRepositoryAdapter:
+        """The forecasts the flows of the tenant recorded: each tenant reads its own, as row level security does."""
+        return self.forecasts.setdefault(tenant_id, InMemoryForecastRepositoryAdapter())
 
     def worker_for(self, tenant_id: TenantId) -> WorkerUseCases:
         """What the worker builds for a request of the API, with the opener only it holds."""
@@ -252,7 +318,9 @@ class Platform:
         access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
-        close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, self.slippage)
+        close_exchange_position = CloseExchangePositionUseCase(
+            access, order_exchanges, orders, self.slippage, self.cancel_protections(tenant_id)
+        )
         open_position = OpenPositionUseCase(access, order_exchanges, orders, self.slippage)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
@@ -274,7 +342,22 @@ class Platform:
                 self.outbox,
             ),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            record_account_executions=RecordAccountExecutionsUseCase(
+                InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+                self.platform_orders,
+                self.ledger,
+            ),
         )
+
+    def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
+        """What the worker runs after every closing: the protections of the position leave the exchange (R3.1.2)."""
+        access = OpenTradingAccessUseCase(
+            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), FakeCredentialOpenerAdapter(self.vault)
+        )
+        protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
+        return CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
 
     def link_chat(self) -> LinkChatUseCase:
         """What the bot of the worker runs for every message it receives."""

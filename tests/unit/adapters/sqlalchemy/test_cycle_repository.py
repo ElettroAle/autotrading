@@ -3,8 +3,14 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import create_engine
 
-from autotrading.adapters.outbound.sqlalchemy.cycle_repository import plain, record_of, row_of
+from autotrading.adapters.outbound.sqlalchemy.cycle_repository import (
+    consecutive_failures_statement,
+    plain,
+    record_of,
+    row_of,
+)
 from autotrading.application.flows.errors import UnrecordableDocumentError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import (
@@ -19,6 +25,8 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 PLANNED = datetime(2026, 11, 12, 10, 22, tzinfo=UTC)
 TENANT = TenantId.new()
+# An engine only for its dialect: it never connects.
+POSTGRESQL = create_engine("postgresql+psycopg://").dialect
 FAILED = CycleRecord(
     flow_id=uuid4(),
     planned_at=PLANNED,
@@ -104,3 +112,19 @@ def test_a_value_that_is_not_json_data_never_reaches_the_record() -> None:
 
     assert raised.value.status_code == 500
     assert str(raised.value) == "documento del ciclo non registrabile: object"
+
+
+def test_the_consecutive_failures_count_the_failed_cycles_after_the_last_completed_one_since_the_anchor() -> None:
+    flow_id = uuid4()
+    statement = consecutive_failures_statement(flow_id)
+    sql = " ".join(str(statement.compile(dialect=POSTGRESQL)).split())
+
+    assert sql.startswith("SELECT count(*)")
+    assert "FROM cycles" in sql
+    assert "cycles.planned_at > (SELECT max(completed.planned_at)" in sql
+    assert "cycles.planned_at >= (SELECT flows.cycle_anchor FROM flows" in sql
+    assert sorted(value for value in statement.compile().params.values() if isinstance(value, str)) == [
+        "completed",
+        "failed",
+    ]
+    assert {value for value in statement.compile().params.values() if not isinstance(value, str)} == {flow_id}

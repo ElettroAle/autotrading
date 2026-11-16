@@ -327,6 +327,205 @@
         }
       }
     },
+    "/accounts/{account_id}/deviation-threshold": {
+      "put": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Set Deviation Threshold",
+        "operationId": "set_deviation_threshold_accounts__account_id__deviation_threshold_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviationThresholdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviationThresholdResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/reconciliation": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Read Account Reconciliation",
+        "operationId": "read_account_reconciliation_accounts__account_id__reconciliation_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountReconciliationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/reconciliation/alarms": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "List Reconciliation Alarms",
+        "operationId": "list_reconciliation_alarms_accounts__account_id__reconciliation_alarms_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReconciliationAlarmResponse"
+                  },
+                  "title": "Response List Reconciliation Alarms Accounts  Account Id  Reconciliation Alarms Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/reconciliation/confirmation": {
+      "post": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Confirm Reconciliation",
+        "operationId": "confirm_reconciliation_accounts__account_id__reconciliation_confirmation_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/exchanges": {
       "get": {
         "tags": [
@@ -871,6 +1070,124 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/flows/emergency-closings": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Close In Emergency",
+        "operationId": "close_in_emergency_flows_emergency_closings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyClosingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyClosingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/flows/emergency-closings/preview": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Preview Emergency Closing",
+        "operationId": "preview_emergency_closing_flows_emergency_closings_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyClosingPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/notifications/email": {
@@ -1491,6 +1808,71 @@
         }
       }
     },
+    "/flows/{flow_id}/cash-out": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Cash Out Profits",
+        "operationId": "cash_out_profits_flows__flow_id__cash_out_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CashOutRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashOutOutcomeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/allocated-capital": {
       "put": {
         "tags": [
@@ -1532,58 +1914,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FlowResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/flows/{flow_id}/capital-changes": {
-      "get": {
-        "tags": [
-          "flussi"
-        ],
-        "summary": "List Capital Changes",
-        "operationId": "list_capital_changes_flows__flow_id__capital_changes_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "flow_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Flow Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CapitalChangeResponse"
-                  },
-                  "title": "Response List Capital Changes Flows  Flow Id  Capital Changes Get"
                 }
               }
             }
@@ -1756,6 +2086,48 @@
         }
       }
     },
+    "/flows/{flow_id}/openings/resume": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Resume Flow Openings",
+        "description": "The user resumes the openings suspended for maximum loss (R3.2.2); the suspension in force, of any cause,\nreads in the state of the flow.",
+        "operationId": "resume_flow_openings_flows__flow_id__openings_resume_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/{action}": {
       "post": {
         "tags": [
@@ -1866,6 +2238,198 @@
         }
       }
     },
+    "/flows/{flow_id}/capital-changes": {
+      "get": {
+        "tags": [
+          "capitale"
+        ],
+        "summary": "List Capital Changes",
+        "operationId": "list_capital_changes_flows__flow_id__capital_changes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "From"
+            },
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "To"
+            },
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapitalChangePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/capital-changes": {
+      "get": {
+        "tags": [
+          "capitale"
+        ],
+        "summary": "List Account Capital Changes",
+        "operationId": "list_account_capital_changes_accounts__account_id__capital_changes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "From"
+            },
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "To"
+            },
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapitalChangePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/assets": {
       "get": {
         "tags": [
@@ -1943,16 +2507,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -1962,16 +2526,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2091,16 +2655,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno della chiusura",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno della chiusura"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2110,16 +2674,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno della chiusura",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno della chiusura"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2189,16 +2753,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2208,16 +2772,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2227,6 +2791,104 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FlowStatisticsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/forecast-accuracy": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Forecast Accuracy",
+        "operationId": "read_forecast_accuracy_flows__flow_id__forecast_accuracy_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "From"
+            },
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
+              "title": "To"
+            },
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowForecastAccuracyResponse"
                 }
               }
             }
@@ -2705,16 +3367,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2724,16 +3386,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -2841,16 +3503,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno dell'intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno dell'intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -2860,16 +3522,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno dell'intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno dell'intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -3045,16 +3707,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3064,16 +3726,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -3202,16 +3864,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3221,16 +3883,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "after",
@@ -3377,16 +4039,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3396,16 +4058,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "after",
@@ -3552,16 +4214,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3571,16 +4233,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "after",
@@ -3658,16 +4320,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "primo giorno di un intervallo",
+              "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "From"
             },
-            "description": "primo giorno di un intervallo"
+            "description": "inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           },
           {
             "name": "to",
@@ -3677,16 +4339,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date"
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "ultimo giorno di un intervallo",
+              "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC",
               "title": "To"
             },
-            "description": "ultimo giorno di un intervallo"
+            "description": "fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC"
           }
         ],
         "responses": {
@@ -3805,6 +4467,47 @@
           "positions"
         ],
         "title": "AccountReadingResponse"
+      },
+      "AccountReconciliationResponse": {
+        "properties": {
+          "aligned": {
+            "type": "boolean",
+            "title": "Aligned"
+          },
+          "threshold_percent": {
+            "type": "string",
+            "title": "Threshold Percent"
+          },
+          "last_comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceComparisonResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "open_alarm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReconciliationAlarmResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "aligned",
+          "threshold_percent",
+          "last_comparison",
+          "open_alarm"
+        ],
+        "title": "AccountReconciliationResponse",
+        "description": "Whether the balance of the account is the expected one: aligned without an open alarm (R3.3.1)."
       },
       "AccountRegistrationRequest": {
         "properties": {
@@ -3970,6 +4673,36 @@
         ],
         "title": "AmountResponse"
       },
+      "BalanceComparisonResponse": {
+        "properties": {
+          "compared_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Compared At"
+          },
+          "expected_balance": {
+            "type": "string",
+            "title": "Expected Balance"
+          },
+          "read_balance": {
+            "type": "string",
+            "title": "Read Balance"
+          },
+          "deviation_percent": {
+            "type": "string",
+            "title": "Deviation Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compared_at",
+          "expected_balance",
+          "read_balance",
+          "deviation_percent"
+        ],
+        "title": "BalanceComparisonResponse",
+        "description": "The last comparison of the balance of the account; amounts as strings (ADR 0018)."
+      },
       "BalanceResponse": {
         "properties": {
           "amount": {
@@ -4018,6 +4751,43 @@
         ],
         "title": "CallCostResponse"
       },
+      "CapitalChangePageResponse": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/CapitalChangeResponse"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "has_next",
+          "total",
+          "currency",
+          "changes"
+        ],
+        "title": "CapitalChangePageResponse",
+        "description": "A page of the history of the capital, from the most recent row, with how many rows the period holds (R3.4.2)."
+      },
       "CapitalChangeRequest": {
         "properties": {
           "allocated_capital": {
@@ -4045,27 +4815,138 @@
             "format": "date-time",
             "title": "Changed At"
           },
-          "previous": {
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow"
+          },
+          "reason": {
             "type": "string",
+            "title": "Reason"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Previous"
           },
           "new": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "New"
-          },
-          "user_id": {
-            "type": "string",
-            "title": "User Id"
           }
         },
         "type": "object",
         "required": [
           "changed_at",
+          "flow_id",
+          "flow",
+          "reason",
+          "amount",
           "previous",
-          "new",
-          "user_id"
+          "new"
         ],
-        "title": "CapitalChangeResponse"
+        "title": "CapitalChangeResponse",
+        "description": "A row of the history of the capital (R3.4.2): a deposit or a withdrawal of the account has no flow and no capital\nbefore and after."
+      },
+      "CashOutOutcomeResponse": {
+        "properties": {
+          "flow": {
+            "$ref": "#/components/schemas/FlowResponse"
+          },
+          "freed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freed"
+          },
+          "capital": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capital"
+          },
+          "left_open": {
+            "items": {
+              "$ref": "#/components/schemas/PositionLeftOpenResponse"
+            },
+            "type": "array",
+            "title": "Left Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow",
+          "freed",
+          "capital",
+          "left_open"
+        ],
+        "title": "CashOutOutcomeResponse",
+        "description": "The flow after the cash-out, the money it freed and the positions not closed, each with its reason (R3.4.1).\n\nWith a position left open nothing is freed."
+      },
+      "CashOutRequest": {
+        "properties": {
+          "capital": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capital"
+          }
+        },
+        "type": "object",
+        "title": "CashOutRequest",
+        "description": "The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1)."
       },
       "ClosedPositionPageResponse": {
         "properties": {
@@ -4264,6 +5145,68 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -4279,7 +5222,14 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "max_consecutive_failures",
+          "max_daily_loss_percent",
+          "max_drawdown_percent",
+          "openings_resume",
+          "default_stop_loss_percent",
+          "default_take_profit_percent",
+          "minimum_confidence"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -4541,6 +5491,40 @@
         "title": "DefaultSystemPromptResponse",
         "description": "The system prompt a new flow starts with, and the placeholders it may use (R1.4.8)."
       },
+      "DeviationThresholdRequest": {
+        "properties": {
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "percent"
+        ],
+        "title": "DeviationThresholdRequest",
+        "description": "The threshold of the balance deviation of the account, in percent of the expected balance (R3.3.1)."
+      },
+      "DeviationThresholdResponse": {
+        "properties": {
+          "percent": {
+            "type": "string",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "percent"
+        ],
+        "title": "DeviationThresholdResponse"
+      },
       "DifferenceResponse": {
         "properties": {
           "part": {
@@ -4597,6 +5581,129 @@
         ],
         "title": "DraftAssignmentRequest",
         "description": "Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason."
+      },
+      "EmergencyClosingPreviewResponse": {
+        "properties": {
+          "flows": {
+            "type": "integer",
+            "title": "Flows"
+          },
+          "positions": {
+            "type": "integer",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flows",
+          "positions"
+        ],
+        "title": "EmergencyClosingPreviewResponse",
+        "description": "The flows of the scope and the positions they hold now, for the confirmation (ADR chiusura-di-emergenza-nella-\ndashboard)."
+      },
+      "EmergencyClosingRequest": {
+        "properties": {
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "title": "EmergencyClosingRequest",
+        "description": "A flow, an account, or neither for every flow of the user (R3.2.3)."
+      },
+      "EmergencyClosingResponse": {
+        "properties": {
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closed At"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EmergencyScopeResponse"
+          },
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/FlowEmergencyOutcomeResponse"
+            },
+            "type": "array",
+            "title": "Flows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "closed_at",
+          "scope",
+          "flows"
+        ],
+        "title": "EmergencyClosingResponse"
+      },
+      "EmergencyScopeKind": {
+        "type": "string",
+        "enum": [
+          "flow",
+          "account",
+          "all"
+        ],
+        "title": "EmergencyScopeKind"
+      },
+      "EmergencyScopeResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/EmergencyScopeKind"
+          },
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "flow_id",
+          "account_id"
+        ],
+        "title": "EmergencyScopeResponse"
       },
       "EquityPointResponse": {
         "properties": {
@@ -4810,6 +5917,34 @@
             ],
             "title": "Max Value Exposure Percent"
           },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
+          },
           "allocated_capital": {
             "anyOf": [
               {
@@ -4836,6 +5971,88 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume",
+            "default": "manual"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -4845,6 +6062,66 @@
         ],
         "title": "FlowCreationRequest",
         "description": "A missing name, model, asset or risk limit arrives empty, so the domain answers with the reason (R1.1.1)."
+      },
+      "FlowEmergencyOutcomeResponse": {
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "closed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed"
+          },
+          "left_open": {
+            "items": {
+              "$ref": "#/components/schemas/PositionLeftOpenResponse"
+            },
+            "type": "array",
+            "title": "Left Open"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "remark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_id",
+          "flow_name",
+          "closed",
+          "left_open",
+          "failure",
+          "remark"
+        ],
+        "title": "FlowEmergencyOutcomeResponse",
+        "description": "What the closing did to one flow: the assets closed, the positions left open with the reason of the exchange,\nthe reason the whole flow failed, or the remark that it had nothing to close (R3.2.3)."
       },
       "FlowEquityResponse": {
         "properties": {
@@ -4874,6 +6151,23 @@
         ],
         "title": "FlowEquityResponse",
         "description": "The equity curve of a flow: a point for each cycle, from the oldest, and the capital it is judged against\n(R2.2.3); amounts as text without trailing zeros (ADR 0018)."
+      },
+      "FlowForecastAccuracyResponse": {
+        "properties": {
+          "forecasts": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastAccuracyResponse"
+            },
+            "type": "array",
+            "title": "Forecasts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "forecasts"
+        ],
+        "title": "FlowForecastAccuracyResponse",
+        "description": "The error of the forecasts of a flow in the period, one for every asset and horizon it forecast (ADR\nerrore-medio-della-previsione-nell-api)."
       },
       "FlowModificationRequest": {
         "properties": {
@@ -5010,6 +6304,34 @@
             ],
             "title": "Max Value Exposure Percent"
           },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
+          },
           "bring_to_minimum": {
             "anyOf": [
               {
@@ -5031,6 +6353,94 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpeningsResume"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5070,6 +6480,16 @@
               }
             ],
             "title": "Pause Reason"
+          },
+          "openings_suspension": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpeningsSuspensionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "model": {
             "type": "string",
@@ -5171,6 +6591,7 @@
           "environment",
           "status",
           "pause_reason",
+          "openings_suspension",
           "model",
           "version",
           "last_cycle",
@@ -5229,6 +6650,39 @@
               }
             ],
             "title": "Unrealized Pnl Percent"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
           }
         },
         "type": "object",
@@ -5241,10 +6695,13 @@
           "mark_price",
           "margin",
           "unrealized_pnl",
-          "unrealized_pnl_percent"
+          "unrealized_pnl_percent",
+          "target_price",
+          "stop_price",
+          "invalidation"
         ],
         "title": "FlowPositionResponse",
-        "description": "An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin."
+        "description": "An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a\nposition without margin, each level of the plan when the agent declared none."
       },
       "FlowRankingResponse": {
         "properties": {
@@ -5407,6 +6864,68 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5426,7 +6945,14 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "max_consecutive_failures",
+          "max_daily_loss_percent",
+          "max_drawdown_percent",
+          "openings_resume",
+          "default_stop_loss_percent",
+          "default_take_profit_percent",
+          "minimum_confidence"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -5524,7 +7050,14 @@
             "title": "Total Value"
           },
           "return_percent": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Return Percent"
           },
           "positions": {
@@ -5536,6 +7069,16 @@
           },
           "summary": {
             "$ref": "#/components/schemas/FlowResultsResponse"
+          },
+          "openings_suspension": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpeningsSuspensionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5551,10 +7094,11 @@
           "total_value",
           "return_percent",
           "positions",
-          "summary"
+          "summary",
+          "openings_suspension"
         ],
         "title": "FlowStateResponse",
-        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2); amounts as strings (ADR 0018)."
+        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018)."
       },
       "FlowStatisticsResponse": {
         "properties": {
@@ -5630,6 +7174,59 @@
         ],
         "title": "FlowStatisticsResponse",
         "description": "The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate in percent with two\ndecimals, null when nothing is available (ADR 0122)."
+      },
+      "ForecastAccuracyResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "horizon_minutes": {
+            "type": "integer",
+            "title": "Horizon Minutes"
+          },
+          "mean_absolute_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Absolute Error"
+          },
+          "mean_percent_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Percent Error"
+          },
+          "evaluated": {
+            "type": "integer",
+            "title": "Evaluated"
+          },
+          "unevaluable": {
+            "type": "integer",
+            "title": "Unevaluable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "horizon_minutes",
+          "mean_absolute_error",
+          "mean_percent_error",
+          "evaluated",
+          "unevaluable"
+        ],
+        "title": "ForecastAccuracyResponse",
+        "description": "How much the forecasts of one asset and horizon missed in the period (R3.6.1): the mean absolute error as text\n(ADR 0018), the mean percent error on the actual price with two decimals, null without evaluated forecasts."
       },
       "FreeCapitalResponse": {
         "properties": {
@@ -6332,6 +7929,53 @@
         "title": "NotificationEmailResponse",
         "description": "The address of the notifications by email, if any, and the warning that no email leaves when the\ninstallation has no mail service (R3.5.2)."
       },
+      "OpeningsResume": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "next_day"
+        ],
+        "title": "OpeningsResume",
+        "description": "How the openings of a flow suspended for maximum loss resume (R3.2.2).\n\nBy hand unless the user chooses otherwise: the openings resume when the user confirms. The next day they resume on\ntheir own at 00:00 UTC of the day after the suspension, and the user may still confirm before."
+      },
+      "OpeningsSuspensionCause": {
+        "type": "string",
+        "enum": [
+          "perdita_massima",
+          "riconciliazione"
+        ],
+        "title": "OpeningsSuspensionCause",
+        "description": "Why the openings of a flow are suspended: a maximum loss passed (R3.2.2) or an alarm of reconciliation open on\nits account (R3.3.1). Only the first one the user resumes from the flow; the second ends with the confirmation of\nthe account."
+      },
+      "OpeningsSuspensionResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "suspended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Suspended At"
+          },
+          "cause": {
+            "$ref": "#/components/schemas/OpeningsSuspensionCause"
+          },
+          "resumable": {
+            "type": "boolean",
+            "title": "Resumable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "suspended_at",
+          "cause",
+          "resumable"
+        ],
+        "title": "OpeningsSuspensionResponse",
+        "description": "The openings of a flow suspended: the reason, since when, the cause and whether the user resumes them from the\nflow, true only after a maximum loss (R3.2.2, R3.3.1)."
+      },
       "OperationResponse": {
         "properties": {
           "occurred_at": {
@@ -6874,6 +8518,49 @@
         ],
         "title": "ProviderResponse"
       },
+      "ReconciliationAlarmResponse": {
+        "properties": {
+          "expected_balance": {
+            "type": "string",
+            "title": "Expected Balance"
+          },
+          "read_balance": {
+            "type": "string",
+            "title": "Read Balance"
+          },
+          "deviation_percent": {
+            "type": "string",
+            "title": "Deviation Percent"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_balance",
+          "read_balance",
+          "deviation_percent",
+          "opened_at",
+          "confirmed_at"
+        ],
+        "title": "ReconciliationAlarmResponse",
+        "description": "An alarm on the balance of the account: open until confirmed (R3.3.1)."
+      },
       "RiskLimitsResponse": {
         "properties": {
           "max_leverage": {
@@ -6908,13 +8595,37 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",
         "required": [
           "max_leverage",
           "max_margin_exposure_percent",
-          "max_value_exposure_percent"
+          "max_value_exposure_percent",
+          "max_total_margin_exposure_percent",
+          "max_total_value_exposure_percent"
         ],
         "title": "RiskLimitsResponse"
       },
@@ -7184,6 +8895,88 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume",
+            "default": "manual"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -7243,6 +9036,76 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume",
+            "default": "manual"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -7378,6 +9241,34 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",
@@ -7417,6 +9308,28 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",

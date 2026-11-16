@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 
 from autotrading.application.flows.ports import CycleHistoryPort, FlowSummary, FlowSummaryPort
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand, ReadFlowResultsUseCase
@@ -8,6 +8,7 @@ from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind
 
 RECENT_CYCLES = 10
@@ -18,8 +19,8 @@ class ListFlowOverviewsCommand:
     """The period of the results of every flow, the same periods as the statistics (ADR 0122, R6.4.2)."""
 
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,11 @@ class FlowOverview:
     @property
     def last_cycle(self) -> CycleRecord | None:
         return self.recent_cycles[0] if self.recent_cycles else None
+
+    @property
+    def openings_suspension(self) -> OpeningsSuspension | None:
+        """The suspension of the openings in force now, of any cause; a draft never has one (R3.2.2, R3.3.1)."""
+        return None if self.results is None else self.results.openings_suspension
 
     @property
     def currency(self) -> str | None:
@@ -70,7 +76,7 @@ class ListFlowOverviewsUseCase:
         self._clock = clock
 
     def execute(self, command: ListFlowOverviewsCommand) -> list[FlowOverview]:
-        StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        StatisticsPeriod.named(command.period, command.since, command.until)
         now = self._clock()
         return [self._overview_of(summary, command, now) for summary in self._summaries.execute()]
 
@@ -80,6 +86,6 @@ class ListFlowOverviewsUseCase:
         if FlowStatus(summary.status) is FlowStatus.DRAFT:
             return FlowOverview(summary, self._environment, recent, next_cycle_at, None)
         results = self._flow_results.execute(
-            ReadFlowResultsCommand(summary.flow_id, command.period, command.first_day, command.last_day)
+            ReadFlowResultsCommand(summary.flow_id, command.period, command.since, command.until)
         )
         return FlowOverview(summary, self._environment, recent, next_cycle_at, results)

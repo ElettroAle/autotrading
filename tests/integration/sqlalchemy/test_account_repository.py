@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -15,6 +16,7 @@ from autotrading.application.verification.errors import VerificationAccountNotFo
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
+from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
@@ -262,3 +264,28 @@ def test_the_sealed_verification_access_of_an_account_is_read_for_its_tenant_onl
     )
     with pytest.raises(VerificationAccountNotFoundError):
         SqlAlchemyAccountRepositoryAdapter(database, tenant_b).sealed_verification(account.id.value)
+
+
+def test_an_account_saved_without_a_threshold_has_the_default_one(database: Engine) -> None:
+    anna = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    assert repository.deviation_threshold(account.id.value) == Decimal(1)
+
+
+def test_the_threshold_of_an_account_is_replaced_and_read_for_its_tenant_only(database: Engine) -> None:
+    anna, bruno = new_tenant(database), new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    repository.replace(account.with_deviation_threshold(DeviationThreshold(Decimal("2.5"))))
+
+    read = repository.get(account.id)
+    assert read is not None
+    assert read.deviation_threshold == DeviationThreshold(Decimal("2.5"))
+    assert repository.deviation_threshold(account.id.value) == Decimal("2.5")
+    with pytest.raises(FlowAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, bruno).deviation_threshold(account.id.value)

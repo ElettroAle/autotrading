@@ -1,15 +1,15 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select, text, update
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.tables import cycles
+from autotrading.adapters.outbound.sqlalchemy.tables import cycles, flows
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.call_cost import CallCost
@@ -137,6 +137,49 @@ def test_the_failed_cycles_are_counted_in_the_window(database: Engine) -> None:
     assert repository.failed_within(flow_id, TimeWindow()) == 3
 
 
+def activated(database: Engine, tenant_id: TenantId, flow_id: UUID) -> datetime:
+    """The flow made active, as a start or a resume does: the database stamps the anchor of its cycles."""
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
+        connection.execute(update(flows).where(flows.c.id == flow_id).values(status="active"))
+        anchor: datetime = connection.execute(select(flows.c.cycle_anchor).where(flows.c.id == flow_id)).scalar_one()
+    return anchor
+
+
+def a_cycle(flow_id: UUID, planned_at: datetime, outcome: CycleOutcome) -> CycleRecord:
+    if outcome is CycleOutcome.FAILED:
+        return a_failed_cycle(flow_id, planned_at)
+    return CycleRecord(flow_id, planned_at, outcome)
+
+
+def test_the_consecutive_failures_count_the_failed_cycles_after_the_last_completed_one(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    anchor = activated(database, tenant_id, flow_id)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    outcomes = (CycleOutcome.FAILED, CycleOutcome.COMPLETED, CycleOutcome.FAILED, CycleOutcome.SKIPPED)
+    for index, outcome in enumerate((*outcomes, CycleOutcome.FAILED)):
+        repository.record(a_cycle(flow_id, anchor + timedelta(minutes=15) * index, outcome))
+
+    assert repository.consecutive_failures(flow_id) == 2
+
+
+def test_the_consecutive_failures_count_only_since_the_flow_became_active(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    anchor = activated(database, tenant_id, flow_id)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    for minutes in (-30, -15, 0):
+        repository.record(a_failed_cycle(flow_id, anchor + timedelta(minutes=minutes)))
+
+    assert repository.consecutive_failures(flow_id) == 1
+
+
+def test_a_flow_without_cycles_has_no_consecutive_failures(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    activated(database, tenant_id, flow_id)
+
+    assert SqlAlchemyCycleRepositoryAdapter(database, tenant_id).consecutive_failures(flow_id) == 0
+
+
 def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
     other_tenant, _ = new_flow(database)
@@ -148,6 +191,7 @@ def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     assert other.costs(flow_id) == []
     assert other.costs_within(flow_id, TimeWindow()) == []
     assert other.failed_within(flow_id, TimeWindow()) == 0
+    assert other.consecutive_failures(flow_id) == 0
 
 
 def test_a_tenant_cannot_record_a_cycle_of_a_flow_of_another_tenant(database: Engine) -> None:
@@ -227,8 +271,9 @@ def test_the_cycles_are_filtered_by_outcome_decision_and_days_and_counted(databa
         failed.planned_at,
         nothing_decided.planned_at,
     ]
-    day = PLANNED.date()
-    assert matched(CycleFilter.named(outcome="concluso", decision="apertura", first_day=day, last_day=day)) == [
+    day = datetime.combine(PLANNED.date(), time(), tzinfo=UTC)
+    last_minute = day + timedelta(hours=23, minutes=59)
+    assert matched(CycleFilter.named(outcome="concluso", decision="apertura", since=day, until=last_minute)) == [
         opening.planned_at
     ]
     assert repository.count(flow_id, CycleFilter.named(outcome="concluso")) == 4

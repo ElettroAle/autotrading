@@ -12,6 +12,9 @@ export type FakeOpenPosition = {
   readonly margin: string;
   readonly unrealized_pnl: string;
   readonly unrealized_pnl_percent: string | null;
+  readonly target_price: string | null;
+  readonly stop_price: string | null;
+  readonly invalidation: string | null;
 };
 
 export type FakeClosedPosition = {
@@ -46,6 +49,9 @@ export const anOpenPosition = ({
   entryPrice = '60000',
   margin = '200',
   pnl = '12',
+  target = null,
+  stop = null,
+  invalidation = null,
 }: {
   asset?: string;
   side?: string;
@@ -54,6 +60,9 @@ export const anOpenPosition = ({
   entryPrice?: string;
   margin?: string;
   pnl?: string;
+  target?: string | null;
+  stop?: string | null;
+  invalidation?: string | null;
 } = {}): FakeOpenPosition => ({
   asset,
   side,
@@ -63,6 +72,9 @@ export const anOpenPosition = ({
   margin,
   unrealized_pnl: pnl,
   unrealized_pnl_percent: percentOf(pnl, margin),
+  target_price: target,
+  stop_price: stop,
+  invalidation,
 });
 
 export const aClosedPosition = ({

@@ -8,8 +8,10 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.accounts import accounts_router
 from autotrading.adapters.inbound.api.assets import assets_router
+from autotrading.adapters.inbound.api.capital_changes import capital_changes_router
 from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
 from autotrading.adapters.inbound.api.cycles import cycles_router
+from autotrading.adapters.inbound.api.emergency_closings import emergency_closings_router
 from autotrading.adapters.inbound.api.equity import equity_router
 from autotrading.adapters.inbound.api.errors import AuthenticationNotConfiguredError, install_error_responses
 from autotrading.adapters.inbound.api.exchanges import exchanges_router
@@ -17,12 +19,14 @@ from autotrading.adapters.inbound.api.flow_ranking import flow_ranking_router
 from autotrading.adapters.inbound.api.flow_state import flow_state_router
 from autotrading.adapters.inbound.api.flow_statistics import flow_statistics_router
 from autotrading.adapters.inbound.api.flows import flows_router
+from autotrading.adapters.inbound.api.forecast_accuracy import forecast_accuracy_router
 from autotrading.adapters.inbound.api.history import history_router
 from autotrading.adapters.inbound.api.models import models_router
 from autotrading.adapters.inbound.api.notification_email import notification_email_router
 from autotrading.adapters.inbound.api.operations import operations_router
 from autotrading.adapters.inbound.api.orders import orders_router
 from autotrading.adapters.inbound.api.provider_keys import provider_keys_router
+from autotrading.adapters.inbound.api.reconciliation import reconciliation_router
 from autotrading.adapters.inbound.api.sources import sources_router
 from autotrading.adapters.inbound.api.telegram import telegram_router
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
@@ -101,6 +105,7 @@ def create_api(
         return Identity(user_id=user_id.value, tenant_id=str(tenant_id.value))
 
     protected.include_router(accounts_router(use_cases_of_request, current_user))
+    protected.include_router(reconciliation_router(use_cases_of_request))
     protected.include_router(exchanges_router(use_cases_of_request))
     protected.include_router(orders_router(use_cases_of_request, current_user))
     protected.include_router(verifications_router(use_cases_of_request, current_user))
@@ -108,12 +113,16 @@ def create_api(
     protected.include_router(provider_keys_router(use_cases_of_request))
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
+    # Before the routes of one flow, whose identifier would otherwise take the place of its fixed path (R3.2.3).
+    protected.include_router(emergency_closings_router(use_cases_of_request, current_user))
     protected.include_router(notification_email_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request, current_user))
+    protected.include_router(capital_changes_router(use_cases_of_request))
     protected.include_router(assets_router(use_cases_of_request))
     protected.include_router(flow_state_router(use_cases_of_request))
     protected.include_router(closed_positions_router(use_cases_of_request))
     protected.include_router(flow_statistics_router(use_cases_of_request))
+    protected.include_router(forecast_accuracy_router(use_cases_of_request))
     protected.include_router(operations_router(use_cases_of_request))
     protected.include_router(cycles_router(use_cases_of_request))
     protected.include_router(equity_router(use_cases_of_request))

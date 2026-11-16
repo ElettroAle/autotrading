@@ -54,6 +54,8 @@ accounts = Table(
     Column("credentials_ciphertext", LargeBinary),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("removed_at", DateTime(timezone=True)),
+    # In percent of the expected balance, 1 unless the user sets another (R3.3.1).
+    Column("deviation_threshold", Numeric, nullable=False, server_default=text("1")),
     Index(
         "accounts_name_unique_in_tenant",
         "tenant_id",
@@ -143,6 +145,10 @@ flows = Table(
     Column("cycle_anchor", DateTime(timezone=True)),
     Column("first_started_at", DateTime(timezone=True)),
     Column("pause_reason", Text),
+    # The openings suspended for maximum loss, with the threshold passed, and their last resume (R3.2.2).
+    Column("openings_suspension_reason", Text),
+    Column("openings_suspended_at", DateTime(timezone=True)),
+    Column("openings_resumed_at", DateTime(timezone=True)),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="flows_account_of_tenant"
     ),
@@ -179,6 +185,10 @@ flow_capital_changes = Table(
     Column("new_capital", Numeric, nullable=False),
     Column("user_id", Text, nullable=False),
     Column("version", Integer, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("amount", Numeric, nullable=False),
+    Column("value_before", Numeric),
+    Column("cashed_profit", Numeric, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     ForeignKeyConstraint(["flow_id", "version"], ["flow_versions.flow_id", "flow_versions.version"]),
 )
@@ -243,6 +253,7 @@ equity_snapshots = Table(
     Column("unrealized_pnl", Numeric, nullable=False),
     Column("fees", Numeric, nullable=False),
     Column("funding", Numeric, nullable=False),
+    Column("cashed_profit", Numeric, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     postgresql_partition_by="RANGE (planned_at)",
 )
@@ -310,6 +321,32 @@ account_readings = Table(
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
     Column("read_at", DateTime(timezone=True), nullable=False),
     Column("open_assets", JSON, nullable=False),
+    # The balance the next comparison starts from, and the comparison of this reading (R3.3.1): empty for a reading
+    # saved before the balances were compared, and the comparison for the first reading of an account.
+    Column("reference_balance", Numeric),
+    Column("expected_balance", Numeric),
+    Column("read_balance", Numeric),
+)
+
+# At most one alarm open per account, also with two cycles of the account together (R3.3.1).
+reconciliation_alarms = Table(
+    "reconciliation_alarms",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("expected_balance", Numeric, nullable=False),
+    Column("read_balance", Numeric, nullable=False),
+    Column("deviation_percent", Numeric, nullable=False),
+    Column("opened_at", DateTime(timezone=True), nullable=False),
+    Column("confirmed_at", DateTime(timezone=True)),
+    Index(
+        "reconciliation_alarms_open_unique",
+        "tenant_id",
+        "account_id",
+        unique=True,
+        postgresql_where=text("confirmed_at IS NULL"),
+    ),
 )
 
 # Recorded once while the case lasts: unique among the cases not resolved (R1.6.2, ADR 0045).
@@ -418,4 +455,50 @@ outbox_messages = Table(
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("last_error", Text),
+)
+
+# The exit plan in force of each open position of a flow, replaced at every opening and removed at the closing (R3.1.1).
+flow_exit_plans = Table(
+    "flow_exit_plans",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("asset", Text, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("target_price", Numeric),
+    Column("stop_price", Numeric),
+    Column("invalidation", Text),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+
+# The protections the platform placed for the positions of the flows; a removed one stays, so that its execution read
+# later still belongs to its flow (R3.1.2).
+flow_protections = Table(
+    "flow_protections",
+    metadata,
+    Column("client_order_id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("flow_id", Uuid, nullable=False),
+    Column("asset", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("trigger_price", Numeric, nullable=False),
+    Column("exchange_order_id", Text, nullable=False),
+    Column("placed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("removed_at", DateTime(timezone=True)),
+    ForeignKeyConstraint(["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"]),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+
+# Every emergency closing a tenant launched: when, on which scope, and the outcome of each flow (R3.2.3).
+emergency_closings = Table(
+    "emergency_closings",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("closed_at", DateTime(timezone=True), nullable=False),
+    Column("scope_kind", Text, nullable=False),
+    Column("scope_id", Uuid),
+    Column("outcome", JSON, nullable=False),
 )

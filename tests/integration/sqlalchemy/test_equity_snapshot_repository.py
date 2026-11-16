@@ -39,8 +39,16 @@ def new_flow(database: Engine) -> tuple[TenantId, UUID]:
 
 
 def snapshot(flow_id: UUID, planned_at: datetime, realized_pnl: str = "4") -> EquitySnapshot:
+    # The profits cashed out travel with the parts (ADR rendimento-composto-tra-le-variazioni-di-capitale).
     return EquitySnapshot(
-        flow_id, planned_at, Decimal(300), Decimal(realized_pnl), Decimal("3.5"), Decimal("1.25"), Decimal("-0.1")
+        flow_id,
+        planned_at,
+        Decimal(300),
+        Decimal(realized_pnl),
+        Decimal("3.5"),
+        Decimal("1.25"),
+        Decimal("-0.1"),
+        cashed_profit=Decimal("0.5"),
     )
 
 
@@ -128,3 +136,57 @@ def test_a_recorded_equity_is_never_changed_nor_deleted_nor_read_from_a_partitio
             connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
             with pytest.raises(ProgrammingError, match="permission denied"):
                 connection.execute(text(statement))
+
+
+def test_the_daily_reference_is_the_last_equity_up_to_midnight_and_the_peak_the_highest_since(
+    database: Engine,
+) -> None:
+    tenant_id, flow_id = new_flow(database)
+    equity = SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id)
+    midnight = datetime(2026, 11, 16, tzinfo=UTC)
+    for planned_at, realized_pnl in [
+        (midnight - timedelta(days=3), "500"),
+        (midnight - timedelta(days=1), "200"),
+        (midnight, "100"),
+        (midnight + timedelta(hours=2), "50"),
+    ]:
+        equity.record(snapshot(flow_id, planned_at, realized_pnl))
+
+    references = equity.loss_references(flow_id, midnight, midnight - timedelta(days=2))
+
+    assert references.daily == snapshot(flow_id, midnight, "100")
+    assert references.peak == snapshot(flow_id, midnight - timedelta(days=1), "200")
+
+
+def test_without_equity_before_midnight_the_daily_reference_is_the_first_of_the_day(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    equity = SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id)
+    midnight = datetime(2026, 11, 16, tzinfo=UTC)
+    equity.record(snapshot(flow_id, midnight + timedelta(hours=3), "7"))
+    equity.record(snapshot(flow_id, midnight + timedelta(hours=1), "9"))
+
+    references = equity.loss_references(flow_id, midnight, midnight)
+
+    assert references.daily == snapshot(flow_id, midnight + timedelta(hours=1), "9")
+
+
+def test_a_flow_without_equity_has_no_reference(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+
+    references = SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id).loss_references(
+        flow_id, PLANNED, PLANNED
+    )
+
+    assert (references.daily, references.peak) == (None, None)
+
+
+def test_the_references_of_a_flow_of_another_tenant_are_not_seen(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    other_tenant, _ = new_flow(database)
+    SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id).record(snapshot(flow_id, PLANNED))
+
+    references = SqlAlchemyEquitySnapshotRepositoryAdapter(database, other_tenant).loss_references(
+        flow_id, PLANNED, PLANNED
+    )
+
+    assert (references.daily, references.peak) == (None, None)

@@ -1,8 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from decimal import Decimal
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -11,8 +15,9 @@ from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 class FlowStrategy:
     """What a flow does, without where and with how much: the part of a configuration a strategy file carries.
 
-    Interval, sources with weights and parameters, model with its parameters, instructions and risk rules; account,
-    allocated capital and assets belong to the flow that uses the strategy, assigned to its draft (R2.5.2, ADR 0140).
+    Interval, sources with weights and parameters, model with its parameters, instructions, risk rules and protection;
+    account, allocated capital and assets belong to the flow that uses the strategy, assigned to its draft (R2.5.2,
+    ADR 0140).
     """
 
     cycle_interval: CycleInterval
@@ -24,6 +29,16 @@ class FlowStrategy:
     bring_to_minimum: bool = False
     # The default of the platform unless the strategy has its own, as in the configuration (R1.4.8).
     system_prompt: str | None = None
+    # No maximum unless the strategy has one, as in the configuration (R3.2.4).
+    max_consecutive_failures: int | None = None
+    # No maximum loss and the manual resume unless the strategy has its own, as in the configuration (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # The protection of every opening, a risk rule like the limits (R3.1.2).
+    protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
+    # The confidence an opening needs, a risk rule like the limits; none unless the strategy has one (R3.1.4).
+    minimum_confidence: MinimumConfidence | None = None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -35,6 +50,12 @@ class FlowStrategy:
             configuration.risk_limits,
             configuration.bring_to_minimum,
             configuration.system_prompt,
+            configuration.max_consecutive_failures,
+            configuration.max_daily_loss_percent,
+            configuration.max_drawdown_percent,
+            configuration.openings_resume,
+            configuration.protection_defaults,
+            configuration.minimum_confidence,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -50,6 +71,12 @@ class FlowStrategy:
             allocated_capital=None,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
+            max_consecutive_failures=self.max_consecutive_failures,
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
+            protection_defaults=self.protection_defaults,
+            minimum_confidence=self.minimum_confidence,
         )
 
 

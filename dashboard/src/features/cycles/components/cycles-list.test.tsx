@@ -175,7 +175,7 @@ describe('CyclesList', () => {
   });
 
   // ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune: the period of the page holds for the tab Cicli too.
-  // The API reads the days in UTC; the page shows the instants in the time zone of the browser, an hour ahead.
+  // The API reads the instants in UTC; the page shows them in the time zone of the browser, an hour ahead.
   const DAY_13_IN_ROME = /13\/11\/2026|14\/11\/2026, 00:/;
 
   describe('in the period of the page, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune', () => {
@@ -183,7 +183,7 @@ describe('CyclesList', () => {
       fakePlatform.recordCycles('alfa', cyclesBack(200));
       await renderApp({
         account: 'anna',
-        url: '/flows/flow-alfa/cycles?period=range&from=2026-11-13&to=2026-11-13',
+        url: '/flows/flow-alfa/cycles?period=range&from=2026-11-13T00:00Z&to=2026-11-13T23:59Z',
       });
 
       const rows = await rowsOf();
@@ -195,18 +195,33 @@ describe('CyclesList', () => {
       fakePlatform.recordCycles('alfa', cyclesBack(200));
       await renderApp({
         account: 'anna',
-        url: '/flows/flow-alfa/cycles?period=7d&from=2026-11-13&to=2026-11-13',
+        url: '/flows/flow-alfa/cycles?period=7d&from=2026-11-13T00:00Z&to=2026-11-13T23:59Z',
       });
 
       const rows = await rowsOf();
       rows.forEach((row) => expect(row).toHaveTextContent(DAY_13_IN_ROME));
     });
 
+    // ADR periodo-al-minuto: the interval holds the cycles from its first minute to its last, both included.
+    it('lists only the cycles of the minutes of the interval', async () => {
+      fakePlatform.recordCycles('alfa', cyclesBack(200));
+      await renderApp({
+        account: 'anna',
+        url: '/flows/flow-alfa/cycles?period=7d&from=2026-11-14T08%3A22Z&to=2026-11-14T08%3A52Z',
+      });
+
+      await expect.poll(async () => (await rowsOf()).length).toBe(3);
+      const rows = await rowsOf();
+      ['09:52:00', '09:37:00', '09:22:00'].forEach((time, index) =>
+        expect(rows[index]).toHaveTextContent(`14/11/2026, ${time}`),
+      );
+    });
+
     it('says no cycle falls in the period', async () => {
       fakePlatform.recordCycles('alfa', cyclesBack(1));
       await renderApp({
         account: 'anna',
-        url: '/flows/flow-alfa/cycles?period=range&from=2026-10-01&to=2026-10-02',
+        url: '/flows/flow-alfa/cycles?period=range&from=2026-10-01T00:00Z&to=2026-10-02T23:59Z',
       });
 
       expect(await screen.findByText('Nessun ciclo nel periodo scelto.')).toBeInTheDocument();
@@ -215,11 +230,11 @@ describe('CyclesList', () => {
     it('waits for both days of a range', async () => {
       await renderApp({
         account: 'anna',
-        url: '/flows/flow-alfa/cycles?period=range&from=2026-10-01',
+        url: '/flows/flow-alfa/cycles?period=range&from=2026-10-01T00:00Z',
       });
 
       expect(
-        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+        await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
       ).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Cicli' })).not.toBeInTheDocument();
     });

@@ -120,8 +120,9 @@ When(
     await dashboard.openHistoryTab('Posizioni chiuse');
     await dashboard.chooseFilter('Asset', asset);
     await dashboard.chooseFilter('Periodo', 'Intervallo');
-    await dashboard.typeFilter('Dal', isoDay(first));
-    await dashboard.typeFilter('Al', isoDay(last));
+    // From the first minute of the first day to the last minute of the last (ADR periodo-al-minuto).
+    await dashboard.typeFilter('Dal', `${isoDay(first)}T00:00`);
+    await dashboard.typeFilter('Al', `${isoDay(last)}T23:59`);
   },
 );
 

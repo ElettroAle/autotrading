@@ -49,8 +49,8 @@ class Bench:
         return order
 
     def record(self) -> list[tuple[str, ExecutionKind]]:
-        entries = self.use_case.execute(RecordAccountExecutionsCommand(ACCOUNT))
-        return [(entry.execution.fill_id, entry.kind) for entry in entries]
+        recorded = self.use_case.execute(RecordAccountExecutionsCommand(ACCOUNT))
+        return [(entry.execution.fill_id, entry.kind) for entry in recorded.entries]
 
 
 @pytest.fixture
@@ -105,7 +105,9 @@ def test_what_the_overlap_reads_again_is_not_recorded_twice(bench: Bench) -> Non
     bench.exchange.funding[ACCOUNT] = [a_payment("BTC", Decimal(-1))]
     bench.record()
 
-    assert bench.record() == []
+    again = bench.use_case.execute(RecordAccountExecutionsCommand(ACCOUNT))
+
+    assert (again.entries, again.funding) == ((), ())
     assert bench.ledger.realized(flow.id) == Decimal(5)
     assert len(bench.ledger.funding[ACCOUNT]) == 1
 
@@ -187,8 +189,9 @@ def test_the_funding_of_the_position_of_the_flow_adds_to_its_totals(bench: Bench
     bench.exchange.executions[ACCOUNT] = [a_fill("BTC", order, size=Decimal(1), executed_at=EARLIER)]
     bench.exchange.funding[ACCOUNT] = [a_payment("BTC", Decimal("-0.25"))]
 
-    bench.record()
+    recorded = bench.use_case.execute(RecordAccountExecutionsCommand(ACCOUNT))
 
+    assert [(entry.payment.amount, entry.flow_id) for entry in recorded.funding] == [(Decimal("-0.25"), flow.id)]
     assert bench.ledger.totals[flow.id].funding == Decimal("-0.25")
     assert bench.ledger.recomputed(flow.id) == bench.ledger.totals[flow.id]
 

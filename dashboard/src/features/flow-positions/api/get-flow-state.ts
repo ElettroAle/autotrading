@@ -13,6 +13,9 @@ const openPositionSchema = z.object({
   margin: z.string(),
   unrealized_pnl: z.string(),
   unrealized_pnl_percent: z.string().nullable(),
+  target_price: z.string().nullable(),
+  stop_price: z.string().nullable(),
+  invalidation: z.string().nullable(),
 });
 
 const flowStateSchema = z.object({
@@ -22,7 +25,9 @@ const flowStateSchema = z.object({
 
 export type OpenPosition = z.infer<typeof openPositionSchema>;
 
-/** The state of the flow read from the exchange at the request, with its open positions (R1.6.1). */
+/** The state of the flow read from the exchange at the request, with its open positions and their exit plans
+ * (R1.6.1, R3.1.1).
+ */
 export const useFlowState = (flowId: string) => {
   const api = useApiClient();
   return useQuery({

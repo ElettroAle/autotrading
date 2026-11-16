@@ -8,6 +8,8 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -17,7 +19,8 @@ class CycleFlow:
     """The flow of a cycle as read at its start: whose it is, its configuration in force, its state now.
 
     The amounts are the state attributed to the flow, the same the user consults (R1.6.1, ADR 0062); the account
-    gives only the details of the positions and the margin it has free, which no flow may go beyond.
+    gives only the details of the positions and the margin it has free, which no flow may go beyond. An alarm of
+    reconciliation open on the account suspends the openings of the flow (R3.3.1).
     """
 
     tenant_id: TenantId
@@ -27,6 +30,7 @@ class CycleFlow:
     started_at: datetime
     account: CycleAccount
     attributed: FlowState
+    alarm: ReconciliationAlarm | None = None
 
     @property
     def configuration(self) -> FlowConfiguration:
@@ -45,20 +49,33 @@ class CycleFlow:
         return self._funds.total_value
 
     @property
-    def return_percent(self) -> Decimal:
+    def return_percent(self) -> Decimal | None:
         return self._funds.return_percent
 
     @property
     def _funds(self) -> CycleFunds:
         return CycleFunds(self.attributed, self.account.available_margin)
 
-    def risk_state(self) -> RiskState:
+    def risk_state(self, *, loss_suspension: OpeningsSuspension | None = None) -> RiskState:
+        """The margin of the open positions is the one the exchange declares, as in the liquidity (ADR 0067); their
+        value is at the mark price (R3.2.1). The openings are suspended by what the guard of the losses found (R3.2.2)
+        or by an alarm of reconciliation on the account (R3.3.1).
+        """
+        attributed = self.attributed
+        suspension = self.openings_suspension(loss_suspension)
         return RiskState(
             currency=self.account.currency,
-            funds=self.attributed.funds,
+            funds=attributed.funds,
             available_liquidity=self.available_liquidity,
-            open_assets=frozenset(position.asset for position in self.positions),
+            open_positions=frozendict({position.asset: position.side for position in self.positions}),
+            open_margin=attributed.margin,
+            open_value=sum((position.size * position.mark_price for position in attributed.positions), Decimal(0)),
+            openings_suspended=None if suspension is None else suspension.blocked_reason,
         )
+
+    def openings_suspension(self, loss_suspension: OpeningsSuspension | None) -> OpeningsSuspension | None:
+        alarm_suspension = None if self.alarm is None else self.alarm.suspension(self.account_name)
+        return OpeningsSuspension.first_of(loss_suspension, alarm_suspension)
 
     @property
     def sources(self) -> tuple[str, ...]:
@@ -84,6 +101,7 @@ class CycleFlow:
                     position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
+                    self.attributed.exit_plan_of(position.asset),
                 )
                 for position in self.positions
             ),

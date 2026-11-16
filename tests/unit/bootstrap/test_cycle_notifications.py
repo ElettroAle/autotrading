@@ -40,7 +40,7 @@ from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.orders.direction import Direction
@@ -51,12 +51,14 @@ from autotrading.domain.orders.rejection import Rejection
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
+from tests.fakes.protection_cancellation import FakeProtectionCancellationAdapter
 from tests.support.activity import a_fill, a_movement, a_position, an_activity
 from tests.support.cycle_composition import TenantCyclePorts
 from tests.support.flow_cycles import FlowCycles, at
@@ -92,6 +94,7 @@ class World:
         self.flow = self.cycles.add_flow(USER, "alfa")
         self.tenant_id = self.flow.tenant_id
         self.cycles.platform.chats[self.tenant_id] = LinkedChat(self.tenant_id, CHAT)
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(self.cycles.platform.exit_plans, self.tenant_id)
         self.openings = ScriptedOpenings(OPENING)
         self.closed = ClosedPositionStore()
 
@@ -107,7 +110,9 @@ class World:
         followers = FlowOrderFollowers(
             NotifyOrderRejectedUseCase(ports.notify),
             NotifyPositionOpenedUseCase(ports.notify, "USDC"),
-            RecordFlowClosingUseCase(self.flows, self.openings, self.history, self.closing_notice(ports.notify)),
+            RecordFlowClosingUseCase(
+                self.flows, self.openings, self.history, self.closing_notice(ports.notify), self.exit_plans
+            ),
         )
         return replace(
             ports,
@@ -222,7 +227,9 @@ def outside(world: World, pnl: str) -> OutsideClosing:
 
 def closed_positions(world: World) -> RecordOutsideClosingUseCase:
     notice = World.closing_notice(world.ports.notify)
-    return RecordOutsideClosingUseCase(world.flows, world.openings, world.history, notice)
+    return RecordOutsideClosingUseCase(
+        world.flows, world.openings, world.history, notice, world.exit_plans, FakeProtectionCancellationAdapter()
+    )
 
 
 def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_flow(world: World) -> None:
@@ -416,7 +423,9 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: W
     reader = world.cycles.platform.activity_reader
     update(world)
     reader.executions[world.address] = [a_fill("ETH", None, executed_at=CLOSED_AT)]
+    # The declared withdrawal explains 25.50 of the balance; the 5 left are within the threshold (R3.3.1).
     reader.activities[world.address] = an_activity(
+        balance=Decimal("979.5"),
         positions=(a_position("SOL"),),
         movements=(a_movement(Decimal("-25.5"), moved_at=CLOSED_AT),),
         read_at=CLOSED_AT + timedelta(minutes=1),
@@ -429,7 +438,7 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: W
         [
             "test-1: posizione non attribuibile su SOL",
             "test-1: esecuzione non attribuibile su ETH",
-            "test-1: movimento non attribuibile di -25,50 USDC",
+            "test-1: movimento non attribuibile di 5 USDC",
         ]
     )
 

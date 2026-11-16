@@ -23,7 +23,7 @@ from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.history import HistoryCursor, HistoryFilter, HistoryQuery
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -197,7 +197,7 @@ def test_the_cycles_go_in_pages_after_the_cursor(database: Engine, anna: TenantH
 
 
 def test_the_closed_positions_of_an_asset_closed_in_a_period(database: Engine, anna: TenantHistory) -> None:
-    period = StatisticsPeriod.named("range", day(10).date(), day(20).date())
+    period = StatisticsPeriod.named("range", day(10, hour=0), day(20, hour=23))
 
     found = anna.adapter(database).closed_positions(query_of(HistoryFilter(period=period, asset="ETH")))
 

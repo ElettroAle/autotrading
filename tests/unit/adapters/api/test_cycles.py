@@ -27,6 +27,7 @@ from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -247,6 +248,9 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
     platform.ledger.totals[paused.id] = FlowTotals(paused.id, Decimal(0), Decimal("10.5"))
     platform.flows.flows.append(paused)
     platform.flows.pause_reasons[paused.id] = "credito esaurito presso openrouter"
+    platform.flows.openings[flow.id] = OpeningsStatus(
+        OpeningsSuspension("perdita giornaliera 6% oltre il 5%", PLANNED), None
+    )
     platform.flows.flows.append(a_flow(platform.tenant_of("bruno"), name="omega"))
 
     response = anna.get("/flows/overview")
@@ -260,6 +264,12 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "environment": "dev",
             "status": "attivo",
             "pause_reason": None,
+            "openings_suspension": {
+                "reason": "perdita giornaliera 6% oltre il 5%",
+                "suspended_at": "2026-11-12T10:07:00Z",
+                "cause": "perdita_massima",
+                "resumable": True,
+            },
             "model": flow.configuration.model.name,
             "version": flow.configuration.version,
             "last_cycle": {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
@@ -288,6 +298,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "environment": "dev",
             "status": "in pausa",
             "pause_reason": "credito esaurito presso openrouter",
+            "openings_suspension": None,
             "model": paused.configuration.model.name,
             "version": paused.configuration.version,
             "last_cycle": None,
@@ -343,7 +354,7 @@ def test_the_flows_in_use_refuse_a_period_the_user_cannot_have_meant(client_of: 
 
     assert (response.status_code, reason_of(response)) == (
         400,
-        {"detail": "periodo non valido: un intervallo ha il giorno iniziale e il giorno finale"},
+        {"detail": "periodo non valido: un intervallo ha l'inizio e la fine"},
     )
 
 
@@ -377,13 +388,32 @@ def test_the_cycles_are_filtered_by_outcome_decision_and_days(client_of: Client,
 
     body = anna.get(
         f"/flows/{flow_id}/cycles",
-        params={"outcome": "concluso", "decision": "apertura", "from": "2026-11-12", "to": "2026-11-12"},
+        params={
+            "outcome": "concluso",
+            "decision": "apertura",
+            "from": "2026-11-12T00:00:00Z",
+            "to": "2026-11-12T23:59:00Z",
+        },
     ).json()
 
     assert [cycle["planned_at"] for cycle in body["cycles"]] == ["2026-11-12T10:07:00Z"]
     assert body["total"] == 1
     failed = anna.get(f"/flows/{flow_id}/cycles", params={"outcome": "fallito"}).json()
     assert [cycle["outcome"] for cycle in failed["cycles"]] == ["fallito"]
+
+
+# ADR periodo-al-minuto: from and to are instants read to the minute, the minute of to included, UTC without a zone.
+def test_the_interval_of_the_cycles_holds_its_minutes(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    for minute in (0, 15, 30):
+        platform.cycles.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(minutes=minute)))
+
+    body = anna.get(
+        f"/flows/{flow_id}/cycles", params={"from": "2026-11-12T10:07:40Z", "to": "2026-11-12T10:22"}
+    ).json()
+
+    assert [cycle["planned_at"] for cycle in body["cycles"]] == ["2026-11-12T10:22:00Z", "2026-11-12T10:07:00Z"]
 
 
 # ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: an unknown value is a 400 error of the project.

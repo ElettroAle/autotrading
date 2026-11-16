@@ -10,7 +10,7 @@ from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.flows import a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -164,7 +164,13 @@ def test_the_closed_positions_are_filtered_by_side_result_asset_and_days(client_
 
     body = anna.get(
         f"/flows/{flow.id.value}/closed-positions",
-        params={"side": "short", "result": "vinta", "asset": "BTC", "from": "2026-11-12", "to": "2026-11-12"},
+        params={
+            "side": "short",
+            "result": "vinta",
+            "asset": "BTC",
+            "from": "2026-11-12T00:00:00Z",
+            "to": "2026-11-12T23:59:00Z",
+        },
     ).json()
 
     assert [(position["side"], position["pnl"]) for position in body["positions"]] == [("short", "5")]

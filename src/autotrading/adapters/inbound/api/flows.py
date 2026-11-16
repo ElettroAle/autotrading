@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.strategy_document import StrategyDocument,
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
+from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
@@ -20,20 +21,23 @@ from autotrading.application.flows.create_flow import CreateFlowCommand, SourceR
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
-from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
+from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.cash_out import CashOutOutcome
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension, OpeningsSuspensionCause
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
@@ -61,10 +65,24 @@ class FlowCreationRequest(BaseModel):
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    # Null or missing: no overall limit on the sum of the open positions (R3.2.1).
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     allocated_capital: Decimal
     bring_to_minimum: bool = False
     # Null or missing follows the default of the platform (R1.4.8).
     system_prompt: str | None = None
+    # Null or missing: no maximum, the flow keeps trying at every cycle (R3.2.4).
+    max_consecutive_failures: int | None = None
+    # Null or missing: no maximum loss; the suspended openings resume by hand unless "next_day" (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # Null or missing: a stop loss of 5% and no take profit (R3.1.2).
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
+    # Null or missing: no minimum confidence (R3.1.4).
+    minimum_confidence: int | None = None
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -76,12 +94,21 @@ class FlowCreationRequest(BaseModel):
             max_leverage=self.max_leverage,
             max_margin_exposure_percent=self.max_margin_exposure_percent,
             max_value_exposure_percent=self.max_value_exposure_percent,
+            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
             model_parameters=self.model_parameters,
             sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in self.sources),
             instructions=self.instructions,
             cycle_minutes=self.cycle_minutes,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
+            max_consecutive_failures=self.max_consecutive_failures,
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
+            default_stop_loss_percent=self.default_stop_loss_percent,
+            default_take_profit_percent=self.default_take_profit_percent,
+            minimum_confidence=self.minimum_confidence,
         )
 
 
@@ -96,11 +123,24 @@ class FlowModificationRequest(BaseModel):
     sources: list[SourceSelectionRequest] | None = None
     instructions: str | None = None
     max_leverage: int | None = None
+    # A null sent on purpose removes the limit; a missing one keeps the version in force (R1.1.3).
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
     # A null sent on purpose goes back to the default; a missing one keeps the version in force (R1.4.8).
     system_prompt: str | None = None
+    max_consecutive_failures: int | None = None
+    # A null sent on purpose removes the maximum loss; a missing one keeps the version in force (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume | None = None
+    default_stop_loss_percent: Decimal | None = None
+    # A null sent on purpose removes the default take profit; a missing one keeps the version in force (R3.1.2).
+    default_take_profit_percent: Decimal | None = None
+    # A null sent on purpose removes the minimum confidence; a missing one keeps the version in force (R3.1.4).
+    minimum_confidence: int | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -117,10 +157,31 @@ class FlowModificationRequest(BaseModel):
             max_leverage=self.max_leverage,
             max_margin_exposure_percent=self.max_margin_exposure_percent,
             max_value_exposure_percent=self.max_value_exposure_percent,
+            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
-            default_system_prompt=self.system_prompt is None and "system_prompt" in self.model_fields_set,
+            max_consecutive_failures=self.max_consecutive_failures,
+            default_system_prompt=self._sent_as_null("system_prompt"),
+            remove_max_margin_exposure=self._sent_as_null("max_margin_exposure_percent"),
+            remove_max_value_exposure=self._sent_as_null("max_value_exposure_percent"),
+            remove_max_total_margin_exposure=self._sent_as_null("max_total_margin_exposure_percent"),
+            remove_max_total_value_exposure=self._sent_as_null("max_total_value_exposure_percent"),
+            remove_max_consecutive_failures=self._sent_as_null("max_consecutive_failures"),
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
+            remove_max_daily_loss=self._sent_as_null("max_daily_loss_percent"),
+            remove_max_drawdown=self._sent_as_null("max_drawdown_percent"),
+            default_stop_loss_percent=self.default_stop_loss_percent,
+            default_take_profit_percent=self.default_take_profit_percent,
+            remove_default_take_profit=self._sent_as_null("default_take_profit_percent"),
+            minimum_confidence=self.minimum_confidence,
+            remove_minimum_confidence=self._sent_as_null("minimum_confidence"),
         )
+
+    def _sent_as_null(self, field: str) -> bool:
+        return field in self.model_fields_set and getattr(self, field) is None
 
 
 class DraftAssignmentRequest(BaseModel):
@@ -154,6 +215,8 @@ class RiskLimitsResponse(BaseModel):
     max_leverage: int | None
     max_margin_exposure_percent: str | None
     max_value_exposure_percent: str | None
+    max_total_margin_exposure_percent: str | None
+    max_total_value_exposure_percent: str | None
 
     @classmethod
     def of(cls, limits: RiskLimits) -> RiskLimitsResponse:
@@ -161,6 +224,8 @@ class RiskLimitsResponse(BaseModel):
             max_leverage=limits.max_leverage,
             max_margin_exposure_percent=_text(limits.max_margin_exposure_percent),
             max_value_exposure_percent=_text(limits.max_value_exposure_percent),
+            max_total_margin_exposure_percent=_text(limits.max_total_margin_exposure_percent),
+            max_total_value_exposure_percent=_text(limits.max_total_value_exposure_percent),
         )
 
 
@@ -208,6 +273,15 @@ class ConfigurationResponse(BaseModel):
     system_prompt: str
     system_prompt_is_default: bool
     system_prompt_placeholders: list[PromptPlaceholderResponse]
+    # None: no maximum of failed cycles in a row (R3.2.4).
+    max_consecutive_failures: int | None
+    # None: no maximum loss (R3.2.2).
+    max_daily_loss_percent: str | None
+    max_drawdown_percent: str | None
+    openings_resume: OpeningsResume
+    default_stop_loss_percent: str
+    default_take_profit_percent: str | None
+    minimum_confidence: int | None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -227,6 +301,13 @@ class ConfigurationResponse(BaseModel):
             system_prompt=configuration.system_prompt_template,
             system_prompt_is_default=configuration.system_prompt is None,
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
+            max_consecutive_failures=configuration.max_consecutive_failures,
+            max_daily_loss_percent=_text(configuration.max_daily_loss_percent),
+            max_drawdown_percent=_text(configuration.max_drawdown_percent),
+            openings_resume=configuration.openings_resume,
+            default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
+            default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
+            minimum_confidence=_confidence(configuration.minimum_confidence),
         )
 
 
@@ -270,6 +351,13 @@ class FlowResponse(BaseModel):
     system_prompt: str
     system_prompt_is_default: bool
     system_prompt_placeholders: list[PromptPlaceholderResponse]
+    max_consecutive_failures: int | None
+    max_daily_loss_percent: str | None
+    max_drawdown_percent: str | None
+    openings_resume: OpeningsResume
+    default_stop_loss_percent: str
+    default_take_profit_percent: str | None
+    minimum_confidence: int | None
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -294,6 +382,35 @@ class FlowResponse(BaseModel):
             system_prompt=configuration.system_prompt_template,
             system_prompt_is_default=configuration.system_prompt is None,
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
+            max_consecutive_failures=configuration.max_consecutive_failures,
+            max_daily_loss_percent=_text(configuration.max_daily_loss_percent),
+            max_drawdown_percent=_text(configuration.max_drawdown_percent),
+            openings_resume=configuration.openings_resume,
+            default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
+            default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
+            minimum_confidence=_confidence(configuration.minimum_confidence),
+        )
+
+
+class OpeningsSuspensionResponse(BaseModel):
+    """The openings of a flow suspended: the reason, since when, the cause and whether the user resumes them from the
+    flow, true only after a maximum loss (R3.2.2, R3.3.1).
+    """
+
+    reason: str
+    suspended_at: datetime
+    cause: OpeningsSuspensionCause
+    resumable: bool
+
+    @classmethod
+    def of(cls, suspension: OpeningsSuspension | None) -> OpeningsSuspensionResponse | None:
+        if suspension is None:
+            return None
+        return cls(
+            reason=suspension.reason,
+            suspended_at=suspension.suspended_at,
+            cause=suspension.cause,
+            resumable=suspension.resumable,
         )
 
 
@@ -329,24 +446,35 @@ class StopOutcomeResponse(BaseModel):
         )
 
 
-class CapitalChangeRequest(BaseModel):
-    allocated_capital: Decimal
+class CashOutRequest(BaseModel):
+    """The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1)."""
+
+    capital: Decimal | None = None
 
 
-class CapitalChangeResponse(BaseModel):
-    changed_at: datetime
-    previous: str
-    new: str
-    user_id: str
+class CashOutOutcomeResponse(BaseModel):
+    """The flow after the cash-out, the money it freed and the positions not closed, each with its reason (R3.4.1).
+
+    With a position left open nothing is freed.
+    """
+
+    flow: FlowResponse
+    freed: str | None
+    capital: str | None
+    left_open: list[PositionLeftOpenResponse]
 
     @classmethod
-    def of(cls, change: CapitalChange) -> CapitalChangeResponse:
+    def of(cls, outcome: CashOutOutcome) -> CashOutOutcomeResponse:
         return cls(
-            changed_at=change.changed_at,
-            previous=amount_text(change.previous),
-            new=amount_text(change.new),
-            user_id=change.user_id.value,
+            flow=FlowResponse.of(outcome.flow),
+            freed=_amount(outcome.freed),
+            capital=_amount(outcome.flow.configuration.allocated_capital),
+            left_open=[PositionLeftOpenResponse.of(position) for position in outcome.left_open],
         )
+
+
+class CapitalChangeRequest(BaseModel):
+    allocated_capital: Decimal
 
 
 def flows_router(
@@ -424,6 +552,17 @@ def flows_router(
     ) -> StopOutcomeResponse:
         return StopOutcomeResponse.of(use_cases.stop_flow.execute(StopFlowCommand(FlowId(flow_id), user_id)))
 
+    @router.post("/flows/{flow_id}/cash-out")
+    def cash_out_profits(
+        flow_id: UUID,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        user_id: Annotated[UserId, Depends(user_of_request)],
+        request: CashOutRequest | None = None,
+    ) -> CashOutOutcomeResponse:
+        capital = None if request is None else request.capital
+        command = CashOutProfitsCommand(FlowId(flow_id), user_id, capital)
+        return CashOutOutcomeResponse.of(use_cases.cash_out_profits.execute(command))
+
     @router.put("/flows/{flow_id}/allocated-capital")
     def change_allocated_capital(
         flow_id: UUID,
@@ -433,13 +572,6 @@ def flows_router(
     ) -> FlowResponse:
         command = ChangeAllocatedCapitalCommand(FlowId(flow_id), request.allocated_capital, user_id)
         return FlowResponse.of(use_cases.change_allocated_capital.execute(command))
-
-    @router.get("/flows/{flow_id}/capital-changes")
-    def list_capital_changes(
-        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> list[CapitalChangeResponse]:
-        changes = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(FlowId(flow_id)))
-        return [CapitalChangeResponse.of(change) for change in changes]
 
     @router.post("/flows/{flow_id}/duplicate", status_code=status.HTTP_201_CREATED)
     def duplicate_flow(
@@ -466,6 +598,15 @@ def flows_router(
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.assign_draft_flow.execute(request.command(flow_id)))
 
+    @router.post("/flows/{flow_id}/openings/resume", status_code=204)
+    def resume_flow_openings(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> None:
+        """The user resumes the openings suspended for maximum loss (R3.2.2); the suspension in force, of any cause,
+        reads in the state of the flow.
+        """
+        use_cases.resume_flow_openings.execute(ResumeFlowOpeningsCommand(FlowId(flow_id)))
+
     @router.post("/flows/{flow_id}/{action}")
     def change_flow_status(
         flow_id: UUID,
@@ -489,6 +630,10 @@ COMMANDS = {"start": FlowAction.START, "pause": FlowAction.PAUSE, "resume": Flow
 
 def _amount(value: Decimal | None) -> str | None:
     return None if value is None else amount_text(value)
+
+
+def _confidence(minimum: MinimumConfidence | None) -> int | None:
+    return None if minimum is None else minimum.value
 
 
 def _text(value: Decimal | None) -> str | None:

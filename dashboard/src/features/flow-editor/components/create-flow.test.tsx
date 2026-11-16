@@ -176,12 +176,21 @@ describe('CreateFlow', () => {
         max_leverage: 3,
         max_margin_exposure_percent: '10',
         max_value_exposure_percent: null,
+        max_total_margin_exposure_percent: null,
+        max_total_value_exposure_percent: null,
       },
+      default_stop_loss_percent: '5',
+      default_take_profit_percent: null,
+      minimum_confidence: null,
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: FAKE_SYSTEM_PROMPT.system_prompt,
       system_prompt_is_default: true,
       system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
+      max_consecutive_failures: null,
+      max_daily_loss_percent: null,
+      max_drawdown_percent: null,
+      openings_resume: 'manual',
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');
@@ -201,6 +210,84 @@ describe('CreateFlow', () => {
     );
     expect(field('Capitale allocato')).toHaveAttribute('aria-invalid', 'true');
     expect(fakePlatform.flowsOf('anna')).toEqual([]);
+  });
+
+  it('saves the maximum of consecutive failed cycles, refusing it beside its field out of range', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('Massimo di cicli falliti consecutivi'), '101');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(field('Massimo di cicli falliti consecutivi')).toHaveAccessibleDescription(
+        'il massimo di cicli falliti consecutivi va da 1 a 100',
+      ),
+    );
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+
+    await userEvent.clear(field('Massimo di cicli falliti consecutivi'));
+    await userEvent.type(field('Massimo di cicli falliti consecutivi'), '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(configurationOf(fakePlatform.flowNamed('alfa')).max_consecutive_failures).toBe(3),
+    );
+  });
+
+  // ADR perdita-massima-nella-dashboard: the maximum losses and the resume among the risk limits, the range as the API's.
+  it('saves the maximum losses and the resume, refusing a loss out of range beside its field', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('Perdita giornaliera massima (%)'), '101');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    expect(await screen.findByText('la perdita massima va da 0,1 a 100')).toBeInTheDocument();
+    expect(field('Perdita giornaliera massima (%)')).toHaveAttribute('aria-invalid', 'true');
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+
+    await userEvent.clear(field('Perdita giornaliera massima (%)'));
+    await userEvent.type(field('Perdita giornaliera massima (%)'), '5');
+    await userEvent.type(field('Perdita massima dal picco (%)'), '12,5');
+    await userEvent.selectOptions(field('Ripresa delle aperture'), 'il giorno dopo');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(configurationOf(fakePlatform.flowNamed('alfa'))).toMatchObject({
+        max_daily_loss_percent: '5',
+        max_drawdown_percent: '12.5',
+        openings_resume: 'next_day',
+      }),
+    );
+  });
+
+  // ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits beside the limits per operation.
+  it('saves the overall exposure limits, refusing one out of range beside its field', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('Esposizione complessiva massima del margine (%)'), '1001');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(field('Esposizione complessiva massima del margine (%)')).toHaveAccessibleDescription(
+        "l'esposizione complessiva massima va da 0,1 a 1000",
+      ),
+    );
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+
+    await userEvent.clear(field('Esposizione complessiva massima del margine (%)'));
+    await userEvent.type(field('Esposizione complessiva massima del margine (%)'), '30');
+    await userEvent.type(field('Esposizione complessiva massima del valore (%)'), '0,5');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(configurationOf(fakePlatform.flowNamed('alfa')).risk_limits).toMatchObject({
+        max_total_margin_exposure_percent: '30',
+        max_total_value_exposure_percent: '0.5',
+      }),
+    );
   });
 
   it('shows beside its field a value the API cannot read', async () => {

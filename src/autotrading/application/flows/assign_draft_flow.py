@@ -4,13 +4,12 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks
-from autotrading.application.flows.flow_account import read_flow_account
+from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import FlowRepositoryPort
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.free_capital import FreeCapital
 
 operations = logging.getLogger("autotrading.flows")
 
@@ -47,7 +46,7 @@ class AssignDraftFlowUseCase:
 
     def _require_admitted(self, assigned: Flow) -> None:
         account_id = assigned.assigned_account_id
-        account = read_flow_account(self._checks.accounts, account_id)
-        require_tradable(self._checks.markets, account.exchange, assigned.configuration.assets)
-        free_capital = FreeCapital.of_account(account.balance, account.currency, account_id, self._flows.list())
+        exchange = self._checks.accounts.directory.exchange_of(account_id)
+        require_tradable(self._checks.markets, exchange, assigned.configuration.assets)
+        free_capital = read_free_capital(self._flows, self._checks.accounts, account_id)
         free_capital.require_room_for(assigned.configuration.assigned_capital)

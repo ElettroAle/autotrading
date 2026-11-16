@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -22,7 +22,7 @@ from autotrading.domain.flows.history import (
     OrderHistoryEntry,
 )
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_history import HistoryRow
 from tests.support.platform import Platform
@@ -171,7 +171,9 @@ def query_cycles_of_version(history: History, user: str, flow: str, version: str
 @when(quoted('"{user}" interroga le posizioni chiuse con asset "{asset}" dal {first} al {last} novembre'))
 def query_positions_in_range(history: History, user: str, asset: str, first: str, last: str) -> None:
     period = StatisticsPeriod(
-        StatisticsPeriodKind.RANGE, date(YEAR, NOVEMBER, int(first)), date(YEAR, NOVEMBER, int(last))
+        StatisticsPeriodKind.RANGE,
+        datetime(YEAR, NOVEMBER, int(first), tzinfo=UTC),
+        datetime(YEAR, NOVEMBER, int(last), 23, 59, tzinfo=UTC),
     )
     command = QueryClosedPositionHistoryCommand(HistoryFilter(period=period, asset=asset))
     history.found = history.platform.use_cases_of(user).query_closed_position_history.execute(command).entries

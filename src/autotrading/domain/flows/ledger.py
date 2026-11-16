@@ -5,6 +5,7 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 
@@ -13,11 +14,12 @@ ZERO = Decimal(0)
 
 @dataclass(frozen=True, slots=True)
 class PlatformOrder:
-    """An order the platform sent on the account: the flow that sent it, if any, and whether the verification
-    procedure sent it (R0.4.1)."""
+    """An order the platform sent on the account: the flow that sent it, if any, whether the verification
+    procedure sent it (R0.4.1), and the closing it makes when it is a protection of the flow (R3.1.2)."""
 
     flow_id: FlowId | None
     verification: bool = False
+    protection: CloseReason | None = None
 
 
 type PlatformOrders = Mapping[UUID, PlatformOrder]
@@ -100,6 +102,8 @@ class LedgerEntry:
     flow_id: FlowId | None
     kind: ExecutionKind
     platform_order: bool = False
+    # The stop loss or take profit of the flow that executed, when the execution is one (R3.1.2).
+    protection: CloseReason | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,7 +206,7 @@ def _entry_of(
             return LedgerEntry(execution, None, ExecutionKind.UNATTRIBUTED, platform_order=True)
         flow_id = sent.flow_id or owner
         kind = ExecutionKind.FLOW_ORDER if flow_id is not None else ExecutionKind.UNATTRIBUTED
-        return LedgerEntry(execution, flow_id, kind, platform_order=True)
+        return LedgerEntry(execution, flow_id, kind, platform_order=True, protection=sent.protection)
     if owner is None:
         return LedgerEntry(execution, None, ExecutionKind.UNATTRIBUTED)
     if execution.liquidation:

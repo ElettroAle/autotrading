@@ -1,6 +1,12 @@
-from autotrading.application.agent.ports import AgentQuestionPort, QuestionPositionPort, QuestionStatePort
+from autotrading.application.agent.ports import (
+    AgentQuestionPort,
+    QuestionExitPlanPort,
+    QuestionPositionPort,
+    QuestionStatePort,
+)
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
 from autotrading.domain.agent.decision import TradeDirection
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 
 class ComposeAgentContextUseCase:
@@ -45,4 +51,9 @@ def _position_of(position: QuestionPositionPort) -> PositionView:
         position.mark_price,
         position.unrealized_pnl,
         position.liquidation_price,
+        _exit_plan_of(position.exit_plan),
     )
+
+
+def _exit_plan_of(plan: QuestionExitPlanPort) -> ExitPlan:
+    return ExitPlan(plan.target, plan.stop, plan.invalidation)

@@ -14,7 +14,8 @@ const HISTORY_DAYS = 30;
 const INITIAL_CAPITAL = 1000;
 const CYCLE_HOUR = 10;
 const CYCLE_MINUTE = 15;
-const CLOSING_HOUR = 12;
+// A position closes within the minute of its cycle, so an interval from a cycle to another holds the closes of both.
+const CLOSING_SECONDS = 30;
 // The days the scenarios name, in November 2026, are part of the history whatever day the scenarios run on.
 const NAMED_DAYS = Array.from({ length: 11 }, (_, index) => 5 + index);
 const NOVEMBER = 10;
@@ -26,7 +27,17 @@ const REMOVE_INTERVAL = "Togli l'intervallo";
 const cycleOfDay = (year: number, month: number, day: number): Date =>
   new Date(year, month, day, CYCLE_HOUR, CYCLE_MINUTE);
 
-const novemberDay = (day: number): string => `${YEAR}-11-${String(day).padStart(2, '0')}`;
+// The instant of the address, UTC to the minute (ADR periodo-al-minuto).
+const minuteInstant = (instant: Date): string => `${instant.toISOString().slice(0, 16)}Z`;
+
+const twoDigits = (value: number): string => String(value).padStart(2, '0');
+
+// An end of the interval as the label says it, in the time zone of the browser: 10/11 10:15.
+const labelEnd = (instant: Date): string =>
+  `${twoDigits(instant.getDate())}/${twoDigits(instant.getMonth() + 1)} ${twoDigits(instant.getHours())}:${twoDigits(instant.getMinutes())}`;
+
+const intervalLabelText = (first: number, last: number): string =>
+  `${labelEnd(cycleOfDay(YEAR, NOVEMBER, first))} – ${labelEnd(cycleOfDay(YEAR, NOVEMBER, last))}`;
 
 const daysOfHistory = (): Date[] => {
   const now = new Date();
@@ -43,8 +54,7 @@ const daysOfHistory = (): Date[] => {
 const equityOf = (instant: Date): number =>
   INITIAL_CAPITAL + Math.round((instant.getTime() - Date.UTC(YEAR, 9, 1)) / DAY);
 
-const closingOf = (cycle: Date): Date =>
-  new Date(cycle.getFullYear(), cycle.getMonth(), cycle.getDate(), CLOSING_HOUR);
+const closingOf = (cycle: Date): Date => new Date(cycle.getTime() + CLOSING_SECONDS * 1000);
 
 const tabs = (dashboard: DashboardPages): Locator =>
   dashboard.content().getByRole('navigation', { name: FLOW_TABS });
@@ -83,6 +93,9 @@ const centreOf = async (locator: Locator): Promise<{ x: number; y: number }> => 
 };
 
 const dragOnTheCurve = async (dashboard: DashboardPages, first: number, last: number) => {
+  // The mouse reaches only what the screen shows: the user scrolls to the curve before dragging on it, as the commands
+  // above it may push it below the fold.
+  await dashboard.equityCurve().scrollIntoViewIfNeeded();
   const start = await centreOf(pointOfDay(dashboard, first));
   const end = await centreOf(pointOfDay(dashboard, last));
   const mouse = dashboard.page.mouse;
@@ -177,9 +190,10 @@ Then(
   'riepilogo, grafico e statistiche valgono dal {int} al {int} novembre 2026',
   async ({ dashboard }, first: number, last: number) => {
     const gain = last - first;
-    await expect(dashboard.page).toHaveURL(
-      new RegExp(`from=${novemberDay(first)}&to=${novemberDay(last)}`),
-    );
+    // ADR periodo-al-minuto: the interval runs from the minute of the first cycle chosen to the minute of the last.
+    const from = encodeURIComponent(minuteInstant(cycleOfDay(YEAR, NOVEMBER, first)));
+    const to = encodeURIComponent(minuteInstant(cycleOfDay(YEAR, NOVEMBER, last)));
+    await expect(dashboard.page).toHaveURL(new RegExp(`from=${from}&to=${to}`));
     await expect(dashboard.result('Guadagno nel periodo')).toHaveText(
       `+${gain},00 USDC · +0,${String(gain * 10).padStart(2, '0')}%`,
     );
@@ -233,7 +247,7 @@ Given(
 
 Then('vede ancora la scheda Posizioni chiuse con lo stesso intervallo', async ({ dashboard }) => {
   await expect(tab(dashboard, 'Posizioni chiuse')).toHaveAttribute('aria-current', 'page');
-  await expect(intervalLabel(dashboard)).toContainText('dal 10/11/2026 al 12/11/2026');
+  await expect(intervalLabel(dashboard)).toContainText(intervalLabelText(10, 12));
   await expect(dashboard.closedPositionRows()).toHaveCount(3);
 });
 

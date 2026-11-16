@@ -1,6 +1,6 @@
 """Fake of the repository of the flows: the database of every tenant, bound to one per request."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -19,6 +19,8 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
+from autotrading.domain.flows.openings_suspension import OpeningsStatus
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -33,6 +35,8 @@ class FlowStore:
         self.first_starts: dict[FlowId, datetime] = {}
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
         self.capital_changes: dict[FlowId, list[CapitalChange]] = {}
+        # Beside the flow as in its row: the suspension of its openings for maximum loss and their last resume (R3.2.2).
+        self.openings: dict[FlowId, OpeningsStatus] = {}
         # As the default of the database: a version is stamped with the time it is saved, here the one the test sets.
         self.now = datetime(2026, 1, 1, tzinfo=UTC)
         self.created_at: dict[tuple[FlowId, int], datetime] = {}
@@ -104,16 +108,38 @@ class InMemoryFlowRepositoryAdapter:
         self._store.save_version(flow)
 
     def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
-        self.add_version(flow)
+        if change.new != change.previous:
+            self.add_version(flow)
         self._store.capital_changes.setdefault(flow.id, []).append(change)
+
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
+        # As the identity of the rows of the database: of two changes of a flow at one instant, the earlier saved first.
+        changes: dict[FlowId, tuple[CapitalChange, ...]] = {}
+        for change in sorted(self._changes_within(flow_ids, TimeWindow()), key=lambda change: change.changed_at):
+            changes[change.flow_id] = (*changes.get(change.flow_id, ()), change)
+        return changes
 
     def add_assignment(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), account_id=flow.account_id, configuration=flow.configuration))
         self._store.versions[flow.id].append(flow.configuration)
 
-    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
-        self.get(flow_id)
-        return tuple(self._store.capital_changes.get(flow_id, []))
+    def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
+        # As the identity of the rows of the database: of two changes of a flow at one instant, the later saved first.
+        saved = self._changes_within(flow_ids, window)
+        return tuple(sorted(reversed(saved), key=lambda change: change.changed_at, reverse=True)[:limit])
+
+    def count_capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> int:
+        return len(self._changes_within(flow_ids, window))
+
+    def _changes_within(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> tuple[CapitalChange, ...]:
+        own = {flow.id for flow in self.list()} & set(flow_ids)
+        return tuple(
+            change
+            for flow_id, changes in self._store.capital_changes.items()
+            if flow_id in own
+            for change in changes
+            if window.contains(change.changed_at)
+        )
 
     def _replace(self, flow: Flow) -> None:
         self._store.flows = [flow if each.id == flow.id else each for each in self._store.flows]
@@ -134,7 +160,7 @@ class InMemoryAutomaticPauseAdapter:
 
 
 class InMemoryFlowTimingAdapter:
-    """Bound to one tenant: the anchor and the pause reason the store keeps beside its flows."""
+    """Bound to one tenant: the anchor, the pause reason and the first start the store keeps beside its flows."""
 
     def __init__(self, store: FlowStore, tenant_id: TenantId) -> None:
         self._store = store

@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from autotrading.domain.flows.risk_check import AssetLimits
 
-DEFAULT_LIMITS = AssetLimits(max_leverage=50, min_order_value=Decimal(10))
+DEFAULT_LIMITS = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(100000))
 
 
 class FakeExchangeLimitsAdapter:
@@ -14,12 +14,20 @@ class FakeExchangeLimitsAdapter:
     def __init__(self, assets: frozenset[str] = frozenset({"BTC", "ETH", "SOL"})) -> None:
         self._limits = dict.fromkeys(assets, DEFAULT_LIMITS)
 
-    def set(self, asset: str, *, max_leverage: int | None = None, min_order_value: Decimal | None = None) -> None:
+    def set(
+        self,
+        asset: str,
+        *,
+        max_leverage: int | None = None,
+        min_order_value: Decimal | None = None,
+        market_price: Decimal | None = None,
+    ) -> None:
         current = self._limits.get(asset, DEFAULT_LIMITS)
         self._limits[asset] = replace(
             current,
             max_leverage=current.max_leverage if max_leverage is None else max_leverage,
             min_order_value=current.min_order_value if min_order_value is None else min_order_value,
+            market_price=current.market_price if market_price is None else market_price,
         )
 
     def limits(self, asset: str) -> AssetLimits | None:

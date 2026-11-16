@@ -9,6 +9,9 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -26,6 +29,12 @@ def a_strategy() -> FlowStrategy:
         risk_limits=RiskLimits(3, Decimal(10), Decimal(50)),
         bring_to_minimum=True,
         system_prompt="{instructions} su {assets}",
+        max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
+        minimum_confidence=MinimumConfidence(55),
     )
 
 
@@ -37,6 +46,12 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         instructions="compra basso",
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=4,
+        max_daily_loss_percent=Decimal(4),
+        max_drawdown_percent=Decimal(8),
+        openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(2), None),
+        minimum_confidence=MinimumConfidence(70),
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -49,11 +64,27 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         configuration.risk_limits,
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=4,
+        max_daily_loss_percent=Decimal(4),
+        max_drawdown_percent=Decimal(8),
+        openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(2), None),
+        minimum_confidence=MinimumConfidence(70),
     )
 
 
 def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
-    strategy = replace(a_strategy(), bring_to_minimum=False, system_prompt=None)
+    strategy = replace(
+        a_strategy(),
+        bring_to_minimum=False,
+        system_prompt=None,
+        max_consecutive_failures=None,
+        max_daily_loss_percent=None,
+        max_drawdown_percent=None,
+        openings_resume=OpeningsResume.MANUAL,
+        protection_defaults=ProtectionDefaults(),
+        minimum_confidence=None,
+    )
 
     assert (
         FlowStrategy(

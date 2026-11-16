@@ -1,4 +1,3 @@
-import json
 import logging
 from dataclasses import replace
 from decimal import Decimal
@@ -13,6 +12,7 @@ from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.notifications.outbox_message import EMAIL_MESSAGE
 from tests.fakes.cycles import FakePermanentError
 from tests.fakes.outbox import OutboxState
+from tests.support.decision_steps import answer, opening
 from tests.support.flow_cycles import FlowCycles
 from tests.support.steps import quoted
 
@@ -129,8 +129,7 @@ def flow_of_user_paused(flow_cycles: FlowCycles, outcome: dict[str, object], flo
 @when(quoted('un ciclo di "{flow}" produce una notifica destinata all\'email'))
 def cycle_notifies(flow_cycles: FlowCycles, flow: str) -> None:
     flow_cycles.platform.order_exchange.fill_at = (MID_PRICE, OPENING_FEE)
-    opening = {"asset": "BTC", "azione": "apri", "direzione": "long", "quota": 0.05, "leva": 3, "ragionamento": "r"}
-    flow_cycles.model.text = json.dumps({"decisioni": [opening]})
+    answer(flow_cycles, opening("BTC", quota=0.05, reasoning="r"))
     flow_cycles.run(flow)
 
 

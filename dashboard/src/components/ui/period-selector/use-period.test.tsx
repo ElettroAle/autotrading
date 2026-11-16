@@ -3,8 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 
 import {
-  daysOfInstants,
-  listDaysOf,
+  instantOfLocalInput,
+  intervalOfInstants,
+  listIntervalOf,
+  localInputOf,
   usePeriod,
   usePeriodInterval,
   usePeriodSearch,
@@ -24,7 +26,7 @@ const Probe = () => {
       <output aria-label="periodo da portare">{periodSearch}</output>
       <button
         type="button"
-        onClick={() => chooseInterval({ from: '2026-11-10', to: '2026-11-12' })}
+        onClick={() => chooseInterval({ from: '2026-11-10T09:15Z', to: '2026-11-12T10:40Z' })}
       >
         Scegli
       </button>
@@ -61,8 +63,10 @@ describe('the interval of the page, ADR intervallo-trascinando-sull-equity-curve
 
     await userEvent.click(screen.getByRole('button', { name: 'Scegli' }));
 
-    expect(shown('query string')).toBe('?period=7d&outcome=fallito&from=2026-11-10&to=2026-11-12');
-    expect(read('intervallo')).toEqual({ from: '2026-11-10', to: '2026-11-12' });
+    expect(shown('query string')).toBe(
+      '?period=7d&outcome=fallito&from=2026-11-10T09%3A15Z&to=2026-11-12T10%3A40Z',
+    );
+    expect(read('intervallo')).toEqual({ from: '2026-11-10T09:15Z', to: '2026-11-12T10:40Z' });
   });
 
   it('gives the panels the interval in place of the period of the menu', () => {
@@ -123,35 +127,56 @@ describe('usePeriodSearch, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comun
   });
 });
 
-describe('listDaysOf', () => {
-  const NOW = new Date('2026-11-16T09:30:00Z');
+// ADR periodo-al-minuto: the lists read the same minutes as the other panels, the last 7 and 30 days from now.
+describe('listIntervalOf, ADR periodo-al-minuto', () => {
+  const NOW = new Date('2026-11-16T09:30:42Z');
   const period = (kind: Period['kind'], from = '', to = ''): Period => ({ kind, from, to });
 
-  it('asks no day for the whole life', () => {
-    expect(listDaysOf(period('all'), NOW)).toEqual({});
+  it('asks no instant for the whole life', () => {
+    expect(listIntervalOf(period('all'), NOW)).toEqual({});
   });
 
-  it('asks the days of a range', () => {
-    expect(listDaysOf(period('range', '2026-11-10', '2026-11-12'), NOW)).toEqual({
-      from: '2026-11-10',
-      to: '2026-11-12',
+  it('asks the instants of a range', () => {
+    expect(listIntervalOf(period('range', '2026-11-16T08:15Z', '2026-11-16T10:40Z'), NOW)).toEqual({
+      from: '2026-11-16T08:15Z',
+      to: '2026-11-16T10:40Z',
     });
   });
 
-  it('asks from the day the last 7 days begin, so the list holds every row the period holds', () => {
-    expect(listDaysOf(period('7d'), NOW)).toEqual({ from: '2026-11-09' });
+  it('asks from the minute 7 days before now', () => {
+    expect(listIntervalOf(period('7d'), NOW)).toEqual({ from: '2026-11-09T09:30Z' });
   });
 
-  it('asks from the day the last 30 days begin', () => {
-    expect(listDaysOf(period('30d'), NOW)).toEqual({ from: '2026-10-17' });
+  it('asks from the minute 30 days before now', () => {
+    expect(listIntervalOf(period('30d'), NOW)).toEqual({ from: '2026-10-17T09:30Z' });
   });
 });
 
-describe('daysOfInstants', () => {
-  it('gives the days of the two instants, the earlier first, in the time zone of the browser', () => {
-    expect(daysOfInstants('2026-11-12T10:15:00Z', '2026-11-09T23:30:00Z')).toEqual({
-      from: '2026-11-10',
-      to: '2026-11-12',
+describe('intervalOfInstants, ADR periodo-al-minuto', () => {
+  it('gives the minutes of the two instants, the earlier first, in UTC', () => {
+    expect(intervalOfInstants('2026-11-12T10:15:00Z', '2026-11-09T23:30:45Z')).toEqual({
+      from: '2026-11-09T23:30Z',
+      to: '2026-11-12T10:15Z',
     });
+  });
+});
+
+describe('the fields of date and time, ADR periodo-al-minuto', () => {
+  it('shows an instant of the address in the time zone of the browser', () => {
+    expect(localInputOf('2026-11-16T08:15Z')).toBe('2026-11-16T09:15');
+    expect(localInputOf('2026-07-16T08:15Z')).toBe('2026-07-16T10:15');
+  });
+
+  it('writes the date and time chosen as the instant in UTC, to the minute', () => {
+    expect(instantOfLocalInput('2026-11-16T09:15')).toBe('2026-11-16T08:15Z');
+  });
+
+  it('leaves an empty field empty', () => {
+    expect(localInputOf('')).toBe('');
+    expect(instantOfLocalInput('')).toBe('');
+  });
+
+  it('shows nothing for an instant it cannot read', () => {
+    expect(localInputOf('ieri')).toBe('');
   });
 });

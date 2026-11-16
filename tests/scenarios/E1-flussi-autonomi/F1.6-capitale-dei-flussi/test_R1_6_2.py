@@ -1,5 +1,7 @@
 import json
+from dataclasses import replace
 from datetime import timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -10,7 +12,7 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
-from tests.support.activity import READ_AT, a_fill, a_movement, a_position, an_activity
+from tests.support.activity import READ_AT, a_fill, a_position, an_activity
 from tests.support.attribution import AttributionBench, amount, step
 from tests.support.flow_cycles import FlowCycles
 
@@ -116,8 +118,10 @@ def verification_on_account(bench: AttributionBench, account: str, a: str, asset
 @given(step(r'che il saldo del conto "{account}" è aumentato di {a} USDC senza esecuzioni dei flussi'))
 def balance_increased(bench: AttributionBench, account: str, a: str) -> None:
     account_id = bench.account(account)
-    bench.previous_reading(account_id)
-    bench.extend(account_id, movements=(a_movement(amount(a)),))
+    # A change within the threshold of the account is unexplained, beyond it an alarm (R3.3.1): the reference is large.
+    reference = Decimal(100000)
+    bench.previous_reading(account_id, reference_balance=reference)
+    bench.show(account_id, replace(bench.activity_of(account_id), balance=reference + amount(a)))
 
 
 @given(step(r'che per il conto "{account}" è già registrata una posizione non attribuibile su "{asset}"'))
@@ -136,7 +140,18 @@ def run_cycle(bench: AttributionBench, flow: str) -> None:
 
 @when(step(r'parte un ciclo del flusso "{flow}" in cui l\'agente apre "{asset}"'))
 def cycle_opens(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
-    opening = {"asset": asset, "azione": "apri", "direzione": "long", "quota": 0.1, "leva": 1, "ragionamento": "r"}
+    opening = {
+        "asset": asset,
+        "azione": "apri",
+        "direzione": "long",
+        "quota": 0.1,
+        "leva": 1,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
+        "ragionamento": "r",
+    }
     flow_cycles.model.text = json.dumps({"decisioni": [opening]})
     flow_cycles.run(flow)
 

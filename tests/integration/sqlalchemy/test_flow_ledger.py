@@ -71,7 +71,7 @@ def test_the_executions_enter_the_ledger_and_the_totals_of_their_flow(database: 
 
     added = ledger.record(account_id, recorded, READ_AT)
 
-    assert added == recorded.entries
+    assert added == recorded
     assert ledger.totals_of([flow_id]) == {
         flow_id: FlowTotals(
             flow_id, Decimal(3), Decimal("1.5"), Decimal("-0.5"), {"BTC": Decimal(2), "ETH": Decimal("-0.5")}
@@ -89,7 +89,7 @@ def test_an_execution_recorded_twice_is_counted_once(database: Engine) -> None:
 
     again = ledger.record(account_id, recorded, READ_AT)
 
-    assert again == ()
+    assert (again.entries, again.funding) == ((), ())
     totals = ledger.totals_of([flow_id])[flow_id]
     assert (totals.realized_pnl, totals.funding, totals.expected("BTC")) == (Decimal(5), Decimal(1), Decimal(1))
 
@@ -117,7 +117,7 @@ def test_an_execution_of_no_flow_is_recorded_without_totals(database: Engine) ->
 
     added = ledger.record(account_id, of_flow(None, an_execution("1")), READ_AT)
 
-    assert len(added) == 1
+    assert len(added.entries) == 1
     assert ledger.recorded_since(account_id, EARLIER).executions == frozenset({("1", "o-1")})
 
 

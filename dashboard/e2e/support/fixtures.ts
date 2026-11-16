@@ -40,6 +40,8 @@ export type ScenarioMemory = {
   periodPage: string;
   /** The time a new cycle of the flow concluded, as the page should show it (R2.1.2). */
   newCycleAt: string;
+  /** The instant of the change of capital the history should show, as the API answers it (R3.4.2). */
+  capitalChangedAt: string;
   /** What spilled past the screen on each page the user opened, by the name of the page (R6.4.1). */
   spilledByPage: Map<string, string[]>;
   /** The widths of the screens the pages are opened on, one after the other (R6.4.4). */
@@ -88,6 +90,7 @@ export const test = base.extend<Fixtures>({
       refusal: '',
       periodPage: '',
       newCycleAt: '',
+      capitalChangedAt: '',
       spilledByPage: new Map(),
       screenWidths: [],
     });

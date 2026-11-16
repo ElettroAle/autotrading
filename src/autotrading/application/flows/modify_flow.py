@@ -6,7 +6,6 @@ from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
 from autotrading.application.flows.errors import AssetWithOpenPositionError
-from autotrading.application.flows.flow_account import read_flow_account
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
@@ -15,6 +14,9 @@ from autotrading.domain.flows.errors import AccountNotChangeableError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -39,10 +41,34 @@ class ModifyFlowCommand:
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
     system_prompt: str | None = None
     # Back to the default of the platform, which None cannot say since None keeps the version in force (R1.4.8).
     default_system_prompt: bool = False
+    max_consecutive_failures: int | None = None
+    # An exposure limit taken away, which None cannot say either (R1.1.3); at least one limit stays (R1.1.1).
+    remove_max_margin_exposure: bool = False
+    remove_max_value_exposure: bool = False
+    # An overall exposure limit taken away, back to no limit on the sum of the open positions (R3.2.1).
+    remove_max_total_margin_exposure: bool = False
+    remove_max_total_value_exposure: bool = False
+    # The maximum of consecutive failed cycles taken away, back to retrying at every cycle (R3.2.4).
+    remove_max_consecutive_failures: bool = False
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume | None = None
+    # A maximum loss taken away, back to no suspension for that loss (R3.2.2).
+    remove_max_daily_loss: bool = False
+    remove_max_drawdown: bool = False
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
+    # The default take profit taken away: the stop loss stays, it is mandatory (R3.1.2).
+    remove_default_take_profit: bool = False
+    minimum_confidence: int | None = None
+    # The minimum confidence taken away: every opening goes on again whatever the confidence (R3.1.4).
+    remove_minimum_confidence: bool = False
 
 
 class ModifyFlowUseCase:
@@ -87,6 +113,16 @@ class ModifyFlowUseCase:
                 current.bring_to_minimum if command.bring_to_minimum is None else command.bring_to_minimum
             ),
             system_prompt=_system_prompt(current.system_prompt, command),
+            max_consecutive_failures=_max_consecutive_failures(current.max_consecutive_failures, command),
+            max_daily_loss_percent=_exposure(
+                current.max_daily_loss_percent, command.max_daily_loss_percent, removed=command.remove_max_daily_loss
+            ),
+            max_drawdown_percent=_exposure(
+                current.max_drawdown_percent, command.max_drawdown_percent, removed=command.remove_max_drawdown
+            ),
+            openings_resume=current.openings_resume if command.openings_resume is None else command.openings_resume,
+            protection_defaults=_protection_defaults(current.protection_defaults, command),
+            minimum_confidence=_minimum_confidence(current.minimum_confidence, command),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -103,8 +139,8 @@ class ModifyFlowUseCase:
         )
 
     def _require_assets_admitted(self, flow: Flow, assets: tuple[str, ...]) -> None:
-        account = read_flow_account(self._checks.accounts, flow.assigned_account_id)
-        require_tradable(self._checks.markets, account.exchange, assets)
+        exchange = self._checks.accounts.directory.exchange_of(flow.assigned_account_id)
+        require_tradable(self._checks.markets, exchange, assets)
         require_assets_free(flow.assigned_account_id, assets, self._flows.list(), excluding=flow.id)
 
     def _require_removed_without_position(self, flow: Flow, assets: tuple[str, ...]) -> None:
@@ -129,13 +165,56 @@ def _system_prompt(current: str | None, command: ModifyFlowCommand) -> str | Non
     return current if command.system_prompt is None else command.system_prompt
 
 
+def _max_consecutive_failures(current: int | None, command: ModifyFlowCommand) -> int | None:
+    if command.remove_max_consecutive_failures:
+        return None
+    return current if command.max_consecutive_failures is None else command.max_consecutive_failures
+
+
+def _protection_defaults(current: ProtectionDefaults, command: ModifyFlowCommand) -> ProtectionDefaults:
+    stop = command.default_stop_loss_percent
+    return ProtectionDefaults(
+        current.stop_loss_percent if stop is None else stop,
+        _exposure(
+            current.take_profit_percent, command.default_take_profit_percent, removed=command.remove_default_take_profit
+        ),
+    )
+
+
+def _minimum_confidence(current: MinimumConfidence | None, command: ModifyFlowCommand) -> MinimumConfidence | None:
+    if command.remove_minimum_confidence:
+        return None
+    return current if command.minimum_confidence is None else MinimumConfidence(command.minimum_confidence)
+
+
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:
     return RiskLimits(
         current.max_leverage if command.max_leverage is None else command.max_leverage,
-        current.max_margin_exposure_percent
-        if command.max_margin_exposure_percent is None
-        else command.max_margin_exposure_percent,
-        current.max_value_exposure_percent
-        if command.max_value_exposure_percent is None
-        else command.max_value_exposure_percent,
+        _exposure(
+            current.max_margin_exposure_percent,
+            command.max_margin_exposure_percent,
+            removed=command.remove_max_margin_exposure,
+        ),
+        _exposure(
+            current.max_value_exposure_percent,
+            command.max_value_exposure_percent,
+            removed=command.remove_max_value_exposure,
+        ),
+        _exposure(
+            current.max_total_margin_exposure_percent,
+            command.max_total_margin_exposure_percent,
+            removed=command.remove_max_total_margin_exposure,
+        ),
+        _exposure(
+            current.max_total_value_exposure_percent,
+            command.max_total_value_exposure_percent,
+            removed=command.remove_max_total_value_exposure,
+        ),
     )
+
+
+def _exposure(current: Decimal | None, sent: Decimal | None, *, removed: bool) -> Decimal | None:
+    """An optional percentage of the configuration: taken away, kept, or the one sent."""
+    if removed:
+        return None
+    return current if sent is None else sent

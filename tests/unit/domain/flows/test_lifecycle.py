@@ -16,6 +16,9 @@ from autotrading.domain.flows.errors import (
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -150,9 +153,15 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         cycle_interval=CycleInterval(30),
         model=ModelSelection("anthropic/claude-sonnet", {"temperature": Decimal("0.5"), "max_tokens": Decimal(900)}),
         instructions="aggressivo",
-        risk_limits=RiskLimits(3, None, Decimal("12.50")),
+        risk_limits=RiskLimits(3, None, Decimal("12.50"), Decimal(30), Decimal("0.5")),
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal("12.5"),
+        openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
+        minimum_confidence=MinimumConfidence(60),
     )
 
     assert differences(before, after) == (
@@ -165,9 +174,18 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("leva massima", "5", "3"),
         ConfigurationDifference("esposizione massima del margine", "10%", "nessuno"),
         ConfigurationDifference("esposizione massima del valore", "nessuno", "12,5%"),
+        ConfigurationDifference("esposizione complessiva massima del margine", "nessuno", "30%"),
+        ConfigurationDifference("esposizione complessiva massima del valore", "nessuno", "0,5%"),
         ConfigurationDifference("capitale allocato", "100", "250,50"),
         ConfigurationDifference("porta al minimo", "no", "sì"),
         ConfigurationDifference("system prompt", "predefinito", "{instructions}"),
+        ConfigurationDifference("cicli falliti consecutivi massimi", "nessuno", "3"),
+        ConfigurationDifference("perdita giornaliera massima", "nessuno", "5%"),
+        ConfigurationDifference("perdita massima dal picco", "nessuno", "12,5%"),
+        ConfigurationDifference("ripresa delle aperture", "manuale", "il giorno dopo"),
+        ConfigurationDifference("stop loss predefinito", "5%", "2,5%"),
+        ConfigurationDifference("take profit predefinito", "nessuno", "10%"),
+        ConfigurationDifference("confidenza minima", "nessuna", "60"),
     )
 
 

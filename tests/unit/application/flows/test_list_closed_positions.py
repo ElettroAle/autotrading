@@ -13,7 +13,7 @@ from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.errors import InvalidPageNumberError
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -163,7 +163,7 @@ def test_the_positions_filtered_are_those_matching_every_filter(
     assert (page.positions, page.total) == ((lost_short,), 1)
 
 
-def test_the_positions_filtered_by_days_are_those_closed_within_them(
+def test_the_positions_filtered_by_an_interval_are_those_closed_within_it(
     flows: FlowStore, positions: ClosedPositionStore
 ) -> None:
     flow = a_flow(TENANT)
@@ -171,7 +171,7 @@ def test_the_positions_filtered_by_days_are_those_closed_within_them(
     today, tomorrow = a_position(flow, timedelta(hours=1)), a_position(flow, timedelta(days=1))
     positions.positions.extend((today, tomorrow))
 
-    criteria = ClosedPositionFilter.named(first_day=OPENED.date(), last_day=OPENED.date())
+    criteria = ClosedPositionFilter.named(since=OPENED, until=OPENED + timedelta(hours=1))
     command = ListClosedPositionsCommand(flow.id.value, criteria=criteria)
 
     assert use_case(flows, positions).execute(command).positions == (today,)

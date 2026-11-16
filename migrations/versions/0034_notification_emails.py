@@ -2,15 +2,15 @@
 
 R3.5.2, ADR canale-email-delle-notifiche-con-smtp.
 
-Revision ID: 0025
-Revises: 0024
+Revision ID: 0034
+Revises: 0033
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0025"
-down_revision = "0024"
+revision = "0034"
+down_revision = "0033"
 branch_labels = None
 depends_on = None
 

@@ -13,7 +13,7 @@ from autotrading.domain.flows.history import (
     OrderExecution,
     OrderHistoryEntry,
 )
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_history import HistoryRow
 

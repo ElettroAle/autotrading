@@ -21,8 +21,10 @@ from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKey
 from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
+from autotrading.application.flows.close_flow_positions import ClosingPorts
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
+    ExitPlanRepositoryPort,
     FlowOpeningsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
@@ -30,7 +32,6 @@ from autotrading.application.flows.ports import (
     RunningCyclePort,
 )
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
-from autotrading.application.flows.stop_flow import StopPorts
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
@@ -404,28 +405,34 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     notices: list[PositionClosedNoticePort] = []
-    real_stop_ports, real_manual_closing = StopPorts, RecordManualClosingUseCase
+    real_stop_ports, real_manual_closing = ClosingPorts, RecordManualClosingUseCase
 
-    def stop_ports(
-        cycles: RunningCyclePort,
-        positions: FlowPositionsPort,
-        openings: FlowOpeningsPort,
-        closed_positions: ClosedPositionRepositoryPort,
-        closing_notice: PositionClosedNoticePort,
-    ) -> StopPorts:
-        notices.append(closing_notice)
-        return real_stop_ports(cycles, positions, openings, closed_positions, closing_notice)
+    def closing_ports(
+        *ports: *tuple[
+            RunningCyclePort,
+            FlowPositionsPort,
+            FlowOpeningsPort,
+            ClosedPositionRepositoryPort,
+            PositionClosedNoticePort,
+            ExitPlanRepositoryPort,
+        ],
+    ) -> ClosingPorts:
+        notices.append(ports[4])
+        return real_stop_ports(*ports)
 
     def manual_closing(
-        flows: FlowRepositoryPort,
-        openings: FlowOpeningsPort,
-        closed_positions: ClosedPositionRepositoryPort,
-        notice: PositionClosedNoticePort,
+        *ports: *tuple[
+            FlowRepositoryPort,
+            FlowOpeningsPort,
+            ClosedPositionRepositoryPort,
+            PositionClosedNoticePort,
+            ExitPlanRepositoryPort,
+        ],
     ) -> RecordManualClosingUseCase:
-        notices.append(notice)
-        return real_manual_closing(flows, openings, closed_positions, notice)
+        notices.append(ports[3])
+        return real_manual_closing(*ports)
 
-    monkeypatch.setattr(bootstrap, "StopPorts", stop_ports)
+    monkeypatch.setattr(bootstrap, "ClosingPorts", closing_ports)
     monkeypatch.setattr(bootstrap, "RecordManualClosingUseCase", manual_closing)
     configuration = installation_configuration(tmp_path)
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))

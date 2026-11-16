@@ -10,10 +10,11 @@ from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
-from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing
+from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, ProtectionClosing
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.capital_history import AccountTransfer
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_access import CycleAccess
@@ -25,7 +26,10 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
+from autotrading.domain.flows.exit_plan import ExitPlan, PlacedLevels
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -42,11 +46,13 @@ from autotrading.domain.flows.ledger import (
     AccountLedger,
     ExecutionsWindow,
     FlowTotals,
-    LedgerEntry,
     LedgerKeys,
     PlatformOrders,
 )
+from autotrading.domain.flows.loss_guard import LossReferences
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -58,15 +64,6 @@ from autotrading.domain.tenancy.user_id import UserId
 
 if TYPE_CHECKING:
     from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
-
-
-@dataclass(frozen=True, slots=True)
-class FlowAccount:
-    """What a flow needs of its account: the exchange it trades on and the balance read from it now."""
-
-    exchange: str
-    balance: Decimal
-    currency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,7 +113,18 @@ class FlowRepositoryPort(Protocol):
         ...
 
     def add_capital_change(self, flow: Flow, change: CapitalChange) -> None:
-        """Saves, together, the version with the new capital and the change in its history. Raises FlowNotFoundError."""
+        """Saves, together, the version with the new capital, when the capital changes, and the change in its history.
+
+        A cash-out that keeps the capital records the change on the version in force (R3.4.1). Raises
+        FlowNotFoundError.
+        """
+        ...
+
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
+        """Every change of the capital of each of those flows, oldest first; a flow never changed has none.
+
+        They carry the profits cashed out (R3.4.1) and chain the return (R3.4.3). A flow of another tenant has none.
+        """
         ...
 
     def add_assignment(self, flow: Flow) -> None:
@@ -126,15 +134,16 @@ class FlowRepositoryPort(Protocol):
         """
         ...
 
-    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
-        """The changes of the capital allocated to the flow, oldest first. Raises FlowNotFoundError."""
+    def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
+        """The most recent changes of the capital of those flows in the window, at most `limit`, newest first (R3.4.2).
+
+        A flow of another tenant has none.
+        """
         ...
 
-
-@dataclass(frozen=True, slots=True)
-class FlowBalance:
-    amount: Decimal
-    currency: str
+    def count_capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> int:
+        """How many changes of the capital of those flows the window holds (R3.4.2)."""
+        ...
 
 
 class FlowAccountDirectoryPort(Protocol):
@@ -143,22 +152,6 @@ class FlowAccountDirectoryPort(Protocol):
     def exchange_of(self, account_id: UUID) -> str:
         """The exchange the account trades on. Raises FlowAccountNotFoundError for an account the tenant lacks."""
         ...
-
-
-class FlowAccountBalancePort(Protocol):
-    """Bound to the tenant of the request: the balance of an account, read now on its exchange (R0.2.2)."""
-
-    def balance_of(self, account_id: UUID) -> FlowBalance:
-        """Raises FlowAccountNotFoundError, or FlowExchangeUnavailableError when the balance cannot be read."""
-        ...
-
-
-@dataclass(frozen=True, slots=True)
-class FlowAccountPorts:
-    """Where a flow learns of its account: the accounts of the tenant, then the balance read now (ADR 0087)."""
-
-    directory: FlowAccountDirectoryPort
-    balances: FlowAccountBalancePort
 
 
 class FlowAccountPositionsPort(Protocol):
@@ -243,6 +236,33 @@ class FlowOpeningsPort(Protocol):
         ...
 
 
+class ExitPlanRepositoryPort(Protocol):
+    """The exit plan in force of each open position of the flows of the tenant, by flow and asset (R3.1.1).
+
+    A plan is saved when its opening is executed and removed when the position closes, whoever closes it.
+    """
+
+    def current(self, flow_id: FlowId, asset: str) -> ExitPlan | None:
+        """None when the flow has no plan in force on the asset."""
+        ...
+
+    def save(self, flow_id: FlowId, asset: str, plan: ExitPlan) -> None:
+        """Replaces the plan of the flow on the asset. Raises CrossTenantAccessError for a flow of another tenant."""
+        ...
+
+    def remove(self, flow_id: FlowId, asset: str) -> None: ...
+
+
+class FlowProtectionLevelsPort(Protocol):
+    """Bound to the tenant of the request: the stop loss and take profit the platform keeps waiting on the exchange for
+    the position of a flow, from the protections the orders context recorded (R3.1.3).
+    """
+
+    def placed_levels(self, flow_id: FlowId, asset: str) -> PlacedLevels:
+        """No level where the flow has no protection of that kind in force on the asset."""
+        ...
+
+
 class RunningCyclePort(Protocol):
     def wait_until_finished(self, flow_id: FlowId) -> None:
         """Returns once no cycle of the flow is running, across processes; at once when none is (R1.1.5)."""
@@ -310,6 +330,14 @@ class AutomaticPausePort(Protocol):
         ...
 
 
+class EmergencyClosingLogPort(Protocol):
+    """Bound to the tenant of the request: the emergency closings it launched, with their outcome (R3.2.3)."""
+
+    def record(self, closing: EmergencyClosing) -> None:
+        """Raises CrossTenantAccessError for a closing of another tenant."""
+        ...
+
+
 class FlowTimingPort(Protocol):
     """Bound to the tenant of the request: the instant every flow last started or resumed, and its pause reason."""
 
@@ -373,6 +401,34 @@ class ActivityReaderPort(Protocol):
         ...
 
 
+class AccountTransfersPort(Protocol):
+    """Bound to the tenant of the request: the deposits and withdrawals the exchange declares on one of its accounts.
+
+    Only the worker opens an account to read it on its exchange: in the API it is the client that asks the worker to
+    run ReadAccountTransfersUseCase (ADR 0007, ADR storico-delle-variazioni-di-capitale).
+    """
+
+    def transfers(self, account_id: UUID, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        """Every one in the window, never part of them: raises FlowAccountNotFoundError, or
+        FlowExchangeUnavailableError when the exchange cannot be read.
+        """
+        ...
+
+
+class TransfersReaderPort(Protocol):
+    """The deposits and withdrawals an exchange declares on an account (R3.4.2)."""
+
+    def reference_fields(self) -> frozenset[str]:
+        """The names of the fields of the credentials the reader needs to find the account on its exchange."""
+        ...
+
+    def transfers(self, reference: AccountReference, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        """Every one in the window. Raises FlowExchangeUnavailableError when the exchange cannot be read, and
+        FlowCredentialsFieldMissingError when the reference lacks a field the reader declares.
+        """
+        ...
+
+
 class FlowPausedNoticePort(Protocol):
     def execute(self, flow_name: str, reason: str) -> None:
         """Tells the user the flow paused on its own, with the reason (R1.2.4, R1.8.2)."""
@@ -399,6 +455,37 @@ class FlowAccountNamePort(Protocol):
     def account_name(self, account_id: UUID) -> str:
         """Raises FlowAccountNotFoundError for an account that does not exist or belongs to another tenant."""
         ...
+
+
+class AccountDeviationThresholdPort(Protocol):
+    """Bound to the tenant of the request: how far the balance of one of its accounts may go from the expected one,
+    from the accounts context (R3.3.1).
+    """
+
+    def deviation_threshold(self, account_id: UUID) -> Decimal:
+        """In percent of the expected balance; raises FlowAccountNotFoundError for an account the tenant does not
+        have.
+        """
+        ...
+
+
+class ReconciliationAlarmNoticePort(Protocol):
+    """In the worker: NotifyReconciliationAlarmUseCase (R3.3.1)."""
+
+    def execute(self, account_name: str, read_balance: Decimal, expected_balance: Decimal) -> None:
+        """Tells the user the balance of the account is not the expected one, once for each alarm."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ReconciliationAlarmPorts:
+    """What the reconciliation of an account needs to raise an alarm on its balance (R3.3.1): the threshold and the
+    name of the account, and who tells the user.
+    """
+
+    thresholds: AccountDeviationThresholdPort
+    accounts: FlowAccountNamePort
+    notice: ReconciliationAlarmNoticePort
 
 
 class UnattributablePositionNoticePort(Protocol):
@@ -457,13 +544,39 @@ class FlowLedgerPort(Protocol):
         """What of the account is recorded already from that moment on, to read the overlap of two windows once."""
         ...
 
-    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> tuple[LedgerEntry, ...]:
-        """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new."""
+    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
+        """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new,
+        executions and funding.
+        """
         ...
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         """The running totals of those flows; a flow without any execution yet has none."""
         ...
+
+
+class LedgerRecordingPort(Protocol):
+    """Bound to the tenant of the request: records in the ledger what the exchange added to an account (ADR 0063).
+
+    Only the worker reads the executions of an account: in the API it is the client that asks the worker to run
+    RecordAccountExecutionsUseCase (ADR 0007, ADR incasso-dei-profitti).
+    """
+
+    def record(self, account_id: UUID) -> None:
+        """Raises FlowAccountNotFoundError, FlowLedgerIncompleteError, or FlowExchangeUnavailableError."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class FlowAccountPorts:
+    """Where a flow learns of its account: the accounts of the tenant, what the exchange shows of them now and the
+    ledger of their flows, from which the free capital is measured (ADR 0087, ADR capitale-libero-al-netto-del-valore-
+    dei-flussi).
+    """
+
+    directory: FlowAccountDirectoryPort
+    activity: AccountActivityPort
+    ledger: FlowLedgerPort
 
 
 class FlowOperationsPort(Protocol):
@@ -491,7 +604,9 @@ class PlatformOrdersPort(Protocol):
 
 
 class ReconciliationRepositoryPort(Protocol):
-    """Bound to the tenant of the request: the readings of its accounts and what no flow explains (R1.6.2)."""
+    """Bound to the tenant of the request: the readings of its accounts, what no flow explains (R1.6.2) and the alarms
+    on their balance (R3.3.1).
+    """
 
     def last_reading(self, account_id: UUID) -> AccountReading | None: ...
 
@@ -507,6 +622,24 @@ class ReconciliationRepositoryPort(Protocol):
         """Closes the recorded positions no longer open: a new position on that asset is a new case."""
         ...
 
+    def open_alarm(self, account_id: UUID) -> ReconciliationAlarm | None:
+        """The alarm of the account still waiting for the confirmation of the user, if any."""
+        ...
+
+    def open(self, alarm: ReconciliationAlarm) -> bool:
+        """Opens the alarm unless its account has one open already, also when two cycles of the account run together;
+        True when it is new.
+        """
+        ...
+
+    def confirm(self, account_id: UUID, at: datetime) -> bool:
+        """Closes the open alarm of the account, confirmed at that moment; False when the account has none open."""
+        ...
+
+    def alarms_of(self, account_id: UUID) -> list[ReconciliationAlarm]:
+        """Every alarm of the account, open and closed, the most recent first."""
+        ...
+
 
 class OutsideClosingRecorderPort(Protocol):
     """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
@@ -514,6 +647,32 @@ class OutsideClosingRecorderPort(Protocol):
     def execute(self, closing: OutsideClosing) -> None:
         """Records a position the reconciliation finds closed outside the platform (ADR 0056)."""
         ...
+
+
+class ProtectionClosingRecorderPort(Protocol):
+    """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
+
+    def execute(self, closing: ProtectionClosing) -> None:
+        """Records a position the reconciliation finds closed by its stop loss or take profit (R3.1.2)."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedPosition:
+    """The position of the account of a flow on an asset, whose protections its closing leaves behind (R3.1.2)."""
+
+    account_id: UUID
+    asset: str
+
+
+class ProtectionCancellationPort(Protocol):
+    """It is CancelProtectionsUseCase of the orders context, bound to the tenant of the request (R3.1.2).
+
+    The protections left on the exchange by a closing the reconciliation finds are cancelled through the worker's own
+    access to the account, as every order of a flow.
+    """
+
+    def execute(self, position: ProtectedPosition) -> None: ...
 
 
 class ClosedPositionRepositoryPort(Protocol):
@@ -764,6 +923,16 @@ class EquitySnapshotRepositoryPort(Protocol):
         ...
 
 
+class FlowForecastsPort(Protocol):
+    """Bound to the tenant of the request: the price forecasts its flows recorded, each with the actual price beside it
+    once read (R1.3.5, R3.6.1).
+    """
+
+    def expired_forecasts(self, flow_id: FlowId, now: datetime) -> list[EvaluatedForecast]:
+        """Every forecast of the flow whose horizon has expired by now, with its actual price or none."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class SourceAsk:
     """An active source of the flow as the cycle asks it: with the parameters, the assets and the interval of the flow
@@ -861,15 +1030,49 @@ class AgentPromptComposerPort(Protocol):
         ...
 
 
-class AgentDecisionPort(Protocol):
-    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4)."""
+class DecisionExitPlanPort(Protocol):
+    """The exit plan the agent gave with an opening, as the agent context hands it over (R3.1.1)."""
 
-    def intent_with[O, C, H](
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+
+class DecisionPlanChangePort(Protocol):
+    """The change of the exit plan of an open position the agent gave with an update, as the agent context hands it
+    over (R3.1.3).
+    """
+
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+    @property
+    def remove_target(self) -> bool: ...
+
+
+class AgentDecisionPort(Protocol):
+    """A conforming decision of the agent, turned by the risk check into what it asks; an opening carries the
+    confidence of the agent (R1.4.4, R3.1.1, R3.1.3, R3.1.4).
+    """
+
+    def intent_with[O, C, H, U](
         self,
-        opening: Callable[[str, str, Decimal, int], O],
+        opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
-    ) -> O | C | H: ...
+        updating: Callable[[str, DecisionPlanChangePort], U],
+    ) -> O | C | H | U: ...
 
 
 class AgentResponsePort(Protocol):
@@ -949,6 +1152,66 @@ class FlowPausePort(Protocol):
 class CycleFailureNoticePort(Protocol):
     def execute(self, flow_id: UUID, reason: str) -> None:
         """Tells the user the cycle of the flow failed, with the message of its error (R1.8.2)."""
+        ...
+
+
+class ConsecutiveFailuresPort(Protocol):
+    """Bound to the tenant of the flow: the failed cycles in a row, read from the recorded cycles (R3.2.4)."""
+
+    def consecutive_failures(self, flow_id: UUID) -> int:
+        """The failed cycles of the flow recorded after its last completed cycle and since it last became active; a
+        skipped cycle neither counts nor breaks the series.
+        """
+        ...
+
+
+class ConsecutiveFailuresPausePort(Protocol):
+    def execute(self, flow_id: UUID, error: AutotradingError) -> object:
+        """Pauses the flow when its failed cycles in a row, the one of the error included, reach its maximum
+        (R3.2.4).
+        """
+        ...
+
+
+class OpeningsSuspensionPort(Protocol):
+    """Bound to the tenant of the request or of the cycle: the openings of its flows suspended for maximum loss and
+    their last resume, saved beside each flow (R3.2.2).
+    """
+
+    def status(self, flow_id: UUID) -> OpeningsStatus:
+        """The openings of the flow as saved; a flow never suspended nor resumed has neither."""
+        ...
+
+    def suspend(self, flow_id: UUID, suspension: OpeningsSuspension) -> None:
+        """Saves the suspension of the openings of the flow, keeping their last resume."""
+        ...
+
+    def resume(self, flow_id: UUID, resumed_at: datetime) -> None:
+        """Lifts the suspension of the openings of the flow and saves the instant the peak counts again from."""
+        ...
+
+
+class LossReferencesPort(Protocol):
+    """Bound to the tenant of the cycle: the recorded equities the losses of its flows are measured from (R3.2.2)."""
+
+    def loss_references(self, flow_id: UUID, day_start: datetime, peak_since: datetime) -> LossReferences:
+        """The last equity recorded at the start of the day or before, else the first of the day, and the one highest
+        once brought to the capital of now, since the instant given; the most recent among equal ones.
+        """
+        ...
+
+
+class OpeningsSuspendedNoticePort(Protocol):
+    def execute(self, flow_name: str, reason: str) -> None:
+        """Tells the user the openings of the flow are suspended, with the threshold passed (R3.2.2, R1.8.2)."""
+        ...
+
+
+class FlowLossGuardPort(Protocol):
+    def execute(self, flow: CycleFlow) -> OpeningsSuspension | None:
+        """The suspension of the openings of the flow of the cycle for maximum loss in force, suspending them when a
+        threshold is passed now; None while they are not suspended (R3.2.2).
+        """
         ...
 
 

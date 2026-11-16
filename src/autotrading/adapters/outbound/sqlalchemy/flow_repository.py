@@ -1,10 +1,10 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from decimal import Decimal
 from typing import NotRequired, TypedDict, cast
 from uuid import UUID
 
-from sqlalchemy import Connection, Engine, RowMapping, Select, func, insert, select, update
+from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, Select, and_, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_capital_changes, flow_versions, flows
@@ -18,7 +18,7 @@ from autotrading.application.flows.errors import (
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account_id import AccountId
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -26,8 +26,12 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelParameterValue, ModelSelection, SourceSelection
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -51,6 +55,9 @@ class _RiskLimitsDocument(TypedDict):
     max_leverage: int
     max_margin_exposure_percent: str | None
     max_value_exposure_percent: str | None
+    # Absent in the versions saved before the overall limits existed: no overall limit (R3.2.1).
+    max_total_margin_exposure_percent: NotRequired[str | None]
+    max_total_value_exposure_percent: NotRequired[str | None]
 
 
 class _ConfigurationDocument(TypedDict):
@@ -66,6 +73,16 @@ class _ConfigurationDocument(TypedDict):
     allocated_capital: str | None
     bring_to_minimum: NotRequired[bool]
     system_prompt: NotRequired[str | None]
+    max_consecutive_failures: NotRequired[int | None]
+    # Absent in the versions saved before the maximum losses existed: none, and the manual resume (R3.2.2).
+    max_daily_loss_percent: NotRequired[str | None]
+    max_drawdown_percent: NotRequired[str | None]
+    openings_resume: NotRequired[str]
+    # Every version has them: the migration gave the versions saved before a stop loss of 5% (R3.1.2).
+    default_stop_loss_percent: str
+    default_take_profit_percent: str | None
+    # Every version has it: the migration gave the versions saved before none (R3.1.4).
+    minimum_confidence: int | None
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -143,7 +160,9 @@ class SqlAlchemyFlowRepositoryAdapter:
             raise CrossTenantAccessError
         self.get(flow.id)
         with self._transaction() as connection:
-            connection.execute(insert(flow_versions).values(_version_row_of(flow)))
+            # A cash-out that keeps the capital records the change on the version in force (R3.4.1).
+            if change.new != change.previous:
+                connection.execute(insert(flow_versions).values(_version_row_of(flow)))
             connection.execute(
                 insert(flow_capital_changes).values(
                     flow_id=flow.id.value,
@@ -153,8 +172,26 @@ class SqlAlchemyFlowRepositoryAdapter:
                     new_capital=change.new,
                     user_id=change.user_id.value,
                     version=flow.configuration.version,
+                    reason=change.reason.value,
+                    amount=change.amount,
+                    value_before=change.value_before,
+                    cashed_profit=change.cashed_profit,
                 )
             )
+
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
+        query = (
+            select(flow_capital_changes)
+            .where(_changes_within(flow_ids, TimeWindow()))
+            .order_by(flow_capital_changes.c.changed_at, flow_capital_changes.c.id)
+        )
+        with self._transaction() as connection:
+            rows = connection.execute(query).mappings().all()
+        changes: dict[FlowId, tuple[CapitalChange, ...]] = {}
+        for row in rows:
+            change = _change_of(row)
+            changes[change.flow_id] = (*changes.get(change.flow_id, ()), change)
+        return changes
 
     def add_assignment(self, flow: Flow) -> None:
         """The account of the draft and its new version in one transaction: a draft never has one without the other."""
@@ -172,25 +209,21 @@ class SqlAlchemyFlowRepositoryAdapter:
                 raise FlowAccountNotFoundError from error
             raise
 
-    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
+    def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
         query = (
             select(flow_capital_changes)
-            .where(flow_capital_changes.c.flow_id == flow_id.value)
-            .order_by(flow_capital_changes.c.changed_at, flow_capital_changes.c.id)
+            .where(_changes_within(flow_ids, window))
+            .order_by(flow_capital_changes.c.changed_at.desc(), flow_capital_changes.c.id.desc())
+            .limit(limit)
         )
-        self.get(flow_id)
         with self._transaction() as connection:
             rows = connection.execute(query).mappings().all()
-        return tuple(
-            CapitalChange(
-                flow_id,
-                row["changed_at"],
-                Decimal(row["previous_capital"]),
-                Decimal(row["new_capital"]),
-                UserId(row["user_id"]),
-            )
-            for row in rows
-        )
+        return tuple(_change_of(row) for row in rows)
+
+    def count_capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> int:
+        query = select(func.count()).select_from(flow_capital_changes).where(_changes_within(flow_ids, window))
+        with self._transaction() as connection:
+            return int(connection.execute(query).scalar_one())
 
     def name_in_use(self, name: FlowName) -> bool:
         query = select(func.count()).select_from(flows).where(NOT_ARCHIVED, flows.c.name == name.value)
@@ -272,10 +305,21 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "max_leverage": limits.max_leverage,
             "max_margin_exposure_percent": _text(limits.max_margin_exposure_percent),
             "max_value_exposure_percent": _text(limits.max_value_exposure_percent),
+            "max_total_margin_exposure_percent": _text(limits.max_total_margin_exposure_percent),
+            "max_total_value_exposure_percent": _text(limits.max_total_value_exposure_percent),
         },
         "allocated_capital": _text(configuration.allocated_capital),
         "bring_to_minimum": configuration.bring_to_minimum,
         "system_prompt": configuration.system_prompt,
+        "max_consecutive_failures": configuration.max_consecutive_failures,
+        "max_daily_loss_percent": _text(configuration.max_daily_loss_percent),
+        "max_drawdown_percent": _text(configuration.max_drawdown_percent),
+        "openings_resume": configuration.openings_resume.value,
+        "default_stop_loss_percent": str(configuration.protection_defaults.stop_loss_percent),
+        "default_take_profit_percent": _text(configuration.protection_defaults.take_profit_percent),
+        "minimum_confidence": None
+        if configuration.minimum_confidence is None
+        else configuration.minimum_confidence.value,
     }
 
 
@@ -297,12 +341,23 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
             limits["max_leverage"],
             _decimal(limits["max_margin_exposure_percent"]),
             _decimal(limits["max_value_exposure_percent"]),
+            _decimal(limits.get("max_total_margin_exposure_percent")),
+            _decimal(limits.get("max_total_value_exposure_percent")),
         ),
         allocated_capital=_decimal(document["allocated_capital"]),
         # Versions saved before the option existed read with it off, its default (ADR 0051).
         bring_to_minimum=document.get("bring_to_minimum", False),
         # Versions saved before the system prompt existed follow the default of the platform (R1.4.8).
         system_prompt=document.get("system_prompt"),
+        # Versions saved before the maximum existed have none: the flow keeps trying at every cycle (R3.2.4).
+        max_consecutive_failures=document.get("max_consecutive_failures"),
+        max_daily_loss_percent=_decimal(document.get("max_daily_loss_percent")),
+        max_drawdown_percent=_decimal(document.get("max_drawdown_percent")),
+        openings_resume=OpeningsResume(document.get("openings_resume", OpeningsResume.MANUAL.value)),
+        protection_defaults=ProtectionDefaults(
+            Decimal(document["default_stop_loss_percent"]), _decimal(document["default_take_profit_percent"])
+        ),
+        minimum_confidence=MinimumConfidence.optional(document["minimum_confidence"]),
     )
 
 
@@ -335,3 +390,26 @@ def _text(value: Decimal | None) -> str | None:
 
 def _decimal(value: str | None) -> Decimal | None:
     return None if value is None else Decimal(value)
+
+
+def _changes_within(flow_ids: Iterable[FlowId], window: TimeWindow) -> ColumnElement[bool]:
+    conditions: list[ColumnElement[bool]] = [flow_capital_changes.c.flow_id.in_([each.value for each in flow_ids])]
+    if window.since is not None:
+        conditions.append(flow_capital_changes.c.changed_at >= window.since)
+    if window.until is not None:
+        conditions.append(flow_capital_changes.c.changed_at < window.until)
+    return and_(*conditions)
+
+
+def _change_of(row: RowMapping) -> CapitalChange:
+    return CapitalChange(
+        FlowId(row["flow_id"]),
+        row["changed_at"],
+        Decimal(row["previous_capital"]),
+        Decimal(row["new_capital"]),
+        UserId(row["user_id"]),
+        CapitalChangeReason(row["reason"]),
+        Decimal(row["amount"]),
+        value_before=_decimal(row["value_before"]),
+        cashed_profit=Decimal(row["cashed_profit"]),
+    )

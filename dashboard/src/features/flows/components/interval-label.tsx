@@ -1,11 +1,10 @@
 import { usePeriodInterval } from '@/components/ui/period-selector/use-period';
-
-// The days as the user reads them, 10/11/2026, from the days of the address, 2026-11-10.
-const dayText = (day: string): string => day.split('-').reverse().join('/');
+import { formatMinute } from '@/utils/format-instant';
 
 /**
  * The interval chosen on the equity curve, said above the tabs with the command that removes it and brings back the
- * period of the menu (R6.4.3, ADR intervallo-trascinando-sull-equity-curve).
+ * period of the menu (R6.4.3, ADR intervallo-trascinando-sull-equity-curve); each end with its date and its time, «16/11
+ * 09:15 – 16/11 11:40» (ADR periodo-al-minuto).
  */
 export const IntervalLabel = () => {
   const { interval, clearInterval } = usePeriodInterval();
@@ -17,7 +16,7 @@ export const IntervalLabel = () => {
       aria-label="Intervallo scelto sul grafico"
       className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 py-1 pr-1 pl-3 text-sm text-blue-900"
     >
-      <span>{`dal ${dayText(interval.from)} al ${dayText(interval.to)}`}</span>
+      <span>{`${formatMinute(interval.from)} – ${formatMinute(interval.to)}`}</span>
       <button
         type="button"
         onClick={clearInterval}

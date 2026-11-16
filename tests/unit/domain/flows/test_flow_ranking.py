@@ -4,11 +4,14 @@ from uuid import uuid4
 
 import pytest
 
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.errors import RankingWithoutEquityError
 from autotrading.domain.flows.flow_cost import FlowCost
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_ranking import FlowRanking, ranked_by_return
 from autotrading.domain.flows.flow_statistics import FlowStatistics
+from autotrading.domain.tenancy.user_id import UserId
 
 FIRST_CYCLE = datetime(2026, 11, 14, 9, tzinfo=UTC)
 CYCLE = timedelta(minutes=15)
@@ -30,6 +33,26 @@ def ranking_of(*values: str, name: str = "alfa") -> FlowRanking:
 
 def test_the_return_is_the_last_equity_of_the_period_over_the_first() -> None:
     assert ranking_of("300", "330", "297", "360").return_percent == Decimal(20)
+
+
+def test_the_return_is_compounded_across_the_changes_of_the_capital_in_the_period() -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: a cash-out at 1100 of 100, then 1050.
+    snapshots = curve("1000", "1100", "1050")
+    cash_out = CapitalChange(
+        FlowId(snapshots[0].flow_id),
+        FIRST_CYCLE + CYCLE + CYCLE / 2,
+        Decimal(1000),
+        Decimal(1000),
+        UserId("anna"),
+        CapitalChangeReason.CASH_OUT,
+        Decimal(100),
+        value_before=Decimal(1100),
+        cashed_profit=Decimal(100),
+    )
+
+    ranking = FlowRanking.of(uuid4(), "alfa", snapshots, NO_STATISTICS, (cash_out,))
+
+    assert ranking.return_percent == Decimal("15.50")
 
 
 def test_the_return_is_negative_when_the_equity_falls() -> None:

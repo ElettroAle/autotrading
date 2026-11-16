@@ -10,12 +10,12 @@ from autotrading.application.flows.change_allocated_capital import (
     ChangeAllocatedCapitalCommand,
     ChangeAllocatedCapitalUseCase,
 )
+from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
-from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand, ListCapitalChangesUseCase
 from autotrading.application.flows.ports import PositionToClose
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
-from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase, StopPorts
-from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.errors import (
     ArchivedFlowNotModifiableError,
@@ -23,6 +23,7 @@ from autotrading.domain.flows.errors import (
     CapitalBelowFlowMinimumError,
     FlowCommandNotAllowedError,
 )
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -32,11 +33,12 @@ from autotrading.domain.flows.stop_outcome import (
     PositionOpening,
     StopOutcome,
 )
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -96,31 +98,37 @@ class Flows:
         self.repository = InMemoryFlowRepositoryAdapter(self.store, self.tenant_id)
         self.events: list[str] = []
         self.positions = ScriptedPositions(self.events)
-        self.accounts = FakeFlowAccountAdapter()
+        self.activity = FakeAccountActivityAdapter()
+        self.ledger = InMemoryFlowLedgerAdapter()
+        self.accounts = FakeFlowAccountAdapter(self.activity, self.ledger)
         self.account_id = uuid4()
         self.accounts.add(self.account_id, Decimal(1000))
         self.openings = ScriptedOpenings()
         self.closed = ClosedPositionStore()
         self.notices = FakePositionClosedNoticeAdapter()
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id)
         self.stop = StopFlowUseCase(
             self.repository,
-            StopPorts(
-                RecordingCycles(self.events, self.repository),
-                self.positions,
-                self.openings,
-                InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
-                self.notices,
+            CloseFlowPositionsUseCase(
+                ClosingPorts(
+                    RecordingCycles(self.events, self.repository),
+                    self.positions,
+                    self.openings,
+                    InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
+                    self.notices,
+                    self.exit_plans,
+                )
             ),
         )
-        self.activity = FakeAccountActivityAdapter()
-        self.ledger = InMemoryFlowLedgerAdapter()
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
             self.accounts.ports(),
-            ReadFlowStateUseCase(self.repository, self.activity, self.ledger),
+            ReadFlowStateUseCase(self.repository, self.activity, self.ledger, self.exit_plans),
             lambda: NOW,
         )
-        self.list_changes = ListCapitalChangesUseCase(self.repository)
+
+    def changes_of(self, flow: Flow) -> tuple[CapitalChange, ...]:
+        return tuple(self.store.capital_changes.get(flow.id, []))
 
     def held(self, margin: str, *, asset: str = "BTC") -> None:
         reading = self.activity.activities.get(self.account_id, an_activity())
@@ -221,10 +229,18 @@ def test_a_raise_within_the_free_capital_becomes_the_next_version_and_its_change
 
     assert changed.configuration == replace(flow.configuration, version=2, allocated_capital=Decimal(900))
     assert flows.repository.get(flow.id) == changed
-    assert flows.list_changes.execute(ListCapitalChangesCommand(flow.id)) == (
-        CapitalChange(flow.id, NOW, Decimal(400), Decimal(900), USER),
+    assert flows.changes_of(flow) == (
+        CapitalChange(
+            flow.id,
+            NOW,
+            Decimal(400),
+            Decimal(900),
+            USER,
+            CapitalChangeReason.INCREASE,
+            Decimal(500),
+            value_before=Decimal(400),
+        ),
     )
-    assert flows.activity.read == []
 
 
 def test_a_raise_beyond_the_capital_available_is_refused_and_nothing_changes(flows: Flows) -> None:
@@ -236,7 +252,7 @@ def test_a_raise_beyond_the_capital_available_is_refused_and_nothing_changes(flo
 
     assert raised.value.available == "900 USDC"
     assert flows.repository.get(flow.id) == flow
-    assert flows.list_changes.execute(ListCapitalChangesCommand(flow.id)) == ()
+    assert flows.changes_of(flow) == ()
 
 
 def test_a_reduction_is_checked_against_the_margin_the_exchange_declares_for_the_flow(flows: Flows) -> None:
@@ -317,14 +333,6 @@ def test_the_change_is_recorded_with_the_new_version(flows: Flows, caplog: pytes
     )
 
 
-def test_the_history_of_a_flow_of_another_tenant_is_not_found(flows: Flows) -> None:
-    theirs = a_flow(TenantId.new())
-    flows.store.flows.append(theirs)
-
-    with pytest.raises(FlowNotFoundError):
-        flows.list_changes.execute(ListCapitalChangesCommand(theirs.id))
-
-
 @pytest.mark.parametrize("reason", [CloseReason.FLOW_STOP, CloseReason.ACCOUNT_REMOVAL])
 def test_each_position_closed_enters_the_history_with_the_reason_of_the_stop(flows: Flows, reason: CloseReason) -> None:
     flow = flows.saved(assets=("BTC", "ETH", "SOL"))
@@ -383,3 +391,18 @@ def test_a_refusal_without_a_reason_is_still_a_position_left_open(flows: Flows) 
     flows.positions.refusals["BTC"] = ""
 
     assert flows.stop.execute(StopFlowCommand(flow.id, USER)).left_open == (PositionLeftOpen("BTC", ""),)
+
+
+def test_a_stop_ends_the_exit_plan_of_each_position_it_closes(flows: Flows) -> None:
+    flow = flows.saved(assets=("BTC", "ETH", "SOL"))
+    plan = ExitPlan(Decimal(110000), Decimal(95000), "chiusura sotto 97000")
+    for asset in ("BTC", "ETH", "SOL"):
+        flows.exit_plans.save(flow.id, asset, plan)
+    flows.openings.openings[flow.id, "BTC"] = OPENING
+    flows.positions.refusals["ETH"] = "Order rejected"
+
+    flows.stop.execute(StopFlowCommand(flow.id, USER))
+
+    assert flows.exit_plans.current(flow.id, "BTC") is None
+    assert flows.exit_plans.current(flow.id, "ETH") == plan
+    assert flows.exit_plans.current(flow.id, "SOL") is None

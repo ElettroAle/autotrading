@@ -1,11 +1,12 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from autotrading.domain.flows.account_reconciliation import OutsideClosing
+from autotrading.domain.flows.account_reconciliation import OutsideClosing, ProtectionClosing
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +15,26 @@ class PositionLeftOpen:
 
     asset: str
     reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class FlowClosings:
+    """What closing every position of a flow gave: the assets closed and the positions the exchange left open
+    (ADR 0055, ADR chiusura-di-emergenza-per-ambito)."""
+
+    closed: tuple[str, ...] = ()
+    left_open: tuple[PositionLeftOpen, ...] = ()
+
+    @classmethod
+    def of(cls, closings: Iterable[PositionClosing]) -> FlowClosings:
+        """A closing with its fill closed the position; one without was refused, with the reason of the exchange."""
+        done = tuple(closings)
+        return cls(
+            closed=tuple(closing.asset for closing in done if closing.fill is not None),
+            left_open=tuple(
+                PositionLeftOpen(closing.asset, closing.refusal or "") for closing in done if closing.fill is None
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,10 +110,18 @@ class PositionOpening:
         The exchange gives the realized PnL, not the price: the closing price is the one that PnL implies on the
         value the margin held with the leverage, so the history shows the result the exchange reported.
         """
+        return self.closed(flow, closing.asset, self._fill_of(closing), CloseReason.OUTSIDE_PLATFORM)
+
+    def closed_by_protection(self, flow: Flow, closing: ProtectionClosing) -> ClosedPosition:
+        """The position its stop loss or take profit closed on the exchange, with the reason of the protection
+        (R3.1.2): like a closing outside the platform, the exchange gives its realized PnL.
+        """
+        return self.closed(flow, closing.asset, self._fill_of(closing), closing.reason)
+
+    def _fill_of(self, closing: OutsideClosing | ProtectionClosing) -> ClosingFill:
         sign = 1 if self.side is TradeSide.LONG else -1
         move = closing.realized_pnl / (self.margin * self.leverage) * sign
-        fill = ClosingFill(self.end.price * (1 + move), closing.closed_at, closing.fee, closing.realized_pnl)
-        return self.closed(flow, closing.asset, fill, CloseReason.OUTSIDE_PLATFORM)
+        return ClosingFill(self.end.price * (1 + move), closing.closed_at, closing.fee, closing.realized_pnl)
 
 
 @dataclass(frozen=True, slots=True)

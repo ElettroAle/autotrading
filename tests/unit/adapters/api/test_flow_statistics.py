@@ -11,7 +11,7 @@ from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.flows import a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -131,7 +131,7 @@ def test_a_range_takes_its_days_from_from_and_to(client_of: Client, platform: Pl
     close(platform, flow, "-4", timedelta(days=2))
     day = (platform.now - timedelta(days=10)).date().isoformat()
 
-    params = {"period": "range", "from": day, "to": day}
+    params = {"period": "range", "from": f"{day}T00:00Z", "to": f"{day}T23:59Z"}
     body = anna.get(f"/flows/{flow.id.value}/statistics", params=params).json()
 
     assert (body["won"], body["operations"]) == (1, 1)
@@ -141,11 +141,11 @@ def test_an_invalid_period_answers_400_with_the_reason(client_of: Client, platfo
     anna = client_of("anna")
     flow = flow_of(platform, "anna")
 
-    params = {"period": "range", "from": "2026-11-03", "to": "2026-11-01"}
+    params = {"period": "range", "from": "2026-11-03T10:00Z", "to": "2026-11-03T09:59Z"}
     response = anna.get(f"/flows/{flow.id.value}/statistics", params=params)
 
     assert response.status_code == 400
-    assert reason_of(response) == {"detail": "periodo non valido: il giorno iniziale è successivo al giorno finale"}
+    assert reason_of(response) == {"detail": "periodo non valido: l'inizio è successivo alla fine"}
 
 
 def test_the_statistics_of_a_flow_of_another_user_do_not_exist(client_of: Client, platform: Platform) -> None:

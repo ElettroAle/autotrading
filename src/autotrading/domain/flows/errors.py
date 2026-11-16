@@ -54,6 +54,24 @@ class InvalidRiskLimitError(FlowSettingError):
         self.label = label
 
 
+class TotalExposureOutOfRangeError(FlowSettingError):
+    def __init__(self, setting: FlowSetting) -> None:
+        super().__init__("l'esposizione complessiva massima va da 0,1 a 1000", setting)
+
+
+class MaxConsecutiveFailuresOutOfRangeError(FlowSettingError):
+    # The status the ADR of the maximum declares (ADR pausa-dopo-cicli-falliti-consecutivi); the field still names it.
+    status_code = 400
+
+    def __init__(self) -> None:
+        super().__init__("il massimo di cicli falliti consecutivi va da 1 a 100", FlowSetting.MAX_CONSECUTIVE_FAILURES)
+
+
+class MaxLossOutOfRangeError(FlowSettingError):
+    def __init__(self, setting: FlowSetting) -> None:
+        super().__init__("la perdita massima va da 0,1 a 100", setting)
+
+
 class SourceWeightOutOfRangeError(FlowSettingError):
     def __init__(self, source: str) -> None:
         super().__init__(f"peso fuori da 1-10: {source}", FlowSetting.SOURCES)
@@ -69,6 +87,21 @@ class RepeatedSourceError(FlowSettingError):
 class AllocatedCapitalNotPositiveError(FlowSettingError):
     def __init__(self) -> None:
         super().__init__("il capitale allocato deve essere positivo", FlowSetting.ALLOCATED_CAPITAL)
+
+
+class InvalidDefaultStopLossError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("lo stop loss predefinito va da 0,1 a 50", FlowSetting.DEFAULT_STOP_LOSS)
+
+
+class InvalidDefaultTakeProfitError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("il take profit predefinito è maggiore di 0", FlowSetting.DEFAULT_TAKE_PROFIT)
+
+
+class InvalidMinimumConfidenceError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("la confidenza minima va da 0 a 100", FlowSetting.MINIMUM_CONFIDENCE)
 
 
 class CapitalAboveFreeCapitalError(FlowSettingError):
@@ -89,6 +122,24 @@ class CapitalBelowFlowMinimumError(FlowSettingError):
         self.minimum = minimum
 
 
+class FlowWithoutProfitsError(DomainError):
+    """The flow is worth no more than its capital: a cash-out would close its positions and free nothing (R3.4.1)."""
+
+    status_code = 409
+
+    def __init__(self, flow_name: str) -> None:
+        super().__init__(f"{flow_name} non ha profitti da incassare")
+        self.flow_name = flow_name
+
+
+class CashOutCapitalOutOfRangeError(DomainError):
+    """The capital a cash-out leaves to the flow is above zero and below its value, or nothing is freed (R3.4.1)."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(f"il capitale indicato è maggiore di 0 e minore del valore del flusso, {value}")
+        self.value = value
+
+
 class FlowCommandNotAllowedError(DomainError):
     status_code = 409
 
@@ -96,6 +147,16 @@ class FlowCommandNotAllowedError(DomainError):
         super().__init__(f"comando {command} non ammesso per un flusso {status}")
         self.command = command
         self.status = status
+
+
+class OpeningsNotSuspendedError(DomainError):
+    """A resume of the openings of a flow that are not suspended for maximum loss (R3.2.2)."""
+
+    status_code = 409
+
+    def __init__(self, flow: str) -> None:
+        super().__init__(f"le aperture di {flow} non sono sospese")
+        self.flow = flow
 
 
 class ArchiveOnlyStoppedError(DomainError):
@@ -233,19 +294,19 @@ class UnknownStatisticsPeriodError(InvalidStatisticsPeriodError):
         super().__init__("scegliere tra " + ", ".join(periods))
 
 
-class DaysOutsideRangeError(InvalidStatisticsPeriodError):
+class BoundsOutsideRangeError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
-        super().__init__("i giorni valgono solo per un intervallo")
+        super().__init__("inizio e fine valgono solo per un intervallo")
 
 
-class RangeDaysRequiredError(InvalidStatisticsPeriodError):
+class RangeBoundsRequiredError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
-        super().__init__("un intervallo ha il giorno iniziale e il giorno finale")
+        super().__init__("un intervallo ha l'inizio e la fine")
 
 
 class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
     def __init__(self) -> None:
-        super().__init__("il giorno iniziale è successivo al giorno finale")
+        super().__init__("l'inizio è successivo alla fine")
 
 
 class InvalidCycleFilterError(DomainError):
@@ -325,3 +386,12 @@ class MalformedSystemPromptError(FlowSettingError):
         super().__init__(
             "parentesi graffa senza la sua coppia: per scriverla nel testo raddoppiala", FlowSetting.SYSTEM_PROMPT
         )
+
+
+class EmergencyScopeAmbiguousError(DomainError):
+    """An emergency closing covers one flow, one account or every flow: never a flow and an account at once
+    (R3.2.3).
+    """
+
+    def __init__(self) -> None:
+        super().__init__("indicare un flusso o un conto, non entrambi")

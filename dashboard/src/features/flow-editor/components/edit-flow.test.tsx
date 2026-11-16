@@ -26,6 +26,8 @@ const giveAlfa = () =>
       max_leverage: 3,
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: null,
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: null,
     },
     allocated_capital: '300',
   });
@@ -169,6 +171,135 @@ describe('EditFlow', () => {
       instructions: 'audace',
       allocated_capital: '400',
       version: 3,
+    });
+  });
+
+  it('changes the stop loss and take profit defaults as new versions, and removes the take profit', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const stopLoss = await screen.findByLabelText('Stop loss predefinito (%)');
+    expect(stopLoss).toHaveValue('5');
+    await userEvent.clear(stopLoss);
+    await userEvent.type(stopLoss, '3,5');
+    await userEvent.type(field('Take profit predefinito (%)'), '8');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa'))).toMatchObject({
+      default_stop_loss_percent: '3.5',
+      default_take_profit_percent: '8',
+    });
+    await userEvent.clear(field('Take profit predefinito (%)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 3'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa'))).toMatchObject({
+      default_stop_loss_percent: '3.5',
+      default_take_profit_percent: null,
+    });
+  });
+
+  it('sets the minimum confidence as a new version, refuses one out of range and removes it', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const minimum = await screen.findByLabelText('Confidenza minima (0-100)');
+    expect(minimum).toHaveValue('');
+    await userEvent.type(minimum, '60');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).minimum_confidence).toBe(60);
+    await userEvent.clear(field('Confidenza minima (0-100)'));
+    await userEvent.type(field('Confidenza minima (0-100)'), '101');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Confidenza minima (0-100)')).toHaveAccessibleDescription(
+        'la confidenza minima va da 0 a 100',
+      ),
+    );
+    await userEvent.clear(field('Confidenza minima (0-100)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 3'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).minimum_confidence).toBeNull();
+  });
+
+  it('removes an exposure limit the user empties, and refuses emptying both', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', {
+      account_id: 'account-principale',
+      risk_limits: {
+        max_leverage: 3,
+        max_margin_exposure_percent: '20',
+        max_value_exposure_percent: '40',
+        max_total_margin_exposure_percent: null,
+        max_total_value_exposure_percent: null,
+      },
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await userEvent.clear(await screen.findByLabelText('Esposizione massima del valore (%)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).risk_limits).toEqual({
+      max_leverage: 3,
+      max_margin_exposure_percent: '20',
+      max_value_exposure_percent: null,
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: null,
+    });
+    await userEvent.clear(field('Esposizione massima del margine (%)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Esposizione massima del margine (%)')).toHaveAccessibleDescription(
+        'almeno un limite di esposizione è obbligatorio',
+      ),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).version).toBe(2);
+  });
+
+  // ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits beside the limits per operation.
+  it('changes and removes an overall exposure limit, as a new version', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', {
+      account_id: 'account-principale',
+      risk_limits: {
+        max_leverage: 3,
+        max_margin_exposure_percent: '10',
+        max_value_exposure_percent: null,
+        max_total_margin_exposure_percent: '30',
+        max_total_value_exposure_percent: null,
+      },
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const totalMargin = await screen.findByLabelText(
+      'Esposizione complessiva massima del margine (%)',
+    );
+    expect(totalMargin).toHaveValue('30');
+    await userEvent.clear(totalMargin);
+    await userEvent.type(field('Esposizione complessiva massima del valore (%)'), '150,5');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).risk_limits).toMatchObject({
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: '150.5',
     });
   });
 

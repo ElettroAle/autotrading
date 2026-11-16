@@ -6,11 +6,19 @@ import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
+from autotrading.adapters.inbound.api.flow_state import FlowStateResponse
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.balance_comparison import BalanceComparison
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.identity_provider import IdentityProvider
@@ -96,6 +104,9 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
                 "margin": "100",
                 "unrealized_pnl": "12",
                 "unrealized_pnl_percent": "12",
+                "target_price": None,
+                "stop_price": None,
+                "invalidation": None,
             }
         ],
         "summary": {
@@ -106,6 +117,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
             "open_positions": 1,
             "failed_cycles": 0,
         },
+        "openings_suspension": None,
     }
 
 
@@ -149,6 +161,23 @@ def test_a_position_without_margin_answers_no_pnl_percent(client_of: Client, pla
     assert position["unrealized_pnl_percent"] is None
 
 
+def test_a_position_answers_its_exit_plan_in_force(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity(positions=(a_position("BTC"),))
+    platform.exit_plans.plans[platform.tenant_of("anna"), flow.id, "BTC"] = ExitPlan(
+        Decimal("63000.0"), Decimal(58500), "chiusura a 4 ore sotto 59000"
+    )
+
+    [position] = anna.get(f"/flows/{flow.id.value}/state").json()["positions"]
+
+    assert (position["target_price"], position["stop_price"], position["invalidation"]) == (
+        "63000",
+        "58500",
+        "chiusura a 4 ore sotto 59000",
+    )
+
+
 def test_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:
     theirs = flow_of(platform, "bruno")
 
@@ -166,3 +195,51 @@ def test_an_exchange_that_cannot_be_read_answers_unavailable(client_of: Client, 
     response = anna.get(f"/flows/{flow.id.value}/state")
 
     assert (response.status_code, reason_of(response)) == (503, {"detail": "exchange non raggiungibile, riprovare"})
+
+
+def test_the_return_is_compounded_across_the_changes_of_the_capital(client_of: Client, platform: Platform) -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: a cash-out at 1100 leaves 10%, then 1050 makes it 15.50%.
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    capital = flow.configuration.assigned_capital
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    platform.ledger.totals[flow.id] = FlowTotals(flow.id, capital * Decimal("0.15"))
+    cash_out = CapitalChange(
+        flow.id,
+        datetime(2026, 11, 16, 10, 0, tzinfo=UTC),
+        capital,
+        capital,
+        platform.user_id_of("anna"),
+        CapitalChangeReason.CASH_OUT,
+        capital / 10,
+        value_before=capital * Decimal("1.1"),
+        cashed_profit=capital / 10,
+    )
+    platform.flows.capital_changes[flow.id] = [cash_out]
+
+    state = anna.get(f"/flows/{flow.id.value}/state").json()
+
+    assert (state["return_percent"], state["summary"]["total_gain_percent"]) == ("15.5", "15.50")
+
+
+def test_a_state_without_capital_answers_no_return() -> None:
+    state = FlowState(FlowId.new(), "USDC", Decimal(0), (), Decimal(5), Decimal(0), Decimal(0))
+
+    assert FlowStateResponse.of(FlowResults(state, Decimal(0), 0)).return_percent is None
+
+
+def test_the_state_of_a_flow_tells_why_its_openings_are_suspended(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    comparison = BalanceComparison(Decimal(1000), Decimal(980), NOW)
+    platform.readings.open(ReconciliationAlarm.of(flow.assigned_account_id, comparison))
+
+    state = anna.get(f"/flows/{flow.id.value}/state").json()
+
+    assert state["openings_suspension"] == {
+        "reason": "allarme di riconciliazione sul conto test-1",
+        "suspended_at": "2026-11-14T12:00:00Z",
+        "cause": "riconciliazione",
+        "resumable": False,
+    }

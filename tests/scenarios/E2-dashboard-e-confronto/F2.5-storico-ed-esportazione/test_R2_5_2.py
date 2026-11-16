@@ -167,6 +167,15 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "risk_limits",
         "bring_to_minimum",
         "system_prompt",
+        "max_consecutive_failures",
+        "max_daily_loss_percent",
+        "max_drawdown_percent",
+        "openings_resume",
+        # The protection defaults travel with the strategy (ADR stop-loss-e-take-profit-predefiniti-del-flusso).
+        "default_stop_loss_percent",
+        "default_take_profit_percent",
+        # The minimum confidence travels with the strategy (ADR confidenza-nella-decisione-e-confidenza-minima).
+        "minimum_confidence",
     }
 
 

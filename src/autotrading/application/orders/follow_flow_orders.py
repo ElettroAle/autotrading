@@ -7,6 +7,7 @@ from autotrading.application.orders.ports import (
     OrderRejectedNoticePort,
     PositionOpenedNoticePort,
 )
+from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.order import Order
 
 
@@ -16,6 +17,8 @@ class FollowFlowOrdersCommand:
     flow_name: str
     cycle: datetime
     orders: tuple[Order, ...]
+    # The closings of the positions the exchange would not protect with a stop loss (R3.1.2).
+    unprotected: frozenset[ClientOrderId] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +52,13 @@ class FollowFlowOrdersUseCase:
             return
         market_order = order.request.market_order
         if market_order.reduce_only:
-            self._followers.closings.execute(command.flow_id, command.cycle, market_order.coin, execution)
+            self._followers.closings.execute(
+                command.flow_id,
+                command.cycle,
+                market_order.coin,
+                execution,
+                unprotected=order.id in command.unprotected,
+            )
             return
         self._followers.openings.execute(
             command.flow_name, market_order.coin, market_order.direction.value, order.request.leverage, execution.value

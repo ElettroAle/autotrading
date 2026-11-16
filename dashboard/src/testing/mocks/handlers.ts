@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
+import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
+import { emergencyClosingHandlers } from './emergency-closings';
 import {
   changeAllocatedCapital,
   createFlow,
@@ -12,7 +14,14 @@ import {
 } from './flow-configuration';
 import { rankingOf } from './flow-ranking';
 import { resultsOf } from './flow-results';
-import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
+import {
+  contains,
+  intervalWindowOf,
+  InvalidPeriod,
+  periodAdmits,
+  statisticsOf,
+} from './flow-statistics';
+import { forecastAccuracyOf } from './forecast-accuracy';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import { notificationEmailHandlers } from './notification-email-handlers';
 import {
@@ -20,6 +29,7 @@ import {
   FAKE_FLOW_COMMANDS,
   fakePlatform,
   type FakeFlowCommand,
+  type FakeOpeningsResume,
   type FakeConfiguration,
   type FakeEquityPoint,
   type FakeFlow,
@@ -28,6 +38,8 @@ import {
 } from './platform';
 import type { FakeClosedPosition } from './positions';
 import { API_KEY_FIELD, providerKeyHandlers } from './provider-key-handlers';
+import { fakeReconciliation } from './reconciliation';
+import { reconciliationHandlers } from './reconciliation-handlers';
 import { problem, withUser } from './responses';
 
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -72,11 +84,20 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
     max_leverage: configuration.maxLeverage,
     max_margin_exposure_percent: null,
     max_value_exposure_percent: null,
+    max_total_margin_exposure_percent: null,
+    max_total_value_exposure_percent: null,
   },
+  default_stop_loss_percent: configuration.defaultStopLossPercent,
+  default_take_profit_percent: configuration.defaultTakeProfitPercent,
+  minimum_confidence: configuration.minimumConfidence,
   allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,
   system_prompt: configuration.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
   system_prompt_is_default: configuration.systemPrompt === null,
+  max_consecutive_failures: configuration.maxConsecutiveFailures,
+  max_daily_loss_percent: configuration.maxDailyLossPercent,
+  max_drawdown_percent: configuration.maxDrawdownPercent,
+  openings_resume: configuration.openingsResume,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
@@ -144,6 +165,25 @@ const pageOf = (request: Request): number =>
 const currencyOf = (user: FakeUser, flow: FakeFlow): string =>
   user.accounts.find((account) => account.id === flow.accountId)?.currency ?? CURRENCY;
 
+// The openings of every flow of an account with an open alarm of reconciliation are suspended (R3.3.1).
+const alarmSuspensionOf = (user: FakeUser, flow: FakeFlow) => {
+  const account = user.accounts.find((candidate) => candidate.id === flow.accountId);
+  return account === undefined
+    ? null
+    : fakeReconciliation.openingsSuspensionOf(account.id, account.name);
+};
+
+// One suspension of the openings, the maximum loss first since the user can resume it (R3.2.2, R3.3.1).
+const openingsSuspensionOf = (user: FakeUser, flow: FakeFlow) =>
+  flow.openingsSuspension === null
+    ? alarmSuspensionOf(user, flow)
+    : {
+        reason: flow.openingsSuspension.reason,
+        suspended_at: flow.openingsSuspension.suspendedAt,
+        cause: 'perdita_massima' as const,
+        resumable: true,
+      };
+
 const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
   resultsOf(
     flow,
@@ -155,16 +195,17 @@ const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
 const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
   flow_id: flow.id,
   currency: currencyOf(user, flow),
-  allocated_capital: '500',
+  allocated_capital: String(flow.allocatedCapital ?? 0),
   available_liquidity: '300',
   margin: '200',
   unrealized_pnl: '12',
   realized_pnl: '0',
   fees: '0',
-  total_value: '512',
+  total_value: String(flow.currentCapital),
   return_percent: '2.4',
   positions: fakePlatform.openPositionsOf(flow.id),
   summary: resultsSummaryOf(flow, request),
+  openings_suspension: openingsSuspensionOf(user, flow),
 });
 
 // The API counts a position won or lost by its result after the fees, as the statistics do (R6.4.4).
@@ -182,19 +223,11 @@ const admits = (request: Request, name: string, value: string | undefined): bool
   return asked === null || asked === value;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// The days of the query string, both whole, in UTC, as the lists of the API read them (R6.4.4): a missing day does not
-// limit its side.
-const admitsDays = (request: Request, instant: string): boolean => {
+// The instants of the query string, to the minute, as the lists of the API read them (R6.4.4, ADR periodo-al-minuto): a
+// missing instant does not limit its side.
+const admitsInterval = (request: Request, instant: string): boolean => {
   const search = new URL(request.url).searchParams;
-  const from = search.get('from');
-  const to = search.get('to');
-  const time = Date.parse(instant);
-  return (
-    (from === null || time >= Date.parse(`${from}T00:00:00Z`)) &&
-    (to === null || time < Date.parse(`${to}T00:00:00Z`) + DAY_MS)
-  );
+  return contains(intervalWindowOf(search.get('from'), search.get('to')), new Date(instant));
 };
 
 const closedPositionPage = (positions: FakeClosedPosition[], request: Request) => {
@@ -206,7 +239,7 @@ const closedPositionPage = (positions: FakeClosedPosition[], request: Request) =
         admits(request, 'asset', position.asset) &&
         admits(request, 'side', position.side) &&
         admits(request, 'result', resultOf(position)) &&
-        admitsDays(request, position.closed_at),
+        admitsInterval(request, position.closed_at),
     )
     .sort((one, other) => Date.parse(other.closed_at) - Date.parse(one.closed_at));
   return {
@@ -248,6 +281,7 @@ const overviewOf = (user: FakeUser, flow: FakeFlow, request: Request) => {
     environment: 'dev',
     status: flow.status,
     pause_reason: flow.pauseReason,
+    openings_suspension: openingsSuspensionOf(user, flow),
     model: flow.model,
     version: flow.version,
     last_cycle: newest === undefined ? null : outcomeOf(newest),
@@ -297,7 +331,7 @@ const cyclePage = (cycles: FakeCycle[], request: Request) => {
     (cycle) =>
       admits(request, 'outcome', cycle.outcome) &&
       admitsDecision(request, cycle) &&
-      admitsDays(request, cycle.planned_at),
+      admitsInterval(request, cycle.planned_at),
   );
   return {
     page,
@@ -336,6 +370,14 @@ const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => {
   };
 };
 
+const percentText = (percent: string | null): string =>
+  percent === null ? 'nessuno' : `${percent}%`;
+
+const RESUME_LABELS: Readonly<Record<FakeOpeningsResume, string>> = {
+  manual: 'manuale',
+  next_day: 'il giorno dopo',
+};
+
 // The parts the API compares, with the same names and texts (R1.1.3): the fake never compares in another way.
 const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
   ['asset', (configuration) => configuration.assets.join(', ')],
@@ -345,6 +387,16 @@ const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
   ['leva massima', (configuration) => String(configuration.maxLeverage)],
   ['capitale allocato', (configuration) => configuration.allocatedCapital],
   ['system prompt', (configuration) => configuration.systemPrompt ?? 'predefinito'],
+  [
+    'cicli falliti consecutivi massimi',
+    (configuration) => String(configuration.maxConsecutiveFailures ?? 'nessuno'),
+  ],
+  [
+    'perdita giornaliera massima',
+    (configuration) => percentText(configuration.maxDailyLossPercent),
+  ],
+  ['perdita massima dal picco', (configuration) => percentText(configuration.maxDrawdownPercent)],
+  ['ripresa delle aperture', (configuration) => RESUME_LABELS[configuration.openingsResume]],
 ];
 
 const differences = (before: FakeConfiguration, after: FakeConfiguration) =>
@@ -369,9 +421,13 @@ const attachmentOf = (flowName: string): string => {
 type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
 
 export const handlers = [
+  // Before the routes of one flow, as on the API: the fixed path is not the identifier of a flow (R3.2.3).
+  ...emergencyClosingHandlers,
   ...accountHandlers,
+  ...reconciliationHandlers,
   ...providerKeyHandlers,
   ...notificationEmailHandlers,
+  ...capitalChangeHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json({ user_id: user.account, tenant_id: user.tenantId }),
@@ -555,6 +611,24 @@ export const handlers = [
       }
     }),
   ),
+  http.get('*/flows/:flowId/forecast-accuracy', ({ request, params }) =>
+    withUser(request, (user) => {
+      const flow = user.flows.find((candidate) => candidate.id === params.flowId);
+      if (flow === undefined) {
+        return problem(404, 'Not Found', 'flusso non trovato');
+      }
+      try {
+        return HttpResponse.json(
+          forecastAccuracyOf(flow.forecasts, new URL(request.url).searchParams),
+        );
+      } catch (error) {
+        if (error instanceof InvalidPeriod) {
+          return problem(400, 'Bad Request', error.message);
+        }
+        throw error;
+      }
+    }),
+  ),
   http.post('*/flows/:flowId/duplicate', ({ request, params }) =>
     withUser(request, (user) =>
       HttpResponse.json(flowResponse(fakePlatform.duplicate(user, String(params.flowId))), {
@@ -604,6 +678,30 @@ export const handlers = [
       ),
     ),
   ),
+  // Only suspended openings resume, with the reason of the API otherwise (R3.2.2).
+  http.post('*/flows/:flowId/openings/resume', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) => {
+      if (flow.openingsSuspension === null) {
+        return problem(409, 'Conflict', `le aperture di ${flow.name} non sono sospese`);
+      }
+      flow.openingsSuspension = null;
+      return new HttpResponse(null, { status: 204 });
+    }),
+  ),
+  http.post('*/flows/:flowId/cash-out', async ({ request, params }) => {
+    const body = (await request.json().catch(() => ({}))) as { capital?: string | null };
+    const capital =
+      body.capital === undefined || body.capital === null ? undefined : Number(body.capital);
+    return withUser(request, (user) => {
+      const { flow, freed } = fakePlatform.cashOut(user, String(params.flowId), capital);
+      return HttpResponse.json({
+        flow: flowResponse(flow),
+        freed: String(freed),
+        capital: String(flow.allocatedCapital),
+        left_open: [],
+      });
+    });
+  }),
   http.get('*/flows/:flowId/state', ({ request, params }) =>
     withUser(request, (user) => {
       const flow = user.flows.find((candidate) => candidate.id === params.flowId);

@@ -9,6 +9,7 @@ from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow_strategy import FlowStrategy
+from autotrading.domain.flows.openings_resume import OpeningsResume
 
 FORMAT = "autotrading-strategy"
 FORMAT_VERSION = 1
@@ -46,6 +47,9 @@ class StrategyRiskLimits(BaseModel):
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    # Null or missing: no overall limit on the sum of the open positions (R3.2.1).
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
 
 
 class StrategyBody(BaseModel):
@@ -62,6 +66,17 @@ class StrategyBody(BaseModel):
     bring_to_minimum: bool = False
     # Null follows the default system prompt of the platform (R1.4.8).
     system_prompt: str | None = None
+    # Null or missing: no maximum of failed cycles in a row (R3.2.4).
+    max_consecutive_failures: int | None = None
+    # Null or missing: no maximum loss; missing resume: by hand (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # Missing in the files written before them: a stop loss of 5% and no take profit (R3.1.2).
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
+    # Missing in the files written before it: no minimum confidence (R3.1.4).
+    minimum_confidence: int | None = None
 
 
 class StrategyDocument(BaseModel):
@@ -92,9 +107,18 @@ class StrategyDocument(BaseModel):
                     max_leverage=limits.max_leverage,
                     max_margin_exposure_percent=limits.max_margin_exposure_percent,
                     max_value_exposure_percent=limits.max_value_exposure_percent,
+                    max_total_margin_exposure_percent=limits.max_total_margin_exposure_percent,
+                    max_total_value_exposure_percent=limits.max_total_value_exposure_percent,
                 ),
                 bring_to_minimum=strategy.bring_to_minimum,
                 system_prompt=strategy.system_prompt,
+                max_consecutive_failures=strategy.max_consecutive_failures,
+                max_daily_loss_percent=strategy.max_daily_loss_percent,
+                max_drawdown_percent=strategy.max_drawdown_percent,
+                openings_resume=strategy.openings_resume,
+                default_stop_loss_percent=strategy.protection_defaults.stop_loss_percent,
+                default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
+                minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
             ),
         )
 
@@ -108,12 +132,21 @@ class StrategyDocument(BaseModel):
             max_leverage=limits.max_leverage,
             max_margin_exposure_percent=limits.max_margin_exposure_percent,
             max_value_exposure_percent=limits.max_value_exposure_percent,
+            max_total_margin_exposure_percent=limits.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=limits.max_total_value_exposure_percent,
             model_parameters={} if model is None else model.parameters,
             sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in strategy.sources),
             instructions=strategy.instructions,
             cycle_minutes=strategy.cycle_minutes,
             bring_to_minimum=strategy.bring_to_minimum,
             system_prompt=strategy.system_prompt,
+            max_consecutive_failures=strategy.max_consecutive_failures,
+            max_daily_loss_percent=strategy.max_daily_loss_percent,
+            max_drawdown_percent=strategy.max_drawdown_percent,
+            openings_resume=strategy.openings_resume,
+            default_stop_loss_percent=strategy.default_stop_loss_percent,
+            default_take_profit_percent=strategy.default_take_profit_percent,
+            minimum_confidence=strategy.minimum_confidence,
         )
 
     def _require_supported(self) -> None:

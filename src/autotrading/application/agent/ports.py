@@ -125,6 +125,19 @@ class ModelGatewayPort(Protocol):
     def model_catalog(self) -> ModelCatalogPort: ...
 
 
+class QuestionExitPlanPort(Protocol):
+    """The exit plan in force of an open position of the flow, as the cycle of the flow hands it (R3.1.1)."""
+
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+
 class QuestionPositionPort(Protocol):
     """An open position of the flow, as the cycle of the flow hands it to the agent."""
 
@@ -152,6 +165,9 @@ class QuestionPositionPort(Protocol):
     @property
     def liquidation_price(self) -> Decimal | None: ...
 
+    @property
+    def exit_plan(self) -> QuestionExitPlanPort: ...
+
 
 class QuestionStatePort(Protocol):
     """The state of the flow alone, as the cycle of the flow hands it to the agent (R1.4.3)."""
@@ -172,7 +188,7 @@ class QuestionStatePort(Protocol):
     def total_value(self) -> Decimal: ...
 
     @property
-    def return_percent(self) -> Decimal: ...
+    def return_percent(self) -> Decimal | None: ...
 
     @property
     def positions(self) -> Sequence[QuestionPositionPort]: ...

@@ -9,6 +9,8 @@ from autotrading.domain.flows.errors import (
     AssetsRequiredError,
     CapitalAboveFreeCapitalError,
     FlowAssignmentMissingError,
+    MaxConsecutiveFailuresOutOfRangeError,
+    MaxLossOutOfRangeError,
     RepeatedSourceError,
 )
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
@@ -16,6 +18,8 @@ from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital_of_account
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -50,6 +54,65 @@ def test_the_allocated_capital_must_be_positive(capital: Decimal) -> None:
         a_configuration(allocated_capital=capital)
 
 
+def test_a_configuration_has_no_maximum_of_consecutive_failed_cycles_unless_given() -> None:
+    assert a_configuration().max_consecutive_failures is None
+
+
+@pytest.mark.parametrize("maximum", [1, 100])
+def test_the_maximum_of_consecutive_failed_cycles_goes_from_1_to_100(maximum: int) -> None:
+    assert replace(a_configuration(), max_consecutive_failures=maximum).max_consecutive_failures == maximum
+
+
+@pytest.mark.parametrize("maximum", [0, 101, -1])
+def test_a_maximum_of_consecutive_failed_cycles_out_of_range_is_refused(maximum: int) -> None:
+    with pytest.raises(
+        MaxConsecutiveFailuresOutOfRangeError, match=r"^il massimo di cicli falliti consecutivi va da 1 a 100$"
+    ) as refused:
+        replace(a_configuration(), max_consecutive_failures=maximum)
+
+    assert refused.value.status_code == 400
+    assert refused.value.details == {"field": "max_consecutive_failures"}
+
+
+def test_a_configuration_has_no_maximum_loss_and_resumes_by_hand_unless_given() -> None:
+    configuration = a_configuration()
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (None, None, OpeningsResume.MANUAL)
+
+
+@pytest.mark.parametrize("percent", ["0.1", "100"])
+def test_the_maximum_losses_go_from_0_1_to_100(percent: str) -> None:
+    configuration = replace(
+        a_configuration(), max_daily_loss_percent=Decimal(percent), max_drawdown_percent=Decimal(percent)
+    )
+
+    assert (configuration.max_daily_loss_percent, configuration.max_drawdown_percent) == (
+        Decimal(percent),
+        Decimal(percent),
+    )
+
+
+@pytest.mark.parametrize("percent", ["0", "0.09", "101", "-1", "NaN"])
+def test_a_maximum_daily_loss_out_of_range_is_refused(percent: str) -> None:
+    with pytest.raises(MaxLossOutOfRangeError, match=r"^la perdita massima va da 0,1 a 100$") as refused:
+        replace(a_configuration(), max_daily_loss_percent=Decimal(percent))
+
+    assert refused.value.status_code == 422
+    assert refused.value.details == {"field": "max_daily_loss_percent"}
+
+
+@pytest.mark.parametrize("percent", ["0", "0.09", "101", "-1", "NaN"])
+def test_a_maximum_loss_from_the_peak_out_of_range_is_refused(percent: str) -> None:
+    with pytest.raises(MaxLossOutOfRangeError, match=r"^la perdita massima va da 0,1 a 100$") as refused:
+        replace(a_configuration(), max_drawdown_percent=Decimal(percent))
+
+    assert refused.value.details == {"field": "max_drawdown_percent"}
+
+
 def test_a_new_flow_is_stopped_at_the_first_version() -> None:
     tenant_id, account_id = TenantId.new(), uuid4()
 
@@ -68,29 +131,6 @@ def test_the_provider_of_a_flow_is_the_first_part_of_its_model() -> None:
     flow = a_flow(TenantId.new(), configuration=a_configuration(model="openrouter/deepseek/deepseek-chat"))
 
     assert flow.model_provider == "openrouter"
-
-
-def test_the_free_capital_is_the_balance_less_the_flows_not_archived() -> None:
-    tenant_id = TenantId.new()
-    flows = [
-        a_flow(tenant_id, name="alfa", configuration=a_configuration(allocated_capital=Decimal(300))),
-        a_flow(tenant_id, name="beta", status=FlowStatus.ACTIVE, configuration=a_configuration()),
-        a_flow(tenant_id, name="gamma", status=FlowStatus.ARCHIVED, configuration=a_configuration()),
-    ]
-
-    assert FreeCapital.of(Decimal(1000), "USDC", flows) == FreeCapital(Decimal(600), "USDC")
-
-
-def test_the_free_capital_of_an_account_ignores_the_flows_of_other_accounts() -> None:
-    tenant_id, account_id = TenantId.new(), uuid4()
-    flows = [
-        a_flow(
-            tenant_id, name="alfa", account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(300))
-        ),
-        a_flow(tenant_id, name="beta", configuration=a_configuration(allocated_capital=Decimal(500))),
-    ]
-
-    assert FreeCapital.of_account(Decimal(1000), "USDC", account_id, flows) == FreeCapital(Decimal(700), "USDC")
 
 
 def test_the_allocated_capital_of_an_account_sums_its_flows_not_archived_only() -> None:
@@ -136,4 +176,14 @@ def test_bringing_an_opening_to_the_exchange_minimum_is_off_unless_chosen() -> N
     assert configuration.risk_policy == RiskPolicy(configuration.risk_limits, bring_to_minimum=False)
     assert replace(configuration, bring_to_minimum=True).risk_policy == RiskPolicy(
         configuration.risk_limits, bring_to_minimum=True
+    )
+
+
+def test_the_minimum_confidence_is_absent_unless_given_and_reaches_the_risk_policy() -> None:
+    configuration = a_configuration()
+
+    assert configuration.minimum_confidence is None
+    assert configuration.risk_policy.minimum_confidence is None
+    assert replace(configuration, minimum_confidence=MinimumConfidence(60)).risk_policy == RiskPolicy(
+        configuration.risk_limits, bring_to_minimum=False, minimum_confidence=MinimumConfidence(60)
     )

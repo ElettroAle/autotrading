@@ -8,13 +8,14 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
+from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.errors import AccountToRemoveNotFoundError, FlowExchangeUnavailableError
 from autotrading.application.flows.ports import AccountRemovalPorts, PositionToClose
 from autotrading.application.flows.remove_account_with_flows import (
     RemoveAccountWithFlowsCommand,
     RemoveAccountWithFlowsUseCase,
 )
-from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
+from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
@@ -26,11 +27,12 @@ from autotrading.domain.flows.errors import (
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter, RemovedAccount
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.accounts import an_account
@@ -100,11 +102,19 @@ class Removal:
         repository = InMemoryFlowRepositoryAdapter(self.flows, TENANT)
         account_repository = InMemoryAccountRepositoryAdapter(self.accounts, TENANT)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed, TENANT)
-        stop_ports = StopPorts(self.cycles, self.closings, OpeningOfEveryAsset(), closed_positions, self.notices)
+        closing_ports = ClosingPorts(
+            self.cycles,
+            self.closings,
+            OpeningOfEveryAsset(),
+            closed_positions,
+            self.notices,
+            InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+        )
+
         self.use_case = RemoveAccountWithFlowsUseCase(
             repository,
             AccountRemovalPorts(self.positions, account_repository),
-            StopFlowUseCase(repository, stop_ports),
+            StopFlowUseCase(repository, CloseFlowPositionsUseCase(closing_ports)),
             ArchiveFlowUseCase(repository),
         )
 

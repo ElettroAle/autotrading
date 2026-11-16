@@ -70,6 +70,10 @@ class Notification:
         return cls(flow, f"in pausa, {reason}")
 
     @classmethod
+    def openings_suspended(cls, flow: str, reason: str) -> Notification:
+        return cls(flow, f"aperture sospese, {reason}")
+
+    @classmethod
     def unattributable_position(cls, account: str, asset: str) -> Notification:
         return cls(account, f"posizione non attribuibile su {asset}")
 
@@ -80,3 +84,7 @@ class Notification:
     @classmethod
     def unattributable_movement(cls, account: str, amount: Amount) -> Notification:
         return cls(account, f"movimento non attribuibile di {amount}")
+
+    @classmethod
+    def reconciliation_alarm(cls, account: str, read: Amount, expected: Amount) -> Notification:
+        return cls(account, f"allarme di riconciliazione, saldo {read} invece di {expected}")

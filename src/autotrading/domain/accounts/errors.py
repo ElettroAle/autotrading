@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from decimal import Decimal
 
 from autotrading.domain.errors import DomainError
 
@@ -80,3 +81,17 @@ class UnsupportedEnvironmentError(DomainError):
     def __init__(self, environment: str, supported: tuple[str, ...]) -> None:
         super().__init__("ambiente non ammesso: sono ammessi " + " e ".join(supported))
         self.environment = environment
+
+
+class DeviationThresholdOutOfRangeError(DomainError):
+    """The threshold of the balance deviation of an account goes from a tenth to a hundred percent (R3.3.1)."""
+
+    status_code = 422
+
+    def __init__(self, percent: Decimal) -> None:
+        super().__init__("la soglia di scostamento va da 0,1 a 100")
+        self.percent = percent
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"percent": str(self.percent)}

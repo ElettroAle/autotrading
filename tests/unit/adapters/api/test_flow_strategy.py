@@ -15,6 +15,9 @@ from autotrading.adapters.inbound.api.strategy_document import (
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow_strategy import FlowStrategy
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from tests.support.flows import OPENROUTER_MODEL, account_id_of, scenario_catalog
@@ -64,9 +67,14 @@ def an_original(client: TestClient, platform: Platform, user: str, name: str = "
         "instructions": "compra in tendenza",
         "max_leverage": 5,
         "max_margin_exposure_percent": "10",
+        "max_total_margin_exposure_percent": "30",
         "allocated_capital": "300",
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
+        "max_consecutive_failures": 4,
+        "max_daily_loss_percent": "5",
+        "max_drawdown_percent": "10",
+        "openings_resume": "next_day",
     }
     response = client.post("/flows", json=request)
     assert response.status_code == 201
@@ -80,9 +88,15 @@ def a_strategy() -> FlowStrategy:
         model=ModelSelection(OPENROUTER_MODEL, {"temperature": Decimal("0.5")}),
         sources=(SourceSelection("notizie", 2, {"articoli": 10}),),
         instructions="compra in tendenza",
-        risk_limits=RiskLimits(5, Decimal(10)),
+        risk_limits=RiskLimits(5, Decimal(10), None, Decimal(30), Decimal(200)),
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal("12.5"),
+        openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
+        minimum_confidence=MinimumConfidence(55),
     )
 
 
@@ -101,9 +115,18 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "max_leverage": 5,
                 "max_margin_exposure_percent": "10",
                 "max_value_exposure_percent": None,
+                "max_total_margin_exposure_percent": "30",
+                "max_total_value_exposure_percent": "200",
             },
             "bring_to_minimum": True,
             "system_prompt": "{instructions}",
+            "max_consecutive_failures": 3,
+            "max_daily_loss_percent": "5",
+            "max_drawdown_percent": "12.5",
+            "openings_resume": "next_day",
+            "default_stop_loss_percent": "3",
+            "default_take_profit_percent": "9",
+            "minimum_confidence": 55,
         },
     }
 
@@ -132,6 +155,18 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         True,
         "{instructions}",
     )
+    assert command.max_consecutive_failures == 3
+    assert (command.max_daily_loss_percent, command.max_drawdown_percent, command.openings_resume) == (
+        Decimal(5),
+        Decimal("12.5"),
+        OpeningsResume.NEXT_DAY,
+    )
+    assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (
+        Decimal(30),
+        Decimal(200),
+    )
+    assert (command.default_stop_loss_percent, command.default_take_profit_percent) == (Decimal(3), Decimal(9))
+    assert command.minimum_confidence == 55
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
@@ -140,6 +175,13 @@ def test_a_document_without_model_or_limits_gives_them_empty() -> None:
     command = document.command("alfa bis")
 
     assert (command.model, command.model_parameters, command.max_leverage, command.sources) == (None, {}, None, ())
+    assert command.max_consecutive_failures is None
+    assert (command.max_daily_loss_percent, command.max_drawdown_percent, command.openings_resume) == (
+        None,
+        None,
+        OpeningsResume.MANUAL,
+    )
+    assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (None, None)
 
 
 @pytest.mark.parametrize(("format_name", "version"), [("altro-formato", 1), ("autotrading-strategy", 2)])
@@ -221,6 +263,7 @@ def test_the_exported_file_imports_as_a_draft_with_the_same_strategy(client_of: 
         "risk_limits",
         "bring_to_minimum",
         "system_prompt",
+        "max_consecutive_failures",
     )
     assert {key: draft[key] for key in strategy_parts} == {key: original[key] for key in strategy_parts}
 

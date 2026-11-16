@@ -7,8 +7,12 @@ from secrets import token_hex
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
@@ -26,6 +30,7 @@ from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.mail_service import FakeMailServiceAdapter
@@ -38,6 +43,9 @@ from tests.fakes.notification_email_repository import (
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
+from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.platform import HYPERLIQUID, new_credentials
@@ -68,6 +76,10 @@ class Worker:
         self.outbox = InMemoryOutboxAdapter()
         self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.activity_reader = FakeActivityReaderAdapter()
+        self.protection_exchange = FakeProtectionExchangeAdapter()
+        self.protections = ProtectionStore()
+        self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
+        self.ledger = InMemoryFlowLedgerAdapter()
         self.exchange.trades_on(self.order_exchange)
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
@@ -75,7 +87,9 @@ class Worker:
         opener = FakeCredentialOpenerAdapter(self.vault)
         access, order_exchanges = OpenTradingAccessUseCase(accounts, opener), {HYPERLIQUID: self.order_exchange}
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: self.exchange})
-        closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default())
+        protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
+        cancel = CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
+        closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default(), cancel)
         opening = OpenPositionUseCase(access, order_exchanges, self.orders, Slippage.default())
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
@@ -97,6 +111,13 @@ class Worker:
                 self.outbox,
             ),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            record_account_executions=RecordAccountExecutionsUseCase(
+                InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+                self.platform_orders,
+                self.ledger,
+            ),
         )
 
     def saved_account(self, tenant_id: TenantId = TENANT) -> Account:

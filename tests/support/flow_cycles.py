@@ -17,7 +17,12 @@ from autotrading.application.flows.notify_unattributable import (
     UnattributableNotices,
 )
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
-from autotrading.application.flows.ports import CycleJob, ScheduledFlow, TenantScheduledFlow
+from autotrading.application.flows.ports import (
+    CycleJob,
+    ReconciliationAlarmPorts,
+    ScheduledFlow,
+    TenantScheduledFlow,
+)
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
@@ -30,13 +35,16 @@ from autotrading.application.flows.record_account_executions import RecordAccoun
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
+from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
 from autotrading.application.notifications.notify_unattributable_movement import (
     NotifyUnattributableMovementUseCase,
@@ -45,9 +53,12 @@ from autotrading.application.notifications.notify_unattributable_position import
     NotifyUnattributablePositionUseCase,
 )
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
-from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
+from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase, FlowOrderProtection
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
+from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
+from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
+from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.agent_context import MessageRole
 from autotrading.domain.agent.provider_name import ProviderName
@@ -68,6 +79,7 @@ from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.consecutive_failures import InMemoryConsecutiveFailuresAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.cycles import (
     FakeClockAdapter,
@@ -77,7 +89,9 @@ from tests.fakes.cycles import (
 )
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
+from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import (
     InMemoryAutomaticPauseAdapter,
     InMemoryFlowRepositoryAdapter,
@@ -88,14 +102,15 @@ from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
 )
-from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.cycle_composition import (
@@ -159,7 +174,7 @@ class FlowCycles:
         self.credentials: dict[tuple[TenantId, str], Credentials] = {}
         self.users: dict[str, str] = {}
         self.running: threading.Thread | None = None
-        self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.readings = self.platform.readings
         self.equity_snapshots = EquitySnapshotStore()
 
     # The platform
@@ -171,10 +186,14 @@ class FlowCycles:
         access = OpenTradingAccessUseCase(accounts, opener)
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
+        exit_plans = InMemoryExitPlanRepositoryAdapter(platform.exit_plans, tenant_id)
         notify = platform.worker_for(tenant_id).notify
         closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
+        protections = InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
+        protection_exchanges = {HYPERLIQUID: platform.protection_exchange}
+        cancel_protections = platform.cancel_protections(tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
             ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
@@ -185,8 +204,16 @@ class FlowCycles:
             flows,
             activity,
             self.readings,
-            RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
+            RecordOutsideClosingUseCase(
+                flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
+            ),
             record_executions,
+            RecordProtectionClosingUseCase(
+                flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
+            ),
+            ReconciliationAlarmPorts(
+                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
             reconcile_account,
@@ -203,16 +230,30 @@ class FlowCycles:
             flows,
             InMemoryFlowTimingAdapter(platform.flows, tenant_id),
             ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
-            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, platform.ledger), reconcile_for_cycle),
+            ReadCycleFlowStateUseCase(
+                ReadFlowStateUseCase(flows, activity, platform.ledger, exit_plans), reconcile_for_cycle
+            ),
+            self.readings,
         )
+        order_exchanges = {HYPERLIQUID: platform.order_exchange}
         execute_flow_orders = ExecuteFlowOrdersUseCase(
-            access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
+            access,
+            order_exchanges,
+            platform.orders_of(tenant_id),
+            platform.slippage,
+            FlowOrderProtection(
+                ProtectFlowPositionUseCase(
+                    order_exchanges, protection_exchanges, protections, platform.orders_of(tenant_id), platform.slippage
+                ),
+                cancel_protections,
+                UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
+            ),
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
                 NotifyOrderRejectedUseCase(notify),
                 NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
         return TenantCyclePorts(
@@ -223,7 +264,17 @@ class FlowCycles:
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),
-            send_orders=SendCycleOrdersUseCase(ExecuteCycleOrdersUseCase(execute_flow_orders, follow_flow_orders)),
+            send_orders=SendCycleOrdersUseCase(
+                ExecuteCycleOrdersUseCase(
+                    execute_flow_orders,
+                    follow_flow_orders,
+                    ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
+                ),
+                openings,
+                exit_plans,
+                flows,
+                InMemoryFlowProtectionLevelsAdapter(platform.protections, tenant_id),
+            ),
             openings=openings,
             closed_positions=closed_positions,
             follow_flow_orders=follow_flow_orders,
@@ -233,6 +284,10 @@ class FlowCycles:
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             checkpoints=self.checkpoints,
             equity=RecordCycleEquityUseCase(InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id)),
+            consecutive_failures=InMemoryConsecutiveFailuresAdapter(self.records, platform.flows),
+            openings_suspensions=InMemoryOpeningsSuspensionAdapter(platform.flows, tenant_id),
+            loss_references=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
+            openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify),
         )
 
     def services(self) -> CycleServices:

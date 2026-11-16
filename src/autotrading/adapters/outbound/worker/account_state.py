@@ -13,7 +13,6 @@ from autotrading.application.accounts.errors import (
     WorkerUnavailableError,
 )
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.application.flows.ports import FlowBalance
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.balance import Balance
@@ -70,11 +69,6 @@ class WorkerAccountStateAdapter:
         except httpx.HTTPError as error:
             raise WorkerUnavailableError from error
         return _state_of(_body_of(response), response.status_code)
-
-    def balance_of(self, account_id: UUID) -> FlowBalance:
-        """The balance of an account as a flow reads it (ADR 0087), with the errors of the flows context."""
-        balance = self._state_for_flows(account_id).balance
-        return FlowBalance(balance.amount, balance.currency)
 
     def open_positions_of(self, account_id: UUID) -> tuple[str, ...]:
         """The assets open on an account about to be removed (ADR 0090), with the errors of the flows context."""

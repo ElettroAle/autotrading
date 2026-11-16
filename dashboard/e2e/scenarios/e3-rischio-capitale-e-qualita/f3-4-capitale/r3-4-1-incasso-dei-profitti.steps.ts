@@ -1,0 +1,36 @@
+import { fakePlatform } from '@/testing/mocks/platform';
+import { anOpenPosition } from '@/testing/mocks/positions';
+
+import { Given, When } from '../../../support/fixtures';
+import { onFlowPage } from '../../../support/flow-page';
+
+// R3.4.1, ADR incasso-dei-profitti-nella-dashboard: the other scenarios run on the use cases with pytest-bdd. The
+// confirmation is checked by the steps it shares with the emergency closing (e2e/support/confirmation.steps.ts).
+Given(
+  'che {string} ha sul conto {string} il flusso attivo {string} con capitale allocato {int} USDC',
+  async ({ memory }, account: string, accountName: string, flow: string, capital: number) => {
+    fakePlatform.addUser(account, { hasUserRole: true });
+    fakePlatform.addFlow(account, flow, {
+      accountName,
+      allocatedCapital: capital,
+      currentCapital: capital,
+    });
+    memory.flow = flow;
+  },
+);
+
+Given(
+  'che {string} ha valore complessivo {int} USDC con una posizione aperta su {string}',
+  async ({}, flow: string, value: number, asset: string) => {
+    fakePlatform.changeFlow(flow, { currentCapital: value });
+    fakePlatform.holdPositions(flow, [anOpenPosition({ asset })]);
+  },
+);
+
+When(
+  "{string} sceglie nella dashboard l'incasso dei profitti di {string}",
+  async ({ dashboard, memory }, account: string, flow: string) => {
+    await onFlowPage(dashboard, memory, account, flow);
+    await dashboard.page.getByRole('button', { name: 'Incassa i profitti' }).click();
+  },
+);
