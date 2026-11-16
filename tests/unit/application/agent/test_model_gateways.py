@@ -30,9 +30,8 @@ from tests.support.provider_key import api_key_of
 TENANT = TenantId.new()
 NOW = datetime(2026, 11, 13, 10, 30, tzinfo=UTC)
 CONTEXT = AgentContext(
-    instructions="Sei un trader prudente",
+    system_prompt="Sei un trader prudente",
     assets=("BTC",),
-    max_leverage=5,
     started_at=NOW,
     now=NOW,
     state=FlowStateView("USDC", Decimal(400), Decimal(400), Decimal(400), Decimal(400), Decimal(0), ()),

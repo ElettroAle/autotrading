@@ -6,9 +6,9 @@ Funzionalità: R2.5.2 Esportazione e importazione della configurazione
   Perché la salvi, la riusi su un altro conto o la ricrei dopo un'archiviazione
 
   L'esportazione produce un file JSON con la sola strategia del flusso: intervallo, fonti con pesi e
-  parametri, modello con i suoi parametri, istruzioni e regole di rischio (RF-21.06). Il file non contiene
-  conto, capitale, asset, chiavi IA, cicli né altri dati del flusso. L'importazione di un file valido crea un
-  nuovo flusso nello stato "bozza" (R2.4.1) alla versione 1, con nome scelto dall'utente; conto, capitale
+  parametri, modello con i suoi parametri, istruzioni, regole di rischio (RF-21.06) e system prompt (R1.4.8). Il file
+  non contiene conto, capitale, asset, chiavi IA, cicli né altri dati del flusso. L'importazione di un file valido
+  crea un nuovo flusso nello stato "bozza" (R2.4.1) alla versione 1, con nome scelto dall'utente; conto, capitale
   allocato e asset si assegnano prima dell'avvio, che verifica RF-02.05 come per ogni bozza. Un file non
   valido è rifiutato con il motivo, senza creare nulla. Disponibile dalla dashboard e dall'interfaccia
   programmatica.

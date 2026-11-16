@@ -1,4 +1,4 @@
-import { FAKE_TRADABLE_ASSETS } from './catalogs';
+import { FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
@@ -71,6 +71,8 @@ export type FakeFlow = {
   instructions: string;
   riskLimits: FakeRiskLimits;
   bringToMinimum: boolean;
+  /** The system prompt the user wrote; null follows the default of the platform (R1.4.8). */
+  systemPrompt: string | null;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
   /** Why the flow paused, as the API says it (R1.2.4). */
@@ -113,6 +115,9 @@ export type FakeFlowConfiguration = {
   };
   allocated_capital: string | null;
   bring_to_minimum: boolean;
+  system_prompt: string;
+  system_prompt_is_default: boolean;
+  system_prompt_placeholders: { name: string; description: string }[];
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -131,6 +136,9 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   },
   allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
   bring_to_minimum: flow.bringToMinimum,
+  system_prompt: flow.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
+  system_prompt_is_default: flow.systemPrompt === null,
+  system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -354,6 +362,7 @@ const draftOf = (
   instructions: strategy.instructions ?? '',
   riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
   bringToMinimum: strategy.bringToMinimum ?? false,
+  systemPrompt: null,
   cycles: 0,
   pauseReason: null,
   currentCapital: 0,
@@ -509,6 +518,7 @@ export const fakePlatform = {
       instructions: '',
       riskLimits: DEFAULT_RISK_LIMITS,
       bringToMinimum: false,
+      systemPrompt: null,
       cycles: 0,
       pauseReason: null,
       currentCapital: 100,

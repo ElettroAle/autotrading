@@ -52,7 +52,12 @@ const FLOW: Flow = {
   },
   allocated_capital: '300',
   bring_to_minimum: false,
+  system_prompt: '{instructions} su {assets}',
+  system_prompt_is_default: true,
+  system_prompt_placeholders: [{ name: 'assets', description: 'gli asset del flusso' }],
 };
+
+const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
 
 describe('creationRequestOf', () => {
   it('sends the configuration the user filled, leaving to the API the defaults of the blank values', () => {
@@ -74,7 +79,14 @@ describe('creationRequestOf', () => {
       max_value_exposure_percent: null,
       allocated_capital: '300',
       bring_to_minimum: false,
+      system_prompt: null,
     });
+  });
+
+  it('sends the system prompt the user wrote instead of the default', () => {
+    const values = filled({ system_prompt: '{instructions}', system_prompt_default: false });
+
+    expect(creationRequestOf(values).system_prompt).toBe('{instructions}');
   });
 
   it('leaves out a blank capital, so the API names it as missing', () => {
@@ -104,6 +116,15 @@ describe('formValuesOf', () => {
       max_value_exposure_percent: '',
       allocated_capital: '300',
       bring_to_minimum: false,
+      system_prompt: '',
+      system_prompt_default: true,
+    });
+  });
+
+  it('fills the system prompt the user wrote, apart from the default', () => {
+    expect(formValuesOf(CUSTOM)).toMatchObject({
+      system_prompt: '{instructions}',
+      system_prompt_default: false,
     });
   });
 
@@ -152,6 +173,19 @@ describe('changesOf', () => {
     const values = { ...formValuesOf(FLOW), max_margin_exposure_percent: '' };
 
     expect(changesOf(FLOW, values)).toEqual({ settings: {} });
+  });
+
+  it('sends a system prompt the user wrote, and null to go back to the default', () => {
+    const written = {
+      ...formValuesOf(FLOW),
+      system_prompt: 'audace',
+      system_prompt_default: false,
+    };
+    const restored = { ...formValuesOf(CUSTOM), system_prompt: '', system_prompt_default: true };
+
+    expect(changesOf(FLOW, written)).toEqual({ settings: { system_prompt: 'audace' } });
+    expect(changesOf(CUSTOM, restored)).toEqual({ settings: { system_prompt: null } });
+    expect(changesOf(CUSTOM, formValuesOf(CUSTOM))).toEqual({ settings: {} });
   });
 
   it('keeps the capital apart, as it changes through its own request', () => {

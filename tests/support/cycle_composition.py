@@ -11,6 +11,7 @@ from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolCon
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
+from autotrading.application.agent.list_agent_actions import ListAgentActionsUseCase
 from autotrading.application.agent.model_gateways import ModelGateways
 from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.flows.check_risk import CheckRiskUseCase
@@ -131,7 +132,7 @@ def run_cycle_for(
             services.clock,
         ),
         calls=ThreadPoolConcurrentCallsAdapter(),
-        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), services.clock),
+        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), ListAgentActionsUseCase(), services.clock),
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
                 ComposeAgentContextUseCase(),

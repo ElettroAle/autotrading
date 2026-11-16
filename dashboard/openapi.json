@@ -1028,6 +1028,32 @@
         }
       }
     },
+    "/flows/system-prompt": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Default System Prompt",
+        "operationId": "read_default_system_prompt_flows_system_prompt_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultSystemPromptResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/flows/{flow_id}": {
       "patch": {
         "tags": [
@@ -3838,6 +3864,21 @@
           "bring_to_minimum": {
             "type": "boolean",
             "title": "Bring To Minimum"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "system_prompt_is_default": {
+            "type": "boolean",
+            "title": "System Prompt Is Default"
+          },
+          "system_prompt_placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PromptPlaceholderResponse"
+            },
+            "type": "array",
+            "title": "System Prompt Placeholders"
           }
         },
         "type": "object",
@@ -3850,7 +3891,10 @@
           "instructions",
           "risk_limits",
           "allocated_capital",
-          "bring_to_minimum"
+          "bring_to_minimum",
+          "system_prompt",
+          "system_prompt_is_default",
+          "system_prompt_placeholders"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -4083,6 +4127,28 @@
           "cost_usd"
         ],
         "title": "DailyCostResponse"
+      },
+      "DefaultSystemPromptResponse": {
+        "properties": {
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "system_prompt_placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PromptPlaceholderResponse"
+            },
+            "type": "array",
+            "title": "System Prompt Placeholders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_prompt",
+          "system_prompt_placeholders"
+        ],
+        "title": "DefaultSystemPromptResponse",
+        "description": "The system prompt a new flow starts with, and the placeholders it may use (R1.4.8)."
       },
       "DifferenceResponse": {
         "properties": {
@@ -4368,6 +4434,17 @@
             "type": "boolean",
             "title": "Bring To Minimum",
             "default": false
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
@@ -4552,6 +4629,17 @@
               }
             ],
             "title": "Bring To Minimum"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
@@ -4902,6 +4990,21 @@
           "bring_to_minimum": {
             "type": "boolean",
             "title": "Bring To Minimum"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "system_prompt_is_default": {
+            "type": "boolean",
+            "title": "System Prompt Is Default"
+          },
+          "system_prompt_placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PromptPlaceholderResponse"
+            },
+            "type": "array",
+            "title": "System Prompt Placeholders"
           }
         },
         "type": "object",
@@ -4918,7 +5021,10 @@
           "instructions",
           "risk_limits",
           "allocated_capital",
-          "bring_to_minimum"
+          "bring_to_minimum",
+          "system_prompt",
+          "system_prompt_is_default",
+          "system_prompt_placeholders"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -6144,6 +6250,25 @@
         ],
         "title": "PositionResponse"
       },
+      "PromptPlaceholderResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "PromptPlaceholderResponse",
+        "description": "A placeholder the system prompt may use, with what it stands for (R1.4.8)."
+      },
       "ProviderKeyFieldResponse": {
         "properties": {
           "name": {
@@ -6542,6 +6667,17 @@
             "type": "boolean",
             "title": "Bring To Minimum",
             "default": false
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
@@ -6590,6 +6726,17 @@
             "type": "boolean",
             "title": "Bring To Minimum",
             "default": false
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
