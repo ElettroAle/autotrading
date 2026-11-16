@@ -104,6 +104,18 @@ class Agent:
         return Reply(Response((Closing("BTC"),)))
 
 
+class LossGuard:
+    """The guard of the losses of the flow, with the answer the test gives, and the flows it guarded."""
+
+    def __init__(self, *, suspended: bool) -> None:
+        self.suspended = suspended
+        self.guarded: list[CycleFlow] = []
+
+    def execute(self, flow: CycleFlow) -> bool:
+        self.guarded.append(flow)
+        return self.suspended
+
+
 class Actions:
     def execute(self) -> tuple[str, ...]:
         return ("apri", "chiudi")
@@ -153,7 +165,7 @@ def test_the_risk_check_runs_on_the_limits_of_the_exchange_of_the_account() -> N
     decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Opening("BTC"), Opening("ETH")))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
 
-    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
 
     assert [order.flow for order in review.orders] == [CYCLE_FLOW]
     outcomes = review.outcomes
@@ -167,4 +179,19 @@ def test_the_exchange_of_an_account_without_limits_is_unavailable() -> None:
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter()})
 
     with pytest.raises(FlowExchangeUnavailableError):
-        ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+        ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+
+def test_openings_suspended_by_the_guard_of_the_losses_are_blocked_before_the_exchange() -> None:
+    decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Opening("BTC"),))))
+    guard = LossGuard(suspended=True)
+
+    review = ReviewCycleRiskUseCase(CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter()}), guard).execute(
+        FLOW.id.value, SNAPSHOT, decisions
+    )
+
+    assert guard.guarded == [CYCLE_FLOW]
+    assert review.orders == ()
+    assert review.outcomes == (
+        BlockedDecision("BTC", "apertura BTC non eseguita: aperture sospese per perdita massima"),
+    )

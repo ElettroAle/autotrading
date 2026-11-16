@@ -63,6 +63,7 @@ from autotrading.application.flows.ports import (
     HistoricalClosedPositionsPort,
     HistoricalCyclesPort,
     HistoricalOrdersPort,
+    OpeningsSuspensionPort,
     RunningVerificationsPort,
 )
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
@@ -73,11 +74,13 @@ from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_default_system_prompt import ReadDefaultSystemPromptUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
+from autotrading.application.flows.read_flow_openings import ReadFlowOpeningsUseCase
 from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
+from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.ports import (
@@ -137,6 +140,7 @@ class TenantPorts:
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
+    openings_suspensions: OpeningsSuspensionPort
     historical_cycles: HistoricalCyclesPort
     historical_closed_positions: HistoricalClosedPositionsPort
     historical_orders: HistoricalOrdersPort
@@ -202,6 +206,8 @@ class TenantUseCases:
     export_flow_strategy: ExportFlowStrategyUseCase
     import_flow_strategy: ImportFlowStrategyUseCase
     rank_flows: RankFlowsUseCase
+    read_flow_openings: ReadFlowOpeningsUseCase
+    resume_flow_openings: ResumeFlowOpeningsUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -299,4 +305,6 @@ class TenantUseCases:
             rank_flows=RankFlowsUseCase(
                 ports.flows, ports.equity_snapshots, ports.closed_positions, ports.cycle_history, ports.clock
             ),
+            read_flow_openings=ReadFlowOpeningsUseCase(ports.flows, ports.openings_suspensions, ports.clock),
+            resume_flow_openings=ResumeFlowOpeningsUseCase(ports.flows, ports.openings_suspensions, ports.clock),
         )

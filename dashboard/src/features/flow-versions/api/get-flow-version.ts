@@ -29,6 +29,9 @@ const configurationSchema = z.object({
   system_prompt: z.string(),
   system_prompt_is_default: z.boolean(),
   max_consecutive_failures: z.number().nullable(),
+  max_daily_loss_percent: z.string().nullable(),
+  max_drawdown_percent: z.string().nullable(),
+  openings_resume: z.enum(['manual', 'next_day']),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

@@ -10,6 +10,7 @@ from autotrading.domain.flows.errors import (
     CapitalAboveFreeCapitalError,
     FlowAssignmentMissingError,
     MaxConsecutiveFailuresOutOfRangeError,
+    MaxLossOutOfRangeError,
     RepeatedSourceError,
 )
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
@@ -17,6 +18,7 @@ from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital_of_account
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -69,6 +71,45 @@ def test_a_maximum_of_consecutive_failed_cycles_out_of_range_is_refused(maximum:
 
     assert refused.value.status_code == 400
     assert refused.value.details == {"field": "max_consecutive_failures"}
+
+
+def test_a_configuration_has_no_maximum_loss_and_resumes_by_hand_unless_given() -> None:
+    configuration = a_configuration()
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (None, None, OpeningsResume.MANUAL)
+
+
+@pytest.mark.parametrize("percent", ["0.1", "100"])
+def test_the_maximum_losses_go_from_0_1_to_100(percent: str) -> None:
+    configuration = replace(
+        a_configuration(), max_daily_loss_percent=Decimal(percent), max_drawdown_percent=Decimal(percent)
+    )
+
+    assert (configuration.max_daily_loss_percent, configuration.max_drawdown_percent) == (
+        Decimal(percent),
+        Decimal(percent),
+    )
+
+
+@pytest.mark.parametrize("percent", ["0", "0.09", "101", "-1", "NaN"])
+def test_a_maximum_daily_loss_out_of_range_is_refused(percent: str) -> None:
+    with pytest.raises(MaxLossOutOfRangeError, match=r"^la perdita massima va da 0,1 a 100$") as refused:
+        replace(a_configuration(), max_daily_loss_percent=Decimal(percent))
+
+    assert refused.value.status_code == 422
+    assert refused.value.details == {"field": "max_daily_loss_percent"}
+
+
+@pytest.mark.parametrize("percent", ["0", "0.09", "101", "-1", "NaN"])
+def test_a_maximum_loss_from_the_peak_out_of_range_is_refused(percent: str) -> None:
+    with pytest.raises(MaxLossOutOfRangeError, match=r"^la perdita massima va da 0,1 a 100$") as refused:
+        replace(a_configuration(), max_drawdown_percent=Decimal(percent))
+
+    assert refused.value.details == {"field": "max_drawdown_percent"}
 
 
 def test_a_new_flow_is_stopped_at_the_first_version() -> None:

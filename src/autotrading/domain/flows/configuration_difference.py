@@ -84,4 +84,7 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
         "cicli falliti consecutivi massimi",
         lambda configuration: _count(configuration.max_consecutive_failures),
     ),
+    ("perdita giornaliera massima", lambda configuration: _percent(configuration.max_daily_loss_percent)),
+    ("perdita massima dal picco", lambda configuration: _percent(configuration.max_drawdown_percent)),
+    ("ripresa delle aperture", lambda configuration: configuration.openings_resume.label),
 )

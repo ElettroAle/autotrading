@@ -73,6 +73,7 @@ from tests.fakes.linked_chat_repository import (
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -221,6 +222,7 @@ class Platform:
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
+            openings_suspensions=InMemoryOpeningsSuspensionAdapter(self.flows, tenant_id),
             historical_cycles=self.history_of(tenant_id),
             historical_closed_positions=self.history_of(tenant_id),
             historical_orders=self.history_of(tenant_id),

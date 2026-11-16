@@ -143,6 +143,10 @@ flows = Table(
     Column("cycle_anchor", DateTime(timezone=True)),
     Column("first_started_at", DateTime(timezone=True)),
     Column("pause_reason", Text),
+    # The openings suspended for maximum loss, with the threshold passed, and their last resume (R3.2.2).
+    Column("openings_suspension_reason", Text),
+    Column("openings_suspended_at", DateTime(timezone=True)),
+    Column("openings_resumed_at", DateTime(timezone=True)),
     ForeignKeyConstraint(
         ["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"], name="flows_account_of_tenant"
     ),

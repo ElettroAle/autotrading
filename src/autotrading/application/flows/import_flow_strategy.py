@@ -10,6 +10,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -35,6 +36,9 @@ class ImportFlowStrategyCommand:
     bring_to_minimum: bool = False
     system_prompt: str | None = None
     max_consecutive_failures: int | None = None
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
 
 class ImportFlowStrategyUseCase:
@@ -86,4 +90,7 @@ class ImportFlowStrategyUseCase:
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,
             max_consecutive_failures=command.max_consecutive_failures,
+            max_daily_loss_percent=command.max_daily_loss_percent,
+            max_drawdown_percent=command.max_drawdown_percent,
+            openings_resume=command.openings_resume,
         )

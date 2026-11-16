@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+from decimal import Decimal
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -26,6 +28,10 @@ class FlowStrategy:
     system_prompt: str | None = None
     # No maximum unless the strategy has one, as in the configuration (R3.2.4).
     max_consecutive_failures: int | None = None
+    # No maximum loss and the manual resume unless the strategy has its own, as in the configuration (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -38,6 +44,9 @@ class FlowStrategy:
             configuration.bring_to_minimum,
             configuration.system_prompt,
             configuration.max_consecutive_failures,
+            configuration.max_daily_loss_percent,
+            configuration.max_drawdown_percent,
+            configuration.openings_resume,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -54,6 +63,9 @@ class FlowStrategy:
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
             max_consecutive_failures=self.max_consecutive_failures,
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
         )
 
 

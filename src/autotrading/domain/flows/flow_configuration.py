@@ -8,9 +8,12 @@ from autotrading.domain.flows.errors import (
     AssetsRequiredError,
     FlowAssignmentMissingError,
     MaxConsecutiveFailuresOutOfRangeError,
+    MaxLossOutOfRangeError,
     RepeatedSourceError,
     SourceNotSelectedError,
 )
+from autotrading.domain.flows.flow_setting import FlowSetting
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -23,6 +26,8 @@ from autotrading.domain.flows.system_prompt import (
 
 FEWEST_CONSECUTIVE_FAILURES = 1
 MOST_CONSECUTIVE_FAILURES = 100
+LOWEST_MAX_LOSS = Decimal("0.1")
+HIGHEST_MAX_LOSS = Decimal(100)
 
 
 def assets_of(names: Iterable[str]) -> tuple[str, ...]:
@@ -56,6 +61,11 @@ class FlowConfiguration:
     system_prompt: str | None = None
     # No maximum unless the user sets one: the flow keeps trying at every cycle (R3.2.4).
     max_consecutive_failures: int | None = None
+    # No maximum loss unless the user sets one; suspended openings resume by hand unless the user chooses the next day
+    # (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]
@@ -70,6 +80,8 @@ class FlowConfiguration:
         maximum = self.max_consecutive_failures
         if maximum is not None and not FEWEST_CONSECUTIVE_FAILURES <= maximum <= MOST_CONSECUTIVE_FAILURES:
             raise MaxConsecutiveFailuresOutOfRangeError
+        _check_max_loss(self.max_daily_loss_percent, FlowSetting.MAX_DAILY_LOSS)
+        _check_max_loss(self.max_drawdown_percent, FlowSetting.MAX_DRAWDOWN)
 
     @property
     def assigned_capital(self) -> Decimal:
@@ -105,3 +117,8 @@ class FlowConfiguration:
     @property
     def risk_policy(self) -> RiskPolicy:
         return RiskPolicy(self.risk_limits, self.bring_to_minimum)
+
+
+def _check_max_loss(percent: Decimal | None, setting: FlowSetting) -> None:
+    if percent is not None and not (percent.is_finite() and LOWEST_MAX_LOSS <= percent <= HIGHEST_MAX_LOSS):
+        raise MaxLossOutOfRangeError(setting)

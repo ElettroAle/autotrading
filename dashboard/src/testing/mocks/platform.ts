@@ -28,6 +28,12 @@ export type FakeFlowHistory = {
 
 export type FakeEquityPoint = { readonly plannedAt: Date; readonly equity: number };
 
+/** How suspended openings resume: by the user, or on their own at the next midnight UTC (R3.2.2). */
+export type FakeOpeningsResume = 'manual' | 'next_day';
+
+/** The openings of a flow suspended for maximum loss, as the API says it (R3.2.2). */
+export type FakeOpeningsSuspension = { readonly reason: string; readonly suspendedAt: string };
+
 export type FakeConfiguration = {
   readonly assets: string[];
   readonly cycleMinutes: number;
@@ -37,6 +43,9 @@ export type FakeConfiguration = {
   readonly allocatedCapital: string;
   readonly systemPrompt: string | null;
   readonly maxConsecutiveFailures: number | null;
+  readonly maxDailyLossPercent: string | null;
+  readonly maxDrawdownPercent: string | null;
+  readonly openingsResume: FakeOpeningsResume;
 };
 
 export type FakeVersion = {
@@ -80,6 +89,12 @@ export type FakeFlow = {
   systemPrompt: string | null;
   /** The failed cycles in a row after which the flow pauses; null keeps it trying (R3.2.4). */
   maxConsecutiveFailures: number | null;
+  /** The maximum losses, null for none, and how the openings they suspend resume (R3.2.2). */
+  maxDailyLossPercent: string | null;
+  maxDrawdownPercent: string | null;
+  openingsResume: FakeOpeningsResume;
+  /** The suspension of the openings in force, null when the flow may open (R3.2.2). */
+  openingsSuspension: FakeOpeningsSuspension | null;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
   /** Why the flow paused, as the API says it (R1.2.4). */
@@ -130,6 +145,9 @@ export type FakeFlowConfiguration = {
   system_prompt_is_default: boolean;
   system_prompt_placeholders: { name: string; description: string }[];
   max_consecutive_failures: number | null;
+  max_daily_loss_percent: string | null;
+  max_drawdown_percent: string | null;
+  openings_resume: FakeOpeningsResume;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -154,6 +172,9 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   system_prompt_is_default: flow.systemPrompt === null,
   system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
   max_consecutive_failures: flow.maxConsecutiveFailures,
+  max_daily_loss_percent: flow.maxDailyLossPercent,
+  max_drawdown_percent: flow.maxDrawdownPercent,
+  openings_resume: flow.openingsResume,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -295,6 +316,9 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   allocatedCapital: '100',
   systemPrompt: null,
   maxConsecutiveFailures: null,
+  maxDailyLossPercent: null,
+  maxDrawdownPercent: null,
+  openingsResume: 'manual',
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -387,6 +411,10 @@ const draftOf = (
   bringToMinimum: strategy.bringToMinimum ?? false,
   systemPrompt: null,
   maxConsecutiveFailures: null,
+  maxDailyLossPercent: null,
+  maxDrawdownPercent: null,
+  openingsResume: 'manual',
+  openingsSuspension: null,
   cycles: 0,
   pauseReason: null,
   currentCapital: 0,
@@ -544,6 +572,10 @@ export const fakePlatform = {
       bringToMinimum: false,
       systemPrompt: null,
       maxConsecutiveFailures: null,
+      maxDailyLossPercent: null,
+      maxDrawdownPercent: null,
+      openingsResume: 'manual',
+      openingsSuspension: null,
       cycles: 0,
       pauseReason: null,
       currentCapital: 100,

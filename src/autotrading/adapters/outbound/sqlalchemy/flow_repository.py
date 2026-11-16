@@ -26,6 +26,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelParameterValue, ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -70,6 +71,10 @@ class _ConfigurationDocument(TypedDict):
     bring_to_minimum: NotRequired[bool]
     system_prompt: NotRequired[str | None]
     max_consecutive_failures: NotRequired[int | None]
+    # Absent in the versions saved before the maximum losses existed: none, and the manual resume (R3.2.2).
+    max_daily_loss_percent: NotRequired[str | None]
+    max_drawdown_percent: NotRequired[str | None]
+    openings_resume: NotRequired[str]
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -283,6 +288,9 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         "bring_to_minimum": configuration.bring_to_minimum,
         "system_prompt": configuration.system_prompt,
         "max_consecutive_failures": configuration.max_consecutive_failures,
+        "max_daily_loss_percent": _text(configuration.max_daily_loss_percent),
+        "max_drawdown_percent": _text(configuration.max_drawdown_percent),
+        "openings_resume": configuration.openings_resume.value,
     }
 
 
@@ -314,6 +322,9 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         system_prompt=document.get("system_prompt"),
         # Versions saved before the maximum existed have none: the flow keeps trying at every cycle (R3.2.4).
         max_consecutive_failures=document.get("max_consecutive_failures"),
+        max_daily_loss_percent=_decimal(document.get("max_daily_loss_percent")),
+        max_drawdown_percent=_decimal(document.get("max_drawdown_percent")),
+        openings_resume=OpeningsResume(document.get("openings_resume", OpeningsResume.MANUAL.value)),
     )
 
 

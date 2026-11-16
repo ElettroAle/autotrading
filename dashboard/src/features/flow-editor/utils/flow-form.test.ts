@@ -58,6 +58,9 @@ const FLOW: Flow = {
   system_prompt_is_default: true,
   system_prompt_placeholders: [{ name: 'assets', description: 'gli asset del flusso' }],
   max_consecutive_failures: null,
+  max_daily_loss_percent: null,
+  max_drawdown_percent: null,
+  openings_resume: 'manual',
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -86,7 +89,26 @@ describe('creationRequestOf', () => {
       bring_to_minimum: false,
       system_prompt: null,
       max_consecutive_failures: null,
+      max_daily_loss_percent: null,
+      max_drawdown_percent: null,
+      openings_resume: 'manual',
     });
+  });
+
+  it('sends the maximum losses the user typed, with a decimal point, and the resume chosen', () => {
+    const request = creationRequestOf(
+      filled({
+        max_daily_loss_percent: ' 5 ',
+        max_drawdown_percent: '12,5',
+        openings_resume: 'next_day',
+      }),
+    );
+
+    expect([
+      request.max_daily_loss_percent,
+      request.max_drawdown_percent,
+      request.openings_resume,
+    ]).toEqual(['5', '12.5', 'next_day']);
   });
 
   // ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits travel as the limits per operation.
@@ -148,6 +170,24 @@ describe('formValuesOf', () => {
       system_prompt: '',
       system_prompt_default: true,
       max_consecutive_failures: '',
+      max_daily_loss_percent: '',
+      max_drawdown_percent: '',
+      openings_resume: 'manual',
+    });
+  });
+
+  it('fills the maximum losses and the resume of the flow', () => {
+    const flow: Flow = {
+      ...FLOW,
+      max_daily_loss_percent: '5',
+      max_drawdown_percent: '10',
+      openings_resume: 'next_day',
+    };
+
+    expect(formValuesOf(flow)).toMatchObject({
+      max_daily_loss_percent: '5',
+      max_drawdown_percent: '10',
+      openings_resume: 'next_day',
     });
   });
 
@@ -287,6 +327,22 @@ describe('changesOf', () => {
     });
   });
 
+  // ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum losses (R3.2.2).
+  it('sends new maximum losses and resume, and null for an emptied loss so the API removes it', () => {
+    const limited: Flow = { ...FLOW, max_daily_loss_percent: '5', max_drawdown_percent: '10' };
+
+    expect(
+      changesOf(FLOW, {
+        ...formValuesOf(FLOW),
+        max_daily_loss_percent: '5',
+        openings_resume: 'next_day',
+      }),
+    ).toEqual({ settings: { max_daily_loss_percent: '5', openings_resume: 'next_day' } });
+    expect(changesOf(limited, { ...formValuesOf(limited), max_drawdown_percent: '' })).toEqual({
+      settings: { max_drawdown_percent: null },
+    });
+  });
+
   it('keeps the capital apart, as it changes through its own request', () => {
     const values = {
       ...formValuesOf(FLOW),
@@ -316,6 +372,29 @@ describe('flowFormSchema', () => {
   it('admits blank numbers and numbers with a decimal comma or point', () => {
     expect(flowFormSchema.safeParse(filled({ allocated_capital: '10,5' })).success).toBe(true);
     expect(flowFormSchema.safeParse(filled({ cycle_minutes: '' })).success).toBe(true);
+  });
+
+  it.each(['0', '101', '0,05'])(
+    'refuses a maximum loss of %s percent with the reason of the API, beside its field',
+    (percent) => {
+      const parsed = flowFormSchema.safeParse(
+        filled({ max_daily_loss_percent: percent, max_drawdown_percent: percent }),
+      );
+
+      expect(parsed.error?.issues.map((issue) => [issue.path.join('.'), issue.message])).toEqual([
+        ['max_daily_loss_percent', 'la perdita massima va da 0,1 a 100'],
+        ['max_drawdown_percent', 'la perdita massima va da 0,1 a 100'],
+      ]);
+    },
+  );
+
+  it('admits a blank maximum loss and the bounds of the interval', () => {
+    expect(
+      flowFormSchema.safeParse(
+        filled({ max_daily_loss_percent: '0,1', max_drawdown_percent: '100' }),
+      ).success,
+    ).toBe(true);
+    expect(flowFormSchema.safeParse(filled({ max_daily_loss_percent: ' ' })).success).toBe(true);
   });
 
   it('refuses a number that is not one, beside its field', () => {

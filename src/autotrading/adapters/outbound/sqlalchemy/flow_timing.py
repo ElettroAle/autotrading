@@ -2,6 +2,7 @@ from collections.abc import Mapping
 
 from sqlalchemy import Engine, func, select
 
+from autotrading.adapters.outbound.sqlalchemy.openings_suspension import OPENINGS_COLUMNS, status_of
 from autotrading.adapters.outbound.sqlalchemy.tables import flows
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_timing import FlowTiming
@@ -9,9 +10,10 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 
 class SqlAlchemyFlowTimingAdapter:
-    """The anchor of the cycles, the automatic pause reason and the first start of the flows of one tenant.
+    """The anchor of the cycles, the automatic pause reason, the first start and the openings of the flows of one
+    tenant.
 
-    R1.7.3, ADR 0042, ADR 0069.
+    R1.7.3, ADR 0042, ADR 0069, R3.2.2.
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
@@ -19,11 +21,15 @@ class SqlAlchemyFlowTimingAdapter:
         self._tenant_id = tenant_id
 
     def timings(self) -> Mapping[FlowId, FlowTiming]:
-        query = select(flows.c.id, flows.c.cycle_anchor, flows.c.pause_reason, flows.c.first_started_at)
+        query = select(
+            flows.c.id, flows.c.cycle_anchor, flows.c.pause_reason, flows.c.first_started_at, *OPENINGS_COLUMNS
+        )
         with self._engine.begin() as connection:
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             rows = connection.execute(query).mappings().all()
         return {
-            FlowId(row["id"]): FlowTiming(row["cycle_anchor"], row["pause_reason"], row["first_started_at"])
+            FlowId(row["id"]): FlowTiming(
+                row["cycle_anchor"], row["pause_reason"], row["first_started_at"], status_of(row)
+            )
             for row in rows
         }

@@ -564,6 +564,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/openings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Flow Openings */
+        get: operations["read_flow_openings_flows__flow_id__openings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/openings/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Flow Openings
+         * @description The user resumes the openings suspended for maximum loss (R3.2.2).
+         */
+        post: operations["resume_flow_openings_flows__flow_id__openings_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/{action}": {
         parameters: {
             query?: never;
@@ -1131,6 +1168,11 @@ export interface components {
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
             /** Max Consecutive Failures */
             max_consecutive_failures: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent: string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent: string | null;
+            openings_resume: components["schemas"]["OpeningsResume"];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1352,6 +1394,12 @@ export interface components {
             system_prompt?: string | null;
             /** Max Consecutive Failures */
             max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: number | string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: number | string | null;
+            /** @default manual */
+            openings_resume: components["schemas"]["OpeningsResume"];
         };
         /**
          * FlowEquityResponse
@@ -1401,6 +1449,18 @@ export interface components {
             system_prompt?: string | null;
             /** Max Consecutive Failures */
             max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: number | string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: number | string | null;
+            openings_resume?: components["schemas"]["OpeningsResume"] | null;
+        };
+        /**
+         * FlowOpeningsResponse
+         * @description The suspension of the openings of the flow in force now, or null (R3.2.2).
+         */
+        FlowOpeningsResponse: {
+            suspension: components["schemas"]["OpeningsSuspensionResponse"] | null;
         };
         /**
          * FlowOverviewResponse
@@ -1423,6 +1483,7 @@ export interface components {
             status: string;
             /** Pause Reason */
             pause_reason: string | null;
+            openings_suspension: components["schemas"]["OpeningsSuspensionResponse"] | null;
             /** Model */
             model: string;
             /** Version */
@@ -1533,6 +1594,11 @@ export interface components {
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
             /** Max Consecutive Failures */
             max_consecutive_failures: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent: string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent: string | null;
+            openings_resume: components["schemas"]["OpeningsResume"];
         };
         /**
          * FlowResultsResponse
@@ -1869,6 +1935,28 @@ export interface components {
             };
         };
         /**
+         * OpeningsResume
+         * @description How the openings of a flow suspended for maximum loss resume (R3.2.2).
+         *
+         *     By hand unless the user chooses otherwise: the openings resume when the user confirms. The next day they resume on
+         *     their own at 00:00 UTC of the day after the suspension, and the user may still confirm before.
+         * @enum {string}
+         */
+        OpeningsResume: "manual" | "next_day";
+        /**
+         * OpeningsSuspensionResponse
+         * @description The openings of a flow suspended for maximum loss: the threshold passed and when (R3.2.2).
+         */
+        OpeningsSuspensionResponse: {
+            /** Reason */
+            reason: string;
+            /**
+             * Suspended At
+             * Format: date-time
+             */
+            suspended_at: string;
+        };
+        /**
          * OperationResponse
          * @description A row of the ledger (ADR 0063, ADR 0074): amounts as text without trailing zeros (ADR 0047).
          *
@@ -2188,6 +2276,12 @@ export interface components {
             system_prompt?: string | null;
             /** Max Consecutive Failures */
             max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: number | string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: number | string | null;
+            /** @default manual */
+            openings_resume: components["schemas"]["OpeningsResume"];
         };
         /**
          * StrategyBody
@@ -2216,6 +2310,12 @@ export interface components {
             system_prompt?: string | null;
             /** Max Consecutive Failures */
             max_consecutive_failures?: number | null;
+            /** Max Daily Loss Percent */
+            max_daily_loss_percent?: string | null;
+            /** Max Drawdown Percent */
+            max_drawdown_percent?: string | null;
+            /** @default manual */
+            openings_resume: components["schemas"]["OpeningsResume"];
         };
         /**
          * StrategyDocument
@@ -3443,6 +3543,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_flow_openings_flows__flow_id__openings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowOpeningsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_flow_openings_flows__flow_id__openings_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowOpeningsResponse"];
                 };
             };
             /** @description Validation Error */

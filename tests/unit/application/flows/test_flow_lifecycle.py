@@ -34,6 +34,7 @@ from autotrading.domain.flows.errors import (
     ExposureLimitRequiredError,
     FlowCommandNotAllowedError,
     MaxConsecutiveFailuresOutOfRangeError,
+    MaxLossOutOfRangeError,
     TotalExposureOutOfRangeError,
     UnknownPromptPlaceholderError,
 )
@@ -41,6 +42,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -148,6 +150,9 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         max_total_value_exposure_percent=Decimal(200),
         bring_to_minimum=True,
         max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
     configuration = flows.modify.execute(command).configuration
@@ -162,6 +167,9 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         risk_limits=RiskLimits(2, Decimal(20), Decimal(30), Decimal(40), Decimal(200)),
         bring_to_minimum=True,
         max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
 
@@ -205,6 +213,44 @@ def test_a_change_without_maximum_of_consecutive_failures_keeps_the_one_in_force
     modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro"))
 
     assert modified.configuration.max_consecutive_failures == 3
+
+
+def test_a_change_without_maximum_losses_nor_resume_keeps_the_ones_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(
+        ModifyFlowCommand(
+            flow.id,
+            max_daily_loss_percent=Decimal(5),
+            max_drawdown_percent=Decimal(10),
+            openings_resume=OpeningsResume.NEXT_DAY,
+        )
+    )
+
+    configuration = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro")).configuration
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (Decimal(5), Decimal(10), OpeningsResume.NEXT_DAY)
+
+
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum losses.
+def test_maximum_losses_removed_on_purpose_leave_the_next_version_without_them(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(
+        ModifyFlowCommand(flow.id, max_daily_loss_percent=Decimal(5), max_drawdown_percent=Decimal(10))
+    )
+
+    daily_removed = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_daily_loss=True)).configuration
+    both_removed = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_drawdown=True)).configuration
+
+    assert (daily_removed.max_daily_loss_percent, daily_removed.max_drawdown_percent) == (None, Decimal(10))
+    assert (both_removed.version, both_removed.max_daily_loss_percent, both_removed.max_drawdown_percent) == (
+        4,
+        None,
+        None,
+    )
 
 
 # ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum of consecutive failures.
@@ -327,6 +373,8 @@ def test_the_default_system_prompt_is_restored_in_the_next_version(flows: Flows)
         ({"assets": ("BTC", "XYZ")}, AssetNotTradableError, "asset non negoziabile sull'exchange: XYZ"),
         ({"account_id": uuid4()}, AccountNotChangeableError, "il conto di un flusso non si cambia"),
         ({"system_prompt": "Leva {leverage}"}, UnknownPromptPlaceholderError, 'il segnaposto "leverage" non esiste'),
+        ({"max_daily_loss_percent": Decimal(0)}, MaxLossOutOfRangeError, "la perdita massima va da 0,1 a 100"),
+        ({"max_drawdown_percent": Decimal(101)}, MaxLossOutOfRangeError, "la perdita massima va da 0,1 a 100"),
         (
             {"max_consecutive_failures": 101},
             MaxConsecutiveFailuresOutOfRangeError,

@@ -20,6 +20,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -56,6 +57,10 @@ class CreateFlowCommand:
     system_prompt: str | None = None
     # None: no maximum, the flow keeps trying at every cycle (R3.2.4).
     max_consecutive_failures: int | None = None
+    # None: no maximum loss; the suspended openings resume by hand unless the user chooses the next day (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +119,9 @@ class CreateFlowUseCase:
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,
             max_consecutive_failures=command.max_consecutive_failures,
+            max_daily_loss_percent=command.max_daily_loss_percent,
+            max_drawdown_percent=command.max_drawdown_percent,
+            openings_resume=command.openings_resume,
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

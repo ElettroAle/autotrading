@@ -3,6 +3,7 @@ import {
   fakePlatform,
   type FakeAccount,
   type FakeFlow,
+  type FakeOpeningsResume,
   type FakeRiskLimits,
   type FakeSource,
   type FakeUser,
@@ -53,6 +54,9 @@ type ConfigurationRequest = {
   bring_to_minimum?: unknown;
   system_prompt?: unknown;
   max_consecutive_failures?: unknown;
+  max_daily_loss_percent?: unknown;
+  max_drawdown_percent?: unknown;
+  openings_resume?: unknown;
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -276,6 +280,19 @@ const maxConsecutiveFailuresOf = (value: unknown): number | null => {
   return maximum;
 };
 
+// The rule of the domain of the API, with its reason (R3.2.2).
+const maxLossOf = (value: unknown, field: string): string | null => {
+  const text = optionalTextOf(value);
+  const percent = Number(text);
+  if (text !== null && !(percent >= 0.1 && percent <= 100)) {
+    throw new Refusal(422, 'la perdita massima va da 0,1 a 100', field);
+  }
+  return text;
+};
+
+const openingsResumeOf = (value: unknown): FakeOpeningsResume =>
+  value === 'next_day' ? 'next_day' : 'manual';
+
 /** The flow as its new configuration version, kept among its versions as the API keeps them (R2.3.5). */
 const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => {
   Object.assign(flow, changes, { version: flow.version + 1 });
@@ -291,6 +308,9 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       allocatedCapital: String(flow.allocatedCapital ?? 0),
       systemPrompt: flow.systemPrompt,
       maxConsecutiveFailures: flow.maxConsecutiveFailures,
+      maxDailyLossPercent: flow.maxDailyLossPercent,
+      maxDrawdownPercent: flow.maxDrawdownPercent,
+      openingsResume: flow.openingsResume,
     },
   });
   return flow;
@@ -346,6 +366,9 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
       request.max_consecutive_failures === undefined || request.max_consecutive_failures === null
         ? null
         : maxConsecutiveFailuresOf(request.max_consecutive_failures),
+    maxDailyLossPercent: maxLossOf(request.max_daily_loss_percent, 'max_daily_loss_percent'),
+    maxDrawdownPercent: maxLossOf(request.max_drawdown_percent, 'max_drawdown_percent'),
+    openingsResume: openingsResumeOf(request.openings_resume),
     currentCapital: capital,
   });
 };
@@ -415,6 +438,19 @@ export const modifyFlow = (
       request.max_consecutive_failures === undefined
         ? flow.maxConsecutiveFailures
         : maxConsecutiveFailuresOf(request.max_consecutive_failures),
+    // A null loss sent on purpose removes it; a missing one keeps it (R3.2.2).
+    maxDailyLossPercent: maxLossOf(
+      sentOr(request.max_daily_loss_percent, flow.maxDailyLossPercent),
+      'max_daily_loss_percent',
+    ),
+    maxDrawdownPercent: maxLossOf(
+      sentOr(request.max_drawdown_percent, flow.maxDrawdownPercent),
+      'max_drawdown_percent',
+    ),
+    openingsResume:
+      request.openings_resume === undefined
+        ? flow.openingsResume
+        : openingsResumeOf(request.openings_resume),
   };
   requireAssetsFree(user, flow.accountId ?? '', assets, flow);
   return nextVersionOf(flow, changes);

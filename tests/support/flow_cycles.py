@@ -34,6 +34,7 @@ from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCa
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
@@ -89,6 +90,7 @@ from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.provider_keys import (
@@ -235,6 +237,9 @@ class FlowCycles:
             checkpoints=self.checkpoints,
             equity=RecordCycleEquityUseCase(InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id)),
             consecutive_failures=InMemoryConsecutiveFailuresAdapter(self.records, platform.flows),
+            openings_suspensions=InMemoryOpeningsSuspensionAdapter(platform.flows, tenant_id),
+            loss_references=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
+            openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify),
         )
 
     def services(self) -> CycleServices:

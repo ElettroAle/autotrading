@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
@@ -19,6 +20,14 @@ class Notifier:
 
     def execute(self, notification: Notification) -> None:
         self.sent.append(notification)
+
+
+def test_openings_suspended_for_maximum_loss_are_told_with_the_threshold_passed() -> None:
+    notifier = Notifier()
+
+    NotifyOpeningsSuspendedUseCase(notifier).execute("alfa", "perdita giornaliera 6% oltre il 5%")
+
+    assert notifier.sent == [Notification.openings_suspended("alfa", "perdita giornaliera 6% oltre il 5%")]
 
 
 def test_a_flow_paused_on_its_own_is_told_with_the_reason() -> None:

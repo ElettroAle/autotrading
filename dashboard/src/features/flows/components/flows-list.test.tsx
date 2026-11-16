@@ -131,6 +131,25 @@ describe('FlowsList', () => {
     expect(factOf(beta, 'Rendimento')).toHaveClass('text-red-700');
   });
 
+  // ADR perdita-massima-nella-dashboard: the same notice as the page of the flow, beside the status.
+  it('shows beside the status that the openings of a flow are suspended, and why', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    fakePlatform.addFlow('anna', 'beta');
+    fakePlatform.changeFlow('alfa', {
+      openingsSuspension: {
+        reason: 'perdita giornaliera 6% oltre il 5%',
+        suspendedAt: '2026-11-14T09:00:00Z',
+      },
+    });
+    await renderApp({ account: 'anna' });
+
+    const alfa = await summaryOf('alfa');
+    expect(within(alfa).getByRole('status')).toHaveTextContent(
+      'aperture sospese: perdita giornaliera 6% oltre il 5%',
+    );
+    expect(within(await summaryOf('beta')).queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('shows a return the API could not measure without a colour', async () => {
     fakePlatform.addFlow('anna', 'gamma');
     fakePlatform.changeFlow('gamma', { allocatedCapital: 0, currentCapital: 0 });

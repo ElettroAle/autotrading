@@ -36,6 +36,9 @@ export const flowSchema = z.object({
   system_prompt_is_default: z.boolean(),
   system_prompt_placeholders: z.array(promptPlaceholderSchema),
   max_consecutive_failures: z.number().nullable(),
+  max_daily_loss_percent: z.string().nullable(),
+  max_drawdown_percent: z.string().nullable(),
+  openings_resume: z.enum(['manual', 'next_day']),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

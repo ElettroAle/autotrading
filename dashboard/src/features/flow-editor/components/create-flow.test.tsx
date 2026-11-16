@@ -185,6 +185,9 @@ describe('CreateFlow', () => {
       system_prompt_is_default: true,
       system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
       max_consecutive_failures: null,
+      max_daily_loss_percent: null,
+      max_drawdown_percent: null,
+      openings_resume: 'manual',
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');
@@ -226,6 +229,33 @@ describe('CreateFlow', () => {
 
     await waitFor(() =>
       expect(configurationOf(fakePlatform.flowNamed('alfa')).max_consecutive_failures).toBe(3),
+    );
+  });
+
+  // ADR perdita-massima-nella-dashboard: the maximum losses and the resume among the risk limits, the range as the API's.
+  it('saves the maximum losses and the resume, refusing a loss out of range beside its field', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('Perdita giornaliera massima (%)'), '101');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    expect(await screen.findByText('la perdita massima va da 0,1 a 100')).toBeInTheDocument();
+    expect(field('Perdita giornaliera massima (%)')).toHaveAttribute('aria-invalid', 'true');
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+
+    await userEvent.clear(field('Perdita giornaliera massima (%)'));
+    await userEvent.type(field('Perdita giornaliera massima (%)'), '5');
+    await userEvent.type(field('Perdita massima dal picco (%)'), '12,5');
+    await userEvent.selectOptions(field('Ripresa delle aperture'), 'il giorno dopo');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(configurationOf(fakePlatform.flowNamed('alfa'))).toMatchObject({
+        max_daily_loss_percent: '5',
+        max_drawdown_percent: '12.5',
+        openings_resume: 'next_day',
+      }),
     );
   });
 

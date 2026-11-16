@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -31,6 +32,9 @@ CONFIGURATION = replace(
     bring_to_minimum=True,
     system_prompt="{instructions} su {assets}",
     max_consecutive_failures=3,
+    max_daily_loss_percent=Decimal("5.5"),
+    max_drawdown_percent=Decimal(10),
+    openings_resume=OpeningsResume.NEXT_DAY,
 )
 
 
@@ -55,6 +59,9 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
         "max_consecutive_failures": 3,
+        "max_daily_loss_percent": "5.5",
+        "max_drawdown_percent": "10",
+        "openings_resume": "next_day",
     }
 
 
@@ -109,6 +116,20 @@ def test_a_version_saved_without_maximum_of_consecutive_failures_has_none() -> N
     del document["max_consecutive_failures"]
 
     assert configuration_of(1, document).max_consecutive_failures is None
+
+
+def test_a_version_saved_before_the_maximum_losses_has_none_and_resumes_by_hand() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    for key in ("max_daily_loss_percent", "max_drawdown_percent", "openings_resume"):
+        del document[key]
+
+    configuration = configuration_of(1, document)
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (None, None, OpeningsResume.MANUAL)
 
 
 def test_a_version_saved_without_overall_exposure_limits_has_none() -> None:

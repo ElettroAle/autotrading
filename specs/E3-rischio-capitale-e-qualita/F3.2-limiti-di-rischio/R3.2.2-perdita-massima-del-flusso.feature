@@ -1,5 +1,5 @@
 # language: it
-@R3.2.2 @wip
+@R3.2.2
 Funzionalità: R3.2.2 Perdita massima del flusso
   Come utente
   Voglio che un flusso smetta di aprire posizioni quando perde oltre una soglia

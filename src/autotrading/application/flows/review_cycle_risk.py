@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
-from autotrading.application.flows.ports import CycleDecisions, FlowSnapshot, RiskReview
+from autotrading.application.flows.ports import CycleDecisions, FlowLossGuardPort, FlowSnapshot, RiskReview
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.risk_outcome import approved_of
@@ -11,10 +11,13 @@ from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenI
 class ReviewCycleRiskUseCase:
     """The decisions of the agent through the risk check of the flow, on the exchange of its account
     (R1.5.1-R1.5.4).
+
+    The guard of the losses comes first: openings suspended for maximum loss are blocked by the check (R3.2.2).
     """
 
-    def __init__(self, check_risk: CheckRiskUseCase) -> None:
+    def __init__(self, check_risk: CheckRiskUseCase, loss_guard: FlowLossGuardPort) -> None:
         self._check_risk = check_risk
+        self._loss_guard = loss_guard
 
     def execute(
         self,
@@ -23,13 +26,14 @@ class ReviewCycleRiskUseCase:
         decisions: CycleDecisions,
     ) -> RiskReview[CycleOrder]:
         cycle_flow = decisions.flow
+        openings_suspended = self._loss_guard.execute(cycle_flow)
         command = CheckRiskCommand(
             tuple(
                 decision.intent_with(OpenIntent.of, CloseIntent, HoldIntent)
                 for decision in decisions.reply.response.decisions
             ),
             cycle_flow.configuration.risk_policy,
-            cycle_flow.risk_state(),
+            cycle_flow.risk_state(openings_suspended=openings_suspended),
             cycle_flow.exchange,
         )
         outcomes = self._check_risk.execute(command)

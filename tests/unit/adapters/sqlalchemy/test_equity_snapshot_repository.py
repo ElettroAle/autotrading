@@ -3,7 +3,10 @@ from decimal import Decimal
 from uuid import uuid4
 
 from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
+    daily_from_query,
+    daily_until_query,
     of_flow_query,
+    peak_query,
     row_of,
     snapshot_of,
 )
@@ -52,3 +55,27 @@ def test_the_curve_of_a_period_reads_the_cycles_between_its_bounds() -> None:
 
     assert "equity_snapshots.planned_at >= " in text
     assert "equity_snapshots.planned_at < " in text
+
+
+def test_the_daily_reference_is_the_last_equity_up_to_midnight() -> None:
+    text = str(daily_until_query(SNAPSHOT.flow_id, PLANNED))
+
+    assert "equity_snapshots.planned_at <= " in text
+    assert text.endswith("ORDER BY equity_snapshots.planned_at DESC\n LIMIT :param_1")
+
+
+def test_without_equity_before_midnight_the_daily_reference_is_the_first_of_the_day() -> None:
+    text = str(daily_from_query(SNAPSHOT.flow_id, PLANNED))
+
+    assert "equity_snapshots.planned_at >= " in text
+    assert text.endswith("ORDER BY equity_snapshots.planned_at\n LIMIT :param_1")
+
+
+def test_the_peak_is_the_highest_gain_on_the_capital_since_the_instant_the_most_recent_first() -> None:
+    text = str(peak_query(SNAPSHOT.flow_id, PLANNED))
+
+    assert "equity_snapshots.planned_at >= " in text
+    assert text.endswith(
+        "ORDER BY equity_snapshots.equity - equity_snapshots.allocated_capital DESC, "
+        "equity_snapshots.planned_at DESC\n LIMIT :param_1"
+    )

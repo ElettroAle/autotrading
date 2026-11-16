@@ -19,3 +19,6 @@ class FlowSetting(StrEnum):
     ALLOCATED_CAPITAL = "allocated_capital"
     SYSTEM_PROMPT = "system_prompt"
     MAX_CONSECUTIVE_FAILURES = "max_consecutive_failures"
+    MAX_DAILY_LOSS = "max_daily_loss_percent"
+    MAX_DRAWDOWN = "max_drawdown_percent"
+    OPENINGS_RESUME = "openings_resume"

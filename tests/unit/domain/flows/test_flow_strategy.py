@@ -9,6 +9,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -27,6 +28,9 @@ def a_strategy() -> FlowStrategy:
         bring_to_minimum=True,
         system_prompt="{instructions} su {assets}",
         max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
 
@@ -39,6 +43,9 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         bring_to_minimum=True,
         system_prompt="{instructions}",
         max_consecutive_failures=4,
+        max_daily_loss_percent=Decimal(4),
+        max_drawdown_percent=Decimal(8),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -52,11 +59,22 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         bring_to_minimum=True,
         system_prompt="{instructions}",
         max_consecutive_failures=4,
+        max_daily_loss_percent=Decimal(4),
+        max_drawdown_percent=Decimal(8),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
 
 def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
-    strategy = replace(a_strategy(), bring_to_minimum=False, system_prompt=None, max_consecutive_failures=None)
+    strategy = replace(
+        a_strategy(),
+        bring_to_minimum=False,
+        system_prompt=None,
+        max_consecutive_failures=None,
+        max_daily_loss_percent=None,
+        max_drawdown_percent=None,
+        openings_resume=OpeningsResume.MANUAL,
+    )
 
     assert (
         FlowStrategy(

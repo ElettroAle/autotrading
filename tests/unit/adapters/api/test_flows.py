@@ -2,13 +2,15 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
 from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import IdentityProvider
@@ -98,6 +100,9 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "system_prompt_is_default": True,
         "system_prompt_placeholders": PLACEHOLDERS,
         "max_consecutive_failures": None,
+        "max_daily_loss_percent": None,
+        "max_drawdown_percent": None,
+        "openings_resume": "manual",
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
 
@@ -270,6 +275,83 @@ def test_a_maximum_of_consecutive_failed_cycles_out_of_range_is_refused(
         {"detail": "il massimo di cicli falliti consecutivi va da 1 a 100", "field": "max_consecutive_failures"},
     )
     assert anna.get("/flows").json()[0]["version"] == 1
+
+
+def test_the_maximum_losses_and_the_resume_are_set_kept_removed_and_compared(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    request = a_request(
+        platform, "anna", max_daily_loss_percent="5", max_drawdown_percent="10", openings_resume="next_day"
+    )
+    created = anna.post("/flows", json=request).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"max_daily_loss_percent": None, "openings_resume": "manual"}).json()
+
+    assert (created["max_daily_loss_percent"], created["max_drawdown_percent"], created["openings_resume"]) == (
+        "5",
+        "10",
+        "next_day",
+    )
+    assert (untouched["max_daily_loss_percent"], untouched["openings_resume"]) == ("5", "next_day")
+    assert (changed["max_daily_loss_percent"], changed["max_drawdown_percent"], changed["openings_resume"]) == (
+        None,
+        "10",
+        "manual",
+    )
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["openings_resume"] == "next_day"
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
+        {"part": "perdita giornaliera massima", "before": "5%", "after": "nessuno"},
+        {"part": "ripresa delle aperture", "before": "il giorno dopo", "after": "manuale"},
+    ]
+
+
+@pytest.mark.parametrize("field", ["max_daily_loss_percent", "max_drawdown_percent"])
+def test_a_maximum_loss_out_of_range_is_refused_with_the_reason_and_the_field(
+    client_of: Client, platform: Platform, field: str
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={field: "101"})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "la perdita massima va da 0,1 a 100", "field": field},
+    )
+
+
+def test_the_suspension_of_the_openings_is_read_and_resumed_by_the_user(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    platform.flows.openings[FlowId(UUID(flow_id))] = OpeningsStatus(
+        OpeningsSuspension("perdita giornaliera 6% oltre il 5%", datetime(2026, 11, 12, 9, tzinfo=UTC)), None
+    )
+
+    suspended = anna.get(f"/flows/{flow_id}/openings")
+    resumed = anna.post(f"/flows/{flow_id}/openings/resume")
+
+    assert (suspended.status_code, suspended.json()) == (
+        200,
+        {"suspension": {"reason": "perdita giornaliera 6% oltre il 5%", "suspended_at": "2026-11-12T09:00:00Z"}},
+    )
+    assert (resumed.status_code, resumed.json()) == (200, {"suspension": None})
+    assert anna.get(f"/flows/{flow_id}/openings").json() == {"suspension": None}
+
+
+def test_openings_not_suspended_are_not_resumed_and_another_tenant_finds_nothing(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    refused = anna.post(f"/flows/{flow_id}/openings/resume")
+    stranger = client_of("bruno").get(f"/flows/{flow_id}/openings")
+
+    assert (refused.status_code, reason_of(refused)) == (409, {"detail": "le aperture di alfa non sono sospese"})
+    assert stranger.status_code == 404
 
 
 def test_the_flows_of_the_tenant_are_listed_and_the_free_capital_shrinks(client_of: Client, platform: Platform) -> None:

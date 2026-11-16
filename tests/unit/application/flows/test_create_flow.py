@@ -24,6 +24,7 @@ from autotrading.domain.flows.errors import (
 )
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -117,6 +118,30 @@ def test_the_maximum_of_consecutive_failed_cycles_is_saved(flows: Flows) -> None
     flow = flows.create.execute(flows.command(max_consecutive_failures=3))
 
     assert flow.configuration.max_consecutive_failures == 3
+
+
+def test_the_maximum_losses_and_the_resume_of_the_openings_are_saved(flows: Flows) -> None:
+    command = flows.command(
+        max_daily_loss_percent=Decimal(5), max_drawdown_percent=Decimal(10), openings_resume=OpeningsResume.NEXT_DAY
+    )
+
+    configuration = flows.create.execute(command).configuration
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (Decimal(5), Decimal(10), OpeningsResume.NEXT_DAY)
+
+
+def test_a_new_flow_has_no_maximum_loss_and_resumes_its_openings_by_hand(flows: Flows) -> None:
+    configuration = flows.create.execute(flows.command()).configuration
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (None, None, OpeningsResume.MANUAL)
 
 
 def test_the_option_to_bring_an_opening_to_the_exchange_minimum_is_saved(flows: Flows) -> None:

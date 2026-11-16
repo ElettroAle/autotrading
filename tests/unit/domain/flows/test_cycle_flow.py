@@ -92,6 +92,13 @@ def test_the_overall_exposure_of_the_risk_sums_the_margin_the_exchange_declares_
     assert (risk.open_margin, risk.open_value) == (Decimal(110), Decimal(400))
 
 
+def test_the_risk_carries_the_suspension_of_the_openings_the_guard_found() -> None:
+    flow = cycle_flow(attributed(margin=Decimal(50)), Decimal(300))
+
+    assert flow.risk_state(openings_suspended=True).openings_suspended
+    assert not flow.risk_state().openings_suspended
+
+
 def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
     flow = cycle_flow(attributed(realized_pnl=Decimal(-100), fees=Decimal(2), margin=Decimal(50)), Decimal(300))
 

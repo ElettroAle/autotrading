@@ -19,6 +19,7 @@ import {
   FAKE_FLOW_COMMANDS,
   fakePlatform,
   type FakeFlowCommand,
+  type FakeOpeningsResume,
   type FakeConfiguration,
   type FakeEquityPoint,
   type FakeFlow,
@@ -79,6 +80,9 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   system_prompt: configuration.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
   system_prompt_is_default: configuration.systemPrompt === null,
   max_consecutive_failures: configuration.maxConsecutiveFailures,
+  max_daily_loss_percent: configuration.maxDailyLossPercent,
+  max_drawdown_percent: configuration.maxDrawdownPercent,
+  openings_resume: configuration.openingsResume,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
@@ -250,6 +254,7 @@ const overviewOf = (user: FakeUser, flow: FakeFlow, request: Request) => {
     environment: 'dev',
     status: flow.status,
     pause_reason: flow.pauseReason,
+    openings_suspension: suspensionResponse(flow),
     model: flow.model,
     version: flow.version,
     last_cycle: newest === undefined ? null : outcomeOf(newest),
@@ -338,6 +343,20 @@ const equityResponse = (flow: FakeFlow, admits: (instant: Date) => boolean) => {
   };
 };
 
+const percentText = (percent: string | null): string =>
+  percent === null ? 'nessuno' : `${percent}%`;
+
+const RESUME_LABELS: Readonly<Record<FakeOpeningsResume, string>> = {
+  manual: 'manuale',
+  next_day: 'il giorno dopo',
+};
+
+// The suspension of the openings as the API answers it, or null (R3.2.2).
+const suspensionResponse = (flow: FakeFlow) =>
+  flow.openingsSuspension === null
+    ? null
+    : { reason: flow.openingsSuspension.reason, suspended_at: flow.openingsSuspension.suspendedAt };
+
 // The parts the API compares, with the same names and texts (R1.1.3): the fake never compares in another way.
 const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
   ['asset', (configuration) => configuration.assets.join(', ')],
@@ -351,6 +370,12 @@ const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
     'cicli falliti consecutivi massimi',
     (configuration) => String(configuration.maxConsecutiveFailures ?? 'nessuno'),
   ],
+  [
+    'perdita giornaliera massima',
+    (configuration) => percentText(configuration.maxDailyLossPercent),
+  ],
+  ['perdita massima dal picco', (configuration) => percentText(configuration.maxDrawdownPercent)],
+  ['ripresa delle aperture', (configuration) => RESUME_LABELS[configuration.openingsResume]],
 ];
 
 const differences = (before: FakeConfiguration, after: FakeConfiguration) =>
@@ -608,6 +633,21 @@ export const handlers = [
         commandResponse(fakePlatform.command(user, String(params.flowId), command), command),
       ),
     ),
+  ),
+  http.get('*/flows/:flowId/openings', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json({ suspension: suspensionResponse(flow) }),
+    ),
+  ),
+  // Only suspended openings resume, with the reason of the API otherwise (R3.2.2).
+  http.post('*/flows/:flowId/openings/resume', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) => {
+      if (flow.openingsSuspension === null) {
+        return problem(409, 'Conflict', `le aperture di ${flow.name} non sono sospese`);
+      }
+      flow.openingsSuspension = null;
+      return HttpResponse.json({ suspension: null });
+    }),
   ),
   http.get('*/flows/:flowId/state', ({ request, params }) =>
     withUser(request, (user) => {

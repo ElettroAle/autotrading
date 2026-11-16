@@ -26,6 +26,9 @@ const CONFIGURATION: Configuration = {
   system_prompt: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
   system_prompt_is_default: false,
   max_consecutive_failures: 3,
+  max_daily_loss_percent: '5',
+  max_drawdown_percent: '12.5',
+  openings_resume: 'next_day',
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -50,6 +53,9 @@ const PARTS_OF_FIELD = {
   system_prompt_is_default: [],
   system_prompt_placeholders: [],
   max_consecutive_failures: ['cicli falliti consecutivi massimi'],
+  max_daily_loss_percent: ['perdita giornaliera massima'],
+  max_drawdown_percent: ['perdita massima dal picco'],
+  openings_resume: ['ripresa delle aperture'],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
   readonly string[]
@@ -76,6 +82,9 @@ describe('configurationRows', () => {
         value: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
       },
       { part: 'cicli falliti consecutivi massimi', value: '3' },
+      { part: 'perdita giornaliera massima', value: '5%' },
+      { part: 'perdita massima dal picco', value: '12.5%' },
+      { part: 'ripresa delle aperture', value: 'il giorno dopo' },
     ]);
   });
 
@@ -105,6 +114,9 @@ describe('configurationRows', () => {
       },
       bring_to_minimum: false,
       max_consecutive_failures: null,
+      max_daily_loss_percent: null,
+      max_drawdown_percent: null,
+      openings_resume: 'manual',
     });
 
     expect(Object.fromEntries(rows.map((row) => [row.part, row.value]))).toMatchObject({
@@ -117,6 +129,9 @@ describe('configurationRows', () => {
       'esposizione complessiva massima del valore': 'nessuno',
       'porta al minimo': 'no',
       'cicli falliti consecutivi massimi': 'nessuno',
+      'perdita giornaliera massima': 'nessuno',
+      'perdita massima dal picco': 'nessuno',
+      'ripresa delle aperture': 'manuale',
     });
   });
 });

@@ -46,6 +46,9 @@ from autotrading.domain.flows.ledger import (
     LedgerKeys,
     PlatformOrders,
 )
+from autotrading.domain.flows.loss_guard import LossReferences
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.openings_suspension import NOT_SUSPENDED, OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
@@ -970,6 +973,48 @@ class ConsecutiveFailuresPausePort(Protocol):
         ...
 
 
+class OpeningsSuspensionPort(Protocol):
+    """Bound to the tenant of the request or of the cycle: the openings of its flows suspended for maximum loss and
+    their last resume, saved beside each flow (R3.2.2).
+    """
+
+    def status(self, flow_id: UUID) -> OpeningsStatus:
+        """The openings of the flow as saved; a flow never suspended nor resumed has neither."""
+        ...
+
+    def suspend(self, flow_id: UUID, suspension: OpeningsSuspension) -> None:
+        """Saves the suspension of the openings of the flow, keeping their last resume."""
+        ...
+
+    def resume(self, flow_id: UUID, resumed_at: datetime) -> None:
+        """Lifts the suspension of the openings of the flow and saves the instant the peak counts again from."""
+        ...
+
+
+class LossReferencesPort(Protocol):
+    """Bound to the tenant of the cycle: the recorded equities the losses of its flows are measured from (R3.2.2)."""
+
+    def loss_references(self, flow_id: UUID, day_start: datetime, peak_since: datetime) -> LossReferences:
+        """The last equity recorded at the start of the day or before, else the first of the day, and the one highest
+        once brought to the capital of now, since the instant given; the most recent among equal ones.
+        """
+        ...
+
+
+class OpeningsSuspendedNoticePort(Protocol):
+    def execute(self, flow_name: str, reason: str) -> None:
+        """Tells the user the openings of the flow are suspended, with the threshold passed (R3.2.2, R1.8.2)."""
+        ...
+
+
+class FlowLossGuardPort(Protocol):
+    def execute(self, flow: CycleFlow) -> bool:
+        """Whether the openings of the flow of the cycle are suspended for maximum loss, suspending them when a
+        threshold is passed now (R3.2.2).
+        """
+        ...
+
+
 class CycleJournalPort(Protocol):
     """Describes for the record what the steps produced: only the contexts behind the steps know their data."""
 
@@ -1024,6 +1069,10 @@ class FlowSummary:
     model: str
     schedule: CycleSchedule | None
     version: int
+    # As saved beside the flow, with how they resume: whether the suspension is in force depends on the instant
+    # (R3.2.2).
+    openings: OpeningsStatus = NOT_SUSPENDED
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
 
 class FlowSummaryPort(Protocol):

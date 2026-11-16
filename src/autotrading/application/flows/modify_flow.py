@@ -15,6 +15,7 @@ from autotrading.domain.flows.errors import AccountNotChangeableError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -54,6 +55,12 @@ class ModifyFlowCommand:
     remove_max_total_value_exposure: bool = False
     # The maximum of consecutive failed cycles taken away, back to retrying at every cycle (R3.2.4).
     remove_max_consecutive_failures: bool = False
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume | None = None
+    # A maximum loss taken away, back to no suspension for that loss (R3.2.2).
+    remove_max_daily_loss: bool = False
+    remove_max_drawdown: bool = False
 
 
 class ModifyFlowUseCase:
@@ -99,6 +106,13 @@ class ModifyFlowUseCase:
             ),
             system_prompt=_system_prompt(current.system_prompt, command),
             max_consecutive_failures=_max_consecutive_failures(current.max_consecutive_failures, command),
+            max_daily_loss_percent=_exposure(
+                current.max_daily_loss_percent, command.max_daily_loss_percent, removed=command.remove_max_daily_loss
+            ),
+            max_drawdown_percent=_exposure(
+                current.max_drawdown_percent, command.max_drawdown_percent, removed=command.remove_max_drawdown
+            ),
+            openings_resume=current.openings_resume if command.openings_resume is None else command.openings_resume,
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -174,6 +188,7 @@ def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:
 
 
 def _exposure(current: Decimal | None, sent: Decimal | None, *, removed: bool) -> Decimal | None:
+    """An optional percentage of the configuration: taken away, kept, or the one sent."""
     if removed:
         return None
     return current if sent is None else sent

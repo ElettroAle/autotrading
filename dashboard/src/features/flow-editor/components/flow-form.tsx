@@ -3,6 +3,8 @@ import { Controller, FormProvider, useForm } from 'react-hook-form';
 
 import { AssetPicker } from '@/components/ui/form/asset-picker';
 import { FORM_CONTROL, FORM_TEXT_AREA, FormField } from '@/components/ui/form/form-field';
+import { InputField } from '@/components/ui/form/input-field';
+import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
 import { useTradableAssets } from '@/hooks/use-tradable-assets';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -15,6 +17,12 @@ import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
 import { SystemPromptField } from './system-prompt-field';
+
+// How suspended openings resume: by the user, or on their own at the next midnight UTC (R3.2.2).
+const OPENINGS_RESUME_CHOICES: readonly SelectOption[] = [
+  { value: 'manual', label: 'manuale' },
+  { value: 'next_day', label: 'il giorno dopo' },
+];
 
 type FlowFormProps = {
   readonly values: FlowFormValues;
@@ -225,6 +233,28 @@ export const FlowForm = ({
               />
             )}
           </FormField>
+          <InputField
+            id="flow-max-daily-loss"
+            label="Perdita giornaliera massima (%)"
+            error={errors.max_daily_loss_percent}
+            inputMode="decimal"
+            {...register('max_daily_loss_percent')}
+          />
+          <InputField
+            id="flow-max-drawdown"
+            label="Perdita massima dal picco (%)"
+            error={errors.max_drawdown_percent}
+            inputMode="decimal"
+            {...register('max_drawdown_percent')}
+          />
+          <SelectField
+            id="flow-openings-resume"
+            label="Ripresa delle aperture"
+            placeholder="Scegli la ripresa"
+            choices={OPENINGS_RESUME_CHOICES}
+            error={errors.openings_resume}
+            {...register('openings_resume')}
+          />
         </fieldset>
         <FormField
           id="flow-allocated-capital"

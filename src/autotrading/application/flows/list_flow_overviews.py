@@ -8,6 +8,7 @@ from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind
 
 RECENT_CYCLES = 10
@@ -33,6 +34,8 @@ class FlowOverview:
     recent_cycles: tuple[CycleRecord, ...]
     next_cycle_at: datetime | None
     results: FlowResults | None
+    # In force now, None when the openings are not suspended for maximum loss (R3.2.2).
+    openings_suspension: OpeningsSuspension | None = None
 
     @property
     def last_cycle(self) -> CycleRecord | None:
@@ -77,9 +80,10 @@ class ListFlowOverviewsUseCase:
     def _overview_of(self, summary: FlowSummary, command: ListFlowOverviewsCommand, now: datetime) -> FlowOverview:
         recent = tuple(self._history.newest(summary.flow_id, 0, RECENT_CYCLES))
         next_cycle_at = None if summary.schedule is None else summary.schedule.next_after(now)
+        suspension = summary.openings.at(now, summary.openings_resume).suspension
         if FlowStatus(summary.status) is FlowStatus.DRAFT:
-            return FlowOverview(summary, self._environment, recent, next_cycle_at, None)
+            return FlowOverview(summary, self._environment, recent, next_cycle_at, None, suspension)
         results = self._flow_results.execute(
             ReadFlowResultsCommand(summary.flow_id, command.period, command.first_day, command.last_day)
         )
-        return FlowOverview(summary, self._environment, recent, next_cycle_at, results)
+        return FlowOverview(summary, self._environment, recent, next_cycle_at, results, suspension)

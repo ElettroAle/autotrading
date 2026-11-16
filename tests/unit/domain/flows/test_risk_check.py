@@ -30,6 +30,7 @@ def check(
     total_value: str | None = None,
     open_margin: str = "0",
     open_value: str = "0",
+    openings_suspended: bool = False,
 ) -> RiskCheck:
     limits = RiskLimits(
         max_leverage,
@@ -39,7 +40,13 @@ def check(
         None if total_value is None else Decimal(total_value),
     )
     state = RiskState(
-        "USDC", Decimal(funds), Decimal(liquidity), open_assets, Decimal(open_margin), Decimal(open_value)
+        "USDC",
+        Decimal(funds),
+        Decimal(liquidity),
+        open_assets,
+        Decimal(open_margin),
+        Decimal(open_value),
+        openings_suspended=openings_suspended,
     )
     return RiskCheck(RiskPolicy(limits, bring_to_minimum), state)
 
@@ -420,3 +427,22 @@ def test_brought_to_the_minimum_within_the_overall_residual_an_opening_passes() 
     outcome = approved(risk.outcome(opening("0.005", 1), EXCHANGE))
 
     assert outcome.value == Decimal(10)
+
+
+def test_openings_suspended_for_maximum_loss_block_every_opening() -> None:
+    outcome = check(openings_suspended=True).outcome(opening("0.01", 2), EXCHANGE)
+
+    assert outcome == BlockedDecision("BTC", "apertura BTC non eseguita: aperture sospese per perdita massima")
+
+
+def test_openings_suspended_for_maximum_loss_still_let_closings_and_holds_through() -> None:
+    suspended = check(openings_suspended=True, open_assets=frozenset({"BTC"}))
+
+    assert suspended.outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
+    assert suspended.outcome(HoldIntent("ETH"), None) == HeldPosition("ETH")
+
+
+def test_openings_are_not_suspended_unless_the_state_says_so() -> None:
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), frozenset(), Decimal(0), Decimal(0))
+
+    assert not state.openings_suspended

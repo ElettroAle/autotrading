@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
+from autotrading.adapters.inbound.api.flows import OpeningsSuspensionResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.application.flows.list_flow_overviews import FlowOverview, ListFlowOverviewsCommand
@@ -170,6 +171,8 @@ class FlowOverviewResponse(BaseModel):
     environment: str
     status: str
     pause_reason: str | None
+    # Null unless the openings are suspended for maximum loss now (R3.2.2).
+    openings_suspension: OpeningsSuspensionResponse | None
     model: str
     version: int
     last_cycle: LastCycleResponse | None
@@ -194,6 +197,7 @@ class FlowOverviewResponse(BaseModel):
             environment=overview.environment,
             status=summary.status,
             pause_reason=summary.pause_reason,
+            openings_suspension=OpeningsSuspensionResponse.of(overview.openings_suspension),
             model=summary.model,
             version=summary.version,
             last_cycle=LastCycleResponse.of(overview.last_cycle),

@@ -25,7 +25,9 @@ from autotrading.application.flows.list_flow_versions import ListFlowVersionsCom
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
+from autotrading.application.flows.read_flow_openings import ReadFlowOpeningsCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
+from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
@@ -34,6 +36,8 @@ from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
@@ -70,6 +74,10 @@ class FlowCreationRequest(BaseModel):
     system_prompt: str | None = None
     # Null or missing: no maximum, the flow keeps trying at every cycle (R3.2.4).
     max_consecutive_failures: int | None = None
+    # Null or missing: no maximum loss; the suspended openings resume by hand unless "next_day" (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -90,6 +98,9 @@ class FlowCreationRequest(BaseModel):
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
             max_consecutive_failures=self.max_consecutive_failures,
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
         )
 
 
@@ -113,6 +124,10 @@ class FlowModificationRequest(BaseModel):
     # A null sent on purpose goes back to the default; a missing one keeps the version in force (R1.4.8).
     system_prompt: str | None = None
     max_consecutive_failures: int | None = None
+    # A null sent on purpose removes the maximum loss; a missing one keeps the version in force (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -140,6 +155,11 @@ class FlowModificationRequest(BaseModel):
             remove_max_total_margin_exposure=self._sent_as_null("max_total_margin_exposure_percent"),
             remove_max_total_value_exposure=self._sent_as_null("max_total_value_exposure_percent"),
             remove_max_consecutive_failures=self._sent_as_null("max_consecutive_failures"),
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
+            remove_max_daily_loss=self._sent_as_null("max_daily_loss_percent"),
+            remove_max_drawdown=self._sent_as_null("max_drawdown_percent"),
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -237,6 +257,10 @@ class ConfigurationResponse(BaseModel):
     system_prompt_placeholders: list[PromptPlaceholderResponse]
     # None: no maximum of failed cycles in a row (R3.2.4).
     max_consecutive_failures: int | None
+    # None: no maximum loss (R3.2.2).
+    max_daily_loss_percent: str | None
+    max_drawdown_percent: str | None
+    openings_resume: OpeningsResume
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -257,6 +281,9 @@ class ConfigurationResponse(BaseModel):
             system_prompt_is_default=configuration.system_prompt is None,
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
             max_consecutive_failures=configuration.max_consecutive_failures,
+            max_daily_loss_percent=_text(configuration.max_daily_loss_percent),
+            max_drawdown_percent=_text(configuration.max_drawdown_percent),
+            openings_resume=configuration.openings_resume,
         )
 
 
@@ -301,6 +328,9 @@ class FlowResponse(BaseModel):
     system_prompt_is_default: bool
     system_prompt_placeholders: list[PromptPlaceholderResponse]
     max_consecutive_failures: int | None
+    max_daily_loss_percent: str | None
+    max_drawdown_percent: str | None
+    openings_resume: OpeningsResume
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -326,7 +356,29 @@ class FlowResponse(BaseModel):
             system_prompt_is_default=configuration.system_prompt is None,
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
             max_consecutive_failures=configuration.max_consecutive_failures,
+            max_daily_loss_percent=_text(configuration.max_daily_loss_percent),
+            max_drawdown_percent=_text(configuration.max_drawdown_percent),
+            openings_resume=configuration.openings_resume,
         )
+
+
+class OpeningsSuspensionResponse(BaseModel):
+    """The openings of a flow suspended for maximum loss: the threshold passed and when (R3.2.2)."""
+
+    reason: str
+    suspended_at: datetime
+
+    @classmethod
+    def of(cls, suspension: OpeningsSuspension | None) -> OpeningsSuspensionResponse | None:
+        if suspension is None:
+            return None
+        return cls(reason=suspension.reason, suspended_at=suspension.suspended_at)
+
+
+class FlowOpeningsResponse(BaseModel):
+    """The suspension of the openings of the flow in force now, or null (R3.2.2)."""
+
+    suspension: OpeningsSuspensionResponse | None
 
 
 class FreeCapitalResponse(BaseModel):
@@ -497,6 +549,21 @@ def flows_router(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> FlowResponse:
         return FlowResponse.of(use_cases.assign_draft_flow.execute(request.command(flow_id)))
+
+    @router.get("/flows/{flow_id}/openings")
+    def read_flow_openings(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> FlowOpeningsResponse:
+        suspension = use_cases.read_flow_openings.execute(ReadFlowOpeningsCommand(FlowId(flow_id)))
+        return FlowOpeningsResponse(suspension=OpeningsSuspensionResponse.of(suspension))
+
+    @router.post("/flows/{flow_id}/openings/resume")
+    def resume_flow_openings(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> FlowOpeningsResponse:
+        """The user resumes the openings suspended for maximum loss (R3.2.2)."""
+        resumed = use_cases.resume_flow_openings.execute(ResumeFlowOpeningsCommand(FlowId(flow_id)))
+        return FlowOpeningsResponse(suspension=OpeningsSuspensionResponse.of(resumed.suspension))
 
     @router.post("/flows/{flow_id}/{action}")
     def change_flow_status(

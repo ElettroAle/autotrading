@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -16,6 +17,8 @@ from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
@@ -90,6 +93,28 @@ def test_an_active_flow_shows_its_last_cycle_and_the_next_planned_one(bench: Ben
     assert (overview.summary, overview.environment) == (active, "dev")
     assert overview.last_cycle == last
     assert overview.next_cycle_at == STARTED + timedelta(minutes=30)
+
+
+def test_a_flow_shows_the_suspension_of_its_openings_in_force_now(bench: Bench) -> None:
+    _, summary = bench.flow()
+    suspension = OpeningsSuspension("perdita giornaliera 6% oltre il 5%", STARTED)
+    bench.summaries.summaries[0] = replace(summary, openings=OpeningsStatus(suspension, None))
+
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
+
+    assert overview.openings_suspension == suspension
+
+
+def test_a_next_day_suspension_ended_before_now_is_not_shown(bench: Bench) -> None:
+    _, summary = bench.flow()
+    suspension = OpeningsSuspension("perdita dal picco 11% oltre il 10%", STARTED - timedelta(days=1))
+    bench.summaries.summaries[0] = replace(
+        summary, openings=OpeningsStatus(suspension, None), openings_resume=OpeningsResume.NEXT_DAY
+    )
+
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
+
+    assert overview.openings_suspension is None
 
 
 def test_a_flow_without_schedule_nor_cycles_has_neither_last_nor_next_cycle(bench: Bench) -> None:

@@ -19,6 +19,12 @@ const sourceText = (source: Source): string =>
 
 const percentText = (percent: string | null): string => (percent === null ? NONE : `${percent}%`);
 
+// The labels of the API in its differences (R3.2.2).
+const RESUME_LABELS: Readonly<Record<Configuration['openings_resume'], string>> = {
+  manual: 'manuale',
+  next_day: 'il giorno dopo',
+};
+
 /**
  * The parts of a configuration with the names the API gives them in its differences (R1.1.3), so the comparison
  * highlights a row by the name of the part the API reports as changed.
@@ -62,5 +68,11 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       part: 'cicli falliti consecutivi massimi',
       value: String(configuration.max_consecutive_failures ?? NONE),
     },
+    {
+      part: 'perdita giornaliera massima',
+      value: percentText(configuration.max_daily_loss_percent),
+    },
+    { part: 'perdita massima dal picco', value: percentText(configuration.max_drawdown_percent) },
+    { part: 'ripresa delle aperture', value: RESUME_LABELS[configuration.openings_resume] },
   ];
 };

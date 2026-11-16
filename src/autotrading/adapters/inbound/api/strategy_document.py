@@ -9,6 +9,7 @@ from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow_strategy import FlowStrategy
+from autotrading.domain.flows.openings_resume import OpeningsResume
 
 FORMAT = "autotrading-strategy"
 FORMAT_VERSION = 1
@@ -67,6 +68,10 @@ class StrategyBody(BaseModel):
     system_prompt: str | None = None
     # Null or missing: no maximum of failed cycles in a row (R3.2.4).
     max_consecutive_failures: int | None = None
+    # Null or missing: no maximum loss; missing resume: by hand (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
 
 
 class StrategyDocument(BaseModel):
@@ -103,6 +108,9 @@ class StrategyDocument(BaseModel):
                 bring_to_minimum=strategy.bring_to_minimum,
                 system_prompt=strategy.system_prompt,
                 max_consecutive_failures=strategy.max_consecutive_failures,
+                max_daily_loss_percent=strategy.max_daily_loss_percent,
+                max_drawdown_percent=strategy.max_drawdown_percent,
+                openings_resume=strategy.openings_resume,
             ),
         )
 
@@ -125,6 +133,9 @@ class StrategyDocument(BaseModel):
             bring_to_minimum=strategy.bring_to_minimum,
             system_prompt=strategy.system_prompt,
             max_consecutive_failures=strategy.max_consecutive_failures,
+            max_daily_loss_percent=strategy.max_daily_loss_percent,
+            max_drawdown_percent=strategy.max_drawdown_percent,
+            openings_resume=strategy.openings_resume,
         )
 
     def _require_supported(self) -> None:
