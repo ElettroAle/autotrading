@@ -40,6 +40,7 @@ from autotrading.application.flows.export_flow_operations import ExportFlowOpera
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyUseCase
+from autotrading.application.flows.list_account_capital_changes import ListAccountCapitalChangesUseCase
 from autotrading.application.flows.list_account_operations import ListAccountOperationsUseCase
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
@@ -53,6 +54,7 @@ from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
     AccountRemovalPorts,
+    AccountTransfersPort,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
     EquitySnapshotRepositoryPort,
@@ -128,6 +130,7 @@ class TenantPorts:
     closing_ports: ClosingPorts
     account_removal: AccountRemovalPorts
     account_activity: AccountActivityPort
+    account_transfers: AccountTransfersPort
     flow_ledger: FlowLedgerPort
     ledger_recording: LedgerRecordingPort
     flow_operations: FlowOperationsPort
@@ -188,6 +191,7 @@ class TenantUseCases:
     cash_out_profits: CashOutProfitsUseCase
     change_allocated_capital: ChangeAllocatedCapitalUseCase
     list_capital_changes: ListCapitalChangesUseCase
+    list_account_capital_changes: ListAccountCapitalChangesUseCase
     list_closed_positions: ListClosedPositionsUseCase
     list_flow_operations: ListFlowOperationsUseCase
     list_account_operations: ListAccountOperationsUseCase
@@ -274,7 +278,10 @@ class TenantUseCases:
                 ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
                 ports.clock,
             ),
-            list_capital_changes=ListCapitalChangesUseCase(ports.flows),
+            list_capital_changes=ListCapitalChangesUseCase(ports.flows, ports.settlement_currency),
+            list_account_capital_changes=ListAccountCapitalChangesUseCase(
+                ports.flows, ports.account_transfers, ports.settlement_currency
+            ),
             list_closed_positions=ListClosedPositionsUseCase(ports.flows, ports.closed_positions),
             list_flow_operations=ListFlowOperationsUseCase(ports.flows, ports.flow_operations),
             list_account_operations=ListAccountOperationsUseCase(ports.flow_operations),

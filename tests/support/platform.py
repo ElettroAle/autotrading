@@ -16,6 +16,7 @@ from autotrading.application.flows.list_flow_summaries import ListFlowSummariesU
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
@@ -50,6 +51,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
+from tests.fakes.account_transfers import FakeAccountTransfersAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
 from tests.fakes.bot_inbox import FakeBotInboxAdapter
@@ -138,6 +140,7 @@ class Platform:
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
         self.account_activity.unread = self.reading_on_exchange
+        self.account_transfers = FakeAccountTransfersAdapter()
         self.platform_orders = InMemoryPlatformOrdersAdapter()
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
@@ -214,6 +217,7 @@ class Platform:
             closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=self.account_activity,
+            account_transfers=self.account_transfers,
             flow_ledger=self.ledger,
             ledger_recording=FakeLedgerRecordingAdapter(
                 RecordAccountExecutionsUseCase(flows, self.account_activity, self.platform_orders, self.ledger)
@@ -280,6 +284,7 @@ class Platform:
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             record_account_executions=RecordAccountExecutionsUseCase(
                 InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
                 ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),

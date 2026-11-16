@@ -19,6 +19,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -119,9 +120,23 @@ class InMemoryFlowRepositoryAdapter:
         self._replace(replace(self.get(flow.id), account_id=flow.account_id, configuration=flow.configuration))
         self._store.versions[flow.id].append(flow.configuration)
 
-    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
-        self.get(flow_id)
-        return tuple(self._store.capital_changes.get(flow_id, []))
+    def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
+        # As the identity of the rows of the database: of two changes of a flow at one instant, the later saved first.
+        saved = self._changes_within(flow_ids, window)
+        return tuple(sorted(reversed(saved), key=lambda change: change.changed_at, reverse=True)[:limit])
+
+    def count_capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> int:
+        return len(self._changes_within(flow_ids, window))
+
+    def _changes_within(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> tuple[CapitalChange, ...]:
+        own = {flow.id for flow in self.list()} & set(flow_ids)
+        return tuple(
+            change
+            for flow_id, changes in self._store.capital_changes.items()
+            if flow_id in own
+            for change in changes
+            if window.contains(change.changed_at)
+        )
 
     def _replace(self, flow: Flow) -> None:
         self._store.flows = [flow if each.id == flow.id else each for each in self._store.flows]

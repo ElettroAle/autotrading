@@ -120,6 +120,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
 from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
@@ -269,6 +270,7 @@ def tenant_use_cases(
             closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=account_activity,
+            account_transfers=account_activity,
             flow_ledger=flow_ledger,
             ledger_recording=ledger_recording,
             flow_operations=SqlAlchemyFlowOperationsAdapter(engine, tenant_id),
@@ -333,6 +335,7 @@ def worker_use_cases(
             ),
             notify=notify_for(engine, outbox, tenant_id),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, activity_readers),
+            read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, activity_readers),
             record_account_executions=RecordAccountExecutionsUseCase(
                 SqlAlchemyFlowRepositoryAdapter(engine, tenant_id),
                 ReadAccountExecutionsUseCase(accounts, opener, executions_readers),

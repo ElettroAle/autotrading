@@ -22,9 +22,7 @@ def upgrade() -> None:
     op.add_column("flow_capital_changes", sa.Column("reason", sa.Text, nullable=True))
     op.add_column("flow_capital_changes", sa.Column("amount", sa.Numeric, nullable=True))
     op.add_column("flow_capital_changes", sa.Column("value_before", sa.Numeric, nullable=True))
-    op.add_column(
-        "flow_capital_changes", sa.Column("cashed_profit", sa.Numeric, nullable=False, server_default="0")
-    )
+    op.add_column("flow_capital_changes", sa.Column("cashed_profit", sa.Numeric, nullable=False, server_default="0"))
     op.execute(
         "UPDATE flow_capital_changes SET "
         "reason = CASE WHEN new_capital > previous_capital THEN 'aumento' ELSE 'riduzione' END, "

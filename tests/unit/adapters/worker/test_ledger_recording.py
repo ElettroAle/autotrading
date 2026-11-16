@@ -22,6 +22,7 @@ from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 EXECUTED_AT = datetime(2026, 11, 16, 9, 29, tzinfo=UTC)
+REFUSED = "connection refused"
 
 
 @pytest.fixture
@@ -89,7 +90,7 @@ def test_a_caller_without_the_token_is_refused_and_nothing_is_recorded(worker: W
 
 def test_a_worker_out_of_reach_is_an_exchange_that_cannot_be_read() -> None:
     def refuse(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("connection refused", request=request)
+        raise httpx.ConnectError(REFUSED, request=request)
 
     client = httpx.Client(transport=httpx.MockTransport(refuse), base_url="http://worker")
 

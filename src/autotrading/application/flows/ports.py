@@ -14,6 +14,7 @@ from autotrading.domain.flows.account_reconciliation import AccountReading, Outs
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.capital_history import AccountTransfer
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_access import CycleAccess
@@ -125,8 +126,15 @@ class FlowRepositoryPort(Protocol):
         """
         ...
 
-    def capital_changes(self, flow_id: FlowId) -> tuple[CapitalChange, ...]:
-        """The changes of the capital allocated to the flow, oldest first. Raises FlowNotFoundError."""
+    def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
+        """The most recent changes of the capital of those flows in the window, at most `limit`, newest first (R3.4.2).
+
+        A flow of another tenant has none.
+        """
+        ...
+
+    def count_capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow) -> int:
+        """How many changes of the capital of those flows the window holds (R3.4.2)."""
         ...
 
 
@@ -346,6 +354,34 @@ class ActivityReaderPort(Protocol):
     def activity(self, reference: AccountReference) -> AccountActivity:
         """Raises FlowExchangeUnavailableError when the exchange cannot be read, and FlowCredentialsFieldMissingError
         when the reference lacks a field the reader declares.
+        """
+        ...
+
+
+class AccountTransfersPort(Protocol):
+    """Bound to the tenant of the request: the deposits and withdrawals the exchange declares on one of its accounts.
+
+    Only the worker opens an account to read it on its exchange: in the API it is the client that asks the worker to
+    run ReadAccountTransfersUseCase (ADR 0007, ADR storico-delle-variazioni-di-capitale).
+    """
+
+    def transfers(self, account_id: UUID, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        """Every one in the window, never part of them: raises FlowAccountNotFoundError, or
+        FlowExchangeUnavailableError when the exchange cannot be read.
+        """
+        ...
+
+
+class TransfersReaderPort(Protocol):
+    """The deposits and withdrawals an exchange declares on an account (R3.4.2)."""
+
+    def reference_fields(self) -> frozenset[str]:
+        """The names of the fields of the credentials the reader needs to find the account on its exchange."""
+        ...
+
+    def transfers(self, reference: AccountReference, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        """Every one in the window. Raises FlowExchangeUnavailableError when the exchange cannot be read, and
+        FlowCredentialsFieldMissingError when the reference lacks a field the reader declares.
         """
         ...
 

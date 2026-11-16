@@ -156,7 +156,7 @@ def test_a_cash_out_closes_the_positions_and_frees_the_value_above_the_capital_k
     assert bench.exchange.closed == ["BTC"]
     assert bench.cycles.waited == [flow.id]
     assert bench.recording.recorded == [bench.account_id]
-    assert bench.flows.capital_changes(flow.id) == (
+    assert tuple(bench.store.capital_changes.get(flow.id, [])) == (
         CapitalChange(
             flow.id,
             NOW,
@@ -189,7 +189,7 @@ def test_a_cash_out_to_a_capital_makes_it_the_next_version_and_frees_the_rest(be
 
     assert outcome.freed == Decimal(218)
     assert outcome.flow == bench.flows.get(flow.id) == flow.with_capital(Decimal(400))
-    (change,) = bench.flows.capital_changes(flow.id)
+    (change,) = tuple(bench.store.capital_changes.get(flow.id, []))
     assert (change.previous, change.new, change.amount, change.cashed_profit) == (
         Decimal(500),
         Decimal(400),
@@ -238,7 +238,7 @@ def test_a_closing_refused_frees_nothing_and_comes_back_with_its_reason(bench: B
 
     assert (outcome.flow, outcome.freed) == (flow, None)
     assert outcome.left_open == (PositionLeftOpen("BTC", "Order rejected"),)
-    assert bench.flows.capital_changes(flow.id) == ()
+    assert tuple(bench.store.capital_changes.get(flow.id, [])) == ()
     assert bench.recording.recorded == []
 
 
@@ -251,7 +251,7 @@ def test_profits_gone_with_the_closings_free_nothing(bench: Bench) -> None:
         bench.cash_out.execute(CashOutProfitsCommand(flow.id, USER))
 
     assert bench.exchange.closed == ["BTC"]
-    assert bench.flows.capital_changes(flow.id) == ()
+    assert tuple(bench.store.capital_changes.get(flow.id, [])) == ()
 
 
 def test_the_flow_keeps_its_status_and_every_closing_enters_the_history_as_a_cash_out(bench: Bench) -> None:

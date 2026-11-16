@@ -18,10 +18,13 @@ from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, 
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reference import AccountReference
+from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
 
 FROM_THE_START = 0
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, ArithmeticError)
+TRANSFER_DIRECTIONS = {"deposit": TransferDirection.DEPOSIT, "withdraw": TransferDirection.WITHDRAWAL}
 
 
 class _LedgerDelta(TypedDict, total=False):
@@ -40,7 +43,8 @@ class _LedgerUpdate(TypedDict):
 
 
 class HyperliquidAccountActivityAdapter:
-    """What Hyperliquid shows of an account: positions with their margin, movements of the balance (R1.6.1).
+    """What Hyperliquid shows of an account: positions with their margin, movements of the balance (R1.6.1), and the
+    deposits and withdrawals of its history of the capital (R3.4.2, ADR storico-delle-variazioni-di-capitale).
 
     Everything is public information of the address: no signature, so no secret leaves the opener. The executions
     are read apart, only the new ones, for the ledger (ADR 0063). Funding payments are not movements.
@@ -84,6 +88,17 @@ class HyperliquidAccountActivityAdapter:
                 movements=tuple(movement for update in ledger if (movement := _movement_of(update, address))),
                 read_at=state.read_at,
             )
+
+    def transfers(self, reference: AccountReference, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        address = address_of(reference)
+        start = FROM_THE_START if window.since is None else _milliseconds(window.since)
+        end = None if window.until is None else _milliseconds(window.until)
+        with translated():
+            info = self._sdk.info(self._base_url, self._timeout)
+            ledger = info.user_non_funding_ledger_updates(address, start, end)
+            # The exchange includes the end it is given; the window excludes it.
+            transfers = (transfer for update in ledger if (transfer := _transfer_of(update)))
+            return tuple(transfer for transfer in transfers if window.contains(transfer.transferred_at))
 
 
 @contextmanager
@@ -129,6 +144,18 @@ def _signed_amount(delta: _LedgerDelta, address: str) -> Decimal | None:
     if kind == "accountClassTransfer":
         return _decimal(delta["usdc"]) if delta["toPerp"] else -_decimal(delta["usdc"])
     return None
+
+
+def _transfer_of(update: _LedgerUpdate) -> AccountTransfer | None:
+    """The deposit or withdrawal a ledger update declares, or None for any other update."""
+    direction = TRANSFER_DIRECTIONS.get(update["delta"]["type"])
+    if direction is None:
+        return None
+    return AccountTransfer(_instant(update["time"]), _decimal(update["delta"]["usdc"]), direction)
+
+
+def _milliseconds(instant: datetime) -> int:
+    return int(instant.timestamp() * 1000)
 
 
 def _instant(milliseconds: int | str) -> datetime:

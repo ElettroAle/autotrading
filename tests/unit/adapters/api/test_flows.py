@@ -367,12 +367,15 @@ def test_the_capital_of_a_flow_changes_with_its_history(client_of: Client, platf
     changed = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "700.50"})
 
     assert (changed.status_code, changed.json()["allocated_capital"], changed.json()["version"]) == (200, "700.5", 2)
-    (change,) = anna.get(f"/flows/{flow_id}/capital-changes").json()
+    (change,) = anna.get(f"/flows/{flow_id}/capital-changes").json()["changes"]
     assert change == {
         "changed_at": platform.now.isoformat().replace("+00:00", "Z"),
+        "flow_id": flow_id,
+        "flow": "alfa",
+        "reason": "aumento",
+        "amount": "300.5",
         "previous": "400",
         "new": "700.5",
-        "user_id": platform.directory.person("anna").object_id,
     }
     refused = anna.put(f"/flows/{flow_id}/allocated-capital", json={"allocated_capital": "1000.51"})
     assert (refused.status_code, reason_of(refused)) == (

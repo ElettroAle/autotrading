@@ -4,13 +4,14 @@ import threading
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel, Field
 
-from autotrading.adapters.inbound.api.account_activity import AccountActivityResponse
+from autotrading.adapters.inbound.api.account_activity import AccountActivityResponse, AccountTransferResponse
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
@@ -19,6 +20,7 @@ from autotrading.adapters.inbound.api.worker_model_catalog import WorkerModelCat
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.agent.read_model_catalog import ReadModelCatalogUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.record_account_executions import (
     RecordAccountExecutionsCommand,
     RecordAccountExecutionsUseCase,
@@ -36,6 +38,7 @@ from autotrading.application.verification.run_exchange_verification import (
 )
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
@@ -62,6 +65,7 @@ class WorkerUseCases:
     run_exchange_verification: RunExchangeVerificationUseCase
     notify: NotifyUseCase
     read_account_activity: ReadAccountActivityUseCase
+    read_account_transfers: ReadAccountTransfersUseCase
     record_account_executions: RecordAccountExecutionsUseCase
 
 
@@ -238,6 +242,15 @@ def create_worker_api(
     def read_activity(tenant_id: UUID, account_id: UUID) -> AccountActivityResponse:
         command = account_id
         return AccountActivityResponse.of(for_tenant(TenantId(tenant_id)).read_account_activity.execute(command))
+
+    @api.get("/tenants/{tenant_id}/accounts/{account_id}/transfers", dependencies=[Depends(require_api)])
+    def read_transfers(
+        tenant_id: UUID, account_id: UUID, since: datetime | None = None, until: datetime | None = None
+    ) -> list[AccountTransferResponse]:
+        """The deposits and withdrawals of the account in the window, for its history of the capital (ADR
+        storico-delle-variazioni-di-capitale): only the worker opens an account to read it on its exchange."""
+        transfers = for_tenant(TenantId(tenant_id)).read_account_transfers.execute(account_id, TimeWindow(since, until))
+        return [AccountTransferResponse.of(transfer) for transfer in transfers]
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/ledger", dependencies=[Depends(require_api)])
     def record_ledger(tenant_id: UUID, account_id: UUID) -> dict[str, int]:

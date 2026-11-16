@@ -21,14 +21,12 @@ from autotrading.application.flows.create_flow import CreateFlowCommand, SourceR
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
-from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
-from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cash_out import CashOutOutcome
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.flow import Flow
@@ -362,22 +360,6 @@ class CapitalChangeRequest(BaseModel):
     allocated_capital: Decimal
 
 
-class CapitalChangeResponse(BaseModel):
-    changed_at: datetime
-    previous: str
-    new: str
-    user_id: str
-
-    @classmethod
-    def of(cls, change: CapitalChange) -> CapitalChangeResponse:
-        return cls(
-            changed_at=change.changed_at,
-            previous=amount_text(change.previous),
-            new=amount_text(change.new),
-            user_id=change.user_id.value,
-        )
-
-
 def flows_router(
     use_cases_of_request: Callable[..., TenantUseCases], user_of_request: Callable[..., UserId]
 ) -> APIRouter:
@@ -473,13 +455,6 @@ def flows_router(
     ) -> FlowResponse:
         command = ChangeAllocatedCapitalCommand(FlowId(flow_id), request.allocated_capital, user_id)
         return FlowResponse.of(use_cases.change_allocated_capital.execute(command))
-
-    @router.get("/flows/{flow_id}/capital-changes")
-    def list_capital_changes(
-        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> list[CapitalChangeResponse]:
-        changes = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(FlowId(flow_id)))
-        return [CapitalChangeResponse.of(change) for change in changes]
 
     @router.post("/flows/{flow_id}/duplicate", status_code=status.HTTP_201_CREATED)
     def duplicate_flow(

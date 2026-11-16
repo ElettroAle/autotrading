@@ -8,6 +8,7 @@ from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
+from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -89,6 +90,7 @@ class Worker:
             ),
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             record_account_executions=RecordAccountExecutionsUseCase(
                 InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
                 ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
