@@ -24,7 +24,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -95,13 +95,26 @@ class InMemoryCycleRepositoryAdapter:
         with self._guard:
             self.records.append(record)
 
-    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
         of_flow = sorted(
-            (record for record in self.records if record.flow_id == flow_id),
+            (
+                record
+                for record in self.records
+                if record.flow_id == flow_id and (outcome is None or record.outcome is outcome)
+            ),
             key=lambda record: record.planned_at,
             reverse=True,
         )
         return of_flow[offset : offset + limit]
+
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        return sum(
+            1
+            for record in self.records
+            if record.flow_id == flow_id
+            and record.outcome is CycleOutcome.FAILED
+            and window.contains(record.planned_at)
+        )
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         return next(
@@ -127,8 +140,11 @@ class InMemoryCycleHistoryAdapter:
         self._flows = flows
         self._tenant_id = tenant_id
 
-    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
-        return self._cycles.newest(flow_id, offset, limit) if self._owns(flow_id) else []
+    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
+        return self._cycles.newest(flow_id, offset, limit, outcome) if self._owns(flow_id) else []
+
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        return self._cycles.failed_within(flow_id, window) if self._owns(flow_id) else 0
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         return self._cycles.at(flow_id, planned_at) if self._owns(flow_id) else None

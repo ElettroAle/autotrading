@@ -1792,6 +1792,56 @@
               "format": "uuid",
               "title": "Flow Id"
             }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
           }
         ],
         "responses": {
@@ -2409,27 +2459,89 @@
         ],
         "summary": "List Flow Overviews",
         "operationId": "list_flow_overviews_flows_overview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FlowOverviewResponse"
                   },
-                  "type": "array",
                   "title": "Response List Flow Overviews Flows Overview Get"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/flows/{flow_id}/cycles": {
@@ -2464,6 +2576,24 @@
               "default": 1,
               "title": "Page"
             }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "concluso, fallito o saltato",
+              "title": "Outcome"
+            },
+            "description": "concluso, fallito o saltato"
           }
         ],
         "responses": {
@@ -4672,6 +4802,16 @@
             },
             "type": "array",
             "title": "Recent Outcomes"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowResultsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4690,10 +4830,11 @@
           "initial_capital",
           "current_capital",
           "return_percent",
-          "recent_outcomes"
+          "recent_outcomes",
+          "summary"
         ],
         "title": "FlowOverviewResponse",
-        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127)."
+        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent, how its capital is doing and its results in the period asked for (R1.7.3, R2.2.2, ADR 0127, R6.4.2)."
       },
       "FlowPositionResponse": {
         "properties": {
@@ -4918,6 +5059,59 @@
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
       },
+      "FlowResultsResponse": {
+        "properties": {
+          "total_gain": {
+            "type": "string",
+            "title": "Total Gain"
+          },
+          "total_gain_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Gain Percent"
+          },
+          "period_gain": {
+            "type": "string",
+            "title": "Period Gain"
+          },
+          "period_gain_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Gain Percent"
+          },
+          "open_positions": {
+            "type": "integer",
+            "title": "Open Positions"
+          },
+          "failed_cycles": {
+            "type": "integer",
+            "title": "Failed Cycles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_gain",
+          "total_gain_percent",
+          "period_gain",
+          "period_gain_percent",
+          "open_positions",
+          "failed_cycles"
+        ],
+        "title": "FlowResultsResponse",
+        "description": "How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains\nin the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without\ninitial capital."
+      },
       "FlowStateResponse": {
         "properties": {
           "flow_id": {
@@ -4967,6 +5161,9 @@
             },
             "type": "array",
             "title": "Positions"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/FlowResultsResponse"
           }
         },
         "type": "object",
@@ -4981,10 +5178,11 @@
           "fees",
           "total_value",
           "return_percent",
-          "positions"
+          "positions",
+          "summary"
         ],
         "title": "FlowStateResponse",
-        "description": "The state of a flow attributed from the exchange at the request (R1.6.1); amounts as strings (ADR 0018)."
+        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2); amounts as strings (ADR 0018)."
       },
       "FlowStatisticsResponse": {
         "properties": {

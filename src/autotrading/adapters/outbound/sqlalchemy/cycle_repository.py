@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import TypedDict, cast
 from uuid import UUID
 
-from sqlalchemy import Connection, Engine, RowMapping, func, select
+from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, func, select, true
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import cycles
@@ -78,10 +78,10 @@ class SqlAlchemyCycleRepositoryAdapter:
         with self._transaction() as connection:
             connection.execute(statement)
 
-    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
         query = (
             select(cycles)
-            .where(cycles.c.flow_id == flow_id, RECORDED)
+            .where(cycles.c.flow_id == flow_id, RECORDED, _having(outcome))
             .order_by(cycles.c.planned_at.desc())
             .offset(offset)
             .limit(limit)
@@ -94,6 +94,13 @@ class SqlAlchemyCycleRepositoryAdapter:
         with self._transaction() as connection:
             row = connection.execute(query).mappings().first()
         return None if row is None else record_of(row)
+
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        query = select(func.count()).where(
+            cycles.c.flow_id == flow_id, _having(CycleOutcome.FAILED), within(cycles.c.planned_at, window)
+        )
+        with self._transaction() as connection:
+            return connection.execute(query).scalar_one()
 
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         return self.costs_within(flow_id, TimeWindow())
@@ -169,6 +176,10 @@ def _plain_value(value: object) -> str:
         return value.isoformat()
     # A type the journal should never put in a document: failing here keeps it out of the record.
     raise UnrecordableDocumentError(type(value).__name__)
+
+
+def _having(outcome: CycleOutcome | None) -> ColumnElement[bool]:
+    return true() if outcome is None else cycles.c.outcome == outcome.name.lower()
 
 
 def _failure_row(failure: CycleFailure | None) -> dict[str, str] | None:

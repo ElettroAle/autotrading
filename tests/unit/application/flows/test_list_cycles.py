@@ -6,7 +6,7 @@ import pytest
 from autotrading.application.flows.errors import CycleFlowNotFoundError
 from autotrading.application.flows.list_cycles import ListCyclesCommand, ListCyclesUseCase
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
-from autotrading.domain.flows.errors import InvalidPageNumberError
+from autotrading.domain.flows.errors import InvalidPageNumberError, UnknownCycleOutcomeError
 from tests.fakes.cycles import FakeFlowDirectoryAdapter, InMemoryCycleRepositoryAdapter
 
 FIRST = datetime(2026, 11, 12, tzinfo=UTC)
@@ -93,3 +93,22 @@ def test_a_flow_of_another_tenant_does_not_exist(
 
     assert raised.value.status_code == 404
     assert str(raised.value) == "flusso non trovato"
+
+
+def test_an_outcome_keeps_only_the_cycles_that_had_it(
+    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
+) -> None:
+    record_cycles(history, 3)
+    failed = CycleRecord(FLOW, FIRST + timedelta(minutes=10), CycleOutcome.FAILED)
+    history.record(failed)
+
+    page = ListCyclesUseCase(directory, history).execute(ListCyclesCommand(FLOW, outcome="fallito"))
+
+    assert (page.cycles, page.has_next) == ((failed,), False)
+
+
+def test_an_unknown_outcome_is_refused(
+    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
+) -> None:
+    with pytest.raises(UnknownCycleOutcomeError):
+        ListCyclesUseCase(directory, history).execute(ListCyclesCommand(FLOW, outcome="perso"))

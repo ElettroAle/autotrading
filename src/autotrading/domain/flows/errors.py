@@ -248,6 +248,13 @@ class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
         super().__init__("il giorno iniziale è successivo al giorno finale")
 
 
+class UnknownCycleOutcomeError(DomainError):
+    """An outcome no cycle is recorded with: the cycles cannot be filtered on it (R6.4.2)."""
+
+    def __init__(self, outcomes: tuple[str, ...]) -> None:
+        super().__init__("esito non valido: scegliere tra " + ", ".join(outcomes))
+
+
 class VersionWithoutFlowError(DomainError):
     """A configuration version is numbered within its flow: without the flow it names nothing (R2.5.1)."""
 

@@ -72,6 +72,7 @@ from autotrading.application.flows.rank_flows import RankFlowsUseCase
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
+from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
@@ -166,7 +167,7 @@ class TenantUseCases:
     list_flows: ListFlowsUseCase
     list_tradable_assets: ListTradableAssetsUseCase
     read_free_capital: ReadFreeCapitalUseCase
-    read_flow_state: ReadFlowStateUseCase
+    read_flow_results: ReadFlowResultsUseCase
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
@@ -231,7 +232,12 @@ class TenantUseCases:
             list_flows=ListFlowsUseCase(ports.flows),
             list_tradable_assets=ListTradableAssetsUseCase(ports.flow_checks.markets),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
-            read_flow_state=ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+            read_flow_results=ReadFlowResultsUseCase(
+                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ports.equity_snapshots,
+                ports.cycle_history,
+                ports.clock,
+            ),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.bot_identity, ports.clock),
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
@@ -266,7 +272,12 @@ class TenantUseCases:
             list_flow_overviews=ListFlowOverviewsUseCase(
                 ports.flow_summaries,
                 ports.cycle_history,
-                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ReadFlowResultsUseCase(
+                    ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                    ports.equity_snapshots,
+                    ports.cycle_history,
+                    ports.clock,
+                ),
                 ports.environment,
                 ports.clock,
             ),
