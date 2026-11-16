@@ -13,7 +13,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing, PositionLeftOpen
+from autotrading.domain.flows.stop_outcome import ClosingFill, FlowClosings, PositionClosing
 from autotrading.domain.tenancy.user_id import UserId
 
 operations = logging.getLogger("autotrading.flows")
@@ -44,29 +44,28 @@ class CloseFlowPositionsUseCase:
 
     The cycle under way ends first, so it never opens a position after the closings. Each position closed enters the
     history with the reason and is told (R1.7.2, ADR 0070); a closing that fails does not stop the others and comes
-    back with the reason the exchange gave.
+    back with the reason the exchange gave. The outcome names the positions closed too, which the emergency closing
+    reports flow by flow (R3.2.3).
     """
 
     def __init__(self, ports: ClosingPorts) -> None:
         self._ports = ports
 
-    def execute(self, command: CloseFlowPositionsCommand) -> tuple[PositionLeftOpen, ...]:
+    def execute(self, command: CloseFlowPositionsCommand) -> FlowClosings:
         flow = command.flow
         self._ports.cycles.wait_until_finished(flow.id)
         closings = [self._close(flow, asset, command) for asset in flow.configuration.assets]
-        return tuple(position for position in closings if position is not None)
+        return FlowClosings.of(closing for closing in closings if closing is not None)
 
-    def _close(self, flow: Flow, asset: str, command: CloseFlowPositionsCommand) -> PositionLeftOpen | None:
+    def _close(self, flow: Flow, asset: str, command: CloseFlowPositionsCommand) -> PositionClosing | None:
         closing = _closing_of(
             asset, self._ports.positions.execute(PositionToClose(flow.assigned_account_id, asset, command.user_id))
         )
-        if closing is None:
-            return None
-        if closing.fill is None:
-            return PositionLeftOpen(asset, closing.refusal or "")
+        if closing is None or closing.fill is None:
+            return closing
         self._ports.exit_plans.remove(flow.id, asset)
         self._record(flow, asset, closing.fill, command.reason)
-        return None
+        return closing
 
     def _record(self, flow: Flow, asset: str, fill: ClosingFill, reason: CloseReason) -> None:
         opening = self._ports.openings.last_opening(flow.id, asset)

@@ -480,3 +480,16 @@ flow_protections = Table(
     ForeignKeyConstraint(["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"]),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
+
+
+# Every emergency closing a tenant launched: when, on which scope, and the outcome of each flow (R3.2.3).
+emergency_closings = Table(
+    "emergency_closings",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("closed_at", DateTime(timezone=True), nullable=False),
+    Column("scope_kind", Text, nullable=False),
+    Column("scope_id", Uuid),
+    Column("outcome", JSON, nullable=False),
+)

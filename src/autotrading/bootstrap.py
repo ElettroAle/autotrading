@@ -45,6 +45,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
 from autotrading.adapters.outbound.sqlalchemy.composition import SqlAlchemyEngine, sqlalchemy_adapters
 from autotrading.adapters.outbound.sqlalchemy.cycle_checkpoints import SqlAlchemyCycleCheckpointsAdapter
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.emergency_closing_log import SqlAlchemyEmergencyClosingLogAdapter
 from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
     SqlAlchemyEquitySnapshotRepositoryAdapter,
 )
@@ -313,6 +314,8 @@ def tenant_use_cases(
             reconciliation=SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id),
             account_thresholds=accounts,
             account_names=accounts,
+            automatic_pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
+            emergency_closings=SqlAlchemyEmergencyClosingLogAdapter(engine, tenant_id),
             environment=environment,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )

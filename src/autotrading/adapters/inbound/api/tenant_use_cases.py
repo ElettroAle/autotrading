@@ -33,6 +33,7 @@ from autotrading.application.flows.cash_out_profits import CashOutPorts, CashOut
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
+from autotrading.application.flows.close_in_emergency import CloseInEmergencyUseCase, EmergencyClosingPorts
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
 from autotrading.application.flows.confirm_reconciliation import ConfirmReconciliationUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
@@ -47,6 +48,7 @@ from autotrading.application.flows.list_account_operations import ListAccountOpe
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
 from autotrading.application.flows.list_cycles import ListCyclesUseCase
+from autotrading.application.flows.list_emergency_flows import ListEmergencyFlowsUseCase
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsUseCase
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsUseCase
@@ -59,8 +61,10 @@ from autotrading.application.flows.ports import (
     AccountDeviationThresholdPort,
     AccountRemovalPorts,
     AccountTransfersPort,
+    AutomaticPausePort,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
+    EmergencyClosingLogPort,
     EquitySnapshotRepositoryPort,
     ExitPlanRepositoryPort,
     FlowAccountNamePort,
@@ -79,6 +83,7 @@ from autotrading.application.flows.ports import (
     ReconciliationRepositoryPort,
     RunningVerificationsPort,
 )
+from autotrading.application.flows.preview_emergency_closing import PreviewEmergencyClosingUseCase
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
 from autotrading.application.flows.query_cycle_history import QueryCycleHistoryUseCase
 from autotrading.application.flows.query_order_history import QueryOrderHistoryUseCase
@@ -166,6 +171,8 @@ class TenantPorts:
     reconciliation: ReconciliationRepositoryPort
     account_thresholds: AccountDeviationThresholdPort
     account_names: FlowAccountNamePort
+    automatic_pause: AutomaticPausePort
+    emergency_closings: EmergencyClosingLogPort
     environment: str
     settlement_currency: str
 
@@ -236,6 +243,8 @@ class TenantUseCases:
     read_account_reconciliation: ReadAccountReconciliationUseCase
     list_reconciliation_alarms: ListReconciliationAlarmsUseCase
     confirm_reconciliation: ConfirmReconciliationUseCase
+    close_in_emergency: CloseInEmergencyUseCase
+    preview_emergency_closing: PreviewEmergencyClosingUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -359,4 +368,17 @@ class TenantUseCases:
             ),
             list_reconciliation_alarms=ListReconciliationAlarmsUseCase(ports.reconciliation, ports.account_names),
             confirm_reconciliation=ConfirmReconciliationUseCase(ports.reconciliation, ports.account_names, ports.clock),
+            close_in_emergency=CloseInEmergencyUseCase(
+                tenant_id,
+                EmergencyClosingPorts(
+                    ListEmergencyFlowsUseCase(ports.flows, ports.account_names),
+                    ports.automatic_pause,
+                    CloseFlowPositionsUseCase(ports.closing_ports),
+                    ports.emergency_closings,
+                    ports.clock,
+                ),
+            ),
+            preview_emergency_closing=PreviewEmergencyClosingUseCase(
+                ListEmergencyFlowsUseCase(ports.flows, ports.account_names), ports.account_activity
+            ),
         )

@@ -26,6 +26,7 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
 from autotrading.domain.flows.exit_plan import ExitPlan
@@ -316,6 +317,14 @@ class AutomaticPausePort(Protocol):
 
     def pause(self, flow_ids: Sequence[FlowId], reason: str) -> None:
         """Pauses the flows still active, with the reason of the automatic pause; the others stay as they are."""
+        ...
+
+
+class EmergencyClosingLogPort(Protocol):
+    """Bound to the tenant of the request: the emergency closings it launched, with their outcome (R3.2.3)."""
+
+    def record(self, closing: EmergencyClosing) -> None:
+        """Raises CrossTenantAccessError for a closing of another tenant."""
         ...
 
 

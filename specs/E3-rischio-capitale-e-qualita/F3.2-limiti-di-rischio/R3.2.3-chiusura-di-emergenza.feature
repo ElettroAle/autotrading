@@ -1,5 +1,5 @@
 # language: it
-@R3.2.3 @wip
+@R3.2.3
 Funzionalità: R3.2.3 Chiusura di emergenza
   Come utente
   Voglio chiudere con un solo comando tutte le posizioni di un flusso, di un conto o di tutti i miei flussi

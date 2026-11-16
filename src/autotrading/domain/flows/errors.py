@@ -381,3 +381,12 @@ class MalformedSystemPromptError(FlowSettingError):
         super().__init__(
             "parentesi graffa senza la sua coppia: per scriverla nel testo raddoppiala", FlowSetting.SYSTEM_PROMPT
         )
+
+
+class EmergencyScopeAmbiguousError(DomainError):
+    """An emergency closing covers one flow, one account or every flow: never a flow and an account at once
+    (R3.2.3).
+    """
+
+    def __init__(self) -> None:
+        super().__init__("indicare un flusso o un conto, non entrambi")
