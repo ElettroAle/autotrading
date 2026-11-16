@@ -24,7 +24,7 @@ campo svuotato (`decimalOrNull` in `flow-form.ts`): una volta impostato, un limi
 1. Come per il system prompt: `ModifyFlowRequest` passa al comando due flag, `remove_max_margin_exposure` e
    `remove_max_value_exposure`, veri quando il campo è in `model_fields_set` con valore `null`. `_risk_limits`
    toglie il limite col flag vero, tiene quello in vigore col campo assente, usa il valore inviato altrimenti.
-   `RiskLimits` rifiuta la combinazione senza limiti con `ExposureLimitRequiredError` (400, motivo «almeno un limite
+   `RiskLimits` rifiuta la combinazione senza limiti con `ExposureLimitRequiredError` (422, motivo «almeno un limite
    di esposizione è obbligatorio»). La dashboard continua a mandare `null` per il campo svuotato.
 2. Un valore sentinella (per esempio `0`) per dire «togli»: scartata, `0` è un valore di dominio e confonde.
 3. La modifica manda sempre la configurazione completa: scartata, cambia il contratto PATCH e tutti i client.
