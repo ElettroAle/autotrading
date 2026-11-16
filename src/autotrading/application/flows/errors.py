@@ -75,12 +75,15 @@ class FlowCredentialsFieldMissingError(ApplicationError):
 
 
 class FlowCredentialsRefusedError(ApplicationError):
-    """The exchange refuses the credentials a cycle proves: the cycle names the account in the error it raises."""
+    """The exchange refuses the credentials a cycle proves, with its reason already masked: the cycle names the account
+    in the error it raises.
+    """
 
     status_code = 422
 
-    def __init__(self) -> None:
+    def __init__(self, reason: str) -> None:
         super().__init__("credenziali rifiutate dall'exchange")
+        self.reason = reason
 
 
 class FlowExchangeUnavailableError(ApplicationError):
@@ -104,12 +107,13 @@ class FlowCredentialsRejectedError(ApplicationError):
     """
 
     status_code = 422
-    permanent = True
+    declared_permanent = True
 
-    def __init__(self, account: str, account_id: UUID) -> None:
-        super().__init__(f"credenziali del conto non valide: {account}")
+    def __init__(self, account: str, account_id: UUID, reason: str) -> None:
+        super().__init__(f"credenziali del conto non valide: {account} ({reason})")
         self.account = account
         self.account_id = account_id
+        self.reason = reason
 
     @property
     def scope(self) -> ErrorScope:
@@ -169,7 +173,7 @@ class FlowPositionMismatchError(ApplicationError):
     """
 
     status_code = 409
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, mismatch: PositionMismatch) -> None:
         super().__init__(
@@ -185,7 +189,7 @@ class FlowLedgerIncompleteError(ApplicationError):
     """
 
     status_code = 409
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, account_id: UUID) -> None:
         super().__init__("registro delle esecuzioni incompleto")

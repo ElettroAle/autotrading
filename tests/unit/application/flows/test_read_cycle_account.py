@@ -24,6 +24,12 @@ ACCESS = CycleAccess({"wallet": "0xabc", "signer": "0xsecret"})
 ACCOUNT = CycleAccount("USDC", Decimal(100), ())
 
 
+class ExternalRefusal(Exception):  # noqa: N818 - the error the library of the exchange raises, not a project error
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"status {status_code}")
+        self.status_code = status_code
+
+
 class Accounts:
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         assert account_id == ACCOUNT_ID
@@ -66,15 +72,31 @@ def test_the_account_is_read_with_its_name_and_exchange() -> None:
 
 
 @pytest.mark.parametrize(
-    ("opener", "reader"),
-    [(Opener(FlowCredentialsNotOpenedError()), Reader()), (Opener(), Reader(FlowCredentialsRefusedError()))],
+    ("opener", "reader", "reason"),
+    [
+        (Opener(FlowCredentialsNotOpenedError()), Reader(), "credenziali del conto non leggibili"),
+        (Opener(), Reader(FlowCredentialsRefusedError("API wallet scaduto")), "API wallet scaduto"),
+    ],
 )
-def test_credentials_not_opened_or_refused_are_a_rejection_of_the_account(opener: Opener, reader: Reader) -> None:
+def test_credentials_not_opened_or_refused_are_a_rejection_of_the_account_with_its_reason(
+    opener: Opener, reader: Reader, reason: str
+) -> None:
     with pytest.raises(FlowCredentialsRejectedError) as raised:
         use_case(opener, reader).execute(ACCOUNT_ID)
 
+    assert str(raised.value) == f"credenziali del conto non valide: test-1 ({reason})"
     assert raised.value.scope.account_id == ACCOUNT_ID
     assert raised.value.permanent
+
+
+def test_a_refusal_the_exchange_answers_with_a_rate_limit_is_no_permanent_rejection() -> None:
+    refusal = FlowCredentialsRefusedError("troppe richieste")
+    refusal.__cause__ = ExternalRefusal(429)
+
+    with pytest.raises(FlowCredentialsRejectedError) as raised:
+        use_case(reader=Reader(refusal)).execute(ACCOUNT_ID)
+
+    assert not raised.value.permanent
 
 
 def test_an_exchange_without_reader_is_unavailable() -> None:

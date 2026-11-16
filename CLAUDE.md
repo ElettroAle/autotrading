@@ -204,11 +204,16 @@ allenta e l'elenco non cresce senza approvazione del proprietario.
 - **Solo eccezioni tipizzate del progetto.** Ogni errore sollevato discende da `AutotradingError`.
   Mai `raise` di eccezioni di sistema (`ValueError`, `KeyError`, `RuntimeError`, `Exception`, ...).
 - **L'errore dichiara la propria risposta.** `AutotradingError` porta `status_code` (400 se non lo
-  ridefinisce), `permanent` (falso se non lo ridefinisce: un errore permanente mette in pausa i flussi,
-  R1.2.4) e `details` (dati che la risposta aggiunge al motivo). Ogni errore si definisce nel livello che
+  ridefinisce), `permanent` (un errore permanente mette in pausa i flussi, R1.2.4) e `details` (dati che la
+  risposta aggiunge al motivo). Ogni errore si definisce nel livello che
   lo solleva e ridefinisce solo ciò che differisce dal padre. Un solo handler centrale per servizio
   risponde in Problem Details (RFC 9457): nessuna mappa da errore a stato fuori dall'errore (ADR 0027).
 - **Una traduzione conserva la causa**: `raise <ErroreTipizzato> from error`.
+- **La permanenza la decide l'errore base.** `AutotradingError` calcola `permanent` dal codice del sistema
+  esterno conservato nella causa (`raise … from error`): 401, 402 e 403 sono sempre permanenti, 429 e 5xx sempre
+  temporanei; per ogni altro codice, o senza codice, vale ciò che l'errore dichiara (temporaneo se non lo dichiara).
+  Gli adapter non decidono la permanenza; l'override in una sottoclasse è un'eccezione che richiede
+  l'approvazione del proprietario (ADR permanenza-decisa-dall-errore-base).
 - **Le eccezioni delle librerie** si catturano solo nell'adapter che usa quella libreria e si
   traducono subito nell'errore tipizzato dichiarato dal contratto della porta.
 - **Fail fast, early return.** Si valida all'ingresso e si esce subito; niente `else` dopo un `return`

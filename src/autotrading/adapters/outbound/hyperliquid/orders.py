@@ -18,7 +18,6 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     INVALID_KEY_MESSAGE,
     MIN_ORDER_VALUE,
     MISSING_FIELD_MESSAGE,
-    RATE_LIMITED_STATUS,
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
 )
@@ -165,8 +164,6 @@ def _translated(access: TradingAccess, on_timeout: type[Exception] = OrderExchan
     try:
         yield
     except ClientError as error:
-        if error.status_code == RATE_LIMITED_STATUS:
-            raise OrderExchangeUnavailableError from error
         raise ExchangeRejectedOrderError(access.redact(str(error.error_message))) from error
     except requests.Timeout as error:
         raise on_timeout from error

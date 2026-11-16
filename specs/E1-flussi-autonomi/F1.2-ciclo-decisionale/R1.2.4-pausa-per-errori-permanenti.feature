@@ -7,7 +7,8 @@ Funzionalità: R1.2.4 Pausa automatica per un errore permanente
 
   Un errore permanente è un errore che si ripete a ogni ciclo finché l'utente non interviene: credito esaurito
   presso il fornitore IA, chiave del fornitore IA non valida o revocata, credenziali dell'exchange non valide o
-  revocate.
+  revocate. Un limite di frequenza dell'exchange o del fornitore («troppe richieste») non è mai permanente.
+  Il motivo di un rifiuto delle credenziali riporta il motivo dato dall'exchange.
   Il ciclo si interrompe come per un errore transitorio (R1.2.3) e in più il flusso passa allo stato "in pausa",
   con il motivo della pausa automatica. Le posizioni aperte restano sull'exchange.
   Il flusso riparte solo quando l'utente lo riprende (R1.1.4).
@@ -29,12 +30,19 @@ Funzionalità: R1.2.4 Pausa automatica per un errore permanente
       | causa                                                  | motivo                                    |
       | il fornitore "openrouter" risponde credito esaurito    | credito esaurito presso openrouter        |
       | il fornitore "openrouter" rifiuta la chiave            | chiave del fornitore non valida: openrouter |
-      | l'exchange rifiuta le credenziali del conto "test-1"   | credenziali del conto non valide: test-1  |
+      | l'exchange rifiuta le credenziali del conto "test-1" perché "API wallet scaduto" | credenziali del conto non valide: test-1 (API wallet scaduto) |
 
   Scenario: Le credenziali del conto mettono in pausa tutti i flussi del conto
-    Dato che l'exchange rifiuta le credenziali del conto "test-1"
+    Dato che l'exchange rifiuta le credenziali del conto "test-1" perché "API wallet scaduto"
     Quando il flusso "alfa" esegue un ciclo
-    Allora il flusso "beta" è nello stato "in pausa" con il motivo "credenziali del conto non valide: test-1"
+    Allora il flusso "beta" è nello stato "in pausa" con il motivo "credenziali del conto non valide: test-1 (API wallet scaduto)"
+
+  Scenario: Un limite di frequenza dell'exchange non mette in pausa
+    Dato che l'exchange risponde "troppe richieste" alla lettura del conto "test-1"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il ciclo è registrato come fallito
+    E il flusso "alfa" è nello stato "attivo"
+    E il flusso "beta" è nello stato "attivo"
 
   Scenario: La chiave del fornitore mette in pausa i flussi che la usano
     Dato che "anna" ha anche il flusso "gamma" attivo con un modello del fornitore "anthropic"

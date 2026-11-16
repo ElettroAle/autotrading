@@ -156,7 +156,8 @@ Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa n
   senza nuovi tentativi e senza ordini successivi. Un solo gestore centrale degli errori del ciclo
   registra il ciclo fallito e, per un errore permanente, mette in pausa i flussi e rilancia comunque
   (ADR della gestione degli errori).
-- La natura transitoria o permanente è una proprietà del tipo di errore, non del punto che lo intercetta.
+- La natura transitoria o permanente la calcola l'errore base dal codice del sistema esterno conservato nella causa
+  (ADR permanenza-decisa-dall-errore-base), non il punto che lo intercetta.
 - **Nessuna sovrapposizione**: due cicli dello stesso flusso non sono mai in corso insieme, anche tra più
   processi; il ciclo previsto durante uno in corso è saltato e registrato (R1.2.2).
 - **Flussi indipendenti**: un flusso lento o in errore non ritarda gli altri.

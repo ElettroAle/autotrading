@@ -26,9 +26,6 @@ DEFAULT_MAX_TOKENS = 4096
 ORIGINAL_LIMIT = 300
 KEY_REJECTED = frozenset({401, 403})
 CREDIT_EXHAUSTED = 402
-TOO_MANY_REQUESTS = 429
-# OpenAI tells an exhausted quota from a rate limit only in its message, under the same status.
-QUOTA_EXHAUSTED = ("insufficient_quota", "exceeded your current quota")
 UNEXPECTED_ANSWER = "risposta del fornitore inattesa"
 
 type Settings = Mapping[str, ParameterValue]
@@ -130,14 +127,10 @@ def _role(message: ModelMessage) -> str:
 def _refusal(provider: ProviderName, key: ProviderKey, status: int, message: str) -> Exception:
     if status in KEY_REJECTED:
         return ModelKeyRejectedError(provider)
-    if status == CREDIT_EXHAUSTED or (status == TOO_MANY_REQUESTS and _quota_exhausted(message)):
+    if status == CREDIT_EXHAUSTED:
         return ModelCreditExhaustedError(provider)
     # A provider may echo part of the request in its message: the key is masked before it can travel further.
     return ModelUnavailableError(provider, key.redact(f"{status} {_compact(message)}"))
-
-
-def _quota_exhausted(message: str) -> bool:
-    return any(sign in message for sign in QUOTA_EXHAUSTED)
 
 
 def _compact(message: str) -> str:

@@ -46,7 +46,7 @@ class OutboxUnavailableError(ApplicationError):
 class UnknownOutboxIntegrationError(ApplicationError):
     """A queued message names an integration no port delivers: no retry can ever deliver it."""
 
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, integration: str) -> None:
         super().__init__("integrazione in uscita sconosciuta")

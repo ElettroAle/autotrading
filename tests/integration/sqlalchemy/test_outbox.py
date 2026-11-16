@@ -58,7 +58,7 @@ class StillFailingError(AutotradingError):
 
 
 class RefusedForGoodError(AutotradingError):
-    permanent: ClassVar[bool] = True
+    declared_permanent: ClassVar[bool] = True
 
     def __init__(self) -> None:
         super().__init__("destinatario rifiutato")

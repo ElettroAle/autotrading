@@ -49,7 +49,7 @@ class FakeTransientError(AutotradingError):
 class FakePermanentError(AutotradingError):
     """A permanent error of an account or of a provider: the bridge pauses the flows that share it."""
 
-    permanent = True
+    declared_permanent = True
 
     def __init__(self, message: str, account: str | None = None, provider: str | None = None) -> None:
         super().__init__(message)

@@ -289,7 +289,7 @@ def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None
 
 
 def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: World) -> None:
-    error = FlowCredentialsRejectedError("test-1", world.flow.assigned_account_id)
+    error = FlowCredentialsRejectedError("test-1", world.flow.assigned_account_id, "API wallet scaduto")
 
     world.pause(error)
 

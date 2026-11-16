@@ -191,9 +191,12 @@ def test_payment_required_is_an_exhausted_credit(model: str) -> None:
 @pytest.mark.parametrize(
     "message", ["OpenAIException - You exceeded your current quota", "{'code': 'insufficient_quota'}"]
 )
-def test_an_exhausted_openai_quota_is_an_exhausted_credit(message: str) -> None:
-    with pytest.raises(ModelCreditExhaustedError, match=r"^credito esaurito presso openai$"):
+def test_an_exhausted_openai_quota_under_a_rate_limit_is_transient(message: str) -> None:
+    # ADR permanenza-decisa-dall-errore-base: a 429 is never permanent, whatever its message says.
+    with pytest.raises(ModelUnavailableError) as raised:
         call(failing(refusal(exceptions.RateLimitError, message)), "openai/gpt")
+
+    assert not raised.value.permanent
 
 
 def test_a_rate_limit_is_transient_with_the_original_message() -> None:

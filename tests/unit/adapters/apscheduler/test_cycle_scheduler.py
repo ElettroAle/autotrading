@@ -18,7 +18,7 @@ LATER = timedelta(hours=1)
 
 
 class PermanentExampleError(AutotradingError):
-    permanent = True
+    declared_permanent = True
 
     def __init__(self) -> None:
         super().__init__("credito esaurito presso openrouter")

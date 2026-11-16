@@ -271,9 +271,7 @@ def test_a_timeout_outside_the_order_is_an_unavailable_exchange() -> None:
 
 
 @pytest.mark.parametrize(
-    "failure",
-    [ServerError(502, "bad gateway"), requests.ConnectionError(), ClientError(429, None, "null", None)],
-    ids=["server-error", "connection", "rate-limited"],
+    "failure", [ServerError(502, "bad gateway"), requests.ConnectionError()], ids=["server-error", "connection"]
 )
 def test_a_fault_of_the_exchange_or_of_the_network_is_unavailable(failure: Exception) -> None:
     with pytest.raises(OrderExchangeUnavailableError):
@@ -289,10 +287,14 @@ def test_an_error_of_the_client_is_a_refusal_without_the_secret() -> None:
     assert raised.value.exchange_message == "bad signer ***"
 
 
-def test_a_rate_limit_of_the_exchange_on_a_reading_is_unavailable_not_a_refusal() -> None:
-    # ADR limite-di-frequenza-dell-exchange-come-indisponibilita: only a 429 among the errors of the client.
-    with pytest.raises(OrderExchangeUnavailableError):
+def test_a_rate_limit_of_the_exchange_keeps_its_code_in_the_cause() -> None:
+    # ADR permanenza-decisa-dall-errore-base: the adapter only keeps the cause, the base error reads the 429 in it.
+    with pytest.raises(ExchangeRejectedOrderError) as raised:
         adapter(FakeSdk(failure=ClientError(429, None, "null", None))).market(ACCESS, "BTC")
+
+    assert isinstance(raised.value.__cause__, ClientError)
+    assert raised.value.__cause__.status_code == 429
+    assert not raised.value.permanent
 
 
 def test_an_invalid_key_is_refused_before_reaching_the_exchange() -> None:
