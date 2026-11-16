@@ -17,6 +17,7 @@ SHORT_ETH = {
     "szi": "-1.5",
     "leverage": {"type": "isolated", "value": 3},
     "entryPx": "3000.0",
+    "positionValue": "4503.0",
     "unrealizedPnl": "-4.5",
     "marginUsed": "1500.0",
     "liquidationPx": "3900.0",
@@ -39,6 +40,7 @@ def test_the_state_is_read_once_with_every_field_the_adapters_need() -> None:
                 signed_size=Decimal("-1.5"),
                 leverage=3,
                 entry_price=Decimal(3000),
+                mark_price=Decimal(3002),
                 unrealized_pnl=Decimal("-4.5"),
                 margin=Decimal(1500),
                 liquidation_price=Decimal(3900),
@@ -49,6 +51,19 @@ def test_the_state_is_read_once_with_every_field_the_adapters_need() -> None:
     )
 
 
+def test_the_mark_price_is_the_value_of_the_position_on_its_size() -> None:
+    (position,) = user_state_of(STATE).positions
+
+    assert position.mark_price == Decimal(3002)
+
+
+def test_a_position_of_size_zero_is_an_answer_of_unexpected_shape() -> None:
+    state = STATE | {"assetPositions": [{"position": SHORT_ETH | {"szi": "0.0"}}]}
+
+    with pytest.raises(ArithmeticError):
+        user_state_of(state)
+
+
 def test_a_position_without_a_liquidation_price_reads_none() -> None:
     state = STATE | {"assetPositions": [{"position": SHORT_ETH | {"liquidationPx": None}}]}
 
@@ -57,7 +72,9 @@ def test_a_position_without_a_liquidation_price_reads_none() -> None:
     assert position.liquidation_price is None
 
 
-@pytest.mark.parametrize("missing", ["szi", "leverage", "entryPx", "unrealizedPnl", "marginUsed", "coin"])
+@pytest.mark.parametrize(
+    "missing", ["szi", "leverage", "entryPx", "positionValue", "unrealizedPnl", "marginUsed", "coin"]
+)
 def test_a_position_missing_a_field_is_refused(missing: str) -> None:
     position = {key: value for key, value in SHORT_ETH.items() if key != missing}
 
@@ -76,6 +93,7 @@ CROSS_BTC = {
     "szi": "0.01",
     "leverage": {"type": "cross", "value": 5},
     "entryPx": "60000.0",
+    "positionValue": "607.5",
     "unrealizedPnl": "7.5",
     "marginUsed": "120.0",
 }
