@@ -17,6 +17,7 @@ from autotrading.domain.flows.errors import (
     ModelRequiredError,
     RepeatedSourceError,
     SourceWeightOutOfRangeError,
+    TotalExposureOutOfRangeError,
 )
 from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.risk_limits import LEVERAGE, VALUE_EXPOSURE
@@ -32,6 +33,8 @@ from autotrading.domain.flows.risk_limits import LEVERAGE, VALUE_EXPOSURE
         (MaxLeverageRequiredError(), "max_leverage"),
         (ExposureLimitRequiredError(), "max_margin_exposure_percent"),
         (InvalidRiskLimitError(VALUE_EXPOSURE, FlowSetting.MAX_VALUE_EXPOSURE), "max_value_exposure_percent"),
+        (TotalExposureOutOfRangeError(FlowSetting.MAX_TOTAL_MARGIN_EXPOSURE), "max_total_margin_exposure_percent"),
+        (TotalExposureOutOfRangeError(FlowSetting.MAX_TOTAL_VALUE_EXPOSURE), "max_total_value_exposure_percent"),
         (SourceWeightOutOfRangeError("notizie"), "sources"),
         (RepeatedSourceError("notizie"), "sources"),
         (AllocatedCapitalNotPositiveError(), "allocated_capital"),

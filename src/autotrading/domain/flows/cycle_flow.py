@@ -53,11 +53,17 @@ class CycleFlow:
         return CycleFunds(self.attributed, self.account.available_margin)
 
     def risk_state(self) -> RiskState:
+        """The margin of the open positions is the one the exchange declares, as in the liquidity (ADR 0067); their
+        value is at the mark price (R3.2.1).
+        """
+        attributed = self.attributed
         return RiskState(
             currency=self.account.currency,
-            funds=self.attributed.funds,
+            funds=attributed.funds,
             available_liquidity=self.available_liquidity,
             open_assets=frozenset(position.asset for position in self.positions),
+            open_margin=attributed.margin,
+            open_value=sum((position.size * position.mark_price for position in attributed.positions), Decimal(0)),
         )
 
     @property

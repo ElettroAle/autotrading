@@ -46,6 +46,9 @@ class StrategyRiskLimits(BaseModel):
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    # Null or missing: no overall limit on the sum of the open positions (R3.2.1).
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
 
 
 class StrategyBody(BaseModel):
@@ -94,6 +97,8 @@ class StrategyDocument(BaseModel):
                     max_leverage=limits.max_leverage,
                     max_margin_exposure_percent=limits.max_margin_exposure_percent,
                     max_value_exposure_percent=limits.max_value_exposure_percent,
+                    max_total_margin_exposure_percent=limits.max_total_margin_exposure_percent,
+                    max_total_value_exposure_percent=limits.max_total_value_exposure_percent,
                 ),
                 bring_to_minimum=strategy.bring_to_minimum,
                 system_prompt=strategy.system_prompt,
@@ -111,6 +116,8 @@ class StrategyDocument(BaseModel):
             max_leverage=limits.max_leverage,
             max_margin_exposure_percent=limits.max_margin_exposure_percent,
             max_value_exposure_percent=limits.max_value_exposure_percent,
+            max_total_margin_exposure_percent=limits.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=limits.max_total_value_exposure_percent,
             model_parameters={} if model is None else model.parameters,
             sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in strategy.sources),
             instructions=strategy.instructions,

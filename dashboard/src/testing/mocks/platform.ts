@@ -56,6 +56,9 @@ export type FakeRiskLimits = {
   readonly maxLeverage: number;
   readonly maxMarginExposurePercent: string | null;
   readonly maxValueExposurePercent: string | null;
+  /** The overall limits on the sum of the open positions; null for none (R3.2.1). */
+  readonly maxTotalMarginExposurePercent: string | null;
+  readonly maxTotalValueExposurePercent: string | null;
 };
 
 export type FakeFlow = {
@@ -118,6 +121,8 @@ export type FakeFlowConfiguration = {
     max_leverage: number;
     max_margin_exposure_percent: string | null;
     max_value_exposure_percent: string | null;
+    max_total_margin_exposure_percent: string | null;
+    max_total_value_exposure_percent: string | null;
   };
   allocated_capital: string | null;
   bring_to_minimum: boolean;
@@ -140,6 +145,8 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
     max_leverage: flow.riskLimits.maxLeverage,
     max_margin_exposure_percent: flow.riskLimits.maxMarginExposurePercent,
     max_value_exposure_percent: flow.riskLimits.maxValueExposurePercent,
+    max_total_margin_exposure_percent: flow.riskLimits.maxTotalMarginExposurePercent,
+    max_total_value_exposure_percent: flow.riskLimits.maxTotalValueExposurePercent,
   },
   allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
   bring_to_minimum: flow.bringToMinimum,
@@ -261,6 +268,8 @@ export const DEFAULT_RISK_LIMITS: FakeRiskLimits = {
   maxLeverage: 3,
   maxMarginExposurePercent: '10',
   maxValueExposurePercent: null,
+  maxTotalMarginExposurePercent: null,
+  maxTotalValueExposurePercent: null,
 };
 const DRAFT = 'bozza';
 const STOPPED = 'fermo';
@@ -641,6 +650,8 @@ export const fakePlatform = {
               maxLeverage: limits.max_leverage,
               maxMarginExposurePercent: limits.max_margin_exposure_percent,
               maxValueExposurePercent: limits.max_value_exposure_percent,
+              maxTotalMarginExposurePercent: limits.max_total_margin_exposure_percent,
+              maxTotalValueExposurePercent: limits.max_total_value_exposure_percent,
             },
           }),
       ...(configuration.allocated_capital == null

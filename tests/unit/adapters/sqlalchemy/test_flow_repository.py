@@ -27,7 +27,7 @@ CONFIGURATION = replace(
     model=ModelSelection("openrouter/deepseek-chat", {"temperature": Decimal("0.70"), "reasoning_effort": "1"}),
     sources=(SourceSelection("notizie", 7, {"hours": 6}),),
     instructions="prudente",
-    risk_limits=RiskLimits(3, None, Decimal("12.5")),
+    risk_limits=RiskLimits(3, None, Decimal("12.5"), Decimal("30.5"), Decimal(200)),
     bring_to_minimum=True,
     system_prompt="{instructions} su {assets}",
     max_consecutive_failures=3,
@@ -44,7 +44,13 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         },
         "sources": [{"name": "notizie", "weight": 7, "parameters": {"hours": 6}}],
         "instructions": "prudente",
-        "risk_limits": {"max_leverage": 3, "max_margin_exposure_percent": None, "max_value_exposure_percent": "12.5"},
+        "risk_limits": {
+            "max_leverage": 3,
+            "max_margin_exposure_percent": None,
+            "max_value_exposure_percent": "12.5",
+            "max_total_margin_exposure_percent": "30.5",
+            "max_total_value_exposure_percent": "200",
+        },
         "allocated_capital": "400.50",
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
@@ -103,6 +109,16 @@ def test_a_version_saved_without_maximum_of_consecutive_failures_has_none() -> N
     del document["max_consecutive_failures"]
 
     assert configuration_of(1, document).max_consecutive_failures is None
+
+
+def test_a_version_saved_without_overall_exposure_limits_has_none() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    del document["risk_limits"]["max_total_margin_exposure_percent"]
+    del document["risk_limits"]["max_total_value_exposure_percent"]
+
+    limits = configuration_of(1, document).risk_limits
+
+    assert (limits.max_total_margin_exposure_percent, limits.max_total_value_exposure_percent) == (None, None)
 
 
 def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_back() -> None:

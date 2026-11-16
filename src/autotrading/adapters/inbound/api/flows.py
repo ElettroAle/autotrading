@@ -61,6 +61,9 @@ class FlowCreationRequest(BaseModel):
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    # Null or missing: no overall limit on the sum of the open positions (R3.2.1).
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     allocated_capital: Decimal
     bring_to_minimum: bool = False
     # Null or missing follows the default of the platform (R1.4.8).
@@ -78,6 +81,8 @@ class FlowCreationRequest(BaseModel):
             max_leverage=self.max_leverage,
             max_margin_exposure_percent=self.max_margin_exposure_percent,
             max_value_exposure_percent=self.max_value_exposure_percent,
+            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
             model_parameters=self.model_parameters,
             sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in self.sources),
             instructions=self.instructions,
@@ -102,6 +107,8 @@ class FlowModificationRequest(BaseModel):
     # A null sent on purpose removes the limit; a missing one keeps the version in force (R1.1.3).
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
     # A null sent on purpose goes back to the default; a missing one keeps the version in force (R1.4.8).
     system_prompt: str | None = None
@@ -122,12 +129,16 @@ class FlowModificationRequest(BaseModel):
             max_leverage=self.max_leverage,
             max_margin_exposure_percent=self.max_margin_exposure_percent,
             max_value_exposure_percent=self.max_value_exposure_percent,
+            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
             max_consecutive_failures=self.max_consecutive_failures,
             default_system_prompt=self._sent_as_null("system_prompt"),
             remove_max_margin_exposure=self._sent_as_null("max_margin_exposure_percent"),
             remove_max_value_exposure=self._sent_as_null("max_value_exposure_percent"),
+            remove_max_total_margin_exposure=self._sent_as_null("max_total_margin_exposure_percent"),
+            remove_max_total_value_exposure=self._sent_as_null("max_total_value_exposure_percent"),
             remove_max_consecutive_failures=self._sent_as_null("max_consecutive_failures"),
         )
 
@@ -166,6 +177,8 @@ class RiskLimitsResponse(BaseModel):
     max_leverage: int | None
     max_margin_exposure_percent: str | None
     max_value_exposure_percent: str | None
+    max_total_margin_exposure_percent: str | None
+    max_total_value_exposure_percent: str | None
 
     @classmethod
     def of(cls, limits: RiskLimits) -> RiskLimitsResponse:
@@ -173,6 +186,8 @@ class RiskLimitsResponse(BaseModel):
             max_leverage=limits.max_leverage,
             max_margin_exposure_percent=_text(limits.max_margin_exposure_percent),
             max_value_exposure_percent=_text(limits.max_value_exposure_percent),
+            max_total_margin_exposure_percent=_text(limits.max_total_margin_exposure_percent),
+            max_total_value_exposure_percent=_text(limits.max_total_value_exposure_percent),
         )
 
 

@@ -27,6 +27,8 @@ export const flowSchema = z.object({
     max_leverage: z.number().nullable(),
     max_margin_exposure_percent: z.string().nullable(),
     max_value_exposure_percent: z.string().nullable(),
+    max_total_margin_exposure_percent: z.string().nullable(),
+    max_total_value_exposure_percent: z.string().nullable(),
   }),
   allocated_capital: z.string().nullable(),
   bring_to_minimum: z.boolean(),

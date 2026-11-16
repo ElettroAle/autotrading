@@ -73,7 +73,23 @@ def test_the_positions_shown_are_those_of_the_account_on_the_assets_of_the_flow(
 def test_the_risk_measures_quotas_and_limits_on_the_money_of_the_flow() -> None:
     flow = cycle_flow(attributed(realized_pnl=Decimal(-100), fees=Decimal(2), margin=Decimal(50)), Decimal(300))
 
-    assert flow.risk_state() == RiskState("USDC", Decimal(398), Decimal(300), frozenset({"BTC"}))
+    assert flow.risk_state() == RiskState(
+        "USDC", Decimal(398), Decimal(300), frozenset({"BTC"}), Decimal(50), Decimal(112)
+    )
+
+
+def test_the_overall_exposure_of_the_risk_sums_the_margin_the_exchange_declares_and_the_value_at_the_mark_price() -> (
+    None
+):
+    positions = (
+        AccountPosition("BTC", TradeSide.LONG, Decimal(2), Decimal(70), Decimal(0), 3, Decimal(100), Decimal(105)),
+        AccountPosition("ETH", TradeSide.SHORT, Decimal("0.5"), Decimal(40), Decimal(0), 5, Decimal(400), Decimal(380)),
+    )
+    state = FlowState(FLOW.id, "USDC", Decimal(500), positions, Decimal(0), Decimal(0), Decimal(0))
+
+    risk = cycle_flow(state).risk_state()
+
+    assert (risk.open_margin, risk.open_value) == (Decimal(110), Decimal(400))
 
 
 def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:

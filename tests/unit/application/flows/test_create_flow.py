@@ -100,6 +100,19 @@ def test_a_valid_flow_is_saved_stopped_with_its_whole_configuration(flows: Flows
     assert configuration.max_consecutive_failures is None
 
 
+def test_the_overall_exposure_limits_are_saved(flows: Flows) -> None:
+    command = flows.command(
+        max_total_margin_exposure_percent=Decimal(30), max_total_value_exposure_percent=Decimal(150)
+    )
+
+    limits = flows.create.execute(command).configuration.risk_limits
+
+    assert (limits.max_total_margin_exposure_percent, limits.max_total_value_exposure_percent) == (
+        Decimal(30),
+        Decimal(150),
+    )
+
+
 def test_the_maximum_of_consecutive_failed_cycles_is_saved(flows: Flows) -> None:
     flow = flows.create.execute(flows.command(max_consecutive_failures=3))
 

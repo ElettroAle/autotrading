@@ -63,7 +63,7 @@ class RiskBench:
         exposure_set = self.margin_percent is not None or self.value_percent is not None
         margin_percent = self.margin_percent if exposure_set else Decimal(100)
         limits = RiskLimits(self.max_leverage, margin_percent, self.value_percent)
-        state = RiskState(CURRENCY, self.funds, self.liquidity, frozenset(self.open_assets))
+        state = RiskState(CURRENCY, self.funds, self.liquidity, frozenset(self.open_assets), Decimal(0), Decimal(0))
         command = CheckRiskCommand(tuple(self.intents), RiskPolicy(limits, self.bring_to_minimum), state, EXCHANGE)
         self.outcomes = CheckRiskUseCase({EXCHANGE: self.exchange}).execute(command)
 

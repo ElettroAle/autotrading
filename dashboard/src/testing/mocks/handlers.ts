@@ -71,6 +71,8 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
     max_leverage: configuration.maxLeverage,
     max_margin_exposure_percent: null,
     max_value_exposure_percent: null,
+    max_total_margin_exposure_percent: null,
+    max_total_value_exposure_percent: null,
   },
   allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,

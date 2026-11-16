@@ -4718,6 +4718,34 @@
             ],
             "title": "Max Value Exposure Percent"
           },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
+          },
           "allocated_capital": {
             "anyOf": [
               {
@@ -4928,6 +4956,34 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           },
           "bring_to_minimum": {
             "anyOf": [
@@ -6803,13 +6859,37 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",
         "required": [
           "max_leverage",
           "max_margin_exposure_percent",
-          "max_value_exposure_percent"
+          "max_value_exposure_percent",
+          "max_total_margin_exposure_percent",
+          "max_total_value_exposure_percent"
         ],
         "title": "RiskLimitsResponse"
       },
@@ -7295,6 +7375,34 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",
@@ -7334,6 +7442,28 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",

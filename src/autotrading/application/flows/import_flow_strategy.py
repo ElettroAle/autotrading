@@ -25,6 +25,9 @@ class ImportFlowStrategyCommand:
     max_leverage: int | None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    # None: no overall limit on the sum of the open positions (R3.2.1).
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     model_parameters: Mapping[str, object] = field(default_factory=dict)
     sources: tuple[SourceRequest, ...] = ()
     instructions: str = ""
@@ -74,7 +77,11 @@ class ImportFlowStrategyUseCase:
             ),
             instructions=command.instructions.strip(),
             risk_limits=RiskLimits.of(
-                command.max_leverage, command.max_margin_exposure_percent, command.max_value_exposure_percent
+                command.max_leverage,
+                command.max_margin_exposure_percent,
+                command.max_value_exposure_percent,
+                command.max_total_margin_exposure_percent,
+                command.max_total_value_exposure_percent,
             ),
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,

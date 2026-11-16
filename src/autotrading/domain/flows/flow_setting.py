@@ -14,6 +14,8 @@ class FlowSetting(StrEnum):
     MAX_LEVERAGE = "max_leverage"
     MAX_MARGIN_EXPOSURE = "max_margin_exposure_percent"
     MAX_VALUE_EXPOSURE = "max_value_exposure_percent"
+    MAX_TOTAL_MARGIN_EXPOSURE = "max_total_margin_exposure_percent"
+    MAX_TOTAL_VALUE_EXPOSURE = "max_total_value_exposure_percent"
     ALLOCATED_CAPITAL = "allocated_capital"
     SYSTEM_PROMPT = "system_prompt"
     MAX_CONSECUTIVE_FAILURES = "max_consecutive_failures"

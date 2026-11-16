@@ -51,6 +51,9 @@ class _RiskLimitsDocument(TypedDict):
     max_leverage: int
     max_margin_exposure_percent: str | None
     max_value_exposure_percent: str | None
+    # Absent in the versions saved before the overall limits existed: no overall limit (R3.2.1).
+    max_total_margin_exposure_percent: NotRequired[str | None]
+    max_total_value_exposure_percent: NotRequired[str | None]
 
 
 class _ConfigurationDocument(TypedDict):
@@ -273,6 +276,8 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "max_leverage": limits.max_leverage,
             "max_margin_exposure_percent": _text(limits.max_margin_exposure_percent),
             "max_value_exposure_percent": _text(limits.max_value_exposure_percent),
+            "max_total_margin_exposure_percent": _text(limits.max_total_margin_exposure_percent),
+            "max_total_value_exposure_percent": _text(limits.max_total_value_exposure_percent),
         },
         "allocated_capital": _text(configuration.allocated_capital),
         "bring_to_minimum": configuration.bring_to_minimum,
@@ -299,6 +304,8 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
             limits["max_leverage"],
             _decimal(limits["max_margin_exposure_percent"]),
             _decimal(limits["max_value_exposure_percent"]),
+            _decimal(limits.get("max_total_margin_exposure_percent")),
+            _decimal(limits.get("max_total_value_exposure_percent")),
         ),
         allocated_capital=_decimal(document["allocated_capital"]),
         # Versions saved before the option existed read with it off, its default (ADR 0051).

@@ -10,11 +10,16 @@ class AdjustmentKind(StrEnum):
     LEVERAGE = "leva"
     MARGIN = "margine"
     VALUE = "valore"
+    TOTAL_MARGIN = "margine complessivo"
+    TOTAL_VALUE = "valore complessivo"
 
 
 @dataclass(frozen=True, slots=True)
 class Adjustment:
-    """A change the risk check made to an opening, recorded with what the agent asked and why (R1.5.1-R1.5.4)."""
+    """A change the risk check made to an opening, recorded with what the agent asked and why.
+
+    Per operation (R1.5.1-R1.5.4) or on the sum of the open positions of the flow (R3.2.1).
+    """
 
     kind: AdjustmentKind
     before: Decimal

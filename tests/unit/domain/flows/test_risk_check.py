@@ -26,11 +26,21 @@ def check(
     funds: str = "1000",
     open_assets: frozenset[str] = frozenset(),
     bring_to_minimum: bool = False,
+    total_margin: str | None = None,
+    total_value: str | None = None,
+    open_margin: str = "0",
+    open_value: str = "0",
 ) -> RiskCheck:
     limits = RiskLimits(
-        max_leverage, None if margin is None else Decimal(margin), None if value is None else Decimal(value)
+        max_leverage,
+        None if margin is None else Decimal(margin),
+        None if value is None else Decimal(value),
+        None if total_margin is None else Decimal(total_margin),
+        None if total_value is None else Decimal(total_value),
     )
-    state = RiskState("USDC", Decimal(funds), Decimal(liquidity), open_assets)
+    state = RiskState(
+        "USDC", Decimal(funds), Decimal(liquidity), open_assets, Decimal(open_margin), Decimal(open_value)
+    )
     return RiskCheck(RiskPolicy(limits, bring_to_minimum), state)
 
 
@@ -280,3 +290,133 @@ def test_a_flow_without_money_left_opens_nothing() -> None:
     outcome = check(funds="0", liquidity="0").outcome(opening("0.4", 1), EXCHANGE)
 
     assert isinstance(outcome, BlockedDecision)
+
+
+# ADR-esposizione-complessiva-nel-controllo-del-rischio: the overall limits come after the limit per operation and
+# the openings of one cycle consume the residual in their order.
+
+
+def test_an_opening_beyond_the_overall_margin_is_reduced_to_the_residual() -> None:
+    outcome = approved(check(total_margin="30", open_margin="200").outcome(opening("0.15", 1), EXCHANGE))
+
+    assert (outcome.margin, outcome.value) == (Decimal(100), Decimal(100))
+    assert outcome.adjustments == (
+        Adjustment(
+            AdjustmentKind.TOTAL_MARGIN, Decimal(150), Decimal(100), "esposizione complessiva del margine al 30%"
+        ),
+    )
+
+
+def test_the_overall_margin_residual_keeps_the_leverage_of_the_opening() -> None:
+    outcome = approved(check(total_margin="30", open_margin="200").outcome(opening("0.15", 3), EXCHANGE))
+
+    assert (outcome.margin, outcome.value, outcome.leverage) == (Decimal(100), Decimal(300), 3)
+
+
+def test_an_opening_beyond_the_overall_value_is_reduced_to_the_residual() -> None:
+    outcome = approved(check(total_value="100", open_value="800").outcome(opening("0.3", 1), EXCHANGE))
+
+    assert outcome.value == Decimal(200)
+    assert outcome.adjustments == (
+        Adjustment(
+            AdjustmentKind.TOTAL_VALUE, Decimal(300), Decimal(200), "esposizione complessiva del valore al 100%"
+        ),
+    )
+
+
+def test_with_both_overall_limits_the_smaller_residual_wins() -> None:
+    risk = check(total_margin="30", total_value="100", open_margin="200", open_value="400")
+
+    outcome = approved(risk.outcome(opening("0.15", 2), EXCHANGE))
+
+    assert (outcome.margin, outcome.value) == (Decimal(100), Decimal(200))
+    assert [item.kind for item in outcome.adjustments] == [AdjustmentKind.TOTAL_MARGIN]
+
+
+def test_with_both_overall_limits_the_value_can_be_the_smaller_residual() -> None:
+    risk = check(total_margin="100", total_value="50", open_margin="100", open_value="400")
+
+    outcome = approved(risk.outcome(opening("0.2", 1), EXCHANGE))
+
+    assert outcome.value == Decimal(100)
+    assert [item.kind for item in outcome.adjustments] == [AdjustmentKind.TOTAL_VALUE]
+
+
+def test_an_exhausted_overall_limit_blocks_the_opening() -> None:
+    outcome = check(total_margin="30", open_margin="300").outcome(opening("0.15", 1), EXCHANGE)
+
+    assert outcome == BlockedDecision(
+        "BTC", "apertura BTC non eseguita: esposizione complessiva del margine al 30% esaurita"
+    )
+
+
+def test_an_overall_limit_already_exceeded_blocks_the_opening() -> None:
+    outcome = check(total_value="0.5", open_value="100").outcome(opening("0.01", 1), EXCHANGE)
+
+    assert outcome == BlockedDecision(
+        "BTC", "apertura BTC non eseguita: esposizione complessiva del valore al 0,5% esaurita"
+    )
+
+
+def test_an_opening_within_the_overall_limits_passes_unchanged() -> None:
+    outcome = approved(check(total_margin="30", open_margin="100").outcome(opening("0.15", 1), EXCHANGE))
+
+    assert (outcome.margin, outcome.adjustments) == (Decimal(150), ())
+
+
+def test_without_overall_limits_the_open_positions_do_not_reduce_an_opening() -> None:
+    outcome = approved(check(open_margin="900", open_value="900").outcome(opening("0.15", 1), EXCHANGE))
+
+    assert outcome.margin == Decimal(150)
+
+
+def test_the_overall_limit_applies_after_the_limit_per_operation() -> None:
+    outcome = approved(check(margin="20", total_margin="30", open_margin="150").outcome(opening("0.3", 1), EXCHANGE))
+
+    assert [(item.kind, item.before, item.after) for item in outcome.adjustments] == [
+        (AdjustmentKind.MARGIN, Decimal(300), Decimal(200)),
+        (AdjustmentKind.TOTAL_MARGIN, Decimal(200), Decimal(150)),
+    ]
+
+
+def test_the_openings_of_one_cycle_consume_the_overall_residual_in_their_order() -> None:
+    risk = check(total_margin="30", total_value="50")
+
+    first = approved(risk.outcome(opening("0.2", 1, asset="BTC"), EXCHANGE))
+    second = approved(risk.outcome(opening("0.2", 1, asset="SOL"), EXCHANGE))
+    third = risk.outcome(opening("0.2", 1, asset="ETH"), EXCHANGE)
+
+    assert (first.margin, second.margin) == (Decimal(200), Decimal(100))
+    assert third == BlockedDecision(
+        "ETH", "apertura ETH non eseguita: esposizione complessiva del margine al 30% esaurita"
+    )
+
+
+def test_a_blocked_opening_consumes_no_overall_residual() -> None:
+    risk = check(total_margin="30", open_assets=frozenset({"ETH"}))
+
+    risk.outcome(opening("0.2", 1, asset="ETH"), EXCHANGE)
+
+    assert approved(risk.outcome(opening("0.3", 1), EXCHANGE)).margin == Decimal(300)
+
+
+def test_a_residual_below_the_exchange_minimum_follows_the_rule_of_the_minimum() -> None:
+    outcome = check(total_value="100", open_value="995").outcome(opening("0.01", 1), EXCHANGE)
+
+    assert outcome == BlockedDecision("BTC", "valore sotto il minimo dell'exchange per BTC: 10 USDC")
+
+
+def test_brought_to_the_minimum_an_opening_still_respects_the_overall_residual() -> None:
+    risk = check(total_value="100", open_value="995", bring_to_minimum=True)
+
+    outcome = risk.outcome(opening("0.01", 1), EXCHANGE)
+
+    assert outcome == BlockedDecision("BTC", "minimo dell'exchange oltre il limite di esposizione")
+
+
+def test_brought_to_the_minimum_within_the_overall_residual_an_opening_passes() -> None:
+    risk = check(total_value="100", open_value="985", bring_to_minimum=True)
+
+    outcome = approved(risk.outcome(opening("0.005", 1), EXCHANGE))
+
+    assert outcome.value == Decimal(10)

@@ -39,6 +39,8 @@ class ModifyFlowCommand:
     max_leverage: int | None = None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
     system_prompt: str | None = None
     # Back to the default of the platform, which None cannot say since None keeps the version in force (R1.4.8).
@@ -47,6 +49,9 @@ class ModifyFlowCommand:
     # An exposure limit taken away, which None cannot say either (R1.1.3); at least one limit stays (R1.1.1).
     remove_max_margin_exposure: bool = False
     remove_max_value_exposure: bool = False
+    # An overall exposure limit taken away, back to no limit on the sum of the open positions (R3.2.1).
+    remove_max_total_margin_exposure: bool = False
+    remove_max_total_value_exposure: bool = False
     # The maximum of consecutive failed cycles taken away, back to retrying at every cycle (R3.2.4).
     remove_max_consecutive_failures: bool = False
 
@@ -154,6 +159,16 @@ def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:
             current.max_value_exposure_percent,
             command.max_value_exposure_percent,
             removed=command.remove_max_value_exposure,
+        ),
+        _exposure(
+            current.max_total_margin_exposure_percent,
+            command.max_total_margin_exposure_percent,
+            removed=command.remove_max_total_margin_exposure,
+        ),
+        _exposure(
+            current.max_total_value_exposure_percent,
+            command.max_total_value_exposure_percent,
+            removed=command.remove_max_total_value_exposure,
         ),
     )
 

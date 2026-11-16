@@ -54,6 +54,11 @@ class InvalidRiskLimitError(FlowSettingError):
         self.label = label
 
 
+class TotalExposureOutOfRangeError(FlowSettingError):
+    def __init__(self, setting: FlowSetting) -> None:
+        super().__init__("l'esposizione complessiva massima va da 0,1 a 1000", setting)
+
+
 class MaxConsecutiveFailuresOutOfRangeError(FlowSettingError):
     # The status the ADR of the maximum declares (ADR pausa-dopo-cicli-falliti-consecutivi); the field still names it.
     status_code = 400

@@ -3,7 +3,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
-from autotrading.domain.flows.risk_limits import LEVERAGE, MARGIN_EXPOSURE, VALUE_EXPOSURE
+from autotrading.domain.flows.risk_limits import (
+    LEVERAGE,
+    MARGIN_EXPOSURE,
+    TOTAL_MARGIN_EXPOSURE,
+    TOTAL_VALUE_EXPOSURE,
+    VALUE_EXPOSURE,
+)
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.italian_text import money_text, number_text
 
@@ -60,6 +66,14 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (LEVERAGE, lambda configuration: str(configuration.risk_limits.max_leverage)),
     (MARGIN_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_margin_exposure_percent)),
     (VALUE_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_value_exposure_percent)),
+    (
+        TOTAL_MARGIN_EXPOSURE,
+        lambda configuration: _percent(configuration.risk_limits.max_total_margin_exposure_percent),
+    ),
+    (
+        TOTAL_VALUE_EXPOSURE,
+        lambda configuration: _percent(configuration.risk_limits.max_total_value_exposure_percent),
+    ),
     ("capitale allocato", lambda configuration: _money(configuration.allocated_capital)),
     ("porta al minimo", lambda configuration: "sì" if configuration.bring_to_minimum else "no"),
     (

@@ -47,6 +47,8 @@ type ConfigurationRequest = {
   max_leverage?: unknown;
   max_margin_exposure_percent?: unknown;
   max_value_exposure_percent?: unknown;
+  max_total_margin_exposure_percent?: unknown;
+  max_total_value_exposure_percent?: unknown;
   allocated_capital?: unknown;
   bring_to_minimum?: unknown;
   system_prompt?: unknown;
@@ -161,18 +163,39 @@ const sourcesOf = (requested: unknown): FakeSource[] => {
   return selected;
 };
 
-const riskLimitsOf = (
-  maxLeverage: unknown,
-  marginPercent: unknown,
-  valuePercent: unknown,
-): FakeRiskLimits => {
+// The rule of the domain of the API, with its reason (R3.2.1).
+const totalExposureOf = (value: unknown, field: string): string | null => {
+  const text = optionalTextOf(value);
+  const percent = Number(text);
+  if (text !== null && !(percent >= 0.1 && percent <= 1000)) {
+    throw new Refusal(422, "l'esposizione complessiva massima va da 0,1 a 1000", field);
+  }
+  return text;
+};
+
+type ExposureRequest = {
+  readonly margin: unknown;
+  readonly value: unknown;
+  readonly totalMargin: unknown;
+  readonly totalValue: unknown;
+};
+
+const riskLimitsOf = (maxLeverage: unknown, exposures: ExposureRequest): FakeRiskLimits => {
   if (maxLeverage === undefined || maxLeverage === null) {
     throw new Refusal(422, 'la leva massima è obbligatoria', 'max_leverage');
   }
   const limits = {
     maxLeverage: numberOf(maxLeverage, 'max_leverage'),
-    maxMarginExposurePercent: optionalTextOf(marginPercent),
-    maxValueExposurePercent: optionalTextOf(valuePercent),
+    maxMarginExposurePercent: optionalTextOf(exposures.margin),
+    maxValueExposurePercent: optionalTextOf(exposures.value),
+    maxTotalMarginExposurePercent: totalExposureOf(
+      exposures.totalMargin,
+      'max_total_margin_exposure_percent',
+    ),
+    maxTotalValueExposurePercent: totalExposureOf(
+      exposures.totalValue,
+      'max_total_value_exposure_percent',
+    ),
   };
   if (limits.maxMarginExposurePercent === null && limits.maxValueExposurePercent === null) {
     throw new Refusal(
@@ -290,11 +313,12 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
   const cycleMinutes = cycleMinutesOf(request.cycle_minutes);
   const model = modelOf(user, request.model, request.model_parameters);
   const sources = sourcesOf(request.sources);
-  const riskLimits = riskLimitsOf(
-    request.max_leverage,
-    request.max_margin_exposure_percent,
-    request.max_value_exposure_percent,
-  );
+  const riskLimits = riskLimitsOf(request.max_leverage, {
+    margin: request.max_margin_exposure_percent,
+    value: request.max_value_exposure_percent,
+    totalMargin: request.max_total_margin_exposure_percent,
+    totalValue: request.max_total_value_exposure_percent,
+  });
   const account = accountOf(user, textOf(request.account_id));
   requireAssetsFree(user, account.id, assets);
   const free = freeCapitalOf(user, account);
@@ -337,6 +361,10 @@ const flowOf = (user: FakeUser, flowId: string): FakeFlow => {
 const changed = <T>(requested: unknown, current: T, read: (value: unknown) => T): T =>
   requested === undefined || requested === null ? current : read(requested);
 
+// The limit a modification sends, null included, or the one in force when it sends none.
+const sentOr = (requested: unknown, current: string | null): unknown =>
+  requested === undefined ? current : requested;
+
 /** PATCH /flows/{id}: only the parts sent change, as the next configuration version. */
 export const modifyFlow = (
   user: FakeUser,
@@ -360,15 +388,18 @@ export const modifyFlow = (
     sources: changed(request.sources, flow.sources, sourcesOf),
     instructions: changed(request.instructions, flow.instructions, (value) => textOf(value).trim()),
     // A null limit of exposure sent on purpose removes it; a missing one keeps the limit in force (R1.1.3).
-    riskLimits: riskLimitsOf(
-      request.max_leverage ?? flow.riskLimits.maxLeverage,
-      request.max_margin_exposure_percent === undefined
-        ? flow.riskLimits.maxMarginExposurePercent
-        : request.max_margin_exposure_percent,
-      request.max_value_exposure_percent === undefined
-        ? flow.riskLimits.maxValueExposurePercent
-        : request.max_value_exposure_percent,
-    ),
+    riskLimits: riskLimitsOf(request.max_leverage ?? flow.riskLimits.maxLeverage, {
+      margin: sentOr(request.max_margin_exposure_percent, flow.riskLimits.maxMarginExposurePercent),
+      value: sentOr(request.max_value_exposure_percent, flow.riskLimits.maxValueExposurePercent),
+      totalMargin: sentOr(
+        request.max_total_margin_exposure_percent,
+        flow.riskLimits.maxTotalMarginExposurePercent,
+      ),
+      totalValue: sentOr(
+        request.max_total_value_exposure_percent,
+        flow.riskLimits.maxTotalValueExposurePercent,
+      ),
+    }),
     bringToMinimum: changed(
       request.bring_to_minimum,
       flow.bringToMinimum,

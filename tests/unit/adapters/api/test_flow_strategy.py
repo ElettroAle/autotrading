@@ -64,6 +64,7 @@ def an_original(client: TestClient, platform: Platform, user: str, name: str = "
         "instructions": "compra in tendenza",
         "max_leverage": 5,
         "max_margin_exposure_percent": "10",
+        "max_total_margin_exposure_percent": "30",
         "allocated_capital": "300",
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
@@ -81,7 +82,7 @@ def a_strategy() -> FlowStrategy:
         model=ModelSelection(OPENROUTER_MODEL, {"temperature": Decimal("0.5")}),
         sources=(SourceSelection("notizie", 2, {"articoli": 10}),),
         instructions="compra in tendenza",
-        risk_limits=RiskLimits(5, Decimal(10)),
+        risk_limits=RiskLimits(5, Decimal(10), None, Decimal(30), Decimal(200)),
         bring_to_minimum=True,
         system_prompt="{instructions}",
         max_consecutive_failures=3,
@@ -103,6 +104,8 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "max_leverage": 5,
                 "max_margin_exposure_percent": "10",
                 "max_value_exposure_percent": None,
+                "max_total_margin_exposure_percent": "30",
+                "max_total_value_exposure_percent": "200",
             },
             "bring_to_minimum": True,
             "system_prompt": "{instructions}",
@@ -136,6 +139,10 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         "{instructions}",
     )
     assert command.max_consecutive_failures == 3
+    assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (
+        Decimal(30),
+        Decimal(200),
+    )
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
@@ -145,6 +152,7 @@ def test_a_document_without_model_or_limits_gives_them_empty() -> None:
 
     assert (command.model, command.model_parameters, command.max_leverage, command.sources) == (None, {}, None, ())
     assert command.max_consecutive_failures is None
+    assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (None, None)
 
 
 @pytest.mark.parametrize(("format_name", "version"), [("altro-formato", 1), ("autotrading-strategy", 2)])

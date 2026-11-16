@@ -85,7 +85,13 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "cycle_minutes": 15,
         "model": {"name": OPENROUTER_MODEL, "parameters": {"temperature": "0.5"}},
         "instructions": "prudente",
-        "risk_limits": {"max_leverage": 5, "max_margin_exposure_percent": "10", "max_value_exposure_percent": None},
+        "risk_limits": {
+            "max_leverage": 5,
+            "max_margin_exposure_percent": "10",
+            "max_value_exposure_percent": None,
+            "max_total_margin_exposure_percent": None,
+            "max_total_value_exposure_percent": None,
+        },
         "allocated_capital": "400",
         "bring_to_minimum": False,
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
@@ -137,11 +143,60 @@ def test_an_exposure_sent_as_null_is_removed_and_one_left_out_stays(client_of: C
         "max_leverage": 5,
         "max_margin_exposure_percent": "20",
         "max_value_exposure_percent": "40",
+        "max_total_margin_exposure_percent": None,
+        "max_total_value_exposure_percent": None,
     }
     assert (removed["version"], removed["risk_limits"]) == (
         3,
-        {"max_leverage": 5, "max_margin_exposure_percent": "20", "max_value_exposure_percent": None},
+        {
+            "max_leverage": 5,
+            "max_margin_exposure_percent": "20",
+            "max_value_exposure_percent": None,
+            "max_total_margin_exposure_percent": None,
+            "max_total_value_exposure_percent": None,
+        },
     )
+
+
+# ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits travel as the limits per operation.
+def test_the_overall_exposures_are_set_kept_removed_and_compared(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    request = a_request(
+        platform, "anna", max_total_margin_exposure_percent="30", max_total_value_exposure_percent="150.5"
+    )
+    created = anna.post("/flows", json=request).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "audace"}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"max_total_margin_exposure_percent": "40"}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"max_total_value_exposure_percent": None}).json()
+
+    totals = [
+        (limits["max_total_margin_exposure_percent"], limits["max_total_value_exposure_percent"])
+        for limits in (body["risk_limits"] for body in (created, untouched, changed, removed))
+    ]
+    assert totals == [("30", "150.5"), ("30", "150.5"), ("40", "150.5"), ("40", None)]
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["risk_limits"]["max_total_margin_exposure_percent"] == "30"
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/4").json() == [
+        {"part": "esposizione complessiva massima del margine", "before": "30%", "after": "40%"},
+        {"part": "esposizione complessiva massima del valore", "before": "150,5%", "after": "nessuno"},
+    ]
+
+
+@pytest.mark.parametrize("percent", ["0", "1001"])
+def test_an_overall_exposure_out_of_range_is_refused_with_the_reason_and_the_field(
+    client_of: Client, platform: Platform, percent: str
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={"max_total_value_exposure_percent": percent})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "l'esposizione complessiva massima va da 0,1 a 1000", "field": "max_total_value_exposure_percent"},
+    )
+    assert anna.get("/flows").json()[0]["version"] == 1
 
 
 def test_a_maximum_of_consecutive_failures_sent_as_null_is_removed_and_one_left_out_stays(

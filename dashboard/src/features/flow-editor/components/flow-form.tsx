@@ -184,6 +184,34 @@ export const FlowForm = ({
             )}
           </FormField>
           <FormField
+            id="flow-max-total-margin-exposure"
+            label="Esposizione complessiva massima del margine (%)"
+            error={errors.max_total_margin_exposure_percent?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('max_total_margin_exposure_percent')}
+                inputMode="decimal"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
+          <FormField
+            id="flow-max-total-value-exposure"
+            label="Esposizione complessiva massima del valore (%)"
+            error={errors.max_total_value_exposure_percent?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('max_total_value_exposure_percent')}
+                inputMode="decimal"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
+          <FormField
             id="flow-max-consecutive-failures"
             label="Massimo di cicli falliti consecutivi"
             error={errors.max_consecutive_failures?.message}

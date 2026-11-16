@@ -1337,6 +1337,10 @@ export interface components {
             max_margin_exposure_percent?: number | string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: number | string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: number | string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: number | string | null;
             /** Allocated Capital */
             allocated_capital: number | string;
             /**
@@ -1387,6 +1391,10 @@ export interface components {
             max_margin_exposure_percent?: number | string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: number | string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: number | string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: number | string | null;
             /** Bring To Minimum */
             bring_to_minimum?: boolean | null;
             /** System Prompt */
@@ -2073,6 +2081,10 @@ export interface components {
             max_margin_exposure_percent: string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent: string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent: string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent: string | null;
         };
         /** SourceParameterResponse */
         SourceParameterResponse: {
@@ -2259,6 +2271,10 @@ export interface components {
             max_margin_exposure_percent?: number | string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: number | string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: number | string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: number | string | null;
         };
         /** StrategyRiskLimits */
         "StrategyRiskLimits-Output": {
@@ -2268,6 +2284,10 @@ export interface components {
             max_margin_exposure_percent?: string | null;
             /** Max Value Exposure Percent */
             max_value_exposure_percent?: string | null;
+            /** Max Total Margin Exposure Percent */
+            max_total_margin_exposure_percent?: string | null;
+            /** Max Total Value Exposure Percent */
+            max_total_value_exposure_percent?: string | null;
         };
         /** StrategySource */
         StrategySource: {

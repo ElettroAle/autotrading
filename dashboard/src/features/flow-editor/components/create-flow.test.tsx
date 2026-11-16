@@ -176,6 +176,8 @@ describe('CreateFlow', () => {
         max_leverage: 3,
         max_margin_exposure_percent: '10',
         max_value_exposure_percent: null,
+        max_total_margin_exposure_percent: null,
+        max_total_value_exposure_percent: null,
       },
       allocated_capital: '300',
       bring_to_minimum: false,
@@ -224,6 +226,34 @@ describe('CreateFlow', () => {
 
     await waitFor(() =>
       expect(configurationOf(fakePlatform.flowNamed('alfa')).max_consecutive_failures).toBe(3),
+    );
+  });
+
+  // ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits beside the limits per operation.
+  it('saves the overall exposure limits, refusing one out of range beside its field', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('Esposizione complessiva massima del margine (%)'), '1001');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(field('Esposizione complessiva massima del margine (%)')).toHaveAccessibleDescription(
+        "l'esposizione complessiva massima va da 0,1 a 1000",
+      ),
+    );
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+
+    await userEvent.clear(field('Esposizione complessiva massima del margine (%)'));
+    await userEvent.type(field('Esposizione complessiva massima del margine (%)'), '30');
+    await userEvent.type(field('Esposizione complessiva massima del valore (%)'), '0,5');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(configurationOf(fakePlatform.flowNamed('alfa')).risk_limits).toMatchObject({
+        max_total_margin_exposure_percent: '30',
+        max_total_value_exposure_percent: '0.5',
+      }),
     );
   });
 

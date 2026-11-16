@@ -49,6 +49,8 @@ const FLOW: Flow = {
     max_leverage: 3,
     max_margin_exposure_percent: '10',
     max_value_exposure_percent: null,
+    max_total_margin_exposure_percent: null,
+    max_total_value_exposure_percent: null,
   },
   allocated_capital: '300',
   bring_to_minimum: false,
@@ -78,11 +80,28 @@ describe('creationRequestOf', () => {
       max_leverage: 3,
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: null,
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: null,
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: null,
       max_consecutive_failures: null,
     });
+  });
+
+  // ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits travel as the limits per operation.
+  it('sends the overall exposure limits the user typed, with a decimal point', () => {
+    const request = creationRequestOf(
+      filled({
+        max_total_margin_exposure_percent: ' 30 ',
+        max_total_value_exposure_percent: '150,5',
+      }),
+    );
+
+    expect([
+      request.max_total_margin_exposure_percent,
+      request.max_total_value_exposure_percent,
+    ]).toEqual(['30', '150.5']);
   });
 
   it('sends the maximum of consecutive failed cycles the user typed', () => {
@@ -122,11 +141,29 @@ describe('formValuesOf', () => {
       max_leverage: '3',
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: '',
+      max_total_margin_exposure_percent: '',
+      max_total_value_exposure_percent: '',
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: '',
       system_prompt_default: true,
       max_consecutive_failures: '',
+    });
+  });
+
+  it('fills the overall exposure limits of the flow', () => {
+    const flow: Flow = {
+      ...FLOW,
+      risk_limits: {
+        ...FLOW.risk_limits,
+        max_total_margin_exposure_percent: '30',
+        max_total_value_exposure_percent: '0.5',
+      },
+    };
+
+    expect(formValuesOf(flow)).toMatchObject({
+      max_total_margin_exposure_percent: '30',
+      max_total_value_exposure_percent: '0.5',
     });
   });
 
@@ -206,6 +243,20 @@ describe('changesOf', () => {
       settings: { max_margin_exposure_percent: null },
     });
     expect(changesOf(FLOW, formValuesOf(FLOW))).toEqual({ settings: {} });
+  });
+
+  it('sends a new overall exposure limit, and null for an emptied one so the API removes it', () => {
+    const limited: Flow = {
+      ...FLOW,
+      risk_limits: { ...FLOW.risk_limits, max_total_value_exposure_percent: '100' },
+    };
+
+    expect(
+      changesOf(FLOW, { ...formValuesOf(FLOW), max_total_margin_exposure_percent: '30' }),
+    ).toEqual({ settings: { max_total_margin_exposure_percent: '30' } });
+    expect(
+      changesOf(limited, { ...formValuesOf(limited), max_total_value_exposure_percent: '' }),
+    ).toEqual({ settings: { max_total_value_exposure_percent: null } });
   });
 
   it('sends a system prompt the user wrote, and null to go back to the default', () => {

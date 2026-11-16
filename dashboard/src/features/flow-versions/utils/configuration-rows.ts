@@ -44,6 +44,14 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       part: 'esposizione massima del valore',
       value: percentText(limits.max_value_exposure_percent),
     },
+    {
+      part: 'esposizione complessiva massima del margine',
+      value: percentText(limits.max_total_margin_exposure_percent),
+    },
+    {
+      part: 'esposizione complessiva massima del valore',
+      value: percentText(limits.max_total_value_exposure_percent),
+    },
     { part: 'capitale allocato', value: configuration.allocated_capital ?? NONE },
     { part: 'porta al minimo', value: configuration.bring_to_minimum ? 'sì' : 'no' },
     {

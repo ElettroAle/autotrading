@@ -34,6 +34,7 @@ from autotrading.domain.flows.errors import (
     ExposureLimitRequiredError,
     FlowCommandNotAllowedError,
     MaxConsecutiveFailuresOutOfRangeError,
+    TotalExposureOutOfRangeError,
     UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
@@ -143,6 +144,8 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         max_leverage=2,
         max_margin_exposure_percent=Decimal(20),
         max_value_exposure_percent=Decimal(30),
+        max_total_margin_exposure_percent=Decimal(40),
+        max_total_value_exposure_percent=Decimal(200),
         bring_to_minimum=True,
         max_consecutive_failures=3,
     )
@@ -156,7 +159,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         sources=(SourceSelection("notizie", 7, {"numero_notizie": 3}),),
         instructions="prudente",
         cycle_interval=CycleInterval(60),
-        risk_limits=RiskLimits(2, Decimal(20), Decimal(30)),
+        risk_limits=RiskLimits(2, Decimal(20), Decimal(30), Decimal(40), Decimal(200)),
         bring_to_minimum=True,
         max_consecutive_failures=3,
     )
@@ -242,6 +245,39 @@ def test_an_exposure_is_replaced_while_the_other_is_removed(flows: Flows) -> Non
     )
 
     assert modified.configuration.risk_limits == RiskLimits(5, None, Decimal(30))
+
+
+def test_an_overall_exposure_left_out_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_total_margin_exposure_percent=Decimal(30)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, max_total_value_exposure_percent=Decimal(90)))
+
+    assert modified.configuration.risk_limits == RiskLimits(5, Decimal(10), None, Decimal(30), Decimal(90))
+
+
+def test_an_overall_exposure_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(
+        ModifyFlowCommand(
+            flow.id, max_total_margin_exposure_percent=Decimal(30), max_total_value_exposure_percent=Decimal(90)
+        )
+    )
+
+    without_margin = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_total_margin_exposure=True))
+    without_any = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_total_value_exposure=True))
+
+    assert without_margin.configuration.risk_limits == RiskLimits(5, Decimal(10), None, None, Decimal(90))
+    assert without_any.configuration.risk_limits == RiskLimits(5, Decimal(10))
+
+
+def test_an_overall_exposure_out_of_range_is_refused_and_the_version_in_force_stays(flows: Flows) -> None:
+    flow = flows.saved()
+
+    with pytest.raises(TotalExposureOutOfRangeError, match=r"^l'esposizione complessiva massima va da 0,1 a 1000$"):
+        flows.modify.execute(ModifyFlowCommand(flow.id, max_total_margin_exposure_percent=Decimal(1001)))
+
+    assert flows.current(flow) == flow
 
 
 def test_removing_both_exposures_is_refused_and_the_version_in_force_stays(flows: Flows) -> None:

@@ -1,5 +1,5 @@
 # language: it
-@R3.2.1 @wip
+@R3.2.1
 Funzionalità: R3.2.1 Esposizione complessiva massima
   Come utente
   Voglio un limite alla somma delle posizioni aperte di un flusso

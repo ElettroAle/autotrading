@@ -12,7 +12,7 @@ from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 
 EXCHANGE = "Hyperliquid"
 POLICY = RiskPolicy(RiskLimits(5, Decimal(100)))
-STATE = RiskState("USDC", Decimal(1000), Decimal(1000), frozenset({"ETH"}))
+STATE = RiskState("USDC", Decimal(1000), Decimal(1000), frozenset({"ETH"}), Decimal(0), Decimal(0))
 
 
 def test_every_decision_gets_its_own_outcome_in_order() -> None:
@@ -45,7 +45,7 @@ def test_an_opening_on_an_asset_the_exchange_does_not_trade_is_blocked() -> None
 
 
 def test_a_close_or_a_hold_needs_no_limits_of_the_exchange() -> None:
-    state = RiskState("USDC", Decimal(1000), Decimal(1000), frozenset({"MATIC"}))
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), frozenset({"MATIC"}), Decimal(0), Decimal(0))
     intents = (CloseIntent("MATIC"), HoldIntent("DOGE"))
 
     outcomes = CheckRiskUseCase({EXCHANGE: FakeExchangeLimitsAdapter()}).execute(
