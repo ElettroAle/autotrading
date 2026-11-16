@@ -29,8 +29,8 @@ paths:
   capacità del modello, non un ramo per fornitore), altrimenti `json_object`; mai la validazione della libreria, che
   perderebbe risposta e costo (ADR risposta-del-modello-con-schema-rigido). Un intervallo unico di temperatura (0-2): un
   fornitore che accetta meno rifiuta la chiamata col suo motivo.
-- **Errori** (R1.2.3, R1.2.4): chiave rifiutata (401, 403) e credito esaurito (402, o 429 con la quota OpenAI esaurita
-  nel messaggio) sono permanenti; tempo scaduto, rete, ogni altro rifiuto (stato e messaggio originale) e risposta
+- **Errori** (R1.2.3, R1.2.4): chiave rifiutata (401, 403) e credito esaurito (402) sono permanenti; un 429, anche con la
+  quota esaurita nel messaggio, è transitorio (ADR http-429-mai-permanente); tempo scaduto, rete, ogni altro rifiuto (stato e messaggio originale) e risposta
   inattesa sono transitori. Il nuovo tentativo è il ciclo successivo, mai un tentativo della libreria.
 - **Catalogo dalla mappa dei modelli della libreria, mai scritto a mano**: i modelli di chat dei fornitori abilitati,
   col nome `<fornitore>/<modello>` (un modello che la mappa nomina con e senza fornitore si offre una volta),

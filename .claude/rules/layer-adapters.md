@@ -26,6 +26,8 @@ una sola tecnologia: virtualmente una libreria a sé, staccabile.
   strutturalmente, verificato da mypy.
 - Le eccezioni della libreria si catturano qui e si traducono subito nell'errore tipizzato del
   contratto della porta. Nessuna eccezione di libreria esce dall'adapter.
+- Un HTTP 429 (troppe richieste) di qualunque sistema si traduce sempre nell'errore temporaneo del contratto della
+  porta, mai in un errore permanente (ADR http-429-mai-permanente).
 - La traduzione tra tipi della libreria e tipi del dominio sta in funzioni private piccole,
   testabili senza la tecnologia.
 - Una cartella di tecnologia non importa un'altra cartella di tecnologia.
