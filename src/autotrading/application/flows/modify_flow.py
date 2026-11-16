@@ -40,6 +40,9 @@ class ModifyFlowCommand:
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
+    system_prompt: str | None = None
+    # Back to the default of the platform, which None cannot say since None keeps the version in force (R1.4.8).
+    default_system_prompt: bool = False
 
 
 class ModifyFlowUseCase:
@@ -83,6 +86,7 @@ class ModifyFlowUseCase:
             bring_to_minimum=(
                 current.bring_to_minimum if command.bring_to_minimum is None else command.bring_to_minimum
             ),
+            system_prompt=_system_prompt(current.system_prompt, command),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -117,6 +121,12 @@ class ModifyFlowUseCase:
 def _require_same_account(flow: Flow, account_id: UUID | None) -> None:
     if account_id is not None and account_id != flow.account_id:
         raise AccountNotChangeableError
+
+
+def _system_prompt(current: str | None, command: ModifyFlowCommand) -> str | None:
+    if command.default_system_prompt:
+        return None
+    return current if command.system_prompt is None else command.system_prompt
 
 
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:

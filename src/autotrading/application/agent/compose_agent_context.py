@@ -11,9 +11,8 @@ class ComposeAgentContextUseCase:
 
     def execute(self, question: AgentQuestionPort) -> AgentContext:
         return AgentContext(
-            instructions=question.instructions,
+            system_prompt=question.system_prompt,
             assets=tuple(question.assets),
-            max_leverage=question.max_leverage,
             started_at=question.started_at,
             now=question.now,
             state=_state_of(question.state),

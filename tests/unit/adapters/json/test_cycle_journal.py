@@ -113,7 +113,7 @@ def test_the_flow_at_the_end_is_recorded_by_its_state_alone() -> None:
 
 
 def test_the_context_is_recorded_as_the_messages_the_agent_receives() -> None:
-    question = CycleQuestion("m", {}, "i", ("BTC",), 2, READ_AT, READ_AT, CYCLE_FLOW.state_view(), (), ())
+    question = CycleQuestion("m", {}, "i", ("BTC",), READ_AT, READ_AT, CYCLE_FLOW.state_view(), (), ())
 
     assert journal().describe(CycleStep.COMPOSE_CONTEXT, CycleContext(CYCLE_FLOW, question, Prompt())) == {
         "messaggi": [{"ruolo": "system", "contenuto": "regole"}, {"ruolo": "user", "contenuto": "dati"}]
