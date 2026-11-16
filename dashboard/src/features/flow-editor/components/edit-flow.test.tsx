@@ -2,12 +2,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { FAKE_SYSTEM_PROMPT } from '@/testing/mocks/catalogs';
 import { configurationOf, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
 const EDIT_ALFA = '/flows/flow-alfa/edit';
 const SAVE = 'Salva le modifiche';
+const RESTORE = 'Ripristina predefinito';
 
 const field = (label: string) => screen.getByLabelText(label, { exact: true });
 
@@ -100,6 +102,52 @@ describe('EditFlow', () => {
         ],
       },
     ]);
+    server.events.removeAllListeners();
+  });
+
+  it('shows the default system prompt with the placeholders the API declares', async () => {
+    giveAlfa();
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const prompt = await screen.findByLabelText('System prompt');
+    expect(prompt).toHaveValue(FAKE_SYSTEM_PROMPT.system_prompt);
+    expect(screen.getByText('predefinito')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: RESTORE })).not.toBeInTheDocument();
+    for (const placeholder of FAKE_SYSTEM_PROMPT.system_prompt_placeholders) {
+      expect(screen.getByText(`{${placeholder.name}}`)).toBeInTheDocument();
+      expect(screen.getByText(placeholder.description)).toBeInTheDocument();
+    }
+  });
+
+  it('saves the system prompt the user writes, then goes back to the default', async () => {
+    giveAlfa();
+    const sent: unknown[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'PATCH') {
+        void request
+          .clone()
+          .json()
+          .then((body) => sent.push(body));
+      }
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const prompt = await screen.findByLabelText('System prompt');
+    await userEvent.clear(prompt);
+    await userEvent.type(prompt, 'Leva {{max_leverage}');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(screen.queryByText('predefinito')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: RESTORE }));
+    expect(screen.getByLabelText('System prompt')).toHaveValue(FAKE_SYSTEM_PROMPT.system_prompt);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 3'),
+    );
+    expect(sent).toEqual([{ system_prompt: 'Leva {max_leverage}' }, { system_prompt: null }]);
     server.events.removeAllListeners();
   });
 

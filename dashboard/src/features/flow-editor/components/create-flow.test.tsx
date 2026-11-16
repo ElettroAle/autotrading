@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { FAKE_SYSTEM_PROMPT } from '@/testing/mocks/catalogs';
 import { configurationOf, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
@@ -178,6 +179,9 @@ describe('CreateFlow', () => {
       },
       allocated_capital: '300',
       bring_to_minimum: false,
+      system_prompt: FAKE_SYSTEM_PROMPT.system_prompt,
+      system_prompt_is_default: true,
+      system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');

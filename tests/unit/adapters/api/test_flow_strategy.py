@@ -66,6 +66,7 @@ def an_original(client: TestClient, platform: Platform, user: str, name: str = "
         "max_margin_exposure_percent": "10",
         "allocated_capital": "300",
         "bring_to_minimum": True,
+        "system_prompt": "{instructions} su {assets}",
     }
     response = client.post("/flows", json=request)
     assert response.status_code == 201
@@ -81,6 +82,7 @@ def a_strategy() -> FlowStrategy:
         instructions="compra in tendenza",
         risk_limits=RiskLimits(5, Decimal(10)),
         bring_to_minimum=True,
+        system_prompt="{instructions}",
     )
 
 
@@ -101,6 +103,7 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "max_value_exposure_percent": None,
             },
             "bring_to_minimum": True,
+            "system_prompt": "{instructions}",
         },
     }
 
@@ -124,7 +127,11 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         Decimal(10),
         None,
     )
-    assert (command.instructions, command.bring_to_minimum) == ("compra in tendenza", True)
+    assert (command.instructions, command.bring_to_minimum, command.system_prompt) == (
+        "compra in tendenza",
+        True,
+        "{instructions}",
+    )
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
@@ -206,7 +213,15 @@ def test_the_exported_file_imports_as_a_draft_with_the_same_strategy(client_of: 
         "assets": [],
         "allocated_capital": None,
     }
-    strategy_parts = ("cycle_minutes", "model", "sources", "instructions", "risk_limits", "bring_to_minimum")
+    strategy_parts = (
+        "cycle_minutes",
+        "model",
+        "sources",
+        "instructions",
+        "risk_limits",
+        "bring_to_minimum",
+        "system_prompt",
+    )
     assert {key: draft[key] for key in strategy_parts} == {key: original[key] for key in strategy_parts}
 
 

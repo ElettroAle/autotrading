@@ -22,6 +22,8 @@ class FlowStrategy:
     risk_limits: RiskLimits
     # Off unless the user chooses it, as in the configuration: a risk rule like the limits (R1.5.4).
     bring_to_minimum: bool = False
+    # The default of the platform unless the strategy has its own, as in the configuration (R1.4.8).
+    system_prompt: str | None = None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -32,6 +34,7 @@ class FlowStrategy:
             configuration.instructions,
             configuration.risk_limits,
             configuration.bring_to_minimum,
+            configuration.system_prompt,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -46,6 +49,7 @@ class FlowStrategy:
             risk_limits=self.risk_limits,
             allocated_capital=None,
             bring_to_minimum=self.bring_to_minimum,
+            system_prompt=self.system_prompt,
         )
 
 

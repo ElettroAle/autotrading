@@ -43,9 +43,8 @@ CATALOG = ModelCatalog(
     )
 )
 CONTEXT = AgentContext(
-    instructions="Sei un trader prudente",
+    system_prompt="Sei un trader prudente",
     assets=("BTC", "ETH"),
-    max_leverage=5,
     started_at=NOW,
     now=NOW,
     state=FlowStateView("USDC", Decimal(400), Decimal(400), Decimal(400), Decimal(400), Decimal(0), ()),
@@ -171,9 +170,8 @@ class Question:
 
     model: str = "openrouter/deepseek-chat"
     settings: Mapping[str, Decimal | str] = field(default_factory=dict)
-    instructions: str = CONTEXT.instructions
+    system_prompt: str = CONTEXT.system_prompt
     assets: tuple[str, ...] = CONTEXT.assets
-    max_leverage: int = CONTEXT.max_leverage
     started_at: datetime = NOW
     now: datetime = NOW
     state: FlowStateView = CONTEXT.state

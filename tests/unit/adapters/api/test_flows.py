@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
 from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import IdentityProvider
 from tests.support.lifecycle_steps import hold_position
@@ -17,6 +18,9 @@ from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
 KEY = "K-OPENROUTER-TEST"
+PLACEHOLDERS = [
+    {"name": placeholder.value, "description": placeholder.description} for placeholder in PromptPlaceholder
+]
 
 
 @pytest.fixture
@@ -84,8 +88,38 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "risk_limits": {"max_leverage": 5, "max_margin_exposure_percent": "10", "max_value_exposure_percent": None},
         "allocated_capital": "400",
         "bring_to_minimum": False,
+        "system_prompt": DEFAULT_SYSTEM_PROMPT,
+        "system_prompt_is_default": True,
+        "system_prompt_placeholders": PLACEHOLDERS,
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
+
+
+def test_the_default_system_prompt_is_offered_with_its_placeholders(client_of: Client) -> None:
+    response = client_of("anna").get("/flows/system-prompt")
+
+    assert (response.status_code, response.json()) == (
+        200,
+        {"system_prompt": DEFAULT_SYSTEM_PROMPT, "system_prompt_placeholders": PLACEHOLDERS},
+    )
+
+
+def test_a_system_prompt_is_written_and_restored_to_the_default(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    created = anna.post("/flows", json=a_request(platform, "anna", system_prompt="{instructions}")).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30}).json()
+    restored = anna.patch(f"/flows/{flow_id}", json={"system_prompt": None}).json()
+
+    assert (created["system_prompt"], created["system_prompt_is_default"]) == ("{instructions}", False)
+    assert (untouched["version"], untouched["system_prompt"]) == (2, "{instructions}")
+    assert (restored["version"], restored["system_prompt"], restored["system_prompt_is_default"]) == (
+        3,
+        DEFAULT_SYSTEM_PROMPT,
+        True,
+    )
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["system_prompt"] == "{instructions}"
 
 
 def test_a_flow_can_be_created_bringing_its_openings_to_the_exchange_minimum(
@@ -247,6 +281,7 @@ def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform)
             "limite di rischio non valido: leva massima",
             "max_leverage",
         ),
+        ({"system_prompt": "{leverage}"}, 'il segnaposto "leverage" non esiste', "system_prompt"),
     ],
 )
 def test_an_invalid_change_answers_with_the_reason_and_the_field_it_concerns(

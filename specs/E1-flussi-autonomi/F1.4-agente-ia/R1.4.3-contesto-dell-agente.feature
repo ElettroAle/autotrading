@@ -18,6 +18,7 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
   - i dati mancanti, dichiarati (R1.2.5).
   Le regole operative vigenti sono: al massimo una posizione per asset, azioni ammesse apri, chiudi e mantieni,
   leva da 1 alla leva massima del flusso, formato obbligatorio della risposta.
+  Istruzioni, regole operative e formato sono il system prompt predefinito, che l'utente può cambiare (R1.4.8).
   Il contesto riguarda solo il flusso: non contiene saldo, posizioni o dati di altri flussi né credenziali.
 
   Fuori ambito: la memoria delle decisioni precedenti, la narrativa di un agente strategico.

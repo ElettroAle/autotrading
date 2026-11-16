@@ -60,6 +60,8 @@ class StrategyBody(BaseModel):
     instructions: str = ""
     risk_limits: StrategyRiskLimits = Field(default_factory=StrategyRiskLimits)
     bring_to_minimum: bool = False
+    # Null follows the default system prompt of the platform (R1.4.8).
+    system_prompt: str | None = None
 
 
 class StrategyDocument(BaseModel):
@@ -92,6 +94,7 @@ class StrategyDocument(BaseModel):
                     max_value_exposure_percent=limits.max_value_exposure_percent,
                 ),
                 bring_to_minimum=strategy.bring_to_minimum,
+                system_prompt=strategy.system_prompt,
             ),
         )
 
@@ -110,6 +113,7 @@ class StrategyDocument(BaseModel):
             instructions=strategy.instructions,
             cycle_minutes=strategy.cycle_minutes,
             bring_to_minimum=strategy.bring_to_minimum,
+            system_prompt=strategy.system_prompt,
         )
 
     def _require_supported(self) -> None:

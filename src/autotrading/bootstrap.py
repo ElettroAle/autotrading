@@ -93,6 +93,7 @@ from autotrading.application.accounts.read_exchange_state import ReadExchangeSta
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
+from autotrading.application.agent.list_agent_actions import ListAgentActionsUseCase
 from autotrading.application.agent.model_gateways import ModelCatalogs, ModelGateways
 from autotrading.application.agent.read_model_catalog import ReadModelCatalogUseCase
 from autotrading.application.flows.check_risk import CheckRiskUseCase
@@ -416,7 +417,7 @@ def cycle_of(
                 clock,
             ),
             calls=ThreadPoolConcurrentCallsAdapter(),
-            context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), clock),
+            context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), ListAgentActionsUseCase(), clock),
             agent=DecideCycleUseCase(
                 AskFlowAgentUseCase(
                     ComposeAgentContextUseCase(),
