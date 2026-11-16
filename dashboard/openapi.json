@@ -2339,6 +2339,104 @@
         }
       }
     },
+    "/flows/{flow_id}/forecast-accuracy": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Forecast Accuracy",
+        "operationId": "read_forecast_accuracy_flows__flow_id__forecast_accuracy_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowForecastAccuracyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/operations": {
       "get": {
         "tags": [
@@ -5075,6 +5173,23 @@
         "title": "FlowEquityResponse",
         "description": "The equity curve of a flow: a point for each cycle, from the oldest, and the capital it is judged against\n(R2.2.3); amounts as text without trailing zeros (ADR 0018)."
       },
+      "FlowForecastAccuracyResponse": {
+        "properties": {
+          "forecasts": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastAccuracyResponse"
+            },
+            "type": "array",
+            "title": "Forecasts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "forecasts"
+        ],
+        "title": "FlowForecastAccuracyResponse",
+        "description": "The error of the forecasts of a flow in the period, one for every asset and horizon it forecast (ADR\nerrore-medio-della-previsione-nell-api)."
+      },
       "FlowModificationRequest": {
         "properties": {
           "account_id": {
@@ -5842,6 +5957,59 @@
         ],
         "title": "FlowStatisticsResponse",
         "description": "The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate in percent with two\ndecimals, null when nothing is available (ADR 0122)."
+      },
+      "ForecastAccuracyResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "horizon_minutes": {
+            "type": "integer",
+            "title": "Horizon Minutes"
+          },
+          "mean_absolute_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Absolute Error"
+          },
+          "mean_percent_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Percent Error"
+          },
+          "evaluated": {
+            "type": "integer",
+            "title": "Evaluated"
+          },
+          "unevaluable": {
+            "type": "integer",
+            "title": "Unevaluable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "horizon_minutes",
+          "mean_absolute_error",
+          "mean_percent_error",
+          "evaluated",
+          "unevaluable"
+        ],
+        "title": "ForecastAccuracyResponse",
+        "description": "How much the forecasts of one asset and horizon missed in the period (R3.6.1): the mean absolute error as text\n(ADR 0018), the mean percent error on the actual price with two decimals, null without evaluated forecasts."
       },
       "FreeCapitalResponse": {
         "properties": {

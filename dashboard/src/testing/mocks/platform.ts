@@ -29,6 +29,18 @@ export type FakeFlowHistory = {
 
 export type FakeEquityPoint = { readonly plannedAt: Date; readonly equity: number };
 
+/**
+ * A price forecast the flow recorded (R1.3.5): asset, horizon, the instant it expires, the price it forecast and the
+ * actual price at that instant, null when never read.
+ */
+export type FakeForecast = {
+  readonly asset: string;
+  readonly horizonMinutes: number;
+  readonly expiresAt: Date;
+  readonly predictedPrice: number;
+  readonly actualPrice: number | null;
+};
+
 export type FakeConfiguration = {
   readonly assets: string[];
   readonly cycleMinutes: number;
@@ -84,6 +96,8 @@ export type FakeFlow = {
   readonly history: FakeFlowHistory;
   /** The equity every cycle of the flow recorded, in the order the scenario records it. */
   readonly equity: FakeEquityPoint[];
+  /** The price forecasts the flow recorded, whose error the API measures (R3.6.1). */
+  readonly forecasts: FakeForecast[];
   readonly versions: FakeVersion[];
 };
 
@@ -377,6 +391,7 @@ const draftOf = (
   currentCapital: 0,
   history: emptyHistory(),
   equity: [],
+  forecasts: [],
   versions: versionsWith({}),
 });
 
@@ -534,6 +549,7 @@ export const fakePlatform = {
       currentCapital: 100,
       history: emptyHistory(),
       equity: [],
+      forecasts: [],
       versions: versionsWith({}),
       ...rest,
     };
