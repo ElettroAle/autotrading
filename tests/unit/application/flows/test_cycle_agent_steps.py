@@ -13,13 +13,16 @@ from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import CycleContext, CycleDecisions, FlowSnapshot, SourceReading
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
-from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource
+from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.risk_outcome import ApprovedOpening, BlockedDecision
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.support.flows import a_configuration, a_flow
@@ -52,17 +55,41 @@ class Composer:
 
 
 @dataclass(frozen=True, slots=True)
+class Plan:
+    target: Decimal | None = None
+    stop: Decimal | None = None
+    invalidation: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Change:
+    target: Decimal | None = None
+    stop: Decimal | None = None
+    invalidation: str | None = None
+    remove_target: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class Decision:
     action: str
     asset: str
+    plan: Plan = Plan()
+    change: Change = Change()
+    confidence: int = 70
 
-    def intent_with[O, C, H](
-        self, opening: Callable[[str, str, Decimal, int], O], closing: Callable[[str], C], holding: Callable[[str], H]
-    ) -> O | C | H:
+    def intent_with[O, C, H, U](
+        self,
+        opening: Callable[[str, str, Decimal, int, Plan, int], O],
+        closing: Callable[[str], C],
+        holding: Callable[[str], H],
+        updating: Callable[[str, Change], U],
+    ) -> O | C | H | U:
         if self.action == "open":
-            return opening(self.asset, "long", Decimal("0.1"), 2)
+            return opening(self.asset, "long", Decimal("0.1"), 2, self.plan, self.confidence)
         if self.action == "close":
             return closing(self.asset)
+        if self.action == "update":
+            return updating(self.asset, self.change)
         return holding(self.asset)
 
 
@@ -162,9 +189,68 @@ def test_the_risk_check_runs_on_the_limits_of_the_exchange_of_the_account() -> N
     assert review.orders[0].outcome == outcomes[0]
 
 
+def test_the_exit_plan_of_the_agent_reaches_the_risk_check() -> None:
+    plan = Plan(Decimal(110000), Decimal(105000), "chiusura sotto 98000")
+    decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Decision("open", "BTC", plan),))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    [order] = review.orders
+    assert isinstance(order.outcome, ApprovedOpening)
+    assert order.outcome.exit_plan == ExitPlan(target=Decimal(110000), invalidation="chiusura sotto 98000")
+    assert [adjustment.reason for adjustment in order.outcome.adjustments] == [
+        "stop 105000 scartato: incoerente con long al prezzo 100000"
+    ]
+
+
+def test_the_minimum_confidence_of_the_flow_blocks_a_weak_opening() -> None:
+    configuration = replace(FLOW.configuration, minimum_confidence=MinimumConfidence(60))
+    cycle_flow = replace(CYCLE_FLOW, flow=replace(FLOW, configuration=configuration))
+    weak, convinced = Decision("open", "BTC", confidence=40), Decision("open", "ETH", confidence=60)
+    decisions = CycleDecisions(cycle_flow, Reply(Response((weak, convinced))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC", "ETH"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    outcomes = review.outcomes
+    assert isinstance(outcomes, tuple)
+    assert outcomes[0] == BlockedDecision("BTC", "apertura BTC non eseguita: confidenza 40 sotto la minima 60")
+    assert [order.outcome.asset for order in review.orders] == ["ETH"]
+
+
 def test_the_exchange_of_an_account_without_limits_is_unavailable() -> None:
     decisions = CycleDecisions(replace(CYCLE_FLOW, exchange="Altro"), Reply(Response((Closing("BTC"),))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter()})
 
     with pytest.raises(FlowExchangeUnavailableError):
         ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+
+def test_the_change_of_the_plan_of_an_open_position_reaches_the_risk_check() -> None:
+    held = CyclePosition(
+        "BTC", TradeSide.SHORT, Decimal("0.01"), 2, Decimal(102000), Decimal(100000), Decimal(20), None
+    )
+    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,)))
+    change = Change(Decimal(99000), Decimal(101500), "sopra 103000", remove_target=False)
+    decisions = CycleDecisions(cycle_flow, Reply(Response((Decision("update", "BTC", change=change),))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    [order] = review.orders
+    assert order.outcome == ApprovedUpdate("BTC", ExitPlanChange(Decimal(99000), Decimal(101500), "sopra 103000"), ())
+
+
+def test_a_removal_of_the_target_reaches_the_risk_check() -> None:
+    held = CyclePosition("BTC", TradeSide.LONG, Decimal("0.01"), 2, Decimal(98000), Decimal(100000), Decimal(20), None)
+    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,)))
+    decisions = CycleDecisions(
+        cycle_flow, Reply(Response((Decision("update", "BTC", change=Change(remove_target=True)),)))
+    )
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    [order] = review.orders
+    assert order.outcome == ApprovedUpdate("BTC", ExitPlanChange(remove_target=True), ())

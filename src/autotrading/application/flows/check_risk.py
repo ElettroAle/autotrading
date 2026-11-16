@@ -5,7 +5,7 @@ from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import ExchangeLimitsPort
 from autotrading.domain.flows.risk_check import RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_outcome import BlockedDecision, RiskOutcome
-from autotrading.domain.flows.trade_intent import OpenIntent, TradeIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,9 +39,12 @@ class CheckRiskUseCase:
 
 
 def _outcome(check: RiskCheck, exchange_limits: ExchangeLimitsPort, intent: TradeIntent) -> RiskOutcome:
-    if not isinstance(intent, OpenIntent):
+    """An opening and an update read the limits of the exchange; an update without a position is blocked by the check
+    before its limits matter (R3.1.3).
+    """
+    if isinstance(intent, (CloseIntent, HoldIntent)):
         return check.outcome(intent, None)
     limits = exchange_limits.limits(intent.asset)
-    if limits is None:
-        return BlockedDecision(intent.asset, f"asset non negoziabile sull'exchange: {intent.asset}")
+    if limits is None and isinstance(intent, OpenIntent):
+        return BlockedDecision.untradable(intent.asset)
     return check.outcome(intent, limits)

@@ -60,7 +60,7 @@ class CycleFlow:
             currency=self.account.currency,
             funds=self.attributed.funds,
             available_liquidity=self.available_liquidity,
-            open_assets=frozenset(position.asset for position in self.positions),
+            open_positions=frozendict({position.asset: position.side for position in self.positions}),
             openings_suspended=None if self.alarm is None else self.alarm.suspension_reason(self.account_name),
         )
 
@@ -88,6 +88,7 @@ class CycleFlow:
                     position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
+                    self.attributed.exit_plan_of(position.asset),
                 )
                 for position in self.positions
             ),

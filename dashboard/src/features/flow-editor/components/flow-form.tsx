@@ -183,6 +183,48 @@ export const FlowForm = ({
               />
             )}
           </FormField>
+          <FormField
+            id="flow-default-stop-loss"
+            label="Stop loss predefinito (%)"
+            error={errors.default_stop_loss_percent?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('default_stop_loss_percent')}
+                inputMode="decimal"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
+          <FormField
+            id="flow-default-take-profit"
+            label="Take profit predefinito (%)"
+            error={errors.default_take_profit_percent?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('default_take_profit_percent')}
+                inputMode="decimal"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
+          <FormField
+            id="flow-minimum-confidence"
+            label="Confidenza minima (0-100)"
+            error={errors.minimum_confidence?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('minimum_confidence')}
+                inputMode="numeric"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
         </fieldset>
         <FormField
           id="flow-allocated-capital"

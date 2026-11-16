@@ -13,7 +13,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 # The engine never connects: these tests stop before the database.

@@ -69,7 +69,7 @@ def user_has_account(session: Session, user: str, account: str, exchange: str) -
 
 @given(quoted('che il conto "{account}" ha una posizione long su "{coin}"'))
 def account_holds_long(session: Session, account: str, coin: str) -> None:
-    position = HeldPosition(coin, Direction.LONG, Decimal("0.0002"), 2)
+    position = HeldPosition(coin, Direction.LONG, Decimal("0.0002"), 2, Decimal(100))
     session.platform.order_exchange.hold(session.access_of(account), position)
 
 

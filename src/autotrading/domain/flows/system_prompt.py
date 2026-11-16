@@ -76,6 +76,12 @@ DEFAULT_SYSTEM_PROMPT = "\n".join(
         f"- leva da {LOWEST_LEVERAGE} a {PromptPlaceholder.MAX_LEVERAGE.slot};",
         f"- una decisione per ciascun asset del flusso: {PromptPlaceholder.ASSETS.slot};",
         "- la chiusura è sempre totale;",
+        "- obiettivo, stop e invalidazione di un'apertura sono facoltativi: per un long lo stop sta sotto il prezzo di"
+        " mercato e l'obiettivo sopra, per uno short il contrario; il piano in vigore di ogni posizione aperta è nello"
+        " stato del flusso;",
+        "- aggiorna cambia il piano di una posizione aperta: obiettivo, stop e invalidazione nuovi, null lascia quelli"
+        " in vigore; togli_obiettivo vero toglie l'obiettivo; lo stop non si toglie e non va oltre lo stop predefinito"
+        " del flusso;",
         "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato dello stato"
         " del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da un'altra rete o piazza e"
         " servono solo a stimare la direzione del mercato.",
@@ -83,8 +89,13 @@ DEFAULT_SYSTEM_PROMPT = "\n".join(
         "Rispondi solo con un oggetto JSON in questo formato:",
         '{{"decisioni": [{{"asset": "<asset>", "azione": "<una delle azioni ammesse>", "direzione": "long|short",'
         ' "quota": <frazione dei soldi del flusso da impegnare come margine, da 0 a 1>,'
-        ' "leva": <intero>, "ragionamento": "<perché>"}}]}}',
-        "direzione, quota e leva servono solo per apri; il ragionamento serve sempre.",
+        ' "leva": <intero>, "obiettivo": <prezzo obiettivo o null>, "stop": <prezzo di stop o null>,'
+        """ "invalidazione": "<condizione che invalida l'apertura>" o null,"""
+        """ "togli_obiettivo": <true per togliere l'obiettivo, altrimenti false>,"""
+        ' "confidenza": <intero da 0 a 100, quanto sei convinto della decisione>,'
+        ' "ragionamento": "<perché>"}}]}}',
+        "direzione, quota e leva servono solo per apri; obiettivo, stop e invalidazione servono solo per apri e"
+        " aggiorna, togli_obiettivo solo per aggiorna; il ragionamento e la confidenza servono sempre.",
     )
 )
 

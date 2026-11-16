@@ -9,7 +9,7 @@ from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowE
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
 from autotrading.domain.flows.statistics_period import TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, InvalidOperation)

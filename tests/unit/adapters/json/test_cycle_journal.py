@@ -6,8 +6,16 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
-from autotrading.application.flows.ports import CycleContext, CycleDecisions, RiskReview, SourceReading
+from autotrading.application.flows.ports import (
+    CycleContext,
+    CycleDecisions,
+    DecisionExitPlanPort,
+    DecisionPlanChangePort,
+    RiskReview,
+    SourceReading,
+)
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.exit_plan import ExitPlan
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
@@ -53,11 +61,15 @@ class Decision:
     action: str
     asset: str
 
-    def intent_with[O, C, H](
-        self, opening: Callable[[str, str, Decimal, int], O], closing: Callable[[str], C], holding: Callable[[str], H]
-    ) -> O | C | H:
+    def intent_with[O, C, H, U](
+        self,
+        opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
+        closing: Callable[[str], C],
+        holding: Callable[[str], H],
+        updating: Callable[[str, DecisionPlanChangePort], U],  # noqa: ARG002 - the decisions of the journal never update
+    ) -> O | C | H | U:
         if self.action == "open":
-            return opening(self.asset, "long", Decimal("0.1"), 2)
+            return opening(self.asset, "long", Decimal("0.1"), 2, ExitPlan(), 70)
         if self.action == "close":
             return closing(self.asset)
         return holding(self.asset)

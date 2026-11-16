@@ -19,12 +19,15 @@ from autotrading.domain.flows.risk_outcome import (
     HeldPosition,
     RiskOutcome,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 
 NUMBER = r"(?P<{}>\d+(?:,\d+)?)"
 EXCHANGE = "Hyperliquid"
 CURRENCY = "USDC"
+# The flows of the risk scenarios have no minimum confidence: any confidence of the agent opens (R3.1.4).
+CONFIDENCE = 70
 
 
 def amount(text: str) -> Decimal:
@@ -63,12 +66,12 @@ class RiskBench:
         exposure_set = self.margin_percent is not None or self.value_percent is not None
         margin_percent = self.margin_percent if exposure_set else Decimal(100)
         limits = RiskLimits(self.max_leverage, margin_percent, self.value_percent)
-        state = RiskState(CURRENCY, self.funds, self.liquidity, frozenset(self.open_assets))
+        state = RiskState(CURRENCY, self.funds, self.liquidity, dict.fromkeys(self.open_assets, TradeSide.LONG))
         command = CheckRiskCommand(tuple(self.intents), RiskPolicy(limits, self.bring_to_minimum), state, EXCHANGE)
         self.outcomes = CheckRiskUseCase({EXCHANGE: self.exchange}).execute(command)
 
     def open_with_value(self, asset: str, value: Decimal) -> None:
-        self.intents.append(OpenIntent(asset, TradeSide.LONG, value / self.funds, 1))
+        self.intents.append(OpenIntent(asset, TradeSide.LONG, value / self.funds, 1, CONFIDENCE))
 
     def outcome_of(self, asset: str) -> RiskOutcome:
         return next(outcome for outcome in self.outcomes if outcome.asset == asset)
@@ -183,12 +186,12 @@ def open_position(bench: RiskBench, asset: str) -> None:
     )
 )
 def agent_opens(bench: RiskBench, side: str, asset: str, fraction: str, leverage: str) -> None:
-    bench.intents.append(OpenIntent(asset, TradeSide(side), amount(fraction), int(leverage)))
+    bench.intents.append(OpenIntent(asset, TradeSide(side), amount(fraction), int(leverage), CONFIDENCE))
 
 
 @given(parsers.re(r'^che l\'agente decide di aprire (?P<side>long|short) su "(?P<asset>[A-Z]+)"$'))
 def agent_opens_small(bench: RiskBench, side: str, asset: str) -> None:
-    bench.intents.append(OpenIntent(asset, TradeSide(side), Decimal("0.01"), 1))
+    bench.intents.append(OpenIntent(asset, TradeSide(side), Decimal("0.01"), 1, CONFIDENCE))
 
 
 @given(
@@ -215,7 +218,7 @@ def agent_closes(bench: RiskBench, asset: str) -> None:
     parsers.re(r'^che l\'agente decide di aprire short su "(?P<opened>[A-Z]+)" e di mantenere su "(?P<held>[A-Z]+)"$')
 )
 def agent_opens_and_holds(bench: RiskBench, opened: str, held: str) -> None:
-    bench.intents.extend((OpenIntent(opened, TradeSide.SHORT, Decimal("0.01"), 1), HoldIntent(held)))
+    bench.intents.extend((OpenIntent(opened, TradeSide.SHORT, Decimal("0.01"), 1, CONFIDENCE), HoldIntent(held)))
 
 
 @when(parsers.re(r"^il rischio controlla (?:la decisione|le decisioni)$"))

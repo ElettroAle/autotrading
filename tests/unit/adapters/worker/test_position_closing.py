@@ -29,7 +29,7 @@ from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 ANNA = UserId("oid-anna")
-LONG_BTC = HeldPosition("BTC", Direction.LONG, Decimal("0.0002"), 2)
+LONG_BTC = HeldPosition("BTC", Direction.LONG, Decimal("0.0002"), 2, Decimal(100))
 MARGIN = "Insufficient margin to place order. asset=0"
 TIMED_OUT = "timed out"
 

@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.hyperliquid.market_data import (
 )
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
 from autotrading.adapters.outbound.hyperliquid.orders import HyperliquidOrderExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.protections import HyperliquidProtectionExchangeAdapter
 from autotrading.domain.orders.slippage import Slippage
 
 type HyperliquidAdaptersOfInstallation = tuple[
@@ -22,6 +23,7 @@ type HyperliquidAdaptersOfInstallation = tuple[
     dict[str, HyperliquidOrderExchangeAdapter],
     dict[str, HyperliquidAccountActivityAdapter],
     dict[str, HyperliquidAccountExecutionsAdapter],
+    dict[str, HyperliquidProtectionExchangeAdapter],
     HyperliquidPriceHistoryAdapter,
     HyperliquidMarketDataAdapter,
 ]
@@ -47,6 +49,10 @@ def hyperliquid_adapters() -> HyperliquidAdaptersOfInstallation:
         {
             EXCHANGE_NAME: HyperliquidAccountExecutionsAdapter.for_network(testnet=False),
             TESTNET_EXCHANGE_NAME: HyperliquidAccountExecutionsAdapter.for_network(testnet=True),
+        },
+        {
+            EXCHANGE_NAME: HyperliquidProtectionExchangeAdapter.for_network(testnet=False),
+            TESTNET_EXCHANGE_NAME: HyperliquidProtectionExchangeAdapter.for_network(testnet=True),
         },
         HyperliquidPriceHistoryAdapter.for_network(testnet=False),
         HyperliquidMarketDataAdapter.for_network(testnet=False),

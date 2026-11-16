@@ -24,9 +24,9 @@ TEST = "Hyperliquid Testnet"
 
 
 def test_every_installation_offers_the_real_exchange_and_the_test_one_without_any_setting() -> None:
-    accounts, markets, orders, activity, executions, prices, market = hyperliquid_adapters()
+    accounts, markets, orders, activity, executions, protections, prices, market = hyperliquid_adapters()
 
-    for by_exchange in (accounts, markets, orders, activity, executions):
+    for by_exchange in (accounts, markets, orders, activity, executions, protections):
         assert list(by_exchange) == [REAL, TEST]
     assert type(accounts[REAL]) is HyperliquidExchangeAdapter
     assert type(accounts[TEST]) is HyperliquidTestnetExchangeAdapter
@@ -38,10 +38,11 @@ def test_every_installation_offers_the_real_exchange_and_the_test_one_without_an
     ("exchange", "url", "real"), [(REAL, MAINNET_API_URL, True), (TEST, TESTNET_API_URL, False)], ids=["real", "test"]
 )
 def test_each_exchange_reaches_its_own_network_for_every_use_of_an_account(exchange: str, url: str, real: bool) -> None:
-    accounts, markets, orders, activity, executions, *_ = hyperliquid_adapters()
+    accounts, markets, orders, activity, executions, protections, *_ = hyperliquid_adapters()
 
     assert accounts[exchange].is_real() is real
-    assert {adapter[exchange].base_url for adapter in (accounts, markets, orders, activity, executions)} == {url}
+    every_use = (accounts, markets, orders, activity, executions, protections)
+    assert {adapter[exchange].base_url for adapter in every_use} == {url}
 
 
 def test_the_market_sources_read_the_real_market() -> None:

@@ -13,7 +13,7 @@ from autotrading.domain.flows.errors import (
 )
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.statistics_period import TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 OPENED = datetime(2026, 11, 12, 9, tzinfo=UTC)

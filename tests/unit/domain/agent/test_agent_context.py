@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -14,6 +15,7 @@ from autotrading.domain.agent.agent_context import (
 )
 from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.errors import InvalidAgentContextError
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 STARTED = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
 NOW = datetime(2026, 11, 12, 10, 30, tzinfo=UTC)
@@ -81,9 +83,28 @@ def test_the_user_message_has_the_state_of_the_flow() -> None:
                 "prezzo_di_mercato": "61250",
                 "pnl_non_realizzato": "12.5",
                 "prezzo_di_liquidazione": "41000",
+                "obiettivo": None,
+                "stop": None,
+                "invalidazione": None,
             }
         ],
     }
+
+
+def test_a_position_carries_the_exit_plan_in_force() -> None:
+    plan = ExitPlan(Decimal(63000), Decimal("58500.5"), "chiusura a 4 ore sotto 59000")
+    planned = replace(LONG_BTC, exit_plan=plan)
+    state = replace(STATE, positions=(planned,))
+
+    document = user_document(context(state=state))["stato_del_flusso"]
+
+    assert isinstance(document, dict)
+    [position] = document["posizioni_aperte"]
+    assert (position["obiettivo"], position["stop"], position["invalidazione"]) == (
+        "63000",
+        "58500.5",
+        "chiusura a 4 ore sotto 59000",
+    )
 
 
 def test_a_return_that_cannot_be_measured_is_null() -> None:

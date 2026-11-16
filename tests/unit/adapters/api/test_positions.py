@@ -15,7 +15,7 @@ from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
 
 Client = Callable[[str], TestClient]
-LONG_BTC = HeldPosition("BTC", Direction.LONG, Decimal("0.0002"), 2)
+LONG_BTC = HeldPosition("BTC", Direction.LONG, Decimal("0.0002"), 2, Decimal(100))
 
 
 @pytest.fixture

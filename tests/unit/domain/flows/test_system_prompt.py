@@ -58,6 +58,41 @@ def test_the_default_uses_every_placeholder_and_renders_the_rules_and_the_format
     assert '{"decisioni": [{"asset": "<asset>", "azione": "<una delle azioni ammesse>"' in rendered
 
 
+def test_the_default_asks_the_exit_plan_of_an_opening() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert '"obiettivo": <prezzo obiettivo o null>, "stop": <prezzo di stop o null>' in rendered
+    assert """"invalidazione": "<condizione che invalida l'apertura>" o null""" in rendered
+    assert (
+        "- obiettivo, stop e invalidazione di un'apertura sono facoltativi: per un long lo stop sta sotto il prezzo di"
+        " mercato e l'obiettivo sopra, per uno short il contrario; il piano in vigore di ogni posizione aperta è nello"
+        " stato del flusso;"
+    ) in rendered
+    assert "direzione, quota e leva servono solo per apri" in rendered
+
+
+def test_the_default_asks_how_to_update_the_plan_of_an_open_position() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert (
+        "- aggiorna cambia il piano di una posizione aperta: obiettivo, stop e invalidazione nuovi, null lascia quelli"
+        " in vigore; togli_obiettivo vero toglie l'obiettivo; lo stop non si toglie e non va oltre lo stop predefinito"
+        " del flusso;"
+    ) in rendered
+    assert '"togli_obiettivo": <true per togliere l\'obiettivo, altrimenti false>' in rendered
+    assert (
+        "obiettivo, stop e invalidazione servono solo per apri e aggiorna, togli_obiettivo solo per aggiorna"
+        in rendered
+    )
+
+
+def test_the_default_asks_the_confidence_of_every_decision() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert '"confidenza": <intero da 0 a 100, quanto sei convinto della decisione>' in rendered
+    assert "il ragionamento e la confidenza servono sempre." in rendered
+
+
 def test_a_template_with_known_placeholders_and_doubled_braces_is_accepted() -> None:
     template = '{instructions} {{"leva": {max_leverage}}} {assets!r:>10}'
 

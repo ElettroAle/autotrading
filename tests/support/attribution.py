@@ -28,9 +28,11 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT, an_activity
@@ -64,14 +66,19 @@ class AttributionBench:
         self.orders = InMemoryPlatformOrdersAdapter()
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.closed = InMemoryClosedPositionsAdapter()
+        self.closed_by_protection = InMemoryProtectionClosingsAdapter()
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.record = RecordAccountExecutionsUseCase(flows, self.exchange, self.orders, self.ledger)
-        self.read_state = ReadFlowStateUseCase(flows, self.exchange, self.ledger)
+        self.read_state = ReadFlowStateUseCase(
+            flows, self.exchange, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+        )
         self.thresholds = FakeAccountThresholdsAdapter({})
         self.alarm_notices = FakeReconciliationAlarmNoticeAdapter()
         alarms = ReconciliationAlarmPorts(self.thresholds, self.thresholds, self.alarm_notices)
-        self.reconcile = ReconcileAccountUseCase(flows, self.exchange, self.readings, self.closed, self.record, alarms)
+        self.reconcile = ReconcileAccountUseCase(
+            flows, self.exchange, self.readings, self.closed, self.record, self.closed_by_protection, alarms
+        )
         self.state: FlowState | None = None
         self.recomputed: FlowTotals | None = None
 

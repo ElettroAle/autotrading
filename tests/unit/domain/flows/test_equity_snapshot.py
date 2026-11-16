@@ -9,7 +9,7 @@ from autotrading.domain.flows.capital_change import CapitalChange, CapitalChange
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot, FlowEquity
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.user_id import UserId
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)

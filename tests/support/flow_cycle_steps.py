@@ -17,7 +17,7 @@ from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
@@ -521,7 +521,7 @@ def operational_rules(flow_cycles: FlowCycles, lowest: str, highest: str) -> Non
     text = flow_cycles.system_text()
     assert f"- leva da {lowest} a {highest};" in text
     assert "- al massimo una posizione per asset;" in text
-    assert "- azioni ammesse: apri, chiudi, mantieni;" in text
+    assert "- azioni ammesse: apri, chiudi, mantieni, aggiorna;" in text
     assert '{"decisioni": [' in text
 
 

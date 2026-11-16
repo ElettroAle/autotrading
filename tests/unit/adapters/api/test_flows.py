@@ -93,8 +93,53 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
         "system_prompt_is_default": True,
         "system_prompt_placeholders": PLACEHOLDERS,
+        "default_stop_loss_percent": "5",
+        "default_take_profit_percent": None,
+        "minimum_confidence": None,
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
+
+
+def test_the_minimum_confidence_is_created_changed_and_removed_with_a_null(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", minimum_confidence=60)).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"minimum_confidence": 75}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"minimum_confidence": None}).json()
+
+    assert (untouched["minimum_confidence"], changed["minimum_confidence"]) == (60, 75)
+    assert (removed["version"], removed["minimum_confidence"]) == (4, None)
+    assert anna.get(f"/flows/{flow_id}/versions/3").json()["minimum_confidence"] == 75
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/4").json() == [
+        {"part": "confidenza minima", "before": "60", "after": "nessuna"},
+    ]
+
+
+def test_the_protection_defaults_are_created_changed_and_the_take_profit_removed_with_a_null(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    request = a_request(platform, "anna", default_stop_loss_percent="2.5", default_take_profit_percent="10")
+    flow_id = anna.post("/flows", json=request).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"default_stop_loss_percent": "3"}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"default_take_profit_percent": None}).json()
+
+    assert (untouched["default_stop_loss_percent"], untouched["default_take_profit_percent"]) == ("3", "10")
+    assert (removed["version"], removed["default_stop_loss_percent"], removed["default_take_profit_percent"]) == (
+        3,
+        "3",
+        None,
+    )
+    first = anna.get(f"/flows/{flow_id}/versions/1").json()
+    assert (first["default_stop_loss_percent"], first["default_take_profit_percent"]) == ("2.5", "10")
+    assert anna.get(f"/flows/{flow_id}/versions/1/differences/3").json() == [
+        {"part": "stop loss predefinito", "before": "2,5%", "after": "3%"},
+        {"part": "take profit predefinito", "before": "10%", "after": "nessuno"},
+    ]
 
 
 def test_the_default_system_prompt_is_offered_with_its_placeholders(client_of: Client) -> None:
@@ -321,6 +366,18 @@ def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform)
             "max_leverage",
         ),
         ({"system_prompt": "{leverage}"}, 'il segnaposto "leverage" non esiste', "system_prompt"),
+        (
+            {"default_stop_loss_percent": "51"},
+            "lo stop loss predefinito va da 0,1 a 50",
+            "default_stop_loss_percent",
+        ),
+        (
+            {"default_take_profit_percent": "0"},
+            "il take profit predefinito è maggiore di 0",
+            "default_take_profit_percent",
+        ),
+        ({"minimum_confidence": -1}, "la confidenza minima va da 0 a 100", "minimum_confidence"),
+        ({"minimum_confidence": 101}, "la confidenza minima va da 0 a 100", "minimum_confidence"),
     ],
 )
 def test_an_invalid_change_answers_with_the_reason_and_the_field_it_concerns(

@@ -16,7 +16,7 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
     realizzato e prezzo di liquidazione;
   - i dati delle fonti attive per ogni asset e i pesi delle fonti;
   - i dati mancanti, dichiarati (R1.2.5).
-  Le regole operative vigenti sono: al massimo una posizione per asset, azioni ammesse apri, chiudi e mantieni,
+  Le regole operative vigenti sono: al massimo una posizione per asset, azioni ammesse apri, chiudi, mantieni e aggiorna,
   leva da 1 alla leva massima del flusso, formato obbligatorio della risposta.
   Istruzioni, regole operative e formato sono il system prompt predefinito, che l'utente può cambiare (R1.4.8).
   Il contesto riguarda solo il flusso: non contiene saldo, posizioni o dati di altri flussi né credenziali.

@@ -91,7 +91,7 @@ def account_without_position(session: Session, account: str, coin: str) -> None:
 
 @given(quoted('che il conto "{account}" ha una posizione aperta su "{coin}"'))
 def account_holds_position(session: Session, account: str, coin: str) -> None:
-    position = HeldPosition(coin, Direction.SHORT, Decimal("0.0002"), 3)
+    position = HeldPosition(coin, Direction.SHORT, Decimal("0.0002"), 3, Decimal(100))
     session.platform.order_exchange.hold(session.access_of(account), position)
 
 

@@ -4,7 +4,7 @@ from autotrading.adapters.outbound.sqlalchemy.tables import orders
 from autotrading.domain.flows.closed_position import PositionEnd
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.stop_outcome import PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 EXECUTED = ("FILLED", "PARTIALLY_FILLED")

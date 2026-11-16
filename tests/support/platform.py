@@ -28,6 +28,7 @@ from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
@@ -61,6 +62,7 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_forecasts import InMemoryFlowForecastsAdapter
 from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
@@ -87,6 +89,8 @@ from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
@@ -144,11 +148,15 @@ class Platform:
         self.account_activity = FakeAccountActivityAdapter()
         self.account_activity.unread = self.reading_on_exchange
         self.account_transfers = FakeAccountTransfersAdapter()
-        self.platform_orders = InMemoryPlatformOrdersAdapter()
+        # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
+        self.protection_exchange = FakeProtectionExchangeAdapter()
+        self.protections = ProtectionStore()
+        self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))
         self.closed_positions = ClosedPositionStore()
+        self.exit_plans = ExitPlanStore()
         self.cycles = InMemoryCycleRepositoryAdapter()
         self.equity_snapshots = EquitySnapshotStore()
         self.histories: dict[TenantId, InMemoryFlowHistoryAdapter] = {}
@@ -194,8 +202,9 @@ class Platform:
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
         closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        exit_plans = InMemoryExitPlanRepositoryAdapter(self.exit_plans, tenant_id)
         closing_ports = ClosingPorts(
-            self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice
+            self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
         )
         ports = TenantPorts(
             accounts=accounts,
@@ -204,7 +213,9 @@ class Platform:
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=position_closing,
-            manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
+            manual_closings=RecordManualClosingUseCase(
+                flows, flow_openings, closed_positions, closing_notice, exit_plans
+            ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
@@ -239,6 +250,7 @@ class Platform:
             notifier=self.worker_for(tenant_id).notify,
             clock=lambda: self.now,
             closed_positions=closed_positions,
+            exit_plans=exit_plans,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
@@ -281,7 +293,9 @@ class Platform:
         access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
-        close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, self.slippage)
+        close_exchange_position = CloseExchangePositionUseCase(
+            access, order_exchanges, orders, self.slippage, self.cancel_protections(tenant_id)
+        )
         open_position = OpenPositionUseCase(access, order_exchanges, orders, self.slippage)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
@@ -306,6 +320,14 @@ class Platform:
                 self.ledger,
             ),
         )
+
+    def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
+        """What the worker runs after every closing: the protections of the position leave the exchange (R3.1.2)."""
+        access = OpenTradingAccessUseCase(
+            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), FakeCredentialOpenerAdapter(self.vault)
+        )
+        protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
+        return CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
 
     def link_chat(self) -> LinkChatUseCase:
         """What the bot of the worker runs for every message it receives."""

@@ -1,4 +1,4 @@
-import type { Key, MouseEvent, ReactNode } from 'react';
+import { Fragment, type Key, type MouseEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import { TableFilters, type TableFiltering } from './table-filters';
@@ -27,6 +27,8 @@ type DataTableProps<T> = {
   readonly rowHref?: (row: T) => string;
   /** The filters of the table, shown above it with the count of the results. */
   readonly filtering?: TableFiltering;
+  /** What a row adds under it across every column, as a text that wraps; nothing for a row without it. */
+  readonly rowDetail?: (row: T) => ReactNode;
 };
 
 const ARROWS: Record<SortDirection, string> = { ascending: '▲', descending: '▼' };
@@ -118,9 +120,30 @@ const LinkedRow = <T,>({ row, columns, href }: CellsProps<T> & { readonly href: 
   );
 };
 
+// On a phone the detail ends the card of its row; on a wide screen it is a line under the row, as wide as the table.
+const DETAIL_ROW = 'block px-2 pb-2 md:table-row md:border-b md:px-0';
+
+const DetailRow = ({ detail, width }: { readonly detail: ReactNode; readonly width: number }) =>
+  detail === undefined || detail === null ? null : (
+    <tr className={DETAIL_ROW}>
+      <td colSpan={width} className="block wrap-anywhere md:table-cell md:px-3 md:pb-2">
+        {detail}
+      </td>
+    </tr>
+  );
+
 type TableProps<T> = Omit<DataTableProps<T>, 'empty' | 'filtering'>;
 
-const Table = <T,>({ label, columns, rows, rowKey, sort, onSort, rowHref }: TableProps<T>) => (
+const Table = <T,>({
+  label,
+  columns,
+  rows,
+  rowKey,
+  sort,
+  onSort,
+  rowHref,
+  rowDetail,
+}: TableProps<T>) => (
   // Wider than its box, the table scrolls inside it: the page never scrolls (R6.4.4).
   <div role="region" aria-label={label} className="md:overflow-x-auto">
     <table aria-label={label} className="block w-full text-sm md:table">
@@ -138,15 +161,18 @@ const Table = <T,>({ label, columns, rows, rowKey, sort, onSort, rowHref }: Tabl
         </tr>
       </thead>
       <tbody className="block space-y-2 md:table-row-group md:space-y-0">
-        {rows.map((row) =>
-          rowHref === undefined ? (
-            <tr key={rowKey(row)} className={ROW}>
-              <Cells row={row} columns={columns} />
-            </tr>
-          ) : (
-            <LinkedRow key={rowKey(row)} row={row} columns={columns} href={rowHref(row)} />
-          ),
-        )}
+        {rows.map((row) => (
+          <Fragment key={rowKey(row)}>
+            {rowHref === undefined ? (
+              <tr className={ROW}>
+                <Cells row={row} columns={columns} />
+              </tr>
+            ) : (
+              <LinkedRow row={row} columns={columns} href={rowHref(row)} />
+            )}
+            <DetailRow detail={rowDetail?.(row)} width={columns.length} />
+          </Fragment>
+        ))}
       </tbody>
     </table>
   </div>

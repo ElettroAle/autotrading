@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 PERCENT = Decimal(100)
 

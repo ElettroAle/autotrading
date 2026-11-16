@@ -26,9 +26,11 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT
@@ -81,6 +83,7 @@ class Bench:
             self.readings,
             InMemoryClosedPositionsAdapter(),
             record,
+            InMemoryProtectionClosingsAdapter(),
             ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
         )
         self.use_case = ReadCycleFlowUseCase(
@@ -88,7 +91,10 @@ class Bench:
             InMemoryFlowTimingAdapter(self.store, TENANT),
             ReadCycleAccountUseCase(accounts, accounts, Opener(), {"Hyperliquid": Reader()}),
             ReadCycleFlowStateUseCase(
-                ReadFlowStateUseCase(flows, activity, ledger), ReconcileAccountForCycleUseCase(reconcile, Notices())
+                ReadFlowStateUseCase(
+                    flows, activity, ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+                ),
+                ReconcileAccountForCycleUseCase(reconcile, Notices()),
             ),
             self.readings,
         )

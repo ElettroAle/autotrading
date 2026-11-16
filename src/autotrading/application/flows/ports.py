@@ -10,7 +10,7 @@ from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
-from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing
+from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, ProtectionClosing
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -28,6 +28,7 @@ from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
+from autotrading.domain.flows.exit_plan import ExitPlan, PlacedLevels
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -229,6 +230,33 @@ class FlowOpeningsPort(Protocol):
 
     def last_opening(self, flow_id: FlowId, asset: str) -> PositionOpening | None:
         """The last executed order of the flow that opened a position on the asset, or None if it never did."""
+        ...
+
+
+class ExitPlanRepositoryPort(Protocol):
+    """The exit plan in force of each open position of the flows of the tenant, by flow and asset (R3.1.1).
+
+    A plan is saved when its opening is executed and removed when the position closes, whoever closes it.
+    """
+
+    def current(self, flow_id: FlowId, asset: str) -> ExitPlan | None:
+        """None when the flow has no plan in force on the asset."""
+        ...
+
+    def save(self, flow_id: FlowId, asset: str, plan: ExitPlan) -> None:
+        """Replaces the plan of the flow on the asset. Raises CrossTenantAccessError for a flow of another tenant."""
+        ...
+
+    def remove(self, flow_id: FlowId, asset: str) -> None: ...
+
+
+class FlowProtectionLevelsPort(Protocol):
+    """Bound to the tenant of the request: the stop loss and take profit the platform keeps waiting on the exchange for
+    the position of a flow, from the protections the orders context recorded (R3.1.3).
+    """
+
+    def placed_levels(self, flow_id: FlowId, asset: str) -> PlacedLevels:
+        """No level where the flow has no protection of that kind in force on the asset."""
         ...
 
 
@@ -610,6 +638,32 @@ class OutsideClosingRecorderPort(Protocol):
         ...
 
 
+class ProtectionClosingRecorderPort(Protocol):
+    """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
+
+    def execute(self, closing: ProtectionClosing) -> None:
+        """Records a position the reconciliation finds closed by its stop loss or take profit (R3.1.2)."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedPosition:
+    """The position of the account of a flow on an asset, whose protections its closing leaves behind (R3.1.2)."""
+
+    account_id: UUID
+    asset: str
+
+
+class ProtectionCancellationPort(Protocol):
+    """It is CancelProtectionsUseCase of the orders context, bound to the tenant of the request (R3.1.2).
+
+    The protections left on the exchange by a closing the reconciliation finds are cancelled through the worker's own
+    access to the account, as every order of a flow.
+    """
+
+    def execute(self, position: ProtectedPosition) -> None: ...
+
+
 class ClosedPositionRepositoryPort(Protocol):
     """Bound to the tenant of the request."""
 
@@ -965,15 +1019,49 @@ class AgentPromptComposerPort(Protocol):
         ...
 
 
-class AgentDecisionPort(Protocol):
-    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4)."""
+class DecisionExitPlanPort(Protocol):
+    """The exit plan the agent gave with an opening, as the agent context hands it over (R3.1.1)."""
 
-    def intent_with[O, C, H](
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+
+class DecisionPlanChangePort(Protocol):
+    """The change of the exit plan of an open position the agent gave with an update, as the agent context hands it
+    over (R3.1.3).
+    """
+
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+    @property
+    def remove_target(self) -> bool: ...
+
+
+class AgentDecisionPort(Protocol):
+    """A conforming decision of the agent, turned by the risk check into what it asks; an opening carries the
+    confidence of the agent (R1.4.4, R3.1.1, R3.1.3, R3.1.4).
+    """
+
+    def intent_with[O, C, H, U](
         self,
-        opening: Callable[[str, str, Decimal, int], O],
+        opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
-    ) -> O | C | H: ...
+        updating: Callable[[str, DecisionPlanChangePort], U],
+    ) -> O | C | H | U: ...
 
 
 class AgentResponsePort(Protocol):

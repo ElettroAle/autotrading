@@ -36,6 +36,10 @@ from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.trading_access import TradingAccess
 
 UNKNOWN_ASSET = "Unknown asset"
+# A price of a perpetual has at most 5 significant figures, a whole price excepted, and at most 6 decimals less the
+# decimals of the size of the asset (the tick of Hyperliquid).
+PRICE_SIGNIFICANT_FIGURES = 5
+MAX_PRICE_DECIMALS = 6
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, ArithmeticError)
 
 
@@ -198,7 +202,15 @@ def _market_of(coin: str, universe: Sequence[Mapping[str, object]], mids: Mappin
         raise ExchangeRejectedOrderError(message)
     try:
         leverage, decimals = int(str(asset["maxLeverage"])), int(str(asset["szDecimals"]))
-        return Market(coin, leverage, decimals, _decimal(mids[coin]), MIN_ORDER_VALUE)
+        return Market(
+            coin,
+            leverage,
+            decimals,
+            _decimal(mids[coin]),
+            MIN_ORDER_VALUE,
+            price_significant_figures=PRICE_SIGNIFICANT_FIGURES,
+            price_decimals=MAX_PRICE_DECIMALS - decimals,
+        )
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error
 
@@ -211,7 +223,8 @@ def _held_position_of(answer: object, coin: str) -> HeldPosition | None:
             return None
         size = _decimal(held[0]["szi"])
         direction = Direction.LONG if size > 0 else Direction.SHORT
-        return HeldPosition(coin, direction, abs(size), int(held[0]["leverage"]["value"]))
+        leverage, entry_price = int(held[0]["leverage"]["value"]), _decimal(held[0]["entryPx"])
+        return HeldPosition(coin, direction, abs(size), leverage, entry_price)
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error
 

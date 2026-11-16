@@ -76,7 +76,18 @@ def answer(flow_cycles: FlowCycles, *decisions: dict[str, object]) -> None:
 
 
 def opening(asset: str) -> dict[str, object]:
-    return {"asset": asset, "azione": "apri", "direzione": "long", "quota": 0.1, "leva": 3, "ragionamento": "r"}
+    return {
+        "asset": asset,
+        "azione": "apri",
+        "direzione": "long",
+        "quota": 0.1,
+        "leva": 3,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
+        "ragionamento": "r",
+    }
 
 
 def next_cycle(flow_cycles: FlowCycles, flow: str) -> None:
@@ -172,7 +183,8 @@ def alarm(flow_cycles: FlowCycles, account: str) -> None:
 @given(quoted('che "{flow}" ha una posizione aperta su "{asset}"'))
 def open_position(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
     access = TradingAccess(HYPERLIQUID, flow_cycles.credentials_of(flow).values)
-    flow_cycles.platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, Decimal("0.0003"), 3))
+    position = HeldPosition(asset, Direction.LONG, Decimal("0.0003"), 3, Decimal(100))
+    flow_cycles.platform.order_exchange.hold(access, position)
 
 
 @given(quoted('che "{user}" imposta la soglia di scostamento del conto "{account}" a {percent}%'))
@@ -206,7 +218,7 @@ def agent_opens(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
 
 @when(quoted('l\'agente di "{flow}" decide di chiudere la posizione su "{asset}"'))
 def agent_closes(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
-    answer(flow_cycles, {"asset": asset, "azione": "chiudi", "ragionamento": "r"})
+    answer(flow_cycles, {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "r"})
     next_cycle(flow_cycles, flow)
 
 

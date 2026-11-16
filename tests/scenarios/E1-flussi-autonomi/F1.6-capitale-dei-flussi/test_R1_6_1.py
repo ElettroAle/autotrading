@@ -228,6 +228,10 @@ def cycle_opens(flow_cycles: FlowCycles, flow: str, asset: str, a: str, leverage
         "direzione": "long",
         "quota": float(amount(a)),
         "leva": int(leverage),
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
         "ragionamento": "r",
     }
     flow_cycles.model.text = json.dumps({"decisioni": [opening]})

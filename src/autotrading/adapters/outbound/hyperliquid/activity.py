@@ -20,7 +20,7 @@ from autotrading.domain.flows.account_activity import AccountActivity, AccountPo
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
 from autotrading.domain.flows.statistics_period import TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 FROM_THE_START = 0
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, ArithmeticError)

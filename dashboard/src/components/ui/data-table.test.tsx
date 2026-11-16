@@ -62,6 +62,42 @@ describe('DataTable', () => {
     expect(label).toHaveClass('md:hidden');
   });
 
+  it('shows the detail of a row under it, across every column, and no detail where the row has none', () => {
+    render(
+      <DataTable
+        label="Frutti"
+        columns={COLUMNS}
+        rows={FRUITS}
+        rowKey={(fruit) => fruit.name}
+        rowDetail={(fruit) => (fruit.name === 'mela' ? `dettaglio di ${fruit.name}` : undefined)}
+      />,
+    );
+
+    const rows = within(screen.getByRole('table', { name: 'Frutti' })).getAllByRole('row');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'NomeColore',
+      'NomemelaColorerossa',
+      'dettaglio di mela',
+      'NomebananaColoregialla',
+    ]);
+    expect(within(rows[2] as HTMLElement).getByRole('cell')).toHaveAttribute('colspan', '2');
+  });
+
+  it('shows the detail of a row that leads to a detail too', () => {
+    inRouter(
+      <DataTable
+        label="Frutti"
+        columns={COLUMNS}
+        rows={FRUITS}
+        rowKey={(fruit) => fruit.name}
+        rowHref={(fruit) => `/frutti/${fruit.name}`}
+        rowDetail={(fruit) => `dettaglio di ${fruit.name}`}
+      />,
+    );
+
+    expect(screen.getByText('dettaglio di banana')).toBeInTheDocument();
+  });
+
   it('says there is nothing to show', () => {
     render(
       <DataTable

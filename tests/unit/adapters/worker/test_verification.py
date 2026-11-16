@@ -99,7 +99,9 @@ def test_a_failed_run_arrives_with_its_steps_and_warning(worker: Worker) -> None
 
 def test_an_account_not_ready_does_not_start_with_the_reason(worker: Worker) -> None:
     account = worker.saved_account()
-    worker.order_exchange.hold(access_of(worker, account), HeldPosition("BTC", Direction.LONG, Decimal(1), 2))
+    worker.order_exchange.hold(
+        access_of(worker, account), HeldPosition("BTC", Direction.LONG, Decimal(1), 2, Decimal(100))
+    )
 
     with pytest.raises(VerificationNotStartedError) as raised:
         adapter_on(worker).run(account.id.value, ANNA, None)
