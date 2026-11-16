@@ -1,4 +1,4 @@
-# ADR limite-di-frequenza-dell-exchange-come-indisponibilita — Limite di frequenza come indisponibilità e motivo del rifiuto conservato
+# ADR limite-di-frequenza-dell-exchange-come-indisponibilita — Limite di frequenza dell'exchange come indisponibilità
 
 - Stato: accettata (16 novembre 2026, approvata dal proprietario)
 - Requisiti: Bug 443, Task 444; R1.2.3 (fallimento del ciclo col messaggio originale), R1.2.4 (errore permanente)
@@ -23,19 +23,18 @@ conserva solo «credenziali del conto non valide: <conto>», senza il motivo dat
 
 1. Nell'adapter Hyperliquid un `ClientError` con `status_code` 429 si traduce nell'errore di indisponibilità del
    contratto (`ExchangeUnavailableError` nelle letture, `OrderExchangeUnavailableError` negli ordini), come
-   `ServerError`. `FlowCredentialsRefusedError` riceve il motivo mascherato dell'exchange e lo conserva
-   (`exchange_message`), e `FlowCredentialsRejectedError` lo aggiunge al proprio messaggio, così il fallimento del
-   ciclo lo registra.
+   `ServerError`.
 2. Ritentare il 429 dentro l'adapter: scartato, il ciclo successivo è già il nuovo tentativo e un'attesa dentro il
    ciclo ne allunga la durata.
 
 ## Esito della decisione
 
-Opzione 1.
+Opzione 1. Il motivo dell'exchange nel fallimento del ciclo resta fuori: il messaggio di R1.2.4 è fissato dai suoi
+criteri di accettazione e cambiarlo è una decisione del proprietario, separata da questo Bug.
 
 Verifica: prova (unit test dell'adapter: 429 come indisponibilità in lettura e negli ordini, altro 4xx ancora
-rifiuto; unit test del caso d'uso: il messaggio del rifiuto contiene il motivo dell'exchange).
+rifiuto).
 
 ### Conseguenze
 
-- Un limite di frequenza salta il ciclo senza mettere in pausa i flussi; un rifiuto vero dice perché.
+- Un limite di frequenza salta il ciclo senza mettere in pausa i flussi.
