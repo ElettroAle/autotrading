@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -15,6 +16,7 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 PLANNED = datetime(2026, 11, 12, 10, 22, tzinfo=UTC)
@@ -50,6 +52,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "input_tokens": 2000,
         "output_tokens": 500,
         "cost_usd": Decimal("0.0031"),
+        "trigger": "scheduled",
     }
 
 
@@ -104,3 +107,12 @@ def test_a_value_that_is_not_json_data_never_reaches_the_record() -> None:
 
     assert raised.value.status_code == 500
     assert str(raised.value) == "documento del ciclo non registrabile: object"
+
+
+def test_a_cycle_asked_for_now_is_saved_and_read_back_as_asked() -> None:
+    asked = replace(FAILED, trigger=CycleTrigger.ON_DEMAND)
+
+    row = row_of(asked, TENANT)
+
+    assert row["trigger"] == "on_demand"
+    assert record_of(row) == asked

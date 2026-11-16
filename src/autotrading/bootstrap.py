@@ -145,6 +145,7 @@ from autotrading.application.flows.record_outside_closing import RecordOutsideCl
 from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
+from autotrading.application.flows.run_cycle_on_demand import RunCycleOnDemandUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -237,9 +238,16 @@ def tenant_use_cases(
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
         sealer = credential_sealer(tenant_id)
-        bot_identity, account_state, account_activity, position_closing, verification, notifier, ledger_recording = (
-            worker_of(tenant_id)
-        )
+        (
+            bot_identity,
+            account_state,
+            account_activity,
+            position_closing,
+            verification,
+            notifier,
+            ledger_recording,
+            on_demand_cycles,
+        ) = worker_of(tenant_id)
         flow_ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
@@ -291,6 +299,7 @@ def tenant_use_cases(
             account_transfers=account_activity,
             flow_ledger=flow_ledger,
             ledger_recording=ledger_recording,
+            on_demand_cycles=on_demand_cycles,
             flow_operations=SqlAlchemyFlowOperationsAdapter(engine, tenant_id),
             link_codes=SqlAlchemyLinkCodeRepositoryAdapter(engine, tenant_id),
             bot_identity=bot_identity,
@@ -321,12 +330,15 @@ def tenant_use_cases(
 def worker_use_cases(
     engine: SqlAlchemyEngine,
     opener: SodiumCredentialOpenerAdapter,
-    installation: tuple[str, HyperliquidAdaptersOfInstallation],
-    slippage: Slippage,
+    trading: tuple[str, Slippage, HyperliquidAdaptersOfInstallation],
     outbox: OutboxPort,
+    cycle_for: Callable[[TenantId], WorkerCycle],
 ) -> Callable[[TenantId], WorkerUseCases]:
-    """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names."""
-    environment, hyperliquid = installation
+    """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names.
+
+    The cycle asked for now runs on the graph of the planned cycles, composed only when the request asks for it.
+    """
+    environment, slippage, hyperliquid = trading
     exchanges, _, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
 
     verification_failures = FailureNames(VerificationAccountNotFoundError, VerificationStepError)
@@ -368,6 +380,12 @@ def worker_use_cases(
                 ReadAccountExecutionsUseCase(accounts, opener, executions_readers),
                 SqlAlchemyPlatformOrdersAdapter(engine, tenant_id),
                 SqlAlchemyFlowLedgerAdapter(engine, tenant_id),
+            ),
+            run_cycle_on_demand=RunCycleOnDemandUseCase(
+                SqlAlchemyFlowRepositoryAdapter(engine, tenant_id),
+                SqlAlchemyFlowTimingAdapter(engine, tenant_id),
+                system_clock_adapters(),
+                lambda command: cycle_for(tenant_id).execute(command),
             ),
         )
 
@@ -565,7 +583,6 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     engine = sqlalchemy_adapters(source)
     messenger, inbox, start_link = telegram_adapters(source)
     outbox = SqlAlchemyOutboxAdapter(engine)
-    for_tenant = worker_use_cases(engine, opener, (environment, hyperliquid), slippage, outbox)
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger, outbox))
     library_gateways = litellm_adapters()
     models: ModelGateways = {**library_gateways, **openrouter_adapters()}
@@ -573,6 +590,7 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     cycle_for = cycle_of(
         engine, (opener, provider_key_opener), (environment, slippage, hyperliquid), outbox, predictors
     )
+    for_tenant = worker_use_cases(engine, opener, (environment, slippage, hyperliquid), outbox, cycle_for)
     cycles = worker_cycles(engine, cycle_for, hyperliquid)
     library_catalog = ReadModelCatalogUseCase(
         {name: gateway.model_catalog() for name, gateway in library_gateways.items()}

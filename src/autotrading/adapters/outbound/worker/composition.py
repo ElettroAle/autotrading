@@ -10,6 +10,7 @@ from autotrading.adapters.outbound.worker.configuration import _settings_of
 from autotrading.adapters.outbound.worker.ledger_recording import WorkerLedgerRecordingAdapter
 from autotrading.adapters.outbound.worker.model_catalog import GATEWAY_NAME, WorkerModelCatalogAdapter
 from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
+from autotrading.adapters.outbound.worker.on_demand_cycle import WorkerOnDemandCycleAdapter
 from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
 from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -22,6 +23,7 @@ type WorkerAdaptersOfTenant = tuple[
     WorkerVerificationAdapter,
     WorkerNotificationAdapter,
     WorkerLedgerRecordingAdapter,
+    WorkerOnDemandCycleAdapter,
 ]
 
 
@@ -43,6 +45,7 @@ def worker_adapters(
             WorkerVerificationAdapter(client, settings.token, tenant_id),
             WorkerNotificationAdapter(client, settings.token, tenant_id),
             WorkerLedgerRecordingAdapter(client, settings.token, tenant_id),
+            WorkerOnDemandCycleAdapter(client, settings.token, tenant_id),
         )
 
     return adapters_of

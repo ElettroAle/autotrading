@@ -3,6 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.flows.cycle_graph import CycleGraph, FailedCycle, PlannedCycle, recorded
+from autotrading.application.flows.errors import CycleInProgressError, FlowNotActiveError
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 from autotrading.application.flows.ports import (
     ClockPort,
@@ -13,8 +14,10 @@ from autotrading.application.flows.ports import (
     FlowLockPort,
     FlowPausePort,
 )
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +25,7 @@ class RunCycleCommand:
     flow_id: UUID
     schedule: CycleSchedule
     planned_at: datetime
+    trigger: CycleTrigger = CycleTrigger.SCHEDULED
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +50,10 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     Every cycle that read the state of its flow, completed or failed, records the equity of the last state it read
     (R2.2.3, ADR 0120). A cycle whose flow is no longer active when it starts runs nothing and leaves no trace: the
     planner may still hold its job for a few seconds (Bug 373).
+
+    A cycle the user asks for now (R6.5.2, ADR ciclo-su-richiesta-nel-worker) answers the user where the planned one
+    would pass in silence: a flow not active and a cycle in progress are refused, and a permanent error comes back as
+    the record of the failed cycle, after the pause, since the user reads it instead of the log of the planner.
     """
 
     def __init__(self, graph: CycleGraph[S, D, C, A, O, E], guards: CycleGuards, equity: CycleEquityPort[S]) -> None:
@@ -59,10 +67,12 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         with self._guards.lock.hold(command.flow_id) as acquired:
             # Read once the flow is held: a stop saves its status before waiting for the cycle under way.
             if not self._guards.activity.execute(command.flow_id):
+                _refuse_if_asked(command, FlowNotActiveError())
                 return None
             if not acquired:
+                _refuse_if_asked(command, CycleInProgressError())
                 return recorded(self._guards.cycles, CycleRecord.skipped(command.flow_id, command.planned_at))
-            cycle = PlannedCycle(command.flow_id, command.schedule, command.planned_at)
+            cycle = PlannedCycle(command.flow_id, command.schedule, command.planned_at, command.trigger)
             outcome = self._graph.run(cycle, self._guards.clock.now())
             if isinstance(outcome, FailedCycle):
                 return self._failed(command, outcome)
@@ -78,4 +88,12 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         if not failed.error.permanent:
             return record
         self._guards.pause.execute(PauseAffectedFlowsCommand.of_error(flow_id, failed.error))
+        if command.trigger is CycleTrigger.ON_DEMAND:
+            return record
         raise failed.error
+
+
+def _refuse_if_asked(command: RunCycleCommand, refusal: AutotradingError) -> None:
+    """The user who asked for the cycle learns why it does not run; a planned cycle passes in silence."""
+    if command.trigger is CycleTrigger.ON_DEMAND:
+        raise refusal

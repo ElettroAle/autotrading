@@ -556,6 +556,19 @@ class LedgerRecordingPort(Protocol):
         ...
 
 
+class OnDemandCyclePort(Protocol):
+    """Bound to the tenant of the request: runs a cycle of a flow now (R6.5.2, ADR
+    comando-del-ciclo-su-richiesta-nell-api).
+
+    Only the worker runs the cycles: in the API it is the client that asks the worker to run RunCycleOnDemandUseCase
+    and waits for the cycle to end. A failed cycle is its record, not an error.
+    """
+
+    def run(self, flow_id: UUID) -> CycleRecord:
+        """Raises FlowNotFoundError, FlowNotActiveError, CycleInProgressError, or CycleWorkerUnavailableError."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class FlowAccountPorts:
     """Where a flow learns of its account: the accounts of the tenant, what the exchange shows of them now and the

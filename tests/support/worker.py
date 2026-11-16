@@ -10,6 +10,8 @@ from autotrading.application.flows.read_account_activity import ReadAccountActiv
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.application.flows.run_cycle import RunCycleCommand
+from autotrading.application.flows.run_cycle_on_demand import CycleRun, RunCycleOnDemandUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
@@ -23,15 +25,17 @@ from autotrading.application.verification.run_exchange_verification import (
     VerificationReadings,
 )
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
+from tests.fakes.cycles import FakeClockAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -72,6 +76,9 @@ class Worker:
         self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.exchange.trades_on(self.order_exchange)
+        # The cycle the worker runs on request, on its clock: none until a test gives one.
+        self.clock = FakeClockAdapter(STARTED_AT)
+        self.cycle_run: CycleRun = lambda _command: None
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = InMemoryAccountRepositoryAdapter(self.store, tenant_id)
@@ -104,7 +111,17 @@ class Worker:
                 self.platform_orders,
                 self.ledger,
             ),
+            run_cycle_on_demand=RunCycleOnDemandUseCase(
+                InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                InMemoryFlowTimingAdapter(self.flows, tenant_id),
+                self.clock,
+                self.run_cycle,
+            ),
         )
+
+    def run_cycle(self, command: RunCycleCommand) -> CycleRecord | None:
+        """The cycle the test gives at the moment it runs, not when the use cases were built."""
+        return self.cycle_run(command)
 
     def saved_account(self, tenant_id: TenantId = TENANT) -> Account:
         credentials = new_credentials()

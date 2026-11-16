@@ -41,6 +41,7 @@ from autotrading.domain.flows.cycle_record import (
 )
 from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 
 operations = logging.getLogger("autotrading.cycles")
 
@@ -78,6 +79,7 @@ class PlannedCycle:
     flow_id: UUID
     schedule: CycleSchedule
     planned_at: datetime
+    trigger: CycleTrigger = CycleTrigger.SCHEDULED
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,4 +306,5 @@ def _record_of[S, D, C, A, O, E](
         failure=failure,
         documents=tuple(state.get("documents", [])),
         cost=state.get("cost"),
+        trigger=cycle.trigger,
     )

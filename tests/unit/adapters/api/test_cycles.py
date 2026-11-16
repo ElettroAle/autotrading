@@ -9,8 +9,10 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.adapters.inbound.api.cycles import FlowOverviewResponse
+from autotrading.application.flows.errors import CycleInProgressError
 from autotrading.application.flows.list_flow_overviews import FlowOverview
 from autotrading.application.flows.ports import FlowSummary
+from autotrading.application.flows.run_cycle import RunCycleCommand
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import (
@@ -21,6 +23,7 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_results import FlowResults
@@ -99,6 +102,7 @@ def test_the_cycles_of_a_flow_answer_from_the_most_recent(client_of: Client, pla
         "outcome": "concluso",
         "failure": None,
         "decisions": {"decisioni": [{"asset": "BTC", "azione": "apri"}]},
+        "trigger": "scheduled",
     }
 
 
@@ -159,6 +163,7 @@ def test_the_detail_of_a_cycle_answers_with_everything_recorded(client_of: Clien
             {"step": "decisione dell'agente", "content": {"decisioni": [{"asset": "BTC", "azione": "apri"}]}},
         ],
         "cost": {"input_tokens": 2000, "output_tokens": 500, "cost_usd": "0.0031"},
+        "trigger": "scheduled",
     }
 
 
@@ -415,3 +420,94 @@ def test_an_unknown_filter_of_the_cycles_is_a_bad_request(client_of: Client, pla
 
 def _decided(action: str) -> StepDocument:
     return StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "action": action}]})
+
+
+def run_now(platform: Platform) -> None:
+    """The worker of the platform runs the cycle it is asked for and records it, as the planned ones."""
+
+    def run(command: RunCycleCommand) -> CycleRecord:
+        record = replace(a_completed_cycle(command.flow_id, command.planned_at), trigger=command.trigger)
+        platform.cycles.record(record)
+        return record
+
+    platform.cycle_run_of = lambda _tenant_id: run
+
+
+def active_flow_of(platform: Platform, user: str, status: FlowStatus = FlowStatus.ACTIVE) -> UUID:
+    flow = a_flow(platform.tenant_of(user), status=status)
+    platform.flows.flows.append(flow)
+    platform.flows.anchors[flow.id] = PLANNED
+    return flow.id.value
+
+
+def test_a_cycle_asked_for_now_answers_created_with_the_cycle_the_worker_ran(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = active_flow_of(platform, "anna")
+    run_now(platform)
+
+    response = anna.post(f"/flows/{flow_id}/cycles")
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "planned_at": "2026-11-10T11:59:59Z",
+        "started_at": "2026-11-10T12:00:01Z",
+        "outcome": "concluso",
+        "failure": None,
+        "decisions": {"decisioni": [{"asset": "BTC", "azione": "apri"}]},
+        "trigger": "on_demand",
+    }
+    [cycle] = anna.get(f"/flows/{flow_id}/cycles").json()["cycles"]
+    assert cycle["trigger"] == CycleTrigger.ON_DEMAND.value
+
+
+@pytest.mark.parametrize("status", [FlowStatus.PAUSED, FlowStatus.STOPPED])
+def test_a_cycle_asked_for_now_on_a_flow_not_active_is_refused(
+    client_of: Client, platform: Platform, status: FlowStatus
+) -> None:
+    flow_id = active_flow_of(platform, "anna", status)
+    run_now(platform)
+
+    response = client_of("anna").post(f"/flows/{flow_id}/cycles")
+
+    assert response.status_code == 409
+    assert reason_of(response) == {"detail": "il flusso non è attivo"}
+    assert platform.cycles.records == []
+
+
+def test_a_cycle_asked_for_now_while_another_runs_is_refused(client_of: Client, platform: Platform) -> None:
+    flow_id = active_flow_of(platform, "anna")
+
+    def busy(_command: RunCycleCommand) -> CycleRecord:
+        raise CycleInProgressError
+
+    platform.cycle_run_of = lambda _tenant_id: busy
+
+    response = client_of("anna").post(f"/flows/{flow_id}/cycles")
+
+    assert response.status_code == 409
+    assert reason_of(response) == {"detail": "un ciclo del flusso è già in corso"}
+
+
+def test_a_cycle_asked_for_now_on_a_flow_of_another_user_is_not_found(client_of: Client, platform: Platform) -> None:
+    flow_id = active_flow_of(platform, "bruno")
+    run_now(platform)
+
+    response = client_of("anna").post(f"/flows/{flow_id}/cycles")
+
+    assert response.status_code == 404
+    assert reason_of(response) == {"detail": "flusso non trovato"}
+    assert platform.cycles.records == []
+
+
+def test_a_cycle_asked_for_now_with_the_worker_out_of_reach_is_unavailable(
+    client_of: Client, platform: Platform
+) -> None:
+    flow_id = active_flow_of(platform, "anna")
+    platform.worker_reachable = False
+
+    response = client_of("anna").post(f"/flows/{flow_id}/cycles")
+
+    assert response.status_code == 503
+    assert reason_of(response) == {"detail": "servizio di esecuzione non raggiungibile, riprovare"}
