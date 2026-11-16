@@ -124,6 +124,19 @@ def test_the_costs_are_those_of_the_cycles_that_called_the_model(database: Engin
     ]
 
 
+def test_the_failed_cycles_are_counted_in_the_window(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    for hours in range(3):
+        repository.record(a_failed_cycle(flow_id, PLANNED + timedelta(hours=hours)))
+    repository.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(hours=1, minutes=15)))
+
+    window = TimeWindow(since=PLANNED + timedelta(hours=1), until=PLANNED + timedelta(hours=2))
+
+    assert repository.failed_within(flow_id, window) == 1
+    assert repository.failed_within(flow_id, TimeWindow()) == 3
+
+
 def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
     other_tenant, _ = new_flow(database)
@@ -134,6 +147,7 @@ def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     assert other.at(flow_id, PLANNED) is None
     assert other.costs(flow_id) == []
     assert other.costs_within(flow_id, TimeWindow()) == []
+    assert other.failed_within(flow_id, TimeWindow()) == 0
 
 
 def test_a_tenant_cannot_record_a_cycle_of_a_flow_of_another_tenant(database: Engine) -> None:

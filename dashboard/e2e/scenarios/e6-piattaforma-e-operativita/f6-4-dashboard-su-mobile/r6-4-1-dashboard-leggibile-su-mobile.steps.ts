@@ -1,6 +1,5 @@
 import { expect, type Locator } from '@playwright/test';
 
-import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
 import { fakePlatform, versionsWith } from '@/testing/mocks/platform';
 
 import { colourOf, isRed, isWhite } from '../../../support/colours';
@@ -26,8 +25,6 @@ const FLOW_VIEWS = [
   'Versioni della configurazione',
 ];
 const HISTORY_FILTERS = ['Flusso', 'Versione', 'Conto', 'Asset', 'Periodo'];
-const NOON = Date.UTC(2026, 10, 14, 11, 0);
-const HOUR = 3_600_000;
 
 type Box = {
   readonly x: number;
@@ -219,27 +216,6 @@ Then('legge i passi per collegare la chat con il codice', async ({ dashboard }) 
     /conferma/,
   ]);
 });
-
-When("l'utente apre l'elenco dei flussi", async ({ dashboard, memory }) => {
-  const flow = flowOfScenario(memory);
-  fakePlatform.recordCycles(flow, [
-    aCompletedCycle(new Date(NOON)),
-    aFailedCycle(aCompletedCycle(new Date(NOON - HOUR)), STEPS.agentDecision, {
-      errorType: 'ModelCallTimeoutError',
-      message: 'il modello non ha risposto',
-    }),
-  ]);
-  await openSignedIn(dashboard, memory, () => dashboard.open());
-  await expect(dashboard.recentOutcomes(flow).getByRole('listitem')).toHaveCount(2);
-});
-
-Then(
-  'gli esiti dei cicli recenti hanno una legenda che dice concluso e fallito',
-  async ({ dashboard }) => {
-    const legend = dashboard.content().getByRole('list', { name: 'Legenda degli esiti' });
-    await expect(legend.getByRole('listitem')).toHaveText([/concluso/, /fallito/]);
-  },
-);
 
 Then("l'impaginazione su più colonne resta", async ({ dashboard }) => {
   const menu = await boxOf(dashboard.menu());

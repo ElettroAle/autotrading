@@ -5,17 +5,21 @@ from uuid import uuid4
 import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
-from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
+from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsCommand, ListFlowOverviewsUseCase
 from autotrading.application.flows.ports import FlowSummary
+from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
+from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
@@ -42,10 +46,12 @@ class Bench:
         self.history = InMemoryCycleRepositoryAdapter()
         self.activity = FakeAccountActivityAdapter()
         self.ledger = InMemoryFlowLedgerAdapter()
+        self.equity = InMemoryEquitySnapshotRepositoryAdapter(EquitySnapshotStore(), TENANT)
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
-        self.use_case = ListFlowOverviewsUseCase(
-            self.summaries, self.history, ReadFlowStateUseCase(flows, self.activity, self.ledger), "dev", lambda: NOW
+        results = ReadFlowResultsUseCase(
+            ReadFlowStateUseCase(flows, self.activity, self.ledger), self.equity, self.history, lambda: NOW
         )
+        self.use_case = ListFlowOverviewsUseCase(self.summaries, self.history, results, "dev", lambda: NOW)
 
     def flow(
         self, status: str = "attivo", schedule: CycleSchedule | None = None, capital: Decimal = Decimal(300)
@@ -79,7 +85,7 @@ def test_an_active_flow_shows_its_last_cycle_and_the_next_planned_one(bench: Ben
     last = CycleRecord(active.flow_id, STARTED + timedelta(minutes=15), CycleOutcome.FAILED)
     bench.history.record(last)
 
-    [overview] = bench.use_case.execute()
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
 
     assert (overview.summary, overview.environment) == (active, "dev")
     assert overview.last_cycle == last
@@ -89,7 +95,7 @@ def test_an_active_flow_shows_its_last_cycle_and_the_next_planned_one(bench: Ben
 def test_a_flow_without_schedule_nor_cycles_has_neither_last_nor_next_cycle(bench: Bench) -> None:
     bench.flow(status="in pausa")
 
-    [overview] = bench.use_case.execute()
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
 
     assert (overview.last_cycle, overview.next_cycle_at, overview.recent_cycles) == (None, None, ())
 
@@ -98,7 +104,7 @@ def test_a_flow_shows_the_outcomes_of_its_last_ten_cycles_from_the_most_recent(b
     _, summary = bench.flow()
     records = bench.cycles(summary, 12)
 
-    [overview] = bench.use_case.execute()
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
 
     assert overview.recent_cycles == tuple(reversed(records[2:]))
 
@@ -108,7 +114,7 @@ def test_a_flow_shows_its_initial_and_current_capital_from_its_attributed_state(
     bench.ledger.totals[flow.id] = FlowTotals(flow.id, Decimal(15), Decimal(5))
     bench.activity.activities[ACCOUNT] = an_activity(positions=(a_position("BTC", unrealized_pnl=Decimal(20)),))
 
-    [overview] = bench.use_case.execute()
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
 
     assert overview.capital == FlowReturn(Decimal(300), Decimal(330))
     assert overview.currency == CURRENCY
@@ -119,7 +125,7 @@ def test_the_overview_fails_when_the_state_of_a_flow_cannot_be_read(bench: Bench
     bench.activity.reachable = False
 
     with pytest.raises(FlowExchangeUnavailableError):
-        bench.use_case.execute()
+        bench.use_case.execute(ListFlowOverviewsCommand())
 
 
 def test_a_draft_has_neither_capital_nor_return_and_reads_no_account(bench: Bench) -> None:
@@ -129,6 +135,36 @@ def test_a_draft_has_neither_capital_nor_return_and_reads_no_account(bench: Benc
         FlowSummary(draft.id.value, "alfa (copia)", "", "bozza", None, "openrouter/deepseek-chat", None, 1)
     )
 
-    [overview] = bench.use_case.execute()
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand())
 
-    assert (overview.currency, overview.capital, overview.next_cycle_at) == (None, None, None)
+    assert (overview.currency, overview.capital, overview.next_cycle_at, overview.results) == (None, None, None, None)
+
+
+def test_a_flow_shows_its_results_in_the_period_asked_for(bench: Bench) -> None:
+    flow, summary = bench.flow(capital=Decimal(100))
+    bench.ledger.totals[flow.id] = FlowTotals(flow.id, Decimal("2.5"), Decimal(0))
+    bench.history.record(CycleRecord(summary.flow_id, NOW - timedelta(days=8), CycleOutcome.FAILED))
+    bench.history.record(CycleRecord(summary.flow_id, NOW - timedelta(days=1), CycleOutcome.FAILED))
+    for days_ago, equity in ((8, "101"), (6, "102.1"), (1, "102.5")):
+        bench.equity.record(
+            EquitySnapshot(
+                flow.id.value,
+                NOW - timedelta(days=days_ago),
+                Decimal(100),
+                Decimal(equity) - Decimal(100),
+                Decimal(0),
+                Decimal(0),
+                Decimal(0),
+            )
+        )
+
+    [overview] = bench.use_case.execute(ListFlowOverviewsCommand("7d"))
+
+    assert overview.results is not None
+    assert (overview.results.total_gain, overview.results.period_gain) == (Decimal("2.5"), Decimal("0.4"))
+    assert overview.results.failed_cycles == 1
+
+
+def test_a_period_the_user_cannot_have_meant_is_refused_even_without_flows(bench: Bench) -> None:
+    with pytest.raises(InvalidStatisticsPeriodError):
+        bench.use_case.execute(ListFlowOverviewsCommand("range"))

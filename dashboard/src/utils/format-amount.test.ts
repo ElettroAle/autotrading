@@ -1,5 +1,6 @@
 import {
   formatAmount,
+  formatGain,
   formatPercent,
   formatPrice,
   formatRate,
@@ -73,6 +74,17 @@ describe('formatUsd', () => {
     expect(formatUsd('1.2')).toBe('1,20');
     expect(formatUsd('0')).toBe('0,00');
     expect(formatUsd('0.0031')).toBe('0,0031');
+  });
+});
+
+describe('formatGain', () => {
+  it.each([
+    ['2.5', '+2,50'],
+    ['-1.2', '-1,20'],
+    ['0', '0,00'],
+    ['12345.678', '+12.345,68'],
+  ])('writes the gain %s with its sign and the cents as %s', (gain, written) => {
+    expect(formatGain(gain)).toBe(written);
   });
 });
 

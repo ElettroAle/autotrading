@@ -981,6 +981,10 @@ class CycleHistoryPort(Protocol):
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None: ...
 
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        """How many cycles of the flow planned in the window failed (R6.4.2)."""
+        ...
+
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         """The cost of every cycle of the flow that called the model."""
         ...
