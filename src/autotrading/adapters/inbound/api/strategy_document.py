@@ -62,6 +62,11 @@ class StrategyBody(BaseModel):
     bring_to_minimum: bool = False
     # Null follows the default system prompt of the platform (R1.4.8).
     system_prompt: str | None = None
+    # Missing in the files written before them: a stop loss of 5% and no take profit (R3.1.2).
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
+    # Missing in the files written before it: no minimum confidence (R3.1.4).
+    minimum_confidence: int | None = None
 
 
 class StrategyDocument(BaseModel):
@@ -95,6 +100,9 @@ class StrategyDocument(BaseModel):
                 ),
                 bring_to_minimum=strategy.bring_to_minimum,
                 system_prompt=strategy.system_prompt,
+                default_stop_loss_percent=strategy.protection_defaults.stop_loss_percent,
+                default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
+                minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
             ),
         )
 
@@ -114,6 +122,9 @@ class StrategyDocument(BaseModel):
             cycle_minutes=strategy.cycle_minutes,
             bring_to_minimum=strategy.bring_to_minimum,
             system_prompt=strategy.system_prompt,
+            default_stop_loss_percent=strategy.default_stop_loss_percent,
+            default_take_profit_percent=strategy.default_take_profit_percent,
+            minimum_confidence=strategy.minimum_confidence,
         )
 
     def _require_supported(self) -> None:

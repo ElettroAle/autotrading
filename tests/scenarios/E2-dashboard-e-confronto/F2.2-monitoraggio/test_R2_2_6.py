@@ -11,7 +11,7 @@ from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_statistics import FlowStatistics
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.flows import a_flow
 from tests.support.platform import Platform
 from tests.support.steps import quoted

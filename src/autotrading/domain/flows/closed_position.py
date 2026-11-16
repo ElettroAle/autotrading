@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from autotrading.domain.flows.errors import InvalidClosedPositionError
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
 
@@ -13,7 +13,7 @@ PERCENT = Decimal(100)
 
 
 class CloseReason(StrEnum):
-    """Why a position of a flow was closed in E1 (R1.7.2)."""
+    """Why a position of a flow was closed (R1.7.2, R3.1.2)."""
 
     AGENT = "decisione dell'agente"
     MANUAL = "comando manuale"
@@ -21,6 +21,10 @@ class CloseReason(StrEnum):
     ACCOUNT_REMOVAL = "rimozione del conto"
     # Liquidations included: the platform sees the position gone without having closed it.
     OUTSIDE_PLATFORM = "chiusa fuori dalla piattaforma"
+    # The protections on the exchange: executed at their price, or a stop loss the exchange refused (R3.1.2).
+    STOP_LOSS = "stop loss"
+    TAKE_PROFIT = "take profit"
+    PROTECTION_MISSING = "stop loss non piazzato"
     CASH_OUT = "incasso"
 
 

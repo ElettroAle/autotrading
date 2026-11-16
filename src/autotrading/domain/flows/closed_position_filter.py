@@ -5,7 +5,7 @@ from enum import StrEnum
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.errors import UnknownPositionResultError, UnknownPositionSideError
 from autotrading.domain.flows.statistics_period import TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 
 class PositionResult(StrEnum):

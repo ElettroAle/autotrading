@@ -3,7 +3,8 @@ from uuid import UUID
 
 from sqlalchemy import Engine, func, select
 
-from autotrading.adapters.outbound.sqlalchemy.tables import orders
+from autotrading.adapters.outbound.sqlalchemy.tables import flow_protections, orders
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import PlatformOrder, PlatformOrders
 from autotrading.domain.orders.order import OrderOrigin
@@ -14,7 +15,9 @@ class SqlAlchemyPlatformOrdersAdapter:
     """The client order ids of the orders the platform recorded on an account, with their flow (ADR 0044, ADR 0063).
 
     The orders of the verification procedure and of the manual commands have no flow (ADR 0050); the origin tells
-    the orders of the verification procedure apart, since they belong to no flow (Bug 165, ADR 0075).
+    the orders of the verification procedure apart, since they belong to no flow (Bug 165, ADR 0075). The stop loss
+    and take profit placed for a flow, removed ones included, are orders of the flow that close its position (R3.1.2,
+    ADR chiusure-per-protezione-nello-storico).
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
@@ -28,13 +31,22 @@ class SqlAlchemyPlatformOrdersAdapter:
         query = select(orders.c.id, orders.c.flow_id, orders.c.origin).where(
             orders.c.account_id == account_id, orders.c.id.in_(wanted)
         )
+        protections = select(
+            flow_protections.c.client_order_id, flow_protections.c.flow_id, flow_protections.c.kind
+        ).where(flow_protections.c.account_id == account_id, flow_protections.c.client_order_id.in_(wanted))
         with self._engine.begin() as connection:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             rows = connection.execute(query).all()
-        return {
+            protection_rows = connection.execute(protections).all()
+        sent = {
             order_id: PlatformOrder(
                 None if flow_id is None else FlowId(flow_id), verification=origin == OrderOrigin.VERIFICATION.name
             )
             for order_id, flow_id, origin in rows
         }
+        placed = {
+            order_id: PlatformOrder(FlowId(flow_id), protection=CloseReason[kind.upper()])
+            for order_id, flow_id, kind in protection_rows
+        }
+        return sent | placed

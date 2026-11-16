@@ -23,6 +23,7 @@ from autotrading.domain.flows.errors import (
     CapitalBelowFlowMinimumError,
     FlowCommandNotAllowedError,
 )
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -32,11 +33,12 @@ from autotrading.domain.flows.stop_outcome import (
     PositionOpening,
     StopOutcome,
 )
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -104,6 +106,7 @@ class Flows:
         self.openings = ScriptedOpenings()
         self.closed = ClosedPositionStore()
         self.notices = FakePositionClosedNoticeAdapter()
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id)
         self.stop = StopFlowUseCase(
             self.repository,
             CloseFlowPositionsUseCase(
@@ -113,13 +116,14 @@ class Flows:
                     self.openings,
                     InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
                     self.notices,
+                    self.exit_plans,
                 )
             ),
         )
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
             self.accounts.ports(),
-            ReadFlowStateUseCase(self.repository, self.activity, self.ledger),
+            ReadFlowStateUseCase(self.repository, self.activity, self.ledger, self.exit_plans),
             lambda: NOW,
         )
 
@@ -387,3 +391,18 @@ def test_a_refusal_without_a_reason_is_still_a_position_left_open(flows: Flows) 
     flows.positions.refusals["BTC"] = ""
 
     assert flows.stop.execute(StopFlowCommand(flow.id, USER)).left_open == (PositionLeftOpen("BTC", ""),)
+
+
+def test_a_stop_ends_the_exit_plan_of_each_position_it_closes(flows: Flows) -> None:
+    flow = flows.saved(assets=("BTC", "ETH", "SOL"))
+    plan = ExitPlan(Decimal(110000), Decimal(95000), "chiusura sotto 97000")
+    for asset in ("BTC", "ETH", "SOL"):
+        flows.exit_plans.save(flow.id, asset, plan)
+    flows.openings.openings[flow.id, "BTC"] = OPENING
+    flows.positions.refusals["ETH"] = "Order rejected"
+
+    flows.stop.execute(StopFlowCommand(flow.id, USER))
+
+    assert flows.exit_plans.current(flow.id, "BTC") is None
+    assert flows.exit_plans.current(flow.id, "ETH") == plan
+    assert flows.exit_plans.current(flow.id, "SOL") is None

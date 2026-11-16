@@ -33,12 +33,17 @@ from autotrading.domain.flows.errors import (
     CycleIntervalOutOfRangeError,
     ExposureLimitRequiredError,
     FlowCommandNotAllowedError,
+    InvalidDefaultStopLossError,
+    InvalidDefaultTakeProfitError,
+    InvalidMinimumConfidenceError,
     UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -260,6 +265,62 @@ def test_the_default_system_prompt_is_restored_in_the_next_version(flows: Flows)
     assert (modified.configuration.version, modified.configuration.system_prompt) == (3, None)
 
 
+def test_new_protection_defaults_are_saved_in_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(
+        ModifyFlowCommand(flow.id, default_stop_loss_percent=Decimal(3), default_take_profit_percent=Decimal(10))
+    )
+
+    assert modified.configuration == replace(
+        flow.configuration, version=2, protection_defaults=ProtectionDefaults(Decimal(3), Decimal(10))
+    )
+
+
+def test_a_change_without_protection_defaults_keeps_those_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, default_take_profit_percent=Decimal(10)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, default_stop_loss_percent=Decimal(2)))
+
+    assert modified.configuration.protection_defaults == ProtectionDefaults(Decimal(2), Decimal(10))
+
+
+def test_the_default_take_profit_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, default_take_profit_percent=Decimal(10)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_default_take_profit=True))
+
+    assert (modified.configuration.version, modified.configuration.protection_defaults) == (3, ProtectionDefaults())
+
+
+def test_a_new_minimum_confidence_is_saved_in_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, minimum_confidence=60))
+
+    assert modified.configuration == replace(flow.configuration, version=2, minimum_confidence=MinimumConfidence(60))
+
+
+def test_a_change_without_a_minimum_confidence_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, minimum_confidence=60))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="prudente"))
+
+    assert modified.configuration.minimum_confidence == MinimumConfidence(60)
+
+
+def test_the_minimum_confidence_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, minimum_confidence=60))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_minimum_confidence=True))
+
+    assert (modified.configuration.version, modified.configuration.minimum_confidence) == (3, None)
+
+
 @pytest.mark.parametrize(
     ("changes", "error", "reason"),
     [
@@ -269,6 +330,18 @@ def test_the_default_system_prompt_is_restored_in_the_next_version(flows: Flows)
         ({"assets": ("BTC", "XYZ")}, AssetNotTradableError, "asset non negoziabile sull'exchange: XYZ"),
         ({"account_id": uuid4()}, AccountNotChangeableError, "il conto di un flusso non si cambia"),
         ({"system_prompt": "Leva {leverage}"}, UnknownPromptPlaceholderError, 'il segnaposto "leverage" non esiste'),
+        (
+            {"default_stop_loss_percent": Decimal(51)},
+            InvalidDefaultStopLossError,
+            "lo stop loss predefinito va da 0,1 a 50",
+        ),
+        (
+            {"default_take_profit_percent": Decimal(0)},
+            InvalidDefaultTakeProfitError,
+            "il take profit predefinito è maggiore di 0",
+        ),
+        ({"minimum_confidence": -1}, InvalidMinimumConfidenceError, "la confidenza minima va da 0 a 100"),
+        ({"minimum_confidence": 101}, InvalidMinimumConfidenceError, "la confidenza minima va da 0 a 100"),
     ],
 )
 def test_an_invalid_change_is_refused_and_the_version_in_force_stays(

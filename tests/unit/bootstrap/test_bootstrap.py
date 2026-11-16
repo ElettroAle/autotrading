@@ -24,6 +24,7 @@ from autotrading.application.accounts.read_account_state import ReadAccountState
 from autotrading.application.flows.close_flow_positions import ClosingPorts
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
+    ExitPlanRepositoryPort,
     FlowOpeningsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
@@ -394,23 +395,29 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     real_stop_ports, real_manual_closing = ClosingPorts, RecordManualClosingUseCase
 
     def closing_ports(
-        cycles: RunningCyclePort,
-        positions: FlowPositionsPort,
-        openings: FlowOpeningsPort,
-        closed_positions: ClosedPositionRepositoryPort,
-        closing_notice: PositionClosedNoticePort,
+        *ports: *tuple[
+            RunningCyclePort,
+            FlowPositionsPort,
+            FlowOpeningsPort,
+            ClosedPositionRepositoryPort,
+            PositionClosedNoticePort,
+            ExitPlanRepositoryPort,
+        ],
     ) -> ClosingPorts:
-        notices.append(closing_notice)
-        return real_stop_ports(cycles, positions, openings, closed_positions, closing_notice)
+        notices.append(ports[4])
+        return real_stop_ports(*ports)
 
     def manual_closing(
-        flows: FlowRepositoryPort,
-        openings: FlowOpeningsPort,
-        closed_positions: ClosedPositionRepositoryPort,
-        notice: PositionClosedNoticePort,
+        *ports: *tuple[
+            FlowRepositoryPort,
+            FlowOpeningsPort,
+            ClosedPositionRepositoryPort,
+            PositionClosedNoticePort,
+            ExitPlanRepositoryPort,
+        ],
     ) -> RecordManualClosingUseCase:
-        notices.append(notice)
-        return real_manual_closing(flows, openings, closed_positions, notice)
+        notices.append(ports[3])
+        return real_manual_closing(*ports)
 
     monkeypatch.setattr(bootstrap, "ClosingPorts", closing_ports)
     monkeypatch.setattr(bootstrap, "RecordManualClosingUseCase", manual_closing)

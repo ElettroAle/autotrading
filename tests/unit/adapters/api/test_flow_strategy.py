@@ -15,6 +15,8 @@ from autotrading.adapters.inbound.api.strategy_document import (
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow_strategy import FlowStrategy
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from tests.support.flows import OPENROUTER_MODEL, account_id_of, scenario_catalog
@@ -83,6 +85,8 @@ def a_strategy() -> FlowStrategy:
         risk_limits=RiskLimits(5, Decimal(10)),
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
+        minimum_confidence=MinimumConfidence(55),
     )
 
 
@@ -104,6 +108,9 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
             },
             "bring_to_minimum": True,
             "system_prompt": "{instructions}",
+            "default_stop_loss_percent": "3",
+            "default_take_profit_percent": "9",
+            "minimum_confidence": 55,
         },
     }
 
@@ -132,6 +139,8 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         True,
         "{instructions}",
     )
+    assert (command.default_stop_loss_percent, command.default_take_profit_percent) == (Decimal(3), Decimal(9))
+    assert command.minimum_confidence == 55
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:

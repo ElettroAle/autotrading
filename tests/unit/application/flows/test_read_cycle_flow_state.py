@@ -22,9 +22,11 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import a_fill, a_position, an_activity
@@ -71,10 +73,16 @@ class Bench:
             InMemoryReconciliationRepositoryAdapter(),
             InMemoryClosedPositionsAdapter(),
             record,
+            InMemoryProtectionClosingsAdapter(),
             ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
         )
         self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
-        self.read = ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, self.activity, self.ledger), self.reconcile)
+        self.read = ReadCycleFlowStateUseCase(
+            ReadFlowStateUseCase(
+                flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+            ),
+            self.reconcile,
+        )
         self.flow = a_flow(
             TENANT, account_id=ACCOUNT, status=FlowStatus.ACTIVE, configuration=a_configuration(assets=("BTC",))
         )

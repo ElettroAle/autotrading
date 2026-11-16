@@ -6,7 +6,7 @@ from uuid import UUID
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.ledger import Execution, FundingPayment
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 CURRENCY = "USDC"
 READ_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)

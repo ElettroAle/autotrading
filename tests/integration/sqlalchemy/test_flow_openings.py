@@ -15,7 +15,7 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.closed_position import PositionEnd
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.stop_outcome import PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.market_order import MarketOrder

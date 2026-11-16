@@ -1,26 +1,34 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
+from autotrading.domain.flows.exit_plan import DiscardedLevel
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_limits import HUNDRED, RiskLimits
 from autotrading.domain.flows.risk_outcome import (
     Adjustment,
     AdjustmentKind,
     ApprovedClose,
     ApprovedOpening,
+    ApprovedUpdate,
     BlockedDecision,
     HeldPosition,
     RiskOutcome,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent, UpdateIntent
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.italian_text import money_text, number_text
 
 
 @dataclass(frozen=True, slots=True)
 class RiskPolicy:
-    """The risk limits of the flow and the option to bring an opening up to the exchange minimum (R1.5.4)."""
+    """The risk limits of the flow, the option to bring an opening up to the exchange minimum (R1.5.4) and the
+    confidence an opening needs at least, if the flow has one (R3.1.4).
+    """
 
     limits: RiskLimits
     bring_to_minimum: bool = False
+    minimum_confidence: MinimumConfidence | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,23 +36,31 @@ class RiskState:
     """The state of the flow read at the start of the cycle (R1.5.3).
 
     Quotas and percentage limits are measured on the money of the flow, not on the capital allocated to it: after
-    losses the openings shrink, after gains they grow (ADR 0078). With an alarm of reconciliation on its account the
-    openings of the flow are suspended, with the reason (R3.3.1).
+    losses the openings shrink, after gains they grow (ADR 0078). The side of each open position checks the levels of
+    an update of its exit plan (R3.1.3). With an alarm of reconciliation on its account the openings of the flow are
+    suspended, with the reason (R3.3.1).
     """
 
     currency: str
     funds: Decimal
     available_liquidity: Decimal
-    open_assets: frozenset[str]
+    open_positions: Mapping[str, TradeSide]
     openings_suspended: str | None = None
+
+    @property
+    def open_assets(self) -> frozenset[str]:
+        return frozenset(self.open_positions)
 
 
 @dataclass(frozen=True, slots=True)
 class AssetLimits:
-    """What the exchange accepts on an asset: its maximum leverage and the minimum value of an order."""
+    """What the exchange accepts on an asset, from one reading of its market: the maximum leverage, the minimum value of
+    an order and the market price the exit plan is checked on (R3.1.1).
+    """
 
     max_leverage: int
     min_order_value: Decimal
+    market_price: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +89,8 @@ class _Sizing:
 class RiskCheck:
     """Leverage, then exposure, then coherence with the state, then the exchange minimum (R1.5.1-R1.5.4).
 
-    An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
+    An opening the agent is less convinced of than the minimum confidence of the flow is blocked before any of them
+    (R3.1.4). An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
     The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
     so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065).
     """
@@ -90,6 +107,8 @@ class RiskCheck:
             return BlockedDecision(intent.asset, self._state.openings_suspended)
         if isinstance(intent, OpenIntent) and limits is not None:
             return self._committed(self._open(intent, limits))
+        if isinstance(intent, UpdateIntent):
+            return self._update(intent, limits)
         return HeldPosition(intent.asset)
 
     def _committed(self, outcome: RiskOutcome) -> RiskOutcome:
@@ -99,10 +118,23 @@ class RiskCheck:
 
     def _close(self, intent: CloseIntent) -> RiskOutcome:
         if intent.asset not in self._state.open_assets:
-            return BlockedDecision(intent.asset, f"nessuna posizione aperta su {intent.asset}")
+            return BlockedDecision.without_position(intent.asset)
         return ApprovedClose(intent.asset)
 
+    def _update(self, intent: UpdateIntent, limits: AssetLimits | None) -> RiskOutcome:
+        """An update needs the position it changes; its levels follow the rule of an opening on its side (R3.1.3)."""
+        side = self._state.open_positions.get(intent.asset)
+        if side is None:
+            return BlockedDecision.without_position(intent.asset)
+        if limits is None:
+            return BlockedDecision.untradable(intent.asset)
+        change, discarded = intent.plan_change.coherent_with(side, limits.market_price)
+        return ApprovedUpdate(intent.asset, change, _exit_plan_notes(discarded))
+
     def _open(self, intent: OpenIntent, limits: AssetLimits) -> RiskOutcome:
+        minimum = self._policy.minimum_confidence
+        if minimum is not None and not minimum.admits(intent.confidence):
+            return BlockedDecision.below_minimum_confidence(intent.asset, intent.confidence, minimum)
         sizing = self._within_exposure(self._within_leverage(intent, limits))
         if intent.asset in self._state.open_assets:
             return BlockedDecision(intent.asset, f"posizione già aperta su {intent.asset}")
@@ -110,7 +142,7 @@ class RiskCheck:
             return self._short_of_liquidity(intent.asset)
         if sizing.value < limits.min_order_value:
             return self._at_minimum(intent, sizing, limits)
-        return ApprovedOpening(intent.asset, intent.side, sizing.value, sizing.leverage, sizing.adjustments)
+        return _approved(intent, sizing, limits)
 
     def _within_leverage(self, intent: OpenIntent, limits: AssetLimits) -> _Sizing:
         """The margin stays the same: a lower leverage gives a smaller position (R1.5.2)."""
@@ -162,13 +194,24 @@ class RiskCheck:
         )
         if raised.margin > self._liquidity:
             return self._short_of_liquidity(intent.asset)
-        return ApprovedOpening(intent.asset, intent.side, raised.value, raised.leverage, raised.adjustments)
+        return _approved(intent, raised, limits)
 
     def _short_of_liquidity(self, asset: str) -> BlockedDecision:
         return BlockedDecision(asset, f"liquidità del flusso insufficiente: {self._money(self._liquidity)}")
 
     def _money(self, amount: Decimal) -> str:
         return f"{money_text(amount)} {self._state.currency}"
+
+
+def _approved(intent: OpenIntent, sizing: _Sizing, limits: AssetLimits) -> ApprovedOpening:
+    """The opening as sized, with only the levels of its plan coherent with the market price of the exchange."""
+    plan, discarded = intent.exit_plan.coherent_with(intent.side, limits.market_price)
+    adjustments = (*sizing.adjustments, *_exit_plan_notes(discarded))
+    return ApprovedOpening(intent.asset, intent.side, sizing.value, sizing.leverage, adjustments, plan)
+
+
+def _exit_plan_notes(discarded: tuple[DiscardedLevel, ...]) -> tuple[Adjustment, ...]:
+    return tuple(Adjustment(AdjustmentKind.EXIT_PLAN, level.price, None, level.reason) for level in discarded)
 
 
 def _capped_leverage(sizing: _Sizing, maximum: int, reason: str) -> _Sizing:

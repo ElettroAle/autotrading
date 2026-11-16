@@ -9,6 +9,7 @@ from autotrading.application.orders.follow_flow_orders import (
     FollowFlowOrdersCommand,
     FollowFlowOrdersUseCase,
 )
+from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.market_order import MarketOrder
@@ -46,14 +47,16 @@ class Closings:
     def __init__(self, recorded: RecordedEvents) -> None:
         self._recorded = recorded
 
-    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution) -> None:
-        self._recorded.events.append(("chiuso", flow_id, cycle, asset, fill))
+    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution, *, unprotected: bool) -> None:
+        event = ("chiuso senza stop loss",) if unprotected else ("chiuso",)
+        self._recorded.events.append((*event, flow_id, cycle, asset, fill))
 
 
-def follow(*orders: Order) -> list[tuple[object, ...]]:
+def follow(*orders: Order, unprotected: frozenset[ClientOrderId] = frozenset()) -> list[tuple[object, ...]]:
     recorded = RecordedEvents()
     followers = FlowOrderFollowers(Rejections(recorded), Openings(recorded), Closings(recorded))
-    FollowFlowOrdersUseCase(followers).execute(FollowFlowOrdersCommand(FLOW, "Trend BTC", CYCLE, orders))
+    command = FollowFlowOrdersCommand(FLOW, "Trend BTC", CYCLE, orders, unprotected)
+    FollowFlowOrdersUseCase(followers).execute(command)
     return recorded.events
 
 
@@ -80,6 +83,14 @@ def test_an_executed_opening_is_told_with_direction_leverage_and_the_value_it_pu
 
 def test_an_executed_closing_is_recorded_for_the_flow_and_cycle_with_its_execution() -> None:
     assert follow(a_closing()) == [("chiuso", FLOW, CYCLE, "ETH", EXECUTION)]
+
+
+def test_a_closing_for_a_refused_stop_loss_is_recorded_as_such() -> None:
+    closing = a_closing()
+
+    assert follow(closing, unprotected=frozenset({closing.id})) == [
+        ("chiuso senza stop loss", FLOW, CYCLE, "ETH", EXECUTION)
+    ]
 
 
 def test_every_order_is_followed_in_the_order_sent() -> None:

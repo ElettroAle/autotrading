@@ -24,11 +24,12 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionLeftOpen, PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
@@ -108,6 +109,7 @@ class Bench:
         self.exchange = Exchange(self.activity)
         self.cycles = Cycles()
         self.closed = ClosedPositionStore()
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id)
         closings = CloseFlowPositionsUseCase(
             ClosingPorts(
                 self.cycles,
@@ -115,12 +117,13 @@ class Bench:
                 Openings(),
                 InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
                 FakePositionClosedNoticeAdapter(),
+                self.exit_plans,
             )
         )
         self.recording = FakeLedgerRecordingAdapter(
             RecordAccountExecutionsUseCase(self.flows, self.activity, InMemoryPlatformOrdersAdapter(), self.ledger)
         )
-        flow_state = ReadFlowStateUseCase(self.flows, self.activity, self.ledger)
+        flow_state = ReadFlowStateUseCase(self.flows, self.activity, self.ledger, self.exit_plans)
         ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW)
         self.cash_out = CashOutProfitsUseCase(self.flows, ports)
 

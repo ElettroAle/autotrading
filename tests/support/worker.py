@@ -12,6 +12,7 @@ from autotrading.application.flows.read_account_transfers import ReadAccountTran
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
@@ -37,6 +38,8 @@ from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.platform import HYPERLIQUID, new_credentials
@@ -64,7 +67,9 @@ class Worker:
         self.outbox = InMemoryOutboxAdapter()
         self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
         self.activity_reader = FakeActivityReaderAdapter()
-        self.platform_orders = InMemoryPlatformOrdersAdapter()
+        self.protection_exchange = FakeProtectionExchangeAdapter()
+        self.protections = ProtectionStore()
+        self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.exchange.trades_on(self.order_exchange)
 
@@ -73,7 +78,9 @@ class Worker:
         opener = FakeCredentialOpenerAdapter(self.vault)
         access, order_exchanges = OpenTradingAccessUseCase(accounts, opener), {HYPERLIQUID: self.order_exchange}
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: self.exchange})
-        closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default())
+        protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
+        cancel = CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
+        closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default(), cancel)
         opening = OpenPositionUseCase(access, order_exchanges, self.orders, Slippage.default())
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,

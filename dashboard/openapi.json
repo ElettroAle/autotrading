@@ -4881,6 +4881,32 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -4896,7 +4922,10 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "default_stop_loss_percent",
+          "default_take_profit_percent",
+          "minimum_confidence"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -5487,6 +5516,45 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5699,6 +5767,45 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5897,6 +6004,39 @@
               }
             ],
             "title": "Unrealized Pnl Percent"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
           }
         },
         "type": "object",
@@ -5909,10 +6049,13 @@
           "mark_price",
           "margin",
           "unrealized_pnl",
-          "unrealized_pnl_percent"
+          "unrealized_pnl_percent",
+          "target_price",
+          "stop_price",
+          "invalidation"
         ],
         "title": "FlowPositionResponse",
-        "description": "An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin."
+        "description": "An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a\nposition without margin, each level of the plan when the agent declared none."
       },
       "FlowRankingResponse": {
         "properties": {
@@ -6075,6 +6218,32 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -6094,7 +6263,10 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "default_stop_loss_percent",
+          "default_take_profit_percent",
+          "minimum_confidence"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -7920,6 +8092,45 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -7979,6 +8190,39 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",

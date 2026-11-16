@@ -14,6 +14,8 @@ class HeldPosition:
     direction: Direction
     size: Decimal
     leverage: int
+    # The average price the position was opened at: where the default protection is measured from (R3.1.2).
+    entry_price: Decimal
 
     def closing_order(self, slippage: Slippage) -> MarketOrder:
         """The whole position closed at the market price: reduce only, so it can never open the opposite side."""

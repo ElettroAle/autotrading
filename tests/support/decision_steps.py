@@ -38,12 +38,16 @@ def opening(asset: str, quota: object = 0.1, leverage: object = 3, reasoning: st
         "direzione": "long",
         "quota": quota,
         "leva": leverage,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
         "ragionamento": reasoning,
     }
 
 
 def decision(asset: str, action: str, reasoning: str = "motivo") -> dict[str, object]:
-    return {"asset": asset, "azione": action, "ragionamento": reasoning}
+    return {"asset": asset, "azione": action, "confidenza": 70, "ragionamento": reasoning}
 
 
 def recorded_decisions(flow_cycles: FlowCycles, flow: str = "alfa") -> dict[str, object]:
@@ -106,7 +110,7 @@ def long_position(flow_cycles: FlowCycles, flow: str, asset: str, size: str) -> 
     flow_cycles.platform.hyperliquid.open_position(credentials, position(asset, PositionSide.LONG, size=amount))
     # The account reads the position from the market data, the orders close it on the exchange of the orders.
     access = TradingAccess(HYPERLIQUID, credentials.values)
-    flow_cycles.platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, amount, 1))
+    flow_cycles.platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, amount, 1, Decimal(100)))
 
 
 @given(quoted('che l\'agente risponde chiudi su "{asset}"'))

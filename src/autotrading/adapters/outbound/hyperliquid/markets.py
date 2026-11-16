@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from decimal import Decimal, InvalidOperation
 
 import requests
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
@@ -13,6 +14,7 @@ from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.risk_check import AssetLimits
 
 SHAPE_ERRORS = (KeyError, TypeError, AttributeError)
+UNAVAILABLE = (ClientError, ServerError, requests.RequestException, *SHAPE_ERRORS, ValueError, InvalidOperation)
 
 
 class HyperliquidMarketsAdapter:
@@ -37,22 +39,35 @@ class HyperliquidMarketsAdapter:
         return frozenset(self._listed())
 
     def limits(self, asset: str) -> AssetLimits | None:
-        """The maximum leverage of the asset from the metadata, and the minimum order value of the exchange."""
-        entry = self._listed().get(asset)
-        if entry is None:
-            return None
+        """The maximum leverage of the asset from the metadata, the minimum order value of the exchange and the mid
+        price of the asset, from one reading of the market (R1.5.2, R3.1.1).
+        """
         try:
-            return AssetLimits(int(str(entry["maxLeverage"])), MIN_ORDER_VALUE)
-        except (*SHAPE_ERRORS, ValueError) as error:
+            info = self._sdk.info(self._base_url, self._timeout)
+            entry = _listed_in(info.meta()).get(asset)
+            if entry is None:
+                return None
+            return AssetLimits(int(str(entry["maxLeverage"])), MIN_ORDER_VALUE, _market_price(info.all_mids(), asset))
+        except UNAVAILABLE as error:
             raise FlowExchangeUnavailableError from error
 
     def _listed(self) -> dict[str, Mapping[str, object]]:
-        """The assets not delisted, by name."""
         try:
-            universe = self._sdk.info(self._base_url, self._timeout).meta()["universe"]
-            return {_name(asset): asset for asset in universe if not asset.get("isDelisted", False)}
+            return _listed_in(self._sdk.info(self._base_url, self._timeout).meta())
         except (ClientError, ServerError, requests.RequestException, *SHAPE_ERRORS) as error:
             raise FlowExchangeUnavailableError from error
+
+
+def _listed_in(meta: Mapping[str, list[Mapping[str, object]]]) -> dict[str, Mapping[str, object]]:
+    """The assets not delisted, by name."""
+    return {_name(asset): asset for asset in meta["universe"] if not asset.get("isDelisted", False)}
+
+
+def _market_price(mids: Mapping[str, object], asset: str) -> Decimal:
+    price = Decimal(str(mids[asset]))
+    if not price > 0:
+        raise FlowExchangeUnavailableError
+    return price
 
 
 def _name(asset: Mapping[str, object]) -> str:
