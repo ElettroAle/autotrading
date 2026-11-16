@@ -337,10 +337,15 @@ export const modifyFlow = (
     modelParameters: model.parameters,
     sources: changed(request.sources, flow.sources, sourcesOf),
     instructions: changed(request.instructions, flow.instructions, (value) => textOf(value).trim()),
+    // A null limit of exposure sent on purpose removes it; a missing one keeps the limit in force (R1.1.3).
     riskLimits: riskLimitsOf(
       request.max_leverage ?? flow.riskLimits.maxLeverage,
-      request.max_margin_exposure_percent ?? flow.riskLimits.maxMarginExposurePercent,
-      request.max_value_exposure_percent ?? flow.riskLimits.maxValueExposurePercent,
+      request.max_margin_exposure_percent === undefined
+        ? flow.riskLimits.maxMarginExposurePercent
+        : request.max_margin_exposure_percent,
+      request.max_value_exposure_percent === undefined
+        ? flow.riskLimits.maxValueExposurePercent
+        : request.max_value_exposure_percent,
     ),
     bringToMinimum: changed(
       request.bring_to_minimum,
