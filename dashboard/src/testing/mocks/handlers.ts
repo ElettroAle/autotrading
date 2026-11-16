@@ -11,6 +11,7 @@ import {
   Refusal,
 } from './flow-configuration';
 import { rankingOf } from './flow-ranking';
+import { resultsOf } from './flow-results';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
@@ -136,9 +137,21 @@ const newestFirst = (cycles: FakeCycle[]): FakeCycle[] =>
 const pageOf = (request: Request): number =>
   Number(new URL(request.url).searchParams.get('page') ?? '1');
 
-const flowState = (flowId: string) => ({
-  flow_id: flowId,
-  currency: CURRENCY,
+// The currency of the account of the flow; a draft has none, and answers no state (ADR 0124).
+const currencyOf = (user: FakeUser, flow: FakeFlow): string =>
+  user.accounts.find((account) => account.id === flow.accountId)?.currency ?? CURRENCY;
+
+const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
+  resultsOf(
+    flow,
+    fakePlatform.cyclesOf(flow.id),
+    fakePlatform.openPositionsOf(flow.id).length,
+    new URL(request.url).searchParams,
+  );
+
+const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
+  flow_id: flow.id,
+  currency: currencyOf(user, flow),
   allocated_capital: '500',
   available_liquidity: '300',
   margin: '200',
@@ -147,7 +160,8 @@ const flowState = (flowId: string) => ({
   fees: '0',
   total_value: '512',
   return_percent: '2.4',
-  positions: fakePlatform.openPositionsOf(flowId),
+  positions: fakePlatform.openPositionsOf(flow.id),
+  summary: resultsSummaryOf(flow, request),
 });
 
 const closedPositionPage = (positions: FakeClosedPosition[], page: number) => {
@@ -183,7 +197,7 @@ const accountNameOf = (user: FakeUser, flow: FakeFlow): string =>
 
 const outcomeOf = (cycle: FakeCycle) => ({ planned_at: cycle.planned_at, outcome: cycle.outcome });
 
-const overviewOf = (user: FakeUser, flow: FakeFlow) => {
+const overviewOf = (user: FakeUser, flow: FakeFlow, request: Request) => {
   const recent = newestFirst(fakePlatform.cyclesOf(flow.id)).slice(0, RECENT_CYCLES);
   const newest = recent[0];
   return {
@@ -199,11 +213,12 @@ const overviewOf = (user: FakeUser, flow: FakeFlow) => {
     next_cycle_at: nextCycleOf(flow, newest),
     // A draft has no account yet, so no currency nor capital (ADR 0124).
     ...(flow.status === 'bozza'
-      ? { currency: null, initial_capital: null, current_capital: null }
+      ? { currency: null, initial_capital: null, current_capital: null, summary: null }
       : {
-          currency: CURRENCY,
+          currency: currencyOf(user, flow),
           initial_capital: String(flow.allocatedCapital ?? 0),
           current_capital: String(flow.currentCapital),
+          summary: resultsSummaryOf(flow, request),
         }),
     return_percent: returnPercentOf(flow),
     recent_outcomes: recent.map(outcomeOf),
@@ -298,10 +313,12 @@ export const handlers = [
   ),
   http.get('*/flows/overview', ({ request }) =>
     withUser(request, (user) =>
-      HttpResponse.json(
-        user.flows
-          .filter((flow) => flow.status !== 'archiviato')
-          .map((flow) => overviewOf(user, flow)),
+      refusedOr(() =>
+        HttpResponse.json(
+          user.flows
+            .filter((flow) => flow.status !== 'archiviato')
+            .map((flow) => overviewOf(user, flow, request)),
+        ),
       ),
     ),
   ),
@@ -377,10 +394,15 @@ export const handlers = [
       return new HttpResponse(null, { status: 204 });
     }),
   ),
+  // The cycles of the flow, only those with the outcome when one is asked for (R6.4.2).
   http.get('*/flows/:flowId/cycles', ({ request, params }) =>
-    withFlow(request, params.flowId, (flow) =>
-      HttpResponse.json(cyclePage(fakePlatform.cyclesOf(flow.id), pageOf(request))),
-    ),
+    withFlow(request, params.flowId, (flow) => {
+      const outcome = new URL(request.url).searchParams.get('outcome');
+      const cycles = fakePlatform
+        .cyclesOf(flow.id)
+        .filter((cycle) => outcome === null || cycle.outcome === outcome);
+      return HttpResponse.json(cyclePage(cycles, pageOf(request)));
+    }),
   ),
   http.get('*/flows/:flowId/versions', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>
@@ -511,7 +533,12 @@ export const handlers = [
     ),
   ),
   http.get('*/flows/:flowId/state', ({ request, params }) =>
-    withFlow(request, params.flowId, (flow) => HttpResponse.json(flowState(flow.id))),
+    withUser(request, (user) => {
+      const flow = user.flows.find((candidate) => candidate.id === params.flowId);
+      return flow === undefined
+        ? notFound('flusso non trovato')
+        : refusedOr(() => HttpResponse.json(flowState(user, flow, request)));
+    }),
   ),
   http.get('*/flows/:flowId/closed-positions', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>

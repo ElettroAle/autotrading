@@ -34,9 +34,26 @@ const columnsFor = (flowId: string): DataTableColumn<CycleSummary>[] => [
   { header: 'Decisioni', cell: decisionsOf },
 ];
 
-/** The cycles of the flow from the most recent, in the pages of the API (R2.2.7). */
-export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) => {
-  const cycles = useCycles(flowId, page);
+type CyclesListProps = {
+  readonly flowId: string;
+  readonly page: number;
+  /** The outcome the cycles are filtered on, empty for every cycle (R6.4.2). */
+  readonly outcome?: string;
+};
+
+// The filter the failed cycles of the summary of the results lead to, said above the cycles with a way back (R6.4.2).
+const OutcomeFilter = ({ flowId, outcome }: { flowId: string; outcome: string }) => (
+  <p className="mb-2 flex flex-wrap gap-2 text-sm text-slate-700">
+    <span>{`Solo i cicli ${outcome === 'fallito' ? 'falliti' : `con esito «${outcome}»`}.`}</span>
+    <Link to={paths.flowCycles.getHref(flowId)} className="text-blue-800 hover:underline">
+      Mostra tutti i cicli
+    </Link>
+  </p>
+);
+
+/** The cycles of the flow from the most recent, in the pages of the API (R2.2.7), filtered on an outcome if asked. */
+export const CyclesList = ({ flowId, page, outcome = '' }: CyclesListProps) => {
+  const cycles = useCycles(flowId, page, outcome);
   if (cycles.isPending) {
     return <Loading />;
   }
@@ -46,6 +63,7 @@ export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) =
   }
   return (
     <>
+      {outcome === '' ? null : <OutcomeFilter flowId={flowId} outcome={outcome} />}
       <DataTable
         label="Cicli"
         columns={columnsFor(flowId)}
@@ -56,7 +74,7 @@ export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) =
       <Pagination
         page={cycles.data.page}
         hasNext={cycles.data.has_next}
-        hrefOf={(target) => paths.flowCycles.getHref(flowId, target)}
+        hrefOf={(target) => paths.flowCycles.getHref(flowId, target, outcome)}
       />
     </>
   );

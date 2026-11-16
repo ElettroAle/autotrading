@@ -9,6 +9,7 @@ import { renderApp } from '@/testing/test-utils';
 
 const LAST_CYCLE = new Date('2026-11-14T10:07:00+01:00');
 const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
 
 const summaryOf = async (name: string) => screen.findByRole('article', { name });
 
@@ -35,7 +36,7 @@ describe('FlowsList', () => {
     expect(screen.queryByText('omega')).not.toBeInTheDocument();
   });
 
-  it('shows where an active flow runs, its cycles and a gain in green', async () => {
+  it('shows where an active flow runs, its last and next cycle and a gain in green', async () => {
     fakePlatform.addFlow('anna', 'alfa');
     fakePlatform.changeFlow('alfa', { allocatedCapital: 300, currentCapital: 330 });
     const last = aCompletedCycle(LAST_CYCLE);
@@ -54,7 +55,6 @@ describe('FlowsList', () => {
     const alfa = await summaryOf('alfa');
     expect(factOf(alfa, 'Stato')).toHaveTextContent('attivo');
     expect(factOf(alfa, 'Conto')).toHaveTextContent('principale');
-    expect(factOf(alfa, 'Ambiente')).toHaveTextContent('dev');
     expect(factOf(alfa, 'Modello')).toHaveTextContent('openai/gpt-4o');
     expect(factOf(alfa, 'Ultima esecuzione')).toHaveTextContent('14/11/2026, 10:07:00 · concluso');
     expect(factOf(alfa, 'Prossima esecuzione prevista')).toHaveTextContent('14/11/2026, 10:22:00');
@@ -63,14 +63,53 @@ describe('FlowsList', () => {
     expect(factOf(alfa, 'Rendimento')).toHaveTextContent('+10,00%');
     expect(factOf(alfa, 'Rendimento')).toHaveClass('text-green-700');
     expect(within(alfa).queryByLabelText('Motivo della pausa')).not.toBeInTheDocument();
-    const outcomes = within(
-      within(alfa).getByRole('list', { name: 'Esito degli ultimi cicli' }),
-    ).getAllByRole('listitem');
-    expect(outcomes.map((outcome) => outcome.textContent)).toEqual([
-      '✓concluso, 10:07:00',
-      '✗fallito, 09:52:00',
-      '–saltato, 09:37:00',
-    ]);
+  });
+
+  // R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard: the summary replaces the row of the outcomes and the
+  // environment, which the header already says.
+  it('shows the summary of the results of each flow instead of its outcomes and its environment', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    fakePlatform.changeFlow('alfa', { allocatedCapital: 100, currentCapital: 102.5 });
+    fakePlatform.recordCycles('alfa', [aCompletedCycle(LAST_CYCLE)]);
+    await renderApp({ account: 'anna' });
+
+    const alfa = await summaryOf('alfa');
+    const results = within(alfa).getByRole('region', { name: 'Riepilogo dei risultati' });
+    expect(within(results).getByLabelText('Guadagno totale')).toHaveTextContent(
+      '+2,50 USDC · +2,50%',
+    );
+    expect(within(alfa).queryByLabelText('Ambiente')).not.toBeInTheDocument();
+    expect(
+      within(alfa).queryByRole('list', { name: 'Esito degli ultimi cicli' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Legenda degli esiti' })).not.toBeInTheDocument();
+  });
+
+  it('measures the results in the period chosen above the list', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    const now = Date.now();
+    fakePlatform.recordEquity('alfa', new Date(now - 10 * DAY), 100);
+    fakePlatform.recordEquity('alfa', new Date(now - 5 * DAY), 101);
+    fakePlatform.recordEquity('alfa', new Date(now - DAY), 101.5);
+    await renderApp({ account: 'anna', url: '/?period=7d' });
+
+    const results = within(await summaryOf('alfa')).getByRole('region', {
+      name: 'Riepilogo dei risultati',
+    });
+    expect(within(results).getByLabelText('Guadagno nel periodo')).toHaveTextContent(
+      '+0,50 USDC · +0,50%',
+    );
+  });
+
+  it('shows no summary for a draft, which has no account yet', async () => {
+    fakePlatform.addFlow('anna', 'bozza', { status: 'bozza', allocatedCapital: null });
+    fakePlatform.changeFlow('bozza', { accountId: null });
+    await renderApp({ account: 'anna' });
+
+    const draft = await summaryOf('bozza');
+    expect(
+      within(draft).queryByRole('region', { name: 'Riepilogo dei risultati' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows why a flow paused, a loss in red and no next cycle', async () => {
@@ -90,7 +129,6 @@ describe('FlowsList', () => {
     expect(within(beta).queryByLabelText('Prossima esecuzione prevista')).not.toBeInTheDocument();
     expect(factOf(beta, 'Rendimento')).toHaveTextContent('-10,00%');
     expect(factOf(beta, 'Rendimento')).toHaveClass('text-red-700');
-    expect(within(beta).getByText('Nessun ciclo registrato.')).toBeInTheDocument();
   });
 
   it('shows a return the API could not measure without a colour', async () => {
@@ -150,26 +188,5 @@ describe('FlowsList', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Dati non aggiornati');
     expect(screen.getByRole('link', { name: 'alfa' })).toBeInTheDocument();
-  });
-
-  it('says once, above the flows, what the icons of the outcomes mean', async () => {
-    fakePlatform.addFlow('anna', 'alfa');
-    fakePlatform.addFlow('anna', 'beta');
-    await renderApp({ account: 'anna' });
-
-    await screen.findByRole('list', { name: 'Flussi' });
-    const legend = screen.getByRole('list', { name: 'Legenda degli esiti' });
-    expect(
-      within(legend)
-        .getAllByRole('listitem')
-        .map((entry) => entry.textContent),
-    ).toEqual(['✓concluso', '✗fallito']);
-  });
-
-  it('shows no legend while the user has no flow', async () => {
-    await renderApp({ account: 'anna' });
-
-    await screen.findByText('Non hai ancora flussi.');
-    expect(screen.queryByRole('list', { name: 'Legenda degli esiti' })).not.toBeInTheDocument();
   });
 });

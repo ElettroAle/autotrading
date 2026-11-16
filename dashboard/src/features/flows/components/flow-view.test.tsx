@@ -6,6 +6,8 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
+const DAY = 24 * 60 * 60_000;
+
 describe('FlowView', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
@@ -110,6 +112,62 @@ describe('FlowView', () => {
     order.slice(1).forEach((element, index) => {
       expect(order[index]?.compareDocumentPosition(element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });
+  });
+
+  // R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard: the summary comes first, in the period of the page.
+  it('shows the summary of the results at the top of the page, in the period of the page', async () => {
+    fakePlatform.changeFlow('alfa', { allocatedCapital: 100, currentCapital: 102.5 });
+    const now = Date.now();
+    fakePlatform.recordEquity('alfa', new Date(now - 10 * DAY), 100);
+    fakePlatform.recordEquity('alfa', new Date(now - 5 * DAY), 102.1);
+    fakePlatform.recordEquity('alfa', new Date(now - DAY), 102.5);
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
+
+    const results = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
+    expect(await within(results).findByLabelText('Guadagno totale')).toHaveTextContent(
+      '+2,50 USDC · +2,50%',
+    );
+    expect(within(results).getByLabelText('Guadagno nel periodo')).toHaveTextContent(
+      '+0,40 USDC · +0,40%',
+    );
+    const status = screen.getByText('Stato: attivo');
+    expect(results.compareDocumentPosition(status)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('waits for both days of a range before reading the summary', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=range&from=2026-11-01' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Scegli il primo e l'ultimo giorno dell'intervallo.").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole('region', { name: 'Riepilogo dei risultati' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows no summary for a draft, which has no account yet', async () => {
+    fakePlatform.addFlow('anna', 'bozza', { status: 'bozza', allocatedCapital: null });
+    fakePlatform.changeFlow('bozza', { accountId: null });
+    await renderApp({ account: 'anna', url: '/flows/flow-bozza' });
+
+    expect(await screen.findByText('Bozza')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Riepilogo dei risultati' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('tells why the summary could not be read', async () => {
+    server.use(
+      http.get('*/flows/:flowId/state', () =>
+        HttpResponse.json({ detail: 'exchange non raggiungibile, riprovare' }, { status: 503 }),
+      ),
+    );
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'exchange non raggiungibile, riprovare',
+    );
   });
 
   it('tells why the flow could not be read', async () => {

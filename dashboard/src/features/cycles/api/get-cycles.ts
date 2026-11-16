@@ -26,15 +26,21 @@ const cyclePageSchema = z.object({
 
 export type CycleSummary = z.infer<typeof cycleSummarySchema>;
 
-/** The cycles of a flow from the most recent, in the pages of the API (R1.7.3). */
-export const useCycles = (flowId: string, page: number) => {
+/**
+ * The cycles of a flow from the most recent, in the pages of the API (R1.7.3); with an outcome, only the cycles that had
+ * it (R6.4.2).
+ */
+export const useCycles = (flowId: string, page: number, outcome = '') => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('cycles', flowId, page),
+    ...pageDataQuery('cycles', flowId, page, outcome),
     queryFn: async () =>
       readData(
         await api.GET('/flows/{flow_id}/cycles', {
-          params: { path: { flow_id: flowId }, query: { page } },
+          params: {
+            path: { flow_id: flowId },
+            query: outcome === '' ? { page } : { page, outcome },
+          },
         }),
         cyclePageSchema,
       ),

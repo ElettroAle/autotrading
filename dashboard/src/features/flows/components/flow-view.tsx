@@ -15,6 +15,7 @@ import { DraftAssignmentForm } from './draft-assignment-form';
 import { DuplicateFlowButton } from './duplicate-flow-button';
 import { ExportStrategyButton } from './export-strategy-button';
 import { FlowDetails } from './flow-details';
+import { FlowResults } from './flow-results';
 import { RecentCycles } from './recent-cycles';
 import { StartFlowButton } from './start-flow-button';
 
@@ -63,6 +64,12 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
   const realMoney = isRealMoney(account?.network);
   return (
     <section aria-label={flow.name} className="rounded border border-slate-200 bg-white p-4">
+      {/* How the flow is doing comes before every detail; a draft has no account, so no results yet (R6.4.2). */}
+      {flow.status === DRAFT_STATUS ? null : (
+        <div className="mb-3">
+          <FlowResults flowId={flow.id} />
+        </div>
+      )}
       <div className="space-y-2">
         <FlowStatus flow={flow} />
         {account !== undefined && !realMoney ? (

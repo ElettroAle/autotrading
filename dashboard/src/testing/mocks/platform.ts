@@ -92,6 +92,8 @@ export type FakeAccount = {
   readonly name: string;
   readonly balance: number;
   publicFields: Record<string, string>;
+  /** The currency the account settles in, which the results of its flows are written in (R6.4.2). */
+  currency: string;
 };
 
 /** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
@@ -153,6 +155,9 @@ const FIRST_CHAT_ID = 1001;
 export type FakeProviderKey = { readonly provider: string; registeredAt: string };
 
 export const FAKE_EXCHANGE = 'Hyperliquid';
+
+/** The currency an account settles in unless a test says otherwise. */
+export const SETTLEMENT_CURRENCY = 'USDC';
 // The account address every fake account is registered with, a public field of the exchange (Bug 401).
 export const FAKE_ACCOUNT_ADDRESS = '0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2';
 const registeredPublicFields = (): Record<string, string> => ({
@@ -323,6 +328,7 @@ const accountOf = (user: FakeUser, name: string): FakeAccount => {
     name,
     balance: 1000,
     publicFields: registeredPublicFields(),
+    currency: SETTLEMENT_CURRENCY,
   };
   user.accounts.push(account);
   return account;
@@ -536,6 +542,7 @@ export const fakePlatform = {
       name,
       balance,
       publicFields: registeredPublicFields(),
+      currency: SETTLEMENT_CURRENCY,
     };
     userNamed(account).accounts.push(created);
     return created;
@@ -748,6 +755,18 @@ export const fakePlatform = {
       .find((candidate) => candidate.name === name);
     if (account === undefined) {
       throw new Error(`unknown fake account ${name}`);
+    }
+    return account;
+  },
+
+  /** The account the flow with the name trades on (R6.4.2). */
+  accountOfFlow(name: string): FakeAccount {
+    const { accountId } = fakePlatform.flowNamed(name);
+    const account = [...state.users.values()]
+      .flatMap((user) => user.accounts)
+      .find((candidate) => candidate.id === accountId);
+    if (account === undefined) {
+      throw new Error(`fake flow ${name} has no account`);
     }
     return account;
   },
