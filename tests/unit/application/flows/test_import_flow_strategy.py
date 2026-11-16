@@ -24,6 +24,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -38,12 +39,18 @@ def a_command(**changes: object) -> ImportFlowStrategyCommand:
         max_leverage=3,
         max_margin_exposure_percent=Decimal(10),
         max_value_exposure_percent=Decimal(50),
+        max_total_margin_exposure_percent=Decimal(30),
+        max_total_value_exposure_percent=Decimal(120),
         model_parameters={"max_tokens": "2048"},
         sources=(SourceRequest("indicatori", 2, {"periodo": 14}), SourceRequest("notizie")),
         instructions="  compra basso  ",
         cycle_minutes=60,
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=5,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
         default_stop_loss_percent=Decimal(4),
         default_take_profit_percent=Decimal(12),
         minimum_confidence=65,
@@ -74,9 +81,13 @@ def test_the_import_saves_a_draft_at_its_first_version_with_the_strategy_checked
         model=ModelSelection(OPENROUTER_MODEL, {"temperature": Decimal(1), "max_tokens": "2048"}),
         sources=(SourceSelection("indicatori", 2, {"periodo": 14}), SourceSelection("notizie")),
         instructions="compra basso",
-        risk_limits=RiskLimits(3, Decimal(10), Decimal(50)),
+        risk_limits=RiskLimits(3, Decimal(10), Decimal(50), Decimal(30), Decimal(120)),
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=5,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(4), Decimal(12)),
         minimum_confidence=MinimumConfidence(65),
     ).draft_configuration(FIRST_VERSION)

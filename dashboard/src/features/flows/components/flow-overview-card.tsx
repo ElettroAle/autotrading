@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import { DETAIL_VALUE } from '@/components/ui/details-list';
+import { OpeningsSuspendedNotice } from '@/components/ui/openings-notice';
 import { paths } from '@/config/paths';
 import { formatAmount } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
@@ -44,7 +45,7 @@ const lastCycleOf = ({ last_cycle }: FlowOverview): string =>
     : `${formatInstant(last_cycle.planned_at)} · ${last_cycle.outcome}`;
 
 /**
- * A flow at a glance: its status, the summary of its results, how its capital is doing, then where and when it runs,
+ * A flow at a glance: its status, with its openings suspended for maximum loss (R3.2.2), the summary of its results, how its capital is doing, then where and when it runs,
  * in second place (R2.2.2, R6.4.2). The installation is said in the header, not on every card; the summary replaces the
  * row of the outcomes of the last cycles (ADR riepilogo-dei-risultati-nella-dashboard).
  */
@@ -57,6 +58,9 @@ export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
       <Fact term="Stato">{flow.status}</Fact>
       {flow.pause_reason !== null && <Fact term="Motivo della pausa">{flow.pause_reason}</Fact>}
     </dl>
+    {flow.openings_suspension !== null && (
+      <OpeningsSuspendedNotice reason={flow.openings_suspension.reason} />
+    )}
     {flow.summary !== null && flow.currency !== null && (
       <ResultsSummary flowId={flow.id} currency={flow.currency} summary={flow.summary} />
     )}

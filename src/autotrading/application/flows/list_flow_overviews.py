@@ -8,6 +8,7 @@ from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind
 
 RECENT_CYCLES = 10
@@ -37,6 +38,11 @@ class FlowOverview:
     @property
     def last_cycle(self) -> CycleRecord | None:
         return self.recent_cycles[0] if self.recent_cycles else None
+
+    @property
+    def openings_suspension(self) -> OpeningsSuspension | None:
+        """The suspension of the openings in force now, of any cause; a draft never has one (R3.2.2, R3.3.1)."""
+        return None if self.results is None else self.results.openings_suspension
 
     @property
     def currency(self) -> str | None:

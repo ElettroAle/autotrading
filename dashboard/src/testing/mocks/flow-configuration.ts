@@ -3,6 +3,7 @@ import {
   fakePlatform,
   type FakeAccount,
   type FakeFlow,
+  type FakeOpeningsResume,
   type FakeRiskLimits,
   type FakeSource,
   type FakeUser,
@@ -47,12 +48,18 @@ type ConfigurationRequest = {
   max_leverage?: unknown;
   max_margin_exposure_percent?: unknown;
   max_value_exposure_percent?: unknown;
+  max_total_margin_exposure_percent?: unknown;
+  max_total_value_exposure_percent?: unknown;
   default_stop_loss_percent?: unknown;
   default_take_profit_percent?: unknown;
   minimum_confidence?: unknown;
   allocated_capital?: unknown;
   bring_to_minimum?: unknown;
   system_prompt?: unknown;
+  max_consecutive_failures?: unknown;
+  max_daily_loss_percent?: unknown;
+  max_drawdown_percent?: unknown;
+  openings_resume?: unknown;
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -175,18 +182,39 @@ const sourcesOf = (requested: unknown): FakeSource[] => {
   return selected;
 };
 
-const riskLimitsOf = (
-  maxLeverage: unknown,
-  marginPercent: unknown,
-  valuePercent: unknown,
-): FakeRiskLimits => {
+// The rule of the domain of the API, with its reason (R3.2.1).
+const totalExposureOf = (value: unknown, field: string): string | null => {
+  const text = optionalTextOf(value);
+  const percent = Number(text);
+  if (text !== null && !(percent >= 0.1 && percent <= 1000)) {
+    throw new Refusal(422, "l'esposizione complessiva massima va da 0,1 a 1000", field);
+  }
+  return text;
+};
+
+type ExposureRequest = {
+  readonly margin: unknown;
+  readonly value: unknown;
+  readonly totalMargin: unknown;
+  readonly totalValue: unknown;
+};
+
+const riskLimitsOf = (maxLeverage: unknown, exposures: ExposureRequest): FakeRiskLimits => {
   if (maxLeverage === undefined || maxLeverage === null) {
     throw new Refusal(422, 'la leva massima è obbligatoria', 'max_leverage');
   }
   const limits = {
     maxLeverage: numberOf(maxLeverage, 'max_leverage'),
-    maxMarginExposurePercent: optionalTextOf(marginPercent),
-    maxValueExposurePercent: optionalTextOf(valuePercent),
+    maxMarginExposurePercent: optionalTextOf(exposures.margin),
+    maxValueExposurePercent: optionalTextOf(exposures.value),
+    maxTotalMarginExposurePercent: totalExposureOf(
+      exposures.totalMargin,
+      'max_total_margin_exposure_percent',
+    ),
+    maxTotalValueExposurePercent: totalExposureOf(
+      exposures.totalValue,
+      'max_total_value_exposure_percent',
+    ),
   };
   if (limits.maxMarginExposurePercent === null && limits.maxValueExposurePercent === null) {
     throw new Refusal(
@@ -251,6 +279,35 @@ const requireAssetsFree = (
 const freeCapitalOf = (user: FakeUser, account: FakeAccount): number =>
   fakePlatform.freeCapitalOfAccount(user, account);
 
+// The rule of the domain of the API, with its reason (R3.2.4).
+const maxConsecutiveFailuresOf = (value: unknown): number | null => {
+  if (value === null) {
+    return null;
+  }
+  const maximum = Number(value);
+  if (!Number.isInteger(maximum) || maximum < 1 || maximum > 100) {
+    throw new Refusal(
+      400,
+      'il massimo di cicli falliti consecutivi va da 1 a 100',
+      'max_consecutive_failures',
+    );
+  }
+  return maximum;
+};
+
+// The rule of the domain of the API, with its reason (R3.2.2).
+const maxLossOf = (value: unknown, field: string): string | null => {
+  const text = optionalTextOf(value);
+  const percent = Number(text);
+  if (text !== null && !(percent >= 0.1 && percent <= 100)) {
+    throw new Refusal(422, 'la perdita massima va da 0,1 a 100', field);
+  }
+  return text;
+};
+
+const openingsResumeOf = (value: unknown): FakeOpeningsResume =>
+  value === 'next_day' ? 'next_day' : 'manual';
+
 /** The flow as its new configuration version, kept among its versions as the API keeps them (R2.3.5). */
 const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => {
   Object.assign(flow, changes, { version: flow.version + 1 });
@@ -265,6 +322,10 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       maxLeverage: flow.riskLimits.maxLeverage,
       allocatedCapital: String(flow.allocatedCapital ?? 0),
       systemPrompt: flow.systemPrompt,
+      maxConsecutiveFailures: flow.maxConsecutiveFailures,
+      maxDailyLossPercent: flow.maxDailyLossPercent,
+      maxDrawdownPercent: flow.maxDrawdownPercent,
+      openingsResume: flow.openingsResume,
       defaultStopLossPercent: flow.defaultStopLossPercent,
       defaultTakeProfitPercent: flow.defaultTakeProfitPercent,
       minimumConfidence: flow.minimumConfidence,
@@ -290,11 +351,12 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
   const cycleMinutes = cycleMinutesOf(request.cycle_minutes);
   const model = modelOf(user, request.model, request.model_parameters);
   const sources = sourcesOf(request.sources);
-  const riskLimits = riskLimitsOf(
-    request.max_leverage,
-    request.max_margin_exposure_percent,
-    request.max_value_exposure_percent,
-  );
+  const riskLimits = riskLimitsOf(request.max_leverage, {
+    margin: request.max_margin_exposure_percent,
+    value: request.max_value_exposure_percent,
+    totalMargin: request.max_total_margin_exposure_percent,
+    totalValue: request.max_total_value_exposure_percent,
+  });
   const account = accountOf(user, textOf(request.account_id));
   requireAssetsFree(user, account.id, assets);
   const free = freeCapitalOf(user, account);
@@ -318,6 +380,13 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     riskLimits,
     bringToMinimum: request.bring_to_minimum === true,
     systemPrompt: typeof request.system_prompt === 'string' ? request.system_prompt : null,
+    maxConsecutiveFailures:
+      request.max_consecutive_failures === undefined || request.max_consecutive_failures === null
+        ? null
+        : maxConsecutiveFailuresOf(request.max_consecutive_failures),
+    maxDailyLossPercent: maxLossOf(request.max_daily_loss_percent, 'max_daily_loss_percent'),
+    maxDrawdownPercent: maxLossOf(request.max_drawdown_percent, 'max_drawdown_percent'),
+    openingsResume: openingsResumeOf(request.openings_resume),
     defaultStopLossPercent: optionalTextOf(request.default_stop_loss_percent) ?? '5',
     defaultTakeProfitPercent: optionalTextOf(request.default_take_profit_percent),
     minimumConfidence: minimumConfidenceOf(request.minimum_confidence),
@@ -335,6 +404,10 @@ const flowOf = (user: FakeUser, flowId: string): FakeFlow => {
 
 const changed = <T>(requested: unknown, current: T, read: (value: unknown) => T): T =>
   requested === undefined || requested === null ? current : read(requested);
+
+// The limit a modification sends, null included, or the one in force when it sends none.
+const sentOr = (requested: unknown, current: string | null): unknown =>
+  requested === undefined ? current : requested;
 
 /** PATCH /flows/{id}: only the parts sent change, as the next configuration version. */
 export const modifyFlow = (
@@ -359,15 +432,18 @@ export const modifyFlow = (
     sources: changed(request.sources, flow.sources, sourcesOf),
     instructions: changed(request.instructions, flow.instructions, (value) => textOf(value).trim()),
     // A null limit of exposure sent on purpose removes it; a missing one keeps the limit in force (R1.1.3).
-    riskLimits: riskLimitsOf(
-      request.max_leverage ?? flow.riskLimits.maxLeverage,
-      request.max_margin_exposure_percent === undefined
-        ? flow.riskLimits.maxMarginExposurePercent
-        : request.max_margin_exposure_percent,
-      request.max_value_exposure_percent === undefined
-        ? flow.riskLimits.maxValueExposurePercent
-        : request.max_value_exposure_percent,
-    ),
+    riskLimits: riskLimitsOf(request.max_leverage ?? flow.riskLimits.maxLeverage, {
+      margin: sentOr(request.max_margin_exposure_percent, flow.riskLimits.maxMarginExposurePercent),
+      value: sentOr(request.max_value_exposure_percent, flow.riskLimits.maxValueExposurePercent),
+      totalMargin: sentOr(
+        request.max_total_margin_exposure_percent,
+        flow.riskLimits.maxTotalMarginExposurePercent,
+      ),
+      totalValue: sentOr(
+        request.max_total_value_exposure_percent,
+        flow.riskLimits.maxTotalValueExposurePercent,
+      ),
+    }),
     defaultStopLossPercent:
       optionalTextOf(request.default_stop_loss_percent) ?? flow.defaultStopLossPercent,
     // A null take profit sent on purpose removes it; a missing one keeps the one in force (R3.1.2).
@@ -390,6 +466,24 @@ export const modifyFlow = (
       request.system_prompt === undefined
         ? flow.systemPrompt
         : optionalTextOf(request.system_prompt),
+    // A null sent on purpose removes the maximum; a missing one keeps it (R3.2.4).
+    maxConsecutiveFailures:
+      request.max_consecutive_failures === undefined
+        ? flow.maxConsecutiveFailures
+        : maxConsecutiveFailuresOf(request.max_consecutive_failures),
+    // A null loss sent on purpose removes it; a missing one keeps it (R3.2.2).
+    maxDailyLossPercent: maxLossOf(
+      sentOr(request.max_daily_loss_percent, flow.maxDailyLossPercent),
+      'max_daily_loss_percent',
+    ),
+    maxDrawdownPercent: maxLossOf(
+      sentOr(request.max_drawdown_percent, flow.maxDrawdownPercent),
+      'max_drawdown_percent',
+    ),
+    openingsResume:
+      request.openings_resume === undefined
+        ? flow.openingsResume
+        : openingsResumeOf(request.openings_resume),
   };
   requireAssetsFree(user, flow.accountId ?? '', assets, flow);
   return nextVersionOf(flow, changes);

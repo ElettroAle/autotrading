@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
 from tests.support.activity import a_fill
 from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
@@ -87,12 +88,22 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "cycle_minutes": 15,
         "model": {"name": OPENROUTER_MODEL, "parameters": {"temperature": "0.5"}},
         "instructions": "prudente",
-        "risk_limits": {"max_leverage": 5, "max_margin_exposure_percent": "10", "max_value_exposure_percent": None},
+        "risk_limits": {
+            "max_leverage": 5,
+            "max_margin_exposure_percent": "10",
+            "max_value_exposure_percent": None,
+            "max_total_margin_exposure_percent": None,
+            "max_total_value_exposure_percent": None,
+        },
         "allocated_capital": "400",
         "bring_to_minimum": False,
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
         "system_prompt_is_default": True,
         "system_prompt_placeholders": PLACEHOLDERS,
+        "max_consecutive_failures": None,
+        "max_daily_loss_percent": None,
+        "max_drawdown_percent": None,
+        "openings_resume": "manual",
         "default_stop_loss_percent": "5",
         "default_take_profit_percent": None,
         "minimum_confidence": None,
@@ -183,11 +194,73 @@ def test_an_exposure_sent_as_null_is_removed_and_one_left_out_stays(client_of: C
         "max_leverage": 5,
         "max_margin_exposure_percent": "20",
         "max_value_exposure_percent": "40",
+        "max_total_margin_exposure_percent": None,
+        "max_total_value_exposure_percent": None,
     }
     assert (removed["version"], removed["risk_limits"]) == (
         3,
-        {"max_leverage": 5, "max_margin_exposure_percent": "20", "max_value_exposure_percent": None},
+        {
+            "max_leverage": 5,
+            "max_margin_exposure_percent": "20",
+            "max_value_exposure_percent": None,
+            "max_total_margin_exposure_percent": None,
+            "max_total_value_exposure_percent": None,
+        },
     )
+
+
+# ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits travel as the limits per operation.
+def test_the_overall_exposures_are_set_kept_removed_and_compared(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    request = a_request(
+        platform, "anna", max_total_margin_exposure_percent="30", max_total_value_exposure_percent="150.5"
+    )
+    created = anna.post("/flows", json=request).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "audace"}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"max_total_margin_exposure_percent": "40"}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"max_total_value_exposure_percent": None}).json()
+
+    totals = [
+        (limits["max_total_margin_exposure_percent"], limits["max_total_value_exposure_percent"])
+        for limits in (body["risk_limits"] for body in (created, untouched, changed, removed))
+    ]
+    assert totals == [("30", "150.5"), ("30", "150.5"), ("40", "150.5"), ("40", None)]
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["risk_limits"]["max_total_margin_exposure_percent"] == "30"
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/4").json() == [
+        {"part": "esposizione complessiva massima del margine", "before": "30%", "after": "40%"},
+        {"part": "esposizione complessiva massima del valore", "before": "150,5%", "after": "nessuno"},
+    ]
+
+
+@pytest.mark.parametrize("percent", ["0", "1001"])
+def test_an_overall_exposure_out_of_range_is_refused_with_the_reason_and_the_field(
+    client_of: Client, platform: Platform, percent: str
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={"max_total_value_exposure_percent": percent})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "l'esposizione complessiva massima va da 0,1 a 1000", "field": "max_total_value_exposure_percent"},
+    )
+    assert anna.get("/flows").json()[0]["version"] == 1
+
+
+def test_a_maximum_of_consecutive_failures_sent_as_null_is_removed_and_one_left_out_stays(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", max_consecutive_failures=3)).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "audace"}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": None}).json()
+
+    assert untouched["max_consecutive_failures"] == 3
+    assert (removed["version"], removed["max_consecutive_failures"]) == (3, None)
 
 
 def test_both_exposures_sent_as_null_are_refused_with_the_reason(client_of: Client, platform: Platform) -> None:
@@ -213,6 +286,113 @@ def test_a_flow_can_be_created_bringing_its_openings_to_the_exchange_minimum(
 
     assert response.status_code == 201
     assert response.json()["bring_to_minimum"] is True
+
+
+def test_the_maximum_of_consecutive_failed_cycles_is_set_kept_and_compared(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    created = anna.post("/flows", json=a_request(platform, "anna", max_consecutive_failures=3)).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": 5}).json()
+
+    assert created["max_consecutive_failures"] == 3
+    assert (untouched["version"], untouched["max_consecutive_failures"]) == (2, 3)
+    assert (changed["version"], changed["max_consecutive_failures"]) == (3, 5)
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["max_consecutive_failures"] == 3
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
+        {"part": "cicli falliti consecutivi massimi", "before": "3", "after": "5"}
+    ]
+
+
+@pytest.mark.parametrize("maximum", [0, 101])
+def test_a_maximum_of_consecutive_failed_cycles_out_of_range_is_refused(
+    client_of: Client, platform: Platform, maximum: int
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": maximum})
+
+    assert (response.status_code, reason_of(response)) == (
+        400,
+        {"detail": "il massimo di cicli falliti consecutivi va da 1 a 100", "field": "max_consecutive_failures"},
+    )
+    assert anna.get("/flows").json()[0]["version"] == 1
+
+
+def test_the_maximum_losses_and_the_resume_are_set_kept_removed_and_compared(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    request = a_request(
+        platform, "anna", max_daily_loss_percent="5", max_drawdown_percent="10", openings_resume="next_day"
+    )
+    created = anna.post("/flows", json=request).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"max_daily_loss_percent": None, "openings_resume": "manual"}).json()
+
+    assert (created["max_daily_loss_percent"], created["max_drawdown_percent"], created["openings_resume"]) == (
+        "5",
+        "10",
+        "next_day",
+    )
+    assert (untouched["max_daily_loss_percent"], untouched["openings_resume"]) == ("5", "next_day")
+    assert (changed["max_daily_loss_percent"], changed["max_drawdown_percent"], changed["openings_resume"]) == (
+        None,
+        "10",
+        "manual",
+    )
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["openings_resume"] == "next_day"
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
+        {"part": "perdita giornaliera massima", "before": "5%", "after": "nessuno"},
+        {"part": "ripresa delle aperture", "before": "il giorno dopo", "after": "manuale"},
+    ]
+
+
+@pytest.mark.parametrize("field", ["max_daily_loss_percent", "max_drawdown_percent"])
+def test_a_maximum_loss_out_of_range_is_refused_with_the_reason_and_the_field(
+    client_of: Client, platform: Platform, field: str
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={field: "101"})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "la perdita massima va da 0,1 a 100", "field": field},
+    )
+
+
+def test_the_suspension_of_the_openings_is_resumed_by_the_user(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    platform.flows.openings[FlowId(UUID(flow_id))] = OpeningsStatus(
+        OpeningsSuspension("perdita giornaliera 6% oltre il 5%", datetime(2026, 11, 12, 9, tzinfo=UTC)), None
+    )
+
+    resumed = anna.post(f"/flows/{flow_id}/openings/resume")
+
+    assert resumed.status_code == 204
+    assert platform.flows.openings[FlowId(UUID(flow_id))].suspension is None
+
+
+def test_openings_not_suspended_are_not_resumed_and_another_tenant_finds_nothing(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    refused = anna.post(f"/flows/{flow_id}/openings/resume")
+    stranger = client_of("bruno").post(f"/flows/{flow_id}/openings/resume")
+
+    assert (refused.status_code, reason_of(refused)) == (409, {"detail": "le aperture di alfa non sono sospese"})
+    assert stranger.status_code == 404
 
 
 def test_the_flows_of_the_tenant_are_listed_and_the_free_capital_shrinks(client_of: Client, platform: Platform) -> None:

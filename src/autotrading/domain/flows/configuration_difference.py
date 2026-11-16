@@ -3,7 +3,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
-from autotrading.domain.flows.risk_limits import LEVERAGE, MARGIN_EXPOSURE, VALUE_EXPOSURE
+from autotrading.domain.flows.risk_limits import (
+    LEVERAGE,
+    MARGIN_EXPOSURE,
+    TOTAL_MARGIN_EXPOSURE,
+    TOTAL_VALUE_EXPOSURE,
+    VALUE_EXPOSURE,
+)
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.italian_text import money_text, number_text
 
@@ -46,6 +52,10 @@ def _money(amount: Decimal | None) -> str:
     return NONE if amount is None else money_text(amount)
 
 
+def _count(count: int | None) -> str:
+    return NONE if count is None else str(count)
+
+
 def _percent(percent: Decimal | None) -> str:
     return NONE if percent is None else f"{number_text(percent)}%"
 
@@ -60,12 +70,27 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (LEVERAGE, lambda configuration: str(configuration.risk_limits.max_leverage)),
     (MARGIN_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_margin_exposure_percent)),
     (VALUE_EXPOSURE, lambda configuration: _percent(configuration.risk_limits.max_value_exposure_percent)),
+    (
+        TOTAL_MARGIN_EXPOSURE,
+        lambda configuration: _percent(configuration.risk_limits.max_total_margin_exposure_percent),
+    ),
+    (
+        TOTAL_VALUE_EXPOSURE,
+        lambda configuration: _percent(configuration.risk_limits.max_total_value_exposure_percent),
+    ),
     ("capitale allocato", lambda configuration: _money(configuration.allocated_capital)),
     ("porta al minimo", lambda configuration: "sì" if configuration.bring_to_minimum else "no"),
     (
         "system prompt",
         lambda configuration: DEFAULT if configuration.system_prompt is None else configuration.system_prompt,
     ),
+    (
+        "cicli falliti consecutivi massimi",
+        lambda configuration: _count(configuration.max_consecutive_failures),
+    ),
+    ("perdita giornaliera massima", lambda configuration: _percent(configuration.max_daily_loss_percent)),
+    ("perdita massima dal picco", lambda configuration: _percent(configuration.max_drawdown_percent)),
+    ("ripresa delle aperture", lambda configuration: configuration.openings_resume.label),
     (DEFAULT_STOP_LOSS, lambda configuration: _percent(configuration.protection_defaults.stop_loss_percent)),
     (DEFAULT_TAKE_PROFIT, lambda configuration: _percent(configuration.protection_defaults.take_profit_percent)),
     (
