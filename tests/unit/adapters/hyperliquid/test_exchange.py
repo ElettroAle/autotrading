@@ -184,8 +184,13 @@ def test_a_client_error_of_the_exchange_is_a_rejection_with_its_message() -> Non
 
 @pytest.mark.parametrize(
     "failure",
-    [ServerError(502, "bad gateway"), requests.ConnectionError("refused"), requests.Timeout("10s")],
-    ids=["server-error", "connection", "timeout"],
+    [
+        ServerError(502, "bad gateway"),
+        requests.ConnectionError("refused"),
+        requests.Timeout("10s"),
+        ClientError(429, None, "null", None),
+    ],
+    ids=["server-error", "connection", "timeout", "rate-limited"],
 )
 def test_an_exchange_that_does_not_answer_is_unavailable(failure: Exception) -> None:
     with pytest.raises(ExchangeUnavailableError):
@@ -407,6 +412,14 @@ def test_a_signer_refused_is_a_refusal_of_the_credentials_of_the_flow() -> None:
     sdk = FakeSdk(cancel_answer={"status": "err", "response": f"User or API Wallet {ADDRESS} does not exist."})
 
     with pytest.raises(FlowCredentialsRefusedError, match=r"^credenziali rifiutate dall'exchange$"):
+        HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
+
+
+def test_a_rate_limit_of_the_exchange_makes_the_cycle_unavailable_without_refusing_the_credentials() -> None:
+    # ADR limite-di-frequenza-dell-exchange-come-indisponibilita: a 429 passes by itself, it pauses no flow.
+    sdk = FakeSdk(failure=ClientError(429, None, "null", None))
+
+    with pytest.raises(FlowExchangeUnavailableError):
         HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
 
 
