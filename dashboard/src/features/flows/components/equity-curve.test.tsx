@@ -1,7 +1,8 @@
-import { screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
@@ -122,6 +123,103 @@ describe('EquityCurve', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
     expect(await screen.findByRole('alert')).toHaveTextContent('errore interno');
+  });
+
+  // ADR cicli-falliti-sull-equity-curve: every failed cycle of the period is a red cross that leads to its detail.
+  describe('the failed cycles, ADR cicli-falliti-sull-equity-curve', () => {
+    const FAILURE = {
+      errorType: 'ExchangeUnavailableError',
+      message: 'exchange non raggiungibile',
+    };
+
+    it('marks every failed cycle of the period, over every page of the list, and no concluded cycle', async () => {
+      const failed = Array.from({ length: 51 }, (_, index) =>
+        aFailedCycle(aCompletedCycle(daysAgo(1 + index / 100)), STEPS.composeContext, FAILURE),
+      );
+      fakePlatform.recordCycles('alfa', [aCompletedCycle(daysAgo(2)), ...failed]);
+      fakePlatform.recordEquity('alfa', daysAgo(3), 300);
+      fakePlatform.recordEquity('alfa', daysAgo(0.5), 305);
+      await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+      const chart = await curve();
+      await expect
+        .poll(() => within(chart).queryAllByRole('link', { name: /^Ciclo fallito del / }))
+        .toHaveLength(51);
+    });
+
+    it('leads from the mark to the detail of the cycle', async () => {
+      const instant = daysAgo(1);
+      fakePlatform.recordCycles('alfa', [
+        aFailedCycle(aCompletedCycle(instant), STEPS.composeContext, FAILURE),
+      ]);
+      fakePlatform.recordEquity('alfa', daysAgo(2), 300);
+      await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+      const mark = await within(await curve()).findByRole('link', { name: /^Ciclo fallito del / });
+      expect(mark).toHaveAttribute(
+        'href',
+        `/flows/flow-alfa/cycles/${encodeURIComponent(instant.toISOString())}`,
+      );
+    });
+  });
+
+  // ADR intervallo-trascinando-sull-equity-curve: the interval in the address narrows the page until it is removed.
+  describe('the interval chosen on the chart, ADR intervallo-trascinando-sull-equity-curve', () => {
+    it('narrows the curve to the interval and says it, with the command that removes it', async () => {
+      fakePlatform.recordEquity('alfa', daysAgo(10), 310);
+      fakePlatform.recordEquity('alfa', daysAgo(5), 295);
+      fakePlatform.recordEquity('alfa', daysAgo(1), 305);
+      const from = dayOf(daysAgo(6));
+      const to = dayOf(daysAgo(4));
+      await renderApp({
+        account: 'anna',
+        url: `/flows/flow-alfa?period=30d&from=${from}&to=${to}`,
+      });
+
+      await expect.poll(() => screen.queryAllByRole('img', { name: /^Equity / })).toHaveLength(1);
+      const label = screen.getByLabelText('Intervallo scelto sul grafico');
+      expect(label).toHaveTextContent(
+        `dal ${from.split('-').reverse().join('/')} al ${to.split('-').reverse().join('/')}`,
+      );
+
+      await userEvent.click(within(label).getByRole('button', { name: "Togli l'intervallo" }));
+
+      await expect.poll(() => screen.queryAllByRole('img', { name: /^Equity / })).toHaveLength(3);
+      expect(screen.queryByLabelText('Intervallo scelto sul grafico')).not.toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'Periodo' })).toHaveValue('30d');
+    });
+
+    it('chooses the interval of the page with a drag across the curve', async () => {
+      fakePlatform.recordEquity('alfa', daysAgo(6), 300);
+      fakePlatform.recordEquity('alfa', daysAgo(4), 305);
+      fakePlatform.recordEquity('alfa', daysAgo(2), 310);
+      const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=30d' });
+      await curve();
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+        DOMRect.fromRect({ width: 720, height: 320 }),
+      );
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(720);
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(320);
+      const chart = within(await curve()).getByRole('application');
+      expect(await curve()).toHaveClass('touch-pan-y');
+      // The chart reads the point under the pointer once the frame is drawn.
+      const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+
+      fireEvent.mouseDown(chart, { clientX: 80, clientY: 100 });
+      fireEvent.mouseMove(chart, { clientX: 80, clientY: 100 });
+      await settle();
+      fireEvent.mouseMove(chart, { clientX: 715, clientY: 100 });
+      await settle();
+      fireEvent.mouseUp(chart, { clientX: 715, clientY: 100 });
+      vi.restoreAllMocks();
+
+      await expect
+        .poll(() => new URLSearchParams(router.state.location.search).get('to'))
+        .toBe(dayOf(daysAgo(2)));
+      const search = new URLSearchParams(router.state.location.search);
+      expect(search.get('from')).toBe(dayOf(daysAgo(6)));
+      expect(search.get('period')).toBe('30d');
+    });
   });
 });
 

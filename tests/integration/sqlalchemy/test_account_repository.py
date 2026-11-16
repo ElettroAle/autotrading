@@ -139,6 +139,18 @@ def test_an_account_read_back_is_the_one_saved(database: Engine) -> None:
     assert repository.get(account.id) == account
 
 
+def test_the_public_fields_of_an_account_are_read_back_as_saved(database: Engine) -> None:
+    anna = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    read = repository.get(account.id)
+
+    assert read is not None
+    assert read.exchange_account.public_fields == account.exchange_account.public_fields
+
+
 def test_an_account_of_another_tenant_reads_as_missing(database: Engine) -> None:
     anna, bruno = new_tenant(database), new_tenant(database)
     account = account_of(anna)

@@ -10,6 +10,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.ports import ModelReply
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.answer_format import AnswerFormat
 from autotrading.domain.agent.errors import InvalidModelUsageError
 from autotrading.domain.agent.model_definition import PROVIDER_SEPARATOR
 from autotrading.domain.agent.model_parameter import ParameterValue
@@ -29,7 +30,8 @@ ORIGINAL_LIMIT = 300
 UNEXPECTED_ANSWER = "risposta del fornitore inattesa"
 DEFAULT_MAX_TOKENS = 4096
 EFFORTS: Mapping[str, str] = {"basso": "low", "medio": "medium", "alto": "high"}
-JSON_ANSWER: Mapping[str, str] = {"type": "json_object"}
+# Routed only to the providers that take every parameter: the format of the answer is enforced, never dropped.
+REQUIRE_EVERY_PARAMETER: Mapping[str, bool] = {"require_parameters": True}
 
 type Settings = Mapping[str, ParameterValue]
 
@@ -44,19 +46,26 @@ class OpenRouterModelCallAdapter:
     def __init__(self, client: httpx.Client) -> None:
         self._client = client
 
-    def call(self, model: str, key: ProviderKey, settings: Settings, messages: tuple[ModelMessage, ...]) -> ModelReply:
-        document = self._complete(model, key, settings, messages)
+    def call(
+        self,
+        model: str,
+        key: ProviderKey,
+        settings: Settings,
+        messages: tuple[ModelMessage, ...],
+        answer: AnswerFormat,
+    ) -> ModelReply:
+        document = self._complete(key, _request(model, settings, messages, answer))
         try:
             return _reply_of(document)
         except (KeyError, IndexError, TypeError, ValueError, InvalidOperation, InvalidModelUsageError) as error:
             raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER) from error
 
-    def _complete(self, model: str, key: ProviderKey, settings: Settings, messages: tuple[ModelMessage, ...]) -> object:
+    def _complete(self, key: ProviderKey, request: Mapping[str, object]) -> object:
         try:
             response = self._client.post(
                 f"{API_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {key.value(API_KEY_FIELD.name)}"},
-                json=_request(model, settings, messages),
+                json=request,
                 timeout=TIMEOUT_SECONDS,
             )
         # The errors of httpx carry the request, and with it the key in its header: they never travel as a cause.
@@ -73,13 +82,18 @@ class OpenRouterModelCallAdapter:
         return document
 
 
-def _request(model: str, settings: Settings, messages: tuple[ModelMessage, ...]) -> dict[str, object]:
+def _request(
+    model: str, settings: Settings, messages: tuple[ModelMessage, ...], answer: AnswerFormat
+) -> dict[str, object]:
     request: dict[str, object] = {
         "model": model.removeprefix(PREFIX),
         "messages": [{"role": _role(message), "content": message.content} for message in messages],
         "max_tokens": int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS))),
-        # OpenRouter ignores a parameter the routed model does not take; the system message asks for JSON anyway.
-        "response_format": JSON_ANSWER,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": answer.name, "strict": True, "schema": answer.schema},
+        },
+        "provider": REQUIRE_EVERY_PARAMETER,
     }
     temperature = settings.get("temperature")
     if temperature is not None:

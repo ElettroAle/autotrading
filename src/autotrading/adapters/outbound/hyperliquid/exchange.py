@@ -1,6 +1,7 @@
 import secrets
 from collections.abc import Mapping
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
+from typing import cast
 
 import requests
 from eth_account import Account as EthereumAccount
@@ -11,7 +12,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
-from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
 from autotrading.application.accounts.errors import (
     CredentialFieldMalformedError,
     ExchangeRejectedCredentialsError,
@@ -49,6 +50,13 @@ ADDRESS_DIGITS = 40
 KEY_SHAPE = "attese 64 cifre esadecimali, con o senza 0x"
 INVALID_ADDRESS_MESSAGE = "indirizzo del conto non valido"
 ADDRESS_SHAPE = "atteso 0x seguito da 40 cifre esadecimali"
+# A signature proves the key, not the account: the exchange applies an action of an API wallet to the account that
+# approved it, whatever address the request names. The role of the signer ties it to the address (Bug 399).
+AGENT_ROLE = "agent"
+AGENT_NOT_AUTHORIZED_MESSAGE = "l'API wallet non è autorizzato per l'indirizzo del conto"
+SIGNER_IS_AGENT_MESSAGE = (
+    "l'indirizzo del conto è quello dell'API wallet: va indicato l'indirizzo del conto che lo ha approvato"
+)
 # The exchanges an account declares at registration: the use cases pick the adapter by this name (R2.3.11).
 EXCHANGE_NAME = "Hyperliquid"
 TESTNET_EXCHANGE_NAME = "Hyperliquid Testnet"
@@ -113,12 +121,16 @@ class HyperliquidExchangeAdapter:
         try:
             exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
-            state = self._sdk.info(self._base_url, self._timeout).user_state(address)
+            info = self._sdk.info(self._base_url, self._timeout)
+            _require_signer_of(info.user_role(wallet.address), wallet.address, address)
+            perps = info.user_state(address)
+            mode = info.query_user_abstraction_state(address)
+            spot = info.spot_user_state(address)
         except ClientError as error:
             raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
-        return _account_state_of(state)
+        return _account_state_of(perps, mode, spot)
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
@@ -156,6 +168,7 @@ class HyperliquidExchangeAdapter:
                     position.size,
                     position.leverage,
                     position.entry_price,
+                    position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
                 )
@@ -234,11 +247,31 @@ def _require_accepted(response: object, credentials: Credentials) -> None:
     raise ExchangeRejectedCredentialsError(_masked(str(message), credentials))
 
 
-def _account_state_of(state: object) -> AccountState:
+def _require_signer_of(role: object, signer: str, address: str) -> None:
+    # The account signs for itself only if it is no API wallet; an API wallet signs only for the account it serves.
+    try:
+        answer = cast("Mapping[str, object]", role)
+        declared = answer["role"]
+        served = cast("Mapping[str, object]", answer["data"])["user"] if declared == AGENT_ROLE else None
+    except (KeyError, TypeError) as error:
+        raise ExchangeUnavailableError from error
+    if signer.lower() == address.lower():
+        _require_not_agent(declared)
+        return
+    if not isinstance(served, str) or served.lower() != address.lower():
+        raise ExchangeRejectedCredentialsError(AGENT_NOT_AUTHORIZED_MESSAGE)
+
+
+def _require_not_agent(declared: object) -> None:
+    if declared == AGENT_ROLE:
+        raise ExchangeRejectedCredentialsError(SIGNER_IS_AGENT_MESSAGE)
+
+
+def _account_state_of(perps: object, mode: object, spot: object) -> AccountState:
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
-        read = user_state_of(state)
-    except (KeyError, TypeError, ValueError, InvalidOperation) as error:
+        read = in_account_mode(user_state_of(perps), mode, spot)
+    except (KeyError, TypeError, ValueError, ArithmeticError) as error:
         raise ExchangeUnavailableError from error
     return AccountState(
         balance=Balance(read.account_value, MARGIN_CURRENCY),
@@ -255,6 +288,7 @@ def _position_of(position: _UserPosition) -> Position:
         size=abs(position.signed_size),
         leverage=position.leverage,
         entry_price=position.entry_price,
+        mark_price=position.mark_price,
         unrealized_pnl=position.unrealized_pnl,
         liquidation_price=position.liquidation_price,
     )

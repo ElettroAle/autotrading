@@ -26,6 +26,11 @@ class Account(TenantOwned):
         if exchange_account != self.exchange_account:
             raise CredentialsOfAnotherAccountError
 
+    def with_exchange_account(self, exchange_account: ExchangeAccount) -> Account:
+        """The same exchange account with its public fields as the credentials just accepted declare them (Bug 401)."""
+        self.require_same_exchange_account(exchange_account)
+        return replace(self, exchange_account=exchange_account)
+
     def with_credentials(self, sealed: SealedCredentials) -> Account:
         # The previous sealed text is gone from the account: nothing keeps the replaced credentials (R0.2.4).
         return replace(self, credentials=sealed)

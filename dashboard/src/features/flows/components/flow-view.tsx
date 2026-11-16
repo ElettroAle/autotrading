@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { isRealMoney, TestNetworkNotice } from '@/components/ui/network-notice';
@@ -9,11 +10,6 @@ import { paths } from '@/config/paths';
 import { useAccounts } from '../api/get-accounts';
 import { DRAFT_STATUS, useFlows, type Flow } from '../api/get-flows';
 
-import { DraftAssignmentForm } from './draft-assignment-form';
-import { DuplicateFlowButton } from './duplicate-flow-button';
-import { ExportStrategyButton } from './export-strategy-button';
-import { FlowDetails } from './flow-details';
-import { RecentCycles } from './recent-cycles';
 import { StartFlowButton } from './start-flow-button';
 
 const FlowStatus = ({ flow }: { flow: Flow }) => {
@@ -32,9 +28,16 @@ type FlowViewProps = {
   /** What the page offers on the flow once read, composed by the app from other features; realMoney says whether its
    * account trades on an exchange configured on real money (Bug 277). */
   readonly renderCommands: (flow: Flow, realMoney: boolean) => ReactNode;
+  /** What follows the head of the flow once read: the period, the tabs and the tab chosen (R6.4.3). */
+  readonly children?: ReactNode;
 };
 
-export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
+/**
+ * The head of the page of the flow: its status with the commands of the status and the warning of the network, then
+ * the command Configurazione, which holds what does not depend on the period (R6.4.3, ADR
+ * pagina-del-flusso-a-schede-sotto-un-periodo-comune).
+ */
+export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) => {
   const flows = useFlows();
   const accounts = useAccounts();
   if (flows.isPending) {
@@ -48,51 +51,31 @@ export const FlowView = ({ flowId, renderCommands }: FlowViewProps) => {
   if (flow === undefined) {
     return <p>Flusso non trovato.</p>;
   }
-  const accountsOfTenant = accounts.data ?? [];
-  const account = accountsOfTenant.find((candidate) => candidate.id === flow.account_id);
+  const account = accounts.data?.find((candidate) => candidate.id === flow.account_id);
   const realMoney = isRealMoney(account?.network);
   return (
-    <section aria-labelledby="flow-name" className="rounded border border-slate-200 bg-white p-4">
-      <h2 id="flow-name" className="text-xl font-semibold break-words">
-        {flow.name}
-      </h2>
-      {account !== undefined && !realMoney ? (
-        <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
-      ) : null}
-      <FlowStatus flow={flow} />
-      <nav aria-label="Dati del flusso" className="mt-2 flex flex-wrap gap-4">
-        <Link to={paths.flowPositions.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Posizioni aperte
-        </Link>
-        <Link
-          to={paths.flowClosedPositions.getHref(flow.id)}
-          className="text-blue-800 hover:underline"
-        >
-          Posizioni chiuse
-        </Link>
-        <Link to={paths.flowCycles.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Cicli del flusso
-        </Link>
-        <Link to={paths.flowVersions.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Versioni della configurazione
-        </Link>
-        <Link to={paths.editFlow.getHref(flow.id)} className="text-blue-800 hover:underline">
-          Modifica la configurazione
-        </Link>
-      </nav>
-      <FlowDetails flow={flow} accounts={accountsOfTenant} />
-      <div className="mt-4 flex gap-3">
-        <DuplicateFlowButton flowId={flow.id} />
-        <ExportStrategyButton flowId={flow.id} />
+    <>
+      <section aria-label={flow.name} className="mb-4 rounded border border-slate-200 bg-white p-4">
+        <div className="space-y-2">
+          <FlowStatus flow={flow} />
+          {account !== undefined && !realMoney ? (
+            <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
+          ) : null}
+        </div>
         {flow.status === DRAFT_STATUS ? (
-          <StartFlowButton flowId={flow.id} realMoney={realMoney} />
-        ) : null}
-      </div>
-      {renderCommands(flow, realMoney)}
-      <RecentCycles flowId={flow.id} />
-      {flow.status === DRAFT_STATUS ? (
-        <DraftAssignmentForm flowId={flow.id} accounts={accountsOfTenant} />
-      ) : null}
-    </section>
+          <div className="mt-3">
+            <StartFlowButton flowId={flow.id} realMoney={realMoney} />
+          </div>
+        ) : (
+          renderCommands(flow, realMoney)
+        )}
+        <div className="mt-3">
+          <Link to={paths.flowVersions.getHref(flow.id)} className={SECONDARY_COMMAND}>
+            Configurazione
+          </Link>
+        </div>
+      </section>
+      {children}
+    </>
   );
 };

@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 from sqlalchemy import create_engine
 
@@ -8,9 +10,10 @@ from autotrading.adapters.outbound.sqlalchemy.account_repository import (
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.accounts import an_account
+from tests.support.accounts import ADDRESS, an_account
 
 # The engine never connects: these tests stop before the database.
 ENGINE = create_engine("postgresql+psycopg://nobody@unreachable.invalid/none")
@@ -29,6 +32,7 @@ def test_a_row_carries_tenant_name_exchange_account_and_the_sealed_credentials()
         "name": "test-1",
         "exchange": "Hyperliquid",
         "exchange_account_fingerprint": account.exchange_account.fingerprint,
+        "exchange_account_public_fields": {"account_address": ADDRESS},
         "credentials_key_version": 3,
         "credentials_ciphertext": b"\x01\x02",
     }
@@ -37,7 +41,21 @@ def test_a_row_carries_tenant_name_exchange_account_and_the_sealed_credentials()
 def test_a_row_read_back_is_the_same_account() -> None:
     account = account_of(TenantId.new())
 
-    assert _account_of(_row_of(account)) == account  # type: ignore[arg-type]
+    read = _account_of(_row_of(account))  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
+
+    assert read == account
+    assert read.exchange_account.public_fields == {"account_address": ADDRESS}
+
+
+def test_an_account_saved_before_the_public_fields_were_kept_reads_without_them() -> None:
+    account = account_of(TenantId.new())
+    legacy = replace(account, exchange_account=ExchangeAccount(account.exchange_account.fingerprint))
+
+    row = _row_of(legacy)
+    read = _account_of(row)  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
+
+    assert row["exchange_account_public_fields"] is None
+    assert read.exchange_account.public_fields is None
 
 
 @pytest.mark.parametrize("operation", ["add", "replace"])

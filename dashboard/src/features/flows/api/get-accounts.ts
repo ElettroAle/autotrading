@@ -10,11 +10,15 @@ const accountsSchema = z.array(
 
 export type Account = z.infer<typeof accountsSchema>[number];
 
-/** The accounts of the tenant a flow can run on, with the network each trades on (Bug 277). */
+/**
+ * The accounts of the tenant a flow can run on, with the network each trades on (Bug 277). A key of their own, under
+ * the accounts every change of an account rereads: the cache keeps the accounts already passed through this schema
+ * (Bug 437).
+ */
 export const useAccounts = () => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('accounts'),
+    ...pageDataQuery('accounts', 'flows'),
     queryFn: async () => readData(await api.GET('/accounts'), accountsSchema),
   });
 };

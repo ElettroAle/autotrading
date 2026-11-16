@@ -44,6 +44,16 @@ describe('OpenPositions', () => {
     ]);
   });
 
+  it('rounds an entry price averaged over several fills (Bug 431)', async () => {
+    fakePlatform.holdPositions('alfa', [
+      anOpenPosition({ entryPrice: '63996.0322580645161290322580' }),
+    ]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const cells = await cellsOfFirstRow();
+    expect(cells[4]?.textContent).toBe('Prezzo di ingresso63.996,03');
+  });
+
   it('shows a gain in green and a loss in red', async () => {
     fakePlatform.holdPositions('alfa', [
       anOpenPosition({ asset: 'BTC', pnl: '12' }),

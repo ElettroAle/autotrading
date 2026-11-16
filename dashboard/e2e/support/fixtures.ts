@@ -20,6 +20,8 @@ export type ScenarioMemory = {
   environments: string[];
   flow: string;
   cycles: FakeCycle[];
+  /** The cycle the user chose, whose detail the page should show. */
+  chosenCycle: FakeCycle | undefined;
   histories: Map<string, FakeFlowHistory>;
   described: DescribedFlow | undefined;
   compared: number[];
@@ -38,6 +40,10 @@ export type ScenarioMemory = {
   periodPage: string;
   /** The time a new cycle of the flow concluded, as the page should show it (R2.1.2). */
   newCycleAt: string;
+  /** What spilled past the screen on each page the user opened, by the name of the page (R6.4.1). */
+  spilledByPage: Map<string, string[]>;
+  /** The widths of the screens the pages are opened on, one after the other (R6.4.4). */
+  screenWidths: number[];
 };
 
 type Fixtures = {
@@ -67,6 +73,7 @@ export const test = base.extend<Fixtures>({
       environments: [],
       flow: '',
       cycles: [],
+      chosenCycle: undefined,
       histories: new Map(),
       described: undefined,
       compared: [],
@@ -81,6 +88,8 @@ export const test = base.extend<Fixtures>({
       refusal: '',
       periodPage: '',
       newCycleAt: '',
+      spilledByPage: new Map(),
+      screenWidths: [],
     });
   },
 });

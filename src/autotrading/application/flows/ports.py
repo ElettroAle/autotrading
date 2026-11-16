@@ -15,8 +15,10 @@ from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
+from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrders
 from autotrading.domain.flows.cycle_question import CycleQuestion
@@ -521,8 +523,14 @@ class ClosedPositionRepositoryPort(Protocol):
         """Raises CrossTenantAccessError for a position of another tenant."""
         ...
 
-    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
-        """The closed positions of the flow from the most recent close."""
+    def matching(
+        self, flow_id: FlowId, criteria: ClosedPositionFilter, offset: int, limit: int
+    ) -> list[ClosedPosition]:
+        """The closed positions of the flow that match the filter, from the most recent close (R6.4.4)."""
+        ...
+
+    def count(self, flow_id: FlowId, criteria: ClosedPositionFilter) -> int:
+        """How many closed positions of the flow match the filter (R6.4.4)."""
         ...
 
     def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
@@ -839,6 +847,14 @@ class AgentPromptPort(Protocol):
     def messages(self) -> Sequence[PromptMessagePort]: ...
 
 
+class AgentActionsPort(Protocol):
+    """It is ListAgentActionsUseCase: the actions the agent may take on an asset, which the system prompt names
+    (R1.4.8).
+    """
+
+    def execute(self) -> Sequence[str]: ...
+
+
 class AgentPromptComposerPort(Protocol):
     def execute(self, question: CycleQuestion) -> AgentPromptPort:
         """Composes what the agent receives; raises an error of the agent when the question cannot be composed."""
@@ -955,7 +971,19 @@ class CycleHistoryPort(Protocol):
         """The cycles of the flow from the most recent planned instant."""
         ...
 
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        """The cycles of the flow that match the filter, from the most recent planned instant (R6.4.4)."""
+        ...
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        """How many cycles of the flow match the filter (R6.4.4)."""
+        ...
+
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None: ...
+
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        """How many cycles of the flow planned in the window failed (R6.4.2)."""
+        ...
 
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         """The cost of every cycle of the flow that called the model."""

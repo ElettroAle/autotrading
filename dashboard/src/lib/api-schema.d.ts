@@ -357,6 +357,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/system-prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Default System Prompt */
+        get: operations["read_default_system_prompt_flows_system_prompt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}": {
         parameters: {
             query?: never;
@@ -886,7 +903,8 @@ export interface components {
         };
         /**
          * AccountDetailsResponse
-         * @description An account as its owner reads it: credentials are only declared present, never returned (R0.2.3).
+         * @description An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the
+         *     public fields the exchange declares are shown by name (Bug 401).
          */
         AccountDetailsResponse: {
             /** Id */
@@ -897,6 +915,10 @@ export interface components {
             exchange: string;
             /** Has Credentials */
             has_credentials: boolean;
+            /** Public Fields */
+            public_fields: {
+                [key: string]: string;
+            };
         };
         /** AccountReadingResponse */
         AccountReadingResponse: {
@@ -968,6 +990,10 @@ export interface components {
             exchange: string;
             /** Has Credentials */
             has_credentials: boolean;
+            /** Public Fields */
+            public_fields: {
+                [key: string]: string;
+            };
             /** Network */
             network: string;
             /** Network Name */
@@ -1021,13 +1047,16 @@ export interface components {
         };
         /**
          * ClosedPositionPageResponse
-         * @description A page of the closed positions of a flow, from the most recent close (R1.7.2, R2.2.5).
+         * @description A page of the closed positions of a flow that match the filters, from the most recent close, with how many
+         *     match in all (R1.7.2, R2.2.5, R6.4.4).
          */
         ClosedPositionPageResponse: {
             /** Page */
             page: number;
             /** Has Next */
             has_next: boolean;
+            /** Total */
+            total: number;
             /** Positions */
             positions: components["schemas"]["ClosedPositionResponse"][];
         };
@@ -1094,6 +1123,12 @@ export interface components {
             allocated_capital: string | null;
             /** Bring To Minimum */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt: string;
+            /** System Prompt Is Default */
+            system_prompt_is_default: boolean;
+            /** System Prompt Placeholders */
+            system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1136,12 +1171,17 @@ export interface components {
             documents: components["schemas"]["StepDocumentResponse"][];
             cost: components["schemas"]["CallCostResponse"] | null;
         };
-        /** CyclePageResponse */
+        /**
+         * CyclePageResponse
+         * @description A page of the cycles that match the filters, with how many match in all (R1.7.3, R6.4.4).
+         */
         CyclePageResponse: {
             /** Page */
             page: number;
             /** Has Next */
             has_next: boolean;
+            /** Total */
+            total: number;
             /** Cycles */
             cycles: components["schemas"]["CycleSummaryResponse"][];
         };
@@ -1174,6 +1214,16 @@ export interface components {
             day: string;
             /** Cost Usd */
             cost_usd: string;
+        };
+        /**
+         * DefaultSystemPromptResponse
+         * @description The system prompt a new flow starts with, and the placeholders it may use (R1.4.8).
+         */
+        DefaultSystemPromptResponse: {
+            /** System Prompt */
+            system_prompt: string;
+            /** System Prompt Placeholders */
+            system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
         };
         /** DifferenceResponse */
         DifferenceResponse: {
@@ -1292,6 +1342,8 @@ export interface components {
              * @default false
              */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * FlowEquityResponse
@@ -1333,11 +1385,13 @@ export interface components {
             max_value_exposure_percent?: number | string | null;
             /** Bring To Minimum */
             bring_to_minimum?: boolean | null;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * FlowOverviewResponse
          * @description A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most
-         *     recent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127).
+         *     recent, how its capital is doing and its results in the period asked for (R1.7.3, R2.2.2, ADR 0127, R6.4.2).
          */
         FlowOverviewResponse: {
             /**
@@ -1372,6 +1426,7 @@ export interface components {
             return_percent: string | null;
             /** Recent Outcomes */
             recent_outcomes: components["schemas"]["LastCycleResponse"][];
+            summary: components["schemas"]["FlowResultsResponse"] | null;
         };
         /**
          * FlowPositionResponse
@@ -1388,6 +1443,8 @@ export interface components {
             leverage: string;
             /** Entry Price */
             entry_price: string;
+            /** Mark Price */
+            mark_price: string;
             /** Margin */
             margin: string;
             /** Unrealized Pnl */
@@ -1454,10 +1511,37 @@ export interface components {
             allocated_capital: string | null;
             /** Bring To Minimum */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt: string;
+            /** System Prompt Is Default */
+            system_prompt_is_default: boolean;
+            /** System Prompt Placeholders */
+            system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+        };
+        /**
+         * FlowResultsResponse
+         * @description How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains
+         *     in the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without
+         *     initial capital.
+         */
+        FlowResultsResponse: {
+            /** Total Gain */
+            total_gain: string;
+            /** Total Gain Percent */
+            total_gain_percent: string | null;
+            /** Period Gain */
+            period_gain: string;
+            /** Period Gain Percent */
+            period_gain_percent: string | null;
+            /** Open Positions */
+            open_positions: number;
+            /** Failed Cycles */
+            failed_cycles: number;
         };
         /**
          * FlowStateResponse
-         * @description The state of a flow attributed from the exchange at the request (R1.6.1); amounts as strings (ADR 0018).
+         * @description The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
+         *     for (R6.4.2); amounts as strings (ADR 0018).
          */
         FlowStateResponse: {
             /**
@@ -1485,6 +1569,7 @@ export interface components {
             return_percent: string;
             /** Positions */
             positions: components["schemas"]["FlowPositionResponse"][];
+            summary: components["schemas"]["FlowResultsResponse"];
         };
         /**
          * FlowStatisticsResponse
@@ -1908,10 +1993,22 @@ export interface components {
             leverage: number;
             /** Entry Price */
             entry_price: string;
+            /** Mark Price */
+            mark_price: string;
             /** Unrealized Pnl */
             unrealized_pnl: string;
             /** Liquidation Price */
             liquidation_price: string | null;
+        };
+        /**
+         * PromptPlaceholderResponse
+         * @description A placeholder the system prompt may use, with what it stands for (R1.4.8).
+         */
+        PromptPlaceholderResponse: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
         };
         /** ProviderKeyFieldResponse */
         ProviderKeyFieldResponse: {
@@ -2067,6 +2164,8 @@ export interface components {
              * @default false
              */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * StrategyBody
@@ -2091,6 +2190,8 @@ export interface components {
              * @default false
              */
             bring_to_minimum: boolean;
+            /** System Prompt */
+            system_prompt?: string | null;
         };
         /**
          * StrategyDocument
@@ -2947,6 +3048,26 @@ export interface operations {
             };
         };
     };
+    read_default_system_prompt_flows_system_prompt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefaultSystemPromptResponse"];
+                };
+            };
+        };
+    };
     modify_flow_flows__flow_id__patch: {
         parameters: {
             query?: never;
@@ -3395,7 +3516,14 @@ export interface operations {
     };
     read_flow_state_flows__flow_id__state_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description all, 7d, 30d o range */
+                period?: string;
+                /** @description primo giorno di un intervallo */
+                from?: string | null;
+                /** @description ultimo giorno di un intervallo */
+                to?: string | null;
+            };
             header?: never;
             path: {
                 flow_id: string;
@@ -3428,6 +3556,15 @@ export interface operations {
         parameters: {
             query?: {
                 page?: number;
+                asset?: string | null;
+                /** @description long o short */
+                side?: string | null;
+                /** @description vinta o persa, dal PnL al netto delle commissioni */
+                result?: string | null;
+                /** @description primo giorno della chiusura */
+                from?: string | null;
+                /** @description ultimo giorno della chiusura */
+                to?: string | null;
             };
             header?: never;
             path: {
@@ -3637,7 +3774,14 @@ export interface operations {
     };
     list_flow_overviews_flows_overview_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description all, 7d, 30d o range */
+                period?: string;
+                /** @description primo giorno di un intervallo */
+                from?: string | null;
+                /** @description ultimo giorno di un intervallo */
+                to?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3653,12 +3797,29 @@ export interface operations {
                     "application/json": components["schemas"]["FlowOverviewResponse"][];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     list_cycles_flows__flow_id__cycles_get: {
         parameters: {
             query?: {
                 page?: number;
+                /** @description concluso o fallito */
+                outcome?: string | null;
+                /** @description apertura, chiusura, mantenimento o nessuna */
+                decision?: string | null;
+                /** @description primo giorno dell'intervallo */
+                from?: string | null;
+                /** @description ultimo giorno dell'intervallo */
+                to?: string | null;
             };
             header?: never;
             path: {

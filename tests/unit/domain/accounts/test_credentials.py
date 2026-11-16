@@ -5,6 +5,7 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.errors import (
     CredentialFieldRequiredError,
     CredentialsRequiredError,
+    PublicCredentialFieldNotReplaceableError,
     UnknownCredentialFieldError,
 )
 
@@ -109,3 +110,35 @@ def test_a_value_made_only_of_invisible_characters_is_empty() -> None:
         Credentials.declared(FIELDS, {"account_address": ADDRESS, "secret_key": "\u200b\ufeff"})
 
     assert raised.value.field == "secret_key"
+
+
+def test_a_replacement_keeps_the_public_fields_kept_and_takes_the_secret_ones() -> None:
+    credentials = Credentials.replacing(FIELDS, {"account_address": ADDRESS}, {"secret_key": f" {SECRET} "})
+
+    assert credentials.values == {"account_address": ADDRESS, "secret_key": SECRET}
+
+
+def test_a_replacement_refuses_a_public_field_by_its_label() -> None:
+    with pytest.raises(PublicCredentialFieldNotReplaceableError) as refused:
+        Credentials.replacing(FIELDS, {"account_address": ADDRESS}, {"account_address": ADDRESS, "secret_key": SECRET})
+
+    assert str(refused.value) == (
+        "indirizzo del conto non si sostituisce: per cambiarlo rimuovi il conto e registrane uno nuovo"
+    )
+    assert refused.value.details == {"field": "account_address"}
+
+
+def test_a_replacement_without_the_secret_fields_names_the_missing_one() -> None:
+    with pytest.raises(CredentialFieldRequiredError) as refused:
+        Credentials.replacing(FIELDS, {"account_address": ADDRESS}, {"secret_key": "  "})
+
+    assert refused.value.field == "secret_key"
+
+
+def test_a_replacement_of_an_account_without_public_fields_kept_asks_every_field() -> None:
+    # An account registered before the public fields were kept (Bug 401): the replacement is a full declaration.
+    credentials = Credentials.replacing(FIELDS, None, {"account_address": ADDRESS, "secret_key": SECRET})
+
+    assert credentials.values == {"account_address": ADDRESS, "secret_key": SECRET}
+    with pytest.raises(CredentialFieldRequiredError):
+        Credentials.replacing(FIELDS, None, {"secret_key": SECRET})

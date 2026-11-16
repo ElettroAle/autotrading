@@ -30,6 +30,7 @@ class ImportFlowStrategyCommand:
     instructions: str = ""
     cycle_minutes: int | None = None
     bring_to_minimum: bool = False
+    system_prompt: str | None = None
 
 
 class ImportFlowStrategyUseCase:
@@ -75,4 +76,5 @@ class ImportFlowStrategyUseCase:
                 command.max_leverage, command.max_margin_exposure_percent, command.max_value_exposure_percent
             ),
             bring_to_minimum=command.bring_to_minimum,
+            system_prompt=command.system_prompt,
         )

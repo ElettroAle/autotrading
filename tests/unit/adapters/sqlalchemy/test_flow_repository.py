@@ -29,6 +29,7 @@ CONFIGURATION = replace(
     instructions="prudente",
     risk_limits=RiskLimits(3, None, Decimal("12.5")),
     bring_to_minimum=True,
+    system_prompt="{instructions} su {assets}",
 )
 
 
@@ -45,6 +46,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "risk_limits": {"max_leverage": 3, "max_margin_exposure_percent": None, "max_value_exposure_percent": "12.5"},
         "allocated_capital": "400.50",
         "bring_to_minimum": True,
+        "system_prompt": "{instructions} su {assets}",
     }
 
 
@@ -85,6 +87,13 @@ def test_a_version_saved_before_the_option_reads_without_bringing_to_the_minimum
     del document["bring_to_minimum"]
 
     assert configuration_of(1, document).bring_to_minimum is False
+
+
+def test_a_version_saved_before_the_system_prompt_follows_the_default() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    del document["system_prompt"]
+
+    assert configuration_of(1, document).system_prompt is None
 
 
 def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_back() -> None:

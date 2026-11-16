@@ -28,6 +28,7 @@ const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   name: account.name,
   exchange: FAKE_EXCHANGE,
   has_credentials: true,
+  public_fields: account.publicFields,
   network: fakePlatform.exchangeNetwork(),
   network_name: fakePlatform.exchangeNetworkName(),
   allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
@@ -92,6 +93,40 @@ const refusalOfCredentials = (credentials: Record<string, string>): Response | u
     });
   }
   return undefined;
+};
+
+const publicFieldsOf = (credentials: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(
+    CREDENTIAL_FIELDS.filter((field) => !field.secret && field.name in credentials).map((field) => [
+      field.name,
+      (credentials[field.name] ?? '').trim(),
+    ]),
+  );
+
+// A replacement asks only the secret fields: the public ones stay those registered, unless none is kept (Bug 401).
+const replacementOf = (
+  user: FakeUser,
+  account: FakeAccount,
+  sent: Record<string, string>,
+): Response => {
+  const kept = Object.keys(account.publicFields).length > 0;
+  const sentPublic = CREDENTIAL_FIELDS.find((field) => !field.secret && field.name in sent);
+  if (kept && sentPublic !== undefined) {
+    const label = `${sentPublic.label.charAt(0).toLowerCase()}${sentPublic.label.slice(1)}`;
+    return problem(
+      400,
+      'Bad Request',
+      `${label} non si sostituisce: per cambiarlo rimuovi il conto e registrane uno nuovo`,
+      { field: sentPublic.name },
+    );
+  }
+  const credentials = kept ? { ...account.publicFields, ...sent } : sent;
+  const refusal = refusalOfCredentials(credentials);
+  if (refusal !== undefined) {
+    return refusal;
+  }
+  account.publicFields = publicFieldsOf(credentials);
+  return HttpResponse.json(accountResponse(user, account));
 };
 
 const refusalOfRegistration = (
@@ -169,6 +204,7 @@ export const accountHandlers = [
         return refusal;
       }
       const account = fakePlatform.addAccount(user.account, (fields.name ?? '').trim());
+      account.publicFields = publicFieldsOf(within);
       return HttpResponse.json(
         {
           id: account.id,
@@ -183,11 +219,8 @@ export const accountHandlers = [
   http.put('*/accounts/:accountId/credentials', ({ request, params }) =>
     withUser(request, async (user) => {
       const { within } = await textFieldsWithin(request, 'credentials');
-      return withAccount(
-        user,
-        String(params.accountId),
-        (account) =>
-          refusalOfCredentials(within) ?? HttpResponse.json(accountResponse(user, account)),
+      return withAccount(user, String(params.accountId), (account) =>
+        replacementOf(user, account, within),
       );
     }),
   ),

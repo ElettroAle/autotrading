@@ -5,16 +5,25 @@ from decimal import Decimal
 from typing import TypedDict, cast
 from uuid import UUID
 
-from sqlalchemy import Connection, Engine, RowMapping, func, insert, select
+from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, case, func, insert, select
 
 from autotrading.adapters.outbound.sqlalchemy.tables import closed_positions
 from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
+from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter, PositionResult
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+
+# The PnL of `ClosedPosition`: the one the exchange reported, or else the price move on the value of the margin.
+_SIGN = case((closed_positions.c.side == TradeSide.LONG.value, 1), else_=-1)
+_PRICE_MOVE = (closed_positions.c.close_price - closed_positions.c.open_price) / closed_positions.c.open_price
+_PNL = func.coalesce(
+    closed_positions.c.realized_pnl, closed_positions.c.margin * closed_positions.c.leverage * _PRICE_MOVE * _SIGN
+)
+_NET_PNL = _PNL - closed_positions.c.fees
 
 
 class _ClosedPositionRow(TypedDict):
@@ -48,17 +57,28 @@ class SqlAlchemyClosedPositionRepositoryAdapter:
         with self._transaction() as connection:
             connection.execute(insert(closed_positions).values(row_of(position)))
 
-    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
+    def matching(
+        self, flow_id: FlowId, criteria: ClosedPositionFilter, offset: int, limit: int
+    ) -> list[ClosedPosition]:
         # The identifier breaks ties of the instant, so a position never shows on two pages.
         query = (
             select(closed_positions)
-            .where(closed_positions.c.flow_id == flow_id.value)
+            .where(closed_positions.c.flow_id == flow_id.value, matching(criteria))
             .order_by(closed_positions.c.closed_at.desc(), closed_positions.c.id)
             .offset(offset)
             .limit(limit)
         )
         with self._transaction() as connection:
             return [position_of(row) for row in connection.execute(query).mappings()]
+
+    def count(self, flow_id: FlowId, criteria: ClosedPositionFilter) -> int:
+        query = (
+            select(func.count())
+            .select_from(closed_positions)
+            .where(closed_positions.c.flow_id == flow_id.value, matching(criteria))
+        )
+        with self._transaction() as connection:
+            return connection.execute(query).scalar_one()
 
     def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
         query = (
@@ -75,6 +95,20 @@ class SqlAlchemyClosedPositionRepositoryAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             yield connection
+
+
+def matching(criteria: ClosedPositionFilter) -> ColumnElement[bool]:
+    """The positions that match the filter: the result goes by the PnL after the fees, as `ClosedPosition` has it."""
+    condition = within(closed_positions.c.closed_at, criteria.window)
+    if criteria.asset is not None:
+        condition = condition & (closed_positions.c.asset == criteria.asset)
+    if criteria.side is not None:
+        condition = condition & (closed_positions.c.side == criteria.side.value)
+    if criteria.result is PositionResult.WON:
+        condition = condition & (_NET_PNL > 0)
+    if criteria.result is PositionResult.LOST:
+        condition = condition & (_NET_PNL < 0)
+    return condition
 
 
 def row_of(position: ClosedPosition) -> dict[str, object]:

@@ -6,12 +6,21 @@ from uuid import UUID
 
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.errors import UnknownCycleOutcomeError
 
 
 class CycleOutcome(StrEnum):
     COMPLETED = "concluso"
     FAILED = "fallito"
     SKIPPED = "saltato"
+
+    @classmethod
+    def named(cls, name: str) -> CycleOutcome:
+        """The outcome by the word the consultation shows (R6.4.2)."""
+        outcomes = {outcome.value: outcome for outcome in cls}
+        if name not in outcomes:
+            raise UnknownCycleOutcomeError(tuple(outcomes))
+        return outcomes[name]
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,6 +13,12 @@ from autotrading.domain.flows.errors import (
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.system_prompt import (
+    DEFAULT_SYSTEM_PROMPT,
+    PromptSubject,
+    checked_system_prompt,
+    rendered_system_prompt,
+)
 
 
 def assets_of(names: Iterable[str]) -> tuple[str, ...]:
@@ -41,6 +47,9 @@ class FlowConfiguration:
     allocated_capital: Decimal | None
     # Off unless the user chooses it: an opening below the exchange minimum is blocked (R1.5.4).
     bring_to_minimum: bool = False
+    # The default of the platform unless the user writes their own, so a flow follows the updates of the default
+    # until then (R1.4.8).
+    system_prompt: str | None = None
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]
@@ -50,6 +59,8 @@ class FlowConfiguration:
         capital = self.allocated_capital
         if capital is not None and (not capital.is_finite() or capital <= 0):
             raise AllocatedCapitalNotPositiveError
+        if self.system_prompt is not None:
+            checked_system_prompt(self.system_prompt)
 
     @property
     def assigned_capital(self) -> Decimal:
@@ -72,6 +83,15 @@ class FlowConfiguration:
         if selection is None:
             raise SourceNotSelectedError(name)
         return selection
+
+    @property
+    def system_prompt_template(self) -> str:
+        """The template in force: the user's own, or the default of the platform (R1.4.8)."""
+        return DEFAULT_SYSTEM_PROMPT if self.system_prompt is None else self.system_prompt
+
+    def rendered_system_prompt(self, actions: tuple[str, ...]) -> str:
+        """The system prompt the agent receives, with the values of this configuration (R1.4.8)."""
+        return rendered_system_prompt(self.system_prompt_template, PromptSubject(self, actions))
 
     @property
     def risk_policy(self) -> RiskPolicy:

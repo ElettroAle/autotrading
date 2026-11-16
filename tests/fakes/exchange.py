@@ -120,6 +120,7 @@ class FakeExchangeAdapter:
                     p.size,
                     p.leverage,
                     p.entry_price,
+                    p.mark_price,
                     p.unrealized_pnl,
                     p.liquidation_price,
                 )
@@ -139,6 +140,7 @@ class FakeExchangeAdapter:
                 PositionSide(p.direction.value),
                 p.size,
                 p.leverage,
+                self._orders.markets[p.coin].mid_price,
                 self._orders.markets[p.coin].mid_price,
                 Decimal(0),
                 None,

@@ -32,6 +32,7 @@ from autotrading.domain.flows.errors import (
     CapitalAboveFreeCapitalError,
     CycleIntervalOutOfRangeError,
     FlowCommandNotAllowedError,
+    UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
@@ -190,6 +191,32 @@ def test_an_exposure_left_out_keeps_the_one_in_force(flows: Flows) -> None:
     assert modified.configuration.risk_limits == RiskLimits(5, Decimal(10), Decimal(5))
 
 
+def test_a_written_system_prompt_is_saved_in_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, system_prompt="{instructions} su {assets}"))
+
+    assert modified.configuration == replace(flow.configuration, version=2, system_prompt="{instructions} su {assets}")
+
+
+def test_a_change_without_system_prompt_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, system_prompt="{instructions}"))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro"))
+
+    assert modified.configuration.system_prompt == "{instructions}"
+
+
+def test_the_default_system_prompt_is_restored_in_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, system_prompt="{instructions}"))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, default_system_prompt=True))
+
+    assert (modified.configuration.version, modified.configuration.system_prompt) == (3, None)
+
+
 @pytest.mark.parametrize(
     ("changes", "error", "reason"),
     [
@@ -198,6 +225,7 @@ def test_an_exposure_left_out_keeps_the_one_in_force(flows: Flows) -> None:
         ({"sources": (SourceRequest("forecast"),)}, InvalidFlowSettingError, "fonte non disponibile: forecast"),
         ({"assets": ("BTC", "XYZ")}, AssetNotTradableError, "asset non negoziabile sull'exchange: XYZ"),
         ({"account_id": uuid4()}, AccountNotChangeableError, "il conto di un flusso non si cambia"),
+        ({"system_prompt": "Leva {leverage}"}, UnknownPromptPlaceholderError, 'il segnaposto "leverage" non esiste'),
     ],
 )
 def test_an_invalid_change_is_refused_and_the_version_in_force_stays(

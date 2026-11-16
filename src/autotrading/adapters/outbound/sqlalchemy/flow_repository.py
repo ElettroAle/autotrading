@@ -65,6 +65,7 @@ class _ConfigurationDocument(TypedDict):
     # None only in the versions of a draft (ADR 0124).
     allocated_capital: str | None
     bring_to_minimum: NotRequired[bool]
+    system_prompt: NotRequired[str | None]
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -274,6 +275,7 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         },
         "allocated_capital": _text(configuration.allocated_capital),
         "bring_to_minimum": configuration.bring_to_minimum,
+        "system_prompt": configuration.system_prompt,
     }
 
 
@@ -299,6 +301,8 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         allocated_capital=_decimal(document["allocated_capital"]),
         # Versions saved before the option existed read with it off, its default (ADR 0051).
         bring_to_minimum=document.get("bring_to_minimum", False),
+        # Versions saved before the system prompt existed follow the default of the platform (R1.4.8).
+        system_prompt=document.get("system_prompt"),
     )
 
 

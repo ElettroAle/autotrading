@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { PRIMARY_COMMAND } from '@/components/ui/commands';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 
 import { useStartFlow } from '../api/start-flow';
@@ -32,7 +33,7 @@ export const StartFlowButton = ({ flowId, realMoney }: StartFlowButtonProps) => 
           type="button"
           disabled={start.isPending}
           onClick={request}
-          className="rounded bg-blue-700 px-3 py-1 text-white hover:bg-blue-800"
+          className={PRIMARY_COMMAND}
         >
           Avvia
         </button>

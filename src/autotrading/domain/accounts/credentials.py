@@ -8,6 +8,7 @@ from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.errors import (
     CredentialFieldRequiredError,
     CredentialsRequiredError,
+    PublicCredentialFieldNotReplaceableError,
     UnknownCredentialFieldError,
 )
 
@@ -40,6 +41,24 @@ class Credentials:
         if not any(_cleaned(values.get(credential_field.name, "")) for credential_field in declared):
             raise CredentialsRequiredError
         return cls({credential_field.name: _required(credential_field, values) for credential_field in declared})
+
+    @classmethod
+    def replacing(
+        cls, fields: Iterable[CredentialField], public_fields: Mapping[str, str] | None, values: Mapping[str, str]
+    ) -> Credentials:
+        """New credentials of an account: only the secret fields, the public ones stay those kept (R0.2.4, Bug 401).
+
+        An account registered before its public fields were kept declares them all again.
+        """
+        declared = tuple(fields)
+        if public_fields is None:
+            return cls.declared(declared, values)
+        sent_public = [
+            declared_field for declared_field in declared if not declared_field.secret and declared_field.name in values
+        ]
+        if sent_public:
+            raise PublicCredentialFieldNotReplaceableError(sent_public[0].name, sent_public[0].label)
+        return cls.declared(declared, {**public_fields, **values})
 
     def value(self, name: str) -> str:
         found = self.values.get(name)

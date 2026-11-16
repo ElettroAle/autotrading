@@ -43,4 +43,34 @@ describe('CompareVersionsForm', () => {
 
     expect(onCompare).not.toHaveBeenCalled();
   });
+
+  it('disables the comparison of a flow with one version and says why', () => {
+    render(
+      <CompareVersionsForm
+        versions={[{ version: 1, created_at: AT }]}
+        chosen={undefined}
+        onCompare={vi.fn()}
+      />,
+    );
+
+    const compare = screen.getByRole('button', { name: 'Confronta' });
+    expect(compare).toBeDisabled();
+    expect(compare).toHaveAccessibleDescription('Il confronto serve almeno una seconda versione.');
+  });
+
+  it('offers the comparison once the flow has a second version', () => {
+    render(
+      <CompareVersionsForm
+        versions={[
+          { version: 2, created_at: AT },
+          { version: 1, created_at: AT },
+        ]}
+        chosen={undefined}
+        onCompare={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Confronta' })).toBeEnabled();
+    expect(screen.queryByText(/seconda versione/)).not.toBeInTheDocument();
+  });
 });

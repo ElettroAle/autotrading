@@ -1,6 +1,11 @@
 import { expect } from '@playwright/test';
 
-import { FAKE_EXCHANGE, REJECTED_SECRET_KEY, fakePlatform } from '@/testing/mocks/platform';
+import {
+  FAKE_ACCOUNT_ADDRESS,
+  FAKE_EXCHANGE,
+  REJECTED_SECRET_KEY,
+  fakePlatform,
+} from '@/testing/mocks/platform';
 import { formatAmount } from '@/utils/format-amount';
 
 import type { DashboardPages } from '../../../support/dashboard-pages';
@@ -14,6 +19,8 @@ const REJECTED_ACCOUNT = 'rifiutato';
 const CONFIRM_REMOVAL = 'Conferma la rimozione';
 const REMOVAL_WITH_FLOWS = 'il conto ha flussi attivi o in pausa che verranno fermati: ';
 const REAL_MONEY = 'Il conto opererà con denaro reale';
+const ADDRESS_LABEL = 'Indirizzo del conto';
+const ON_EXCHANGE = "Conto sull'exchange";
 
 const registrationForm = (dashboard: DashboardPages) =>
   dashboard.page.getByRole('region', { name: 'Nuovo conto' });
@@ -138,9 +145,40 @@ When(
     memory.secret = OTHER_SECRET_KEY;
     const item = dashboard.accountRow(name);
     await item.getByRole('button', { name: 'Sostituisci le credenziali' }).click();
-    await dashboard.field('Indirizzo del conto', item).fill(VALID_ADDRESS);
     await dashboard.field("Chiave dell'API wallet", item).fill(OTHER_SECRET_KEY);
     await item.getByRole('button', { name: 'Sostituisci', exact: true }).click();
+  },
+);
+
+When(
+  '{string} apre la sostituzione delle credenziali del conto {string}',
+  async ({ dashboard, memory }, account: string, name: string) => {
+    expectSignedIn(memory, account);
+    memory.subject = name;
+    await dashboard
+      .accountRow(name)
+      .getByRole('button', { name: 'Sostituisci le credenziali' })
+      .click();
+  },
+);
+
+Then(
+  "la sostituzione mostra l'indirizzo registrato del conto senza chiederlo",
+  async ({ dashboard, memory }) => {
+    const form = dashboard.page.getByRole('form', {
+      name: `Nuove credenziali del conto ${memory.subject}`,
+    });
+    await expect(form.getByText(FAKE_ACCOUNT_ADDRESS)).toBeVisible();
+    await expect(form.getByLabel(ADDRESS_LABEL)).toHaveCount(0);
+  },
+);
+
+Then(
+  "il conto {string} mostra l'indirizzo con cui è registrato",
+  async ({ dashboard }, name: string) => {
+    const cell = await dashboard.accountCell(name, ON_EXCHANGE);
+    await expect(cell).toContainText(ADDRESS_LABEL);
+    await expect(cell).toContainText(VALID_ADDRESS);
   },
 );
 

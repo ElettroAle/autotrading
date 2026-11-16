@@ -47,3 +47,25 @@ def test_the_secret_fields_never_enter_the_fingerprint() -> None:
     assert ExchangeAccount.of(credentials(ADDRESS, "0x01"), FIELDS) == ExchangeAccount.of(
         credentials(ADDRESS, "0x99"), FIELDS
     )
+
+
+def test_the_public_fields_are_kept_as_entered_and_the_secret_ones_never() -> None:
+    exchange_account = ExchangeAccount.of(credentials(ADDRESS, "0x01"), FIELDS)
+
+    assert exchange_account.public_fields == {"account_address": ADDRESS}
+
+
+def test_an_account_without_public_fields_is_the_same_exchange_account_as_one_with_them() -> None:
+    # Accounts registered before the public fields were kept still compare by their fingerprint (Bug 401).
+    kept = ExchangeAccount.of(credentials(ADDRESS, "0x01"), FIELDS)
+
+    assert ExchangeAccount(kept.fingerprint) == kept
+    assert ExchangeAccount(kept.fingerprint).public_fields is None
+
+
+def test_the_public_fields_cannot_change_after_creation() -> None:
+    entered = {"account_address": ADDRESS}
+    exchange_account = ExchangeAccount("digest", entered)
+    entered["account_address"] = "0x02"
+
+    assert exchange_account.public_fields == {"account_address": ADDRESS}

@@ -17,7 +17,9 @@ from autotrading.domain.agent.errors import InvalidAgentContextError
 
 STARTED = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
 NOW = datetime(2026, 11, 12, 10, 30, tzinfo=UTC)
-LONG_BTC = PositionView("BTC", TradeDirection.LONG, Decimal("0.01"), 3, Decimal(60000), Decimal("12.5"), Decimal(41000))
+LONG_BTC = PositionView(
+    "BTC", TradeDirection.LONG, Decimal("0.01"), 3, Decimal(60000), Decimal(61250), Decimal("12.5"), Decimal(41000)
+)
 STATE = FlowStateView("USDC", Decimal(400), Decimal(380), Decimal(250), Decimal(412), Decimal("2.5"), (LONG_BTC,))
 RSI = SourceData("indicatori", 7, "BTC", {"rsi_14": "61.2"})
 FEAR = SourceData("sentiment-alternative-me", 3, None, {"valore": "29", "classificazione": "Fear"})
@@ -25,9 +27,8 @@ FEAR = SourceData("sentiment-alternative-me", 3, None, {"valore": "29", "classif
 
 def context(**changes: object) -> AgentContext:
     values: dict[str, object] = {
-        "instructions": "Sei un trader prudente",
+        "system_prompt": "Sei un trader prudente su BTC, ETH",
         "assets": ("BTC", "ETH"),
-        "max_leverage": 5,
         "started_at": STARTED,
         "now": NOW,
         "state": STATE,
@@ -51,16 +52,8 @@ def user_document(agent_context: AgentContext) -> dict[str, object]:
     return document
 
 
-def test_the_system_message_has_the_instructions_and_the_operational_rules() -> None:
-    text = system_text(context())
-
-    assert text.startswith("Sei un trader prudente\n")
-    assert "- al massimo una posizione per asset;" in text
-    assert "- azioni ammesse: apri, chiudi, mantieni;" in text
-    assert "- leva da 1 a 5;" in text
-    assert "- una decisione per ciascun asset del flusso: BTC, ETH;" in text
-    assert '{"decisioni": [{"asset": "<asset>", "azione": "apri|chiudi|mantieni"' in text
-    assert '"quota": <frazione dei soldi del flusso da impegnare come margine, da 0 a 1>' in text
+def test_the_system_message_is_the_system_prompt_the_flow_rendered() -> None:
+    assert system_text(context()) == "Sei un trader prudente su BTC, ETH"
 
 
 def test_the_user_message_has_the_time_and_the_time_since_the_start() -> None:
@@ -85,6 +78,7 @@ def test_the_user_message_has_the_state_of_the_flow() -> None:
                 "dimensione": "0.01",
                 "leva": 3,
                 "prezzo_di_ingresso": "60000",
+                "prezzo_di_mercato": "61250",
                 "pnl_non_realizzato": "12.5",
                 "prezzo_di_liquidazione": "41000",
             }
@@ -93,7 +87,7 @@ def test_the_user_message_has_the_state_of_the_flow() -> None:
 
 
 def test_a_position_without_liquidation_price_says_so() -> None:
-    cross = PositionView("ETH", TradeDirection.SHORT, Decimal(1), 1, Decimal(3000), Decimal(0), None)
+    cross = PositionView("ETH", TradeDirection.SHORT, Decimal(1), 1, Decimal(3000), Decimal(3000), Decimal(0), None)
     state = FlowStateView("USDC", Decimal(400), Decimal(400), Decimal(250), Decimal(400), Decimal(0), (cross,))
 
     position = user_document(context(state=state))["stato_del_flusso"]

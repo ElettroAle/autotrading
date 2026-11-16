@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -37,6 +38,9 @@ export const CompareVersionsForm = ({ versions, chosen, onCompare }: CompareVers
     resolver: zodResolver(choiceSchema),
     defaultValues: defaultChoice(versions, chosen),
   });
+  // With one version there is nothing to compare it with (R6.4.1).
+  const alone = versions.length < 2;
+  const onlyOneId = useId();
   const options = versions.map((version) => (
     <option key={version.version} value={String(version.version)}>
       {`Versione ${version.version}`}
@@ -62,9 +66,19 @@ export const CompareVersionsForm = ({ versions, chosen, onCompare }: CompareVers
           {options}
         </select>
       </label>
-      <button type="submit" className="rounded bg-blue-800 px-4 py-1.5 text-white">
+      <button
+        type="submit"
+        disabled={alone}
+        aria-describedby={alone ? onlyOneId : undefined}
+        className="rounded bg-blue-800 px-4 py-1.5 text-white disabled:opacity-50"
+      >
         Confronta
       </button>
+      {alone && (
+        <p id={onlyOneId} className="text-sm text-slate-600">
+          Il confronto serve almeno una seconda versione.
+        </p>
+      )}
     </form>
   );
 };

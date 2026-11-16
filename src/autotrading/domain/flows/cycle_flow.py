@@ -81,6 +81,7 @@ class CycleFlow:
                     position.size,
                     position.leverage,
                     position.entry_price,
+                    position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
                 )

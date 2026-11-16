@@ -1,7 +1,9 @@
+from dataclasses import replace
 from decimal import Decimal
 
 from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.domain.accounts.declared_network import DeclaredNetwork
+from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.accounts import ADDRESS, SECRET, an_account
@@ -15,9 +17,17 @@ def test_the_summary_names_the_account_with_network_and_allocated_capital() -> N
 
     summary = AccountSummary.of(account, Decimal(500), TESTNET, "USDC")
 
-    assert summary == AccountSummary(account.id, account.name, account.exchange, True, TESTNET, Decimal(500), "USDC")
-    assert ADDRESS not in repr(summary)
+    assert summary == AccountSummary(
+        account.id, account.name, account.exchange, True, TESTNET, Decimal(500), "USDC", {"account_address": ADDRESS}
+    )
     assert SECRET not in repr(summary)
+
+
+def test_the_summary_of_an_account_without_public_fields_kept_shows_none() -> None:
+    account = an_account(TenantId.new())
+    legacy = replace(account, exchange_account=ExchangeAccount(account.exchange_account.fingerprint))
+
+    assert AccountSummary.of(legacy, Decimal(0), TESTNET, "USDC").public_fields == {}
 
 
 def test_the_summary_of_an_account_without_a_sealed_text_says_credentials_are_missing() -> None:

@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from autotrading.application.agent.ports import ModelReply
 from autotrading.domain.agent.agent_context import ModelMessage
+from autotrading.domain.agent.answer_format import AnswerFormat
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -19,6 +20,7 @@ class ModelCall:
     key: ProviderKey
     settings: Mapping[str, ParameterValue]
     messages: tuple[ModelMessage, ...]
+    answer: AnswerFormat
 
 
 @dataclass
@@ -34,9 +36,14 @@ class FakeModelCallAdapter:
     entered: threading.Event = field(default_factory=threading.Event)
 
     def call(
-        self, model: str, key: ProviderKey, settings: Mapping[str, ParameterValue], messages: tuple[ModelMessage, ...]
+        self,
+        model: str,
+        key: ProviderKey,
+        settings: Mapping[str, ParameterValue],
+        messages: tuple[ModelMessage, ...],
+        answer: AnswerFormat,
     ) -> ModelReply:
-        self.calls.append(ModelCall(model, key, settings, messages))
+        self.calls.append(ModelCall(model, key, settings, messages, answer))
         self.entered.set()
         if self.gate is not None:
             self.gate.wait(HELD_SECONDS)

@@ -5,6 +5,7 @@ export type ConfigurationRow = { readonly part: string; readonly value: string }
 type Source = Configuration['sources'][number];
 
 const NONE = 'nessuno';
+const DEFAULT = 'predefinito';
 
 const sortedEntries = (parameters: Record<string, string | number>): string[] =>
   Object.keys(parameters)
@@ -45,5 +46,9 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
     },
     { part: 'capitale allocato', value: configuration.allocated_capital ?? NONE },
     { part: 'porta al minimo', value: configuration.bring_to_minimum ? 'sì' : 'no' },
+    {
+      part: 'system prompt',
+      value: configuration.system_prompt_is_default ? DEFAULT : configuration.system_prompt,
+    },
   ];
 };

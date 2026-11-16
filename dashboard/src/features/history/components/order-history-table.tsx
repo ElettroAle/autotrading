@@ -1,5 +1,5 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { formatRoundedAmount } from '@/utils/format-amount';
+import { formatPrice, formatRoundedAmount } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
 
 import type { HistoryExecution, HistoryOrder } from '../api/get-order-history';
@@ -38,7 +38,7 @@ const Executions = ({ executions }: { executions: readonly HistoryExecution[] })
           {executions.map((execution) => (
             <tr key={`${execution.executed_at}/${execution.price}/${execution.size}`}>
               <td className="pr-3">{formatInstant(execution.executed_at)}</td>
-              <td className="pr-3">{formatRoundedAmount(execution.price)}</td>
+              <td className="pr-3">{formatPrice(execution.price)}</td>
               <td className="pr-3">{execution.size}</td>
               <td>{formatRoundedAmount(execution.fee)}</td>
             </tr>

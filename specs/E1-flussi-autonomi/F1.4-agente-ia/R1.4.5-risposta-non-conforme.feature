@@ -12,11 +12,19 @@ Funzionalità: R1.4.5 Risposta dell'agente non conforme
   come decisione mancante.
   Una risposta non leggibile per intero scarta tutte le decisioni: il ciclo si registra con la risposta
   integrale e nessun ordine.
+  La piattaforma chiede al modello la risposta vincolata al formato delle decisioni (campi, tipi, azioni e
+  direzioni ammesse), non un testo qualsiasi. La lettura delle decisioni resta il controllo finale: un modello che
+  non rispetta il vincolo produce al più decisioni scartate.
 
   Fuori ambito: nuovi tentativi verso il modello nello stesso ciclo.
 
   Contesto:
     Dato che "anna" ha il flusso "alfa" con asset "BTC, ETH, SOL"
+
+  Scenario: Risposta chiesta nel formato delle decisioni
+    Quando il flusso "alfa" esegue un ciclo
+    Allora la chiamata al modello chiede la risposta nel formato delle decisioni
+    E il formato ammette solo le azioni "apri, chiudi, mantieni" e le direzioni "long, short"
 
   Scenario: Solo le decisioni non conformi sono scartate
     Dato che l'agente risponde apri long su "BTC" con quota 0,1 e leva 3, e apri su "ETH" senza direzione

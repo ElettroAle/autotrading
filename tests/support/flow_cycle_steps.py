@@ -32,6 +32,12 @@ def flow_cycles() -> FlowCycles:
     return FlowCycles()
 
 
+@pytest.fixture
+def exchange_prices() -> dict[str, Decimal]:
+    """The price at which the exchange of the account values each asset, apart from the one the sources report."""
+    return {}
+
+
 def names_of(text: str) -> tuple[str, ...]:
     return tuple(name.strip() for name in text.split(","))
 
@@ -47,6 +53,7 @@ def position(asset: str, side: PositionSide = PositionSide.LONG, **values: objec
         "size": Decimal("0.01"),
         "leverage": 1,
         "entry_price": Decimal(100),
+        "mark_price": Decimal(100),
         "unrealized_pnl": Decimal(0),
         "liquidation_price": None,
     }
@@ -107,6 +114,24 @@ def started_flow(  # noqa: PLR0917 - one argument per value of the step
             configuration, instructions=instructions, risk_limits=RiskLimits(int(leverage), Decimal(10))
         ),
     )
+
+
+@given(
+    quoted(
+        'che "{user}" ha il flusso "{flow}" con asset "{asset}" su un conto il cui exchange valuta {valued} a {price}'
+    )
+)
+def flow_on_exchange_price(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles,
+    exchange_prices: dict[str, Decimal],
+    user: str,
+    flow: str,
+    asset: str,
+    valued: str,
+    price: str,
+) -> None:
+    flow_cycles.add_flow(user, flow, assets=names_of(asset))
+    exchange_prices[valued] = number(price)
 
 
 @given(quoted('che il flusso "{flow}" è stato messo in pausa e ripreso alle {clock}'))
@@ -195,6 +220,23 @@ def credentials_rejected(flow_cycles: FlowCycles, account: str) -> None:
     flow_cycles.platform.hyperliquid.revoke(flow_cycles.credentials[tenant_id, account])
 
 
+@given(
+    parsers.re(
+        r'^che il flusso "(?P<flow>[^"]+)" ha una posizione short su "(?P<asset>[^"]+)" con prezzo di ingresso '
+        r"(?P<entry>[\d,]+) e PnL non realizzato (?P<pnl>-?[\d,]+) USDC$"
+    )
+)
+def short_at_exchange_price(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles, exchange_prices: dict[str, Decimal], flow: str, asset: str, entry: str, pnl: str
+) -> None:
+    size, leverage = Decimal("0.001"), 2
+    values = {"entry_price": number(entry), "mark_price": exchange_prices[asset], "unrealized_pnl": number(pnl)}
+    held = position(asset, PositionSide.SHORT, size=size, leverage=leverage, **values)
+    flow_cycles.platform.hyperliquid.open_position(flow_cycles.credentials_of(flow), held)
+    shown = a_position(asset, margin=size * number(entry) / leverage, size=size, leverage=leverage, **values)
+    show_activity(flow_cycles, flow, replace(shown, side=TradeSide.SHORT))
+
+
 # Given: the provider of the model
 
 
@@ -213,6 +255,11 @@ def key_rejected(flow_cycles: FlowCycles, provider: str) -> None:
 
 @given(quoted('che l\'ultimo prezzo di "{asset}" è {price}'))
 def last_price(flow_cycles: FlowCycles, asset: str, price: str) -> None:
+    flow_cycles.prices.prices[asset] = number(price)
+
+
+@given(quoted('che le fonti di mercato riportano per "{asset}" il prezzo {price}'))
+def source_price(flow_cycles: FlowCycles, asset: str, price: str) -> None:
     flow_cycles.prices.prices[asset] = number(price)
 
 
@@ -521,6 +568,32 @@ def position_in_context(flow_cycles: FlowCycles, asset: str, leverage: str) -> N
     assert (held["direzione"], held["leva"]) == ("long", int(leverage))
     for field in ("dimensione", "prezzo_di_ingresso", "pnl_non_realizzato", "prezzo_di_liquidazione"):
         Decimal(held[field])
+
+
+@then(
+    parsers.re(
+        r'^il contesto contiene la posizione (?P<side>long|short) su "(?P<asset>[^"]+)" con prezzo di mercato '
+        r"(?P<price>[\d,]+) e PnL non realizzato (?P<pnl>-?[\d,]+) USDC$"
+    )
+)
+def position_at_exchange_price(flow_cycles: FlowCycles, side: str, asset: str, price: str, pnl: str) -> None:
+    positions = state_in_context(flow_cycles)["posizioni_aperte"]
+    assert isinstance(positions, list)
+    [held] = [held for held in positions if held["asset"] == asset]
+    assert held["direzione"] == side
+    assert Decimal(held["prezzo_di_mercato"]) == number(price)
+    assert Decimal(held["pnl_non_realizzato"]) == number(pnl)
+
+
+@then(
+    "le regole operative dicono di valutare le posizioni aperte con prezzo di mercato e PnL non realizzato "
+    "dell'exchange del conto"
+)
+def exchange_prices_rule(flow_cycles: FlowCycles) -> None:
+    assert (
+        "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato dello stato"
+        " del flusso, letti dall'exchange del conto"
+    ) in flow_cycles.system_text()
 
 
 @then(quoted('il contesto non contiene la posizione su "{asset}"'))

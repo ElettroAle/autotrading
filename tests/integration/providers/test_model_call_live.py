@@ -9,6 +9,7 @@ import pytest
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.application.agent.errors import ModelKeyRejectedError
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from tests.support.provider_key import api_key_of
 
 pytestmark = pytest.mark.providers
@@ -25,4 +26,4 @@ def test_the_catalog_offers_models_of_every_enabled_provider_and_each_refuses_a_
     assert {provider.value for provider in first_model_of} == {"anthropic", "deepseek", "openai"}
     for model in first_model_of.values():
         with pytest.raises(ModelKeyRejectedError):
-            gateway.model_call().call(model, MADE_UP_KEY, {}, MESSAGES)
+            gateway.model_call().call(model, MADE_UP_KEY, {}, MESSAGES, DECISIONS_FORMAT)

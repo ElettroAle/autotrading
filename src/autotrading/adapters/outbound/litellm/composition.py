@@ -14,11 +14,17 @@ def litellm_adapters() -> dict[str, LiteLlmModelGatewayAdapter]:
     _keep_the_library_to_itself()
     gateway = LiteLlmModelGatewayAdapter(
         litellm.completion,
+        _supports_response_schema,
         _ModelLibrary(litellm.model_cost, litellm.get_supported_openai_params, _required_keys),
         settings.providers,
         settings.timeout_seconds,
     )
     return {GATEWAY_NAME: gateway}
+
+
+def _supports_response_schema(model: str) -> bool:
+    """Whether the library can have the provider enforce a strict format on the answer of the model."""
+    return litellm.supports_response_schema(model=model)
 
 
 def _required_keys(model: str) -> list[str]:

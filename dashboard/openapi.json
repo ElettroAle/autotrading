@@ -1028,6 +1028,32 @@
         }
       }
     },
+    "/flows/system-prompt": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Default System Prompt",
+        "operationId": "read_default_system_prompt_flows_system_prompt_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultSystemPromptResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/flows/{flow_id}": {
       "patch": {
         "tags": [
@@ -1792,6 +1818,56 @@
               "format": "uuid",
               "title": "Flow Id"
             }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
           }
         ],
         "responses": {
@@ -1850,6 +1926,96 @@
               "default": 1,
               "title": "Page"
             }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "long o short",
+              "title": "Side"
+            },
+            "description": "long o short"
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "vinta o persa, dal PnL al netto delle commissioni",
+              "title": "Result"
+            },
+            "description": "vinta o persa, dal PnL al netto delle commissioni"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno della chiusura",
+              "title": "From"
+            },
+            "description": "primo giorno della chiusura"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno della chiusura",
+              "title": "To"
+            },
+            "description": "ultimo giorno della chiusura"
           }
         ],
         "responses": {
@@ -2409,27 +2575,89 @@
         ],
         "summary": "List Flow Overviews",
         "operationId": "list_flow_overviews_flows_overview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FlowOverviewResponse"
                   },
-                  "type": "array",
                   "title": "Response List Flow Overviews Flows Overview Get"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/flows/{flow_id}/cycles": {
@@ -2464,6 +2692,80 @@
               "default": 1,
               "title": "Page"
             }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "concluso o fallito",
+              "title": "Outcome"
+            },
+            "description": "concluso o fallito"
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "apertura, chiusura, mantenimento o nessuna",
+              "title": "Decision"
+            },
+            "description": "apertura, chiusura, mantenimento o nessuna"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno dell'intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno dell'intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno dell'intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno dell'intervallo"
           }
         ],
         "responses": {
@@ -3349,6 +3651,13 @@
           "has_credentials": {
             "type": "boolean",
             "title": "Has Credentials"
+          },
+          "public_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Public Fields"
           }
         },
         "type": "object",
@@ -3356,10 +3665,11 @@
           "id",
           "name",
           "exchange",
-          "has_credentials"
+          "has_credentials",
+          "public_fields"
         ],
         "title": "AccountDetailsResponse",
-        "description": "An account as its owner reads it: credentials are only declared present, never returned (R0.2.3)."
+        "description": "An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the\npublic fields the exchange declares are shown by name (Bug 401)."
       },
       "AccountReadingResponse": {
         "properties": {
@@ -3499,6 +3809,13 @@
             "type": "boolean",
             "title": "Has Credentials"
           },
+          "public_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Public Fields"
+          },
           "network": {
             "type": "string",
             "title": "Network"
@@ -3522,6 +3839,7 @@
           "name",
           "exchange",
           "has_credentials",
+          "public_fields",
           "network",
           "network_name",
           "allocated_capital",
@@ -3655,6 +3973,10 @@
             "type": "boolean",
             "title": "Has Next"
           },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
           "positions": {
             "items": {
               "$ref": "#/components/schemas/ClosedPositionResponse"
@@ -3667,10 +3989,11 @@
         "required": [
           "page",
           "has_next",
+          "total",
           "positions"
         ],
         "title": "ClosedPositionPageResponse",
-        "description": "A page of the closed positions of a flow, from the most recent close (R1.7.2, R2.2.5)."
+        "description": "A page of the closed positions of a flow that match the filters, from the most recent close, with how many\nmatch in all (R1.7.2, R2.2.5, R6.4.4)."
       },
       "ClosedPositionResponse": {
         "properties": {
@@ -3822,6 +4145,21 @@
           "bring_to_minimum": {
             "type": "boolean",
             "title": "Bring To Minimum"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "system_prompt_is_default": {
+            "type": "boolean",
+            "title": "System Prompt Is Default"
+          },
+          "system_prompt_placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PromptPlaceholderResponse"
+            },
+            "type": "array",
+            "title": "System Prompt Placeholders"
           }
         },
         "type": "object",
@@ -3834,7 +4172,10 @@
           "instructions",
           "risk_limits",
           "allocated_capital",
-          "bring_to_minimum"
+          "bring_to_minimum",
+          "system_prompt",
+          "system_prompt_is_default",
+          "system_prompt_placeholders"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -3976,6 +4317,10 @@
             "type": "boolean",
             "title": "Has Next"
           },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
           "cycles": {
             "items": {
               "$ref": "#/components/schemas/CycleSummaryResponse"
@@ -3988,9 +4333,11 @@
         "required": [
           "page",
           "has_next",
+          "total",
           "cycles"
         ],
-        "title": "CyclePageResponse"
+        "title": "CyclePageResponse",
+        "description": "A page of the cycles that match the filters, with how many match in all (R1.7.3, R6.4.4)."
       },
       "CycleSummaryResponse": {
         "properties": {
@@ -4067,6 +4414,28 @@
           "cost_usd"
         ],
         "title": "DailyCostResponse"
+      },
+      "DefaultSystemPromptResponse": {
+        "properties": {
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "system_prompt_placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PromptPlaceholderResponse"
+            },
+            "type": "array",
+            "title": "System Prompt Placeholders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_prompt",
+          "system_prompt_placeholders"
+        ],
+        "title": "DefaultSystemPromptResponse",
+        "description": "The system prompt a new flow starts with, and the placeholders it may use (R1.4.8)."
       },
       "DifferenceResponse": {
         "properties": {
@@ -4352,6 +4721,17 @@
             "type": "boolean",
             "title": "Bring To Minimum",
             "default": false
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
@@ -4536,6 +4916,17 @@
               }
             ],
             "title": "Bring To Minimum"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
@@ -4656,6 +5047,16 @@
             },
             "type": "array",
             "title": "Recent Outcomes"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowResultsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4674,10 +5075,11 @@
           "initial_capital",
           "current_capital",
           "return_percent",
-          "recent_outcomes"
+          "recent_outcomes",
+          "summary"
         ],
         "title": "FlowOverviewResponse",
-        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127)."
+        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent, how its capital is doing and its results in the period asked for (R1.7.3, R2.2.2, ADR 0127, R6.4.2)."
       },
       "FlowPositionResponse": {
         "properties": {
@@ -4700,6 +5102,10 @@
           "entry_price": {
             "type": "string",
             "title": "Entry Price"
+          },
+          "mark_price": {
+            "type": "string",
+            "title": "Mark Price"
           },
           "margin": {
             "type": "string",
@@ -4728,6 +5134,7 @@
           "size",
           "leverage",
           "entry_price",
+          "mark_price",
           "margin",
           "unrealized_pnl",
           "unrealized_pnl_percent"
@@ -4881,6 +5288,21 @@
           "bring_to_minimum": {
             "type": "boolean",
             "title": "Bring To Minimum"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt"
+          },
+          "system_prompt_is_default": {
+            "type": "boolean",
+            "title": "System Prompt Is Default"
+          },
+          "system_prompt_placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PromptPlaceholderResponse"
+            },
+            "type": "array",
+            "title": "System Prompt Placeholders"
           }
         },
         "type": "object",
@@ -4897,10 +5319,66 @@
           "instructions",
           "risk_limits",
           "allocated_capital",
-          "bring_to_minimum"
+          "bring_to_minimum",
+          "system_prompt",
+          "system_prompt_is_default",
+          "system_prompt_placeholders"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
+      },
+      "FlowResultsResponse": {
+        "properties": {
+          "total_gain": {
+            "type": "string",
+            "title": "Total Gain"
+          },
+          "total_gain_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Gain Percent"
+          },
+          "period_gain": {
+            "type": "string",
+            "title": "Period Gain"
+          },
+          "period_gain_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Gain Percent"
+          },
+          "open_positions": {
+            "type": "integer",
+            "title": "Open Positions"
+          },
+          "failed_cycles": {
+            "type": "integer",
+            "title": "Failed Cycles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_gain",
+          "total_gain_percent",
+          "period_gain",
+          "period_gain_percent",
+          "open_positions",
+          "failed_cycles"
+        ],
+        "title": "FlowResultsResponse",
+        "description": "How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains\nin the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without\ninitial capital."
       },
       "FlowStateResponse": {
         "properties": {
@@ -4951,6 +5429,9 @@
             },
             "type": "array",
             "title": "Positions"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/FlowResultsResponse"
           }
         },
         "type": "object",
@@ -4965,10 +5446,11 @@
           "fees",
           "total_value",
           "return_percent",
-          "positions"
+          "positions",
+          "summary"
         ],
         "title": "FlowStateResponse",
-        "description": "The state of a flow attributed from the exchange at the request (R1.6.1); amounts as strings (ADR 0018)."
+        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2); amounts as strings (ADR 0018)."
       },
       "FlowStatisticsResponse": {
         "properties": {
@@ -6090,6 +6572,10 @@
             "type": "string",
             "title": "Entry Price"
           },
+          "mark_price": {
+            "type": "string",
+            "title": "Mark Price"
+          },
           "unrealized_pnl": {
             "type": "string",
             "title": "Unrealized Pnl"
@@ -6113,10 +6599,30 @@
           "size",
           "leverage",
           "entry_price",
+          "mark_price",
           "unrealized_pnl",
           "liquidation_price"
         ],
         "title": "PositionResponse"
+      },
+      "PromptPlaceholderResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "PromptPlaceholderResponse",
+        "description": "A placeholder the system prompt may use, with what it stands for (R1.4.8)."
       },
       "ProviderKeyFieldResponse": {
         "properties": {
@@ -6516,6 +7022,17 @@
             "type": "boolean",
             "title": "Bring To Minimum",
             "default": false
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",
@@ -6564,6 +7081,17 @@
             "type": "boolean",
             "title": "Bring To Minimum",
             "default": false
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
           }
         },
         "type": "object",

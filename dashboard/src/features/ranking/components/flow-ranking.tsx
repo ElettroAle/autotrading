@@ -42,21 +42,11 @@ const CompareBox = ({ row, comparison }: { row: FlowRankingRow; comparison: Comp
   );
 };
 
-// The values are the API's: the page formats them and sorts them, and computes nothing (ADR 0136).
+// The values are the API's: the page formats them and sorts them, and computes nothing (ADR 0136). The name comes
+// first, the column that stays in view and links the flow (R6.4.4).
 const columnsFor = (comparison: Comparison): DataTableColumn<FlowRankingRow>[] => [
+  { header: 'Flusso', sortKey: 'name', cell: (row) => row.flow_name },
   { header: 'Confronta', cell: (row) => <CompareBox row={row} comparison={comparison} /> },
-  {
-    header: 'Flusso',
-    sortKey: 'name',
-    cell: (row) => (
-      <Link
-        to={paths.flow.getHref(row.flow_id)}
-        className="font-medium text-blue-800 hover:underline"
-      >
-        {row.flow_name}
-      </Link>
-    ),
-  },
   {
     header: 'Rendimento',
     sortKey: 'return',
@@ -110,6 +100,7 @@ const RankingTable = ({ rows, period }: { rows: FlowRankingRow[]; period: Period
         columns={columnsFor({ chosen, toggle })}
         rows={sortRanking(rows, sort)}
         rowKey={(row) => row.flow_id}
+        rowHref={(row) => paths.flow.getHref(row.flow_id)}
         empty="Nessun flusso con cicli nel periodo."
         sort={sort}
         onSort={sortBy}

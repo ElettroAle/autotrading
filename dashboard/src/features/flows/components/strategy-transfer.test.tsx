@@ -62,7 +62,7 @@ describe('Strategy export and import', () => {
 
   it('saves the strategy file of the flow under the name the API gives it', async () => {
     const saved = watchSavedFiles();
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Esporta' }));
 
@@ -80,7 +80,7 @@ describe('Strategy export and import', () => {
       ),
     );
     const saved = watchSavedFiles();
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Esporta' }));
 
@@ -96,7 +96,7 @@ describe('Strategy export and import', () => {
     await importAs('alfa bis', fileOf(JSON.stringify(exportedFromAlfa())));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/flows/flow-alfa%20bis'));
-    expect(await screen.findByRole('heading', { level: 2, name: 'alfa bis' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa bis' })).toBeVisible();
     expect(screen.getByText('Bozza')).toBeInTheDocument();
     expect(screen.getByRole('form', { name: 'Assegnazione della bozza' })).toBeInTheDocument();
     expect(fakePlatform.flowNamed('alfa bis').sources).toEqual([{ name: 'indicatori', weight: 2 }]);

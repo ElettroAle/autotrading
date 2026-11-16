@@ -80,6 +80,37 @@ describe('FlowVersions', () => {
     expect(screen.queryByText('Nessuna differenza')).not.toBeInTheDocument();
   });
 
+  it('shows the system prompt of each version, predefinito when it follows the platform', async () => {
+    await renderApp({ account: 'anna', url: `${VERSIONS_URL}?first=2&second=3` });
+
+    const comparison = await screen.findByRole('table', { name: 'Confronto delle versioni' });
+    expect(
+      within(comparison).getByRole('row', { name: 'system prompt predefinito predefinito' }),
+    ).toBeVisible();
+  });
+
+  it('highlights a changed system prompt in its place, keeping its lines', async () => {
+    fakePlatform.addFlow('anna', 'beta', {
+      versions: versionsWith({}, { systemPrompt: '{instructions}\nMai contro trend' }),
+    });
+    await renderApp({ account: 'anna', url: '/flows/flow-beta/versions?first=1&second=2' });
+
+    const comparison = await screen.findByRole('table', { name: 'Confronto delle versioni' });
+    const parts = within(comparison)
+      .getAllByRole('rowheader')
+      .map((header) => header.textContent);
+    expect(parts.indexOf('system prompt')).toBe(parts.indexOf('porta al minimo') + 1);
+    const prompt = within(comparison).getByRole('row', { name: /^system prompt/ });
+    const marks = within(prompt).getAllByRole('mark');
+    expect(marks.map((mark) => mark.textContent)).toEqual([
+      'predefinito',
+      '{instructions}\nMai contro trend',
+    ]);
+    for (const cell of within(prompt).getAllByRole('cell')) {
+      expect(cell).toHaveClass('whitespace-pre-wrap');
+    }
+  });
+
   it('says there is no difference when a version is compared with itself', async () => {
     await renderApp({ account: 'anna', url: `${VERSIONS_URL}?first=3&second=3` });
 

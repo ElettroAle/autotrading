@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -20,7 +21,10 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
-from autotrading.domain.flows.flow_return import FlowReturn
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
 from tests.support.flows import a_configuration, a_flow
@@ -222,12 +226,8 @@ def test_a_draft_in_use_answers_without_currency_nor_capital(client_of: Client, 
     [overview] = anna.get("/flows/overview").json()
 
     assert overview["status"] == "bozza"
-    assert [overview[key] for key in ("currency", "initial_capital", "current_capital", "return_percent")] == [
-        None,
-        None,
-        None,
-        None,
-    ]
+    keys = ("currency", "initial_capital", "current_capital", "return_percent", "summary")
+    assert [overview[key] for key in keys] == [None, None, None, None, None]
 
 
 def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Client, platform: Platform) -> None:
@@ -272,6 +272,14 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
                 {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
                 {"planned_at": "2026-11-12T09:52:00Z", "outcome": "fallito"},
             ],
+            "summary": {
+                "total_gain": "30",
+                "total_gain_percent": "10.00",
+                "period_gain": "0",
+                "period_gain_percent": "0.00",
+                "open_positions": 0,
+                "failed_cycles": 1,
+            },
         },
         {
             "id": str(paused.id.value),
@@ -289,14 +297,102 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "current_capital": "89.5",
             "return_percent": "-10.50",
             "recent_outcomes": [],
+            "summary": {
+                "total_gain": "-10.5",
+                "total_gain_percent": "-10.50",
+                "period_gain": "0",
+                "period_gain_percent": "0.00",
+                "open_positions": 0,
+                "failed_cycles": 0,
+            },
         },
     ]
 
 
 def test_a_flow_without_initial_capital_answers_without_a_return() -> None:
     summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None, 1)
-    overview = FlowOverview(summary, "dev", (), None, "USDC", FlowReturn(Decimal(0), Decimal("12.50")))
+    state = FlowState(FlowId.new(), "USDC", Decimal(0), (), Decimal("12.50"), Decimal(0), Decimal(0))
+    overview = FlowOverview(summary, "dev", (), None, FlowResults(state, Decimal(0), 0))
 
     response = FlowOverviewResponse.of(overview)
 
     assert (response.initial_capital, response.current_capital, response.return_percent) == ("0", "12.5", None)
+    assert response.summary is not None
+    assert (response.summary.total_gain_percent, response.summary.period_gain_percent) == (None, None)
+
+
+def test_the_flows_in_use_answer_their_results_in_the_period_asked_for(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = a_flow(platform.tenant_of("anna"), configuration=a_configuration(allocated_capital=Decimal(100)))
+    platform.flows.flows.append(flow)
+    platform.now = PLANNED
+    platform.cycles.record(CycleRecord(flow.id.value, PLANNED - timedelta(days=8), CycleOutcome.FAILED))
+    platform.cycles.record(CycleRecord(flow.id.value, PLANNED - timedelta(days=1), CycleOutcome.FAILED))
+    record_equity(platform, flow.id.value, PLANNED - timedelta(days=6), "102.1")
+    record_equity(platform, flow.id.value, PLANNED - timedelta(days=1), "102.5")
+
+    [overview] = anna.get("/flows/overview?period=7d").json()
+
+    assert overview["summary"]["period_gain"] == "0.4"
+    assert overview["summary"]["period_gain_percent"] == "0.40"
+    assert overview["summary"]["failed_cycles"] == 1
+
+
+def test_the_flows_in_use_refuse_a_period_the_user_cannot_have_meant(client_of: Client) -> None:
+    response = client_of("anna").get("/flows/overview?period=range&from=2026-11-12")
+
+    assert (response.status_code, reason_of(response)) == (
+        400,
+        {"detail": "periodo non valido: un intervallo ha il giorno iniziale e il giorno finale"},
+    )
+
+
+def record_equity(platform: Platform, flow_id: UUID, planned_at: datetime, equity: str) -> None:
+    snapshot = EquitySnapshot(
+        flow_id, planned_at, Decimal(100), Decimal(equity) - Decimal(100), Decimal(0), Decimal(0), Decimal(0)
+    )
+    platform.equity_snapshots.snapshots[platform.tenant_of("anna"), flow_id, planned_at] = snapshot
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: every paginated answer carries the total of the results.
+def test_the_cycles_answer_with_how_many_match_in_all(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    for minute in range(51):
+        platform.cycles.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(minutes=minute)))
+
+    assert anna.get(f"/flows/{flow_id}/cycles", params={"page": 2}).json()["total"] == 51
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: the filters are optional query parameters of the reading.
+def test_the_cycles_are_filtered_by_outcome_decision_and_days(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    opening = a_completed_cycle(flow_id)
+    platform.cycles.record(replace(opening, documents=(_decided("apri"),)))
+    closing = replace(opening, planned_at=PLANNED + timedelta(minutes=15), documents=(_decided("chiudi"),))
+    platform.cycles.record(closing)
+    platform.cycles.record(CycleRecord(flow_id, PLANNED + timedelta(minutes=30), CycleOutcome.FAILED))
+    platform.cycles.record(replace(opening, planned_at=PLANNED + timedelta(days=1), documents=(_decided("apri"),)))
+
+    body = anna.get(
+        f"/flows/{flow_id}/cycles",
+        params={"outcome": "concluso", "decision": "apertura", "from": "2026-11-12", "to": "2026-11-12"},
+    ).json()
+
+    assert [cycle["planned_at"] for cycle in body["cycles"]] == ["2026-11-12T10:07:00Z"]
+    assert body["total"] == 1
+    failed = anna.get(f"/flows/{flow_id}/cycles", params={"outcome": "fallito"}).json()
+    assert [cycle["outcome"] for cycle in failed["cycles"]] == ["fallito"]
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: an unknown value is a 400 error of the project.
+def test_an_unknown_filter_of_the_cycles_is_a_bad_request(client_of: Client, platform: Platform) -> None:
+    response = client_of("anna").get(f"/flows/{flow_of(platform, 'anna')}/cycles", params={"outcome": "vinto"})
+
+    assert response.status_code == 400
+    assert reason_of(response) == {"detail": "esito non valido: scegliere tra concluso, fallito"}
+
+
+def _decided(action: str) -> StepDocument:
+    return StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "action": action}]})

@@ -6,6 +6,7 @@ Funzionalità: R0.2.3 Credenziali dei conti mai esposte
   Perché chi accede ai miei dati, ai registri o alle risposte non possa operare al posto mio
 
   Le credenziali sono salvate cifrate. Le decifra solo il servizio della piattaforma che opera sull'exchange; nessuna persona le legge, né dalla piattaforma né dai dati salvati né dai backup.
+  I campi che l'exchange dichiara pubblici, come l'indirizzo del conto, non sono segreti: il conto li conserva in chiaro e li mostra (Bug 401).
 
   Fuori ambito: rotazione della chiave di cifratura (R0.2.6), scadenza delle chiavi sull'exchange.
 

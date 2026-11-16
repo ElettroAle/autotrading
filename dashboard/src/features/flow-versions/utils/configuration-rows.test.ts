@@ -1,3 +1,5 @@
+import type { components } from '@/lib/api-schema';
+
 import type { Configuration } from '../api/get-flow-version';
 
 import { configurationRows } from './configuration-rows';
@@ -19,7 +21,33 @@ const CONFIGURATION: Configuration = {
   },
   allocated_capital: '400',
   bring_to_minimum: true,
+  system_prompt: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
+  system_prompt_is_default: false,
 };
+
+// Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
+// fields that are not compared. A new field of the API fails the types until it is placed here.
+const PARTS_OF_FIELD = {
+  version: [],
+  assets: ['asset'],
+  cycle_minutes: ['intervallo di ciclo'],
+  model: ['modello', 'parametri del modello'],
+  sources: ['fonti'],
+  instructions: ['istruzioni'],
+  risk_limits: [
+    'leva massima',
+    'esposizione massima del margine',
+    'esposizione massima del valore',
+  ],
+  allocated_capital: ['capitale allocato'],
+  bring_to_minimum: ['porta al minimo'],
+  system_prompt: ['system prompt'],
+  system_prompt_is_default: [],
+  system_prompt_placeholders: [],
+} as const satisfies Record<
+  keyof components['schemas']['ConfigurationResponse'],
+  readonly string[]
+>;
 
 describe('configurationRows', () => {
   it('names every part of the configuration as the API compares it, with its value as text', () => {
@@ -35,7 +63,23 @@ describe('configurationRows', () => {
       { part: 'esposizione massima del valore', value: 'nessuno' },
       { part: 'capitale allocato', value: '400' },
       { part: 'porta al minimo', value: 'sì' },
+      {
+        part: 'system prompt',
+        value: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
+      },
     ]);
+  });
+
+  it('has a row for every field of the configuration the API compares', () => {
+    const parts = configurationRows(CONFIGURATION).map((row) => row.part);
+
+    expect(parts).toEqual(Object.values(PARTS_OF_FIELD).flat());
+  });
+
+  it('says predefinito for the system prompt that follows the platform', () => {
+    const rows = configurationRows({ ...CONFIGURATION, system_prompt_is_default: true });
+
+    expect(rows.find((row) => row.part === 'system prompt')?.value).toBe('predefinito');
   });
 
   it('says nessuno for the parts left empty', () => {

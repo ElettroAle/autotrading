@@ -16,8 +16,10 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
   catalogo dichiara per quel fornitore (`api_key` se non ne dichiara altri, R2.3.9, ADR 0159).
 - **Model catalog**: modelli disponibili con fornitore, nome, parametri ammessi, valori predefiniti e
   prezzi (R1.4.2).
-- **Agent context**: istruzioni del flusso, regole operative, ora, stato del flusso, dati delle fonti con
-  i pesi, dati mancanti (R1.4.3). Riguarda solo il flusso.
+- **Agent context**: system prompt del flusso già reso (istruzioni, regole operative e formato nel predefinito,
+  R1.4.8), ora, stato del flusso, dati delle fonti con i pesi, dati mancanti (R1.4.3). Riguarda solo il flusso.
+  `AgentContext` non ha testo di sistema cablato: lo scrive `flows`; `agent` dichiara solo le azioni ammesse
+  (`ListAgentActionsUseCase`) che il prompt nomina.
 - **Decision**: per ogni asset del flusso, `open` (long o short, quota dei soldi del flusso da 0 a 1, leva),
   `close` (sempre totale) o `hold`, con il ragionamento (R1.4.4).
 - **Non-conforming decision**: campo mancante, valore fuori tipo o intervallo, azione non ammessa, asset
@@ -34,8 +36,15 @@ L'agente IA: chiavi dei fornitori, modelli, contesto, decisione e costo.
 - Nessun limite di spesa sulla piattaforma: il flusso va in pausa solo quando il fornitore dichiara il
   credito esaurito o la chiave non valida (errore permanente, ciclo decisionale di `flows`).
 - Una risposta non leggibile per intero scarta tutte le decisioni; nessun nuovo tentativo nello stesso ciclo.
+- Le posizioni aperte nel contesto portano prezzo di mercato e PnL non realizzato dell'exchange del conto e le regole
+  operative dicono di valutarle solo con quelli: le fonti possono leggere un'altra rete o piazza (R1.4.7, ADR
+  prezzo-di-mercato-dichiarato-dall-exchange).
 - Formato della risposta, lettura delle decisioni, contesto e costo sono regole del domain (`AgentResponse`,
   `AgentContext`, `ModelUsage`, ADR 0038): le chiavi della risposta sono i nomi dei campi dei motivi di scarto.
+- Il modello riceve il formato delle decisioni come vincolo (`DECISIONS_FORMAT`, schema JSON rigido costruito dalle
+  chiavi di `AgentResponse`): `AskAgentUseCase` lo passa a `ModelCallPort.call` e l'adapter lo fa imporre al fornitore
+  dove il modello lo supporta. La lettura di `AgentResponse` resta il controllo finale (ADR
+  risposta-del-modello-con-schema-rigido).
 - La chiamata al modello passa dalla libreria LiteLLM nel solo `worker` (`adapters/outbound/litellm`, ADR 0148) o
   dall'API di OpenRouter (ADR 0109): la chiave dell'utente viaggia nella sola chiamata del suo flusso, nessuna
   chiave dei fornitori della piattaforma. 401/403 chiave non valida e 402 (o quota OpenAI esaurita) credito

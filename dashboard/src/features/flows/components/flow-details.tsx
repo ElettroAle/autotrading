@@ -1,3 +1,5 @@
+import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
+
 import type { Account } from '../api/get-accounts';
 import type { Flow } from '../api/get-flows';
 
@@ -24,14 +26,11 @@ export const FlowDetails = ({ flow, accounts }: { flow: Flow; accounts: Account[
     ['Asset', flow.assets.length === 0 ? TO_ASSIGN : flow.assets.join(', ')],
   ];
   return (
-    <dl
-      aria-label="Configurazione"
-      className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1"
-    >
+    <dl aria-label="Configurazione" className={`mt-3 ${DETAILS_GRID}`}>
       {details.map(([label, value]) => (
         <div key={label} className="contents">
           <dt className="text-slate-600">{label}</dt>
-          <dd>{value}</dd>
+          <dd className={DETAIL_VALUE}>{value}</dd>
         </div>
       ))}
     </dl>

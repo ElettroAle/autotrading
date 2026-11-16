@@ -41,6 +41,7 @@ def a_command(**changes: object) -> ImportFlowStrategyCommand:
         instructions="  compra basso  ",
         cycle_minutes=60,
         bring_to_minimum=True,
+        system_prompt="{instructions}",
     )
     return replace(command, **changes)  # type: ignore[arg-type]  # each test names the part it changes
 
@@ -70,6 +71,7 @@ def test_the_import_saves_a_draft_at_its_first_version_with_the_strategy_checked
         instructions="compra basso",
         risk_limits=RiskLimits(3, Decimal(10), Decimal(50)),
         bring_to_minimum=True,
+        system_prompt="{instructions}",
     ).draft_configuration(FIRST_VERSION)
     assert [(record.getMessage(), record.__dict__["flow_id"]) for record in caplog.records] == [
         ("strategia importata", str(draft.id.value))

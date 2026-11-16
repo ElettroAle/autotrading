@@ -203,4 +203,16 @@ describe('FlowRanking', () => {
       expect(screen.getByRole('checkbox', { name: 'Confronta uno' })).toBeEnabled();
     });
   });
+
+  it('keeps the name of the flow first, where it stays in view, and opens the flow from any point of its row', async () => {
+    giveFlow('alfa', [300, 330]);
+    const user = userEvent.setup();
+    const { router } = await renderApp({ account: 'anna', url: '/ranking' });
+
+    const [first] = within(await table()).getAllByRole('columnheader');
+    expect(first).toHaveTextContent('Flusso');
+    await user.click(await cellOf('alfa', 'Operazioni'));
+
+    expect(router.state.location.pathname).toBe(`/flows/${fakePlatform.flowNamed('alfa').id}`);
+  });
 });

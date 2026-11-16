@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import TypedDict
 
 import requests
@@ -14,14 +14,14 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     TIMEOUT_SECONDS,
     HyperliquidSdkAdapter,
 )
-from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
 
 FROM_THE_START = 0
-SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, InvalidOperation)
+SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, ArithmeticError)
 
 
 class _LedgerDelta(TypedDict, total=False):
@@ -70,7 +70,11 @@ class HyperliquidAccountActivityAdapter:
         address = address_of(reference)
         with translated():
             info = self._sdk.info(self._base_url, self._timeout)
-            state = user_state_of(info.user_state(address))
+            state = in_account_mode(
+                user_state_of(info.user_state(address)),
+                info.query_user_abstraction_state(address),
+                info.spot_user_state(address),
+            )
             ledger = info.user_non_funding_ledger_updates(address, FROM_THE_START)
             return AccountActivity(
                 currency=MARGIN_CURRENCY,
@@ -100,6 +104,7 @@ def _position_of(position: _UserPosition) -> AccountPosition:
         unrealized_pnl=position.unrealized_pnl,
         leverage=position.leverage,
         entry_price=position.entry_price,
+        mark_price=position.mark_price,
     )
 
 
