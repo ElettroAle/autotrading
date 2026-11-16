@@ -25,6 +25,13 @@ export const aCapitalChange = (
   new: String(next),
 });
 
+/** A cash-out of the flow that freed the amount and kept the capital, at the instant (R3.4.1, R3.4.3). */
+export const aCashOut = (flow: FakeFlow, amount: number, at: Date): FakeCapitalChange => ({
+  ...aCapitalChange(flow, flow.allocatedCapital ?? 0, flow.allocatedCapital ?? 0, at),
+  reason: 'incasso',
+  amount: String(amount),
+});
+
 /** A deposit or a withdrawal the exchange declares on the account, at the instant (R3.4.2). */
 export const aTransfer = (
   accountId: string,

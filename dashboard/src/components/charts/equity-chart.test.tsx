@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   ABOVE_COLOR,
   BELOW_COLOR,
+  CHANGE_COLOR,
   chosenRange,
   equityAt,
   EquityChart,
@@ -111,9 +112,17 @@ describe('the tooltip of a point', () => {
 });
 
 const FAILED: ChartEvent = {
+  kind: 'failed-cycle',
   instant: '2026-11-12T09:35:00Z',
   label: 'Ciclo fallito del 12/11/2026, 10:35:00',
   to: '/flows/alfa/cycles/2026-11-12T09:35:00Z',
+};
+
+const CASH_OUT: ChartEvent = {
+  kind: 'capital-change',
+  instant: '2026-11-12T09:35:00Z',
+  label: 'incasso, 100 USDC',
+  to: '/flows/alfa/capital',
 };
 
 const renderWithEvents = (events: readonly ChartEvent[]) => {
@@ -133,6 +142,22 @@ describe('the events on the chart, ADR cicli-falliti-sull-equity-curve', () => {
     const mark = await screen.findByRole('link', { name: FAILED.label });
     expect(mark).toHaveAttribute('href', FAILED.to);
     expect(mark).toContainHTML(`stroke="${BELOW_COLOR}"`);
+  });
+
+  // ADR rendimento-composto-tra-le-variazioni-di-capitale: a change of the capital is marked on its instant too, with
+  // a mark of its own that no one takes for a failed cycle.
+  it('marks a change of the capital on its instant with a mark of its own, named by its label', async () => {
+    renderWithEvents([FAILED, CASH_OUT]);
+
+    const mark = await screen.findByRole('link', { name: CASH_OUT.label });
+    expect(mark).toHaveAttribute('href', CASH_OUT.to);
+    expect(mark).toHaveAttribute('data-instant', CASH_OUT.instant);
+    expect(mark).toContainHTML(`fill="${CHANGE_COLOR}"`);
+    expect(mark).not.toContainHTML(`stroke="${BELOW_COLOR}"`);
+    expect(screen.getByRole('link', { name: FAILED.label })).toHaveAttribute(
+      'data-instant',
+      FAILED.instant,
+    );
   });
 
   it('draws no mark without events', async () => {
