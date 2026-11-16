@@ -13,6 +13,7 @@ import {
 import { rankingOf } from './flow-ranking';
 import { resultsOf } from './flow-results';
 import { InvalidPeriod, periodAdmits, statisticsOf } from './flow-statistics';
+import { forecastAccuracyOf } from './forecast-accuracy';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
 import {
   configurationOf,
@@ -545,6 +546,24 @@ export const handlers = [
       }
       try {
         return HttpResponse.json(statisticsOf(flow.history, new URL(request.url).searchParams));
+      } catch (error) {
+        if (error instanceof InvalidPeriod) {
+          return problem(400, 'Bad Request', error.message);
+        }
+        throw error;
+      }
+    }),
+  ),
+  http.get('*/flows/:flowId/forecast-accuracy', ({ request, params }) =>
+    withUser(request, (user) => {
+      const flow = user.flows.find((candidate) => candidate.id === params.flowId);
+      if (flow === undefined) {
+        return problem(404, 'Not Found', 'flusso non trovato');
+      }
+      try {
+        return HttpResponse.json(
+          forecastAccuracyOf(flow.forecasts, new URL(request.url).searchParams),
+        );
       } catch (error) {
         if (error instanceof InvalidPeriod) {
           return problem(400, 'Bad Request', error.message);
