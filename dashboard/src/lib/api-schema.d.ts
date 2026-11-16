@@ -1651,7 +1651,7 @@ export interface components {
         /**
          * FlowStateResponse
          * @description The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
-         *     for (R6.4.2); amounts as strings (ADR 0018).
+         *     for (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018).
          */
         FlowStateResponse: {
             /**
@@ -1680,6 +1680,8 @@ export interface components {
             /** Positions */
             positions: components["schemas"]["FlowPositionResponse"][];
             summary: components["schemas"]["FlowResultsResponse"];
+            /** Openings Suspended */
+            openings_suspended: string | null;
         };
         /**
          * FlowStatisticsResponse

@@ -84,6 +84,7 @@ from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCa
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
@@ -251,6 +252,7 @@ class TenantUseCases:
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
             read_flow_results=ReadFlowResultsUseCase(
                 ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ReadOpeningsSuspensionUseCase(ports.flows, ports.reconciliation, ports.account_names),
                 ports.equity_snapshots,
                 ports.cycle_history,
                 ports.clock,
@@ -291,6 +293,7 @@ class TenantUseCases:
                 ports.cycle_history,
                 ReadFlowResultsUseCase(
                     ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                    ReadOpeningsSuspensionUseCase(ports.flows, ports.reconciliation, ports.account_names),
                     ports.equity_snapshots,
                     ports.cycle_history,
                     ports.clock,

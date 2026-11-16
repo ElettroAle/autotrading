@@ -2,7 +2,7 @@ import { expect, type Locator } from '@playwright/test';
 
 import { fakePlatform } from '@/testing/mocks/platform';
 
-import { Given, Then, When } from '../../../support/fixtures';
+import { Given, Then } from '../../../support/fixtures';
 
 // The header of each cell stays in the page for narrow screens, hidden on the wide one: the text is what shows.
 const expectShown = async (cell: Promise<Locator>, text: string): Promise<void> => {
@@ -31,11 +31,6 @@ Given('che {string} non ha conti', async ({}, account: string) => {
 
 Given("che l'exchange non risponde", async () => {
   fakePlatform.stopExchange();
-});
-
-When('{string} apre la pagina dei conti', async ({ dashboard }, account: string) => {
-  await dashboard.openAccounts();
-  await dashboard.signInAs(account);
 });
 
 Then(

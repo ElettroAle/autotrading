@@ -3,6 +3,7 @@ import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
+import { fakeReconciliation } from './reconciliation';
 
 /**
  * The platform behind the fakes: the users of the identity provider, their role, the accounts and the flows of their
@@ -465,6 +466,7 @@ export const fakePlatform = {
     state.exchangeNetwork = 'test';
     state.exchangeNetworkName = 'testnet';
     state.apiAnswers = true;
+    fakeReconciliation.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {

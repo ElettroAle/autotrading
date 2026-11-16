@@ -10,6 +10,7 @@ import { paths } from '@/config/paths';
 import { useAccounts } from '../api/get-accounts';
 import { DRAFT_STATUS, useFlows, type Flow } from '../api/get-flows';
 
+import { OpeningsSuspendedNotice } from './openings-suspended-notice';
 import { StartFlowButton } from './start-flow-button';
 
 const FlowStatus = ({ flow }: { flow: Flow }) => {
@@ -33,8 +34,8 @@ type FlowViewProps = {
 };
 
 /**
- * The head of the page of the flow: its status with the commands of the status and the warning of the network, then
- * the command Configurazione, which holds what does not depend on the period (R6.4.3, ADR
+ * The head of the page of the flow: its status with the commands of the status, the warning of the network and the
+ * openings suspended (R3.3.2), then the command Configurazione, which holds what does not depend on the period (R6.4.3, ADR
  * pagina-del-flusso-a-schede-sotto-un-periodo-comune).
  */
 export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) => {
@@ -61,6 +62,7 @@ export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) =>
           {account !== undefined && !realMoney ? (
             <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
           ) : null}
+          {flow.status === DRAFT_STATUS ? null : <OpeningsSuspendedNotice flowId={flow.id} />}
         </div>
         {flow.status === DRAFT_STATUS ? (
           <div className="mt-3">

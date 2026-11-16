@@ -14,6 +14,10 @@ export const paths = {
     path: '/accounts',
     getHref: () => '/accounts',
   },
+  accountAlarms: {
+    path: '/accounts/:accountId/alarms',
+    getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/alarms`,
+  },
   newFlow: {
     path: '/flows/new',
     getHref: () => '/flows/new',

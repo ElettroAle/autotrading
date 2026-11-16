@@ -10,6 +10,7 @@ import {
 } from '@/testing/mocks/history';
 import { fakePlatform, versionsWith, type FakeFlow } from '@/testing/mocks/platform';
 import { aClosedPosition, anOpenPosition } from '@/testing/mocks/positions';
+import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 
 import type { DashboardPages } from './dashboard-pages';
 
@@ -55,10 +56,13 @@ export const preparePagesWithLongWords = (
     aClosedPosition({ closedAt: new Date(DAY), reason: LONG_FAILURE }),
   ]);
   fakePlatform.saveProviderKey(account, LONG_PROVIDER, apiInstant(new Date(DAY)));
+  const accountId = flow.accountId ?? '';
+  fakeReconciliation.closedAlarm(accountId, new Date(DAY - 2 * HOUR), new Date(DAY - HOUR));
+  fakeReconciliation.openAlarm(accountId, 1000, 980, new Date(DAY));
   const owner = {
     flowId: flow.id,
     flow: flow.name,
-    accountId: flow.accountId ?? '',
+    accountId,
     account: LONG_ACCOUNT,
     version: flow.version,
   };
@@ -74,6 +78,7 @@ export const preparePagesWithLongWords = (
     home: paths.home.getHref(),
     login: paths.login.getHref(),
     accounts: paths.accounts.getHref(),
+    accountAlarms: paths.accountAlarms.getHref(accountId),
     newFlow: paths.newFlow.getHref(),
     flow: paths.flow.getHref(flow.id),
     editFlow: paths.editFlow.getHref(flow.id),

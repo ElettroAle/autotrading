@@ -5736,6 +5736,17 @@
           },
           "summary": {
             "$ref": "#/components/schemas/FlowResultsResponse"
+          },
+          "openings_suspended": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openings Suspended"
           }
         },
         "type": "object",
@@ -5751,10 +5762,11 @@
           "total_value",
           "return_percent",
           "positions",
-          "summary"
+          "summary",
+          "openings_suspended"
         ],
         "title": "FlowStateResponse",
-        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2); amounts as strings (ADR 0018)."
+        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018)."
       },
       "FlowStatisticsResponse": {
         "properties": {
