@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 
-from autotrading.domain.agent.agent_response import LOWEST_LEVERAGE
-from autotrading.domain.agent.decision import TradeAction, TradeDirection
+from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.errors import InvalidAgentContextError
 
 MINUTE = timedelta(minutes=1)
@@ -64,9 +63,9 @@ class SourceData:
 class AgentContext:
     """Everything the agent receives in a cycle, and nothing else (R1.4.3)."""
 
-    instructions: str
+    # The flow writes it, from its template and its values: the agent declares only the data and the answer (R1.4.8).
+    system_prompt: str
     assets: tuple[str, ...]
-    max_leverage: int
     started_at: datetime
     now: datetime
     state: FlowStateView
@@ -78,34 +77,10 @@ class AgentContext:
             raise InvalidAgentContextError
 
     def messages(self) -> tuple[ModelMessage, ModelMessage]:
-        """The rules and the response format as the system message, the data of the cycle as the user message."""
+        """The system prompt of the flow as the system message, the data of the cycle as the user message."""
         return (
-            ModelMessage(MessageRole.SYSTEM, self._system_text()),
+            ModelMessage(MessageRole.SYSTEM, self.system_prompt),
             ModelMessage(MessageRole.USER, json.dumps(self._document(), ensure_ascii=False, indent=1)),
-        )
-
-    def _system_text(self) -> str:
-        actions = ", ".join(action.value for action in TradeAction)
-        return "\n".join(
-            (
-                self.instructions,
-                "",
-                "Regole operative:",
-                "- al massimo una posizione per asset;",
-                f"- azioni ammesse: {actions};",
-                f"- leva da {LOWEST_LEVERAGE} a {self.max_leverage};",
-                f"- una decisione per ciascun asset del flusso: {', '.join(self.assets)};",
-                "- la chiusura è sempre totale;",
-                "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato"
-                " dello stato del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da"
-                " un'altra rete o piazza e servono solo a stimare la direzione del mercato.",
-                "",
-                "Rispondi solo con un oggetto JSON in questo formato:",
-                '{"decisioni": [{"asset": "<asset>", "azione": "apri|chiudi|mantieni", "direzione": "long|short",'
-                ' "quota": <frazione dei soldi del flusso da impegnare come margine, da 0 a 1>,'
-                ' "leva": <intero>, "ragionamento": "<perché>"}]}',
-                "direzione, quota e leva servono solo per apri; il ragionamento serve sempre.",
-            )
         )
 
     def _document(self) -> dict[str, object]:

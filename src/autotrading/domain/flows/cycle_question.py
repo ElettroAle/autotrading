@@ -9,15 +9,14 @@ from autotrading.domain.flows.source_data import SourceData
 
 @dataclass(frozen=True, slots=True)
 class CycleQuestion:
-    """What a cycle asks the agent: the model of the flow, its instructions and limits, its state and the data of its
-    sources, and nothing else (R1.4.3).
+    """What a cycle asks the agent: the model of the flow, its system prompt rendered with the values of the flow
+    (R1.4.8), its state and the data of its sources, and nothing else (R1.4.3).
     """
 
     model: str
     settings: Mapping[str, ModelParameterValue]
-    instructions: str
+    system_prompt: str
     assets: tuple[str, ...]
-    max_leverage: int
     started_at: datetime
     now: datetime
     state: FlowStateView

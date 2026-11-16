@@ -276,3 +276,18 @@ class FlowCredentialsMissingError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("credenziali del conto incomplete")
+
+
+class UnknownPromptPlaceholderError(FlowSettingError):
+    """A placeholder the system prompt names but the registry does not declare (R1.4.8)."""
+
+    def __init__(self, placeholder: str) -> None:
+        super().__init__(f'il segnaposto "{placeholder}" non esiste', FlowSetting.SYSTEM_PROMPT)
+        self.placeholder = placeholder
+
+
+class MalformedSystemPromptError(FlowSettingError):
+    """A brace without its pair: a literal brace is written twice, {{ or }} (R1.4.8)."""
+
+    def __init__(self) -> None:
+        super().__init__("parentesi graffa senza la sua coppia: per scriverla nel testo raddoppiala", FlowSetting.SYSTEM_PROMPT)

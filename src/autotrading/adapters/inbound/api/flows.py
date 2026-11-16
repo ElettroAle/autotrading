@@ -36,6 +36,7 @@ from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
+from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -61,6 +62,8 @@ class FlowCreationRequest(BaseModel):
     max_value_exposure_percent: Decimal | None = None
     allocated_capital: Decimal
     bring_to_minimum: bool = False
+    # Null or missing follows the default of the platform (R1.4.8).
+    system_prompt: str | None = None
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -77,6 +80,7 @@ class FlowCreationRequest(BaseModel):
             instructions=self.instructions,
             cycle_minutes=self.cycle_minutes,
             bring_to_minimum=self.bring_to_minimum,
+            system_prompt=self.system_prompt,
         )
 
 
@@ -94,6 +98,8 @@ class FlowModificationRequest(BaseModel):
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
     bring_to_minimum: bool | None = None
+    # A null sent on purpose goes back to the default; a missing one keeps the version in force (R1.4.8).
+    system_prompt: str | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -111,6 +117,8 @@ class FlowModificationRequest(BaseModel):
             max_margin_exposure_percent=self.max_margin_exposure_percent,
             max_value_exposure_percent=self.max_value_exposure_percent,
             bring_to_minimum=self.bring_to_minimum,
+            system_prompt=self.system_prompt,
+            default_system_prompt=self.system_prompt is None and "system_prompt" in self.model_fields_set,
         )
 
 
@@ -155,6 +163,24 @@ class RiskLimitsResponse(BaseModel):
         )
 
 
+class PromptPlaceholderResponse(BaseModel):
+    """A placeholder the system prompt may use, with what it stands for (R1.4.8)."""
+
+    name: str
+    description: str
+
+    @classmethod
+    def all(cls) -> list[PromptPlaceholderResponse]:
+        return [cls(name=placeholder.value, description=placeholder.description) for placeholder in PromptPlaceholder]
+
+
+class DefaultSystemPromptResponse(BaseModel):
+    """The system prompt a new flow starts with, and the placeholders it may use (R1.4.8)."""
+
+    system_prompt: str
+    system_prompt_placeholders: list[PromptPlaceholderResponse]
+
+
 class ConfigurationResponse(BaseModel):
     """One configuration version of a flow."""
 
@@ -168,6 +194,9 @@ class ConfigurationResponse(BaseModel):
     # None only in the versions of a draft (ADR 0124).
     allocated_capital: str | None
     bring_to_minimum: bool
+    system_prompt: str
+    system_prompt_is_default: bool
+    system_prompt_placeholders: list[PromptPlaceholderResponse]
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -184,6 +213,9 @@ class ConfigurationResponse(BaseModel):
             risk_limits=RiskLimitsResponse.of(configuration.risk_limits),
             allocated_capital=_amount(configuration.allocated_capital),
             bring_to_minimum=configuration.bring_to_minimum,
+            system_prompt=configuration.system_prompt_template,
+            system_prompt_is_default=configuration.system_prompt is None,
+            system_prompt_placeholders=PromptPlaceholderResponse.all(),
         )
 
 
@@ -224,6 +256,9 @@ class FlowResponse(BaseModel):
     risk_limits: RiskLimitsResponse
     allocated_capital: str | None
     bring_to_minimum: bool
+    system_prompt: str
+    system_prompt_is_default: bool
+    system_prompt_placeholders: list[PromptPlaceholderResponse]
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -245,6 +280,9 @@ class FlowResponse(BaseModel):
             risk_limits=RiskLimitsResponse.of(configuration.risk_limits),
             allocated_capital=_amount(configuration.allocated_capital),
             bring_to_minimum=configuration.bring_to_minimum,
+            system_prompt=configuration.system_prompt_template,
+            system_prompt_is_default=configuration.system_prompt is None,
+            system_prompt_placeholders=PromptPlaceholderResponse.all(),
         )
 
 
@@ -319,6 +357,12 @@ def flows_router(
     ) -> FlowResponse:
         """A draft named as asked, with the strategy of the file sent as it is (R2.5.2, ADR 0140)."""
         return FlowResponse.of(use_cases.import_flow_strategy.execute(document.command(name)))
+
+    @router.get("/flows/system-prompt")
+    def read_default_system_prompt() -> DefaultSystemPromptResponse:
+        return DefaultSystemPromptResponse(
+            system_prompt=DEFAULT_SYSTEM_PROMPT, system_prompt_placeholders=PromptPlaceholderResponse.all()
+        )
 
     @router.get("/flows")
     def list_flows(

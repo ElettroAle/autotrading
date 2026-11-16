@@ -5,6 +5,7 @@ from autotrading.domain.flows.errors import ExposureLimitRequiredError, InvalidR
 from autotrading.domain.flows.flow_setting import FlowSetting
 
 HUNDRED = Decimal(100)
+LOWEST_LEVERAGE = 1
 LEVERAGE = "leva massima"
 MARGIN_EXPOSURE = "esposizione massima del margine"
 VALUE_EXPOSURE = "esposizione massima del valore"
@@ -33,7 +34,7 @@ class RiskLimits:
     def __post_init__(self) -> None:
         if self.max_margin_exposure_percent is None and self.max_value_exposure_percent is None:
             raise ExposureLimitRequiredError
-        if self.max_leverage < 1:
+        if self.max_leverage < LOWEST_LEVERAGE:
             raise InvalidRiskLimitError(LEVERAGE, FlowSetting.MAX_LEVERAGE)
         _require_percent(self.max_margin_exposure_percent, MARGIN_EXPOSURE, FlowSetting.MAX_MARGIN_EXPOSURE)
         _require_percent(self.max_value_exposure_percent, VALUE_EXPOSURE, FlowSetting.MAX_VALUE_EXPOSURE)
