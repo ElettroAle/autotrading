@@ -1,4 +1,5 @@
 import threading
+from decimal import Decimal
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -7,6 +8,7 @@ from autotrading.application.flows.compare_flow_versions import CompareFlowVersi
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
 from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.flows.errors import ExposureLimitRequiredError
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.fakes.model_call import HELD_SECONDS
 from tests.support.flow_cycles import FlowCycles
@@ -17,6 +19,13 @@ from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the lif
 from tests.support.lifecycle_steps import Lifecycle, add_flow, flow_named, modify, put_in_status
 from tests.support.platform import Platform
 from tests.support.steps import quoted
+
+
+class Exposures:
+    """The configuration version of the flow before the change the scenario makes."""
+
+    def __init__(self) -> None:
+        self.version_before = 0
 
 
 class Comparison:
@@ -37,6 +46,11 @@ def platform(flow_cycles: FlowCycles) -> Platform:
 @pytest.fixture
 def comparison() -> Comparison:
     return Comparison()
+
+
+@pytest.fixture
+def exposures() -> Exposures:
+    return Exposures()
 
 
 scenarios("E1-flussi-autonomi/F1.1-flussi-di-trading/R1.1.3-modifica-versionata-della-configurazione.feature")
@@ -132,3 +146,67 @@ def next_cycle_uses_version(flow_cycles: FlowCycles, name: str, version: str) ->
 def model_of_version(version: str) -> str:
     """The model the agent was called with: version 1 has DeepSeek, version 2 Claude."""
     return {"1": OPENROUTER_MODEL, "2": ANTHROPIC_MODEL}[version]
+
+
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta: the scenarios of Bug 503.
+@given(quoted('che "{user}" ha il flusso "{name}" con esposizione massima del margine {margin}% e del valore {value}%'))
+def flow_with_both_exposures(
+    platform: Platform, lifecycle: Lifecycle, exposures: Exposures, user: str, name: str, *, margin: str, value: str
+) -> None:
+    # The flow of the background gets both limits, as the user would set them.
+    modify(
+        platform,
+        lifecycle,
+        user,
+        name,
+        max_margin_exposure_percent=Decimal(margin),
+        max_value_exposure_percent=Decimal(value),
+    )
+    configuration = flow_named(platform, user, name).configuration
+    assert configuration.risk_limits.max_margin_exposure_percent == Decimal(margin)
+    assert configuration.risk_limits.max_value_exposure_percent == Decimal(value)
+    exposures.version_before = configuration.version
+
+
+@when(quoted('"{user}" modifica "{name}" togliendo l\'esposizione massima del valore'))
+def remove_value_exposure(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
+    modify(platform, lifecycle, user, name, remove_max_value_exposure=True)
+
+
+@when(quoted('"{user}" modifica "{name}" togliendo entrambi i limiti di esposizione'))
+def remove_both_exposures(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
+    modify(platform, lifecycle, user, name, remove_max_margin_exposure=True, remove_max_value_exposure=True)
+
+
+@when(quoted('"{user}" modifica solo le istruzioni di "{name}"'))
+def modify_instructions_only(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
+    modify(platform, lifecycle, user, name, instructions="solo trend chiari")
+
+
+@then(quoted('la nuova versione di "{name}" ha esposizione massima del margine {margin}% e nessun limite sul valore'))
+def new_version_without_value_exposure(
+    platform: Platform, lifecycle: Lifecycle, exposures: Exposures, name: str, margin: str
+) -> None:
+    configuration = flow_named(platform, lifecycle.user, name).configuration
+    assert configuration.version == exposures.version_before + 1
+    assert (
+        configuration.risk_limits.max_margin_exposure_percent,
+        configuration.risk_limits.max_value_exposure_percent,
+    ) == (Decimal(margin), None)
+
+
+@then(quoted('la nuova versione di "{name}" ha esposizione massima del margine {margin}% e del valore {value}%'))
+def new_version_with_both_exposures(
+    platform: Platform, lifecycle: Lifecycle, exposures: Exposures, name: str, *, margin: str, value: str
+) -> None:
+    configuration = flow_named(platform, lifecycle.user, name).configuration
+    assert configuration.version == exposures.version_before + 1
+    assert (
+        configuration.risk_limits.max_margin_exposure_percent,
+        configuration.risk_limits.max_value_exposure_percent,
+    ) == (Decimal(margin), Decimal(value))
+
+
+@then("la modifica viene rifiutata perché serve almeno un limite di esposizione")
+def refused_without_exposure(lifecycle: Lifecycle) -> None:
+    assert isinstance(lifecycle.error, ExposureLimitRequiredError)
