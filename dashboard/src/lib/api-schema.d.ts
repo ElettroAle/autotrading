@@ -476,6 +476,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/cash-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cash Out Profits */
+        post: operations["cash_out_profits_flows__flow_id__cash_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/allocated-capital": {
         parameters: {
             query?: never;
@@ -1044,6 +1061,29 @@ export interface components {
             new: string;
             /** User Id */
             user_id: string;
+        };
+        /**
+         * CashOutOutcomeResponse
+         * @description The flow after the cash-out, the money it freed and the positions not closed, each with its reason (R3.4.1).
+         *
+         *     With a position left open nothing is freed.
+         */
+        CashOutOutcomeResponse: {
+            flow: components["schemas"]["FlowResponse"];
+            /** Freed */
+            freed: string | null;
+            /** Capital */
+            capital: string | null;
+            /** Left Open */
+            left_open: components["schemas"]["PositionLeftOpenResponse"][];
+        };
+        /**
+         * CashOutRequest
+         * @description The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1).
+         */
+        CashOutRequest: {
+            /** Capital */
+            capital?: number | string | null;
         };
         /**
          * ClosedPositionPageResponse
@@ -3248,6 +3288,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StopOutcomeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cash_out_profits_flows__flow_id__cash_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CashOutRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashOutOutcomeResponse"];
                 };
             };
             /** @description Validation Error */

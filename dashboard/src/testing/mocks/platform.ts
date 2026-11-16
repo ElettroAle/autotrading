@@ -239,6 +239,12 @@ export const FAKE_FLOW_COMMANDS = ['pause', 'resume', 'stop', 'archive'] as cons
 
 export type FakeFlowCommand = (typeof FAKE_FLOW_COMMANDS)[number];
 
+/** The flow after a cash-out of its profits and what the cash-out freed (R3.4.1). */
+export type FakeCashOut = {
+  readonly flow: FakeFlow;
+  readonly freed: number;
+};
+
 type Transition = {
   readonly from: readonly string[];
   readonly to: string;
@@ -307,6 +313,7 @@ const state = {
   cycles: new Map<string, FakeCycle[]>(),
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
+  cashOuts: [] as string[],
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
   exchangeReachable: true,
@@ -458,6 +465,7 @@ export const fakePlatform = {
     state.cycles.clear();
     state.openPositions.clear();
     state.closedPositions.clear();
+    state.cashOuts.length = 0;
     state.signingIn = undefined;
     state.sessionsExpired = false;
     state.exchangeReachable = true;
@@ -897,6 +905,36 @@ export const fakePlatform = {
     }
     flow.status = transition.to;
     return flow;
+  },
+
+  /**
+   * The cash-out of the profits of the flow, refused as the API refuses it: it closes every position, keeps the capital
+   * asked for, or the capital allocated now, and frees the rest of what the flow is worth (R3.4.1).
+   */
+  cashOut(user: FakeUser, flowId: string, capital: number | undefined): FakeCashOut {
+    const flow = flowOf(user, flowId);
+    const allocated = flow.allocatedCapital ?? 0;
+    if (flow.currentCapital <= allocated) {
+      throw new FakeRefusal(409, `${flow.name} non ha profitti da incassare`);
+    }
+    const kept = capital ?? allocated;
+    if (kept <= 0 || kept >= flow.currentCapital) {
+      throw new FakeRefusal(
+        400,
+        `il capitale indicato è maggiore di 0 e minore del valore del flusso, ${String(flow.currentCapital)} USDC`,
+      );
+    }
+    state.openPositions.delete(flow.id);
+    const freed = flow.currentCapital - kept;
+    flow.allocatedCapital = kept;
+    flow.currentCapital = kept;
+    state.cashOuts.push(flow.id);
+    return { flow, freed };
+  },
+
+  /** How many cash-outs of the flow with the name the fake API ran. */
+  cashOutsOf(flowName: string): number {
+    return state.cashOuts.filter((flowId) => flowId === flowIdOf(flowName)).length;
   },
 
   /** Time passes for the worker: every active flow runs one cycle per interval of its own. */
