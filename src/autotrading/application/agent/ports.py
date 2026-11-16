@@ -144,6 +144,9 @@ class QuestionPositionPort(Protocol):
     def entry_price(self) -> Decimal: ...
 
     @property
+    def mark_price(self) -> Decimal: ...
+
+    @property
     def unrealized_pnl(self) -> Decimal: ...
 
     @property

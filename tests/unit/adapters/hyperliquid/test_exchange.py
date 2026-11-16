@@ -61,6 +61,7 @@ LONG_BTC = {
     "szi": "0.02",
     "leverage": {"type": "cross", "value": 2},
     "entryPx": "60000.0",
+    "positionValue": "1225.0",
     "unrealizedPnl": "12.5",
     "liquidationPx": "31000.0",
     "marginUsed": "600.0",
@@ -255,14 +256,37 @@ def test_a_key_with_or_without_prefix_in_any_case_is_accepted(key: str) -> None:
 
 
 def test_positions_carry_side_size_leverage_prices_and_result() -> None:
-    short_eth = LONG_BTC | {"coin": "ETH", "szi": "-1.5", "leverage": {"type": "isolated", "value": 3}}
+    short_eth = LONG_BTC | {
+        "coin": "ETH",
+        "szi": "-1.5",
+        "leverage": {"type": "isolated", "value": 3},
+        "positionValue": "91875.0",
+    }
     entries = [{"type": "oneWay", "position": LONG_BTC}, {"type": "oneWay", "position": short_eth}]
 
     positions = read(FakeSdk(state=STATE | {"assetPositions": entries})).positions
 
     assert positions == (
-        Position("BTC", PositionSide.LONG, Decimal("0.02"), 2, Decimal(60000), Decimal("12.5"), Decimal(31000)),
-        Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(60000), Decimal("12.5"), Decimal(31000)),
+        Position(
+            "BTC",
+            PositionSide.LONG,
+            Decimal("0.02"),
+            2,
+            Decimal(60000),
+            Decimal(61250),
+            Decimal("12.5"),
+            Decimal(31000),
+        ),
+        Position(
+            "ETH",
+            PositionSide.SHORT,
+            Decimal("1.5"),
+            3,
+            Decimal(60000),
+            Decimal(61250),
+            Decimal("12.5"),
+            Decimal(31000),
+        ),
     )
 
 
@@ -358,7 +382,14 @@ def test_the_cycle_reads_margin_and_positions_proving_the_signer() -> None:
     account = HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
 
     position = CyclePosition(
-        "BTC", TradeSide.LONG, Decimal("0.02"), 2, Decimal("60000.0"), Decimal("12.5"), Decimal("31000.0")
+        "BTC",
+        TradeSide.LONG,
+        Decimal("0.02"),
+        2,
+        Decimal("60000.0"),
+        Decimal(61250),
+        Decimal("12.5"),
+        Decimal("31000.0"),
     )
     assert account == CycleAccount("USDC", Decimal("1000.5"), (position,))
     assert [name for name, _ in sdk.calls] == [

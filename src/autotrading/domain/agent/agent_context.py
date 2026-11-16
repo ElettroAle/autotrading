@@ -32,6 +32,7 @@ class PositionView:
     size: Decimal
     leverage: int
     entry_price: Decimal
+    mark_price: Decimal
     unrealized_pnl: Decimal
     liquidation_price: Decimal | None
 
@@ -94,7 +95,10 @@ class AgentContext:
                 f"- azioni ammesse: {actions};",
                 f"- leva da {LOWEST_LEVERAGE} a {self.max_leverage};",
                 f"- una decisione per ciascun asset del flusso: {', '.join(self.assets)};",
-                "- la chiusura è sempre totale.",
+                "- la chiusura è sempre totale;",
+                "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato"
+                " dello stato del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da"
+                " un'altra rete o piazza e servono solo a stimare la direzione del mercato.",
                 "",
                 "Rispondi solo con un oggetto JSON in questo formato:",
                 '{"decisioni": [{"asset": "<asset>", "azione": "apri|chiudi|mantieni", "direzione": "long|short",'
@@ -158,6 +162,7 @@ def _position_document(position: PositionView) -> dict[str, object]:
         "dimensione": str(position.size),
         "leva": position.leverage,
         "prezzo_di_ingresso": str(position.entry_price),
+        "prezzo_di_mercato": str(position.mark_price),
         "pnl_non_realizzato": str(position.unrealized_pnl),
         "prezzo_di_liquidazione": None if liquidation is None else str(liquidation),
     }

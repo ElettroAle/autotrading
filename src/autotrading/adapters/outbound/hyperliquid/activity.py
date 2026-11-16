@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import TypedDict
 
 import requests
@@ -21,7 +21,7 @@ from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.trade_intent import TradeSide
 
 FROM_THE_START = 0
-SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, InvalidOperation)
+SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, ArithmeticError)
 
 
 class _LedgerDelta(TypedDict, total=False):
@@ -104,6 +104,7 @@ def _position_of(position: _UserPosition) -> AccountPosition:
         unrealized_pnl=position.unrealized_pnl,
         leverage=position.leverage,
         entry_price=position.entry_price,
+        mark_price=position.mark_price,
     )
 
 

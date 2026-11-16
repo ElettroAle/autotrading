@@ -21,6 +21,7 @@ class PositionResponse(BaseModel):
     size: str
     leverage: int
     entry_price: str
+    mark_price: str
     unrealized_pnl: str
     liquidation_price: str | None
 
@@ -33,6 +34,7 @@ class PositionResponse(BaseModel):
             size=str(position.size),
             leverage=position.leverage,
             entry_price=str(position.entry_price),
+            mark_price=str(position.mark_price),
             unrealized_pnl=str(position.unrealized_pnl),
             liquidation_price=None if liquidation is None else str(liquidation),
         )

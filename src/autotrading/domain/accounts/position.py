@@ -17,6 +17,7 @@ class Position:
     size: Decimal
     leverage: int
     entry_price: Decimal
+    mark_price: Decimal
     unrealized_pnl: Decimal
     # The exchange reports no liquidation price when the margin covers any move of the price.
     liquidation_price: Decimal | None
