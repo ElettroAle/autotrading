@@ -3,6 +3,7 @@ import { expect, type Locator } from '@playwright/test';
 import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
 import { fakePlatform, versionsWith } from '@/testing/mocks/platform';
 
+import { colourOf, isRed, isWhite } from '../../../support/colours';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import {
   aStoppedFlow,
@@ -16,7 +17,6 @@ import { Given, Then, When, type ScenarioMemory } from '../../../support/fixture
 const USER = 'utente';
 // The flow the scenarios open when they name none.
 const THE_FLOW = 'prova-btc';
-const SCREEN_HEIGHT = 800;
 // The least a command or a view needs to be touched with a finger (ADR viste-e-comandi-della-pagina-del-flusso).
 const TOUCHABLE_HEIGHT = 44;
 const FLOW_VIEWS = [
@@ -41,28 +41,6 @@ const boxOf = async (locator: Locator): Promise<Box> => {
   expect(box).not.toBeNull();
   return box ?? { x: 0, y: 0, width: 0, height: 0 };
 };
-
-type Rgb = { readonly red: number; readonly green: number; readonly blue: number };
-
-// The browser writes colours in the space the style chose (oklch for Tailwind): painted on a canvas they read as RGB.
-const colourOf = async (locator: Locator, property: 'color' | 'backgroundColor'): Promise<Rgb> => {
-  const [red = 0, green = 0, blue = 0, alpha = 0] = await locator.evaluate((element, name) => {
-    const context = document.createElement('canvas').getContext('2d');
-    if (context === null) {
-      return [];
-    }
-    context.fillStyle = getComputedStyle(element)[name];
-    context.fillRect(0, 0, 1, 1);
-    return [...context.getImageData(0, 0, 1, 1).data];
-  }, property);
-  // A transparent background shows the white of the page behind it.
-  return alpha === 0 ? { red: 255, green: 255, blue: 255 } : { red, green, blue };
-};
-
-const isWhite = ({ red, green, blue }: Rgb): boolean => Math.min(red, green, blue) > 240;
-
-// A red tone: the red channel well above the other two, as the commands that destroy.
-const isRed = ({ red, green, blue }: Rgb): boolean => red > 150 && red > 2 * Math.max(green, blue);
 
 /** The flow the scenario named, or the flow of the feature: a stopped flow of the user, created when missing. */
 const flowOfScenario = (memory: ScenarioMemory, name = memory.flow || THE_FLOW): string => {
@@ -103,10 +81,6 @@ const filterLabel = (dashboard: DashboardPages, label: string): Locator =>
     .getByRole('group', { name: 'Filtri' })
     .locator('label')
     .filter({ hasText: new RegExp(`^${label}$`) });
-
-Given('uno schermo largo {int} pixel', async ({ dashboard }, width: number) => {
-  await dashboard.page.setViewportSize({ width, height: SCREEN_HEIGHT });
-});
 
 When("l'utente apre una qualsiasi pagina della dashboard", async ({ dashboard, memory }) => {
   const pages = preparePagesWithLongWords(USER, THE_FLOW);
