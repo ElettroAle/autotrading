@@ -20,6 +20,7 @@ export const accountSchema = z.object({
 
 export type Account = z.infer<typeof accountSchema>;
 
+// Every reading of the accounts starts with this key: a change of an account invalidates them all (Bug 437).
 export const ACCOUNTS_QUERY_KEY = ['accounts'] as const;
 
 /** The accounts of the tenant of the user, with network and allocated capital, never the balance (ADR 0126). */
