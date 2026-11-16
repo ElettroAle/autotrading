@@ -24,6 +24,7 @@ from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepo
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -63,7 +64,12 @@ class Bench:
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         record = RecordAccountExecutionsUseCase(flows, self.activity, self.orders, self.ledger)
         reconcile_account = ReconcileAccountUseCase(
-            flows, self.activity, InMemoryReconciliationRepositoryAdapter(), InMemoryClosedPositionsAdapter(), record
+            flows,
+            self.activity,
+            InMemoryReconciliationRepositoryAdapter(),
+            InMemoryClosedPositionsAdapter(),
+            record,
+            InMemoryProtectionClosingsAdapter(),
         )
         self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
         self.read = ReadCycleFlowStateUseCase(

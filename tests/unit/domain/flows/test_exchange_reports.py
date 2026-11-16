@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
 from autotrading.domain.flows.trade_side import TradeSide
@@ -48,7 +49,16 @@ def test_an_approved_opening_becomes_the_order_that_opens() -> None:
 
     order = opening.order_with(lambda *values: ("apri", *values), lambda asset: ("chiudi", asset))
 
-    assert order == ("apri", "BTC", "short", Decimal(120), 3)
+    assert order == ("apri", "BTC", "short", Decimal(120), 3, None, None)
+
+
+def test_an_approved_opening_hands_the_levels_of_its_exit_plan_to_its_order() -> None:
+    plan = ExitPlan(Decimal(110), Decimal(130), "sopra 125")
+    opening = ApprovedOpening("BTC", TradeSide.SHORT, Decimal(120), 3, (), plan)
+
+    order = opening.order_with(lambda *values: ("apri", *values), lambda asset: ("chiudi", asset))
+
+    assert order == ("apri", "BTC", "short", Decimal(120), 3, Decimal(130), Decimal(110))
 
 
 def test_an_approved_close_becomes_the_order_that_closes() -> None:

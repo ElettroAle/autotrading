@@ -423,3 +423,23 @@ flow_exit_plans = Table(
     Column("invalidation", Text),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
+
+
+# The protections the platform placed for the positions of the flows; a removed one stays, so that its execution read
+# later still belongs to its flow (R3.1.2).
+flow_protections = Table(
+    "flow_protections",
+    metadata,
+    Column("client_order_id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("flow_id", Uuid, nullable=False),
+    Column("asset", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("trigger_price", Numeric, nullable=False),
+    Column("exchange_order_id", Text, nullable=False),
+    Column("placed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("removed_at", DateTime(timezone=True)),
+    ForeignKeyConstraint(["account_id", "tenant_id"], ["accounts.id", "accounts.tenant_id"]),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)

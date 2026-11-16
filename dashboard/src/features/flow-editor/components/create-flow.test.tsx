@@ -177,6 +177,8 @@ describe('CreateFlow', () => {
         max_margin_exposure_percent: '10',
         max_value_exposure_percent: null,
       },
+      default_stop_loss_percent: '5',
+      default_take_profit_percent: null,
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: FAKE_SYSTEM_PROMPT.system_prompt,

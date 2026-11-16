@@ -23,6 +23,7 @@ from tests.fakes.closed_position_repository import InMemoryClosedPositionReposit
 from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT, a_fill, an_activity
 from tests.support.flows import ACCOUNT, a_flow, account_id_of
@@ -131,11 +132,14 @@ class History:
             InMemoryClosedPositionRepositoryAdapter(self.platform.closed_positions, operating.tenant_id),
             NotifyPositionClosedUseCase(notify, "USDC"),
             InMemoryExitPlanRepositoryAdapter(self.platform.exit_plans, operating.tenant_id),
+            self.platform.cancel_protections(operating.tenant_id),
         )
         record = RecordAccountExecutionsUseCase(
             flows, self.platform.account_activity, self.platform.platform_orders, self.platform.ledger
         )
-        reconciliation = ReconcileAccountUseCase(flows, self.platform.account_activity, readings, history, record)
+        reconciliation = ReconcileAccountUseCase(
+            flows, self.platform.account_activity, readings, history, record, InMemoryProtectionClosingsAdapter()
+        )
         reconciliation.execute(ReconcileAccountCommand(operating.id))
 
     def position(self) -> ClosedPosition:

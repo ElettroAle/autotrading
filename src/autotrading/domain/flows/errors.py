@@ -71,6 +71,16 @@ class AllocatedCapitalNotPositiveError(FlowSettingError):
         super().__init__("il capitale allocato deve essere positivo", FlowSetting.ALLOCATED_CAPITAL)
 
 
+class InvalidDefaultStopLossError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("lo stop loss predefinito va da 0,1 a 50", FlowSetting.DEFAULT_STOP_LOSS)
+
+
+class InvalidDefaultTakeProfitError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("il take profit predefinito è maggiore di 0", FlowSetting.DEFAULT_TAKE_PROFIT)
+
+
 class CapitalAboveFreeCapitalError(FlowSettingError):
     def __init__(self, free_capital: str) -> None:
         super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}", FlowSetting.ALLOCATED_CAPITAL)

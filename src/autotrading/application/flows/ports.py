@@ -10,7 +10,7 @@ from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountActivity
-from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing
+from autotrading.domain.flows.account_reconciliation import AccountReading, OutsideClosing, ProtectionClosing
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
@@ -533,6 +533,32 @@ class OutsideClosingRecorderPort(Protocol):
     def execute(self, closing: OutsideClosing) -> None:
         """Records a position the reconciliation finds closed outside the platform (ADR 0056)."""
         ...
+
+
+class ProtectionClosingRecorderPort(Protocol):
+    """Bound to the tenant of the request: the history of the closed positions of its flows (R1.7.2)."""
+
+    def execute(self, closing: ProtectionClosing) -> None:
+        """Records a position the reconciliation finds closed by its stop loss or take profit (R3.1.2)."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedPosition:
+    """The position of the account of a flow on an asset, whose protections its closing leaves behind (R3.1.2)."""
+
+    account_id: UUID
+    asset: str
+
+
+class ProtectionCancellationPort(Protocol):
+    """It is CancelProtectionsUseCase of the orders context, bound to the tenant of the request (R3.1.2).
+
+    The protections left on the exchange by a closing the reconciliation finds are cancelled through the worker's own
+    access to the account, as every order of a flow.
+    """
+
+    def execute(self, position: ProtectedPosition) -> None: ...
 
 
 class ClosedPositionRepositoryPort(Protocol):

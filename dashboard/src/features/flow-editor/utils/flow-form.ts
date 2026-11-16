@@ -25,6 +25,8 @@ export const flowFormSchema = z.object({
   max_leverage: numberText,
   max_margin_exposure_percent: numberText,
   max_value_exposure_percent: numberText,
+  default_stop_loss_percent: numberText,
+  default_take_profit_percent: numberText,
   allocated_capital: numberText,
   bring_to_minimum: z.boolean(),
   // The text the user wrote, kept apart from whether the flow follows the default of the platform (R1.4.8).
@@ -53,6 +55,9 @@ type SettingsRequest = {
   max_leverage: number | null;
   max_margin_exposure_percent: string | null;
   max_value_exposure_percent: string | null;
+  // Blank at creation takes the default stop loss of the platform; the take profit may stay absent (R3.1.2).
+  default_stop_loss_percent: string | null;
+  default_take_profit_percent: string | null;
   bring_to_minimum: boolean;
   // Null follows the default of the platform (R1.4.8).
   system_prompt: string | null;
@@ -75,6 +80,8 @@ export const emptyFormValues = (): FlowFormValues => ({
   max_leverage: '',
   max_margin_exposure_percent: '',
   max_value_exposure_percent: '',
+  default_stop_loss_percent: '',
+  default_take_profit_percent: '',
   allocated_capital: '',
   bring_to_minimum: false,
   system_prompt: '',
@@ -123,6 +130,8 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   max_leverage: numberOrNull(values.max_leverage),
   max_margin_exposure_percent: decimalOrNull(values.max_margin_exposure_percent),
   max_value_exposure_percent: decimalOrNull(values.max_value_exposure_percent),
+  default_stop_loss_percent: decimalOrNull(values.default_stop_loss_percent),
+  default_take_profit_percent: decimalOrNull(values.default_take_profit_percent),
   bring_to_minimum: values.bring_to_minimum,
   system_prompt: values.system_prompt_default ? null : values.system_prompt,
 });
@@ -163,6 +172,8 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   max_leverage: textOf(flow.risk_limits.max_leverage),
   max_margin_exposure_percent: textOf(flow.risk_limits.max_margin_exposure_percent),
   max_value_exposure_percent: textOf(flow.risk_limits.max_value_exposure_percent),
+  default_stop_loss_percent: flow.default_stop_loss_percent,
+  default_take_profit_percent: textOf(flow.default_take_profit_percent),
   allocated_capital: flow.allocated_capital ?? '',
   bring_to_minimum: flow.bring_to_minimum,
   system_prompt: flow.system_prompt_is_default ? '' : flow.system_prompt,
@@ -174,11 +185,13 @@ const sameValue = (one: unknown, other: unknown): boolean =>
 
 const MODEL: keyof SettingsRequest = 'model';
 const MODEL_PARAMETERS: keyof SettingsRequest = 'model_parameters';
-// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3).
+// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3), the
+// default take profit removed (R3.1.2).
 const NULL_IS_A_VALUE = new Set<keyof SettingsRequest>([
   'system_prompt',
   'max_margin_exposure_percent',
   'max_value_exposure_percent',
+  'default_take_profit_percent',
 ]);
 
 /**

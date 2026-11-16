@@ -46,11 +46,14 @@ class ApprovedOpening:
 
     def order_with[T](
         self,
-        opening: Callable[[str, str, Decimal, int], T],
+        opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],
         closing: Callable[[str], T],  # noqa: ARG002 - each outcome builds one of the two orders
     ) -> T:
-        """The order that executes the opening, built by whoever sends it: asset, side, value and leverage."""
-        return opening(self.asset, self.side.value, self.value, self.leverage)
+        """The order that executes the opening, built by whoever sends it: asset, side, value, leverage, and the stop
+        and target of its exit plan that its protection follows (R3.1.2).
+        """
+        plan = self.exit_plan
+        return opening(self.asset, self.side.value, self.value, self.leverage, plan.stop, plan.target)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +62,7 @@ class ApprovedClose:
 
     def order_with[T](
         self,
-        opening: Callable[[str, str, Decimal, int], T],  # noqa: ARG002 - each outcome builds one of the two orders
+        opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],  # noqa: ARG002 - one of two
         closing: Callable[[str], T],
     ) -> T:
         """The order that executes the close, built by whoever sends it: a close is always total (R1.4.4)."""

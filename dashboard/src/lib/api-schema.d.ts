@@ -1146,6 +1146,10 @@ export interface components {
             system_prompt_is_default: boolean;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent: string;
+            /** Default Take Profit Percent */
+            default_take_profit_percent: string | null;
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1361,6 +1365,10 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: number | string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: number | string | null;
         };
         /**
          * FlowEquityResponse
@@ -1413,6 +1421,10 @@ export interface components {
             bring_to_minimum?: boolean | null;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: number | string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: number | string | null;
         };
         /**
          * FlowOverviewResponse
@@ -1550,6 +1562,10 @@ export interface components {
             system_prompt_is_default: boolean;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent: string;
+            /** Default Take Profit Percent */
+            default_take_profit_percent: string | null;
         };
         /**
          * FlowResultsResponse
@@ -2218,6 +2234,10 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: number | string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: number | string | null;
         };
         /**
          * StrategyBody
@@ -2244,6 +2264,10 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: string | null;
         };
         /**
          * StrategyDocument

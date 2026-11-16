@@ -75,9 +75,16 @@ FILLS = [
 
 STATE = {
     "assetPositions": [
-        {"position": {"coin": "BTC", "szi": "-0.0003", "leverage": {"type": "cross", "value": 3}}},
-        {"position": {"coin": "ETH", "szi": "1.25", "leverage": {"type": "cross", "value": 5}}},
-        {"position": {"coin": "SOL", "szi": "0.0", "leverage": {"type": "cross", "value": 2}}},
+        {
+            "position": {
+                "coin": "BTC",
+                "szi": "-0.0003",
+                "entryPx": "61000.5",
+                "leverage": {"type": "cross", "value": 3},
+            }
+        },
+        {"position": {"coin": "ETH", "szi": "1.25", "entryPx": "4000", "leverage": {"type": "cross", "value": 5}}},
+        {"position": {"coin": "SOL", "szi": "0.0", "entryPx": "150", "leverage": {"type": "cross", "value": 2}}},
     ]
 }
 
@@ -155,7 +162,9 @@ def calls_named(sdk: FakeSdk, name: str) -> list[Any]:
 
 
 def test_the_market_carries_leverage_size_decimals_and_mid_price() -> None:
-    assert adapter(FakeSdk()).market(ACCESS, "ETH") == Market("ETH", 25, 4, Decimal("4000.5"), Decimal(10))
+    assert adapter(FakeSdk()).market(ACCESS, "ETH") == Market(
+        "ETH", 25, 4, Decimal("4000.5"), Decimal(10), price_significant_figures=5, price_decimals=2
+    )
 
 
 def test_an_asset_the_exchange_does_not_list_is_refused_as_unknown() -> None:
@@ -352,8 +361,8 @@ def test_the_network_is_chosen_by_the_installation(testnet: bool, url: str) -> N
 @pytest.mark.parametrize(
     ("coin", "expected"),
     [
-        ("BTC", HeldPosition("BTC", Direction.SHORT, Decimal("0.0003"), 3)),
-        ("ETH", HeldPosition("ETH", Direction.LONG, Decimal("1.25"), 5)),
+        ("BTC", HeldPosition("BTC", Direction.SHORT, Decimal("0.0003"), 3, Decimal("61000.5"))),
+        ("ETH", HeldPosition("ETH", Direction.LONG, Decimal("1.25"), 5, Decimal(4000))),
     ],
 )
 def test_the_position_is_read_from_the_state_of_the_account(coin: str, expected: HeldPosition) -> None:

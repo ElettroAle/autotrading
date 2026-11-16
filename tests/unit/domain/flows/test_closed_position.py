@@ -62,13 +62,16 @@ def test_the_ends_keep_the_cycles_that_produced_them() -> None:
     assert (POSITION.opening.cycle, POSITION.closing.cycle) == (OPENED, None)
 
 
-def test_the_reasons_of_e1_speak_italian() -> None:
+def test_the_reasons_speak_italian() -> None:
     assert [reason.value for reason in CloseReason] == [
         "decisione dell'agente",
         "comando manuale",
         "stop del flusso",
         "rimozione del conto",
         "chiusa fuori dalla piattaforma",
+        "stop loss",
+        "take profit",
+        "stop loss non piazzato",
     ]
 
 

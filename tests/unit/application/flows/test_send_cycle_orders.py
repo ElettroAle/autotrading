@@ -1,4 +1,5 @@
-"""The approved orders of a cycle handed to the execution, on the account of the flow (R1.5.5)."""
+"""The approved orders of a cycle handed to the execution, on the account of the flow (R1.5.5), with the protection
+defaults of the version the cycle read (R3.1.2)."""
 
 from collections.abc import Sequence
 from dataclasses import replace
@@ -13,16 +14,23 @@ from autotrading.domain.flows.cycle_order import CycleOrder, CycleOrders
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.flows import a_configuration, a_flow
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
 TENANT = TenantId.new()
-FLOW = a_flow(TENANT, configuration=replace(a_configuration(), assets=("BTC", "ETH")))
+FLOW = a_flow(
+    TENANT,
+    configuration=replace(
+        a_configuration(), assets=("BTC", "ETH"), protection_defaults=ProtectionDefaults.of(Decimal(4), Decimal(9))
+    ),
+)
 STATE = FlowState(FLOW.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0))
 CYCLE_FLOW = CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), ()), STATE)
 
@@ -63,7 +71,11 @@ class Bench:
         self.execution = Execution(self.openings.openings, executed)
         self.store = ExitPlanStore()
         self.exit_plans = InMemoryExitPlanRepositoryAdapter(self.store, TENANT)
-        self.use_case = SendCycleOrdersUseCase(self.execution, self.openings, self.exit_plans)
+        flows = FlowStore()
+        flows.flows.append(FLOW)
+        self.use_case = SendCycleOrdersUseCase(
+            self.execution, self.openings, self.exit_plans, InMemoryFlowRepositoryAdapter(flows, TENANT)
+        )
 
 
 def test_the_orders_go_to_the_account_of_the_flow_with_its_name() -> None:
@@ -78,16 +90,34 @@ def test_the_orders_go_to_the_account_of_the_flow_with_its_name() -> None:
     assert sent == ("inviato",)
     assert execution.cycles == [
         CycleOrders(
-            FLOW.assigned_account_id, FLOW.id.value, FLOW.name.value, PLANNED_AT, (opening, ApprovedClose("ETH"))
+            FLOW.assigned_account_id,
+            FLOW.id.value,
+            FLOW.name.value,
+            PLANNED_AT,
+            (opening, ApprovedClose("ETH")),
+            ("BTC", "ETH"),
+            Decimal(4),
+            Decimal(9),
         )
     ]
 
 
-def test_a_cycle_without_approved_orders_sends_nothing() -> None:
+def test_a_cycle_without_approved_orders_still_protects_the_positions_with_the_version_in_force() -> None:
     bench = Bench()
 
-    assert bench.use_case.execute(FLOW.id.value, PLANNED_AT, []) == ()
-    assert bench.execution.cycles == []
+    assert bench.use_case.execute(FLOW.id.value, PLANNED_AT, []) == ("inviato",)
+    assert bench.execution.cycles == [
+        CycleOrders(
+            FLOW.assigned_account_id,
+            FLOW.id.value,
+            FLOW.name.value,
+            PLANNED_AT,
+            (),
+            ("BTC", "ETH"),
+            Decimal(4),
+            Decimal(9),
+        )
+    ]
 
 
 def test_an_executed_opening_puts_its_exit_plan_in_force() -> None:

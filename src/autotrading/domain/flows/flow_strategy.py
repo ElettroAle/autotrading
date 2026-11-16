@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -11,8 +12,9 @@ from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 class FlowStrategy:
     """What a flow does, without where and with how much: the part of a configuration a strategy file carries.
 
-    Interval, sources with weights and parameters, model with its parameters, instructions and risk rules; account,
-    allocated capital and assets belong to the flow that uses the strategy, assigned to its draft (R2.5.2, ADR 0140).
+    Interval, sources with weights and parameters, model with its parameters, instructions, risk rules and protection;
+    account, allocated capital and assets belong to the flow that uses the strategy, assigned to its draft (R2.5.2,
+    ADR 0140).
     """
 
     cycle_interval: CycleInterval
@@ -24,6 +26,8 @@ class FlowStrategy:
     bring_to_minimum: bool = False
     # The default of the platform unless the strategy has its own, as in the configuration (R1.4.8).
     system_prompt: str | None = None
+    # The protection of every opening, a risk rule like the limits (R3.1.2).
+    protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -35,6 +39,7 @@ class FlowStrategy:
             configuration.risk_limits,
             configuration.bring_to_minimum,
             configuration.system_prompt,
+            configuration.protection_defaults,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -50,6 +55,7 @@ class FlowStrategy:
             allocated_capital=None,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
+            protection_defaults=self.protection_defaults,
         )
 
 

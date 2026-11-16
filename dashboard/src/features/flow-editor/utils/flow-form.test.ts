@@ -27,6 +27,7 @@ const filled = (changes: Partial<FlowFormValues> = {}): FlowFormValues => ({
   instructions: 'prudente',
   max_leverage: '3',
   max_margin_exposure_percent: '10',
+  default_take_profit_percent: '10',
   allocated_capital: '300',
   ...changes,
 });
@@ -50,6 +51,8 @@ const FLOW: Flow = {
     max_margin_exposure_percent: '10',
     max_value_exposure_percent: null,
   },
+  default_stop_loss_percent: '5',
+  default_take_profit_percent: null,
   allocated_capital: '300',
   bring_to_minimum: false,
   system_prompt: '{instructions} su {assets}',
@@ -77,6 +80,8 @@ describe('creationRequestOf', () => {
       max_leverage: 3,
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: null,
+      default_stop_loss_percent: null,
+      default_take_profit_percent: '10',
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: null,
@@ -114,6 +119,8 @@ describe('formValuesOf', () => {
       max_leverage: '3',
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: '',
+      default_stop_loss_percent: '5',
+      default_take_profit_percent: '',
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: '',
@@ -191,6 +198,24 @@ describe('changesOf', () => {
       settings: { max_margin_exposure_percent: null },
     });
     expect(changesOf(FLOW, formValuesOf(FLOW))).toEqual({ settings: {} });
+  });
+
+  // R3.1.2: the stop loss is mandatory, so an emptied one keeps the value in force; the take profit may go.
+  it('sends the protection defaults the user changed, and null for a take profit the user emptied', () => {
+    const withTakeProfit: Flow = { ...FLOW, default_take_profit_percent: '8' };
+    const changed = { ...formValuesOf(withTakeProfit), default_stop_loss_percent: '3,5' };
+    const emptied = {
+      ...formValuesOf(withTakeProfit),
+      default_stop_loss_percent: '',
+      default_take_profit_percent: ' ',
+    };
+
+    expect(changesOf(withTakeProfit, changed)).toEqual({
+      settings: { default_stop_loss_percent: '3.5' },
+    });
+    expect(changesOf(withTakeProfit, emptied)).toEqual({
+      settings: { default_take_profit_percent: null },
+    });
   });
 
   it('sends a system prompt the user wrote, and null to go back to the default', () => {

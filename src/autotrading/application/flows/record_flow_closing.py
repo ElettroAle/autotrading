@@ -36,7 +36,9 @@ class RecordFlowClosingUseCase:
         self._notice = notice
         self._exit_plans = exit_plans
 
-    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: ExecutedFillPort) -> None:
+    def execute(
+        self, flow_id: UUID, cycle: datetime, asset: str, fill: ExecutedFillPort, *, unprotected: bool = False
+    ) -> None:
         flow = self._flows.get(FlowId(flow_id))
         self._exit_plans.remove(flow.id, asset)
         opening = self._openings.last_opening(flow.id, asset)
@@ -44,6 +46,8 @@ class RecordFlowClosingUseCase:
             self._notice.execute(flow.name.value, asset, fill.realized_pnl)
             return
         closing = ClosingFill(fill.average_price, fill.executed_at, fill.fee, fill.realized_pnl)
-        position = opening.closed(flow, asset, closing, CloseReason.AGENT, cycle=cycle)
+        # A position the exchange would not protect is closed by the platform at once, not by the agent (R3.1.2).
+        reason = CloseReason.PROTECTION_MISSING if unprotected else CloseReason.AGENT
+        position = opening.closed(flow, asset, closing, reason, cycle=cycle)
         self._closed_positions.add(position)
         self._notice.execute(flow.name.value, asset, position.pnl)

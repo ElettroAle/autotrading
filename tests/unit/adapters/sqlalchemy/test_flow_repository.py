@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -30,6 +31,7 @@ CONFIGURATION = replace(
     risk_limits=RiskLimits(3, None, Decimal("12.5")),
     bring_to_minimum=True,
     system_prompt="{instructions} su {assets}",
+    protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
 )
 
 
@@ -47,6 +49,8 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "allocated_capital": "400.50",
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
+        "default_stop_loss_percent": "2.5",
+        "default_take_profit_percent": "10",
     }
 
 
@@ -94,6 +98,14 @@ def test_a_version_saved_before_the_system_prompt_follows_the_default() -> None:
     del document["system_prompt"]
 
     assert configuration_of(1, document).system_prompt is None
+
+
+def test_a_version_without_default_take_profit_reads_back_without_it() -> None:
+    configuration = replace(CONFIGURATION, protection_defaults=ProtectionDefaults())
+    document = json.loads(json.dumps(document_of(configuration)))
+
+    assert (document["default_stop_loss_percent"], document["default_take_profit_percent"]) == ("5", None)
+    assert configuration_of(1, document).protection_defaults == ProtectionDefaults()
 
 
 def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_back() -> None:

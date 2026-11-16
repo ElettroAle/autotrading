@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_verification_position import CloseVerificationPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
@@ -24,7 +25,9 @@ from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
-from tests.fakes.trading_access import FakeTradingAccessAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
+from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, new_access
 
 ANNA = UserId("oid-anna")
@@ -85,12 +88,23 @@ class Orders:
                 OpenPositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage), NAMES
             ),
             CloseVerificationPositionUseCase(
-                CloseExchangePositionUseCase(self.accesses.use_case, exchanges, self.recorded, slippage), NAMES
+                CloseExchangePositionUseCase(
+                    self.accesses.use_case,
+                    exchanges,
+                    self.recorded,
+                    slippage,
+                    CancelProtectionsUseCase(
+                        self.accesses.use_case,
+                        {HYPERLIQUID: FakeProtectionExchangeAdapter()},
+                        InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT),
+                    ),
+                ),
+                NAMES,
             ),
         )
 
     def hold_btc(self) -> None:
-        position = HeldPosition("BTC", Direction.LONG, Decimal("0.00012"), 2)
+        position = HeldPosition("BTC", Direction.LONG, Decimal("0.00012"), 2, Decimal(100))
         self.exchange.hold(self.accesses.accesses[self.account_id], position)
 
 

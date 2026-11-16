@@ -9,6 +9,8 @@ from autotrading.domain.italian_text import money_text, number_text
 
 NONE = "nessuno"
 DEFAULT = "predefinito"
+DEFAULT_STOP_LOSS = "stop loss predefinito"
+DEFAULT_TAKE_PROFIT = "take profit predefinito"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,4 +64,6 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
         "system prompt",
         lambda configuration: DEFAULT if configuration.system_prompt is None else configuration.system_prompt,
     ),
+    (DEFAULT_STOP_LOSS, lambda configuration: _percent(configuration.protection_defaults.stop_loss_percent)),
+    (DEFAULT_TAKE_PROFIT, lambda configuration: _percent(configuration.protection_defaults.take_profit_percent)),
 )

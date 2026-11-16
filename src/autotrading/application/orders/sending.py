@@ -11,7 +11,7 @@ from autotrading.domain.orders.rejection import Rejection
 from autotrading.domain.orders.trading_access import TradingAccess
 
 
-def supported_exchange(exchanges: Mapping[str, ExchangePort], exchange_name: str) -> ExchangePort:
+def supported_exchange[E](exchanges: Mapping[str, E], exchange_name: str) -> E:
     exchange = exchanges.get(exchange_name)
     if exchange is None:
         raise UnsupportedOrderExchangeError(exchange_name, exchanges)

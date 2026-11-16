@@ -96,7 +96,7 @@ def test_an_account_with_btc_open_does_not_start(
     platform: Platform, client_of: Client, account_id: str, credentials: Credentials
 ) -> None:
     access = TradingAccess(HYPERLIQUID, credentials.values)
-    platform.order_exchange.hold(access, HeldPosition("BTC", Direction.SHORT, Decimal("0.001"), 4))
+    platform.order_exchange.hold(access, HeldPosition("BTC", Direction.SHORT, Decimal("0.001"), 4, Decimal(100)))
 
     response = client_of("anna").post(f"/accounts/{account_id}/verifications")
 

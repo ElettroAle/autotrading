@@ -5,8 +5,9 @@ roles the installation has: the owner that runs the migrations and the applicati
 """
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 from uuid import uuid4
 
@@ -44,7 +45,7 @@ def _ensure_roles(admin: Engine) -> None:
                 connection.execute(text(f"CREATE ROLE {role} LOGIN PASSWORD '{TEST_PASSWORD}'"))
 
 
-def _migrate(database: str, password_file: Path) -> None:
+def _migrate(database: str, password_file: Path, revision: str = "head") -> None:
     host, port, _, _ = _server()
     password_file.write_text(TEST_PASSWORD, encoding="utf-8")
     variables = {
@@ -57,7 +58,7 @@ def _migrate(database: str, password_file: Path) -> None:
     previous = {name: os.environ.get(name) for name in variables}
     os.environ.update(variables)
     try:
-        command.upgrade(Config(str(MIGRATIONS)), "head")
+        command.upgrade(Config(str(MIGRATIONS)), revision)
     finally:
         for name, value in previous.items():
             if value is None:
@@ -69,6 +70,15 @@ def _migrate(database: str, password_file: Path) -> None:
 @contextmanager
 def migrated_database(workspace: Path) -> Iterator[Engine]:
     """Yields an engine connected as the application role to a new database with every migration applied."""
+    with database_migrated_to(workspace, "head") as (application, _):
+        yield application
+
+
+@contextmanager
+def database_migrated_to(workspace: Path, revision: str) -> Iterator[tuple[Engine, Callable[[], None]]]:
+    """Yields an engine connected as the application role to a new database migrated up to the revision, with the
+    function that applies the migrations after it: what a migration does to the data saved before it.
+    """
     host, port, _, _ = _server()
     database = f"autotrading_test_{uuid4().hex[:12]}"
     admin = _admin_engine("postgres")
@@ -76,11 +86,11 @@ def migrated_database(workspace: Path) -> Iterator[Engine]:
     with admin.connect() as connection:
         connection.execute(text(f"CREATE DATABASE {database} OWNER {OWNER_ROLE}"))
     try:
-        _migrate(database, workspace / "owner-password")
+        _migrate(database, workspace / "owner-password", revision)
         application = SqlAlchemyDatabaseAdapter(
             host=host, port=port, name=database, user=APPLICATION_ROLE, password=TEST_PASSWORD
         ).engine()
-        yield application
+        yield application, partial(_migrate, database, workspace / "owner-password")
         application.dispose()
     finally:
         with admin.connect() as connection:

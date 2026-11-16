@@ -10,6 +10,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -31,6 +32,8 @@ class ImportFlowStrategyCommand:
     cycle_minutes: int | None = None
     bring_to_minimum: bool = False
     system_prompt: str | None = None
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
 
 
 class ImportFlowStrategyUseCase:
@@ -77,4 +80,7 @@ class ImportFlowStrategyUseCase:
             ),
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,
+            protection_defaults=ProtectionDefaults.of(
+                command.default_stop_loss_percent, command.default_take_profit_percent
+            ),
         )

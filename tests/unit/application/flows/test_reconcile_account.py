@@ -7,17 +7,23 @@ import pytest
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
-from autotrading.domain.flows.account_reconciliation import AccountReading
+from autotrading.domain.flows.account_reconciliation import AccountReading, ProtectionClosing
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.unattributable import UnattributableKind
+from autotrading.domain.orders.client_order_id import ClientOrderId
+from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT, a_fill, a_movement, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -31,13 +37,17 @@ class Bench:
     def __init__(self) -> None:
         self.store = FlowStore()
         self.activity = FakeAccountActivityAdapter()
-        self.orders = InMemoryPlatformOrdersAdapter()
+        self.protections = ProtectionStore()
+        self.orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.closed = InMemoryClosedPositionsAdapter()
+        self.closed_by_protection = InMemoryProtectionClosingsAdapter()
         self.ledger = InMemoryFlowLedgerAdapter()
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         record = RecordAccountExecutionsUseCase(flows, self.activity, self.orders, self.ledger)
-        self.use_case = ReconcileAccountUseCase(flows, self.activity, self.readings, self.closed, record)
+        self.use_case = ReconcileAccountUseCase(
+            flows, self.activity, self.readings, self.closed, record, self.closed_by_protection
+        )
 
     def flow(self, *assets: str, account_id: UUID = ACCOUNT) -> Flow:
         flow = a_flow(
@@ -163,6 +173,51 @@ def test_a_position_closed_outside_enters_the_history_of_the_flow(bench: Bench) 
 
     assert [closing.asset for closing in bench.closed.closed] == ["BTC"]
     assert outcome.closed_outside == tuple(bench.closed.closed)
+
+
+def placed(bench: Bench, flow: Flow, kind: ProtectionKind) -> ClientOrderId:
+    """A protection the flow placed on the asset, then removed: its execution still belongs to the flow."""
+    client_order_id = ClientOrderId.new()
+    protections = InMemoryProtectionRepositoryAdapter(bench.protections, TENANT)
+    protections.add(PlacedProtection(ACCOUNT, flow.id.value, "BTC", kind, Decimal(57000), "41", client_order_id))
+    protections.remove(ACCOUNT, "BTC")
+    return client_order_id
+
+
+@pytest.mark.parametrize(
+    ("kind", "reason"),
+    [(ProtectionKind.STOP_LOSS, CloseReason.STOP_LOSS), (ProtectionKind.TAKE_PROFIT, CloseReason.TAKE_PROFIT)],
+)
+def test_a_position_its_protection_closed_enters_the_history_by_its_protection(
+    bench: Bench, kind: ProtectionKind, reason: CloseReason
+) -> None:
+    flow = bench.flow("BTC")
+    order = placed(bench, flow, kind)
+    bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {flow.id: frozenset({"BTC"})}))
+    bench.activity.activities[ACCOUNT] = an_activity()
+    bench.activity.executions[ACCOUNT] = [
+        a_fill("BTC", order.value, realized_pnl=Decimal("-3"), fee=Decimal("0.01"), fill_id="1"),
+        a_fill("BTC", order.value, realized_pnl=Decimal("-2.1"), fee=Decimal("0.02"), fill_id="2"),
+    ]
+
+    outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert bench.closed_by_protection.closed == [
+        ProtectionClosing(flow.id, "BTC", reason, Decimal("-5.1"), Decimal("0.03"), READ_AT)
+    ]
+    assert (bench.closed.closed, outcome.closed_outside, outcome.new_items) == ([], (), ())
+
+
+def test_a_position_closed_by_an_order_of_the_flow_is_no_closing_by_protection(bench: Bench) -> None:
+    flow, order = bench.flow("BTC"), uuid4()
+    bench.orders.add(order, ACCOUNT, flow.id)
+    bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {flow.id: frozenset({"BTC"})}))
+    bench.activity.activities[ACCOUNT] = an_activity()
+    bench.activity.executions[ACCOUNT] = [a_fill("BTC", order)]
+
+    bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert (bench.closed_by_protection.closed, bench.closed.closed) == ([], [])
 
 
 def test_an_unknown_flow_is_not_found(bench: Bench) -> None:

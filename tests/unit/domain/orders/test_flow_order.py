@@ -2,9 +2,11 @@ from decimal import Decimal
 
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, in_sending_order
+from autotrading.domain.orders.protection_request import ProtectionRequest
 
-BTC = FlowOpening("BTC", Direction.LONG, Decimal(100), 2)
-SOL = FlowOpening("SOL", Direction.SHORT, Decimal(50), 1)
+PROTECTION = ProtectionRequest(None, None, Decimal(5), None)
+BTC = FlowOpening("BTC", Direction.LONG, Decimal(100), 2, PROTECTION)
+SOL = FlowOpening("SOL", Direction.SHORT, Decimal(50), 1, PROTECTION)
 
 
 def test_closings_go_before_the_openings_keeping_their_relative_order() -> None:

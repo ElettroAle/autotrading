@@ -57,6 +57,7 @@ from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
+from tests.fakes.protection_cancellation import FakeProtectionCancellationAdapter
 from tests.support.activity import a_fill, a_movement, a_position, an_activity
 from tests.support.cycle_composition import TenantCyclePorts
 from tests.support.flow_cycles import FlowCycles, at
@@ -225,7 +226,9 @@ def outside(world: World, pnl: str) -> OutsideClosing:
 
 def closed_positions(world: World) -> RecordOutsideClosingUseCase:
     notice = World.closing_notice(world.ports.notify)
-    return RecordOutsideClosingUseCase(world.flows, world.openings, world.history, notice, world.exit_plans)
+    return RecordOutsideClosingUseCase(
+        world.flows, world.openings, world.history, notice, world.exit_plans, FakeProtectionCancellationAdapter()
+    )
 
 
 def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_flow(world: World) -> None:

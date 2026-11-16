@@ -19,6 +19,8 @@ const CONFIGURATION: Configuration = {
     max_margin_exposure_percent: '10',
     max_value_exposure_percent: null,
   },
+  default_stop_loss_percent: '5',
+  default_take_profit_percent: '10',
   allocated_capital: '400',
   bring_to_minimum: true,
   system_prompt: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
@@ -39,6 +41,8 @@ const PARTS_OF_FIELD = {
     'esposizione massima del margine',
     'esposizione massima del valore',
   ],
+  default_stop_loss_percent: ['stop loss predefinito'],
+  default_take_profit_percent: ['take profit predefinito'],
   allocated_capital: ['capitale allocato'],
   bring_to_minimum: ['porta al minimo'],
   system_prompt: ['system prompt'],
@@ -61,6 +65,8 @@ describe('configurationRows', () => {
       { part: 'leva massima', value: '5' },
       { part: 'esposizione massima del margine', value: '10%' },
       { part: 'esposizione massima del valore', value: 'nessuno' },
+      { part: 'stop loss predefinito', value: '5%' },
+      { part: 'take profit predefinito', value: '10%' },
       { part: 'capitale allocato', value: '400' },
       { part: 'porta al minimo', value: 'sì' },
       {
@@ -92,6 +98,7 @@ describe('configurationRows', () => {
         max_margin_exposure_percent: null,
         max_value_exposure_percent: '12.5',
       },
+      default_take_profit_percent: null,
       bring_to_minimum: false,
     });
 
@@ -101,6 +108,7 @@ describe('configurationRows', () => {
       'leva massima': 'nessuno',
       'esposizione massima del margine': 'nessuno',
       'esposizione massima del valore': '12.5%',
+      'take profit predefinito': 'nessuno',
       'porta al minimo': 'no',
     });
   });

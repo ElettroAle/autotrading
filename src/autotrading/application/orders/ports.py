@@ -11,6 +11,8 @@ from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
 from autotrading.domain.orders.order_outcome import OrderOutcome
+from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_order import ActiveProtection, ProtectionOrder
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.user_id import UserId
@@ -57,6 +59,50 @@ class ExchangePort(Protocol):
 
     def find_order(self, access: TradingAccess, order: MarketOrder) -> Execution | None:
         """The execution of an order looked up by its client order id, or None if the exchange has none."""
+
+
+class ProtectionExchangePort(Protocol):
+    """Stop loss and take profit on the exchange, over the whole position of an asset (R3.1.2).
+
+    Raises OrderExchangeUnavailableError when the exchange cannot be reached.
+    """
+
+    def place(self, access: TradingAccess, order: ProtectionOrder) -> str:
+        """The identifier the exchange gave the protection, waiting for its price.
+
+        Raises ExchangeRejectedOrderError with the message of the exchange when it refuses it.
+        """
+        ...
+
+    def cancel(self, access: TradingAccess, asset: str, order_id: str) -> None:
+        """Raises ExchangeRejectedOrderError when the exchange no longer has it: executed or cancelled already."""
+        ...
+
+    def active(self, access: TradingAccess, asset: str) -> tuple[ActiveProtection, ...]:
+        """The protections waiting on the exchange for the position on the asset."""
+        ...
+
+
+class ProtectionRepositoryPort(Protocol):
+    """The protections the platform placed for the flows of the tenant, bound to it like every port of owned data."""
+
+    def add(self, protection: PlacedProtection) -> None: ...
+
+    def placed(self, account_id: UUID, asset: str) -> tuple[PlacedProtection, ...]:
+        """The protections recorded for the position of the account on the asset: one flow at most has it (R1.1.2)."""
+        ...
+
+    def remove(self, account_id: UUID, asset: str) -> None: ...
+
+
+class ProtectedPositionPort(Protocol):
+    """The position of an account on an asset whose protections are left behind by its closing (R3.1.2)."""
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def asset(self) -> str: ...
 
 
 class VerificationAssetPort(Protocol):
@@ -131,8 +177,10 @@ class PositionOpenedNoticePort(Protocol):
 
 
 class FlowClosingRecorderPort(Protocol):
-    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution) -> None:
-        """Records in the history of the flow a position an order of its cycle closed (R1.7.2)."""
+    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution, *, unprotected: bool) -> None:
+        """Records in the history of the flow a position an order of its cycle closed (R1.7.2): unprotected when it
+        closed because the exchange refused its stop loss (R3.1.2).
+        """
         ...
 
 
@@ -145,8 +193,14 @@ class ManualClosingRecorderPort(Protocol):
 class ApprovedOrderPort(Protocol):
     """An order a cycle of a flow got through the risk check, as the flows context hands it over."""
 
-    def order_with[T](self, opening: Callable[[str, str, Decimal, int], T], closing: Callable[[str], T]) -> T:
-        """Builds the order with the opening (asset, side, value, leverage) or the closing (asset) it needs."""
+    def order_with[T](
+        self,
+        opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],
+        closing: Callable[[str], T],
+    ) -> T:
+        """Builds the order with the opening (asset, side, value, leverage, stop and target of the exit plan) or the
+        closing (asset) it needs.
+        """
         ...
 
 
@@ -167,3 +221,14 @@ class CycleOrdersPort(Protocol):
 
     @property
     def orders(self) -> Sequence[ApprovedOrderPort]: ...
+
+    @property
+    def assets(self) -> Sequence[str]:
+        """The assets of the flow: a position on one of them without a stop loss gets the default one (R3.1.2)."""
+        ...
+
+    @property
+    def default_stop_loss_percent(self) -> Decimal: ...
+
+    @property
+    def default_take_profit_percent(self) -> Decimal | None: ...

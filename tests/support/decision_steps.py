@@ -109,7 +109,7 @@ def long_position(flow_cycles: FlowCycles, flow: str, asset: str, size: str) -> 
     flow_cycles.platform.hyperliquid.open_position(credentials, position(asset, PositionSide.LONG, size=amount))
     # The account reads the position from the market data, the orders close it on the exchange of the orders.
     access = TradingAccess(HYPERLIQUID, credentials.values)
-    flow_cycles.platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, amount, 1))
+    flow_cycles.platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, amount, 1, Decimal(100)))
 
 
 @given(quoted('che l\'agente risponde chiudi su "{asset}"'))

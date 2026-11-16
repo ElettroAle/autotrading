@@ -167,6 +167,9 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "risk_limits",
         "bring_to_minimum",
         "system_prompt",
+        # The protection defaults travel with the strategy (ADR stop-loss-e-take-profit-predefiniti-del-flusso).
+        "default_stop_loss_percent",
+        "default_take_profit_percent",
     }
 
 

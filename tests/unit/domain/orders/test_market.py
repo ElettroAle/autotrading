@@ -91,3 +91,30 @@ def test_rounding_down_to_exactly_the_minimum_is_kept() -> None:
 
 def test_an_exchange_without_a_minimum_is_admitted() -> None:
     assert Market("BTC", 40, 5, Decimal(100000), Decimal(0)).size_for(Decimal("10.5")) == Decimal("0.0001")
+
+
+@pytest.mark.parametrize(
+    ("price", "rounded"),
+    [
+        (Decimal("57017.1"), Decimal(57017)),
+        (Decimal("57017.5"), Decimal(57018)),
+        (Decimal("3.123456"), Decimal("3.1235")),
+        (Decimal("0.0123456"), Decimal("0.01235")),
+    ],
+)
+def test_a_price_is_rounded_to_the_significant_figures_and_decimals_the_exchange_admits(
+    price: Decimal, rounded: Decimal
+) -> None:
+    market = Market("X", 10, 1, Decimal(1), Decimal(10), price_significant_figures=5, price_decimals=5)
+
+    assert market.rounded_price(price) == rounded
+
+
+def test_a_whole_price_keeps_every_digit_beyond_the_significant_figures() -> None:
+    market = Market("BTC", 40, 5, Decimal(100000), Decimal(10), price_significant_figures=5, price_decimals=1)
+
+    assert market.rounded_price(Decimal("123456.7")) == Decimal(123457)
+
+
+def test_a_market_without_price_rules_keeps_the_price() -> None:
+    assert BTC.rounded_price(Decimal("57017.123")) == Decimal("57017.123")

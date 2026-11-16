@@ -1,5 +1,5 @@
-"""Closings that enter the history of a flow and are told, from a cycle or from outside the platform (R1.7.2, ADR 0056,
-0070)."""
+"""Closings that enter the history of a flow and are told, from a cycle, from outside the platform or by a protection on
+the exchange (R1.7.2, R3.1.2, ADR 0056, 0070, ADR chiusure-per-protezione-nello-storico)."""
 
 import logging
 from dataclasses import dataclass
@@ -9,9 +9,11 @@ from uuid import uuid4
 
 import pytest
 
+from autotrading.application.flows.ports import ProtectedPosition
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
-from autotrading.domain.flows.account_reconciliation import OutsideClosing
+from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
+from autotrading.domain.flows.account_reconciliation import OutsideClosing, ProtectionClosing
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_id import FlowId
@@ -22,6 +24,7 @@ from tests.fakes.closed_position_repository import ClosedPositionStore, InMemory
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
+from tests.fakes.protection_cancellation import FakeProtectionCancellationAdapter
 from tests.support.flows import a_flow
 
 TENANT = TenantId(uuid4())
@@ -63,13 +66,24 @@ class Bench:
         self.cycle_closing = RecordFlowClosingUseCase(
             flows, self.openings, closed_positions, self.notices, self.exit_plans
         )
+        self.cancellation = FakeProtectionCancellationAdapter()
         self.outside_closing = RecordOutsideClosingUseCase(
-            flows, self.openings, closed_positions, self.notices, self.exit_plans
+            flows, self.openings, closed_positions, self.notices, self.exit_plans, self.cancellation
+        )
+        self.protection_closing = RecordProtectionClosingUseCase(
+            flows, self.openings, closed_positions, self.notices, self.exit_plans, self.cancellation
         )
 
     def close_in_cycle(self) -> None:
         fill = Executed(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
         self.cycle_closing.execute(self.flow.id.value, CYCLE, "BTC", fill)
+
+    def close_by_protection(
+        self, reason: CloseReason = CloseReason.STOP_LOSS, realized_pnl: Decimal = Decimal("-5.1")
+    ) -> ProtectionClosing:
+        closing = ProtectionClosing(self.flow.id, "BTC", reason, realized_pnl, Decimal("0.04"), CLOSED)
+        self.protection_closing.execute(closing)
+        return closing
 
     def close_outside(self, realized_pnl: Decimal = Decimal("2")) -> OutsideClosing:
         closing = OutsideClosing(self.flow.id, "BTC", realized_pnl, Decimal("0.04"), CLOSED)
@@ -163,3 +177,61 @@ def test_a_closing_outside_beyond_the_value_of_the_position_still_ends_its_plan(
     bench.close_outside(Decimal(-150))
 
     assert bench.exit_plans.current(bench.flow.id, "BTC") is None
+
+
+def test_a_cycle_closing_after_a_refused_stop_loss_enters_the_history_with_that_reason(bench: Bench) -> None:
+    bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+    fill = Executed(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
+
+    bench.cycle_closing.execute(bench.flow.id.value, CYCLE, "BTC", fill, unprotected=True)
+
+    [position] = bench.history.positions
+    assert position.reason is CloseReason.PROTECTION_MISSING
+
+
+def test_a_closing_outside_cancels_the_protections_left_on_the_exchange(bench: Bench) -> None:
+    bench.close_outside()
+
+    assert bench.cancellation.cancelled == [ProtectedPosition(bench.flow.assigned_account_id, "BTC")]
+
+
+@pytest.mark.parametrize("reason", [CloseReason.STOP_LOSS, CloseReason.TAKE_PROFIT])
+def test_a_closing_by_protection_enters_the_history_with_its_reason_and_the_outcome_of_the_exchange(
+    bench: Bench, reason: CloseReason
+) -> None:
+    bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+
+    closing = bench.close_by_protection(reason)
+
+    position = OPENING.closed_by_protection(bench.flow, closing)
+    assert bench.history.positions == [position]
+    assert (position.reason, position.pnl, position.fees) == (reason, Decimal("-5.1"), Decimal("0.07"))
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("-5.1"))]
+    assert bench.exit_plans.current(bench.flow.id, "BTC") is None
+    assert bench.cancellation.cancelled == [ProtectedPosition(bench.flow.assigned_account_id, "BTC")]
+
+
+def test_a_closing_by_protection_the_flow_never_opened_is_told_and_logged(
+    bench: Bench, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="autotrading.flows"):
+        bench.close_by_protection()
+
+    assert bench.history.positions == []
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("-5.1"))]
+    (record,) = caplog.records
+    assert record.getMessage() == "posizione chiusa da una protezione senza apertura del flusso"
+    assert len(bench.cancellation.cancelled) == 1
+
+
+def test_a_closing_by_protection_beyond_the_value_of_the_position_is_told_and_logged(
+    bench: Bench, caplog: pytest.LogCaptureFixture
+) -> None:
+    bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.flows"):
+        bench.close_by_protection(realized_pnl=Decimal(-150))
+
+    assert bench.history.positions == []
+    (record,) = caplog.records
+    assert record.getMessage() == "esito della chiusura per protezione non rappresentabile"

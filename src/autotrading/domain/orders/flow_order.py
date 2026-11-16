@@ -3,16 +3,20 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.protection_request import ProtectionRequest
 
 
 @dataclass(frozen=True, slots=True)
 class FlowOpening:
-    """An opening the risk check approved: the value sizes the order at the market price (ADR 0040)."""
+    """An opening the risk check approved: the value sizes the order at the market price (ADR 0040); the protection
+    says where its stop loss and take profit go once it is executed (R3.1.2).
+    """
 
     asset: str
     direction: Direction
     value: Decimal
     leverage: int
+    protection: ProtectionRequest
 
 
 @dataclass(frozen=True, slots=True)

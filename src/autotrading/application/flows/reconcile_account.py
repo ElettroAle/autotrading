@@ -4,6 +4,7 @@ from autotrading.application.flows.ports import (
     AccountActivityPort,
     FlowRepositoryPort,
     OutsideClosingRecorderPort,
+    ProtectionClosingRecorderPort,
     ReconciliationRepositoryPort,
 )
 from autotrading.application.flows.record_account_executions import (
@@ -32,23 +33,25 @@ class ReconcileAccountUseCase:
     """At every cycle of a flow, what the account of the flow shows that no flow explains (R1.6.2).
 
     The new executions of the account enter the ledger first (ADR 0063). Every case is recorded once; a position
-    of a flow closed outside the platform enters the history of the flow.
-    Nothing on the exchange is touched, and the flows keep operating.
+    of a flow closed outside the platform, or by its stop loss or take profit (R3.1.2), enters the history of the flow.
+    Nothing on the exchange is touched but the protections such a closing leaves, and the flows keep operating.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913, PLR0917 - the readings of the account and the recorders of what they show
         self,
         flows: FlowRepositoryPort,
         activity: AccountActivityPort,
         readings: ReconciliationRepositoryPort,
         closed_positions: OutsideClosingRecorderPort,
         record_executions: RecordAccountExecutionsUseCase,
+        protection_closings: ProtectionClosingRecorderPort,
     ) -> None:
         self._flows = flows
         self._activity = activity
         self._readings = readings
         self._closed_positions = closed_positions
         self._record_executions = record_executions
+        self._protection_closings = protection_closings
 
     def execute(self, command: ReconcileAccountCommand) -> ReconciliationOutcome:
         account_id = self._flows.get(command.flow_id).assigned_account_id
@@ -64,5 +67,7 @@ class ReconcileAccountUseCase:
         self._readings.resolve_positions(account_id, reconciliation.open_assets)
         for closing in reconciliation.closed_outside:
             self._closed_positions.execute(closing)
+        for protection_closing in reconciliation.closed_by_protection:
+            self._protection_closings.execute(protection_closing)
         self._readings.save_reading(reconciliation.reading)
         return ReconciliationOutcome(new_items, reconciliation.closed_outside)

@@ -24,6 +24,7 @@ from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
@@ -81,6 +82,8 @@ from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
@@ -134,7 +137,10 @@ class Platform:
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
         self.account_activity = FakeAccountActivityAdapter()
-        self.platform_orders = InMemoryPlatformOrdersAdapter()
+        # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
+        self.protection_exchange = FakeProtectionExchangeAdapter()
+        self.protections = ProtectionStore()
+        self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))
@@ -256,7 +262,9 @@ class Platform:
         access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
-        close_exchange_position = CloseExchangePositionUseCase(access, order_exchanges, orders, self.slippage)
+        close_exchange_position = CloseExchangePositionUseCase(
+            access, order_exchanges, orders, self.slippage, self.cancel_protections(tenant_id)
+        )
         open_position = OpenPositionUseCase(access, order_exchanges, orders, self.slippage)
         return WorkerUseCases(
             read_exchange_state=read_exchange_state,
@@ -274,6 +282,14 @@ class Platform:
             notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
+
+    def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
+        """What the worker runs after every closing: the protections of the position leave the exchange (R3.1.2)."""
+        access = OpenTradingAccessUseCase(
+            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), FakeCredentialOpenerAdapter(self.vault)
+        )
+        protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
+        return CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
 
     def link_chat(self) -> LinkChatUseCase:
         """What the bot of the worker runs for every message it receives."""

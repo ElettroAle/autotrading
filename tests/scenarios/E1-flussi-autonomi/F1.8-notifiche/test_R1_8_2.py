@@ -133,7 +133,7 @@ def flow_opens(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
 @when(quoted('il flusso "{flow}" chiude la posizione su "{asset}" con PnL {pnl} USDC'))
 def flow_closes(flow_cycles: FlowCycles, flow: str, asset: str, pnl: str) -> None:
     exchange = flow_cycles.platform.order_exchange
-    exchange.hold(access_of(flow_cycles, flow), HeldPosition(asset, Direction.LONG, Decimal("0.0015"), 3))
+    exchange.hold(access_of(flow_cycles, flow), HeldPosition(asset, Direction.LONG, Decimal("0.0015"), 3, Decimal(100)))
     exchange.realized_on_close = Decimal(pnl.replace(",", "."))
     answer(flow_cycles, {"asset": asset, "azione": "chiudi", "ragionamento": "r"})
     flow_cycles.run(flow)

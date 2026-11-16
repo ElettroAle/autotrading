@@ -47,6 +47,8 @@ type ConfigurationRequest = {
   max_leverage?: unknown;
   max_margin_exposure_percent?: unknown;
   max_value_exposure_percent?: unknown;
+  default_stop_loss_percent?: unknown;
+  default_take_profit_percent?: unknown;
   allocated_capital?: unknown;
   bring_to_minimum?: unknown;
   system_prompt?: unknown;
@@ -250,6 +252,8 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       maxLeverage: flow.riskLimits.maxLeverage,
       allocatedCapital: String(flow.allocatedCapital ?? 0),
       systemPrompt: flow.systemPrompt,
+      defaultStopLossPercent: flow.defaultStopLossPercent,
+      defaultTakeProfitPercent: flow.defaultTakeProfitPercent,
     },
   });
   return flow;
@@ -300,6 +304,8 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     riskLimits,
     bringToMinimum: request.bring_to_minimum === true,
     systemPrompt: typeof request.system_prompt === 'string' ? request.system_prompt : null,
+    defaultStopLossPercent: optionalTextOf(request.default_stop_loss_percent) ?? '5',
+    defaultTakeProfitPercent: optionalTextOf(request.default_take_profit_percent),
     currentCapital: capital,
   });
 };
@@ -347,6 +353,13 @@ export const modifyFlow = (
         ? flow.riskLimits.maxValueExposurePercent
         : request.max_value_exposure_percent,
     ),
+    defaultStopLossPercent:
+      optionalTextOf(request.default_stop_loss_percent) ?? flow.defaultStopLossPercent,
+    // A null take profit sent on purpose removes it; a missing one keeps the one in force (R3.1.2).
+    defaultTakeProfitPercent:
+      request.default_take_profit_percent === undefined
+        ? flow.defaultTakeProfitPercent
+        : optionalTextOf(request.default_take_profit_percent),
     bringToMinimum: changed(
       request.bring_to_minimum,
       flow.bringToMinimum,

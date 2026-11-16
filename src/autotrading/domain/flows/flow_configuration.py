@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -10,6 +10,7 @@ from autotrading.domain.flows.errors import (
     RepeatedSourceError,
     SourceNotSelectedError,
 )
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -50,6 +51,8 @@ class FlowConfiguration:
     # The default of the platform unless the user writes their own, so a flow follows the updates of the default
     # until then (R1.4.8).
     system_prompt: str | None = None
+    # A stop loss of 5% and no take profit unless the user chooses others; the existing flows got the same (R3.1.2).
+    protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]

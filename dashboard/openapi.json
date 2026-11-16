@@ -4258,6 +4258,21 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -4273,7 +4288,9 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "default_stop_loss_percent",
+          "default_take_profit_percent"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -4830,6 +4847,34 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -5042,6 +5087,34 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -5454,6 +5527,21 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -5473,7 +5561,9 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "default_stop_loss_percent",
+          "default_take_profit_percent"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -7237,6 +7327,34 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -7296,6 +7414,28 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",

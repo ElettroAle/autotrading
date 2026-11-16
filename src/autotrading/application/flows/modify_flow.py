@@ -15,6 +15,7 @@ from autotrading.domain.flows.errors import AccountNotChangeableError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -46,6 +47,10 @@ class ModifyFlowCommand:
     # An exposure limit taken away, which None cannot say either (R1.1.3); at least one limit stays (R1.1.1).
     remove_max_margin_exposure: bool = False
     remove_max_value_exposure: bool = False
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
+    # The default take profit taken away: the stop loss stays, it is mandatory (R3.1.2).
+    remove_default_take_profit: bool = False
 
 
 class ModifyFlowUseCase:
@@ -90,6 +95,7 @@ class ModifyFlowUseCase:
                 current.bring_to_minimum if command.bring_to_minimum is None else command.bring_to_minimum
             ),
             system_prompt=_system_prompt(current.system_prompt, command),
+            protection_defaults=_protection_defaults(current.protection_defaults, command),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -130,6 +136,16 @@ def _system_prompt(current: str | None, command: ModifyFlowCommand) -> str | Non
     if command.default_system_prompt:
         return None
     return current if command.system_prompt is None else command.system_prompt
+
+
+def _protection_defaults(current: ProtectionDefaults, command: ModifyFlowCommand) -> ProtectionDefaults:
+    stop = command.default_stop_loss_percent
+    return ProtectionDefaults(
+        current.stop_loss_percent if stop is None else stop,
+        _exposure(
+            current.take_profit_percent, command.default_take_profit_percent, removed=command.remove_default_take_profit
+        ),
+    )
 
 
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:
