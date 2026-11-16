@@ -12,7 +12,7 @@ from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter

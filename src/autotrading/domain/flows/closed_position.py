@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from autotrading.domain.flows.errors import InvalidClosedPositionError
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
 

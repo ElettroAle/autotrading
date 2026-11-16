@@ -1430,7 +1430,8 @@ export interface components {
         };
         /**
          * FlowPositionResponse
-         * @description An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin.
+         * @description An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a
+         *     position without margin, each level of the plan when the agent declared none.
          */
         FlowPositionResponse: {
             /** Asset */
@@ -1451,6 +1452,12 @@ export interface components {
             unrealized_pnl: string;
             /** Unrealized Pnl Percent */
             unrealized_pnl_percent: string | null;
+            /** Target Price */
+            target_price: string | null;
+            /** Stop Price */
+            stop_price: string | null;
+            /** Invalidation */
+            invalidation: string | null;
         };
         /**
          * FlowRankingResponse

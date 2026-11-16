@@ -58,6 +58,19 @@ def test_the_default_uses_every_placeholder_and_renders_the_rules_and_the_format
     assert '{"decisioni": [{"asset": "<asset>", "azione": "<una delle azioni ammesse>"' in rendered
 
 
+def test_the_default_asks_the_exit_plan_of_an_opening() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert '"obiettivo": <prezzo obiettivo o null>, "stop": <prezzo di stop o null>' in rendered
+    assert """"invalidazione": "<condizione che invalida l'apertura>" o null""" in rendered
+    assert (
+        "- obiettivo, stop e invalidazione di un'apertura sono facoltativi: per un long lo stop sta sotto il prezzo di"
+        " mercato e l'obiettivo sopra, per uno short il contrario; il piano in vigore di ogni posizione aperta è nello"
+        " stato del flusso;"
+    ) in rendered
+    assert "direzione, quota, leva, obiettivo, stop e invalidazione servono solo per apri" in rendered
+
+
 def test_a_template_with_known_placeholders_and_doubled_braces_is_accepted() -> None:
     template = '{instructions} {{"leva": {max_leverage}}} {assets!r:>10}'
 

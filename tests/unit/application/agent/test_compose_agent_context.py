@@ -1,15 +1,23 @@
 """The question of a cycle as the agent reads it: the flow alone, its sources, its limits (R1.4.3)."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, PositionView, SourceData
 from autotrading.domain.agent.decision import TradeDirection
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 NOW = datetime(2026, 11, 12, 10, 30, tzinfo=UTC)
+
+
+@dataclass(frozen=True, slots=True)
+class Plan:
+    target: Decimal | None = None
+    stop: Decimal | None = None
+    invalidation: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +30,7 @@ class Position:
     mark_price: Decimal = Decimal(59000)
     unrealized_pnl: Decimal = Decimal(-2)
     liquidation_price: Decimal | None = None
+    exit_plan: Plan = Plan()
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,3 +89,12 @@ def test_the_question_becomes_the_context_of_the_agent() -> None:
         sources=(SourceData("indicatori", 8, "BTC", {"rsi": "71"}),),
         missing=("notizie: timeout",),
     )
+
+
+def test_each_position_keeps_the_exit_plan_in_force() -> None:
+    planned = Position(exit_plan=Plan(Decimal(57000), Decimal(61000), "chiusura sopra 60500"))
+    question = replace(Question(), state=State(positions=(planned,)))
+
+    [position] = ComposeAgentContextUseCase().execute(question).state.positions
+
+    assert position.exit_plan == ExitPlan(Decimal(57000), Decimal(61000), "chiusura sopra 60500")

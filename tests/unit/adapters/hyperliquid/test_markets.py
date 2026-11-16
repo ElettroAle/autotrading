@@ -21,13 +21,17 @@ META = {
     ]
 }
 
+MIDS = {"BTC": "60123.5", "ETH": "3100.0", "MATIC": "0.4"}
+
 
 @dataclass
 class FakeSdk(HyperliquidSdkAdapter):
     """Stands in for the official SDK: it answers the metadata the test decides, or fails as the test decides."""
 
     meta_answer: Any = field(default_factory=lambda: META)
+    mids_answer: Any = field(default_factory=lambda: MIDS)
     failure: Exception | None = None
+    mids_failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
     def exchange(self, wallet: LocalAccount, base_url: str, account_address: str, timeout: float) -> FakeSdk:
@@ -42,6 +46,12 @@ class FakeSdk(HyperliquidSdkAdapter):
         if self.failure is not None:
             raise self.failure
         return self.meta_answer
+
+    def all_mids(self) -> Any:
+        self.calls.append(("all_mids", ()))
+        if self.mids_failure is not None:
+            raise self.mids_failure
+        return self.mids_answer
 
 
 def test_the_tradable_assets_are_those_listed_and_not_delisted() -> None:
@@ -75,11 +85,34 @@ def test_metadata_of_unexpected_shape_are_unavailable(meta: Any) -> None:
         HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk(meta_answer=meta)).tradable_assets()
 
 
-def test_the_limits_of_an_asset_are_its_maximum_leverage_and_the_minimum_order_value() -> None:
+def test_the_limits_of_an_asset_are_its_maximum_leverage_the_minimum_order_value_and_the_market_price() -> None:
     adapter = HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk())
 
-    assert adapter.limits("ETH") == AssetLimits(25, Decimal(10))
-    assert adapter.limits("BTC") == AssetLimits(40, Decimal(10))
+    assert adapter.limits("ETH") == AssetLimits(25, Decimal(10), Decimal("3100.0"))
+    assert adapter.limits("BTC") == AssetLimits(40, Decimal(10), Decimal("60123.5"))
+
+
+def test_the_limits_come_from_one_reading_of_the_market() -> None:
+    sdk = FakeSdk()
+
+    HyperliquidMarketsAdapter(TESTNET_API_URL, sdk, 3.0).limits("BTC")
+
+    assert sdk.calls == [("info", (TESTNET_API_URL, 3.0)), ("all_mids", ())]
+
+
+@pytest.mark.parametrize("mids", [{}, {"BTC": None}, {"BTC": "many"}, {"BTC": "0"}, {"BTC": "-1"}, None])
+def test_a_market_price_of_unexpected_shape_is_unavailable(mids: Any) -> None:
+    adapter = HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk(mids_answer=mids))
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        adapter.limits("BTC")
+
+
+def test_a_market_price_the_exchange_does_not_give_is_unavailable() -> None:
+    adapter = HyperliquidMarketsAdapter(TESTNET_API_URL, FakeSdk(mids_failure=ServerError(502, "bad gateway")))
+
+    with pytest.raises(FlowExchangeUnavailableError):
+        adapter.limits("BTC")
 
 
 @pytest.mark.parametrize("asset", ["DOGE", "MATIC"])

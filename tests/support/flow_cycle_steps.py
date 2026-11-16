@@ -17,7 +17,7 @@ from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex

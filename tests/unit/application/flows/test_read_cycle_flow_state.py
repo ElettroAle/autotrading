@@ -20,6 +20,7 @@ from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
@@ -65,7 +66,12 @@ class Bench:
             flows, self.activity, InMemoryReconciliationRepositoryAdapter(), InMemoryClosedPositionsAdapter(), record
         )
         self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
-        self.read = ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, self.activity, self.ledger), self.reconcile)
+        self.read = ReadCycleFlowStateUseCase(
+            ReadFlowStateUseCase(
+                flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+            ),
+            self.reconcile,
+        )
         self.flow = a_flow(
             TENANT, account_id=ACCOUNT, status=FlowStatus.ACTIVE, configuration=a_configuration(assets=("BTC",))
         )

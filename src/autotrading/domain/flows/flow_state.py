@@ -3,10 +3,11 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 HUNDRED = Decimal(100)
 ZERO = Decimal(0)
@@ -33,7 +34,8 @@ class FlowState:
 
     Positions belong to the flow by asset; realized PnL, fees and funding come from the running totals of the ledger
     the platform keeps (ADR 0063), never from the executions the exchange still holds. The return is measured
-    against the capital allocated now: a change of the capital moves the reference from that moment (R1.1.7).
+    against the capital allocated now: a change of the capital moves the reference from that moment (R1.1.7). Every
+    open position carries the exit plan in force, while it stays open (R3.1.1).
     """
 
     flow_id: FlowId
@@ -44,19 +46,34 @@ class FlowState:
     fees: Decimal
     funding: Decimal
     expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
+    exit_plans: Mapping[str, ExitPlan] = field(default_factory=lambda: frozendict({}))
 
     @classmethod
-    def attributed(cls, flow: Flow, activity: AccountActivity, totals: FlowTotals) -> FlowState:
+    def attributed(
+        cls,
+        flow: Flow,
+        activity: AccountActivity,
+        totals: FlowTotals,
+        exit_plans: Mapping[str, ExitPlan] = frozendict({}),
+    ) -> FlowState:
+        positions = flow.configuration.held(activity.positions, lambda position: position.asset)
         return cls(
             flow_id=flow.id,
             currency=activity.currency,
             allocated_capital=flow.configuration.assigned_capital,
-            positions=flow.configuration.held(activity.positions, lambda position: position.asset),
+            positions=positions,
             realized_pnl=totals.realized_pnl,
             fees=totals.fees,
             funding=totals.funding,
             expected_positions=totals.positions,
+            exit_plans=frozendict(
+                {position.asset: exit_plans[position.asset] for position in positions if position.asset in exit_plans}
+            ),
         )
+
+    def exit_plan_of(self, asset: str) -> ExitPlan:
+        """The exit plan in force of the position open on the asset; the empty plan when there is none (R3.1.1)."""
+        return self.exit_plans.get(asset, ExitPlan())
 
     def position_mismatch(self) -> PositionMismatch | None:
         """The first asset of the flow whose position on the account is not the one its ledger expects (ADR 0064)."""

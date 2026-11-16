@@ -77,6 +77,7 @@ from tests.fakes.cycles import (
 )
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
+from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_repository import (
     InMemoryAutomaticPauseAdapter,
@@ -171,6 +172,7 @@ class FlowCycles:
         access = OpenTradingAccessUseCase(accounts, opener)
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
+        exit_plans = InMemoryExitPlanRepositoryAdapter(platform.exit_plans, tenant_id)
         notify = platform.worker_for(tenant_id).notify
         closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
@@ -185,7 +187,7 @@ class FlowCycles:
             flows,
             activity,
             self.readings,
-            RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
+            RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             record_executions,
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
@@ -203,7 +205,9 @@ class FlowCycles:
             flows,
             InMemoryFlowTimingAdapter(platform.flows, tenant_id),
             ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
-            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, platform.ledger), reconcile_for_cycle),
+            ReadCycleFlowStateUseCase(
+                ReadFlowStateUseCase(flows, activity, platform.ledger, exit_plans), reconcile_for_cycle
+            ),
         )
         execute_flow_orders = ExecuteFlowOrdersUseCase(
             access, {HYPERLIQUID: platform.order_exchange}, platform.orders_of(tenant_id), platform.slippage
@@ -212,7 +216,7 @@ class FlowCycles:
             FlowOrderFollowers(
                 NotifyOrderRejectedUseCase(notify),
                 NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
         return TenantCyclePorts(
@@ -223,7 +227,9 @@ class FlowCycles:
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),
-            send_orders=SendCycleOrdersUseCase(ExecuteCycleOrdersUseCase(execute_flow_orders, follow_flow_orders)),
+            send_orders=SendCycleOrdersUseCase(
+                ExecuteCycleOrdersUseCase(execute_flow_orders, follow_flow_orders), openings, exit_plans
+            ),
             openings=openings,
             closed_positions=closed_positions,
             follow_flow_orders=follow_flow_orders,

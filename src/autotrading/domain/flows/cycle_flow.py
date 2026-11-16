@@ -84,6 +84,7 @@ class CycleFlow:
                     position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
+                    self.attributed.exit_plan_of(position.asset),
                 )
                 for position in self.positions
             ),

@@ -38,6 +38,9 @@ def opening(asset: str, quota: object = 0.1, leverage: object = 3, reasoning: st
         "direzione": "long",
         "quota": quota,
         "leva": leverage,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
         "ragionamento": reasoning,
     }
 

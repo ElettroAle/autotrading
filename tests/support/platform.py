@@ -55,6 +55,7 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
@@ -136,6 +137,7 @@ class Platform:
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))
         self.closed_positions = ClosedPositionStore()
+        self.exit_plans = ExitPlanStore()
         self.cycles = InMemoryCycleRepositoryAdapter()
         self.equity_snapshots = EquitySnapshotStore()
         self.histories: dict[TenantId, InMemoryFlowHistoryAdapter] = {}
@@ -178,7 +180,10 @@ class Platform:
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
         closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        stop_ports = StopPorts(self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice)
+        exit_plans = InMemoryExitPlanRepositoryAdapter(self.exit_plans, tenant_id)
+        stop_ports = StopPorts(
+            self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
+        )
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -186,7 +191,9 @@ class Platform:
             exchanges=self.exchanges,
             account_state=account_state,
             position_closing=position_closing,
-            manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
+            manual_closings=RecordManualClosingUseCase(
+                flows, flow_openings, closed_positions, closing_notice, exit_plans
+            ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
@@ -217,6 +224,7 @@ class Platform:
             notifier=self.worker_for(tenant_id).notify,
             clock=lambda: self.now,
             closed_positions=closed_positions,
+            exit_plans=exit_plans,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),

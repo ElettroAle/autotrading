@@ -8,13 +8,15 @@ import pytest
 
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.flows import a_configuration, a_flow
@@ -56,11 +58,13 @@ class Bench:
         self.history = ClosedPositionStore()
         self.openings = KnownOpenings()
         self.notices = FakePositionClosedNoticeAdapter()
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
         self.use_case = RecordManualClosingUseCase(
             InMemoryFlowRepositoryAdapter(self.store, TENANT),
             self.openings,
             InMemoryClosedPositionRepositoryAdapter(self.history, TENANT),
             self.notices,
+            self.exit_plans,
         )
 
     def flow(
@@ -143,3 +147,27 @@ def test_a_closing_not_confirmed_by_the_exchange_enters_no_history(bench: Bench)
 
     assert bench.history.positions == []
     assert bench.notices.told == []
+
+
+PLAN = ExitPlan(Decimal(110000), Decimal(95000), "chiusura sotto 97000")
+
+
+@pytest.mark.parametrize("opened", [True, False])
+def test_a_manual_closing_ends_the_exit_plan_of_the_position(bench: Bench, *, opened: bool) -> None:
+    flow = bench.flow()
+    bench.exit_plans.save(flow.id, "BTC", PLAN)
+    if opened:
+        bench.openings.openings[flow.id, "BTC"] = OPENING
+
+    bench.record()
+
+    assert bench.exit_plans.current(flow.id, "BTC") is None
+
+
+def test_a_manual_closing_not_confirmed_keeps_the_exit_plan(bench: Bench) -> None:
+    flow = bench.flow()
+    bench.exit_plans.save(flow.id, "BTC", PLAN)
+
+    bench.use_case.execute(ACCOUNT, "BTC", Reported())
+
+    assert bench.exit_plans.current(flow.id, "BTC") == PLAN

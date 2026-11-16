@@ -2,6 +2,7 @@ import logging
 
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
+    ExitPlanRepositoryPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
     PositionClosedNoticePort,
@@ -14,8 +15,8 @@ operations = logging.getLogger("autotrading.flows")
 
 
 class RecordOutsideClosingUseCase:
-    """A position the reconciliation finds closed outside the platform enters the history of its flow, then is told
-    (ADR 0056, ADR 0070).
+    """A position the reconciliation finds closed outside the platform ends its exit plan and enters the history of its
+    flow, then is told (R3.1.1, ADR 0056, ADR 0070).
 
     The opening is the last order of the flow on the asset. A position the flow never opened, or a loss beyond the
     value it held, has no history to enter: the closing is told on its own and stays among the unattributable.
@@ -27,14 +28,17 @@ class RecordOutsideClosingUseCase:
         openings: FlowOpeningsPort,
         closed_positions: ClosedPositionRepositoryPort,
         notice: PositionClosedNoticePort,
+        exit_plans: ExitPlanRepositoryPort,
     ) -> None:
         self._flows = flows
         self._openings = openings
         self._closed_positions = closed_positions
         self._notice = notice
+        self._exit_plans = exit_plans
 
     def execute(self, closing: OutsideClosing) -> None:
         flow = self._flows.get(closing.flow_id)
+        self._exit_plans.remove(flow.id, closing.asset)
         opening = self._openings.last_opening(flow.id, closing.asset)
         if opening is None:
             self._tell_without_history(flow, closing, "posizione chiusa fuori senza apertura del flusso")

@@ -5,7 +5,7 @@ from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.flow_cost import FlowCost
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_statistics import FlowStatistics
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 CLOSED = datetime(2026, 11, 12, 10, tzinfo=UTC)

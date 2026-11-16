@@ -20,6 +20,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
@@ -49,7 +50,12 @@ class Bench:
         self.equity = InMemoryEquitySnapshotRepositoryAdapter(EquitySnapshotStore(), TENANT)
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         results = ReadFlowResultsUseCase(
-            ReadFlowStateUseCase(flows, self.activity, self.ledger), self.equity, self.history, lambda: NOW
+            ReadFlowStateUseCase(
+                flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+            ),
+            self.equity,
+            self.history,
+            lambda: NOW,
         )
         self.use_case = ListFlowOverviewsUseCase(self.summaries, self.history, results, "dev", lambda: NOW)
 

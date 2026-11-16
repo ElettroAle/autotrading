@@ -7,10 +7,11 @@ from decimal import Decimal
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.risk_check import RiskState
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
@@ -88,3 +89,18 @@ def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
         Decimal("-18.00"),
         (PositionView("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(105), Decimal(5), Decimal(60)),),
     )
+
+
+def test_each_position_of_the_state_view_carries_its_exit_plan_in_force() -> None:
+    plan = ExitPlan(Decimal(130), Decimal(90), "chiusura sotto 95")
+    state = replace(attributed(margin=Decimal(50)), exit_plans={"BTC": plan})
+
+    [position] = cycle_flow(state).state_view().positions
+
+    assert position.exit_plan == plan
+
+
+def test_a_position_without_a_plan_shows_the_empty_one() -> None:
+    [position] = cycle_flow(attributed()).state_view().positions
+
+    assert position.exit_plan == ExitPlan()

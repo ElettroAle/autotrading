@@ -7,7 +7,7 @@ import pytest
 
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 AT = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
 PRICE, FEE, PNL = Decimal(102000), Decimal("0.05"), Decimal("1.5")

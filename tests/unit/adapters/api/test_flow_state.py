@@ -9,6 +9,7 @@ from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.ledger import FlowTotals
 from tests.support.activity import a_position, an_activity
@@ -96,6 +97,9 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
                 "margin": "100",
                 "unrealized_pnl": "12",
                 "unrealized_pnl_percent": "12",
+                "target_price": None,
+                "stop_price": None,
+                "invalidation": None,
             }
         ],
         "summary": {
@@ -147,6 +151,23 @@ def test_a_position_without_margin_answers_no_pnl_percent(client_of: Client, pla
     [position] = anna.get(f"/flows/{flow.id.value}/state").json()["positions"]
 
     assert position["unrealized_pnl_percent"] is None
+
+
+def test_a_position_answers_its_exit_plan_in_force(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity(positions=(a_position("BTC"),))
+    platform.exit_plans.plans[platform.tenant_of("anna"), flow.id, "BTC"] = ExitPlan(
+        Decimal("63000.0"), Decimal(58500), "chiusura a 4 ore sotto 59000"
+    )
+
+    [position] = anna.get(f"/flows/{flow.id.value}/state").json()["positions"]
+
+    assert (position["target_price"], position["stop_price"], position["invalidation"]) == (
+        "63000",
+        "58500",
+        "chiusura a 4 ore sotto 59000",
+    )
 
 
 def test_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:

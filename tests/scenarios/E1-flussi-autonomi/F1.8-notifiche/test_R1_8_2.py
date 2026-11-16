@@ -65,6 +65,9 @@ def opening(asset: str, leverage: int = 3) -> dict[str, object]:
         "direzione": "long",
         "quota": QUOTA,
         "leva": leverage,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
         "ragionamento": "r",
     }
 

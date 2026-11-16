@@ -8,7 +8,7 @@ from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.statistics_period import TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.flows import a_flow

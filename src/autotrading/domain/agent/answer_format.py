@@ -6,9 +6,12 @@ from autotrading.domain.agent.agent_response import (
     ASSET,
     DECISIONS,
     DIRECTION,
+    INVALIDATION,
     LEVERAGE,
     MARGIN_FRACTION,
     REASONING,
+    STOP,
+    TARGET,
 )
 from autotrading.domain.agent.decision import TradeAction, TradeDirection
 
@@ -39,6 +42,9 @@ def _decisions_schema() -> Schema:
             DIRECTION: {"type": ["string", "null"], "enum": [*(direction.value for direction in TradeDirection), None]},
             MARGIN_FRACTION: {"type": ["number", "null"]},
             LEVERAGE: {"type": ["integer", "null"]},
+            TARGET: {"type": ["number", "null"]},
+            STOP: {"type": ["number", "null"]},
+            INVALIDATION: {"type": ["string", "null"]},
             REASONING: {"type": "string"},
         }
     )

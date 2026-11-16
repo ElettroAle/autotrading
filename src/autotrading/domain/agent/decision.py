@@ -1,7 +1,9 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
+
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 
 class TradeAction(StrEnum):
@@ -19,11 +21,14 @@ class TradeDirection(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class TradeOpening:
-    """The operational fields of an opening: the share of the flow capital committed as margin, and the leverage."""
+    """The operational fields of an opening: the share of the flow capital committed as margin, the leverage and the
+    exit plan (R1.4.4, R3.1.1).
+    """
 
     direction: TradeDirection
     margin_fraction: Decimal
     leverage: int
+    exit_plan: ExitPlan = field(default_factory=ExitPlan)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +45,7 @@ class Decision:
 
     def intent_with[O, C, H](
         self,
-        opening: Callable[[str, str, Decimal, int], O],
+        opening: Callable[[str, str, Decimal, int, ExitPlan], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
     ) -> O | C | H:
@@ -49,7 +54,9 @@ class Decision:
             return closing(self.asset)
         if self.action is TradeAction.OPEN and self.opening is not None:
             fields = self.opening
-            return opening(self.asset, fields.direction.value, fields.margin_fraction, fields.leverage)
+            return opening(
+                self.asset, fields.direction.value, fields.margin_fraction, fields.leverage, fields.exit_plan
+            )
         return holding(self.asset)
 
 

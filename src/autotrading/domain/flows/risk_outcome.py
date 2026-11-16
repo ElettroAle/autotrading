@@ -1,36 +1,44 @@
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
 
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.trade_side import TradeSide
 
 
 class AdjustmentKind(StrEnum):
     LEVERAGE = "leva"
     MARGIN = "margine"
     VALUE = "valore"
+    EXIT_PLAN = "piano di uscita"
 
 
 @dataclass(frozen=True, slots=True)
 class Adjustment:
-    """A change the risk check made to an opening, recorded with what the agent asked and why (R1.5.1-R1.5.4)."""
+    """A change the risk check made to an opening, recorded with what the agent asked and why (R1.5.1-R1.5.4).
+
+    A level of the exit plan incoherent with the side is removed: nothing comes after it (R3.1.1).
+    """
 
     kind: AdjustmentKind
     before: Decimal
-    after: Decimal
+    after: Decimal | None
     reason: str
 
 
 @dataclass(frozen=True, slots=True)
 class ApprovedOpening:
-    """An opening the risk check lets through: its value is what the order sizes, the margin follows from it."""
+    """An opening the risk check lets through: its value is what the order sizes, the margin follows from it; its exit
+    plan holds only the levels coherent with its side (R3.1.1).
+    """
 
     asset: str
     side: TradeSide
     value: Decimal
     leverage: int
     adjustments: tuple[Adjustment, ...]
+    exit_plan: ExitPlan = field(default_factory=ExitPlan)
 
     @property
     def margin(self) -> Decimal:

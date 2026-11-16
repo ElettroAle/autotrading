@@ -7,7 +7,7 @@ import httpx
 
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, InvalidOperation)

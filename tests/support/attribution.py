@@ -26,6 +26,7 @@ from autotrading.domain.flows.ledger import Execution, FlowTotals
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
@@ -64,7 +65,9 @@ class AttributionBench:
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         self.ledger = InMemoryFlowLedgerAdapter()
         self.record = RecordAccountExecutionsUseCase(flows, self.exchange, self.orders, self.ledger)
-        self.read_state = ReadFlowStateUseCase(flows, self.exchange, self.ledger)
+        self.read_state = ReadFlowStateUseCase(
+            flows, self.exchange, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+        )
         self.reconcile = ReconcileAccountUseCase(flows, self.exchange, self.readings, self.closed, self.record)
         self.state: FlowState | None = None
         self.recomputed: FlowTotals | None = None

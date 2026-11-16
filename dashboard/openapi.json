@@ -5125,6 +5125,39 @@
               }
             ],
             "title": "Unrealized Pnl Percent"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
           }
         },
         "type": "object",
@@ -5137,10 +5170,13 @@
           "mark_price",
           "margin",
           "unrealized_pnl",
-          "unrealized_pnl_percent"
+          "unrealized_pnl_percent",
+          "target_price",
+          "stop_price",
+          "invalidation"
         ],
         "title": "FlowPositionResponse",
-        "description": "An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin."
+        "description": "An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a\nposition without margin, each level of the plan when the agent declared none."
       },
       "FlowRankingResponse": {
         "properties": {

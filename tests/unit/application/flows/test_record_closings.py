@@ -13,11 +13,13 @@ from autotrading.application.flows.record_flow_closing import RecordFlowClosingU
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.domain.flows.account_reconciliation import OutsideClosing
 from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionOpening
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
+from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.support.flows import a_flow
@@ -26,6 +28,7 @@ TENANT = TenantId(uuid4())
 OPENED = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
 CLOSED = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
 CYCLE = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
+PLAN = ExitPlan(Decimal(110000), Decimal(95000), "chiusura sotto 97000")
 OPENING = PositionOpening(TradeSide.LONG, 2, Decimal(50), PositionEnd(Decimal(100000), OPENED, OPENED), Decimal("0.03"))
 
 
@@ -55,8 +58,14 @@ class Bench:
         self.flows.flows.append(self.flow)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.history, TENANT)
         flows = InMemoryFlowRepositoryAdapter(self.flows, TENANT)
-        self.cycle_closing = RecordFlowClosingUseCase(flows, self.openings, closed_positions, self.notices)
-        self.outside_closing = RecordOutsideClosingUseCase(flows, self.openings, closed_positions, self.notices)
+        self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+        self.exit_plans.save(self.flow.id, "BTC", PLAN)
+        self.cycle_closing = RecordFlowClosingUseCase(
+            flows, self.openings, closed_positions, self.notices, self.exit_plans
+        )
+        self.outside_closing = RecordOutsideClosingUseCase(
+            flows, self.openings, closed_positions, self.notices, self.exit_plans
+        )
 
     def close_in_cycle(self) -> None:
         fill = Executed(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
@@ -126,3 +135,31 @@ def test_a_loss_beyond_the_value_of_the_position_is_told_and_logged(
     assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal(-150))]
     (record,) = caplog.records
     assert record.getMessage() == "esito della chiusura fuori non rappresentabile"
+
+
+@pytest.mark.parametrize("opened", [True, False])
+def test_a_cycle_closing_ends_the_exit_plan_of_the_position(bench: Bench, *, opened: bool) -> None:
+    if opened:
+        bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+
+    bench.close_in_cycle()
+
+    assert bench.exit_plans.current(bench.flow.id, "BTC") is None
+
+
+@pytest.mark.parametrize("opened", [True, False])
+def test_a_closing_outside_ends_the_exit_plan_of_the_position(bench: Bench, *, opened: bool) -> None:
+    if opened:
+        bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+
+    bench.close_outside()
+
+    assert bench.exit_plans.current(bench.flow.id, "BTC") is None
+
+
+def test_a_closing_outside_beyond_the_value_of_the_position_still_ends_its_plan(bench: Bench) -> None:
+    bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+
+    bench.close_outside(Decimal(-150))
+
+    assert bench.exit_plans.current(bench.flow.id, "BTC") is None

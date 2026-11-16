@@ -48,6 +48,7 @@ from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemy
 from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
     SqlAlchemyEquitySnapshotRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.exit_plan_repository import SqlAlchemyExitPlanRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_history import SqlAlchemyFlowHistoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_ledger import SqlAlchemyFlowLedgerAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlowOpeningsAdapter
@@ -236,8 +237,14 @@ def tenant_use_cases(
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         flow_openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
+        exit_plans = SqlAlchemyExitPlanRepositoryAdapter(engine, tenant_id)
         stop_ports = StopPorts(
-            SqlAlchemyRunningCycleAdapter(engine), flow_positions, flow_openings, closed_positions, closing_notice
+            SqlAlchemyRunningCycleAdapter(engine),
+            flow_positions,
+            flow_openings,
+            closed_positions,
+            closing_notice,
+            exit_plans,
         )
         history = SqlAlchemyFlowHistoryAdapter(engine, tenant_id)
         ports = TenantPorts(
@@ -247,7 +254,9 @@ def tenant_use_cases(
             exchanges=exchanges,
             account_state=account_state,
             position_closing=position_closing,
-            manual_closings=RecordManualClosingUseCase(flows, flow_openings, closed_positions, closing_notice),
+            manual_closings=RecordManualClosingUseCase(
+                flows, flow_openings, closed_positions, closing_notice, exit_plans
+            ),
             verification=verification,
             source_catalog=SOURCE_CATALOG,
             provider_keys=provider_keys,
@@ -274,6 +283,7 @@ def tenant_use_cases(
             notifier=notifier,
             clock=system_clock_adapters().now,
             closed_positions=closed_positions,
+            exit_plans=exit_plans,
             cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
@@ -363,6 +373,7 @@ def cycle_of(
         access = OpenTradingAccessUseCase(accounts, opener)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
         openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
+        exit_plans = SqlAlchemyExitPlanRepositoryAdapter(engine, tenant_id)
         notify = notify_for(engine, outbox, tenant_id)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
         closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
@@ -378,7 +389,7 @@ def cycle_of(
             flows,
             activity,
             SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id),
-            RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice),
+            RecordOutsideClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             record_executions,
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
@@ -396,13 +407,13 @@ def cycle_of(
             flows,
             SqlAlchemyFlowTimingAdapter(engine, tenant_id),
             ReadCycleAccountUseCase(accounts, accounts, opener, exchanges),
-            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger), reconcile_for_cycle),
+            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger, exit_plans), reconcile_for_cycle),
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
                 NotifyOrderRejectedUseCase(notify),
                 NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice),
+                RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
         steps = CycleSteps(
@@ -430,7 +441,9 @@ def cycle_of(
             orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(
                     ExecuteFlowOrdersUseCase(access, order_exchanges, orders, slippage), follow_flow_orders
-                )
+                ),
+                openings,
+                exit_plans,
             ),
             end=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             journal=JsonCycleJournalAdapter(environment),

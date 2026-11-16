@@ -1,9 +1,11 @@
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
-from autotrading.application.flows.ports import CycleDecisions, FlowSnapshot, RiskReview
+from autotrading.application.flows.ports import CycleDecisions, DecisionExitPlanPort, FlowSnapshot, RiskReview
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.risk_outcome import approved_of
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
 
@@ -25,7 +27,7 @@ class ReviewCycleRiskUseCase:
         cycle_flow = decisions.flow
         command = CheckRiskCommand(
             tuple(
-                decision.intent_with(OpenIntent.of, CloseIntent, HoldIntent)
+                decision.intent_with(_open_intent, CloseIntent, HoldIntent)
                 for decision in decisions.reply.response.decisions
             ),
             cycle_flow.configuration.risk_policy,
@@ -35,3 +37,10 @@ class ReviewCycleRiskUseCase:
         outcomes = self._check_risk.execute(command)
         orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
         return RiskReview(orders, tuple(outcomes))
+
+
+def _open_intent(
+    asset: str, side: str, margin_fraction: Decimal, leverage: int, exit_plan: DecisionExitPlanPort
+) -> OpenIntent:
+    plan = ExitPlan(exit_plan.target, exit_plan.stop, exit_plan.invalidation)
+    return OpenIntent.of(asset, side, margin_fraction, leverage, plan)

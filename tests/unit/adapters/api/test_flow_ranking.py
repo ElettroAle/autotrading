@@ -12,7 +12,7 @@ from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.flows import a_flow
 from tests.support.identity_provider import IdentityProvider

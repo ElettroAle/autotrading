@@ -54,6 +54,7 @@ from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
     EquitySnapshotRepositoryPort,
+    ExitPlanRepositoryPort,
     FlowDirectoryPort,
     FlowLedgerPort,
     FlowOperationsPort,
@@ -133,6 +134,7 @@ class TenantPorts:
     notifier: NotifierPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
+    exit_plans: ExitPlanRepositoryPort
     cycle_history: CycleHistoryPort
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
@@ -236,7 +238,7 @@ class TenantUseCases:
             list_tradable_assets=ListTradableAssetsUseCase(ports.flow_checks.markets),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
             read_flow_results=ReadFlowResultsUseCase(
-                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
                 ports.equity_snapshots,
                 ports.cycle_history,
                 ports.clock,
@@ -257,7 +259,7 @@ class TenantUseCases:
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
                 ports.flows,
                 ports.flow_checks.accounts,
-                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
                 ports.clock,
             ),
             list_capital_changes=ListCapitalChangesUseCase(ports.flows),
@@ -276,7 +278,7 @@ class TenantUseCases:
                 ports.flow_summaries,
                 ports.cycle_history,
                 ReadFlowResultsUseCase(
-                    ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                    ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
                     ports.equity_snapshots,
                     ports.cycle_history,
                     ports.clock,

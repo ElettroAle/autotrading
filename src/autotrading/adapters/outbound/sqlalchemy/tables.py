@@ -410,3 +410,16 @@ outbox_messages = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("last_error", Text),
 )
+
+# The exit plan in force of each open position of a flow, replaced at every opening and removed at the closing (R3.1.1).
+flow_exit_plans = Table(
+    "flow_exit_plans",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("asset", Text, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("target_price", Numeric),
+    Column("stop_price", Numeric),
+    Column("invalidation", Text),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)

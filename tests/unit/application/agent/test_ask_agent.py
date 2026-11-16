@@ -53,7 +53,7 @@ CONTEXT = AgentContext(
 )
 ANSWER = (
     '{"decisioni": [{"asset": "BTC", "azione": "apri", "direzione": "long", "quota": 0.1, "leva": 3,'
-    ' "ragionamento": "rottura"}]}'
+    ' "obiettivo": null, "stop": null, "invalidazione": null, "ragionamento": "rottura"}]}'
 )
 
 

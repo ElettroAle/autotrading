@@ -5,6 +5,7 @@ import pytest
 
 from autotrading.domain.agent.agent_response import AgentResponse
 from autotrading.domain.agent.decision import Decision, DiscardedDecision, TradeAction, TradeDirection, TradeOpening
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 ASSETS = ("BTC", "ETH", "SOL")
 
@@ -20,6 +21,9 @@ def opening(asset: str = "BTC", **fields: object) -> dict[str, object]:
         "direzione": "long",
         "quota": 0.1,
         "leva": 3,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
         "ragionamento": "rottura della resistenza",
     }
     decision.update(fields)
@@ -69,6 +73,35 @@ def test_hold_and_close_ignore_the_operational_fields(action: str) -> None:
     assert response.decisions == (Decision("SOL", TradeAction(action), "mercato laterale"),)
 
 
+def test_an_opening_keeps_its_exit_plan() -> None:
+    entry = opening(obiettivo=63000, stop=58500.5, invalidazione="  chiusura a 4 ore sotto 59000 ")
+
+    decision = read(answer(entry)).decisions[0]
+
+    assert decision.opening is not None
+    assert decision.opening.exit_plan == ExitPlan(Decimal(63000), Decimal("58500.5"), "chiusura a 4 ore sotto 59000")
+
+
+def test_every_part_of_the_exit_plan_is_optional() -> None:
+    decision = read(answer(opening(obiettivo=None, stop=None, invalidazione=None))).decisions[0]
+
+    assert decision.opening is not None
+    assert decision.opening.exit_plan == ExitPlan()
+
+
+def test_a_blank_invalidation_is_no_invalidation() -> None:
+    decision = read(answer(opening(invalidazione="   "))).decisions[0]
+
+    assert decision.opening is not None
+    assert decision.opening.exit_plan.invalidation is None
+
+
+def test_hold_and_close_ignore_the_exit_plan() -> None:
+    response = read(answer(opening("SOL", azione="mantieni", obiettivo="alto", stop=-3, invalidazione=1)))
+
+    assert response.decisions == (Decision("SOL", TradeAction.HOLD, "rottura della resistenza"),)
+
+
 def test_the_asset_is_read_in_upper_case_and_the_texts_without_spaces() -> None:
     decision = read(answer(opening(" btc ", ragionamento="  rottura  "))).decisions[0]
 
@@ -102,6 +135,19 @@ def test_only_the_non_conforming_decisions_are_discarded() -> None:
         ({"azione": ["apri"]}, "valore di tipo non ammesso: azione"),
         ({"ragionamento": ...}, "campo obbligatorio mancante: ragionamento"),
         ({"ragionamento": "   "}, "campo obbligatorio mancante: ragionamento"),
+        ({"obiettivo": 0}, "valore fuori dall'intervallo: obiettivo"),
+        ({"obiettivo": -1}, "valore fuori dall'intervallo: obiettivo"),
+        ({"obiettivo": "alto"}, "valore di tipo non ammesso: obiettivo"),
+        ({"obiettivo": True}, "valore di tipo non ammesso: obiettivo"),
+        ({"stop": 0}, "valore fuori dall'intervallo: stop"),
+        ({"stop": "58500"}, "valore di tipo non ammesso: stop"),
+        ({"stop": False}, "valore di tipo non ammesso: stop"),
+        ({"invalidazione": 59000}, "valore di tipo non ammesso: invalidazione"),
+        # The rigid schema wants every key: an opening without one is not conforming (ADR
+        # piano-di-uscita-nella-decisione-dell-agente).
+        ({"obiettivo": ...}, "campo obbligatorio mancante: obiettivo"),
+        ({"stop": ...}, "campo obbligatorio mancante: stop"),
+        ({"invalidazione": ...}, "campo obbligatorio mancante: invalidazione"),
     ],
 )
 def test_the_reasons_of_non_conformity(fields: dict[str, object], reason: str) -> None:

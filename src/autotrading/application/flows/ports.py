@@ -26,6 +26,7 @@ from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -241,6 +242,23 @@ class FlowOpeningsPort(Protocol):
     def last_opening(self, flow_id: FlowId, asset: str) -> PositionOpening | None:
         """The last executed order of the flow that opened a position on the asset, or None if it never did."""
         ...
+
+
+class ExitPlanRepositoryPort(Protocol):
+    """The exit plan in force of each open position of the flows of the tenant, by flow and asset (R3.1.1).
+
+    A plan is saved when its opening is executed and removed when the position closes, whoever closes it.
+    """
+
+    def current(self, flow_id: FlowId, asset: str) -> ExitPlan | None:
+        """None when the flow has no plan in force on the asset."""
+        ...
+
+    def save(self, flow_id: FlowId, asset: str, plan: ExitPlan) -> None:
+        """Replaces the plan of the flow on the asset. Raises CrossTenantAccessError for a flow of another tenant."""
+        ...
+
+    def remove(self, flow_id: FlowId, asset: str) -> None: ...
 
 
 class RunningCyclePort(Protocol):
@@ -861,12 +879,25 @@ class AgentPromptComposerPort(Protocol):
         ...
 
 
+class DecisionExitPlanPort(Protocol):
+    """The exit plan the agent gave with an opening, as the agent context hands it over (R3.1.1)."""
+
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+
 class AgentDecisionPort(Protocol):
-    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4)."""
+    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4, R3.1.1)."""
 
     def intent_with[O, C, H](
         self,
-        opening: Callable[[str, str, Decimal, int], O],
+        opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
     ) -> O | C | H: ...
