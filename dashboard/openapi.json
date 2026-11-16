@@ -3400,6 +3400,63 @@
         }
       }
     },
+    "/flows/{flow_id}/decisions/latest": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Last Decision",
+        "description": "The last decision of the flow, whatever the period; null before its first completed cycle with one.",
+        "operationId": "read_last_decision_flows__flow_id__decisions_latest_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LastDecisionResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Read Last Decision Flows  Flow Id  Decisions Latest Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/equity": {
       "get": {
         "tags": [
@@ -5164,6 +5221,54 @@
           "cost_usd"
         ],
         "title": "DailyCostResponse"
+      },
+      "DecisionResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "reasoning": {
+            "type": "string",
+            "title": "Reasoning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "action",
+          "direction",
+          "confidence",
+          "reasoning"
+        ],
+        "title": "DecisionResponse",
+        "description": "A decision of the agent on one asset: the direction only for an opening, the confidence null when the agent\ngave none (R6.5.4)."
       },
       "DefaultSystemPromptResponse": {
         "properties": {
@@ -6996,6 +7101,29 @@
           "outcome"
         ],
         "title": "LastCycleResponse"
+      },
+      "LastDecisionResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionResponse"
+            },
+            "type": "array",
+            "title": "Decisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "decisions"
+        ],
+        "title": "LastDecisionResponse",
+        "description": "The last decision of the agent in the flow: the planned instant of its cycle and its decisions, one by asset\n(ADR decisioni-del-ciclo-registrate-per-asset)."
       },
       "LinkCodeResponse": {
         "properties": {

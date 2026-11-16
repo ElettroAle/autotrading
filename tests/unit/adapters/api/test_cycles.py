@@ -27,6 +27,7 @@ from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.recorded_decision import RecordedDecision
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -369,11 +370,11 @@ def test_the_cycles_are_filtered_by_outcome_decision_and_days(client_of: Client,
     anna = client_of("anna")
     flow_id = flow_of(platform, "anna")
     opening = a_completed_cycle(flow_id)
-    platform.cycles.record(replace(opening, documents=(_decided("apri"),)))
-    closing = replace(opening, planned_at=PLANNED + timedelta(minutes=15), documents=(_decided("chiudi"),))
+    platform.cycles.record(replace(opening, decisions=_decided("apri")))
+    closing = replace(opening, planned_at=PLANNED + timedelta(minutes=15), decisions=_decided("chiudi"))
     platform.cycles.record(closing)
     platform.cycles.record(CycleRecord(flow_id, PLANNED + timedelta(minutes=30), CycleOutcome.FAILED))
-    platform.cycles.record(replace(opening, planned_at=PLANNED + timedelta(days=1), documents=(_decided("apri"),)))
+    platform.cycles.record(replace(opening, planned_at=PLANNED + timedelta(days=1), decisions=_decided("apri")))
 
     body = anna.get(
         f"/flows/{flow_id}/cycles",
@@ -413,5 +414,5 @@ def test_an_unknown_filter_of_the_cycles_is_a_bad_request(client_of: Client, pla
     assert reason_of(response) == {"detail": "esito non valido: scegliere tra concluso, fallito"}
 
 
-def _decided(action: str) -> StepDocument:
-    return StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "action": action}]})
+def _decided(action: str) -> tuple[RecordedDecision, ...]:
+    return (RecordedDecision.named("BTC", action, None, 60, "motivo"),)

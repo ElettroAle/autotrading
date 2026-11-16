@@ -41,6 +41,7 @@ from autotrading.domain.flows.cycle_record import (
 )
 from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.recorded_decision import RecordedDecision
 
 operations = logging.getLogger("autotrading.cycles")
 
@@ -114,6 +115,7 @@ class CycleState[S = object, D = object, C = object, A = object, O = object, E =
     context: C
     decisions: A
     cost: CallCost | None
+    recorded_decisions: tuple[RecordedDecision, ...]
     review: RiskReview[O]
     executions: Sequence[E]
     steps: Annotated[list[CycleStep], operator.add]
@@ -229,7 +231,13 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
     def _decide(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         decisions = self._steps.agent.execute(cycle.flow_id, state["context"])
         cost = self._steps.journal.call_cost(decisions)
-        return {"decisions": decisions, "cost": cost, **self._done(CycleStep.AGENT_DECISION, decisions)}
+        recorded_decisions = self._steps.journal.recorded_decisions(decisions)
+        return {
+            "decisions": decisions,
+            "cost": cost,
+            "recorded_decisions": recorded_decisions,
+            **self._done(CycleStep.AGENT_DECISION, decisions),
+        }
 
     def _risk_filter(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         review = self._steps.risk.execute(cycle.flow_id, state["snapshot"], state["decisions"])
@@ -304,4 +312,5 @@ def _record_of[S, D, C, A, O, E](
         failure=failure,
         documents=tuple(state.get("documents", [])),
         cost=state.get("cost"),
+        decisions=tuple(state.get("recorded_decisions", ())),
     )

@@ -10,6 +10,7 @@ from autotrading.domain.flows.errors import (
     UnknownCycleDecisionError,
     UnknownCycleOutcomeError,
 )
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 
 
@@ -74,3 +75,29 @@ def test_the_minutes_of_the_interval_become_the_window_of_the_planned_instants()
 def test_an_end_before_the_start_is_refused() -> None:
     with pytest.raises(RangeEndingBeforeStartError):
         CycleFilter.named(since=datetime(2026, 11, 3, 10, tzinfo=UTC), until=datetime(2026, 11, 3, 9, tzinfo=UTC))
+
+
+def _decisions(*actions: DecisionAction) -> tuple[RecordedDecision, ...]:
+    return tuple(RecordedDecision("BTC", action, None, 50, "motivo") for action in actions)
+
+
+@pytest.mark.parametrize(
+    ("decision", "action"),
+    [
+        (CycleDecision.OPENING, DecisionAction.OPEN),
+        (CycleDecision.CLOSING, DecisionAction.CLOSE),
+        (CycleDecision.HOLDING, DecisionAction.HOLD),
+    ],
+)
+def test_a_decision_matches_the_cycles_where_the_agent_took_its_action_on_an_asset(
+    decision: CycleDecision, action: DecisionAction
+) -> None:
+    assert decision.action is action
+    assert decision.taken_in(_decisions(DecisionAction.UPDATE, action)) is True
+    assert decision.taken_in(_decisions(DecisionAction.UPDATE)) is False
+
+
+def test_no_decision_matches_only_the_cycles_where_the_agent_decided_nothing() -> None:
+    assert CycleDecision.NONE.action is None
+    assert CycleDecision.NONE.taken_in(()) is True
+    assert CycleDecision.NONE.taken_in(_decisions(DecisionAction.UPDATE)) is False

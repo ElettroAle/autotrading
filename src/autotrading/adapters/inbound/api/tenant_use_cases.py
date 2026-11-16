@@ -92,6 +92,7 @@ from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.read_last_decision import ReadLastDecisionUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase
@@ -215,6 +216,7 @@ class TenantUseCases:
     export_account_operations: ExportAccountOperationsUseCase
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
+    read_last_decision: ReadLastDecisionUseCase
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
     read_forecast_accuracy: ReadForecastAccuracyUseCase
@@ -311,6 +313,7 @@ class TenantUseCases:
             export_account_operations=ExportAccountOperationsUseCase(ports.flow_operations),
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
+            read_last_decision=ReadLastDecisionUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_statistics=ReadFlowStatisticsUseCase(
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock

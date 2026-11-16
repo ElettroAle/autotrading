@@ -24,12 +24,14 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_filter import CycleDecision, CycleFilter
+from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_repository import FlowStore
 
@@ -37,6 +39,7 @@ ACTIVE, PAUSED = "attivo", "in pausa"
 TENANT = TenantId(UUID("00000000-0000-4000-8000-000000000001"))
 # A silent source or a held cycle gives up after this many real seconds: a broken cycle fails the test, never hangs it.
 LONGEST_HOLD = 3.0
+FAKE_CONFIDENCE = 70
 
 
 class FakeTransientError(AutotradingError):
@@ -135,6 +138,15 @@ class InMemoryCycleRepositoryAdapter:
     def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
         return [cost for cost in self.costs(flow_id) if window.contains(cost.planned_at)]
 
+    def last_decided(self, flow_id: UUID) -> DecidedCycle | None:
+        decided = (
+            record
+            for record in self.newest(flow_id, 0, len(self.records))
+            if record.outcome is CycleOutcome.COMPLETED and record.decisions
+        )
+        latest = next(decided, None)
+        return None if latest is None else DecidedCycle(latest.planned_at, latest.decisions)
+
 
 class InMemoryCycleHistoryAdapter:
     """The cycles of every tenant, bound to one like the real adapter under row level security."""
@@ -164,6 +176,9 @@ class InMemoryCycleHistoryAdapter:
 
     def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
         return self._cycles.costs_within(flow_id, window) if self._owns(flow_id) else []
+
+    def last_decided(self, flow_id: UUID) -> DecidedCycle | None:
+        return self._cycles.last_decided(flow_id) if self._owns(flow_id) else None
 
     def _owns(self, flow_id: UUID) -> bool:
         return any(flow.id.value == flow_id for flow in self._flows.of(self._tenant_id))
@@ -431,6 +446,14 @@ class FakeCycleJournalAdapter:
     def call_cost(self, decision: object) -> CallCost | None:  # noqa: ARG002 - the same cost for every call
         return self.cost
 
+    def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
+        """Every asset the fake agent decided is a long opening, with the confidence of the fake."""
+        assets = decision if isinstance(decision, list) else []
+        return tuple(
+            RecordedDecision(asset, DecisionAction.OPEN, TradeSide.LONG, FAKE_CONFIDENCE, f"apertura di {asset}")
+            for asset in assets
+        )
+
 
 class InMemoryCycleEquityAdapter:
     """The equity every cycle recorded: the flow, the planned instant and the state it was taken from."""
@@ -466,23 +489,9 @@ class InMemoryCycleCheckpointsAdapter:
         yield self.saver
 
 
-# The actions of the agent as the journal of the cycle records them in the document of the decision (R1.7.1).
-RECORDED_ACTIONS = {CycleDecision.OPENING: "apri", CycleDecision.CLOSING: "chiudi", CycleDecision.HOLDING: "mantieni"}
-
-
 def _matches(record: CycleRecord, criteria: CycleFilter) -> bool:
     return (
         (criteria.outcome is None or record.outcome is criteria.outcome)
-        and (criteria.decision is None or _decided(record, criteria.decision))
+        and (criteria.decision is None or criteria.decision.taken_in(record.decisions))
         and criteria.window.contains(record.planned_at)
     )
-
-
-def _decided(record: CycleRecord, decision: CycleDecision) -> bool:
-    document = record.document(CycleStep.AGENT_DECISION) or {}
-    decisions = document.get("decisioni", [])
-    items = decisions if isinstance(decisions, list) else []
-    actions = {item.get("action") for item in items if isinstance(item, dict)}
-    if decision is CycleDecision.NONE:
-        return not actions
-    return RECORDED_ACTIONS[decision] in actions

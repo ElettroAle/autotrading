@@ -924,6 +924,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/decisions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Last Decision
+         * @description The last decision of the flow, whatever the period; null before its first completed cycle with one.
+         */
+        get: operations["read_last_decision_flows__flow_id__decisions_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/equity": {
         parameters: {
             query?: never;
@@ -1417,6 +1437,23 @@ export interface components {
             day: string;
             /** Cost Usd */
             cost_usd: string;
+        };
+        /**
+         * DecisionResponse
+         * @description A decision of the agent on one asset: the direction only for an opening, the confidence null when the agent
+         *     gave none (R6.5.4).
+         */
+        DecisionResponse: {
+            /** Asset */
+            asset: string;
+            /** Action */
+            action: string;
+            /** Direction */
+            direction: string | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Reasoning */
+            reasoning: string;
         };
         /**
          * DefaultSystemPromptResponse
@@ -2051,6 +2088,20 @@ export interface components {
             planned_at: string;
             /** Outcome */
             outcome: string;
+        };
+        /**
+         * LastDecisionResponse
+         * @description The last decision of the agent in the flow: the planned instant of its cycle and its decisions, one by asset
+         *     (ADR decisioni-del-ciclo-registrate-per-asset).
+         */
+        LastDecisionResponse: {
+            /**
+             * Planned At
+             * Format: date-time
+             */
+            planned_at: string;
+            /** Decisions */
+            decisions: components["schemas"]["DecisionResponse"][];
         };
         /**
          * LinkCodeResponse
@@ -4443,6 +4494,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowCostResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_last_decision_flows__flow_id__decisions_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastDecisionResponse"] | null;
                 };
             };
             /** @description Validation Error */

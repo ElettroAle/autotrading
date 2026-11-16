@@ -297,6 +297,33 @@ class UnknownCycleDecisionError(InvalidCycleFilterError):
         self.decisions = decisions
 
 
+class InvalidRecordedDecisionError(DomainError):
+    """A decision of the agent the cycle cannot record as it is (R6.4.4, R6.5.4)."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"decisione registrata non valida: {reason}")
+
+
+class DirectionWithoutOpeningError(InvalidRecordedDecisionError):
+    def __init__(self, direction: str, action: str) -> None:
+        super().__init__(f"direzione {direction} su un'azione {action}")
+
+
+class DecisionConfidenceOutOfRangeError(InvalidRecordedDecisionError):
+    def __init__(self) -> None:
+        super().__init__("confidenza fuori da 0-100")
+
+
+class UnknownDecisionActionError(InvalidRecordedDecisionError):
+    def __init__(self, action: str) -> None:
+        super().__init__(f"azione sconosciuta: {action}")
+
+
+class UnknownDecisionDirectionError(InvalidRecordedDecisionError):
+    def __init__(self, direction: str) -> None:
+        super().__init__(f"direzione sconosciuta: {direction}")
+
+
 class InvalidClosedPositionFilterError(DomainError):
     """A filter of the closed positions of a flow with a value no position has (R6.4.4)."""
 
