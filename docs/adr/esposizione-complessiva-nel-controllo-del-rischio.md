@@ -28,8 +28,8 @@ consumano il residuo nell'ordine di esecuzione.
 1. **Nel `RiskCheck` esistente.** `RiskLimits` aggiunge `max_total_margin_exposure_percent` e
    `max_total_value_exposure_percent` (facoltativi, da 0,1 a 1000, errore tipizzato con "l'esposizione complessiva
    massima va da 0,1 a 1000"); `RiskState` aggiunge margine e valore delle posizioni aperte del flusso, ricavati in
-   `CycleFlow.risk_state()` dalle posizioni del flusso (valore = dimensione × prezzo di mercato, margine = valore /
-   leva). Dopo `_within_exposure`, un passo `_within_total_exposure` riduce il valore al residuo più restrittivo
+   `CycleFlow.risk_state()` dalle posizioni del flusso (valore = dimensione × prezzo di mercato, margine = quello
+   dichiarato dall'exchange per la posizione, l'unico margine dei controlli per ADR 0067). Dopo `_within_exposure`, un passo `_within_total_exposure` riduce il valore al residuo più restrittivo
    (residuo di margine e di valore convertiti nel valore alla leva dell'apertura); un residuo nullo blocca con
    "apertura <asset> non eseguita: esposizione complessiva del <margine|valore> al <p>% esaurita". Ogni apertura
    approvata somma margine e valore all'esposizione dell'istanza, come la liquidità (ADR 0065).
