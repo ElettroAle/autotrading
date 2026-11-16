@@ -6,7 +6,7 @@ import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import { paths } from '@/config/paths';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
-import { formatAmount } from '@/utils/format-amount';
+import { formatAmount, formatPrice } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
 import { searchWithPage } from '@/utils/page-number';
 
@@ -23,9 +23,9 @@ const columnsIn = (currency: string | undefined): DataTableColumn<ClosedPosition
   { header: 'Asset', cell: (position) => position.asset },
   { header: 'Direzione', cell: (position) => position.side },
   { header: 'Aperta il', cell: (position) => formatInstant(position.opened_at) },
-  { header: 'Apertura', cell: (position) => formatAmount(position.open_price) },
+  { header: 'Apertura', cell: (position) => formatPrice(position.open_price) },
   { header: 'Chiusa il', cell: (position) => formatInstant(position.closed_at) },
-  { header: 'Chiusura', cell: (position) => formatAmount(position.close_price) },
+  { header: 'Chiusura', cell: (position) => formatPrice(position.close_price) },
   { header: 'PnL', cell: (position) => <PnlAmount amount={position.pnl} unit={currency} /> },
   { header: 'PnL %', cell: (position) => <PnlPercent percent={position.pnl_percent_of_margin} /> },
   { header: 'Commissioni', cell: (position) => inUnit(position.fees, currency) },

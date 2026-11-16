@@ -1,5 +1,10 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { formatRate, formatRoundedAmount, formatRoundedResult } from '@/utils/format-amount';
+import {
+  formatPrice,
+  formatRate,
+  formatRoundedAmount,
+  formatRoundedResult,
+} from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
 
 import type { HistoryPosition } from '../api/get-closed-position-history';
@@ -12,8 +17,8 @@ const COLUMNS: DataTableColumn<HistoryPosition>[] = [
   { header: 'Flusso', cell: (position) => position.flow },
   { header: 'Asset', cell: (position) => position.asset },
   { header: 'Direzione', cell: (position) => `${position.side} ${position.leverage}x` },
-  { header: 'Prezzo di apertura', cell: (position) => formatRoundedAmount(position.open_price) },
-  { header: 'Prezzo di chiusura', cell: (position) => formatRoundedAmount(position.close_price) },
+  { header: 'Prezzo di apertura', cell: (position) => formatPrice(position.open_price) },
+  { header: 'Prezzo di chiusura', cell: (position) => formatPrice(position.close_price) },
   {
     header: 'PnL',
     cell: (position) => (

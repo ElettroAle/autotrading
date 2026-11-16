@@ -19,6 +19,7 @@ class Position:
     size: Decimal = Decimal("0.1")
     leverage: int = 3
     entry_price: Decimal = Decimal(60000)
+    mark_price: Decimal = Decimal(59000)
     unrealized_pnl: Decimal = Decimal(-2)
     liquidation_price: Decimal | None = None
 
@@ -72,7 +73,11 @@ def test_the_question_becomes_the_context_of_the_agent() -> None:
             Decimal(300),
             Decimal(478),
             Decimal("-4.40"),
-            (PositionView("BTC", TradeDirection.SHORT, Decimal("0.1"), 3, Decimal(60000), Decimal(-2), None),),
+            (
+                PositionView(
+                    "BTC", TradeDirection.SHORT, Decimal("0.1"), 3, Decimal(60000), Decimal(59000), Decimal(-2), None
+                ),
+            ),
         ),
         sources=(SourceData("indicatori", 8, "BTC", {"rsi": "71"}),),
         missing=("notizie: timeout",),

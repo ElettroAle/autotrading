@@ -1405,6 +1405,8 @@ export interface components {
             leverage: string;
             /** Entry Price */
             entry_price: string;
+            /** Mark Price */
+            mark_price: string;
             /** Margin */
             margin: string;
             /** Unrealized Pnl */
@@ -1925,6 +1927,8 @@ export interface components {
             leverage: number;
             /** Entry Price */
             entry_price: string;
+            /** Mark Price */
+            mark_price: string;
             /** Unrealized Pnl */
             unrealized_pnl: string;
             /** Liquidation Price */

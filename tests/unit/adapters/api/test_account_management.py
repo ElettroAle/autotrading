@@ -201,7 +201,7 @@ def test_the_replacement_request_never_shows_the_credentials() -> None:
 def test_the_state_of_an_account_is_read_from_the_exchange(
     client_of: Client, platform: Platform, account_id: str, credentials: Credentials
 ) -> None:
-    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal("5.5"), None)
+    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal(60550), Decimal("5.5"), None)
     platform.hyperliquid.open_position(credentials, btc)
 
     response = client_of("anna").get(f"/accounts/{account_id}/state")
@@ -217,6 +217,7 @@ def test_the_state_of_an_account_is_read_from_the_exchange(
                 "size": "0.01",
                 "leverage": 2,
                 "entry_price": "60000",
+                "mark_price": "60550",
                 "unrealized_pnl": "5.5",
                 "liquidation_price": None,
             }
@@ -278,7 +279,7 @@ def test_an_account_without_positions_is_removed_and_no_longer_listed(
 def test_an_account_with_open_positions_is_kept_without_confirmation(
     client_of: Client, platform: Platform, account_id: str, credentials: Credentials
 ) -> None:
-    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal("5.5"), None)
+    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal(60550), Decimal("5.5"), None)
     platform.hyperliquid.open_position(credentials, btc)
 
     response = client_of("anna").delete(f"/accounts/{account_id}", params={"confirmed": "false"})
@@ -293,7 +294,7 @@ def test_an_account_with_open_positions_is_kept_without_confirmation(
 def test_a_confirmed_removal_keeps_the_positions_and_removes_the_account(
     client_of: Client, platform: Platform, account_id: str, credentials: Credentials
 ) -> None:
-    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal("5.5"), None)
+    btc = Position("BTC", PositionSide.LONG, Decimal("0.01"), 2, Decimal(60000), Decimal(60550), Decimal("5.5"), None)
     platform.hyperliquid.open_position(credentials, btc)
     platform.worker_reachable = False
 

@@ -59,6 +59,21 @@ describe('ClosedPositions', () => {
     ]);
   });
 
+  it('rounds the prices averaged over several fills (Bug 431)', async () => {
+    fakePlatform.recordClosedPositions('alfa', [
+      aClosedPosition({
+        closedAt: LAST,
+        openPrice: '63996.0322580645161290322580',
+        closePrice: '0.123456789',
+      }),
+    ]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const [first] = await rowsOf();
+    expect(within(first as HTMLElement).getByText('63.996,03')).toBeInTheDocument();
+    expect(within(first as HTMLElement).getByText('0,123457')).toBeInTheDocument();
+  });
+
   it('shows a gain in green and a loss in red', async () => {
     fakePlatform.recordClosedPositions('alfa', [
       aClosedPosition({ closedAt: LAST, pnl: '-2', margin: '100' }),

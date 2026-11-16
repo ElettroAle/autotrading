@@ -13,7 +13,8 @@ paths:
   (`TenantOwned`). Nome univoco nel tenant.
 - **Credentials**: chiavi generate dall'utente sull'exchange. Il database le conserva cifrate con la
   chiave pubblica dell'installazione; solo il `worker` le decifra (R0.2.3, ADR 0007).
-- **Account state**: saldo, margine disponibile, posizioni aperte, letti dall'exchange.
+- **Account state**: saldo, margine disponibile, posizioni aperte con prezzo di mercato dichiarato dall'exchange (R1.4.7),
+  letti dall'exchange.
 
 ## Regole
 

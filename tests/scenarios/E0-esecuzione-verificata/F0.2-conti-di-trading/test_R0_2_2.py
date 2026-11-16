@@ -61,7 +61,14 @@ def account_without_positions(platform: Platform, reading: Reading, account: str
 @given(quoted('che sull\'exchange il conto "{account}" ha una posizione long su "{coin}" con leva {leverage}'))
 def account_with_long_position(platform: Platform, reading: Reading, account: str, coin: str, leverage: str) -> None:
     position = Position(
-        coin, PositionSide.LONG, Decimal("0.01"), int(leverage), Decimal(60000), Decimal("5.5"), Decimal(30000)
+        coin,
+        PositionSide.LONG,
+        Decimal("0.01"),
+        int(leverage),
+        Decimal(60000),
+        Decimal(60550),
+        Decimal("5.5"),
+        Decimal(30000),
     )
     platform.hyperliquid.open_position(reading.credentials[account], position)
 

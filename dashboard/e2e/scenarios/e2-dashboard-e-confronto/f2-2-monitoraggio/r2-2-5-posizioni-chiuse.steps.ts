@@ -9,6 +9,10 @@ import { Given, Then, When } from '../../../support/fixtures';
 const LAST_CLOSE = new Date('2026-11-14T09:00:00Z');
 const HOUR = 3_600_000;
 
+// A price averaged over several fills reaches the API with every digit of the division: the page rounds it (Bug 431,
+// ADR formato-dei-prezzi-condiviso).
+const averagedOverFills = (price: string): string => `${price}.0032258064516129032258064516`;
+
 // The margin of the last position, at leverage 1, is the value whose price move gave its PnL: the API measures the
 // percent on it.
 const marginOf = (side: string, openPrice: string, closePrice: string, pnl: string): string => {
@@ -35,8 +39,8 @@ Given(
       closedAt: LAST_CLOSE,
       asset,
       side,
-      openPrice,
-      closePrice,
+      openPrice: averagedOverFills(openPrice),
+      closePrice: averagedOverFills(closePrice),
       pnl,
       margin: marginOf(side, openPrice, closePrice, pnl),
     });
