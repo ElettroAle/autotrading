@@ -51,6 +51,8 @@ class CreateFlowCommand:
     bring_to_minimum: bool = False
     # None keeps the default of the platform (R1.4.8).
     system_prompt: str | None = None
+    # None: no maximum, the flow keeps trying at every cycle (R3.2.4).
+    max_consecutive_failures: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +106,7 @@ class CreateFlowUseCase:
             allocated_capital=command.allocated_capital,
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,
+            max_consecutive_failures=command.max_consecutive_failures,
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

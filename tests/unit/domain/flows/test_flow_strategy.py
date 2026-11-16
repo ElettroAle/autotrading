@@ -26,6 +26,7 @@ def a_strategy() -> FlowStrategy:
         risk_limits=RiskLimits(3, Decimal(10), Decimal(50)),
         bring_to_minimum=True,
         system_prompt="{instructions} su {assets}",
+        max_consecutive_failures=3,
     )
 
 
@@ -37,6 +38,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         instructions="compra basso",
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=4,
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -49,11 +51,12 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         configuration.risk_limits,
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=4,
     )
 
 
 def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
-    strategy = replace(a_strategy(), bring_to_minimum=False, system_prompt=None)
+    strategy = replace(a_strategy(), bring_to_minimum=False, system_prompt=None, max_consecutive_failures=None)
 
     assert (
         FlowStrategy(

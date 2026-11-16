@@ -43,6 +43,7 @@ class ModifyFlowCommand:
     system_prompt: str | None = None
     # Back to the default of the platform, which None cannot say since None keeps the version in force (R1.4.8).
     default_system_prompt: bool = False
+    max_consecutive_failures: int | None = None
 
 
 class ModifyFlowUseCase:
@@ -87,6 +88,11 @@ class ModifyFlowUseCase:
                 current.bring_to_minimum if command.bring_to_minimum is None else command.bring_to_minimum
             ),
             system_prompt=_system_prompt(current.system_prompt, command),
+            max_consecutive_failures=(
+                current.max_consecutive_failures
+                if command.max_consecutive_failures is None
+                else command.max_consecutive_failures
+            ),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

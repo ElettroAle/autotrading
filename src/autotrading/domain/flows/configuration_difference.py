@@ -42,6 +42,10 @@ def _money(amount: Decimal | None) -> str:
     return NONE if amount is None else money_text(amount)
 
 
+def _count(count: int | None) -> str:
+    return NONE if count is None else str(count)
+
+
 def _percent(percent: Decimal | None) -> str:
     return NONE if percent is None else f"{number_text(percent)}%"
 
@@ -61,5 +65,9 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (
         "system prompt",
         lambda configuration: DEFAULT if configuration.system_prompt is None else configuration.system_prompt,
+    ),
+    (
+        "cicli falliti consecutivi massimi",
+        lambda configuration: _count(configuration.max_consecutive_failures),
     ),
 )

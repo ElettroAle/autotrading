@@ -67,6 +67,7 @@ def an_original(client: TestClient, platform: Platform, user: str, name: str = "
         "allocated_capital": "300",
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
+        "max_consecutive_failures": 4,
     }
     response = client.post("/flows", json=request)
     assert response.status_code == 201
@@ -83,6 +84,7 @@ def a_strategy() -> FlowStrategy:
         risk_limits=RiskLimits(5, Decimal(10)),
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=3,
     )
 
 
@@ -104,6 +106,7 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
             },
             "bring_to_minimum": True,
             "system_prompt": "{instructions}",
+            "max_consecutive_failures": 3,
         },
     }
 
@@ -132,6 +135,7 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         True,
         "{instructions}",
     )
+    assert command.max_consecutive_failures == 3
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
@@ -140,6 +144,7 @@ def test_a_document_without_model_or_limits_gives_them_empty() -> None:
     command = document.command("alfa bis")
 
     assert (command.model, command.model_parameters, command.max_leverage, command.sources) == (None, {}, None, ())
+    assert command.max_consecutive_failures is None
 
 
 @pytest.mark.parametrize(("format_name", "version"), [("altro-formato", 1), ("autotrading-strategy", 2)])
@@ -221,6 +226,7 @@ def test_the_exported_file_imports_as_a_draft_with_the_same_strategy(client_of: 
         "risk_limits",
         "bring_to_minimum",
         "system_prompt",
+        "max_consecutive_failures",
     )
     assert {key: draft[key] for key in strategy_parts} == {key: original[key] for key in strategy_parts}
 

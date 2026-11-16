@@ -7,6 +7,7 @@ from autotrading.domain.flows.errors import (
     AllocatedCapitalNotPositiveError,
     AssetsRequiredError,
     FlowAssignmentMissingError,
+    MaxConsecutiveFailuresOutOfRangeError,
     RepeatedSourceError,
     SourceNotSelectedError,
 )
@@ -19,6 +20,9 @@ from autotrading.domain.flows.system_prompt import (
     checked_system_prompt,
     rendered_system_prompt,
 )
+
+FEWEST_CONSECUTIVE_FAILURES = 1
+MOST_CONSECUTIVE_FAILURES = 100
 
 
 def assets_of(names: Iterable[str]) -> tuple[str, ...]:
@@ -50,6 +54,8 @@ class FlowConfiguration:
     # The default of the platform unless the user writes their own, so a flow follows the updates of the default
     # until then (R1.4.8).
     system_prompt: str | None = None
+    # No maximum unless the user sets one: the flow keeps trying at every cycle (R3.2.4).
+    max_consecutive_failures: int | None = None
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]
@@ -61,6 +67,9 @@ class FlowConfiguration:
             raise AllocatedCapitalNotPositiveError
         if self.system_prompt is not None:
             checked_system_prompt(self.system_prompt)
+        maximum = self.max_consecutive_failures
+        if maximum is not None and not FEWEST_CONSECUTIVE_FAILURES <= maximum <= MOST_CONSECUTIVE_FAILURES:
+            raise MaxConsecutiveFailuresOutOfRangeError
 
     @property
     def assigned_capital(self) -> Decimal:

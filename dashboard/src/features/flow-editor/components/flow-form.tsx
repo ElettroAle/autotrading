@@ -183,6 +183,20 @@ export const FlowForm = ({
               />
             )}
           </FormField>
+          <FormField
+            id="flow-max-consecutive-failures"
+            label="Massimo di cicli falliti consecutivi"
+            error={errors.max_consecutive_failures?.message}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register('max_consecutive_failures')}
+                inputMode="numeric"
+                className={FORM_CONTROL}
+              />
+            )}
+          </FormField>
         </fieldset>
         <FormField
           id="flow-allocated-capital"

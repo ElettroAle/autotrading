@@ -30,6 +30,7 @@ export const flowFormSchema = z.object({
   // The text the user wrote, kept apart from whether the flow follows the default of the platform (R1.4.8).
   system_prompt: z.string(),
   system_prompt_default: z.boolean(),
+  max_consecutive_failures: numberText,
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
@@ -56,6 +57,8 @@ type SettingsRequest = {
   bring_to_minimum: boolean;
   // Null follows the default of the platform (R1.4.8).
   system_prompt: string | null;
+  // Null: no maximum, the flow keeps trying at every cycle (R3.2.4).
+  max_consecutive_failures: number | null;
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -79,6 +82,7 @@ export const emptyFormValues = (): FlowFormValues => ({
   bring_to_minimum: false,
   system_prompt: '',
   system_prompt_default: true,
+  max_consecutive_failures: '',
 });
 
 const decimalOf = (text: string): string => text.trim().replace(',', '.');
@@ -125,6 +129,7 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   max_value_exposure_percent: decimalOrNull(values.max_value_exposure_percent),
   bring_to_minimum: values.bring_to_minimum,
   system_prompt: values.system_prompt_default ? null : values.system_prompt,
+  max_consecutive_failures: numberOrNull(values.max_consecutive_failures),
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -167,6 +172,7 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   bring_to_minimum: flow.bring_to_minimum,
   system_prompt: flow.system_prompt_is_default ? '' : flow.system_prompt,
   system_prompt_default: flow.system_prompt_is_default,
+  max_consecutive_failures: textOf(flow.max_consecutive_failures),
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>

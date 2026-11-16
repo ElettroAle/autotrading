@@ -33,6 +33,7 @@ export const flowSchema = z.object({
   system_prompt: z.string(),
   system_prompt_is_default: z.boolean(),
   system_prompt_placeholders: z.array(promptPlaceholderSchema),
+  max_consecutive_failures: z.number().nullable(),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

@@ -62,6 +62,8 @@ class StrategyBody(BaseModel):
     bring_to_minimum: bool = False
     # Null follows the default system prompt of the platform (R1.4.8).
     system_prompt: str | None = None
+    # Null or missing: no maximum of failed cycles in a row (R3.2.4).
+    max_consecutive_failures: int | None = None
 
 
 class StrategyDocument(BaseModel):
@@ -95,6 +97,7 @@ class StrategyDocument(BaseModel):
                 ),
                 bring_to_minimum=strategy.bring_to_minimum,
                 system_prompt=strategy.system_prompt,
+                max_consecutive_failures=strategy.max_consecutive_failures,
             ),
         )
 
@@ -114,6 +117,7 @@ class StrategyDocument(BaseModel):
             cycle_minutes=strategy.cycle_minutes,
             bring_to_minimum=strategy.bring_to_minimum,
             system_prompt=strategy.system_prompt,
+            max_consecutive_failures=strategy.max_consecutive_failures,
         )
 
     def _require_supported(self) -> None:

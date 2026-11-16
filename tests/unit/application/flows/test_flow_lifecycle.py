@@ -32,6 +32,7 @@ from autotrading.domain.flows.errors import (
     CapitalAboveFreeCapitalError,
     CycleIntervalOutOfRangeError,
     FlowCommandNotAllowedError,
+    MaxConsecutiveFailuresOutOfRangeError,
     UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
@@ -142,6 +143,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         max_margin_exposure_percent=Decimal(20),
         max_value_exposure_percent=Decimal(30),
         bring_to_minimum=True,
+        max_consecutive_failures=3,
     )
 
     configuration = flows.modify.execute(command).configuration
@@ -155,6 +157,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         cycle_interval=CycleInterval(60),
         risk_limits=RiskLimits(2, Decimal(20), Decimal(30)),
         bring_to_minimum=True,
+        max_consecutive_failures=3,
     )
 
 
@@ -189,6 +192,15 @@ def test_an_exposure_left_out_keeps_the_one_in_force(flows: Flows) -> None:
     modified = flows.modify.execute(ModifyFlowCommand(flow.id, max_value_exposure_percent=Decimal(5)))
 
     assert modified.configuration.risk_limits == RiskLimits(5, Decimal(10), Decimal(5))
+
+
+def test_a_change_without_maximum_of_consecutive_failures_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_consecutive_failures=3))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro"))
+
+    assert modified.configuration.max_consecutive_failures == 3
 
 
 def test_a_written_system_prompt_is_saved_in_the_next_version(flows: Flows) -> None:
@@ -226,6 +238,11 @@ def test_the_default_system_prompt_is_restored_in_the_next_version(flows: Flows)
         ({"assets": ("BTC", "XYZ")}, AssetNotTradableError, "asset non negoziabile sull'exchange: XYZ"),
         ({"account_id": uuid4()}, AccountNotChangeableError, "il conto di un flusso non si cambia"),
         ({"system_prompt": "Leva {leverage}"}, UnknownPromptPlaceholderError, 'il segnaposto "leverage" non esiste'),
+        (
+            {"max_consecutive_failures": 101},
+            MaxConsecutiveFailuresOutOfRangeError,
+            "il massimo di cicli falliti consecutivi va da 1 a 100",
+        ),
     ],
 )
 def test_an_invalid_change_is_refused_and_the_version_in_force_stays(

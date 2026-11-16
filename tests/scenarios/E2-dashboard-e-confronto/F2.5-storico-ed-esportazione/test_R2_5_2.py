@@ -167,6 +167,7 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "risk_limits",
         "bring_to_minimum",
         "system_prompt",
+        "max_consecutive_failures",
     }
 
 

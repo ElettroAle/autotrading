@@ -182,6 +182,7 @@ describe('CreateFlow', () => {
       system_prompt: FAKE_SYSTEM_PROMPT.system_prompt,
       system_prompt_is_default: true,
       system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
+      max_consecutive_failures: null,
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');
@@ -201,6 +202,29 @@ describe('CreateFlow', () => {
     );
     expect(field('Capitale allocato')).toHaveAttribute('aria-invalid', 'true');
     expect(fakePlatform.flowsOf('anna')).toEqual([]);
+  });
+
+  it('saves the maximum of consecutive failed cycles, refusing it beside its field out of range', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('Massimo di cicli falliti consecutivi'), '101');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(field('Massimo di cicli falliti consecutivi')).toHaveAccessibleDescription(
+        'il massimo di cicli falliti consecutivi va da 1 a 100',
+      ),
+    );
+    expect(fakePlatform.flowsOf('anna')).toEqual([]);
+
+    await userEvent.clear(field('Massimo di cicli falliti consecutivi'));
+    await userEvent.type(field('Massimo di cicli falliti consecutivi'), '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(configurationOf(fakePlatform.flowNamed('alfa')).max_consecutive_failures).toBe(3),
+    );
   });
 
   it('shows beside its field a value the API cannot read', async () => {

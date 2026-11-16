@@ -16,3 +16,4 @@ class FlowSetting(StrEnum):
     MAX_VALUE_EXPOSURE = "max_value_exposure_percent"
     ALLOCATED_CAPITAL = "allocated_capital"
     SYSTEM_PROMPT = "system_prompt"
+    MAX_CONSECUTIVE_FAILURES = "max_consecutive_failures"

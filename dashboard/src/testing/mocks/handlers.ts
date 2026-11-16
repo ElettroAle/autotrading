@@ -76,6 +76,7 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   bring_to_minimum: false,
   system_prompt: configuration.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
   system_prompt_is_default: configuration.systemPrompt === null,
+  max_consecutive_failures: configuration.maxConsecutiveFailures,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
@@ -344,6 +345,10 @@ const PARTS: [string, (configuration: FakeConfiguration) => string][] = [
   ['leva massima', (configuration) => String(configuration.maxLeverage)],
   ['capitale allocato', (configuration) => configuration.allocatedCapital],
   ['system prompt', (configuration) => configuration.systemPrompt ?? 'predefinito'],
+  [
+    'cicli falliti consecutivi massimi',
+    (configuration) => String(configuration.maxConsecutiveFailures ?? 'nessuno'),
+  ],
 ];
 
 const differences = (before: FakeConfiguration, after: FakeConfiguration) =>

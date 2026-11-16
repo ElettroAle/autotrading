@@ -55,6 +55,7 @@ const FLOW: Flow = {
   system_prompt: '{instructions} su {assets}',
   system_prompt_is_default: true,
   system_prompt_placeholders: [{ name: 'assets', description: 'gli asset del flusso' }],
+  max_consecutive_failures: null,
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -80,7 +81,14 @@ describe('creationRequestOf', () => {
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: null,
+      max_consecutive_failures: null,
     });
+  });
+
+  it('sends the maximum of consecutive failed cycles the user typed', () => {
+    expect(
+      creationRequestOf(filled({ max_consecutive_failures: ' 3 ' })).max_consecutive_failures,
+    ).toBe(3);
   });
 
   it('sends the system prompt the user wrote instead of the default', () => {
@@ -118,7 +126,14 @@ describe('formValuesOf', () => {
       bring_to_minimum: false,
       system_prompt: '',
       system_prompt_default: true,
+      max_consecutive_failures: '',
     });
+  });
+
+  it('fills the maximum of consecutive failed cycles of the flow', () => {
+    expect(formValuesOf({ ...FLOW, max_consecutive_failures: 4 }).max_consecutive_failures).toBe(
+      '4',
+    );
   });
 
   it('fills the system prompt the user wrote, apart from the default', () => {
@@ -186,6 +201,17 @@ describe('changesOf', () => {
     expect(changesOf(FLOW, written)).toEqual({ settings: { system_prompt: 'audace' } });
     expect(changesOf(CUSTOM, restored)).toEqual({ settings: { system_prompt: null } });
     expect(changesOf(CUSTOM, formValuesOf(CUSTOM))).toEqual({ settings: {} });
+  });
+
+  it('sends a new maximum of consecutive failed cycles, never an emptied one', () => {
+    const limited = { ...FLOW, max_consecutive_failures: 3 };
+
+    expect(changesOf(FLOW, { ...formValuesOf(FLOW), max_consecutive_failures: '5' })).toEqual({
+      settings: { max_consecutive_failures: 5 },
+    });
+    expect(changesOf(limited, { ...formValuesOf(limited), max_consecutive_failures: '' })).toEqual({
+      settings: {},
+    });
   });
 
   it('keeps the capital apart, as it changes through its own request', () => {

@@ -109,6 +109,7 @@ from autotrading.application.flows.notify_unattributable import (
     UnattributableNotices,
 )
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.pause_after_consecutive_failures import PauseAfterConsecutiveFailuresUseCase
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
@@ -436,15 +437,17 @@ def cycle_of(
             journal=JsonCycleJournalAdapter(environment),
         )
         cycles = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
+        pause = PauseAffectedFlowsUseCase(
+            flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify)
+        )
         guards = CycleGuards(
             cycles=cycles,
             lock=lock,
-            pause=PauseAffectedFlowsUseCase(
-                flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify)
-            ),
+            pause=pause,
             clock=clock,
             failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             activity=ReadFlowActivityUseCase(flows),
+            consecutive_failures=PauseAfterConsecutiveFailuresUseCase(flows, cycles, pause),
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
         equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))

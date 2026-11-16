@@ -23,6 +23,7 @@ const CONFIGURATION: Configuration = {
   bring_to_minimum: true,
   system_prompt: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
   system_prompt_is_default: false,
+  max_consecutive_failures: 3,
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -44,6 +45,7 @@ const PARTS_OF_FIELD = {
   system_prompt: ['system prompt'],
   system_prompt_is_default: [],
   system_prompt_placeholders: [],
+  max_consecutive_failures: ['cicli falliti consecutivi massimi'],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
   readonly string[]
@@ -67,6 +69,7 @@ describe('configurationRows', () => {
         part: 'system prompt',
         value: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
       },
+      { part: 'cicli falliti consecutivi massimi', value: '3' },
     ]);
   });
 
@@ -93,6 +96,7 @@ describe('configurationRows', () => {
         max_value_exposure_percent: '12.5',
       },
       bring_to_minimum: false,
+      max_consecutive_failures: null,
     });
 
     expect(Object.fromEntries(rows.map((row) => [row.part, row.value]))).toMatchObject({
@@ -102,6 +106,7 @@ describe('configurationRows', () => {
       'esposizione massima del margine': 'nessuno',
       'esposizione massima del valore': '12.5%',
       'porta al minimo': 'no',
+      'cicli falliti consecutivi massimi': 'nessuno',
     });
   });
 });

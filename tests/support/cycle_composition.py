@@ -21,10 +21,12 @@ from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.pause_after_consecutive_failures import PauseAfterConsecutiveFailuresUseCase
 from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ClockPort,
     ClosedPositionRepositoryPort,
+    ConsecutiveFailuresPort,
     CycleContext,
     CycleDecisions,
     CycleRepositoryPort,
@@ -84,6 +86,7 @@ class TenantCyclePorts:
     settlement_currency: str
     checkpoints: GraphCheckpoints
     equity: RecordCycleEquityUseCase
+    consecutive_failures: ConsecutiveFailuresPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,13 +148,15 @@ def run_cycle_for(
         journal=JsonCycleJournalAdapter(services.environment),
     )
     cycles = cycles_of(tenant_id)
+    pause = PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice)
     guards = CycleGuards(
         cycles=cycles,
         lock=lock,
-        pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
+        pause=pause,
         clock=services.clock,
         failures=ports.cycle_failure,
         activity=ReadFlowActivityUseCase(ports.flows),
+        consecutive_failures=PauseAfterConsecutiveFailuresUseCase(ports.flows, ports.consecutive_failures, pause),
     )
     return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
 

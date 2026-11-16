@@ -50,5 +50,9 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       part: 'system prompt',
       value: configuration.system_prompt_is_default ? DEFAULT : configuration.system_prompt,
     },
+    {
+      part: 'cicli falliti consecutivi massimi',
+      value: String(configuration.max_consecutive_failures ?? NONE),
+    },
   ];
 };

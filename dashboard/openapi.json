@@ -4160,6 +4160,17 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
           }
         },
         "type": "object",
@@ -4175,7 +4186,8 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "max_consecutive_failures"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -4732,6 +4744,17 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
           }
         },
         "type": "object",
@@ -4927,6 +4950,17 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
           }
         },
         "type": "object",
@@ -5303,6 +5337,17 @@
             },
             "type": "array",
             "title": "System Prompt Placeholders"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
           }
         },
         "type": "object",
@@ -5322,7 +5367,8 @@
           "bring_to_minimum",
           "system_prompt",
           "system_prompt_is_default",
-          "system_prompt_placeholders"
+          "system_prompt_placeholders",
+          "max_consecutive_failures"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -7033,6 +7079,17 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
           }
         },
         "type": "object",
@@ -7092,6 +7149,17 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
           }
         },
         "type": "object",

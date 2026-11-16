@@ -31,6 +31,7 @@ class ImportFlowStrategyCommand:
     cycle_minutes: int | None = None
     bring_to_minimum: bool = False
     system_prompt: str | None = None
+    max_consecutive_failures: int | None = None
 
 
 class ImportFlowStrategyUseCase:
@@ -77,4 +78,5 @@ class ImportFlowStrategyUseCase:
             ),
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,
+            max_consecutive_failures=command.max_consecutive_failures,
         )

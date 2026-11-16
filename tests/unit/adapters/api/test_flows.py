@@ -91,6 +91,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
         "system_prompt_is_default": True,
         "system_prompt_placeholders": PLACEHOLDERS,
+        "max_consecutive_failures": None,
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
 
@@ -129,6 +130,41 @@ def test_a_flow_can_be_created_bringing_its_openings_to_the_exchange_minimum(
 
     assert response.status_code == 201
     assert response.json()["bring_to_minimum"] is True
+
+
+def test_the_maximum_of_consecutive_failed_cycles_is_set_kept_and_compared(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    created = anna.post("/flows", json=a_request(platform, "anna", max_consecutive_failures=3)).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": None, "cycle_minutes": 30}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": 5}).json()
+
+    assert created["max_consecutive_failures"] == 3
+    assert (untouched["version"], untouched["max_consecutive_failures"]) == (2, 3)
+    assert (changed["version"], changed["max_consecutive_failures"]) == (3, 5)
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["max_consecutive_failures"] == 3
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
+        {"part": "cicli falliti consecutivi massimi", "before": "3", "after": "5"}
+    ]
+
+
+@pytest.mark.parametrize("maximum", [0, 101])
+def test_a_maximum_of_consecutive_failed_cycles_out_of_range_is_refused(
+    client_of: Client, platform: Platform, maximum: int
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": maximum})
+
+    assert (response.status_code, reason_of(response)) == (
+        400,
+        {"detail": "il massimo di cicli falliti consecutivi va da 1 a 100", "field": "max_consecutive_failures"},
+    )
+    assert anna.get("/flows").json()[0]["version"] == 1
 
 
 def test_the_flows_of_the_tenant_are_listed_and_the_free_capital_shrinks(client_of: Client, platform: Platform) -> None:

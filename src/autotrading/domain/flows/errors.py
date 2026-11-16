@@ -54,6 +54,14 @@ class InvalidRiskLimitError(FlowSettingError):
         self.label = label
 
 
+class MaxConsecutiveFailuresOutOfRangeError(FlowSettingError):
+    # The status the ADR of the maximum declares (ADR pausa-dopo-cicli-falliti-consecutivi); the field still names it.
+    status_code = 400
+
+    def __init__(self) -> None:
+        super().__init__("il massimo di cicli falliti consecutivi va da 1 a 100", FlowSetting.MAX_CONSECUTIVE_FAILURES)
+
+
 class SourceWeightOutOfRangeError(FlowSettingError):
     def __init__(self, source: str) -> None:
         super().__init__(f"peso fuori da 1-10: {source}", FlowSetting.SOURCES)

@@ -97,6 +97,13 @@ def test_a_valid_flow_is_saved_stopped_with_its_whole_configuration(flows: Flows
     assert configuration.instructions == "prudente"
     assert (configuration.risk_limits.max_leverage, configuration.allocated_capital) == (5, Decimal(400))
     assert configuration.bring_to_minimum is False
+    assert configuration.max_consecutive_failures is None
+
+
+def test_the_maximum_of_consecutive_failed_cycles_is_saved(flows: Flows) -> None:
+    flow = flows.create.execute(flows.command(max_consecutive_failures=3))
+
+    assert flow.configuration.max_consecutive_failures == 3
 
 
 def test_the_option_to_bring_an_opening_to_the_exchange_minimum_is_saved(flows: Flows) -> None:

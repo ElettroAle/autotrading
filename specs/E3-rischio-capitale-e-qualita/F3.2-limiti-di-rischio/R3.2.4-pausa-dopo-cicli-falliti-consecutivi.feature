@@ -1,5 +1,5 @@
 # language: it
-@R3.2.4 @wip
+@R3.2.4
 Funzionalità: R3.2.4 Pausa dopo cicli falliti consecutivi
   Come utente
   Voglio poter mettere in pausa da solo un flusso i cui cicli falliscono più volte di fila

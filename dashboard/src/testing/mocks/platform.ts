@@ -36,6 +36,7 @@ export type FakeConfiguration = {
   readonly maxLeverage: number;
   readonly allocatedCapital: string;
   readonly systemPrompt: string | null;
+  readonly maxConsecutiveFailures: number | null;
 };
 
 export type FakeVersion = {
@@ -74,6 +75,8 @@ export type FakeFlow = {
   bringToMinimum: boolean;
   /** The system prompt the user wrote; null follows the default of the platform (R1.4.8). */
   systemPrompt: string | null;
+  /** The failed cycles in a row after which the flow pauses; null keeps it trying (R3.2.4). */
+  maxConsecutiveFailures: number | null;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
   /** Why the flow paused, as the API says it (R1.2.4). */
@@ -121,6 +124,7 @@ export type FakeFlowConfiguration = {
   system_prompt: string;
   system_prompt_is_default: boolean;
   system_prompt_placeholders: { name: string; description: string }[];
+  max_consecutive_failures: number | null;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -142,6 +146,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   system_prompt: flow.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
   system_prompt_is_default: flow.systemPrompt === null,
   system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
+  max_consecutive_failures: flow.maxConsecutiveFailures,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -280,6 +285,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   maxLeverage: 3,
   allocatedCapital: '100',
   systemPrompt: null,
+  maxConsecutiveFailures: null,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -371,6 +377,7 @@ const draftOf = (
   riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
   bringToMinimum: strategy.bringToMinimum ?? false,
   systemPrompt: null,
+  maxConsecutiveFailures: null,
   cycles: 0,
   pauseReason: null,
   currentCapital: 0,
@@ -527,6 +534,7 @@ export const fakePlatform = {
       riskLimits: DEFAULT_RISK_LIMITS,
       bringToMinimum: false,
       systemPrompt: null,
+      maxConsecutiveFailures: null,
       cycles: 0,
       pauseReason: null,
       currentCapital: 100,

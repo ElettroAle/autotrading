@@ -1129,6 +1129,8 @@ export interface components {
             system_prompt_is_default: boolean;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+            /** Max Consecutive Failures */
+            max_consecutive_failures: number | null;
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1344,6 +1346,8 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
         };
         /**
          * FlowEquityResponse
@@ -1387,6 +1391,8 @@ export interface components {
             bring_to_minimum?: boolean | null;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
         };
         /**
          * FlowOverviewResponse
@@ -1517,6 +1523,8 @@ export interface components {
             system_prompt_is_default: boolean;
             /** System Prompt Placeholders */
             system_prompt_placeholders: components["schemas"]["PromptPlaceholderResponse"][];
+            /** Max Consecutive Failures */
+            max_consecutive_failures: number | null;
         };
         /**
          * FlowResultsResponse
@@ -2166,6 +2174,8 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
         };
         /**
          * StrategyBody
@@ -2192,6 +2202,8 @@ export interface components {
             bring_to_minimum: boolean;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Max Consecutive Failures */
+            max_consecutive_failures?: number | null;
         };
         /**
          * StrategyDocument

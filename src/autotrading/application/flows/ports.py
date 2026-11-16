@@ -952,6 +952,24 @@ class CycleFailureNoticePort(Protocol):
         ...
 
 
+class ConsecutiveFailuresPort(Protocol):
+    """Bound to the tenant of the flow: the failed cycles in a row, read from the recorded cycles (R3.2.4)."""
+
+    def consecutive_failures(self, flow_id: UUID) -> int:
+        """The failed cycles of the flow recorded after its last completed cycle and since it last became active; a
+        skipped cycle neither counts nor breaks the series.
+        """
+        ...
+
+
+class ConsecutiveFailuresPausePort(Protocol):
+    def execute(self, flow_id: UUID, error: AutotradingError) -> object:
+        """Pauses the flow when its failed cycles in a row, the one of the error included, reach its maximum
+        (R3.2.4).
+        """
+        ...
+
+
 class CycleJournalPort(Protocol):
     """Describes for the record what the steps produced: only the contexts behind the steps know their data."""
 

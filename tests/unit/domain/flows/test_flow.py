@@ -9,6 +9,7 @@ from autotrading.domain.flows.errors import (
     AssetsRequiredError,
     CapitalAboveFreeCapitalError,
     FlowAssignmentMissingError,
+    MaxConsecutiveFailuresOutOfRangeError,
     RepeatedSourceError,
 )
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
@@ -48,6 +49,26 @@ def test_a_source_cannot_appear_twice() -> None:
 def test_the_allocated_capital_must_be_positive(capital: Decimal) -> None:
     with pytest.raises(AllocatedCapitalNotPositiveError, match=r"^il capitale allocato deve essere positivo$"):
         a_configuration(allocated_capital=capital)
+
+
+def test_a_configuration_has_no_maximum_of_consecutive_failed_cycles_unless_given() -> None:
+    assert a_configuration().max_consecutive_failures is None
+
+
+@pytest.mark.parametrize("maximum", [1, 100])
+def test_the_maximum_of_consecutive_failed_cycles_goes_from_1_to_100(maximum: int) -> None:
+    assert replace(a_configuration(), max_consecutive_failures=maximum).max_consecutive_failures == maximum
+
+
+@pytest.mark.parametrize("maximum", [0, 101, -1])
+def test_a_maximum_of_consecutive_failed_cycles_out_of_range_is_refused(maximum: int) -> None:
+    with pytest.raises(
+        MaxConsecutiveFailuresOutOfRangeError, match=r"^il massimo di cicli falliti consecutivi va da 1 a 100$"
+    ) as refused:
+        replace(a_configuration(), max_consecutive_failures=maximum)
+
+    assert refused.value.status_code == 400
+    assert refused.value.details == {"field": "max_consecutive_failures"}
 
 
 def test_a_new_flow_is_stopped_at_the_first_version() -> None:

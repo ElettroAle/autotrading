@@ -26,6 +26,7 @@ const configurationSchema = z.object({
   bring_to_minimum: z.boolean(),
   system_prompt: z.string(),
   system_prompt_is_default: z.boolean(),
+  max_consecutive_failures: z.number().nullable(),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

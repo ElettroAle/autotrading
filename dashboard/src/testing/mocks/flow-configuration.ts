@@ -50,6 +50,7 @@ type ConfigurationRequest = {
   allocated_capital?: unknown;
   bring_to_minimum?: unknown;
   system_prompt?: unknown;
+  max_consecutive_failures?: unknown;
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -237,6 +238,19 @@ const freeCapitalOf = (user: FakeUser, account: FakeAccount): number =>
   fakePlatform.freeCapitalOfAccount(user, account);
 
 /** The flow as its new configuration version, kept among its versions as the API keeps them (R2.3.5). */
+// The rule of the domain of the API, with its reason (R3.2.4).
+const maxConsecutiveFailuresOf = (value: unknown): number | null => {
+  const maximum = Number(value);
+  if (!Number.isInteger(maximum) || maximum < 1 || maximum > 100) {
+    throw new Refusal(
+      400,
+      'il massimo di cicli falliti consecutivi va da 1 a 100',
+      'max_consecutive_failures',
+    );
+  }
+  return maximum;
+};
+
 const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => {
   Object.assign(flow, changes, { version: flow.version + 1 });
   flow.versions.push({
@@ -250,6 +264,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       maxLeverage: flow.riskLimits.maxLeverage,
       allocatedCapital: String(flow.allocatedCapital ?? 0),
       systemPrompt: flow.systemPrompt,
+      maxConsecutiveFailures: flow.maxConsecutiveFailures,
     },
   });
   return flow;
@@ -300,6 +315,10 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     riskLimits,
     bringToMinimum: request.bring_to_minimum === true,
     systemPrompt: typeof request.system_prompt === 'string' ? request.system_prompt : null,
+    maxConsecutiveFailures:
+      request.max_consecutive_failures === undefined || request.max_consecutive_failures === null
+        ? null
+        : maxConsecutiveFailuresOf(request.max_consecutive_failures),
     currentCapital: capital,
   });
 };
@@ -352,6 +371,11 @@ export const modifyFlow = (
       request.system_prompt === undefined
         ? flow.systemPrompt
         : optionalTextOf(request.system_prompt),
+    maxConsecutiveFailures: changed(
+      request.max_consecutive_failures,
+      flow.maxConsecutiveFailures,
+      maxConsecutiveFailuresOf,
+    ),
   };
   requireAssetsFree(user, flow.accountId ?? '', assets, flow);
   return nextVersionOf(flow, changes);

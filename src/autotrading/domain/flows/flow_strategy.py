@@ -24,6 +24,8 @@ class FlowStrategy:
     bring_to_minimum: bool = False
     # The default of the platform unless the strategy has its own, as in the configuration (R1.4.8).
     system_prompt: str | None = None
+    # No maximum unless the strategy has one, as in the configuration (R3.2.4).
+    max_consecutive_failures: int | None = None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -35,6 +37,7 @@ class FlowStrategy:
             configuration.risk_limits,
             configuration.bring_to_minimum,
             configuration.system_prompt,
+            configuration.max_consecutive_failures,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -50,6 +53,7 @@ class FlowStrategy:
             allocated_capital=None,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
+            max_consecutive_failures=self.max_consecutive_failures,
         )
 
 

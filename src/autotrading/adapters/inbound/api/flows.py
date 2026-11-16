@@ -65,6 +65,8 @@ class FlowCreationRequest(BaseModel):
     bring_to_minimum: bool = False
     # Null or missing follows the default of the platform (R1.4.8).
     system_prompt: str | None = None
+    # Null or missing: no maximum, the flow keeps trying at every cycle (R3.2.4).
+    max_consecutive_failures: int | None = None
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -82,6 +84,7 @@ class FlowCreationRequest(BaseModel):
             cycle_minutes=self.cycle_minutes,
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
+            max_consecutive_failures=self.max_consecutive_failures,
         )
 
 
@@ -101,6 +104,7 @@ class FlowModificationRequest(BaseModel):
     bring_to_minimum: bool | None = None
     # A null sent on purpose goes back to the default; a missing one keeps the version in force (R1.4.8).
     system_prompt: str | None = None
+    max_consecutive_failures: int | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -120,6 +124,7 @@ class FlowModificationRequest(BaseModel):
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
             default_system_prompt=self.system_prompt is None and "system_prompt" in self.model_fields_set,
+            max_consecutive_failures=self.max_consecutive_failures,
         )
 
 
@@ -208,6 +213,8 @@ class ConfigurationResponse(BaseModel):
     system_prompt: str
     system_prompt_is_default: bool
     system_prompt_placeholders: list[PromptPlaceholderResponse]
+    # None: no maximum of failed cycles in a row (R3.2.4).
+    max_consecutive_failures: int | None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -227,6 +234,7 @@ class ConfigurationResponse(BaseModel):
             system_prompt=configuration.system_prompt_template,
             system_prompt_is_default=configuration.system_prompt is None,
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
+            max_consecutive_failures=configuration.max_consecutive_failures,
         )
 
 
@@ -270,6 +278,7 @@ class FlowResponse(BaseModel):
     system_prompt: str
     system_prompt_is_default: bool
     system_prompt_placeholders: list[PromptPlaceholderResponse]
+    max_consecutive_failures: int | None
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -294,6 +303,7 @@ class FlowResponse(BaseModel):
             system_prompt=configuration.system_prompt_template,
             system_prompt_is_default=configuration.system_prompt is None,
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
+            max_consecutive_failures=configuration.max_consecutive_failures,
         )
 
 

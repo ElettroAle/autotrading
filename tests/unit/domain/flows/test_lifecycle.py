@@ -153,6 +153,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         risk_limits=RiskLimits(3, None, Decimal("12.50")),
         bring_to_minimum=True,
         system_prompt="{instructions}",
+        max_consecutive_failures=3,
     )
 
     assert differences(before, after) == (
@@ -168,6 +169,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("capitale allocato", "100", "250,50"),
         ConfigurationDifference("porta al minimo", "no", "sì"),
         ConfigurationDifference("system prompt", "predefinito", "{instructions}"),
+        ConfigurationDifference("cicli falliti consecutivi massimi", "nessuno", "3"),
     )
 
 
