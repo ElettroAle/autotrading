@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_account_capital_changes import ListAccountCapitalChangesCommand
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesCommand
@@ -61,11 +62,8 @@ class CapitalChangePageResponse(BaseModel):
         )
 
 
-def window_of(
-    first_day: Annotated[date | None, Query(alias="from", description="primo giorno dell'intervallo")] = None,
-    last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno dell'intervallo")] = None,
-) -> TimeWindow:
-    return TimeWindow.of_days(first_day, last_day)
+def window_of(since: IntervalStart = None, until: IntervalEnd = None) -> TimeWindow:
+    return TimeWindow.of_minutes(since, until)
 
 
 def capital_changes_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:

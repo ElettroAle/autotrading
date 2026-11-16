@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowPositionMismatchError
+from autotrading.application.flows.ports import ReconciliationAlarmPorts
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateCommand, ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
@@ -19,10 +20,12 @@ from autotrading.domain.flows.ledger import ExecutionsWindow
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -61,8 +64,14 @@ class Bench:
         self.notices = RecordedNotices()
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         record = RecordAccountExecutionsUseCase(flows, self.activity, self.orders, self.ledger)
+        thresholds = FakeAccountThresholdsAdapter({ACCOUNT: "test-1"})
         reconcile_account = ReconcileAccountUseCase(
-            flows, self.activity, InMemoryReconciliationRepositoryAdapter(), InMemoryClosedPositionsAdapter(), record
+            flows,
+            self.activity,
+            InMemoryReconciliationRepositoryAdapter(),
+            InMemoryClosedPositionsAdapter(),
+            record,
+            ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
         )
         self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
         self.read = ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, self.activity, self.ledger), self.reconcile)

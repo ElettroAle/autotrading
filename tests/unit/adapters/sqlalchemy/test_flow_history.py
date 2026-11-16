@@ -1,5 +1,5 @@
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -31,7 +31,9 @@ NARROW = HistoryQuery.of(
     HistoryFilter(
         flow_id=FLOW,
         account_id=ACCOUNT,
-        period=StatisticsPeriod.named("range", date(2026, 11, 10), date(2026, 11, 20)),
+        period=StatisticsPeriod.named(
+            "range", datetime(2026, 11, 10, tzinfo=UTC), datetime(2026, 11, 20, 23, 59, tzinfo=UTC)
+        ),
         asset="ETH",
         version=2,
     ),

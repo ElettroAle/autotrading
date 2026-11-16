@@ -248,3 +248,13 @@ class HistoryCursorInvalidError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("pagina dello storico non valida")
+
+
+class ReconciliationAlarmNotOpenError(ApplicationError):
+    """The user confirms an account whose balance raised no alarm, or one already confirmed (R3.3.1)."""
+
+    status_code = 409
+
+    def __init__(self, account_name: str) -> None:
+        super().__init__(f"il conto {account_name} non ha un allarme di riconciliazione aperto")
+        self.account_name = account_name

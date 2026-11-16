@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { fakePlatform } from '@/testing/mocks/platform';
+import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
@@ -160,7 +161,7 @@ describe('FlowView', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(
-      screen.getAllByText("Scegli il primo e l'ultimo giorno dell'intervallo.").length,
+      screen.getAllByText("Scegli l'inizio e la fine dell'intervallo.").length,
     ).toBeGreaterThan(0);
     expect(
       screen.queryByRole('region', { name: 'Riepilogo dei risultati' }),
@@ -223,5 +224,45 @@ describe('FlowView', () => {
     expect(
       within(configuration).getByText('openrouter/~deepseek/deepseek-flash-latest'),
     ).toHaveClass('min-w-0', 'wrap-anywhere');
+  });
+  it('says the openings are suspended by an alarm of reconciliation on the account (R3.3.2)', async () => {
+    fakeReconciliation.openAlarm(fakePlatform.accountOfFlow('alfa').id, 1000, 980, new Date());
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(
+      await screen.findByText('aperture sospese: allarme di riconciliazione sul conto principale'),
+    ).toHaveAttribute('role', 'note');
+  });
+
+  it('says nothing of the openings of a flow whose account has no alarm', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'Riepilogo dei risultati' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/aperture sospese/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing of the openings when the state of the flow cannot be read', async () => {
+    fakeReconciliation.openAlarm(fakePlatform.accountOfFlow('alfa').id, 1000, 980, new Date());
+    fakePlatform.stopExchange();
+    server.use(
+      http.get('*/flows/:flowId/state', () =>
+        HttpResponse.json(
+          {
+            type: 'about:blank',
+            title: 'Unavailable',
+            status: 503,
+            detail: 'exchange non raggiungibile',
+          },
+          { status: 503, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findAllByText(/exchange non raggiungibile/)).not.toHaveLength(0);
+    expect(screen.queryByText(/aperture sospese/)).not.toBeInTheDocument();
   });
 });

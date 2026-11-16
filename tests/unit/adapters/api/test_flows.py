@@ -124,6 +124,43 @@ def test_a_system_prompt_is_written_and_restored_to_the_default(client_of: Clien
     assert anna.get(f"/flows/{flow_id}/versions/1").json()["system_prompt"] == "{instructions}"
 
 
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta:
+# a null sent on purpose removes the limit, a field left out keeps it.
+def test_an_exposure_sent_as_null_is_removed_and_one_left_out_stays(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    request = a_request(platform, "anna", max_margin_exposure_percent="20", max_value_exposure_percent="40")
+    flow_id = anna.post("/flows", json=request).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "audace"}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"max_value_exposure_percent": None}).json()
+
+    assert untouched["risk_limits"] == {
+        "max_leverage": 5,
+        "max_margin_exposure_percent": "20",
+        "max_value_exposure_percent": "40",
+    }
+    assert (removed["version"], removed["risk_limits"]) == (
+        3,
+        {"max_leverage": 5, "max_margin_exposure_percent": "20", "max_value_exposure_percent": None},
+    )
+
+
+def test_both_exposures_sent_as_null_are_refused_with_the_reason(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    request = a_request(platform, "anna", max_value_exposure_percent="40")
+    flow_id = anna.post("/flows", json=request).json()["id"]
+
+    response = anna.patch(
+        f"/flows/{flow_id}", json={"max_margin_exposure_percent": None, "max_value_exposure_percent": None}
+    )
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "almeno un limite di esposizione è obbligatorio", "field": "max_margin_exposure_percent"},
+    )
+    assert anna.get("/flows").json()[0]["version"] == 1
+
+
 def test_a_flow_can_be_created_bringing_its_openings_to_the_exchange_minimum(
     client_of: Client, platform: Platform
 ) -> None:

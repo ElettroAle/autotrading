@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.flows.ports import ClosedPositionRepositoryPort, CycleHistoryPort, FlowRepositoryPort
@@ -14,8 +14,8 @@ from autotrading.domain.flows.statistics_period import StatisticsPeriod, Statist
 class ReadFlowStatisticsCommand:
     flow_id: UUID
     period: str = StatisticsPeriodKind.ALL.value
-    first_day: date | None = None
-    last_day: date | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 class ReadFlowStatisticsUseCase:
@@ -34,7 +34,7 @@ class ReadFlowStatisticsUseCase:
         self._clock = clock
 
     def execute(self, command: ReadFlowStatisticsCommand) -> FlowStatistics:
-        period = StatisticsPeriod.named(command.period, command.first_day, command.last_day)
+        period = StatisticsPeriod.named(command.period, command.since, command.until)
         flow = self._flows.get(FlowId(command.flow_id))
         window = period.window(self._clock())
         positions = self._positions.closed_within(flow.id, window)

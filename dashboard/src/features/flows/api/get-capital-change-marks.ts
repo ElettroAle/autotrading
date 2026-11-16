@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import type { ListDays } from '@/components/ui/period-selector/use-period';
+import type { ListInterval } from '@/components/ui/period-selector/use-period';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
@@ -20,20 +20,20 @@ export type CapitalChangeMark = {
 };
 
 /**
- * The changes of the capital of the flow in the days of the period, every page of the history, to mark them on the
+ * The changes of the capital of the flow in the period, every page of the history, to mark them on the
  * equity curve (ADR rendimento-composto-tra-le-variazioni-di-capitale).
  */
-export const useCapitalChangeMarks = (flowId: string, days: ListDays) => {
+export const useCapitalChangeMarks = (flowId: string, interval: ListInterval) => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('flows', flowId, 'capital-change-marks', days),
+    ...pageDataQuery('flows', flowId, 'capital-change-marks', interval),
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const marks: CapitalChangeMark[] = [];
       for (let page = 1; ; page += 1) {
         const read = readData(
           await api.GET('/flows/{flow_id}/capital-changes', {
-            params: { path: { flow_id: flowId }, query: { page, ...days } },
+            params: { path: { flow_id: flowId }, query: { page, ...interval } },
           }),
           changesPageSchema,
         );

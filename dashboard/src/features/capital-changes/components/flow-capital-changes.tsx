@@ -1,8 +1,8 @@
 import {
   isComplete,
-  listDaysOf,
+  listIntervalOf,
   usePeriod,
-  type ListDays,
+  type ListInterval,
 } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 
@@ -12,14 +12,14 @@ import { CapitalChangesTable } from './capital-changes-table';
 
 type FlowCapitalChangesProps = { readonly flowId: string; readonly page: number };
 
-const ChangesInDays = ({
+const ChangesInInterval = ({
   flowId,
   page,
-  days,
-}: FlowCapitalChangesProps & { readonly days: ListDays }) => (
+  interval,
+}: FlowCapitalChangesProps & { readonly interval: ListInterval }) => (
   <CapitalChangesTable
-    reading={useFlowCapitalChanges(flowId, page, days)}
-    days={days}
+    reading={useFlowCapitalChanges(flowId, page, interval)}
+    interval={interval}
     path={paths.flowCapital.getHref(flowId)}
   />
 );
@@ -31,9 +31,9 @@ const ChangesInDays = ({
 export const FlowCapitalChanges = ({ flowId, page }: FlowCapitalChangesProps) => {
   const [period] = usePeriod();
   if (!isComplete(period)) {
-    return (
-      <p className="text-slate-600">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
-    );
+    return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
-  return <ChangesInDays flowId={flowId} page={page} days={listDaysOf(period, new Date())} />;
+  return (
+    <ChangesInInterval flowId={flowId} page={page} interval={listIntervalOf(period, new Date())} />
+  );
 };

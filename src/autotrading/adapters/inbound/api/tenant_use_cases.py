@@ -15,6 +15,7 @@ from autotrading.application.accounts.ports import (
 from autotrading.application.accounts.read_account_state import ReadAccountStateUseCase
 from autotrading.application.accounts.register_account import RegisterAccountUseCase
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
+from autotrading.application.accounts.set_deviation_threshold import SetDeviationThresholdUseCase
 from autotrading.application.agent.list_models import ListModelsUseCase
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
 from autotrading.application.agent.model_gateways import ModelCatalogs
@@ -33,6 +34,7 @@ from autotrading.application.flows.change_allocated_capital import ChangeAllocat
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
 from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsUseCase
+from autotrading.application.flows.confirm_reconciliation import ConfirmReconciliationUseCase
 from autotrading.application.flows.create_flow import CreateFlowUseCase, FlowChecks
 from autotrading.application.flows.duplicate_flow import DuplicateFlowUseCase
 from autotrading.application.flows.export_account_operations import ExportAccountOperationsUseCase
@@ -49,16 +51,20 @@ from autotrading.application.flows.list_flow_operations import ListFlowOperation
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsUseCase
 from autotrading.application.flows.list_flows import ListFlowsUseCase
+from autotrading.application.flows.list_reconciliation_alarms import ListReconciliationAlarmsUseCase
 from autotrading.application.flows.list_tradable_assets import ListTradableAssetsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
+    AccountDeviationThresholdPort,
     AccountRemovalPorts,
     AccountTransfersPort,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
     EquitySnapshotRepositoryPort,
+    FlowAccountNamePort,
     FlowDirectoryPort,
+    FlowForecastsPort,
     FlowLedgerPort,
     FlowOperationsPort,
     FlowPositionsPort,
@@ -68,12 +74,14 @@ from autotrading.application.flows.ports import (
     HistoricalCyclesPort,
     HistoricalOrdersPort,
     LedgerRecordingPort,
+    ReconciliationRepositoryPort,
     RunningVerificationsPort,
 )
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
 from autotrading.application.flows.query_cycle_history import QueryCycleHistoryUseCase
 from autotrading.application.flows.query_order_history import QueryOrderHistoryUseCase
 from autotrading.application.flows.rank_flows import RankFlowsUseCase
+from autotrading.application.flows.read_account_reconciliation import ReadAccountReconciliationUseCase
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_default_system_prompt import ReadDefaultSystemPromptUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
@@ -81,7 +89,9 @@ from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
 from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
+from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
+from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
@@ -144,9 +154,13 @@ class TenantPorts:
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
+    flow_forecasts: FlowForecastsPort
     historical_cycles: HistoricalCyclesPort
     historical_closed_positions: HistoricalClosedPositionsPort
     historical_orders: HistoricalOrdersPort
+    reconciliation: ReconciliationRepositoryPort
+    account_thresholds: AccountDeviationThresholdPort
+    account_names: FlowAccountNamePort
     environment: str
     settlement_currency: str
 
@@ -201,6 +215,7 @@ class TenantUseCases:
     read_cycle: ReadCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
+    read_forecast_accuracy: ReadForecastAccuracyUseCase
     list_flow_overviews: ListFlowOverviewsUseCase
     read_flow_equity: ReadFlowEquityUseCase
     duplicate_flow: DuplicateFlowUseCase
@@ -211,6 +226,10 @@ class TenantUseCases:
     export_flow_strategy: ExportFlowStrategyUseCase
     import_flow_strategy: ImportFlowStrategyUseCase
     rank_flows: RankFlowsUseCase
+    set_deviation_threshold: SetDeviationThresholdUseCase
+    read_account_reconciliation: ReadAccountReconciliationUseCase
+    list_reconciliation_alarms: ListReconciliationAlarmsUseCase
+    confirm_reconciliation: ConfirmReconciliationUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -246,6 +265,7 @@ class TenantUseCases:
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
             read_flow_results=ReadFlowResultsUseCase(
                 ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                ReadOpeningsSuspensionUseCase(ports.flows, ports.reconciliation, ports.account_names),
                 ports.equity_snapshots,
                 ports.cycle_history,
                 ports.clock,
@@ -293,11 +313,13 @@ class TenantUseCases:
             read_flow_statistics=ReadFlowStatisticsUseCase(
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock
             ),
+            read_forecast_accuracy=ReadForecastAccuracyUseCase(ports.flows, ports.flow_forecasts, ports.clock),
             list_flow_overviews=ListFlowOverviewsUseCase(
                 ports.flow_summaries,
                 ports.cycle_history,
                 ReadFlowResultsUseCase(
                     ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger),
+                    ReadOpeningsSuspensionUseCase(ports.flows, ports.reconciliation, ports.account_names),
                     ports.equity_snapshots,
                     ports.cycle_history,
                     ports.clock,
@@ -320,4 +342,10 @@ class TenantUseCases:
             rank_flows=RankFlowsUseCase(
                 ports.flows, ports.equity_snapshots, ports.closed_positions, ports.cycle_history, ports.clock
             ),
+            set_deviation_threshold=SetDeviationThresholdUseCase(accounts),
+            read_account_reconciliation=ReadAccountReconciliationUseCase(
+                ports.reconciliation, ports.account_thresholds
+            ),
+            list_reconciliation_alarms=ListReconciliationAlarmsUseCase(ports.reconciliation, ports.account_names),
+            confirm_reconciliation=ConfirmReconciliationUseCase(ports.reconciliation, ports.account_names, ports.clock),
         )

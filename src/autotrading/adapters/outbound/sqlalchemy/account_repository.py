@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import Connection, Engine, RowMapping, func, insert, select, update
@@ -14,6 +15,7 @@ from autotrading.application.verification.errors import VerificationAccountNotFo
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
+from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
@@ -70,6 +72,13 @@ class SqlAlchemyAccountRepositoryAdapter:
         if account is None:
             raise FlowAccountNotFoundError
         return account.name.value
+
+    def deviation_threshold(self, account_id: UUID) -> Decimal:
+        """The threshold of the account as the flows context compares its balance with it (R3.3.1)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.deviation_threshold.percent
 
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         """The account as the flows context opens it to read it on its exchange (ADR 0044)."""
@@ -153,6 +162,7 @@ def _row_of(account: Account) -> dict[str, object]:
         "exchange_account_public_fields": _public_fields_of(account.exchange_account),
         "credentials_key_version": account.credentials.key_version,
         "credentials_ciphertext": account.credentials.ciphertext,
+        "deviation_threshold": account.deviation_threshold.percent,
     }
 
 
@@ -164,6 +174,7 @@ def _account_of(row: RowMapping) -> Account:
         ExchangeName(row["exchange"]),
         ExchangeAccount(row["exchange_account_fingerprint"], row["exchange_account_public_fields"]),
         SealedCredentials(row["credentials_key_version"], row["credentials_ciphertext"]),
+        DeviationThreshold(row["deviation_threshold"]),
     )
 
 

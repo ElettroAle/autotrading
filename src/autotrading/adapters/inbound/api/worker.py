@@ -258,7 +258,7 @@ def create_worker_api(
         profitti): only the worker reads the executions of an account."""
         command = RecordAccountExecutionsCommand(account_id)
         recorded = for_tenant(TenantId(tenant_id)).record_account_executions.execute(command)
-        return {"recorded": len(recorded)}
+        return {"recorded": len(recorded.entries)}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])
     def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: UserRequest) -> OrderOutcomeResponse:

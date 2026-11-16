@@ -4,7 +4,7 @@ the same scenario proves that the API gives the table what it shows.
 """
 
 from dataclasses import dataclass, field, replace
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -170,7 +170,7 @@ def read_account_history(history: History, user: str, account: str) -> None:
 @when(quoted('"{user}" consulta lo storico delle variazioni di "{name}" dal {first} al {last}'))
 def read_flow_history_in_period(history: History, user: str, name: str, first: str, last: str) -> None:
     assert user == history.user
-    history.page = history.read_flow(name, TimeWindow.of_days(_day(first), _day(last)))
+    history.page = history.read_flow(name, _days(first, last))
 
 
 @when(quoted('"{user}" apre nella dashboard lo storico delle variazioni di "{name}"'))
@@ -235,3 +235,10 @@ def without_other_tenant(history: History, platform: Platform, user: str) -> Non
 
 def _day(text: str) -> date:
     return datetime.strptime(text, "%d/%m/%Y").replace(tzinfo=UTC).date()
+
+
+def _days(first: str, last: str) -> TimeWindow:
+    """The minutes of the days from the first to the last, both whole (ADR periodo-al-minuto)."""
+    start = datetime.combine(_day(first), time.min, tzinfo=UTC)
+    end = datetime.combine(_day(last), time(23, 59), tzinfo=UTC)
+    return TimeWindow.of_minutes(start, end)

@@ -1,7 +1,7 @@
 """The worker reads the deposits and withdrawals of an account on its exchange: found for the tenant, opened only for
 the fields of its reader (R3.4.2, ADR storico-delle-variazioni-di-capitale)."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -17,7 +17,7 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.support.platform import HYPERLIQUID
 from tests.support.worker import TENANT, Worker
 
-WINDOW = TimeWindow.of_days(date(2026, 11, 14), date(2026, 11, 16))
+WINDOW = TimeWindow.of_minutes(datetime(2026, 11, 14, tzinfo=UTC), datetime(2026, 11, 16, 23, 59, tzinfo=UTC))
 
 
 def transfers_on(

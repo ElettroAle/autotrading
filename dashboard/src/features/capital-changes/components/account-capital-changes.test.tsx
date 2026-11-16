@@ -64,7 +64,7 @@ describe('AccountCapitalChanges', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows only the changes of the days of the period', async () => {
+  it('shows only the changes of the minutes of the period', async () => {
     const alfa = fakePlatform.giveFlowTo('anna', 'alfa');
     const accountId = alfa.accountId ?? '';
     fakePlatform.recordCapitalChange(aTransfer(accountId, 'prelievo', 50, AT));
@@ -73,7 +73,7 @@ describe('AccountCapitalChanges', () => {
     );
     await renderApp({
       account: 'anna',
-      url: `/accounts/${accountId}/capital?period=range&from=2026-11-14&to=2026-11-16`,
+      url: `/accounts/${accountId}/capital?period=range&from=2026-11-14T00%3A00Z&to=2026-11-16T23%3A59Z`,
     });
 
     const rows = await rowsOf();
@@ -81,7 +81,7 @@ describe('AccountCapitalChanges', () => {
     expect(rows[0]).toHaveTextContent('prelievo');
   });
 
-  it('asks both days of a range before reading', async () => {
+  it('asks the start and the end of a range before reading', async () => {
     const accountId = fakePlatform.giveFlowTo('anna', 'alfa').accountId ?? '';
     await renderApp({
       account: 'anna',
@@ -89,7 +89,7 @@ describe('AccountCapitalChanges', () => {
     });
 
     expect(
-      await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
     ).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Variazioni di capitale' })).not.toBeInTheDocument();
   });

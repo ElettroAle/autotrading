@@ -15,17 +15,25 @@ class FlowResults:
     The total gain in percent is the return of the flow, compounded across the changes of its capital (R3.4.3); the
     gain in the period goes from the equity recorded at the first cycle of the period to the one recorded at the last,
     the same points the equity curve draws (R2.2.3), without the money the changes moved in between, and is measured
-    in percent of the capital allocated now.
+    in percent of the capital allocated now. The results also tell why the openings of the flow are suspended, when
+    they are (R3.3.2).
     """
 
     state: FlowState
     period_gain: Decimal
     failed_cycles: int
+    openings_suspended: str | None = None
 
     @classmethod
-    def of(cls, state: FlowState, period_equity: Sequence[EquitySnapshot], failed_cycles: int) -> FlowResults:
+    def of(
+        cls,
+        state: FlowState,
+        period_equity: Sequence[EquitySnapshot],
+        failed_cycles: int,
+        openings_suspended: str | None = None,
+    ) -> FlowResults:
         period_gain = FlowReturn.over(period_equity, state.capital_changes).gain if period_equity else ZERO
-        return cls(state, period_gain, failed_cycles)
+        return cls(state, period_gain, failed_cycles, openings_suspended)
 
     @property
     def currency(self) -> str:

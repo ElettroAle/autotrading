@@ -1,11 +1,11 @@
 import { http, HttpResponse } from 'msw';
 
 import { apiInstant } from './cycles';
+import { contains, intervalWindowOf } from './flow-statistics';
 import { fakePlatform, type FakeCapitalChange, type FakeFlow } from './platform';
 import { problem, withUser } from './responses';
 
 const CAPITAL_CHANGES_PER_PAGE = 50;
-const DAY_MS = 24 * 60 * 60 * 1000;
 const NOT_FOUND = 'non trovato';
 
 /** A change of the capital of the flow, from the capital it had to the new one, at the instant (R1.1.7, R3.4.2). */
@@ -49,16 +49,10 @@ export const aTransfer = (
   new: null,
 });
 
-// The days of the query string, both whole, in UTC, as the API reads them: a missing day does not limit its side.
-const admitsDays = (search: URLSearchParams, instant: string): boolean => {
-  const from = search.get('from');
-  const to = search.get('to');
-  const time = Date.parse(instant);
-  return (
-    (from === null || time >= Date.parse(`${from}T00:00:00Z`)) &&
-    (to === null || time < Date.parse(`${to}T00:00:00Z`) + DAY_MS)
-  );
-};
+// The instants of the query string, to the minute, as the API reads them (ADR periodo-al-minuto): a missing instant
+// does not limit its side.
+const admitsInterval = (search: URLSearchParams, instant: string): boolean =>
+  contains(intervalWindowOf(search.get('from'), search.get('to')), new Date(instant));
 
 const answerOf = (change: FakeCapitalChange) => ({
   changed_at: change.changed_at,
@@ -75,7 +69,7 @@ const pageOf = (changes: FakeCapitalChange[], request: Request) => {
   const page = Number(search.get('page') ?? '1');
   const start = (page - 1) * CAPITAL_CHANGES_PER_PAGE;
   const sorted = changes
-    .filter((change) => admitsDays(search, change.changed_at))
+    .filter((change) => admitsInterval(search, change.changed_at))
     .sort((one, other) => Date.parse(other.changed_at) - Date.parse(one.changed_at));
   return {
     page,

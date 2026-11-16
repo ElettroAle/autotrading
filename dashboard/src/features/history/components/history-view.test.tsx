@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
@@ -119,8 +119,8 @@ describe('HistoryView', () => {
     await user.selectOptions(screen.getByLabelText('Asset'), 'ETH');
     await user.selectOptions(screen.getByLabelText('Periodo'), 'Intervallo');
     expect(screen.getByText(/Scegli il giorno iniziale e il giorno finale/)).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Dal'), '2026-11-10');
-    await user.type(screen.getByLabelText('Al'), '2026-11-20');
+    fireEvent.change(screen.getByLabelText('Dal'), { target: { value: '2026-11-10T00:00' } });
+    fireEvent.change(screen.getByLabelText('Al'), { target: { value: '2026-11-20T23:59' } });
 
     await waitFor(async () => expect(await rowsOf('Posizioni chiuse')).toHaveLength(11));
     const rows = await rowsOf('Posizioni chiuse');

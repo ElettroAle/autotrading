@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router';
 
 import { paths } from '@/config/paths';
 
+import { AccountAlarmsRoute } from './routes/app/account-alarms';
 import { AccountCapitalRoute } from './routes/app/account-capital';
 import { AccountsRoute } from './routes/app/accounts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <HomeRoute /> },
       { path: paths.accounts.path, element: <AccountsRoute /> },
       { path: paths.accountCapital.path, element: <AccountCapitalRoute /> },
+      { path: paths.accountAlarms.path, element: <AccountAlarmsRoute /> },
       { path: paths.newFlow.path, element: <NewFlowRoute /> },
       // The tabs of the page of the flow live under its head and its period (R6.4.3).
       {

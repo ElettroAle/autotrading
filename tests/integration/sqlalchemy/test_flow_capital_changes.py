@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -138,7 +138,7 @@ def test_the_most_recent_changes_of_the_flows_asked_in_the_window_come_newest_fi
     repository.add_capital_change(alfa.with_capital(Decimal(200)).with_capital(Decimal(400)), late)
     repository.add_capital_change(gamma.with_capital(Decimal(500)), elsewhere)
     asked = (alfa.id, beta.id)
-    window = TimeWindow.of_days(date(2026, 11, 14), date(2026, 11, 16))
+    window = TimeWindow.of_minutes(datetime(2026, 11, 14, tzinfo=UTC), datetime(2026, 11, 16, 23, 59, tzinfo=UTC))
 
     assert repository.capital_changes(asked, EVER, 10) == (late, middle, early)
     assert repository.capital_changes(asked, EVER, 2) == (late, middle)

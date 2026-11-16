@@ -5,15 +5,15 @@ money of the flow for the free capital of the account. The changes recorded befo
 the difference as amount and no value before. R3.4.1, ADR incasso-dei-profitti, ADR
 capitale-libero-al-netto-del-valore-dei-flussi.
 
-Revision ID: 0025
-Revises: 0024
+Revision ID: 0026
+Revises: 0025
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0025"
-down_revision = "0024"
+revision = "0026"
+down_revision = "0025"
 branch_labels = None
 depends_on = None
 

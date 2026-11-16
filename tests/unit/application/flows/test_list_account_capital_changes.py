@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -95,7 +95,7 @@ def test_the_period_narrows_both_the_changes_and_the_transfers(bench: Bench) -> 
     bench.declared(datetime(2026, 11, 13, 23, 59, tzinfo=UTC))
     kept_change = bench.changed(alfa, datetime(2026, 11, 15, 10, tzinfo=UTC))
     kept_transfer = bench.declared(datetime(2026, 11, 16, 23, 59, tzinfo=UTC))
-    window = TimeWindow.of_days(date(2026, 11, 14), date(2026, 11, 16))
+    window = TimeWindow.of_minutes(datetime(2026, 11, 14, tzinfo=UTC), datetime(2026, 11, 16, 23, 59, tzinfo=UTC))
 
     page = bench.list_changes.execute(ListAccountCapitalChangesCommand(bench.account_id, window=window))
 

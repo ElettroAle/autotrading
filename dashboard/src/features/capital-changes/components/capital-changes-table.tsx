@@ -5,7 +5,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
-import type { ListDays } from '@/components/ui/period-selector/use-period';
+import type { ListInterval } from '@/components/ui/period-selector/use-period';
 import { formatAmount } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
 import { searchWithPage } from '@/utils/page-number';
@@ -16,7 +16,7 @@ const NONE = '—';
 
 type CapitalChangesTableProps = {
   readonly reading: UseQueryResult<CapitalChangePage>;
-  readonly days: ListDays;
+  readonly interval: ListInterval;
   /** The address of the page of the history, which the pages keep with their filters. */
   readonly path: string;
   /** The history of an account names the flow of each change; that of a flow does not repeat it. */
@@ -35,8 +35,8 @@ const columnsOf = (currency: string, withFlow: boolean): DataTableColumn<Capital
   { header: 'Capitale dopo', cell: (change) => capitalOf(change.new, currency) },
 ];
 
-const emptyText = (days: ListDays): string =>
-  days.from === undefined
+const emptyText = (interval: ListInterval): string =>
+  interval.from === undefined
     ? 'Nessuna variazione di capitale.'
     : 'Nessuna variazione nel periodo scelto.';
 
@@ -46,7 +46,7 @@ const emptyText = (days: ListDays): string =>
  */
 export const CapitalChangesTable = ({
   reading,
-  days,
+  interval,
   path,
   withFlow = false,
 }: CapitalChangesTableProps) => {
@@ -65,7 +65,7 @@ export const CapitalChangesTable = ({
         columns={columnsOf(reading.data.currency, withFlow)}
         rows={reading.data.changes}
         rowKey={(change) => `${change.changed_at}-${change.flow_id ?? change.reason}`}
-        empty={emptyText(days)}
+        empty={emptyText(interval)}
       />
       <Pagination
         page={reading.data.page}

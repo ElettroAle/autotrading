@@ -28,13 +28,15 @@ class RiskState:
     """The state of the flow read at the start of the cycle (R1.5.3).
 
     Quotas and percentage limits are measured on the money of the flow, not on the capital allocated to it: after
-    losses the openings shrink, after gains they grow (ADR 0078).
+    losses the openings shrink, after gains they grow (ADR 0078). With an alarm of reconciliation on its account the
+    openings of the flow are suspended, with the reason (R3.3.1).
     """
 
     currency: str
     funds: Decimal
     available_liquidity: Decimal
     open_assets: frozenset[str]
+    openings_suspended: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +86,8 @@ class RiskCheck:
     def outcome(self, intent: TradeIntent, limits: AssetLimits | None) -> RiskOutcome:
         if isinstance(intent, CloseIntent):
             return self._close(intent)
+        if isinstance(intent, OpenIntent) and self._state.openings_suspended is not None:
+            return BlockedDecision(intent.asset, self._state.openings_suspended)
         if isinstance(intent, OpenIntent) and limits is not None:
             return self._committed(self._open(intent, limits))
         return HeldPosition(intent.asset)

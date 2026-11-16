@@ -1,7 +1,7 @@
 """The API side and the worker side of the deposits and withdrawals of an account, run against each other in memory
 (R3.4.2, ADR storico-delle-variazioni-di-capitale)."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from secrets import token_hex
 from uuid import uuid4
@@ -20,7 +20,7 @@ from tests.support.worker import TENANT, TOKEN, Worker
 
 DEPOSIT = AccountTransfer(datetime(2026, 11, 15, 9, 30, tzinfo=UTC), Decimal("500.5"), TransferDirection.DEPOSIT)
 WITHDRAWAL = AccountTransfer(datetime(2026, 11, 1, 9, 30, tzinfo=UTC), Decimal(300), TransferDirection.WITHDRAWAL)
-WINDOW = TimeWindow.of_days(date(2026, 11, 14), date(2026, 11, 16))
+WINDOW = TimeWindow.of_minutes(datetime(2026, 11, 14, tzinfo=UTC), datetime(2026, 11, 16, 23, 59, tzinfo=UTC))
 REFUSED = "connection refused"
 
 

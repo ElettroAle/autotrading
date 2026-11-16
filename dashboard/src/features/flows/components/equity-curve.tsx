@@ -2,9 +2,9 @@ import { EquityChart, type ChartEvent } from '@/components/charts/equity-chart';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import {
-  daysOfInstants,
+  intervalOfInstants,
   isComplete,
-  listDaysOf,
+  listIntervalOf,
   usePeriod,
   usePeriodInterval,
   type Period,
@@ -36,9 +36,9 @@ const capitalChangeEvent = (flowId: string, change: CapitalChangeMark): ChartEve
 
 const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) => {
   const equity = useFlowEquity(flowId, period);
-  const days = listDaysOf(period, new Date());
-  const failed = useFailedCycles(flowId, days);
-  const changes = useCapitalChangeMarks(flowId, days);
+  const interval = listIntervalOf(period, new Date());
+  const failed = useFailedCycles(flowId, interval);
+  const changes = useCapitalChangeMarks(flowId, interval);
   const { chooseInterval } = usePeriodInterval();
   if (equity.isPending) {
     return <Loading />;
@@ -58,7 +58,7 @@ const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) =>
           ...(failed.data ?? []).map((plannedAt) => failedCycleEvent(flowId, plannedAt)),
           ...(changes.data ?? []).map((change) => capitalChangeEvent(flowId, change)),
         ]}
-        onSelect={(from, to) => chooseInterval(daysOfInstants(from, to))}
+        onSelect={(from, to) => chooseInterval(intervalOfInstants(from, to))}
       />
     );
   }
@@ -88,9 +88,7 @@ export const EquityCurve = ({ flowId }: { flowId: string }) => {
       {isComplete(period) ? (
         <EquityPoints flowId={flowId} period={period} />
       ) : (
-        <p className="text-slate-600">
-          Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.
-        </p>
+        <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
       )}
     </section>
   );

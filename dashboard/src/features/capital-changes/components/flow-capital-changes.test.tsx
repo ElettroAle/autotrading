@@ -66,12 +66,12 @@ describe('FlowCapitalChanges', () => {
     );
   });
 
-  it('shows only the changes of the days of the period', async () => {
+  it('shows only the changes of the minutes of the period', async () => {
     changed(flow, 500, 600, new Date('2026-11-10T09:00:00Z'));
     changed(flow, 600, 700, new Date('2026-11-15T09:00:00Z'));
     await renderApp({
       account: 'anna',
-      url: '/flows/flow-alfa/capital?period=range&from=2026-11-14&to=2026-11-16',
+      url: '/flows/flow-alfa/capital?period=range&from=2026-11-14T00%3A00Z&to=2026-11-16T23%3A59Z',
     });
 
     const rows = await rowsOf();
@@ -79,14 +79,14 @@ describe('FlowCapitalChanges', () => {
     expect(rows[0]).toHaveTextContent('15/11/2026');
   });
 
-  it('asks both days of a range before reading', async () => {
+  it('asks the start and the end of a range before reading', async () => {
     await renderApp({
       account: 'anna',
-      url: '/flows/flow-alfa/capital?period=range&from=2026-11-14',
+      url: '/flows/flow-alfa/capital?period=range&from=2026-11-14T00%3A00Z',
     });
 
     expect(
-      await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
     ).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Variazioni di capitale' })).not.toBeInTheDocument();
   });
@@ -119,7 +119,7 @@ describe('FlowCapitalChanges', () => {
     changed(flow, 500, 600, AT);
     await renderApp({
       account: 'anna',
-      url: '/flows/flow-alfa/capital?period=range&from=2026-10-01&to=2026-10-02',
+      url: '/flows/flow-alfa/capital?period=range&from=2026-10-01T00%3A00Z&to=2026-10-02T23%3A59Z',
     });
 
     expect(await screen.findByText('Nessuna variazione nel periodo scelto.')).toBeInTheDocument();

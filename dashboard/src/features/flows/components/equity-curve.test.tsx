@@ -57,9 +57,11 @@ describe('EquityCurve', () => {
     expect(screen.getByRole('img', { name: /^Equity 305 / })).toBeInTheDocument();
   });
 
-  it('shows the cycles of a range from its first to its last day', async () => {
+  // ADR periodo-al-minuto: the menu takes the date and the time of each end of a range.
+  it('shows the cycles of a range from its first to its last minute', async () => {
+    const fiveDaysAgo = daysAgo(5);
     fakePlatform.recordEquity('alfa', daysAgo(10), 310);
-    fakePlatform.recordEquity('alfa', daysAgo(5), 295);
+    fakePlatform.recordEquity('alfa', fiveDaysAgo, 295);
     fakePlatform.recordEquity('alfa', daysAgo(1), 305);
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
     await curve();
@@ -67,11 +69,11 @@ describe('EquityCurve', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Periodo' }), 'Intervallo');
     expect(
       within(screen.getByRole('region', { name: 'Equity curve' })).getByText(
-        "Scegli il primo e l'ultimo giorno dell'intervallo.",
+        "Scegli l'inizio e la fine dell'intervallo.",
       ),
     ).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Dal'), dayOf(daysAgo(6)));
-    await userEvent.type(screen.getByLabelText('Al'), dayOf(daysAgo(4)));
+    fireEvent.change(screen.getByLabelText('Dal'), { target: { value: localInput(fiveDaysAgo) } });
+    fireEvent.change(screen.getByLabelText('Al'), { target: { value: localInput(fiveDaysAgo) } });
 
     await expect.poll(() => screen.queryAllByRole('img', { name: /^Equity / })).toHaveLength(1);
     expect(screen.getByRole('img', { name: /^Equity 295 / })).toBeInTheDocument();
@@ -82,13 +84,11 @@ describe('EquityCurve', () => {
     await screen.findByText('Nessun ciclo ancora eseguito');
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Periodo' }), 'Intervallo');
-    await userEvent.type(screen.getByLabelText('Dal'), dayOf(daysAgo(1)));
-    await userEvent.type(screen.getByLabelText('Al'), dayOf(daysAgo(3)));
+    fireEvent.change(screen.getByLabelText('Dal'), { target: { value: localInput(daysAgo(1)) } });
+    fireEvent.change(screen.getByLabelText('Al'), { target: { value: localInput(daysAgo(3)) } });
 
     const panel = screen.getByRole('region', { name: 'Equity curve' });
-    expect(
-      await within(panel).findByText(/il giorno iniziale è successivo al giorno finale/),
-    ).toBeInTheDocument();
+    expect(await within(panel).findByText(/l'inizio è successivo alla fine/)).toBeInTheDocument();
   });
 
   it('says when the flow has not run a cycle yet', async () => {
@@ -202,8 +202,8 @@ describe('EquityCurve', () => {
       fakePlatform.recordEquity('alfa', daysAgo(10), 310);
       fakePlatform.recordEquity('alfa', daysAgo(5), 295);
       fakePlatform.recordEquity('alfa', daysAgo(1), 305);
-      const from = dayOf(daysAgo(6));
-      const to = dayOf(daysAgo(4));
+      const from = minuteOf(daysAgo(6));
+      const to = minuteOf(daysAgo(4));
       await renderApp({
         account: 'anna',
         url: `/flows/flow-alfa?period=30d&from=${from}&to=${to}`,
@@ -211,9 +211,8 @@ describe('EquityCurve', () => {
 
       await expect.poll(() => screen.queryAllByRole('img', { name: /^Equity / })).toHaveLength(1);
       const label = screen.getByLabelText('Intervallo scelto sul grafico');
-      expect(label).toHaveTextContent(
-        `dal ${from.split('-').reverse().join('/')} al ${to.split('-').reverse().join('/')}`,
-      );
+      // ADR periodo-al-minuto: the label says the date and the time of each end, «16/11 09:15 – 16/11 11:40».
+      expect(label).toHaveTextContent(`${labelOf(from)} – ${labelOf(to)}`);
 
       await userEvent.click(within(label).getByRole('button', { name: "Togli l'intervallo" }));
 
@@ -223,9 +222,10 @@ describe('EquityCurve', () => {
     });
 
     it('chooses the interval of the page with a drag across the curve', async () => {
-      fakePlatform.recordEquity('alfa', daysAgo(6), 300);
-      fakePlatform.recordEquity('alfa', daysAgo(4), 305);
-      fakePlatform.recordEquity('alfa', daysAgo(2), 310);
+      const sixDaysAgoAndAfter = [daysAgo(6), daysAgo(4), daysAgo(2)] as const;
+      sixDaysAgoAndAfter.forEach((instant, index) => {
+        fakePlatform.recordEquity('alfa', instant, 300 + index * 5);
+      });
       const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=30d' });
       await curve();
       vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
@@ -246,18 +246,28 @@ describe('EquityCurve', () => {
       fireEvent.mouseUp(chart, { clientX: 715, clientY: 100 });
       vi.restoreAllMocks();
 
+      // ADR periodo-al-minuto: the interval runs from the minute of the first point chosen to the minute of the last.
       await expect
         .poll(() => new URLSearchParams(router.state.location.search).get('to'))
-        .toBe(dayOf(daysAgo(2)));
+        .toBe(minuteOf(sixDaysAgoAndAfter[2]));
       const search = new URLSearchParams(router.state.location.search);
-      expect(search.get('from')).toBe(dayOf(daysAgo(6)));
+      expect(search.get('from')).toBe(minuteOf(sixDaysAgoAndAfter[0]));
       expect(search.get('period')).toBe('30d');
     });
   });
 });
 
-const dayOf = (instant: Date): string => {
-  const month = String(instant.getMonth() + 1).padStart(2, '0');
-  const day = String(instant.getDate()).padStart(2, '0');
-  return `${instant.getFullYear()}-${month}-${day}`;
+// The instant of the address, UTC to the minute, as the dashboard writes it (ADR periodo-al-minuto).
+const minuteOf = (instant: Date): string => `${instant.toISOString().slice(0, 16)}Z`;
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+// An end of the interval as the label says it, in the time zone of the browser: 16/11 09:15.
+const labelOf = (instant: string): string => {
+  const date = new Date(instant);
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+// The value of a field of date and time for an instant, in the time zone of the browser: 2026-11-16T09:15.
+const localInput = (instant: Date): string =>
+  `${instant.getFullYear()}-${pad(instant.getMonth() + 1)}-${pad(instant.getDate())}T${pad(instant.getHours())}:${pad(instant.getMinutes())}`;

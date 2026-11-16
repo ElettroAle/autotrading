@@ -3,6 +3,7 @@ import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
+import { fakeReconciliation } from './reconciliation';
 
 /**
  * The platform behind the fakes: the users of the identity provider, their role, the accounts and the flows of their
@@ -27,6 +28,18 @@ export type FakeFlowHistory = {
 };
 
 export type FakeEquityPoint = { readonly plannedAt: Date; readonly equity: number };
+
+/**
+ * A price forecast the flow recorded (R1.3.5): asset, horizon, the instant it expires, the price it forecast and the
+ * actual price at that instant, null when never read.
+ */
+export type FakeForecast = {
+  readonly asset: string;
+  readonly horizonMinutes: number;
+  readonly expiresAt: Date;
+  readonly predictedPrice: number;
+  readonly actualPrice: number | null;
+};
 
 export type FakeConfiguration = {
   readonly assets: string[];
@@ -83,6 +96,8 @@ export type FakeFlow = {
   readonly history: FakeFlowHistory;
   /** The equity every cycle of the flow recorded, in the order the scenario records it. */
   readonly equity: FakeEquityPoint[];
+  /** The price forecasts the flow recorded, whose error the API measures (R3.6.1). */
+  readonly forecasts: FakeForecast[];
   readonly versions: FakeVersion[];
 };
 
@@ -399,6 +414,7 @@ const draftOf = (
   currentCapital: 0,
   history: emptyHistory(),
   equity: [],
+  forecasts: [],
   versions: versionsWith({}),
 });
 
@@ -490,6 +506,7 @@ export const fakePlatform = {
     state.exchangeNetwork = 'test';
     state.exchangeNetworkName = 'testnet';
     state.apiAnswers = true;
+    fakeReconciliation.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
@@ -557,6 +574,7 @@ export const fakePlatform = {
       currentCapital: 100,
       history: emptyHistory(),
       equity: [],
+      forecasts: [],
       versions: versionsWith({}),
       ...rest,
     };

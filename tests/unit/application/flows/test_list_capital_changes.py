@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -59,7 +59,7 @@ def test_only_the_changes_of_the_period_are_listed_and_counted(bench: Bench) -> 
     flow = bench.saved()
     bench.changed(flow, datetime(2026, 11, 10, 10, tzinfo=UTC))
     kept = bench.changed(flow, datetime(2026, 11, 15, 10, tzinfo=UTC))
-    window = TimeWindow.of_days(date(2026, 11, 14), date(2026, 11, 16))
+    window = TimeWindow.of_minutes(datetime(2026, 11, 14, tzinfo=UTC), datetime(2026, 11, 16, 23, 59, tzinfo=UTC))
 
     page = bench.list_changes.execute(ListCapitalChangesCommand(flow.id, window=window))
 

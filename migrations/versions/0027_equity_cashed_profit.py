@@ -3,15 +3,15 @@
 The ranking chains the return across the changes of the capital on these equities. The cycles recorded before had
 nothing cashed out to leave out. R3.4.3, ADR rendimento-composto-tra-le-variazioni-di-capitale.
 
-Revision ID: 0026
-Revises: 0025
+Revision ID: 0027
+Revises: 0026
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0026"
-down_revision = "0025"
+revision = "0027"
+down_revision = "0026"
 branch_labels = None
 depends_on = None
 
