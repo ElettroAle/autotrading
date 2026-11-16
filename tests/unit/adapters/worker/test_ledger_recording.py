@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 from autotrading.adapters.inbound.api.worker import create_worker_api
-from autotrading.adapters.outbound.worker.ledger_recording import WorkerLedgerRecordingAdapter
+from autotrading.adapters.outbound.worker.ledger_recording import TIMEOUT_SECONDS, WorkerLedgerRecordingAdapter
 from autotrading.application.flows.errors import (
     FlowAccountNotFoundError,
     FlowExchangeUnavailableError,
@@ -109,3 +109,17 @@ def test_the_adapter_never_shows_its_token() -> None:
 
     assert TOKEN not in repr(adapter)
     assert str(TENANT.value) in repr(adapter)
+
+
+def test_the_call_declares_its_own_timeout() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(httpx.codes.OK, json={})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://worker")
+    WorkerLedgerRecordingAdapter(client, TOKEN, TENANT).record(uuid4())
+
+    (request,) = seen
+    assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS

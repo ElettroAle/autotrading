@@ -9,6 +9,9 @@ from autotrading.application.flows.errors import (
 )
 from autotrading.domain.tenancy.tenant_id import TenantId
 
+# Recording reads the new executions of the account from the exchange before writing them: as long as a closing.
+TIMEOUT_SECONDS = 40.0
+
 
 class WorkerLedgerRecordingAdapter:
     """Asks the worker, over the internal network of the installation, to record in the ledger what the exchange added
@@ -29,7 +32,9 @@ class WorkerLedgerRecordingAdapter:
     def record(self, account_id: UUID) -> None:
         path = f"/tenants/{self._tenant_id.value}/accounts/{account_id}/ledger"
         try:
-            response = self._client.post(path, headers={"Authorization": f"Bearer {self._token}"})
+            response = self._client.post(
+                path, headers={"Authorization": f"Bearer {self._token}"}, timeout=TIMEOUT_SECONDS
+            )
         except httpx.HTTPError as error:
             raise FlowExchangeUnavailableError from error
         if response.status_code == httpx.codes.NOT_FOUND:
