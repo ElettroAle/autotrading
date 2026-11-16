@@ -387,6 +387,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/emergency-closings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close In Emergency */
+        post: operations["close_in_emergency_flows_emergency_closings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/emergency-closings/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Emergency Closing */
+        get: operations["preview_emergency_closing_flows_emergency_closings_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows": {
         parameters: {
             query?: never;
@@ -1492,6 +1526,51 @@ export interface components {
             assets?: string[];
         };
         /**
+         * EmergencyClosingPreviewResponse
+         * @description The flows of the scope and the positions they hold now, for the confirmation (ADR chiusura-di-emergenza-nella-
+         *     dashboard).
+         */
+        EmergencyClosingPreviewResponse: {
+            /** Flows */
+            flows: number;
+            /** Positions */
+            positions: number;
+        };
+        /**
+         * EmergencyClosingRequest
+         * @description A flow, an account, or neither for every flow of the user (R3.2.3).
+         */
+        EmergencyClosingRequest: {
+            /** Flow Id */
+            flow_id?: string | null;
+            /** Account Id */
+            account_id?: string | null;
+        };
+        /** EmergencyClosingResponse */
+        EmergencyClosingResponse: {
+            /**
+             * Closed At
+             * Format: date-time
+             */
+            closed_at: string;
+            scope: components["schemas"]["EmergencyScopeResponse"];
+            /** Flows */
+            flows: components["schemas"]["FlowEmergencyOutcomeResponse"][];
+        };
+        /**
+         * EmergencyScopeKind
+         * @enum {string}
+         */
+        EmergencyScopeKind: "flow" | "account" | "all";
+        /** EmergencyScopeResponse */
+        EmergencyScopeResponse: {
+            kind: components["schemas"]["EmergencyScopeKind"];
+            /** Flow Id */
+            flow_id: string | null;
+            /** Account Id */
+            account_id: string | null;
+        };
+        /**
          * EquityPointResponse
          * @description A point of the curve: its equity and how much it moved from the first point of the period, in percent with two
          *     decimals, null when the first point has no equity (ADR 0137).
@@ -1602,6 +1681,28 @@ export interface components {
             default_stop_loss_percent?: number | string | null;
             /** Default Take Profit Percent */
             default_take_profit_percent?: number | string | null;
+        };
+        /**
+         * FlowEmergencyOutcomeResponse
+         * @description What the closing did to one flow: the assets closed, the positions left open with the reason of the exchange,
+         *     the reason the whole flow failed, or the remark that it had nothing to close (R3.2.3).
+         */
+        FlowEmergencyOutcomeResponse: {
+            /**
+             * Flow Id
+             * Format: uuid
+             */
+            flow_id: string;
+            /** Flow Name */
+            flow_name: string;
+            /** Closed */
+            closed: string[];
+            /** Left Open */
+            left_open: components["schemas"]["PositionLeftOpenResponse"][];
+            /** Failure */
+            failure: string | null;
+            /** Remark */
+            remark: string | null;
         };
         /**
          * FlowEquityResponse
@@ -3482,6 +3583,71 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    close_in_emergency_flows_emergency_closings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyClosingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyClosingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_emergency_closing_flows_emergency_closings_preview_get: {
+        parameters: {
+            query?: {
+                flow_id?: string | null;
+                account_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyClosingPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

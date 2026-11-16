@@ -4,6 +4,7 @@ import { accountHandlers } from './account-handlers';
 import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
+import { emergencyClosingHandlers } from './emergency-closings';
 import {
   changeAllocatedCapital,
   createFlow,
@@ -418,6 +419,8 @@ const attachmentOf = (flowName: string): string => {
 type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
 
 export const handlers = [
+  // Before the routes of one flow, as on the API: the fixed path is not the identifier of a flow (R3.2.3).
+  ...emergencyClosingHandlers,
   ...accountHandlers,
   ...reconciliationHandlers,
   ...providerKeyHandlers,

@@ -1072,6 +1072,124 @@
         ]
       }
     },
+    "/flows/emergency-closings": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Close In Emergency",
+        "operationId": "close_in_emergency_flows_emergency_closings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyClosingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyClosingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/flows/emergency-closings/preview": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Preview Emergency Closing",
+        "operationId": "preview_emergency_closing_flows_emergency_closings_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyClosingPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows": {
       "post": {
         "tags": [
@@ -5348,6 +5466,129 @@
         "title": "DraftAssignmentRequest",
         "description": "Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason."
       },
+      "EmergencyClosingPreviewResponse": {
+        "properties": {
+          "flows": {
+            "type": "integer",
+            "title": "Flows"
+          },
+          "positions": {
+            "type": "integer",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flows",
+          "positions"
+        ],
+        "title": "EmergencyClosingPreviewResponse",
+        "description": "The flows of the scope and the positions they hold now, for the confirmation (ADR chiusura-di-emergenza-nella-\ndashboard)."
+      },
+      "EmergencyClosingRequest": {
+        "properties": {
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "title": "EmergencyClosingRequest",
+        "description": "A flow, an account, or neither for every flow of the user (R3.2.3)."
+      },
+      "EmergencyClosingResponse": {
+        "properties": {
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closed At"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EmergencyScopeResponse"
+          },
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/FlowEmergencyOutcomeResponse"
+            },
+            "type": "array",
+            "title": "Flows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "closed_at",
+          "scope",
+          "flows"
+        ],
+        "title": "EmergencyClosingResponse"
+      },
+      "EmergencyScopeKind": {
+        "type": "string",
+        "enum": [
+          "flow",
+          "account",
+          "all"
+        ],
+        "title": "EmergencyScopeKind"
+      },
+      "EmergencyScopeResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/EmergencyScopeKind"
+          },
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "flow_id",
+          "account_id"
+        ],
+        "title": "EmergencyScopeResponse"
+      },
       "EquityPointResponse": {
         "properties": {
           "planned_at": {
@@ -5694,6 +5935,66 @@
         ],
         "title": "FlowCreationRequest",
         "description": "A missing name, model, asset or risk limit arrives empty, so the domain answers with the reason (R1.1.1)."
+      },
+      "FlowEmergencyOutcomeResponse": {
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "closed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed"
+          },
+          "left_open": {
+            "items": {
+              "$ref": "#/components/schemas/PositionLeftOpenResponse"
+            },
+            "type": "array",
+            "title": "Left Open"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "remark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_id",
+          "flow_name",
+          "closed",
+          "left_open",
+          "failure",
+          "remark"
+        ],
+        "title": "FlowEmergencyOutcomeResponse",
+        "description": "What the closing did to one flow: the assets closed, the positions left open with the reason of the exchange,\nthe reason the whole flow failed, or the remark that it had nothing to close (R3.2.3)."
       },
       "FlowEquityResponse": {
         "properties": {

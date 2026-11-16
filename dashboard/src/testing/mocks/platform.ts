@@ -397,6 +397,7 @@ const state = {
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   cashOuts: [] as string[],
+  emergencyClosings: [] as FakeEmergencyScope[],
   capitalChanges: [] as FakeCapitalChange[],
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
@@ -408,6 +409,17 @@ const state = {
 };
 
 export const flowIdOf = (name: string): string => `flow-${name}`;
+
+/** What an emergency closing covers: one flow, the flows of one account, or every flow (R3.2.3). */
+export type FakeEmergencyScope = { readonly flowId?: string; readonly accountId?: string };
+
+/** What the emergency closing did to one flow, as the API answers it (R3.2.3). */
+export type FakeEmergencyOutcome = {
+  readonly flow: FakeFlow;
+  readonly closed: string[];
+};
+
+export const EMERGENCY_REASON = 'chiusura di emergenza';
 
 const userNamed = (account: string): FakeUser => {
   const user = state.users.get(account);
@@ -558,6 +570,7 @@ export const fakePlatform = {
     state.openPositions.clear();
     state.closedPositions.clear();
     state.cashOuts.length = 0;
+    state.emergencyClosings.length = 0;
     state.capitalChanges.length = 0;
     state.signingIn = undefined;
     state.sessionsExpired = false;
@@ -1034,6 +1047,51 @@ export const fakePlatform = {
     flow.currentCapital = kept;
     state.cashOuts.push(flow.id);
     return { flow, freed };
+  },
+
+  /**
+   * The flows an emergency closing covers, refused as the API refuses a flow or an account the user lacks: active or
+   * paused, of the flow, of the account or of every account (R3.2.3).
+   */
+  emergencyFlowsOf(user: FakeUser, scope: FakeEmergencyScope): FakeFlow[] {
+    if (scope.flowId !== undefined && scope.accountId !== undefined) {
+      throw new FakeRefusal(400, 'indicare un flusso o un conto, non entrambi');
+    }
+    if (scope.flowId !== undefined) {
+      flowOf(user, scope.flowId);
+    }
+    if (
+      scope.accountId !== undefined &&
+      !user.accounts.some((each) => each.id === scope.accountId)
+    ) {
+      throw new FakeRefusal(404, 'conto non trovato');
+    }
+    return user.flows.filter(
+      (flow) =>
+        (flow.status === ACTIVE || flow.status === PAUSED) &&
+        (scope.flowId === undefined || flow.id === scope.flowId) &&
+        (scope.accountId === undefined || flow.accountId === scope.accountId),
+    );
+  },
+
+  /** The emergency closing: every position of the flows of the scope closes, the active flows pause (R3.2.3). */
+  closeInEmergency(user: FakeUser, scope: FakeEmergencyScope): FakeEmergencyOutcome[] {
+    const outcomes = fakePlatform.emergencyFlowsOf(user, scope).map((flow) => {
+      const closed = fakePlatform.openPositionsOf(flow.id).map((position) => position.asset);
+      state.openPositions.delete(flow.id);
+      if (flow.status === ACTIVE) {
+        flow.status = PAUSED;
+        flow.pauseReason = EMERGENCY_REASON;
+      }
+      return { flow, closed };
+    });
+    state.emergencyClosings.push(scope);
+    return outcomes;
+  },
+
+  /** How many emergency closings the fake API ran. */
+  emergencyClosings(): number {
+    return state.emergencyClosings.length;
   },
 
   /** A row of the history of the capital, in any order: the fake API serves them from the most recent (R3.4.2). */
