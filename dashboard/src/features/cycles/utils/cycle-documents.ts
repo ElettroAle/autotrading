@@ -57,12 +57,3 @@ export const exitPlanOf = (decision: Decision): ExitPlan | undefined => {
     ? undefined
     : plan;
 };
-
-export const decisionLabelOf = (decision: Decision): string =>
-  [decision.action, decision.opening?.direction, decision.asset]
-    .filter((part) => part !== undefined)
-    .join(' ');
-
-/** The decisions of the agent in a few words each, «apri long BTC»; none when the cycle never got to the agent. */
-export const decisionLabelsOf = (content: unknown): string[] =>
-  decisionsOf(content)?.decisioni.map(decisionLabelOf) ?? [];

@@ -56,6 +56,9 @@ describe('CycleView', () => {
 
     const decisions = await section('Decisioni e ragionamento');
     expect(within(decisions).getByRole('heading', { name: 'apri long BTC' })).toBeInTheDocument();
+    expect(
+      within(within(decisions).getByText('apri')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'plus');
     expect(within(decisions).getByText(reasoningOf('BTC'))).toBeInTheDocument();
     expect(await section("Risposta integrale dell'agente")).toHaveTextContent('"action": "open"');
   });

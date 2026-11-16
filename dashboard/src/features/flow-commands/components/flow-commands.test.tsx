@@ -2,7 +2,12 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 
-import { DESTRUCTIVE_COMMAND, PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
+import {
+  DESTRUCTIVE_COMMAND,
+  GO_COMMAND,
+  HOLD_COMMAND,
+  STOP_COMMAND,
+} from '@/components/ui/commands';
 import { fakePlatform, type FakeFlow } from '@/testing/mocks/platform';
 import { anOpenPosition } from '@/testing/mocks/positions';
 import { server } from '@/testing/mocks/server';
@@ -45,11 +50,11 @@ describe('FlowCommands', () => {
   });
 
   it.each([
-    ['fermo', 'Avvia', PRIMARY_COMMAND],
-    ['in pausa', 'Riprendi', PRIMARY_COMMAND],
+    ['fermo', 'Avvia', GO_COMMAND],
+    ['in pausa', 'Riprendi', GO_COMMAND],
     ['fermo', 'Archivia', DESTRUCTIVE_COMMAND],
-    ['attivo', 'Pausa', SECONDARY_COMMAND],
-    ['attivo', 'Stop', SECONDARY_COMMAND],
+    ['attivo', 'Pausa', HOLD_COMMAND],
+    ['attivo', 'Stop', STOP_COMMAND],
   ])('for a flow %s shows %s with the look of its weight', async (status, name, look) => {
     alfa.status = status;
     await renderApp({ account: 'anna', url: FLOW_PAGE });
@@ -60,6 +65,35 @@ describe('FlowCommands', () => {
         { name },
       ),
     ).toHaveAttribute('class', look);
+  });
+
+  it.each([
+    ['fermo', 'Avvia', 'play'],
+    ['in pausa', 'Riprendi', 'play'],
+    ['attivo', 'Pausa', 'pause'],
+    ['attivo', 'Stop', 'square'],
+  ])(
+    'for a flow %s shows %s with its icon, named by its text alone',
+    async (status, name, icon) => {
+      alfa.status = status;
+      await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+      const button = await within(
+        await screen.findByRole('group', { name: 'Comandi del flusso' }),
+      ).findByRole('button', { name });
+      expect(button).toHaveAccessibleName(name);
+      expect(within(button).getByRole('img', { hidden: true })).toHaveAttribute('data-icon', icon);
+    },
+  );
+
+  it('shows Archivia without an icon', async () => {
+    alfa.status = 'fermo';
+    await renderApp({ account: 'anna', url: FLOW_PAGE });
+
+    const button = await within(
+      await screen.findByRole('group', { name: 'Comandi del flusso' }),
+    ).findByRole('button', { name: 'Archivia' });
+    expect(within(button).queryByRole('img', { hidden: true })).toBeNull();
   });
 
   it('pauses the flow and then offers to resume it', async () => {

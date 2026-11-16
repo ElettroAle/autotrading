@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
+import { CommandButton } from '@/components/ui/command-button';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField } from '@/components/ui/form/select-field';
@@ -104,13 +105,13 @@ export const RegisterAccountForm = () => {
           registerField={(name) => register(`credentials.${name}`)}
           reasonOf={(name) => errors.credentials?.[name]?.message}
         />
-        <button
+        <CommandButton
+          tone="primary"
           type="submit"
           disabled={registration.isPending || !exchanges.isSuccess}
-          className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50"
         >
           Registra il conto
-        </button>
+        </CommandButton>
         {registered !== null && (
           <p role="status" className="text-green-800">
             Conto {registered} registrato
