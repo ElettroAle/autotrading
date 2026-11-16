@@ -58,8 +58,9 @@ describe('EquityCurve', () => {
 
   // ADR periodo-al-minuto: the menu takes the date and the time of each end of a range.
   it('shows the cycles of a range from its first to its last minute', async () => {
+    const fiveDaysAgo = daysAgo(5);
     fakePlatform.recordEquity('alfa', daysAgo(10), 310);
-    fakePlatform.recordEquity('alfa', daysAgo(5), 295);
+    fakePlatform.recordEquity('alfa', fiveDaysAgo, 295);
     fakePlatform.recordEquity('alfa', daysAgo(1), 305);
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
     await curve();
@@ -70,7 +71,6 @@ describe('EquityCurve', () => {
         "Scegli il primo e l'ultimo giorno dell'intervallo.",
       ),
     ).toBeInTheDocument();
-    const fiveDaysAgo = daysAgo(5);
     fireEvent.change(screen.getByLabelText('Dal'), { target: { value: localInput(fiveDaysAgo) } });
     fireEvent.change(screen.getByLabelText('Al'), { target: { value: localInput(fiveDaysAgo) } });
 
