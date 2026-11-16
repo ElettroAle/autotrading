@@ -253,6 +253,7 @@ class UnknownCycleOutcomeError(DomainError):
 
     def __init__(self, outcomes: tuple[str, ...]) -> None:
         super().__init__("esito non valido: scegliere tra " + ", ".join(outcomes))
+        self.outcomes = outcomes
 
 
 class VersionWithoutFlowError(DomainError):
