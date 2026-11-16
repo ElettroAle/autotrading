@@ -45,7 +45,7 @@ class CycleFlow:
         return self._funds.total_value
 
     @property
-    def return_percent(self) -> Decimal:
+    def return_percent(self) -> Decimal | None:
         return self._funds.return_percent
 
     @property

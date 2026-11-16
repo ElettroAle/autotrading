@@ -1,28 +1,45 @@
 """ADR capitale-libero-al-netto-del-valore-dei-flussi: the free capital is the balance less the total value of the
 flows holding the account, so the gains and losses of a flow stay its own until it cashes them out."""
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.errors import CapitalAboveFreeCapitalError
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital_of_account
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
 ACCOUNT = uuid4()
+CASHED_AT = datetime(2026, 11, 16, 10, 0, tzinfo=UTC)
 
 
 def state_of(capital: str, *, realized_pnl: str = "0", unrealized_pnl: str = "0", cashed: str = "0") -> FlowState:
     flow = a_flow(TENANT, account_id=ACCOUNT, configuration=a_configuration(allocated_capital=Decimal(capital)))
     activity = an_activity(positions=(a_position("BTC", unrealized_pnl=Decimal(unrealized_pnl)),))
-    return FlowState.attributed(flow, activity, FlowTotals(flow.id, Decimal(realized_pnl)), Decimal(cashed))
+    capital_value = Decimal(capital)
+    cash_out = CapitalChange(
+        flow.id,
+        CASHED_AT,
+        capital_value,
+        capital_value,
+        UserId("anna"),
+        CapitalChangeReason.CASH_OUT,
+        Decimal(cashed),
+        value_before=capital_value + Decimal(cashed),
+        cashed_profit=Decimal(cashed),
+    )
+    changes = (cash_out,) if Decimal(cashed) else ()
+    return FlowState.attributed(flow, activity, FlowTotals(flow.id, Decimal(realized_pnl)), changes)
 
 
 def test_the_free_capital_takes_off_the_balance_the_total_value_of_every_flow() -> None:

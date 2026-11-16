@@ -2,7 +2,7 @@ from uuid import UUID
 
 from autotrading.application.flows.ports import FlowAccountPorts, FlowRepositoryPort
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.flow_state import ZERO, FlowState
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.ledger import FlowTotals
 
@@ -24,9 +24,9 @@ def read_free_capital(
     ]
     flow_ids = [flow.id for flow in holding]
     totals = accounts.ledger.totals_of(flow_ids)
-    cashed = flows.cashed_profits_of(flow_ids)
+    changes = flows.capital_changes_of(flow_ids)
     states = [
-        FlowState.attributed(flow, activity, totals.get(flow.id) or FlowTotals(flow.id), cashed.get(flow.id, ZERO))
+        FlowState.attributed(flow, activity, totals.get(flow.id) or FlowTotals(flow.id), changes.get(flow.id, ()))
         for flow in holding
     ]
     return FreeCapital.of(activity.balance, activity.currency, states)

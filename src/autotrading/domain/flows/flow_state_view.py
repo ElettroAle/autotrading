@@ -29,5 +29,6 @@ class FlowStateView:
     funds: Decimal
     available_liquidity: Decimal
     total_value: Decimal
-    return_percent: Decimal
+    # None when no return can be measured (R3.4.3).
+    return_percent: Decimal | None
     positions: tuple[PositionView, ...]

@@ -1,14 +1,14 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.trade_intent import TradeSide
 
-HUNDRED = Decimal(100)
 ZERO = Decimal(0)
 
 
@@ -32,8 +32,8 @@ class FlowState:
     """The share of the account that belongs to a flow, attributed from what the exchange shows (R1.6.1).
 
     Positions belong to the flow by asset; realized PnL, fees and funding come from the running totals of the ledger
-    the platform keeps (ADR 0063), never from the executions the exchange still holds. The return is measured
-    against the capital allocated now: a change of the capital moves the reference from that moment (R1.1.7).
+    the platform keeps (ADR 0063), never from the executions the exchange still holds. The changes of its capital,
+    oldest first, carry the profits it cashed out and chain its return (R3.4.1, R3.4.3).
     """
 
     flow_id: FlowId
@@ -44,12 +44,11 @@ class FlowState:
     fees: Decimal
     funding: Decimal
     expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
-    # The profits the user cashed out: they left the flow for the free capital of the account (R3.4.1).
-    cashed_profit: Decimal = ZERO
+    capital_changes: tuple[CapitalChange, ...] = ()
 
     @classmethod
     def attributed(
-        cls, flow: Flow, activity: AccountActivity, totals: FlowTotals, cashed_profit: Decimal = ZERO
+        cls, flow: Flow, activity: AccountActivity, totals: FlowTotals, capital_changes: Sequence[CapitalChange] = ()
     ) -> FlowState:
         return cls(
             flow_id=flow.id,
@@ -60,7 +59,7 @@ class FlowState:
             fees=totals.fees,
             funding=totals.funding,
             expected_positions=totals.positions,
-            cashed_profit=cashed_profit,
+            capital_changes=tuple(capital_changes),
         )
 
     def position_mismatch(self) -> PositionMismatch | None:
@@ -71,6 +70,11 @@ class FlowState:
             if held.get(asset, ZERO) != expected.get(asset, ZERO):
                 return PositionMismatch(asset, expected.get(asset, ZERO), held.get(asset, ZERO))
         return None
+
+    @property
+    def cashed_profit(self) -> Decimal:
+        """The profits the user cashed out: they left the flow for the free capital of the account (R3.4.1)."""
+        return sum((change.cashed_profit for change in self.capital_changes), ZERO)
 
     @property
     def margin(self) -> Decimal:
@@ -102,7 +106,3 @@ class FlowState:
     def pnl(self) -> Decimal:
         """What the flow gained or lost in all, the profits it cashed out included (R3.4.3)."""
         return self.total_value + self.cashed_profit - self.allocated_capital
-
-    @property
-    def return_percent(self) -> Decimal:
-        return (self.total_value - self.allocated_capital) / self.allocated_capital * HUNDRED

@@ -238,6 +238,7 @@ equity_snapshots = Table(
     Column("unrealized_pnl", Numeric, nullable=False),
     Column("fees", Numeric, nullable=False),
     Column("funding", Numeric, nullable=False),
+    Column("cashed_profit", Numeric, nullable=False),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
     postgresql_partition_by="RANGE (planned_at)",
 )

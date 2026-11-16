@@ -89,7 +89,8 @@ def test_a_cash_out_keeping_the_capital_is_recorded_on_the_version_in_force(data
     assert repository.capital_changes((flow.id,), EVER, 10) == (cash_out,)
 
 
-def test_the_profits_cashed_out_sum_up_by_flow(database: Engine) -> None:
+def test_every_change_of_each_flow_reads_oldest_first(database: Engine) -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: the changes chain the return and carry the profits.
     tenant_id, account_id = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
     flow = a_flow(tenant_id, account_id=account_id, configuration=a_configuration(allocated_capital=Decimal(500)))
@@ -97,12 +98,14 @@ def test_the_profits_cashed_out_sum_up_by_flow(database: Engine) -> None:
     repository.add(flow)
     repository.add(never)
     lowered = flow.with_capital(Decimal(400))
-    repository.add_capital_change(lowered, a_cash_out(flow.id, Decimal(500), Decimal(400), Decimal(618)))
-    repository.add_capital_change(lowered, a_cash_out(flow.id, Decimal(400), Decimal(400), Decimal("430.5")))
+    cash_out = a_cash_out(flow.id, Decimal(500), Decimal(400), Decimal(618))
+    raised = a_change(flow.id, FIRST, Decimal(400), Decimal(450))
+    repository.add_capital_change(lowered, cash_out)
+    repository.add_capital_change(lowered.with_capital(Decimal(450)), raised)
 
-    assert repository.cashed_profits_of((flow.id, never.id)) == {flow.id: Decimal("148.5")}
-    assert repository.cashed_profits_of(()) == {}
-    assert SqlAlchemyFlowRepositoryAdapter(database, new_account(database)[0]).cashed_profits_of((flow.id,)) == {}
+    assert repository.capital_changes_of((flow.id, never.id)) == {flow.id: (raised, cash_out)}
+    assert repository.capital_changes_of(()) == {}
+    assert SqlAlchemyFlowRepositoryAdapter(database, new_account(database)[0]).capital_changes_of((flow.id,)) == {}
 
 
 def test_a_flow_without_changes_has_an_empty_history(database: Engine) -> None:

@@ -26,6 +26,7 @@ class _EquityRow(TypedDict):
     unrealized_pnl: Decimal
     fees: Decimal
     funding: Decimal
+    cashed_profit: Decimal
 
 
 class SqlAlchemyEquitySnapshotRepositoryAdapter:
@@ -82,6 +83,7 @@ def row_of(snapshot: EquitySnapshot, tenant_id: TenantId) -> dict[str, object]:
         "unrealized_pnl": snapshot.unrealized_pnl,
         "fees": snapshot.fees,
         "funding": snapshot.funding,
+        "cashed_profit": snapshot.cashed_profit,
     }
 
 
@@ -95,4 +97,5 @@ def snapshot_of(columns: RowMapping | Mapping[str, object]) -> EquitySnapshot:
         unrealized_pnl=row["unrealized_pnl"],
         fees=row["fees"],
         funding=row["funding"],
+        cashed_profit=row["cashed_profit"],
     )

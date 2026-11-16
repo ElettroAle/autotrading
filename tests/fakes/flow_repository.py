@@ -109,12 +109,12 @@ class InMemoryFlowRepositoryAdapter:
             self.add_version(flow)
         self._store.capital_changes.setdefault(flow.id, []).append(change)
 
-    def cashed_profits_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, Decimal]:
-        return {
-            flow_id: sum((change.cashed_profit for change in self._store.capital_changes[flow_id]), Decimal(0))
-            for flow_id in flow_ids
-            if flow_id in self._store.capital_changes
-        }
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
+        # As the identity of the rows of the database: of two changes of a flow at one instant, the earlier saved first.
+        changes: dict[FlowId, tuple[CapitalChange, ...]] = {}
+        for change in sorted(self._changes_within(flow_ids, TimeWindow()), key=lambda change: change.changed_at):
+            changes[change.flow_id] = (*changes.get(change.flow_id, ()), change)
+        return changes
 
     def add_assignment(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), account_id=flow.account_id, configuration=flow.configuration))

@@ -86,6 +86,15 @@ def test_the_user_message_has_the_state_of_the_flow() -> None:
     }
 
 
+def test_a_return_that_cannot_be_measured_is_null() -> None:
+    state = FlowStateView("USDC", Decimal(0), Decimal(0), Decimal(0), Decimal(0), None, ())
+
+    flow_state = user_document(context(state=state))["stato_del_flusso"]
+
+    assert isinstance(flow_state, dict)
+    assert flow_state["rendimento_dall_avvio_percento"] is None
+
+
 def test_a_position_without_liquidation_price_says_so() -> None:
     cross = PositionView("ETH", TradeDirection.SHORT, Decimal(1), 1, Decimal(3000), Decimal(3000), Decimal(0), None)
     state = FlowStateView("USDC", Decimal(400), Decimal(400), Decimal(250), Decimal(400), Decimal(0), (cross,))

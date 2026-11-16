@@ -5773,7 +5773,14 @@
             "title": "Total Value"
           },
           "return_percent": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Return Percent"
           },
           "positions": {

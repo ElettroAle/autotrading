@@ -12,9 +12,10 @@ class FlowResults:
     """How a flow is doing at a glance: what it gained in all and in a period, its open positions and its failed cycles
     in the period, in the settlement currency of its account (R6.4.2, ADR riepilogo-dei-risultati-nell-api).
 
-    Both gains are measured in percent of the capital allocated now, the reference of the return of the flow (R2.2.2);
-    the gain in the period goes from the equity recorded at the first cycle of the period to the one recorded at the
-    last, the same points the equity curve draws (R2.2.3).
+    The total gain in percent is the return of the flow, compounded across the changes of its capital (R3.4.3); the
+    gain in the period goes from the equity recorded at the first cycle of the period to the one recorded at the last,
+    the same points the equity curve draws (R2.2.3), without the money the changes moved in between, and is measured
+    in percent of the capital allocated now.
     """
 
     state: FlowState
@@ -23,7 +24,7 @@ class FlowResults:
 
     @classmethod
     def of(cls, state: FlowState, period_equity: Sequence[EquitySnapshot], failed_cycles: int) -> FlowResults:
-        period_gain = period_equity[-1].equity - period_equity[0].equity if period_equity else ZERO
+        period_gain = FlowReturn.over(period_equity, state.capital_changes).gain if period_equity else ZERO
         return cls(state, period_gain, failed_cycles)
 
     @property

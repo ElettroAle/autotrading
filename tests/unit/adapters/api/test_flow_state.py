@@ -6,10 +6,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
+from autotrading.adapters.inbound.api.flow_state import FlowStateResponse
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.ledger import FlowTotals
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow, account_id_of
@@ -166,3 +171,34 @@ def test_an_exchange_that_cannot_be_read_answers_unavailable(client_of: Client, 
     response = anna.get(f"/flows/{flow.id.value}/state")
 
     assert (response.status_code, reason_of(response)) == (503, {"detail": "exchange non raggiungibile, riprovare"})
+
+
+def test_the_return_is_compounded_across_the_changes_of_the_capital(client_of: Client, platform: Platform) -> None:
+    # ADR rendimento-composto-tra-le-variazioni-di-capitale: a cash-out at 1100 leaves 10%, then 1050 makes it 15.50%.
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    capital = flow.configuration.assigned_capital
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    platform.ledger.totals[flow.id] = FlowTotals(flow.id, capital * Decimal("0.15"))
+    cash_out = CapitalChange(
+        flow.id,
+        datetime(2026, 11, 16, 10, 0, tzinfo=UTC),
+        capital,
+        capital,
+        platform.user_id_of("anna"),
+        CapitalChangeReason.CASH_OUT,
+        capital / 10,
+        value_before=capital * Decimal("1.1"),
+        cashed_profit=capital / 10,
+    )
+    platform.flows.capital_changes[flow.id] = [cash_out]
+
+    state = anna.get(f"/flows/{flow.id.value}/state").json()
+
+    assert (state["return_percent"], state["summary"]["total_gain_percent"]) == ("15.5", "15.50")
+
+
+def test_a_state_without_capital_answers_no_return() -> None:
+    state = FlowState(FlowId.new(), "USDC", Decimal(0), (), Decimal(5), Decimal(0), Decimal(0))
+
+    assert FlowStateResponse.of(FlowResults(state, Decimal(0), 0)).return_percent is None

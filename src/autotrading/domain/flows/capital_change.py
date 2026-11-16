@@ -2,13 +2,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from autotrading.domain.flows.errors import CapitalAboveAvailableCapitalError, CapitalBelowFlowMinimumError
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.italian_text import money_text
 from autotrading.domain.tenancy.user_id import UserId
+
+# The state of a flow holds its changes (R3.4.3): a change names the state only in its signatures.
+if TYPE_CHECKING:
+    from autotrading.domain.flows.flow_state import FlowState
+    from autotrading.domain.flows.free_capital import FreeCapital
 
 ZERO = Decimal(0)
 
@@ -39,6 +43,11 @@ class CapitalChange:
     amount: Decimal
     value_before: Decimal | None = None
     cashed_profit: Decimal = ZERO
+
+    @property
+    def signed_amount(self) -> Decimal:
+        """The money the change moved into the flow: negative when it took money away."""
+        return self.amount if self.reason is CapitalChangeReason.INCREASE else -self.amount
 
     @classmethod
     def of(cls, state: FlowState, new: Decimal, changed_at: datetime, user_id: UserId) -> CapitalChange:

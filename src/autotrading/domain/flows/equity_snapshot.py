@@ -13,7 +13,8 @@ class EquitySnapshot:
     """The equity of a flow at one cycle, with the parts it is made of (R2.2.3, ADR 0120).
 
     It is the value of the state attributed to the flow (R1.6.1): the capital allocated plus the realized and the
-    unrealized PnL, less the fees; the funding counts as it does in the value of the flow.
+    unrealized PnL, less the fees and the profits cashed out (R3.4.1); the funding counts as it does in the value of
+    the flow.
     """
 
     flow_id: UUID
@@ -23,6 +24,7 @@ class EquitySnapshot:
     unrealized_pnl: Decimal
     fees: Decimal
     funding: Decimal
+    cashed_profit: Decimal = Decimal(0)
 
     @classmethod
     def of_state(cls, planned_at: datetime, state: FlowState) -> EquitySnapshot:
@@ -34,19 +36,27 @@ class EquitySnapshot:
             unrealized_pnl=state.unrealized_pnl,
             fees=state.fees,
             funding=state.funding,
+            cashed_profit=state.cashed_profit,
         )
 
     @property
     def equity(self) -> Decimal:
-        return self.allocated_capital + self.realized_pnl + self.unrealized_pnl - self.fees + self.funding
+        return (
+            self.allocated_capital
+            + self.realized_pnl
+            + self.unrealized_pnl
+            - self.fees
+            + self.funding
+            - self.cashed_profit
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class FlowEquity:
     """The equity curve of a flow: a point for each cycle of the period, and the capital the curve is judged against.
 
-    The initial capital is the capital allocated now, the same reference the return of the flow uses (R1.6.1); a draft
-    has none, and no cycle either (ADR 0124).
+    The initial capital is the capital allocated now, against which the curve is green or red (R1.6.1, ADR 0121); a
+    draft has none, and no cycle either (ADR 0124).
     """
 
     initial_capital: Decimal | None

@@ -60,3 +60,18 @@ def test_a_cash_out_frees_the_value_above_the_new_capital_and_cashes_the_profit_
         value_before=Decimal(618),
         cashed_profit=Decimal(118),
     )
+
+
+@pytest.mark.parametrize(
+    ("reason", "signed"),
+    [
+        (CapitalChangeReason.INCREASE, Decimal(300)),
+        (CapitalChangeReason.REDUCTION, Decimal(-300)),
+        (CapitalChangeReason.CASH_OUT, Decimal(-300)),
+    ],
+)
+def test_the_signed_amount_is_the_money_into_the_flow(reason: CapitalChangeReason, signed: Decimal) -> None:
+    flow_id = state_worth(Decimal(500), Decimal(500)).flow_id
+    change = CapitalChange(flow_id, NOW, Decimal(500), Decimal(500), USER, reason, Decimal(300))
+
+    assert change.signed_amount == signed

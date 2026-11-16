@@ -163,18 +163,19 @@ class SqlAlchemyFlowRepositoryAdapter:
                 )
             )
 
-    def cashed_profits_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, Decimal]:
-        wanted = [flow_id.value for flow_id in flow_ids]
-        if not wanted:
-            return {}
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
         query = (
-            select(flow_capital_changes.c.flow_id, func.sum(flow_capital_changes.c.cashed_profit))
-            .where(flow_capital_changes.c.flow_id.in_(wanted))
-            .group_by(flow_capital_changes.c.flow_id)
+            select(flow_capital_changes)
+            .where(_changes_within(flow_ids, TimeWindow()))
+            .order_by(flow_capital_changes.c.changed_at, flow_capital_changes.c.id)
         )
         with self._transaction() as connection:
-            rows = connection.execute(query).all()
-        return {FlowId(flow_id): Decimal(total) for flow_id, total in rows}
+            rows = connection.execute(query).mappings().all()
+        changes: dict[FlowId, tuple[CapitalChange, ...]] = {}
+        for row in rows:
+            change = _change_of(row)
+            changes[change.flow_id] = (*changes.get(change.flow_id, ()), change)
+        return changes
 
     def add_assignment(self, flow: Flow) -> None:
         """The account of the draft and its new version in one transaction: a draft never has one without the other."""

@@ -1,5 +1,5 @@
 # language: it
-@R3.4.3 @wip
+@R3.4.3
 Funzionalità: R3.4.3 Rendimento corretto dopo incassi e variazioni
   Come utente
   Voglio che il rendimento di un flusso non cambi quando incasso o vario il capitale

@@ -169,7 +169,6 @@ def test_a_cash_out_closes_the_positions_and_frees_the_value_above_the_capital_k
             cashed_profit=Decimal(118),
         ),
     )
-    assert bench.flows.cashed_profits_of((flow.id,)) == {flow.id: Decimal(118)}
 
 
 def test_a_cash_out_keeping_the_capital_adds_no_version(bench: Bench) -> None:

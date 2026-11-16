@@ -1649,7 +1649,7 @@ export interface components {
             /** Total Value */
             total_value: string;
             /** Return Percent */
-            return_percent: string;
+            return_percent: string | null;
             /** Positions */
             positions: components["schemas"]["FlowPositionResponse"][];
             summary: components["schemas"]["FlowResultsResponse"];

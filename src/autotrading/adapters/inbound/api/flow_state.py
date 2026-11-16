@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import date
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_return import FlowReturn
 
 
 class FlowPositionResponse(BaseModel):
@@ -57,7 +59,8 @@ class FlowStateResponse(BaseModel):
     realized_pnl: str
     fees: str
     total_value: str
-    return_percent: str
+    # Compounded across the changes of the capital (R3.4.3); null when no return can be measured.
+    return_percent: str | None
     positions: list[FlowPositionResponse]
     summary: FlowResultsResponse
 
@@ -74,7 +77,7 @@ class FlowStateResponse(BaseModel):
             realized_pnl=amount_text(state.realized_pnl),
             fees=amount_text(state.fees),
             total_value=amount_text(state.total_value),
-            return_percent=amount_text(state.return_percent),
+            return_percent=_optional_amount(FlowReturn.of(state).percent),
             positions=[FlowPositionResponse.of(position) for position in state.positions],
             summary=FlowResultsResponse.of(results),
         )
@@ -95,3 +98,7 @@ def flow_state_router(use_cases_of_request: Callable[..., TenantUseCases]) -> AP
         return FlowStateResponse.of(use_cases.read_flow_results.execute(command))
 
     return router
+
+
+def _optional_amount(value: Decimal | None) -> str | None:
+    return None if value is None else amount_text(value)

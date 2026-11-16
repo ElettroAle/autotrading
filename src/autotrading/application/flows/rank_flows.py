@@ -31,7 +31,7 @@ _OUT_OF_RANKING = frozenset({FlowStatus.DRAFT, FlowStatus.ARCHIVED})
 
 class RankFlowsUseCase:
     """The ranking of the flows of the tenant neither drafts nor archived with a cycle in the period, from the highest
-    return (R2.4.2, ADR 0135).
+    return compounded across the changes of the capital (R2.4.2, ADR 0135, R3.4.3).
     """
 
     def __init__(
@@ -60,7 +60,9 @@ class RankFlowsUseCase:
             snapshots = self._equity.of_flow(flow.id.value, window)
             if not snapshots:
                 continue
-            yield FlowRanking.of(flow.id.value, flow.name.value, snapshots, self._statistics(flow, window))
+            changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())
+            statistics = self._statistics(flow, window)
+            yield FlowRanking.of(flow.id.value, flow.name.value, snapshots, statistics, changes)
 
     def _statistics(self, flow: Flow, window: TimeWindow) -> FlowStatistics:
         positions = self._positions.closed_within(flow.id, window)

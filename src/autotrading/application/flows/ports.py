@@ -115,8 +115,11 @@ class FlowRepositoryPort(Protocol):
         """
         ...
 
-    def cashed_profits_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, Decimal]:
-        """The profits each of those flows cashed out in all; a flow never cashed out has none (R3.4.1)."""
+    def capital_changes_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, tuple[CapitalChange, ...]]:
+        """Every change of the capital of each of those flows, oldest first; a flow never changed has none.
+
+        They carry the profits cashed out (R3.4.1) and chain the return (R3.4.3). A flow of another tenant has none.
+        """
         ...
 
     def add_assignment(self, flow: Flow) -> None:

@@ -6,7 +6,7 @@ from autotrading.application.flows.ports import (
     FlowRepositoryPort,
 )
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.flow_state import ZERO, FlowState
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.ledger import FlowTotals
 
 
@@ -16,8 +16,8 @@ class ReadFlowStateCommand:
 
 
 class ReadFlowStateUseCase:
-    """A flow's positions from what the exchange shows now, its money from its ledger, net of the profits it cashed out
-    (R1.6.1, ADR 0063, R3.4.1)."""
+    """A flow's positions from what the exchange shows now, its money from its ledger, net of the profits it cashed out,
+    and the changes of its capital that chain its return (R1.6.1, ADR 0063, R3.4.1, R3.4.3)."""
 
     def __init__(self, flows: FlowRepositoryPort, activity: AccountActivityPort, ledger: FlowLedgerPort) -> None:
         self._flows = flows
@@ -28,5 +28,5 @@ class ReadFlowStateUseCase:
         flow = self._flows.get(command.flow_id)
         activity = self._activity.execute(flow.assigned_account_id)
         totals = self._ledger.totals_of((flow.id,)).get(flow.id) or FlowTotals(flow.id)
-        cashed_profit = self._flows.cashed_profits_of((flow.id,)).get(flow.id, ZERO)
-        return FlowState.attributed(flow, activity, totals, cashed_profit)
+        changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())
+        return FlowState.attributed(flow, activity, totals, changes)
