@@ -237,9 +237,11 @@ const requireAssetsFree = (
 const freeCapitalOf = (user: FakeUser, account: FakeAccount): number =>
   fakePlatform.freeCapitalOfAccount(user, account);
 
-/** The flow as its new configuration version, kept among its versions as the API keeps them (R2.3.5). */
 // The rule of the domain of the API, with its reason (R3.2.4).
 const maxConsecutiveFailuresOf = (value: unknown): number | null => {
+  if (value === null) {
+    return null;
+  }
   const maximum = Number(value);
   if (!Number.isInteger(maximum) || maximum < 1 || maximum > 100) {
     throw new Refusal(
@@ -251,6 +253,7 @@ const maxConsecutiveFailuresOf = (value: unknown): number | null => {
   return maximum;
 };
 
+/** The flow as its new configuration version, kept among its versions as the API keeps them (R2.3.5). */
 const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => {
   Object.assign(flow, changes, { version: flow.version + 1 });
   flow.versions.push({
@@ -376,11 +379,11 @@ export const modifyFlow = (
       request.system_prompt === undefined
         ? flow.systemPrompt
         : optionalTextOf(request.system_prompt),
-    maxConsecutiveFailures: changed(
-      request.max_consecutive_failures,
-      flow.maxConsecutiveFailures,
-      maxConsecutiveFailuresOf,
-    ),
+    // A null sent on purpose removes the maximum; a missing one keeps it (R3.2.4).
+    maxConsecutiveFailures:
+      request.max_consecutive_failures === undefined
+        ? flow.maxConsecutiveFailures
+        : maxConsecutiveFailuresOf(request.max_consecutive_failures),
   };
   requireAssetsFree(user, flow.accountId ?? '', assets, flow);
   return nextVersionOf(flow, changes);

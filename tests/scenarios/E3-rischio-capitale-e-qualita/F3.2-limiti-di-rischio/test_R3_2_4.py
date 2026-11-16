@@ -145,6 +145,12 @@ def set_maximum(flow_cycles: FlowCycles, refusals: list[AutotradingError], user:
         refusals.append(error)
 
 
+@when(quoted('"{user}" toglie il massimo di cicli falliti consecutivi di "{flow}"'))
+def remove_maximum(flow_cycles: FlowCycles, user: str, flow: str) -> None:
+    command = ModifyFlowCommand(flow_cycles.flow(flow).id, remove_max_consecutive_failures=True)
+    flow_cycles.platform.use_cases_of(user).modify_flow.execute(command)
+
+
 # Then
 
 
@@ -158,6 +164,12 @@ def paused_with_reason(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
 def notified(flow_cycles: FlowCycles, user: str, text: str) -> None:
     received = flow_cycles.platform.messenger.received_by(chat_named(user))
     assert text in received, received
+
+
+@then(quoted('il flusso "{flow}" non ha il massimo di cicli falliti consecutivi'))
+def without_maximum(flow_cycles: FlowCycles, flow: str) -> None:
+    configuration = flow_cycles.flow(flow).configuration
+    assert (configuration.version, configuration.max_consecutive_failures) == (2, None)
 
 
 @then(quoted('il flusso "{flow}" resta attivo'))

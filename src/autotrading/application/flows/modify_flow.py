@@ -47,6 +47,8 @@ class ModifyFlowCommand:
     # An exposure limit taken away, which None cannot say either (R1.1.3); at least one limit stays (R1.1.1).
     remove_max_margin_exposure: bool = False
     remove_max_value_exposure: bool = False
+    # The maximum of consecutive failed cycles taken away, back to retrying at every cycle (R3.2.4).
+    remove_max_consecutive_failures: bool = False
 
 
 class ModifyFlowUseCase:
@@ -91,11 +93,7 @@ class ModifyFlowUseCase:
                 current.bring_to_minimum if command.bring_to_minimum is None else command.bring_to_minimum
             ),
             system_prompt=_system_prompt(current.system_prompt, command),
-            max_consecutive_failures=(
-                current.max_consecutive_failures
-                if command.max_consecutive_failures is None
-                else command.max_consecutive_failures
-            ),
+            max_consecutive_failures=_max_consecutive_failures(current.max_consecutive_failures, command),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -136,6 +134,12 @@ def _system_prompt(current: str | None, command: ModifyFlowCommand) -> str | Non
     if command.default_system_prompt:
         return None
     return current if command.system_prompt is None else command.system_prompt
+
+
+def _max_consecutive_failures(current: int | None, command: ModifyFlowCommand) -> int | None:
+    if command.remove_max_consecutive_failures:
+        return None
+    return current if command.max_consecutive_failures is None else command.max_consecutive_failures
 
 
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:

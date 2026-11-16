@@ -221,13 +221,17 @@ describe('changesOf', () => {
     expect(changesOf(CUSTOM, formValuesOf(CUSTOM))).toEqual({ settings: {} });
   });
 
-  it('sends a new maximum of consecutive failed cycles, never an emptied one', () => {
+  // ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum of consecutive failed cycles.
+  it('sends a new maximum of consecutive failed cycles, and null for an emptied one so the API removes it', () => {
     const limited = { ...FLOW, max_consecutive_failures: 3 };
 
     expect(changesOf(FLOW, { ...formValuesOf(FLOW), max_consecutive_failures: '5' })).toEqual({
       settings: { max_consecutive_failures: 5 },
     });
     expect(changesOf(limited, { ...formValuesOf(limited), max_consecutive_failures: '' })).toEqual({
+      settings: { max_consecutive_failures: null },
+    });
+    expect(changesOf(FLOW, { ...formValuesOf(FLOW), max_consecutive_failures: '' })).toEqual({
       settings: {},
     });
   });

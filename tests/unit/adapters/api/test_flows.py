@@ -144,6 +144,19 @@ def test_an_exposure_sent_as_null_is_removed_and_one_left_out_stays(client_of: C
     )
 
 
+def test_a_maximum_of_consecutive_failures_sent_as_null_is_removed_and_one_left_out_stays(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", max_consecutive_failures=3)).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "audace"}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": None}).json()
+
+    assert untouched["max_consecutive_failures"] == 3
+    assert (removed["version"], removed["max_consecutive_failures"]) == (3, None)
+
+
 def test_both_exposures_sent_as_null_are_refused_with_the_reason(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     request = a_request(platform, "anna", max_value_exposure_percent="40")
@@ -176,7 +189,7 @@ def test_the_maximum_of_consecutive_failed_cycles_is_set_kept_and_compared(
     created = anna.post("/flows", json=a_request(platform, "anna", max_consecutive_failures=3)).json()
     flow_id = created["id"]
 
-    untouched = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": None, "cycle_minutes": 30}).json()
+    untouched = anna.patch(f"/flows/{flow_id}", json={"cycle_minutes": 30}).json()
     changed = anna.patch(f"/flows/{flow_id}", json={"max_consecutive_failures": 5}).json()
 
     assert created["max_consecutive_failures"] == 3

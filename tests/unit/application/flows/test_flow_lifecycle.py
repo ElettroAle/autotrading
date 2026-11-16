@@ -203,6 +203,17 @@ def test_a_change_without_maximum_of_consecutive_failures_keeps_the_one_in_force
 
     assert modified.configuration.max_consecutive_failures == 3
 
+
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum of consecutive failures.
+def test_a_maximum_of_consecutive_failures_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_consecutive_failures=3))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_consecutive_failures=True))
+
+    assert (modified.configuration.version, modified.configuration.max_consecutive_failures) == (3, None)
+
+
 # ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta:
 # the flag removes the limit, the domain refuses a version without any.
 def test_an_exposure_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:

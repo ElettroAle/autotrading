@@ -180,11 +180,13 @@ const sameValue = (one: unknown, other: unknown): boolean =>
 
 const MODEL: keyof SettingsRequest = 'model';
 const MODEL_PARAMETERS: keyof SettingsRequest = 'model_parameters';
-// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3).
+// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3), the
+// maximum of consecutive failed cycles removed (R3.2.4).
 const NULL_IS_A_VALUE = new Set<keyof SettingsRequest>([
   'system_prompt',
   'max_margin_exposure_percent',
   'max_value_exposure_percent',
+  'max_consecutive_failures',
 ]);
 
 /**

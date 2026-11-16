@@ -11,7 +11,7 @@ Funzionalità: R3.2.4 Pausa dopo cicli falliti consecutivi
   "<N> cicli falliti consecutivi: <ultimo errore>" e l'utente riceve la notifica di pausa automatica (R1.8.2).
   Un ciclo riuscito azzera il conteggio. La ripresa del flusso (R1.1.4) azzera il conteggio.
   Le posizioni aperte restano aperte, con i loro ordini di protezione (R3.1.2).
-  Modificare il valore crea una versione della configurazione (R1.1.3).
+  Modificare il valore crea una versione della configurazione (R1.1.3); il valore si può anche togliere.
   Fuori ambito: gli errori permanenti, che mettono già in pausa il flusso al primo ciclo (R1.2.4).
 
   Contesto:
@@ -42,6 +42,12 @@ Funzionalità: R3.2.4 Pausa dopo cicli falliti consecutivi
     Dato che "alfa" ha una posizione aperta su "BTC" e gli ultimi 2 cicli di "alfa" sono falliti
     Quando il ciclo successivo di "alfa" fallisce
     Allora la posizione di "alfa" su "BTC" resta aperta
+
+  Scenario: Il massimo si toglie dalla modifica
+    Quando "anna" toglie il massimo di cicli falliti consecutivi di "alfa"
+    E 5 cicli di "alfa" falliscono di fila
+    Allora il flusso "alfa" non ha il massimo di cicli falliti consecutivi
+    E il flusso "alfa" resta attivo
 
   Schema dello scenario: Massimo fuori dall'intervallo
     Quando "anna" imposta il massimo di cicli falliti consecutivi di "alfa" a <valore>

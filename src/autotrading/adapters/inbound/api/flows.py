@@ -128,6 +128,7 @@ class FlowModificationRequest(BaseModel):
             default_system_prompt=self._sent_as_null("system_prompt"),
             remove_max_margin_exposure=self._sent_as_null("max_margin_exposure_percent"),
             remove_max_value_exposure=self._sent_as_null("max_value_exposure_percent"),
+            remove_max_consecutive_failures=self._sent_as_null("max_consecutive_failures"),
         )
 
     def _sent_as_null(self, field: str) -> bool:
