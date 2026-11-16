@@ -24,6 +24,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_filter import CycleDecision, CycleFilter
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -95,13 +96,9 @@ class InMemoryCycleRepositoryAdapter:
         with self._guard:
             self.records.append(record)
 
-    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
         of_flow = sorted(
-            (
-                record
-                for record in self.records
-                if record.flow_id == flow_id and (outcome is None or record.outcome is outcome)
-            ),
+            (record for record in self.records if record.flow_id == flow_id),
             key=lambda record: record.planned_at,
             reverse=True,
         )
@@ -115,6 +112,13 @@ class InMemoryCycleRepositoryAdapter:
             and record.outcome is CycleOutcome.FAILED
             and window.contains(record.planned_at)
         )
+
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        matched = [record for record in self.newest(flow_id, 0, len(self.records)) if _matches(record, criteria)]
+        return matched[offset : offset + limit]
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        return len(self.matching(flow_id, criteria, 0, len(self.records)))
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         return next(
@@ -140,11 +144,17 @@ class InMemoryCycleHistoryAdapter:
         self._flows = flows
         self._tenant_id = tenant_id
 
-    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
-        return self._cycles.newest(flow_id, offset, limit, outcome) if self._owns(flow_id) else []
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+        return self._cycles.newest(flow_id, offset, limit) if self._owns(flow_id) else []
 
     def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
         return self._cycles.failed_within(flow_id, window) if self._owns(flow_id) else 0
+
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        return self._cycles.matching(flow_id, criteria, offset, limit) if self._owns(flow_id) else []
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        return self._cycles.count(flow_id, criteria) if self._owns(flow_id) else 0
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         return self._cycles.at(flow_id, planned_at) if self._owns(flow_id) else None
@@ -454,3 +464,25 @@ class InMemoryCycleCheckpointsAdapter:
     @contextmanager
     def opened(self) -> Iterator[BaseCheckpointSaver[str]]:
         yield self.saver
+
+
+# The actions of the agent as the journal of the cycle records them in the document of the decision (R1.7.1).
+RECORDED_ACTIONS = {CycleDecision.OPENING: "apri", CycleDecision.CLOSING: "chiudi", CycleDecision.HOLDING: "mantieni"}
+
+
+def _matches(record: CycleRecord, criteria: CycleFilter) -> bool:
+    return (
+        (criteria.outcome is None or record.outcome is criteria.outcome)
+        and (criteria.decision is None or _decided(record, criteria.decision))
+        and criteria.window.contains(record.planned_at)
+    )
+
+
+def _decided(record: CycleRecord, decision: CycleDecision) -> bool:
+    document = record.document(CycleStep.AGENT_DECISION) or {}
+    decisions = document.get("decisioni", [])
+    items = decisions if isinstance(decisions, list) else []
+    actions = {item.get("action") for item in items if isinstance(item, dict)}
+    if decision is CycleDecision.NONE:
+        return not actions
+    return RECORDED_ACTIONS[decision] in actions

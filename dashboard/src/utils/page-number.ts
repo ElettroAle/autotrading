@@ -8,3 +8,14 @@ export const pageOf = (value: string | null): number => {
   const page = Number(value);
   return Number.isInteger(page) && page >= FIRST_PAGE ? page : FIRST_PAGE;
 };
+
+/** The query string of another page of the same list: the filters stay, the first page leaves no trace. */
+export const searchWithPage = (current: URLSearchParams, page: number): string => {
+  const next = new URLSearchParams(current);
+  next.delete('page');
+  if (page !== FIRST_PAGE) {
+    next.set('page', String(page));
+  }
+  const search = next.toString();
+  return search === '' ? '' : `?${search}`;
+};

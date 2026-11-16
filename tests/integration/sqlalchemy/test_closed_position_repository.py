@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyF
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
+from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -25,6 +26,7 @@ from tests.support.flows import a_flow
 pytestmark = pytest.mark.integration
 
 OPENED = datetime(2026, 11, 12, 10, tzinfo=UTC)
+EVERY = ClosedPositionFilter()
 
 
 def new_flow(database: Engine) -> Flow:
@@ -61,7 +63,7 @@ def test_the_closed_positions_read_back_from_the_most_recent_close(database: Eng
     repository.add(earlier)
     repository.add(later)
 
-    assert repository.newest(flow.id, 0, 10) == [later, earlier]
+    assert repository.matching(flow.id, EVERY, 0, 10) == [later, earlier]
 
 
 def test_the_closed_positions_read_back_one_page_at_a_time(database: Engine) -> None:
@@ -71,7 +73,7 @@ def test_the_closed_positions_read_back_one_page_at_a_time(database: Engine) -> 
     for position in positions:
         repository.add(position)
 
-    assert repository.newest(flow.id, 1, 2) == [positions[2], positions[1]]
+    assert repository.matching(flow.id, EVERY, 1, 2) == [positions[2], positions[1]]
 
 
 def test_a_closed_position_keeps_the_pnl_the_exchange_reported(database: Engine) -> None:
@@ -81,7 +83,7 @@ def test_a_closed_position_keeps_the_pnl_the_exchange_reported(database: Engine)
 
     repository.add(reported)
 
-    [read] = repository.newest(flow.id, 0, 10)
+    [read] = repository.matching(flow.id, EVERY, 0, 10)
     assert (read, read.pnl) == (reported, Decimal("-4.2"))
 
 
@@ -89,7 +91,7 @@ def test_the_closed_positions_of_another_tenant_stay_invisible(database: Engine)
     flow, other = new_flow(database), new_flow(database)
     SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id).add(a_position(flow, timedelta(hours=1)))
 
-    assert SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id).newest(flow.id, 0, 10) == []
+    assert SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id).matching(flow.id, EVERY, 0, 10) == []
 
 
 def test_a_session_without_tenant_sees_no_closed_position(database: Engine) -> None:
@@ -120,3 +122,40 @@ def test_the_closed_positions_within_a_window_of_another_tenant_stay_invisible(d
     repository = SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id)
 
     assert repository.closed_within(flow.id, TimeWindow()) == []
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: PostgreSQL filters and counts, so the pages stay right.
+def test_the_closed_positions_are_filtered_by_asset_side_result_after_the_fees_and_days(database: Engine) -> None:
+    flow = new_flow(database)
+    repository = SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id)
+    # Long from 100000 to 102000 with 50.5 of margin at 2x: 2.02 before the fees, 1.94 after them.
+    won_long = a_position(flow, timedelta(hours=1))
+    lost_short = replace(a_position(flow, timedelta(hours=2)), side=TradeSide.SHORT)
+    even_after_fees = replace(a_position(flow, timedelta(hours=3)), realized_pnl=Decimal("0.08"))
+    won_short_reported = replace(lost_short, closing=PositionEnd(Decimal(102000), OPENED + timedelta(hours=4)))
+    won_short_reported = replace(won_short_reported, realized_pnl=Decimal(3))
+    won_eth = replace(won_long, asset="ETH")
+    won_next_day = replace(won_long, closing=PositionEnd(Decimal(102000), OPENED + timedelta(days=1)))
+    for position in (won_long, lost_short, even_after_fees, won_short_reported, won_eth, won_next_day):
+        repository.add(position)
+
+    def matched(criteria: ClosedPositionFilter) -> list[ClosedPosition]:
+        return repository.matching(flow.id, criteria, 0, 10)
+
+    assert matched(ClosedPositionFilter.named(result="persa")) == [lost_short]
+    assert matched(ClosedPositionFilter.named(side="short", result="vinta")) == [won_short_reported]
+    assert matched(ClosedPositionFilter.named(asset="ETH")) == [won_eth]
+    day = OPENED.date()
+    assert matched(ClosedPositionFilter.named(asset="BTC", result="vinta", first_day=day, last_day=day)) == [
+        won_short_reported,
+        won_long,
+    ]
+    assert repository.count(flow.id, ClosedPositionFilter.named(result="vinta")) == 4
+    assert repository.count(flow.id, EVERY) == 6
+
+
+def test_the_count_of_the_closed_positions_of_another_tenant_is_zero(database: Engine) -> None:
+    flow, other = new_flow(database), new_flow(database)
+    SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id).add(a_position(flow, timedelta(hours=1)))
+
+    assert SqlAlchemyClosedPositionRepositoryAdapter(database, other.tenant_id).count(flow.id, EVERY) == 0

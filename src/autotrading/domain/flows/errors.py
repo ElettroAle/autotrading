@@ -248,12 +248,36 @@ class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
         super().__init__("il giorno iniziale è successivo al giorno finale")
 
 
-class UnknownCycleOutcomeError(DomainError):
-    """An outcome no cycle is recorded with: the cycles cannot be filtered on it (R6.4.2)."""
+class InvalidCycleFilterError(DomainError):
+    """A filter of the cycles of a flow with a value the cycles never have (R6.4.4)."""
 
+
+class UnknownCycleOutcomeError(InvalidCycleFilterError):
     def __init__(self, outcomes: tuple[str, ...]) -> None:
         super().__init__("esito non valido: scegliere tra " + ", ".join(outcomes))
         self.outcomes = outcomes
+
+
+class UnknownCycleDecisionError(InvalidCycleFilterError):
+    def __init__(self, decisions: tuple[str, ...]) -> None:
+        super().__init__("decisione non valida: scegliere tra " + ", ".join(decisions))
+        self.decisions = decisions
+
+
+class InvalidClosedPositionFilterError(DomainError):
+    """A filter of the closed positions of a flow with a value no position has (R6.4.4)."""
+
+
+class UnknownPositionSideError(InvalidClosedPositionFilterError):
+    def __init__(self, sides: tuple[str, ...]) -> None:
+        super().__init__("direzione non valida: scegliere tra " + ", ".join(sides))
+        self.sides = sides
+
+
+class UnknownPositionResultError(InvalidClosedPositionFilterError):
+    def __init__(self, results: tuple[str, ...]) -> None:
+        super().__init__("risultato non valido: scegliere tra " + ", ".join(results))
+        self.results = results
 
 
 class VersionWithoutFlowError(DomainError):

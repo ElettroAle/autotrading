@@ -15,12 +15,14 @@ from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
+from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrders
 from autotrading.domain.flows.cycle_question import CycleQuestion
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
@@ -521,8 +523,14 @@ class ClosedPositionRepositoryPort(Protocol):
         """Raises CrossTenantAccessError for a position of another tenant."""
         ...
 
-    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
-        """The closed positions of the flow from the most recent close."""
+    def matching(
+        self, flow_id: FlowId, criteria: ClosedPositionFilter, offset: int, limit: int
+    ) -> list[ClosedPosition]:
+        """The closed positions of the flow that match the filter, from the most recent close (R6.4.4)."""
+        ...
+
+    def count(self, flow_id: FlowId, criteria: ClosedPositionFilter) -> int:
+        """How many closed positions of the flow match the filter (R6.4.4)."""
         ...
 
     def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
@@ -959,8 +967,16 @@ class CycleJournalPort(Protocol):
 class CycleHistoryPort(Protocol):
     """Bound to the tenant of the request: it never shows the cycles of a flow of another tenant."""
 
-    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
-        """The cycles of the flow from the most recent planned instant; with an outcome, only the cycles that had it."""
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+        """The cycles of the flow from the most recent planned instant."""
+        ...
+
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        """The cycles of the flow that match the filter, from the most recent planned instant (R6.4.4)."""
+        ...
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        """How many cycles of the flow match the filter (R6.4.4)."""
         ...
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None: ...

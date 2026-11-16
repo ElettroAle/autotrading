@@ -138,4 +138,57 @@ describe('ClosedPositions', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('flusso non trovato');
   });
+
+  describe('with filters', () => {
+    const SHORT_WON = { side: 'short', pnl: '3', fees: '0.1' };
+    const LONG_LOST = { side: 'long', pnl: '-2', fees: '0.1' };
+
+    it('shows only the lost positions, with how many they are', async () => {
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: LAST, ...SHORT_WON }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - HOUR), ...SHORT_WON }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - 2 * HOUR), ...LONG_LOST }),
+      ]);
+      const user = userEvent.setup();
+      await renderApp({ account: 'anna', url: URL });
+      expect(await screen.findByText('3 posizioni')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Perse' }));
+
+      expect(await screen.findByText('1 posizione')).toBeInTheDocument();
+      const [row] = await rowsOf();
+      expect(row).toHaveTextContent('long');
+    });
+
+    it('offers the side, the result and the assets of the flow', async () => {
+      fakePlatform.changeFlow('alfa', { assets: ['BTC', 'ETH'] });
+      fakePlatform.recordClosedPositions('alfa', closedBack(1));
+      await renderApp({ account: 'anna', url: `${URL}?side=short` });
+
+      expect(await screen.findByRole('group', { name: 'Direzione' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Short' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('group', { name: 'Risultato' })).toBeInTheDocument();
+      const assets = screen.getByRole('group', { name: 'Asset' });
+      expect(
+        await within(assets)
+          .findAllByRole('button')
+          .then((buttons) => buttons.map((b) => b.textContent)),
+      ).toEqual(['Tutti', 'BTC', 'ETH']);
+    });
+
+    it('shows the positions of one asset', async () => {
+      fakePlatform.changeFlow('alfa', { assets: ['BTC', 'ETH'] });
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: LAST, asset: 'ETH' }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - HOUR) }),
+      ]);
+      const user = userEvent.setup();
+      await renderApp({ account: 'anna', url: URL });
+
+      await user.click(await screen.findByRole('button', { name: 'ETH' }));
+
+      expect(await screen.findByText('1 posizione')).toBeInTheDocument();
+      expect(await rowsOf()).toHaveLength(1);
+    });
+  });
 });

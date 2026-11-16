@@ -6,13 +6,14 @@ from decimal import Decimal
 from typing import TypedDict, cast
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, func, select, true
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, func, select
+from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import cycles
 from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.application.flows.errors import UnrecordableDocumentError
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_filter import CycleDecision, CycleFilter
 from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
@@ -27,6 +28,9 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]
 RECORDED = cycles.c.outcome.is_not(None)
+# The decisions of the agent as the journal of the cycle records them, each with its action (R1.4.6, R1.7.1).
+DECISIONS = "decisioni"
+RECORDED_ACTIONS = {CycleDecision.OPENING: "apri", CycleDecision.CLOSING: "chiudi", CycleDecision.HOLDING: "mantieni"}
 
 
 class _AbsentSourceColumn(TypedDict):
@@ -78,16 +82,34 @@ class SqlAlchemyCycleRepositoryAdapter:
         with self._transaction() as connection:
             connection.execute(statement)
 
-    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
         query = (
             select(cycles)
-            .where(cycles.c.flow_id == flow_id, RECORDED, _having(outcome))
+            .where(cycles.c.flow_id == flow_id, RECORDED)
             .order_by(cycles.c.planned_at.desc())
             .offset(offset)
             .limit(limit)
         )
         with self._transaction() as connection:
             return [record_of(row) for row in connection.execute(query).mappings()]
+
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        query = (
+            select(cycles)
+            .where(cycles.c.flow_id == flow_id, RECORDED, matching(criteria))
+            .order_by(cycles.c.planned_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        with self._transaction() as connection:
+            return [record_of(row) for row in connection.execute(query).mappings()]
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        query = (
+            select(func.count()).select_from(cycles).where(cycles.c.flow_id == flow_id, RECORDED, matching(criteria))
+        )
+        with self._transaction() as connection:
+            return connection.execute(query).scalar_one()
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         query = select(cycles).where(cycles.c.flow_id == flow_id, cycles.c.planned_at == planned_at, RECORDED)
@@ -97,7 +119,9 @@ class SqlAlchemyCycleRepositoryAdapter:
 
     def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
         query = select(func.count()).where(
-            cycles.c.flow_id == flow_id, _having(CycleOutcome.FAILED), within(cycles.c.planned_at, window)
+            cycles.c.flow_id == flow_id,
+            cycles.c.outcome == CycleOutcome.FAILED.name.lower(),
+            within(cycles.c.planned_at, window),
         )
         with self._transaction() as connection:
             return connection.execute(query).scalar_one()
@@ -123,6 +147,30 @@ class SqlAlchemyCycleRepositoryAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             yield connection
+
+
+def matching(criteria: CycleFilter) -> ColumnElement[bool]:
+    """The recorded cycles that match the filter, by the planned instant."""
+    condition = within(cycles.c.planned_at, criteria.window)
+    if criteria.outcome is not None:
+        condition = condition & (cycles.c.outcome == criteria.outcome.name.lower())
+    if criteria.decision is not None:
+        condition = condition & _decided(criteria.decision)
+    return condition
+
+
+def _decided(decision: CycleDecision) -> ColumnElement[bool]:
+    # A document contains another when one of its steps holds every key of the other: any decision is an object.
+    documents = cycles.c.documents.cast(JSONB)
+    if decision is CycleDecision.NONE:
+        decided: ColumnElement[bool] = documents.contains(_decision_documents({}))
+        return ~decided
+    taken: ColumnElement[bool] = documents.contains(_decision_documents({"action": RECORDED_ACTIONS[decision]}))
+    return taken
+
+
+def _decision_documents(decision: Mapping[str, str]) -> list[object]:
+    return [{"step": CycleStep.AGENT_DECISION.name.lower(), "content": {DECISIONS: [decision]}}]
 
 
 def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
@@ -176,10 +224,6 @@ def _plain_value(value: object) -> str:
         return value.isoformat()
     # A type the journal should never put in a document: failing here keeps it out of the record.
     raise UnrecordableDocumentError(type(value).__name__)
-
-
-def _having(outcome: CycleOutcome | None) -> ColumnElement[bool]:
-    return true() if outcome is None else cycles.c.outcome == outcome.name.lower()
 
 
 def _failure_row(failure: CycleFailure | None) -> dict[str, str] | None:

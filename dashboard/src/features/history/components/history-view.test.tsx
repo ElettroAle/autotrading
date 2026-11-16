@@ -67,6 +67,17 @@ describe('HistoryView', () => {
     );
   });
 
+  it('opens a cycle from any point of its row', async () => {
+    records().cycles.push(aHistoryCycle(ownerAt(3), dayOf(3), ['BTC']));
+    const user = userEvent.setup();
+    const { router } = await renderApp({ account: 'anna', url: '/history' });
+
+    const [row] = await rowsOf('Cicli');
+    await user.click(within(row as HTMLElement).getByText('concluso'));
+
+    expect(router.state.location.pathname).toBe('/flows/flow-alfa/cycles/2026-11-03T11%3A00%3A00Z');
+  });
+
   it('makes every filter as wide as a phone and as wide as its choices on a wide screen', async () => {
     await renderApp({ account: 'anna', url: '/history' });
 
