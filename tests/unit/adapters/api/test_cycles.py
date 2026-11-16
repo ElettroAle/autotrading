@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -300,3 +301,47 @@ def test_a_flow_without_initial_capital_answers_without_a_return() -> None:
     response = FlowOverviewResponse.of(overview)
 
     assert (response.initial_capital, response.current_capital, response.return_percent) == ("0", "12.5", None)
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: every paginated answer carries the total of the results.
+def test_the_cycles_answer_with_how_many_match_in_all(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    for minute in range(51):
+        platform.cycles.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(minutes=minute)))
+
+    assert anna.get(f"/flows/{flow_id}/cycles", params={"page": 2}).json()["total"] == 51
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: the filters are optional query parameters of the reading.
+def test_the_cycles_are_filtered_by_outcome_decision_and_days(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    opening = a_completed_cycle(flow_id)
+    platform.cycles.record(replace(opening, documents=(_decided("apri"),)))
+    closing = replace(opening, planned_at=PLANNED + timedelta(minutes=15), documents=(_decided("chiudi"),))
+    platform.cycles.record(closing)
+    platform.cycles.record(CycleRecord(flow_id, PLANNED + timedelta(minutes=30), CycleOutcome.FAILED))
+    platform.cycles.record(replace(opening, planned_at=PLANNED + timedelta(days=1), documents=(_decided("apri"),)))
+
+    body = anna.get(
+        f"/flows/{flow_id}/cycles",
+        params={"outcome": "concluso", "decision": "apertura", "from": "2026-11-12", "to": "2026-11-12"},
+    ).json()
+
+    assert [cycle["planned_at"] for cycle in body["cycles"]] == ["2026-11-12T10:07:00Z"]
+    assert body["total"] == 1
+    failed = anna.get(f"/flows/{flow_id}/cycles", params={"outcome": "fallito"}).json()
+    assert [cycle["outcome"] for cycle in failed["cycles"]] == ["fallito"]
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: an unknown value is a 400 error of the project.
+def test_an_unknown_filter_of_the_cycles_is_a_bad_request(client_of: Client, platform: Platform) -> None:
+    response = client_of("anna").get(f"/flows/{flow_of(platform, 'anna')}/cycles", params={"outcome": "vinto"})
+
+    assert response.status_code == 400
+    assert reason_of(response) == {"detail": "esito non valido: scegliere tra concluso, fallito"}
+
+
+def _decided(action: str) -> StepDocument:
+    return StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "action": action}]})

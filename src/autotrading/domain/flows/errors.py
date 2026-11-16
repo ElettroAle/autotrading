@@ -248,6 +248,34 @@ class RangeEndingBeforeStartError(InvalidStatisticsPeriodError):
         super().__init__("il giorno iniziale è successivo al giorno finale")
 
 
+class InvalidCycleFilterError(DomainError):
+    """A filter of the cycles of a flow with a value the cycles never have (R6.4.4)."""
+
+
+class UnknownCycleOutcomeError(InvalidCycleFilterError):
+    def __init__(self, outcomes: tuple[str, ...]) -> None:
+        super().__init__("esito non valido: scegliere tra " + ", ".join(outcomes))
+
+
+class UnknownCycleDecisionError(InvalidCycleFilterError):
+    def __init__(self, decisions: tuple[str, ...]) -> None:
+        super().__init__("decisione non valida: scegliere tra " + ", ".join(decisions))
+
+
+class InvalidClosedPositionFilterError(DomainError):
+    """A filter of the closed positions of a flow with a value no position has (R6.4.4)."""
+
+
+class UnknownPositionSideError(InvalidClosedPositionFilterError):
+    def __init__(self, sides: tuple[str, ...]) -> None:
+        super().__init__("direzione non valida: scegliere tra " + ", ".join(sides))
+
+
+class UnknownPositionResultError(InvalidClosedPositionFilterError):
+    def __init__(self, results: tuple[str, ...]) -> None:
+        super().__init__("risultato non valido: scegliere tra " + ", ".join(results))
+
+
 class VersionWithoutFlowError(DomainError):
     """A configuration version is numbered within its flow: without the flow it names nothing (R2.5.1)."""
 

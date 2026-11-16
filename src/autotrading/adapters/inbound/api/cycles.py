@@ -14,6 +14,7 @@ from autotrading.application.flows.list_flow_overviews import FlowOverview
 from autotrading.application.flows.read_cycle import ReadCycleCommand
 from autotrading.application.flows.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_page import CyclePage
 from autotrading.domain.flows.cycle_record import CycleFailure, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -67,14 +68,20 @@ class CycleSummaryResponse(BaseModel):
 
 
 class CyclePageResponse(BaseModel):
+    """A page of the cycles that match the filters, with how many match in all (R1.7.3, R6.4.4)."""
+
     page: int
     has_next: bool
+    total: int
     cycles: list[CycleSummaryResponse]
 
     @classmethod
     def of(cls, page: CyclePage) -> CyclePageResponse:
         return cls(
-            page=page.number, has_next=page.has_next, cycles=[CycleSummaryResponse.of(cycle) for cycle in page.cycles]
+            page=page.number,
+            has_next=page.has_next,
+            total=page.total,
+            cycles=[CycleSummaryResponse.of(cycle) for cycle in page.cycles],
         )
 
 
@@ -199,6 +206,16 @@ class FlowOverviewResponse(BaseModel):
         )
 
 
+def cycle_filter_of(
+    outcome: Annotated[str | None, Query(description="concluso o fallito")] = None,
+    decision: Annotated[str | None, Query(description="apertura, chiusura, mantenimento o nessuna")] = None,
+    first_day: Annotated[date | None, Query(alias="from", description="primo giorno dell'intervallo")] = None,
+    last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno dell'intervallo")] = None,
+) -> CycleFilter:
+    """The filters of the cycles of a flow, in any combination (R6.4.4)."""
+    return CycleFilter.named(outcome, decision, first_day, last_day)
+
+
 def cycles_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
     router = APIRouter(tags=["cicli"])
 
@@ -212,9 +229,10 @@ def cycles_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRou
     def list_cycles(
         flow_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        criteria: Annotated[CycleFilter, Depends(cycle_filter_of)],
         page: Annotated[int, Query()] = 1,
     ) -> CyclePageResponse:
-        return CyclePageResponse.of(use_cases.list_cycles.execute(ListCyclesCommand(flow_id, page)))
+        return CyclePageResponse.of(use_cases.list_cycles.execute(ListCyclesCommand(flow_id, page, criteria)))
 
     @router.get("/flows/{flow_id}/cycles/{planned_at}")
     def read_cycle(

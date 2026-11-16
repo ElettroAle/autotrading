@@ -76,3 +76,20 @@ def test_a_window_holds_the_instants_from_its_start_included_to_its_end_excluded
 
 def test_a_window_without_bounds_holds_every_instant() -> None:
     assert TimeWindow().contains(datetime(2000, 1, 1, tzinfo=UTC))
+
+
+def test_the_window_of_days_covers_them_whole_in_utc() -> None:
+    assert TimeWindow.of_days(date(2026, 11, 1), date(2026, 11, 3)) == TimeWindow(
+        since=datetime(2026, 11, 1, tzinfo=UTC), until=datetime(2026, 11, 4, tzinfo=UTC)
+    )
+
+
+def test_the_window_of_days_without_a_day_has_no_bound_on_that_side() -> None:
+    assert TimeWindow.of_days(None, date(2026, 11, 3)) == TimeWindow(until=datetime(2026, 11, 4, tzinfo=UTC))
+    assert TimeWindow.of_days(date(2026, 11, 1), None) == TimeWindow(since=datetime(2026, 11, 1, tzinfo=UTC))
+    assert TimeWindow.of_days(None, None) == TimeWindow()
+
+
+def test_the_window_of_days_ending_before_it_starts_is_refused() -> None:
+    with pytest.raises(InvalidStatisticsPeriodError):
+        TimeWindow.of_days(date(2026, 11, 3), date(2026, 11, 2))

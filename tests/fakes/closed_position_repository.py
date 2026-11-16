@@ -2,6 +2,7 @@
 
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.closed_position import ClosedPosition
+from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -24,13 +25,18 @@ class InMemoryClosedPositionRepositoryAdapter:
             raise CrossTenantAccessError
         self._store.positions.append(position)
 
-    def newest(self, flow_id: FlowId, offset: int, limit: int) -> list[ClosedPosition]:
-        of_flow = sorted(
-            self._of_flow(flow_id),
+    def matching(
+        self, flow_id: FlowId, criteria: ClosedPositionFilter, offset: int, limit: int
+    ) -> list[ClosedPosition]:
+        matched = sorted(
+            (position for position in self._of_flow(flow_id) if criteria.matches(position)),
             key=lambda position: position.closing.at,
             reverse=True,
         )
-        return of_flow[offset : offset + limit]
+        return matched[offset : offset + limit]
+
+    def count(self, flow_id: FlowId, criteria: ClosedPositionFilter) -> int:
+        return sum(1 for position in self._of_flow(flow_id) if criteria.matches(position))
 
     def closed_within(self, flow_id: FlowId, window: TimeWindow) -> list[ClosedPosition]:
         return [position for position in self._of_flow(flow_id) if window.contains(position.closing.at)]

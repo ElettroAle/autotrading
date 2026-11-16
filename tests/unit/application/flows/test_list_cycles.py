@@ -5,7 +5,9 @@ import pytest
 
 from autotrading.application.flows.errors import CycleFlowNotFoundError
 from autotrading.application.flows.list_cycles import ListCyclesCommand, ListCyclesUseCase
-from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_filter import CycleFilter
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.errors import InvalidPageNumberError
 from tests.fakes.cycles import FakeFlowDirectoryAdapter, InMemoryCycleRepositoryAdapter
 
@@ -93,3 +95,69 @@ def test_a_flow_of_another_tenant_does_not_exist(
 
     assert raised.value.status_code == 404
     assert str(raised.value) == "flusso non trovato"
+
+
+def a_cycle_deciding(minute: int, *actions: str, outcome: CycleOutcome = CycleOutcome.COMPLETED) -> CycleRecord:
+    decisions = [{"tipo": "Decision", "asset": "BTC", "action": action} for action in actions]
+    return CycleRecord(
+        FLOW,
+        FIRST + timedelta(minutes=minute),
+        outcome,
+        documents=(StepDocument(CycleStep.AGENT_DECISION, {"decisioni": decisions}),),
+    )
+
+
+def test_the_page_says_how_many_cycles_match_in_all(
+    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
+) -> None:
+    record_cycles(history, 120)
+
+    page = ListCyclesUseCase(directory, history).execute(ListCyclesCommand(FLOW, 2))
+
+    assert (len(page.cycles), page.total) == (50, 120)
+
+
+def test_the_cycles_filtered_by_outcome_are_only_those_with_it(
+    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
+) -> None:
+    record_cycles(history, 3)
+    history.record(CycleRecord(FLOW, FIRST + timedelta(minutes=10), CycleOutcome.FAILED))
+
+    page = ListCyclesUseCase(directory, history).execute(
+        ListCyclesCommand(FLOW, criteria=CycleFilter.named(outcome="fallito"))
+    )
+
+    assert instants(page.cycles) == [10]
+    assert (page.total, page.has_next) == (1, False)
+
+
+def test_the_cycles_filtered_by_decision_are_those_where_the_agent_took_it(
+    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
+) -> None:
+    history.record(a_cycle_deciding(0, "apri"))
+    history.record(a_cycle_deciding(1, "mantieni", "chiudi"))
+    history.record(a_cycle_deciding(2))
+    history.record(CycleRecord(FLOW, FIRST + timedelta(minutes=3), CycleOutcome.FAILED))
+
+    def decided(decision: str) -> list[int]:
+        command = ListCyclesCommand(FLOW, criteria=CycleFilter.named(decision=decision))
+        return instants(ListCyclesUseCase(directory, history).execute(command).cycles)
+
+    assert decided("apertura") == [0]
+    assert decided("chiusura") == [1]
+    assert decided("mantenimento") == [1]
+    assert decided("nessuna") == [3, 2]
+
+
+def test_the_cycles_filtered_by_days_are_those_planned_within_them(
+    history: InMemoryCycleRepositoryAdapter, directory: FakeFlowDirectoryAdapter
+) -> None:
+    history.record(CycleRecord(FLOW, FIRST - timedelta(minutes=1), CycleOutcome.COMPLETED))
+    record_cycles(history, 2)
+    history.record(CycleRecord(FLOW, FIRST + timedelta(days=1), CycleOutcome.COMPLETED))
+
+    criteria = CycleFilter.named(first_day=FIRST.date(), last_day=FIRST.date())
+    command = ListCyclesCommand(FLOW, criteria=criteria)
+    page = ListCyclesUseCase(directory, history).execute(command)
+
+    assert (instants(page.cycles), page.total) == ([1, 0], 2)
