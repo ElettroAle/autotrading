@@ -255,11 +255,13 @@ class InvalidCycleFilterError(DomainError):
 class UnknownCycleOutcomeError(InvalidCycleFilterError):
     def __init__(self, outcomes: tuple[str, ...]) -> None:
         super().__init__("esito non valido: scegliere tra " + ", ".join(outcomes))
+        self.outcomes = outcomes
 
 
 class UnknownCycleDecisionError(InvalidCycleFilterError):
     def __init__(self, decisions: tuple[str, ...]) -> None:
         super().__init__("decisione non valida: scegliere tra " + ", ".join(decisions))
+        self.decisions = decisions
 
 
 class InvalidClosedPositionFilterError(DomainError):
@@ -269,11 +271,13 @@ class InvalidClosedPositionFilterError(DomainError):
 class UnknownPositionSideError(InvalidClosedPositionFilterError):
     def __init__(self, sides: tuple[str, ...]) -> None:
         super().__init__("direzione non valida: scegliere tra " + ", ".join(sides))
+        self.sides = sides
 
 
 class UnknownPositionResultError(InvalidClosedPositionFilterError):
     def __init__(self, results: tuple[str, ...]) -> None:
         super().__init__("risultato non valido: scegliere tra " + ", ".join(results))
+        self.results = results
 
 
 class VersionWithoutFlowError(DomainError):

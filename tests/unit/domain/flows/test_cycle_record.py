@@ -57,5 +57,9 @@ def test_an_outcome_is_named_by_its_italian_word() -> None:
 
 
 def test_an_outcome_nobody_records_is_refused_with_the_outcomes_to_choose_from() -> None:
-    with pytest.raises(UnknownCycleOutcomeError, match="esito non valido: scegliere tra concluso, fallito, saltato"):
+    with pytest.raises(
+        UnknownCycleOutcomeError, match="esito non valido: scegliere tra concluso, fallito, saltato"
+    ) as raised:
         CycleOutcome.named("failed")
+
+    assert raised.value.outcomes == ("concluso", "fallito", "saltato")

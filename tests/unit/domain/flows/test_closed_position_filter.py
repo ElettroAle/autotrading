@@ -62,6 +62,7 @@ def test_an_unknown_side_is_refused_with_the_choices() -> None:
         ClosedPositionFilter.named(side="buy")
 
     assert str(raised.value) == "direzione non valida: scegliere tra long, short"
+    assert raised.value.sides == ("long", "short")
     assert raised.value.status_code == 400
 
 
@@ -86,6 +87,7 @@ def test_an_unknown_result_is_refused_with_the_choices() -> None:
         ClosedPositionFilter.named(result="pari")
 
     assert str(raised.value) == "risultato non valido: scegliere tra vinta, persa"
+    assert raised.value.results == ("vinta", "persa")
     assert isinstance(raised.value, InvalidClosedPositionFilterError)
 
 

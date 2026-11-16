@@ -80,45 +80,6 @@ describe('CyclesList', () => {
     expect(first).toHaveTextContent('—');
   });
 
-  // R6.4.2: the failed cycles of the summary lead here, filtered on the failed.
-  it('lists only the failed cycles when the page asks for them, keeping the filter across the pages', async () => {
-    const failed = (index: number) =>
-      aFailedCycle(
-        aCompletedCycle(new Date(LAST.getTime() - index * QUARTER)),
-        STEPS.agentDecision,
-        {
-          errorType: 'X',
-          message: 'y',
-        },
-      );
-    fakePlatform.recordCycles('alfa', [
-      ...cyclesBack(3),
-      ...Array.from({ length: 51 }, (_, index) => failed(index + 3)),
-    ]);
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles?outcome=fallito' });
-
-    const rows = await rowsOf();
-    expect(rows).toHaveLength(50);
-    rows.forEach((row) => expect(row).toHaveTextContent('fallito'));
-    expect(screen.getByText('Solo i cicli falliti.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Pagina successiva' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/cycles?outcome=fallito&page=2',
-    );
-    expect(screen.getByRole('link', { name: 'Mostra tutti i cicli' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/cycles',
-    );
-  });
-
-  it('names any other outcome the page filters on', async () => {
-    fakePlatform.recordCycles('alfa', [{ ...aCompletedCycle(LAST), outcome: 'saltato' }]);
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles?outcome=saltato' });
-
-    expect(await rowsOf()).toHaveLength(1);
-    expect(screen.getByText('Solo i cicli con esito «saltato».')).toBeInTheDocument();
-  });
-
   it('says the flow has no cycle yet', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });
 

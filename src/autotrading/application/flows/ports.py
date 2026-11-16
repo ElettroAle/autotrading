@@ -967,7 +967,9 @@ class CycleJournalPort(Protocol):
 class CycleHistoryPort(Protocol):
     """Bound to the tenant of the request: it never shows the cycles of a flow of another tenant."""
 
-    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]: ...
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
+        """The cycles of the flow from the most recent planned instant."""
+        ...
 
     def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
         """The cycles of the flow that match the filter, from the most recent planned instant (R6.4.4)."""

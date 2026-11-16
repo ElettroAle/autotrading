@@ -30,6 +30,7 @@ def test_a_skipped_cycle_is_no_outcome_to_filter_by() -> None:
         CycleFilter.named(outcome="saltato")
 
     assert str(raised.value) == "esito non valido: scegliere tra concluso, fallito"
+    assert raised.value.outcomes == ("concluso", "fallito")
     assert raised.value.status_code == 400
 
 
@@ -56,6 +57,7 @@ def test_an_unknown_decision_is_refused_with_the_choices() -> None:
         CycleFilter.named(decision="apri")
 
     assert str(raised.value) == "decisione non valida: scegliere tra apertura, chiusura, mantenimento, nessuna"
+    assert raised.value.decisions == ("apertura", "chiusura", "mantenimento", "nessuna")
     assert raised.value.status_code == 400
 
 
