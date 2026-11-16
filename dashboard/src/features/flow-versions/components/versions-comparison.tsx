@@ -16,10 +16,10 @@ const Row = ({ row }: { row: ComparisonRow }) => (
     <th scope="row" className="px-3 py-2 text-left font-medium">
       {row.part}
     </th>
-    <td className="px-3 py-2">
+    <td className="px-3 py-2 whitespace-pre-wrap">
       <Value text={row.before} changed={row.changed} />
     </td>
-    <td className="px-3 py-2">
+    <td className="px-3 py-2 whitespace-pre-wrap">
       <Value text={row.after} changed={row.changed} />
     </td>
   </tr>

@@ -35,6 +35,7 @@ export type FakeConfiguration = {
   readonly instructions: string;
   readonly maxLeverage: number;
   readonly allocatedCapital: string;
+  readonly systemPrompt: string | null;
 };
 
 export type FakeVersion = {
@@ -273,6 +274,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   instructions: '',
   maxLeverage: 3,
   allocatedCapital: '100',
+  systemPrompt: null,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
