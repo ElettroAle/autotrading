@@ -21,6 +21,7 @@ class FlowPositionResponse(BaseModel):
     size: str
     leverage: str
     entry_price: str
+    mark_price: str
     margin: str
     unrealized_pnl: str
     unrealized_pnl_percent: str | None
@@ -34,6 +35,7 @@ class FlowPositionResponse(BaseModel):
             size=amount_text(position.size),
             leverage=str(position.leverage),
             entry_price=amount_text(position.entry_price),
+            mark_price=amount_text(position.mark_price),
             margin=amount_text(position.margin),
             unrealized_pnl=amount_text(position.unrealized_pnl),
             unrealized_pnl_percent=None if percent is None else amount_text(percent),

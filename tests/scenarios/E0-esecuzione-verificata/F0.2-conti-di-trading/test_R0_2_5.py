@@ -15,7 +15,9 @@ from tests.support.steps import quoted
 
 scenarios("E0-esecuzione-verificata/F0.2-conti-di-trading/R0.2.5-rimozione-di-un-conto.feature")
 
-LONG_BTC = Position("BTC", PositionSide.LONG, Decimal("0.001"), 2, Decimal(100000), Decimal("1.5"), None)
+LONG_BTC = Position(
+    "BTC", PositionSide.LONG, Decimal("0.001"), 2, Decimal(100000), Decimal(100750), Decimal("1.5"), None
+)
 
 
 @dataclass

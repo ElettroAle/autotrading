@@ -1,6 +1,6 @@
 import secrets
 from collections.abc import Mapping
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import cast
 
 import requests
@@ -168,6 +168,7 @@ class HyperliquidExchangeAdapter:
                     position.size,
                     position.leverage,
                     position.entry_price,
+                    position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
                 )
@@ -270,7 +271,7 @@ def _account_state_of(perps: object, mode: object, spot: object) -> AccountState
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
         read = in_account_mode(user_state_of(perps), mode, spot)
-    except (KeyError, TypeError, ValueError, InvalidOperation) as error:
+    except (KeyError, TypeError, ValueError, ArithmeticError) as error:
         raise ExchangeUnavailableError from error
     return AccountState(
         balance=Balance(read.account_value, MARGIN_CURRENCY),
@@ -287,6 +288,7 @@ def _position_of(position: _UserPosition) -> Position:
         size=abs(position.signed_size),
         leverage=position.leverage,
         entry_price=position.entry_price,
+        mark_price=position.mark_price,
         unrealized_pnl=position.unrealized_pnl,
         liquidation_price=position.liquidation_price,
     )

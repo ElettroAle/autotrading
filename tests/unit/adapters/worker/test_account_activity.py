@@ -39,7 +39,12 @@ def test_the_activity_read_by_the_worker_arrives_unchanged(worker: Worker) -> No
         balance=Decimal("1012.5"),
         positions=(
             a_position(
-                "BTC", margin=Decimal(100), unrealized_pnl=Decimal("-1.5"), leverage=3, entry_price=Decimal("60000.5")
+                "BTC",
+                margin=Decimal(100),
+                unrealized_pnl=Decimal("-1.5"),
+                leverage=3,
+                entry_price=Decimal("60000.5"),
+                mark_price=Decimal("59850.5"),
             ),
         ),
         movements=(a_movement(Decimal(-20)),),

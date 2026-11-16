@@ -13,6 +13,7 @@ class CyclePosition:
     size: Decimal
     leverage: int
     entry_price: Decimal
+    mark_price: Decimal
     unrealized_pnl: Decimal
     liquidation_price: Decimal | None
 
