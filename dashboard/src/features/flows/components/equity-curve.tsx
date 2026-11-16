@@ -70,9 +70,7 @@ export const EquityCurve = ({ flowId }: { flowId: string }) => {
       {isComplete(period) ? (
         <EquityPoints flowId={flowId} period={period} />
       ) : (
-        <p className="text-slate-600">
-          Scegli l&apos;inizio e la fine dell&apos;intervallo.
-        </p>
+        <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
       )}
     </section>
   );

@@ -69,9 +69,7 @@ const StatisticsContent = ({ flowId }: { flowId: string }) => {
   const [period] = usePeriod();
   const statistics = useFlowStatistics(flowId, period);
   if (statistics.isPending && statistics.fetchStatus === 'idle') {
-    return (
-      <p className="text-slate-500">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
-    );
+    return <p className="text-slate-500">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
   if (statistics.isPending) {
     return <Loading />;

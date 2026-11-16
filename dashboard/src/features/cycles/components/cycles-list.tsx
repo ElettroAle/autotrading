@@ -112,9 +112,7 @@ const CyclesInInterval = ({ flowId, page, interval }: CyclesInIntervalProps) => 
 export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) => {
   const [period] = usePeriod();
   if (!isComplete(period)) {
-    return (
-      <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
-    );
+    return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
   return (
     <CyclesInInterval flowId={flowId} page={page} interval={listIntervalOf(period, new Date())} />

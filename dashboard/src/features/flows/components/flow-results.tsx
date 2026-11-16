@@ -28,9 +28,7 @@ const Results = ({ flowId, period }: { flowId: string; period: Period }) => {
 export const FlowResults = ({ flowId }: { flowId: string }) => {
   const [period] = usePeriod();
   if (!isComplete(period)) {
-    return (
-      <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
-    );
+    return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
   return <Results flowId={flowId} period={period} />;
 };
