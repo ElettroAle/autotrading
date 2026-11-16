@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.trade_side import TradeSide
 
 
@@ -36,4 +36,18 @@ class HoldIntent:
     asset: str
 
 
-type TradeIntent = OpenIntent | CloseIntent | HoldIntent
+@dataclass(frozen=True, slots=True)
+class UpdateIntent:
+    """What the agent wants to change in the exit plan of a position already open (R3.1.3)."""
+
+    asset: str
+    plan_change: ExitPlanChange
+
+    @classmethod
+    def of(
+        cls, asset: str, target: Decimal | None, stop: Decimal | None, invalidation: str | None, *, remove_target: bool
+    ) -> UpdateIntent:
+        return cls(asset, ExitPlanChange(target, stop, invalidation, remove_target=remove_target))
+
+
+type TradeIntent = OpenIntent | CloseIntent | HoldIntent | UpdateIntent

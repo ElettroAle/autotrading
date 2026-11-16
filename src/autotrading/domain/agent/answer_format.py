@@ -10,6 +10,7 @@ from autotrading.domain.agent.agent_response import (
     LEVERAGE,
     MARGIN_FRACTION,
     REASONING,
+    REMOVE_TARGET,
     STOP,
     TARGET,
 )
@@ -45,6 +46,7 @@ def _decisions_schema() -> Schema:
             TARGET: {"type": ["number", "null"]},
             STOP: {"type": ["number", "null"]},
             INVALIDATION: {"type": ["string", "null"]},
+            REMOVE_TARGET: {"type": "boolean"},
             REASONING: {"type": "string"},
         }
     )

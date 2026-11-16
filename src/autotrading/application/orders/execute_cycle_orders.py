@@ -8,7 +8,7 @@ from autotrading.application.orders.protect_open_positions import (
     ProtectOpenPositionsUseCase,
 )
 from autotrading.domain.orders.direction import Direction
-from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder
+from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, FlowUpdate
 from autotrading.domain.orders.order import Order
 from autotrading.domain.orders.protection_note import ProtectionNote
 from autotrading.domain.orders.protection_request import ProtectionRequest
@@ -38,8 +38,8 @@ class ExecuteCycleOrdersUseCase:
                 cycle.account_id, cycle.flow_id, tuple(cycle.assets), cycle.default_stop_loss_percent
             )
         )
-        opening = _OpeningOf(cycle.default_stop_loss_percent, cycle.default_take_profit_percent)
-        orders = tuple(order.order_with(opening.order, FlowClosing) for order in cycle.orders)
+        built = _FlowOrderOf(cycle.default_stop_loss_percent, cycle.default_take_profit_percent)
+        orders = tuple(order.order_with(built.opening, FlowClosing, built.update) for order in cycle.orders)
         sent = self._execute.execute(
             ExecuteFlowOrdersCommand(cycle.account_id, cycle.flow_id, cycle.planned_at, orders)
         )
@@ -49,15 +49,26 @@ class ExecuteCycleOrdersUseCase:
         return (*sent.orders, *protected, *sent.notes)
 
 
-class _OpeningOf:
-    """The opening of an approved decision, protected with the exit plan of the agent and the defaults of the flow."""
+class _FlowOrderOf:
+    """The order of an approved decision, protected with the exit plan of the agent and the defaults of the flow."""
 
     def __init__(self, default_stop_percent: Decimal, default_take_profit_percent: Decimal | None) -> None:
         self._default_stop_percent = default_stop_percent
         self._default_take_profit_percent = default_take_profit_percent
 
-    def order(  # noqa: PLR0913, PLR0917 - the fields of an approved opening, as the flows context hands them over
+    def opening(  # noqa: PLR0913, PLR0917 - the fields of an approved opening, as the flows context hands them over
         self, asset: str, side: str, value: Decimal, leverage: int, stop: Decimal | None, target: Decimal | None
     ) -> FlowOrder:
         protection = ProtectionRequest(stop, target, self._default_stop_percent, self._default_take_profit_percent)
         return FlowOpening(asset, Direction(side), value, leverage, protection)
+
+    def update(
+        self,
+        asset: str,
+        stop: Decimal | None,
+        target: Decimal | None,
+        remove_target: bool,
+    ) -> FlowOrder:
+        """The default take profit sizes only an opening: an update keeps the take profit the agent does not change."""
+        protection = ProtectionRequest(stop, target, self._default_stop_percent, None)
+        return FlowUpdate(asset, protection, remove_target=remove_target)

@@ -3,15 +3,18 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
 
-from autotrading.domain.agent.exit_plan import ExitPlan
+from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 
 class TradeAction(StrEnum):
-    """The only actions the agent may take on an asset (R1.4.3, R1.4.4)."""
+    """The only actions the agent may take on an asset (R1.4.3, R1.4.4); an update changes the exit plan of a position
+    already open (R3.1.3).
+    """
 
     OPEN = "apri"
     CLOSE = "chiudi"
     HOLD = "mantieni"
+    UPDATE = "aggiorna"
 
 
 class TradeDirection(StrEnum):
@@ -35,23 +38,30 @@ class TradeOpening:
 class Decision:
     """A conforming decision of the agent on one asset, with its reasoning (R1.4.4).
 
-    Only an opening carries operational fields; a close is always total.
+    Only an opening carries operational fields and only an update the change of the plan (R3.1.3); a close is always
+    total.
     """
 
     asset: str
     action: TradeAction
     reasoning: str
     opening: TradeOpening | None = None
+    plan_change: ExitPlanChange | None = None
 
-    def intent_with[O, C, H](
+    def intent_with[O, C, H, U](
         self,
         opening: Callable[[str, str, Decimal, int, ExitPlan], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
-    ) -> O | C | H:
-        """What the decision asks, built by whoever checks it: an opening without its fields holds the asset."""
+        updating: Callable[[str, ExitPlanChange], U],
+    ) -> O | C | H | U:
+        """What the decision asks, built by whoever checks it: an opening or an update without its fields holds the
+        asset.
+        """
         if self.action is TradeAction.CLOSE:
             return closing(self.asset)
+        if self.action is TradeAction.UPDATE and self.plan_change is not None:
+            return updating(self.asset, self.plan_change)
         if self.action is TradeAction.OPEN and self.opening is not None:
             fields = self.opening
             return opening(

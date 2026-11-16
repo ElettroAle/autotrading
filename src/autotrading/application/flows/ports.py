@@ -27,7 +27,7 @@ from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
-from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.exit_plan import ExitPlan, PlacedLevels
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -260,6 +260,16 @@ class ExitPlanRepositoryPort(Protocol):
         ...
 
     def remove(self, flow_id: FlowId, asset: str) -> None: ...
+
+
+class FlowProtectionLevelsPort(Protocol):
+    """Bound to the tenant of the request: the stop loss and take profit the platform keeps waiting on the exchange for
+    the position of a flow, from the protections the orders context recorded (R3.1.3).
+    """
+
+    def placed_levels(self, flow_id: FlowId, asset: str) -> PlacedLevels:
+        """No level where the flow has no protection of that kind in force on the asset."""
+        ...
 
 
 class RunningCyclePort(Protocol):
@@ -929,15 +939,34 @@ class DecisionExitPlanPort(Protocol):
     def invalidation(self) -> str | None: ...
 
 
-class AgentDecisionPort(Protocol):
-    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4, R3.1.1)."""
+class DecisionPlanChangePort(Protocol):
+    """The change of the exit plan of an open position the agent gave with an update, as the agent context hands it
+    over (R3.1.3).
+    """
 
-    def intent_with[O, C, H](
+    @property
+    def target(self) -> Decimal | None: ...
+
+    @property
+    def stop(self) -> Decimal | None: ...
+
+    @property
+    def invalidation(self) -> str | None: ...
+
+    @property
+    def remove_target(self) -> bool: ...
+
+
+class AgentDecisionPort(Protocol):
+    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4, R3.1.1, R3.1.3)."""
+
+    def intent_with[O, C, H, U](
         self,
         opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
-    ) -> O | C | H: ...
+        updating: Callable[[str, DecisionPlanChangePort], U],
+    ) -> O | C | H | U: ...
 
 
 class AgentResponsePort(Protocol):

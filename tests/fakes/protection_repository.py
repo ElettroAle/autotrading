@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -32,10 +33,14 @@ class InMemoryProtectionRepositoryAdapter:
             if tenant_id == self._tenant_id and (protection.account_id, protection.asset) == (account_id, asset)
         )
 
-    def remove(self, account_id: UUID, asset: str) -> None:
+    def remove(self, account_id: UUID, asset: str, kind: ProtectionKind | None = None) -> None:
         kept = [
             (tenant_id, protection)
             for tenant_id, protection in self._store.protections
-            if not (tenant_id == self._tenant_id and (protection.account_id, protection.asset) == (account_id, asset))
+            if not (
+                tenant_id == self._tenant_id
+                and (protection.account_id, protection.asset) == (account_id, asset)
+                and kind in {None, protection.kind}
+            )
         ]
         self._store.protections[:] = kept

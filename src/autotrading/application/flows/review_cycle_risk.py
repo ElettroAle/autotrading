@@ -2,12 +2,18 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.check_risk import CheckRiskCommand, CheckRiskUseCase
-from autotrading.application.flows.ports import CycleDecisions, DecisionExitPlanPort, FlowSnapshot, RiskReview
+from autotrading.application.flows.ports import (
+    CycleDecisions,
+    DecisionExitPlanPort,
+    DecisionPlanChangePort,
+    FlowSnapshot,
+    RiskReview,
+)
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.risk_outcome import approved_of
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, UpdateIntent
 
 
 class ReviewCycleRiskUseCase:
@@ -27,7 +33,7 @@ class ReviewCycleRiskUseCase:
         cycle_flow = decisions.flow
         command = CheckRiskCommand(
             tuple(
-                decision.intent_with(_open_intent, CloseIntent, HoldIntent)
+                decision.intent_with(_open_intent, CloseIntent, HoldIntent, _update_intent)
                 for decision in decisions.reply.response.decisions
             ),
             cycle_flow.configuration.risk_policy,
@@ -44,3 +50,7 @@ def _open_intent(
 ) -> OpenIntent:
     plan = ExitPlan(exit_plan.target, exit_plan.stop, exit_plan.invalidation)
     return OpenIntent.of(asset, side, margin_fraction, leverage, plan)
+
+
+def _update_intent(asset: str, change: DecisionPlanChangePort) -> UpdateIntent:
+    return UpdateIntent.of(asset, change.target, change.stop, change.invalidation, remove_target=change.remove_target)

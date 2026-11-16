@@ -5,7 +5,7 @@ import pytest
 
 from autotrading.domain.agent.agent_response import AgentResponse
 from autotrading.domain.agent.decision import Decision, DiscardedDecision, TradeAction, TradeDirection, TradeOpening
-from autotrading.domain.agent.exit_plan import ExitPlan
+from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 ASSETS = ("BTC", "ETH", "SOL")
 
@@ -25,6 +25,23 @@ def opening(asset: str = "BTC", **fields: object) -> dict[str, object]:
         "stop": None,
         "invalidazione": None,
         "ragionamento": "rottura della resistenza",
+    }
+    decision.update(fields)
+    return {key: value for key, value in decision.items() if value is not ...}
+
+
+def update(asset: str = "BTC", **fields: object) -> dict[str, object]:
+    decision: dict[str, object] = {
+        "asset": asset,
+        "azione": "aggiorna",
+        "direzione": None,
+        "quota": None,
+        "leva": None,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "togli_obiettivo": False,
+        "ragionamento": "proteggo il guadagno",
     }
     decision.update(fields)
     return {key: value for key, value in decision.items() if value is not ...}
@@ -229,3 +246,50 @@ def test_an_answer_in_a_code_block_is_read(fence: str) -> None:
 
 def test_an_empty_list_leaves_every_asset_missing() -> None:
     assert read(answer()).missing == ASSETS
+
+
+def test_an_update_carries_the_change_of_the_plan() -> None:
+    decision = read(answer(update(obiettivo=68000, stop=62000.5, invalidazione=" chiusura sotto 61000 "))).decisions[0]
+
+    assert decision == Decision(
+        "BTC",
+        TradeAction.UPDATE,
+        "proteggo il guadagno",
+        plan_change=ExitPlanChange(Decimal(68000), Decimal("62000.5"), "chiusura sotto 61000"),
+    )
+
+
+def test_an_update_may_remove_the_target() -> None:
+    decision = read(answer(update(togli_obiettivo=True))).decisions[0]
+
+    assert decision.plan_change == ExitPlanChange(remove_target=True)
+
+
+def test_a_null_removal_of_the_target_keeps_it() -> None:
+    decision = read(answer(update(stop=62000, togli_obiettivo=None))).decisions[0]
+
+    assert decision.plan_change == ExitPlanChange(stop=Decimal(62000))
+
+
+def test_an_update_ignores_the_fields_of_an_opening() -> None:
+    decision = read(answer(update(direzione="long", quota=0.5, leva=3, stop=62000))).decisions[0]
+
+    assert (decision.opening, decision.plan_change) == (None, ExitPlanChange(stop=Decimal(62000)))
+
+
+@pytest.mark.parametrize(
+    ("fields", "reason"),
+    [
+        ({"stop": 0}, "valore fuori dall'intervallo: stop"),
+        ({"obiettivo": "alto"}, "valore di tipo non ammesso: obiettivo"),
+        ({"invalidazione": 1}, "valore di tipo non ammesso: invalidazione"),
+        ({"togli_obiettivo": "si"}, "valore di tipo non ammesso: togli_obiettivo"),
+        ({"togli_obiettivo": 1}, "valore di tipo non ammesso: togli_obiettivo"),
+        ({"stop": ...}, "campo obbligatorio mancante: stop"),
+        ({"togli_obiettivo": ...}, "campo obbligatorio mancante: togli_obiettivo"),
+        # A new target and its removal together say two opposite things.
+        ({"obiettivo": 68000, "togli_obiettivo": True}, "valore non ammesso: togli_obiettivo"),
+    ],
+)
+def test_the_reasons_of_non_conformity_of_an_update(fields: dict[str, object], reason: str) -> None:
+    assert reasons(read(answer(update("BTC", **fields)))) == {"BTC": reason}

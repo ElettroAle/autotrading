@@ -11,16 +11,21 @@ from autotrading.domain.flows.closed_position import PositionEnd
 from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder, CycleOrders
-from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
-from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
+from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.orders.client_order_id import ClientOrderId
+from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.support.flows import a_configuration, a_flow
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
@@ -73,9 +78,21 @@ class Bench:
         self.exit_plans = InMemoryExitPlanRepositoryAdapter(self.store, TENANT)
         flows = FlowStore()
         flows.flows.append(FLOW)
+        self.protections = ProtectionStore()
         self.use_case = SendCycleOrdersUseCase(
-            self.execution, self.openings, self.exit_plans, InMemoryFlowRepositoryAdapter(flows, TENANT)
+            self.execution,
+            self.openings,
+            self.exit_plans,
+            InMemoryFlowRepositoryAdapter(flows, TENANT),
+            InMemoryFlowProtectionLevelsAdapter(self.protections, TENANT),
         )
+
+    def protected(self, asset: str, kind: ProtectionKind, price: int) -> None:
+        """A protection the execution left waiting on the exchange for the position of the flow."""
+        protection = PlacedProtection(
+            FLOW.assigned_account_id, FLOW.id.value, asset, kind, Decimal(price), "1", ClientOrderId.new()
+        )
+        InMemoryProtectionRepositoryAdapter(self.protections, TENANT).add(protection)
 
 
 def test_the_orders_go_to_the_account_of_the_flow_with_its_name() -> None:
@@ -168,3 +185,51 @@ def test_a_close_puts_no_plan_in_force() -> None:
     bench.use_case.execute(FLOW.id.value, PLANNED_AT, [CycleOrder(CYCLE_FLOW, ApprovedClose("BTC"))])
 
     assert bench.store.plans == {}
+
+
+def test_an_update_puts_in_force_the_levels_placed_and_its_invalidation() -> None:
+    bench = Bench()
+    bench.exit_plans.save(FLOW.id, "BTC", PLAN)
+    bench.protected("BTC", ProtectionKind.STOP_LOSS, 62000)
+    change = ExitPlanChange(stop=Decimal(62000), invalidation="chiusura sotto 61000", remove_target=True)
+
+    bench.use_case.execute(FLOW.id.value, PLANNED_AT, [CycleOrder(CYCLE_FLOW, ApprovedUpdate("BTC", change, ()))])
+
+    assert bench.exit_plans.current(FLOW.id, "BTC") == ExitPlan(None, Decimal(62000), "chiusura sotto 61000")
+
+
+def test_an_update_the_exchange_refused_leaves_the_levels_in_force() -> None:
+    bench = Bench()
+    bench.exit_plans.save(FLOW.id, "BTC", PLAN)
+    bench.protected("BTC", ProtectionKind.STOP_LOSS, 58500)
+    bench.protected("BTC", ProtectionKind.TAKE_PROFIT, 63000)
+
+    bench.use_case.execute(
+        FLOW.id.value,
+        PLANNED_AT,
+        [CycleOrder(CYCLE_FLOW, ApprovedUpdate("BTC", ExitPlanChange(stop=Decimal(62000)), ()))],
+    )
+
+    assert bench.exit_plans.current(FLOW.id, "BTC") == PLAN
+
+
+def test_an_update_of_a_position_without_a_plan_gets_one_from_the_levels_placed() -> None:
+    bench = Bench()
+    bench.protected("ETH", ProtectionKind.STOP_LOSS, 2850)
+
+    bench.use_case.execute(
+        FLOW.id.value,
+        PLANNED_AT,
+        [CycleOrder(CYCLE_FLOW, ApprovedUpdate("ETH", ExitPlanChange(invalidation="sotto 2900"), ()))],
+    )
+
+    assert bench.exit_plans.current(FLOW.id, "ETH") == ExitPlan(None, Decimal(2850), "sotto 2900")
+
+
+def test_an_update_goes_to_the_execution_with_the_other_orders() -> None:
+    bench = Bench()
+    update = ApprovedUpdate("BTC", ExitPlanChange(stop=Decimal(62000)), ())
+
+    bench.use_case.execute(FLOW.id.value, PLANNED_AT, [CycleOrder(CYCLE_FLOW, update)])
+
+    assert bench.execution.cycles[0].orders == (update,)

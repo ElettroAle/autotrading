@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.flows.cycle_flow import CycleFlow
-from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
+from autotrading.domain.flows.risk_outcome import ApprovedOutcome
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,7 +12,7 @@ class CycleOrder:
     """An order the risk check approved in a cycle, with the flow it was approved for."""
 
     flow: CycleFlow
-    outcome: ApprovedOpening | ApprovedClose
+    outcome: ApprovedOutcome
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class CycleOrders:
     flow_id: UUID
     flow_name: str
     planned_at: datetime
-    orders: tuple[ApprovedOpening | ApprovedClose, ...]
+    orders: tuple[ApprovedOutcome, ...]
     assets: tuple[str, ...]
     default_stop_loss_percent: Decimal
     default_take_profit_percent: Decimal | None

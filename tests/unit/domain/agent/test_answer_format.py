@@ -1,10 +1,12 @@
 """The format the model is asked to answer in: the decisions, in the strict form a provider can enforce (R1.4.5)."""
 
 import json
+from decimal import Decimal
 
 from autotrading.domain.agent.agent_response import AgentResponse
 from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from autotrading.domain.agent.decision import TradeAction
+from autotrading.domain.agent.exit_plan import ExitPlanChange
 
 ASSETS = ("BTC", "ETH")
 
@@ -35,6 +37,7 @@ def test_every_field_of_a_decision_is_required_and_no_other_is_allowed() -> None
         "obiettivo",
         "stop",
         "invalidazione",
+        "togli_obiettivo",
         "ragionamento",
     ]
     assert entry["additionalProperties"] is False
@@ -43,12 +46,13 @@ def test_every_field_of_a_decision_is_required_and_no_other_is_allowed() -> None
 def test_the_fields_only_an_opening_needs_may_be_null() -> None:
     properties = json.loads(json.dumps(decision_schema()))["properties"]
 
-    assert properties["azione"] == {"type": "string", "enum": ["apri", "chiudi", "mantieni"]}
+    assert properties["azione"] == {"type": "string", "enum": ["apri", "chiudi", "mantieni", "aggiorna"]}
     assert properties["direzione"] == {"type": ["string", "null"], "enum": ["long", "short", None]}
     assert properties["quota"] == {"type": ["number", "null"]}
     assert properties["leva"] == {"type": ["integer", "null"]}
     assert properties["obiettivo"] == properties["stop"] == {"type": ["number", "null"]}
     assert properties["invalidazione"] == {"type": ["string", "null"]}
+    assert properties["togli_obiettivo"] == {"type": "boolean"}
     assert properties["asset"] == properties["ragionamento"] == {"type": "string"}
 
 
@@ -84,3 +88,23 @@ def test_an_answer_in_the_format_reads_as_conforming_decisions() -> None:
 
     assert [decision.action for decision in response.decisions] == [TradeAction.OPEN, TradeAction.HOLD]
     assert response.discarded == ()
+
+
+def test_an_update_in_the_format_reads_as_a_change_of_the_plan() -> None:
+    update = {
+        "asset": "BTC",
+        "azione": "aggiorna",
+        "direzione": None,
+        "quota": None,
+        "leva": None,
+        "obiettivo": None,
+        "stop": 62000,
+        "invalidazione": None,
+        "togli_obiettivo": True,
+        "ragionamento": "proteggo il guadagno",
+    }
+
+    [decision] = AgentResponse.read(json.dumps({"decisioni": [update]}), ASSETS).decisions
+
+    assert decision.action is TradeAction.UPDATE
+    assert decision.plan_change == ExitPlanChange(None, Decimal(62000), None, remove_target=True)

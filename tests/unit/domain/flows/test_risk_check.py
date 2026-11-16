@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import (
@@ -10,10 +10,11 @@ from autotrading.domain.flows.risk_outcome import (
     AdjustmentKind,
     ApprovedClose,
     ApprovedOpening,
+    ApprovedUpdate,
     BlockedDecision,
     HeldPosition,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, UpdateIntent
 from autotrading.domain.flows.trade_side import TradeSide
 
 EXCHANGE = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(60000))
@@ -32,7 +33,7 @@ def check(
     limits = RiskLimits(
         max_leverage, None if margin is None else Decimal(margin), None if value is None else Decimal(value)
     )
-    state = RiskState("USDC", Decimal(funds), Decimal(liquidity), open_assets)
+    state = RiskState("USDC", Decimal(funds), Decimal(liquidity), dict.fromkeys(open_assets, TradeSide.LONG))
     return RiskCheck(RiskPolicy(limits, bring_to_minimum), state)
 
 
@@ -337,3 +338,48 @@ def test_an_opening_brought_to_the_minimum_keeps_its_exit_plan_checked() -> None
 
     assert outcome.exit_plan == ExitPlan(stop=Decimal(58000))
     assert [item.kind for item in outcome.adjustments] == [AdjustmentKind.VALUE, AdjustmentKind.EXIT_PLAN]
+
+
+def test_an_update_of_an_open_position_is_approved_with_its_change() -> None:
+    change = ExitPlanChange(Decimal(68000), Decimal(59000), "chiusura sotto 61000")
+
+    outcome = check(open_assets=frozenset({"BTC"})).outcome(UpdateIntent("BTC", change), EXCHANGE)
+
+    assert outcome == ApprovedUpdate("BTC", change, ())
+
+
+def test_an_update_without_an_open_position_is_blocked() -> None:
+    outcome = check().outcome(UpdateIntent("ETH", ExitPlanChange(stop=Decimal(3000))), None)
+
+    assert outcome == BlockedDecision("ETH", "nessuna posizione aperta su ETH")
+
+
+def test_an_update_on_an_asset_the_exchange_does_not_trade_is_blocked() -> None:
+    outcome = check(open_assets=frozenset({"BTC"})).outcome(UpdateIntent("BTC", ExitPlanChange()), None)
+
+    assert outcome == BlockedDecision("BTC", "asset non negoziabile sull'exchange: BTC")
+
+
+def test_an_update_discards_the_levels_incoherent_with_the_side_of_the_position() -> None:
+    risk = RiskCheck(
+        RiskPolicy(RiskLimits(50, Decimal(100))),
+        RiskState("USDC", Decimal(1000), Decimal(1000), {"BTC": TradeSide.SHORT}),
+    )
+    change = ExitPlanChange(Decimal(61000), Decimal(62000))
+
+    outcome = risk.outcome(UpdateIntent("BTC", change), EXCHANGE)
+
+    reason = "obiettivo 61000 scartato: incoerente con short al prezzo 60000"
+    assert outcome == ApprovedUpdate(
+        "BTC",
+        ExitPlanChange(None, Decimal(62000)),
+        (Adjustment(AdjustmentKind.EXIT_PLAN, Decimal(61000), None, reason),),
+    )
+
+
+def test_an_update_commits_no_liquidity() -> None:
+    risk = check(liquidity="60", open_assets=frozenset({"BTC"}))
+
+    risk.outcome(UpdateIntent("BTC", ExitPlanChange(stop=Decimal(59000))), EXCHANGE)
+
+    assert approved(risk.outcome(opening("0.06", 1, asset="ETH"), EXCHANGE)).margin == Decimal(60)

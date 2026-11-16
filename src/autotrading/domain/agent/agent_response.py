@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from autotrading.domain.agent.decision import Decision, DiscardedDecision, TradeAction, TradeDirection, TradeOpening
 from autotrading.domain.agent.errors import DecisionNotConformingError
-from autotrading.domain.agent.exit_plan import ExitPlan
+from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 DECISIONS = "decisioni"
 ASSET, ACTION, DIRECTION, MARGIN_FRACTION, LEVERAGE, REASONING = (
@@ -18,6 +18,7 @@ ASSET, ACTION, DIRECTION, MARGIN_FRACTION, LEVERAGE, REASONING = (
     "ragionamento",
 )
 TARGET, STOP, INVALIDATION = "obiettivo", "stop", "invalidazione"
+REMOVE_TARGET = "togli_obiettivo"
 UNREADABLE = "risposta non leggibile"
 FENCE = "```"
 LOWEST_LEVERAGE = 1
@@ -93,9 +94,11 @@ def _decision_of(entry: object, asset: str, flow_assets: tuple[str, ...]) -> Dec
         raise DecisionNotConformingError.foreign(asset)
     action = _action_of(entry)
     reasoning = _text_of(entry, REASONING)
-    if action is not TradeAction.OPEN:
-        return Decision(asset, action, reasoning)
-    return Decision(asset, action, reasoning, _opening_of(entry))
+    if action is TradeAction.OPEN:
+        return Decision(asset, action, reasoning, _opening_of(entry))
+    if action is TradeAction.UPDATE:
+        return Decision(asset, action, reasoning, plan_change=_plan_change_of(entry))
+    return Decision(asset, action, reasoning)
 
 
 def _action_of(entry: Mapping[str, object]) -> TradeAction:
@@ -136,6 +139,24 @@ def _leverage_of(entry: Mapping[str, object]) -> int:
 def _exit_plan_of(entry: Mapping[str, object]) -> ExitPlan:
     """Every part of the plan is optional, but its key is always there: null says the agent declared none (R3.1.1)."""
     return ExitPlan(_price_of(entry, TARGET), _price_of(entry, STOP), _invalidation_of(entry))
+
+
+def _plan_change_of(entry: Mapping[str, object]) -> ExitPlanChange:
+    """A null level keeps the one in force; a new target and its removal together say two opposite things (R3.1.3)."""
+    target = _price_of(entry, TARGET)
+    remove_target = _removal_of(entry)
+    if remove_target and target is not None:
+        raise DecisionNotConformingError.not_allowed(REMOVE_TARGET)
+    return ExitPlanChange(target, _price_of(entry, STOP), _invalidation_of(entry), remove_target=remove_target)
+
+
+def _removal_of(entry: Mapping[str, object]) -> bool:
+    value = _keyed(entry, REMOVE_TARGET)
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        raise DecisionNotConformingError.type(REMOVE_TARGET)
+    return value
 
 
 def _price_of(entry: Mapping[str, object], field: str) -> Decimal | None:

@@ -1,17 +1,21 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
+from autotrading.domain.flows.exit_plan import DiscardedLevel
 from autotrading.domain.flows.risk_limits import HUNDRED, RiskLimits
 from autotrading.domain.flows.risk_outcome import (
     Adjustment,
     AdjustmentKind,
     ApprovedClose,
     ApprovedOpening,
+    ApprovedUpdate,
     BlockedDecision,
     HeldPosition,
     RiskOutcome,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent, UpdateIntent
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.italian_text import money_text, number_text
 
 
@@ -28,13 +32,18 @@ class RiskState:
     """The state of the flow read at the start of the cycle (R1.5.3).
 
     Quotas and percentage limits are measured on the money of the flow, not on the capital allocated to it: after
-    losses the openings shrink, after gains they grow (ADR 0078).
+    losses the openings shrink, after gains they grow (ADR 0078). The side of each open position checks the levels of
+    an update of its exit plan (R3.1.3).
     """
 
     currency: str
     funds: Decimal
     available_liquidity: Decimal
-    open_assets: frozenset[str]
+    open_positions: Mapping[str, TradeSide]
+
+    @property
+    def open_assets(self) -> frozenset[str]:
+        return frozenset(self.open_positions)
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +98,8 @@ class RiskCheck:
             return self._close(intent)
         if isinstance(intent, OpenIntent) and limits is not None:
             return self._committed(self._open(intent, limits))
+        if isinstance(intent, UpdateIntent):
+            return self._update(intent, limits)
         return HeldPosition(intent.asset)
 
     def _committed(self, outcome: RiskOutcome) -> RiskOutcome:
@@ -98,8 +109,18 @@ class RiskCheck:
 
     def _close(self, intent: CloseIntent) -> RiskOutcome:
         if intent.asset not in self._state.open_assets:
-            return BlockedDecision(intent.asset, f"nessuna posizione aperta su {intent.asset}")
+            return BlockedDecision.without_position(intent.asset)
         return ApprovedClose(intent.asset)
+
+    def _update(self, intent: UpdateIntent, limits: AssetLimits | None) -> RiskOutcome:
+        """An update needs the position it changes; its levels follow the rule of an opening on its side (R3.1.3)."""
+        side = self._state.open_positions.get(intent.asset)
+        if side is None:
+            return BlockedDecision.without_position(intent.asset)
+        if limits is None:
+            return BlockedDecision.untradable(intent.asset)
+        change, discarded = intent.plan_change.coherent_with(side, limits.market_price)
+        return ApprovedUpdate(intent.asset, change, _exit_plan_notes(discarded))
 
     def _open(self, intent: OpenIntent, limits: AssetLimits) -> RiskOutcome:
         sizing = self._within_exposure(self._within_leverage(intent, limits))
@@ -173,9 +194,12 @@ class RiskCheck:
 def _approved(intent: OpenIntent, sizing: _Sizing, limits: AssetLimits) -> ApprovedOpening:
     """The opening as sized, with only the levels of its plan coherent with the market price of the exchange."""
     plan, discarded = intent.exit_plan.coherent_with(intent.side, limits.market_price)
-    notes = tuple(Adjustment(AdjustmentKind.EXIT_PLAN, level.price, None, level.reason) for level in discarded)
-    adjustments = (*sizing.adjustments, *notes)
+    adjustments = (*sizing.adjustments, *_exit_plan_notes(discarded))
     return ApprovedOpening(intent.asset, intent.side, sizing.value, sizing.leverage, adjustments, plan)
+
+
+def _exit_plan_notes(discarded: tuple[DiscardedLevel, ...]) -> tuple[Adjustment, ...]:
+    return tuple(Adjustment(AdjustmentKind.EXIT_PLAN, level.price, None, level.reason) for level in discarded)
 
 
 def _capped_leverage(sizing: _Sizing, maximum: int, reason: str) -> _Sizing:

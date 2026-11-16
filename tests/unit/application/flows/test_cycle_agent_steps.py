@@ -13,14 +13,15 @@ from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import CycleContext, CycleDecisions, FlowSnapshot, SourceReading
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
-from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource
-from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.flow_state import FlowState
-from autotrading.domain.flows.risk_outcome import ApprovedOpening, BlockedDecision
+from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.support.flows import a_configuration, a_flow
@@ -60,21 +61,33 @@ class Plan:
 
 
 @dataclass(frozen=True, slots=True)
+class Change:
+    target: Decimal | None = None
+    stop: Decimal | None = None
+    invalidation: str | None = None
+    remove_target: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class Decision:
     action: str
     asset: str
     plan: Plan = Plan()
+    change: Change = Change()
 
-    def intent_with[O, C, H](
+    def intent_with[O, C, H, U](
         self,
         opening: Callable[[str, str, Decimal, int, Plan], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
-    ) -> O | C | H:
+        updating: Callable[[str, Change], U],
+    ) -> O | C | H | U:
         if self.action == "open":
             return opening(self.asset, "long", Decimal("0.1"), 2, self.plan)
         if self.action == "close":
             return closing(self.asset)
+        if self.action == "update":
+            return updating(self.asset, self.change)
         return holding(self.asset)
 
 
@@ -195,3 +208,32 @@ def test_the_exchange_of_an_account_without_limits_is_unavailable() -> None:
 
     with pytest.raises(FlowExchangeUnavailableError):
         ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+
+def test_the_change_of_the_plan_of_an_open_position_reaches_the_risk_check() -> None:
+    held = CyclePosition(
+        "BTC", TradeSide.SHORT, Decimal("0.01"), 2, Decimal(102000), Decimal(100000), Decimal(20), None
+    )
+    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,)))
+    change = Change(Decimal(99000), Decimal(101500), "sopra 103000", remove_target=False)
+    decisions = CycleDecisions(cycle_flow, Reply(Response((Decision("update", "BTC", change=change),))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    [order] = review.orders
+    assert order.outcome == ApprovedUpdate("BTC", ExitPlanChange(Decimal(99000), Decimal(101500), "sopra 103000"), ())
+
+
+def test_a_removal_of_the_target_reaches_the_risk_check() -> None:
+    held = CyclePosition("BTC", TradeSide.LONG, Decimal("0.01"), 2, Decimal(98000), Decimal(100000), Decimal(20), None)
+    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,)))
+    decisions = CycleDecisions(
+        cycle_flow, Reply(Response((Decision("update", "BTC", change=Change(remove_target=True)),)))
+    )
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    [order] = review.orders
+    assert order.outcome == ApprovedUpdate("BTC", ExitPlanChange(remove_target=True), ())

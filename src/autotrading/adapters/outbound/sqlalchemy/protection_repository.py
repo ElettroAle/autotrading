@@ -55,8 +55,13 @@ class SqlAlchemyProtectionRepositoryAdapter:
             rows = connection.execute(query).mappings().all()
         return tuple(protection_of(row) for row in rows)
 
-    def remove(self, account_id: UUID, asset: str) -> None:
-        statement = update(flow_protections).where(*_in_force(account_id, asset)).values(removed_at=func.now())
+    def remove(self, account_id: UUID, asset: str, kind: ProtectionKind | None = None) -> None:
+        kinds = [kind_name(each) for each in ProtectionKind if kind in {None, each}]
+        statement = (
+            update(flow_protections)
+            .where(*_in_force(account_id, asset), flow_protections.c.kind.in_(kinds))
+            .values(removed_at=func.now())
+        )
         with self._transaction() as connection:
             connection.execute(statement)
 
@@ -82,10 +87,14 @@ def row_of(protection: PlacedProtection) -> dict[str, object]:
         "account_id": protection.account_id,
         "flow_id": protection.flow_id,
         "asset": protection.asset,
-        "kind": protection.kind.name.lower(),
+        "kind": kind_name(protection.kind),
         "trigger_price": protection.trigger_price,
         "exchange_order_id": protection.exchange_order_id,
     }
+
+
+def kind_name(kind: ProtectionKind) -> str:
+    return kind.name.lower()
 
 
 def protection_of(columns: RowMapping | Mapping[str, object]) -> PlacedProtection:

@@ -26,12 +26,25 @@ class FlowClosing:
     asset: str
 
 
-type FlowOrder = FlowOpening | FlowClosing
+@dataclass(frozen=True, slots=True)
+class FlowUpdate:
+    """An update of the exit plan of an open position of the flow: the new stop goes back to the default stop of the
+    flow when it lies farther, the new target replaces the take profit, a removed target cancels it (R3.1.3).
+    """
+
+    asset: str
+    protection: ProtectionRequest
+    remove_target: bool
+
+
+type FlowOrder = FlowOpening | FlowClosing | FlowUpdate
 
 
 def in_sending_order(orders: Iterable[FlowOrder]) -> tuple[FlowOrder, ...]:
-    """The closings before the openings, each group in the order given: a close frees margin for an opening (R1.5.5)."""
+    """The closings, then the updates, then the openings, each group in the order given: a close frees margin for an
+    opening (R1.5.5, R3.1.3).
+    """
     ordered = tuple(orders)
-    return tuple(order for order in ordered if isinstance(order, FlowClosing)) + tuple(
-        order for order in ordered if isinstance(order, FlowOpening)
+    return tuple(
+        order for kind in (FlowClosing, FlowUpdate, FlowOpening) for order in ordered if isinstance(order, kind)
     )

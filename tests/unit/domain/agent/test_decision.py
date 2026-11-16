@@ -3,7 +3,7 @@
 from decimal import Decimal
 
 from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection, TradeOpening
-from autotrading.domain.agent.exit_plan import ExitPlan
+from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 
 def built(decision: Decision) -> tuple[object, ...]:
@@ -11,6 +11,7 @@ def built(decision: Decision) -> tuple[object, ...]:
         lambda asset, side, fraction, leverage, plan: ("apri", asset, side, fraction, leverage, plan),
         lambda asset: ("chiudi", asset),
         lambda asset: ("mantieni", asset),
+        lambda asset, change: ("aggiorna", asset, change),
     )
 
 
@@ -44,3 +45,13 @@ def test_a_hold_is_built_from_the_asset_alone() -> None:
 
 def test_an_opening_without_its_fields_holds_the_asset() -> None:
     assert built(Decision("BTC", TradeAction.OPEN, "incompleta")) == ("mantieni", "BTC")
+
+
+def test_an_update_carries_the_change_of_the_plan() -> None:
+    change = ExitPlanChange(None, Decimal(62000), None, remove_target=True)
+
+    assert built(Decision("BTC", TradeAction.UPDATE, "protezione", plan_change=change)) == ("aggiorna", "BTC", change)
+
+
+def test_an_update_without_its_change_holds_the_asset() -> None:
+    assert built(Decision("BTC", TradeAction.UPDATE, "incompleta")) == ("mantieni", "BTC")

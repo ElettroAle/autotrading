@@ -10,6 +10,7 @@ from autotrading.application.flows.ports import (
     CycleContext,
     CycleDecisions,
     DecisionExitPlanPort,
+    DecisionPlanChangePort,
     RiskReview,
     SourceReading,
 )
@@ -60,12 +61,13 @@ class Decision:
     action: str
     asset: str
 
-    def intent_with[O, C, H](
+    def intent_with[O, C, H, U](
         self,
         opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
-    ) -> O | C | H:
+        updating: Callable[[str, DecisionPlanChangePort], U],  # noqa: ARG002 - the decisions of the journal never update
+    ) -> O | C | H | U:
         if self.action == "open":
             return opening(self.asset, "long", Decimal("0.1"), 2, ExitPlan())
         if self.action == "close":

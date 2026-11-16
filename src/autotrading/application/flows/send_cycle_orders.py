@@ -6,11 +6,13 @@ from autotrading.application.flows.ports import (
     CycleOrderExecutionPort,
     ExitPlanRepositoryPort,
     FlowOpeningsPort,
+    FlowProtectionLevelsPort,
     FlowRepositoryPort,
 )
 from autotrading.domain.flows.cycle_order import CycleOrder, CycleOrders
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.risk_outcome import ApprovedOpening
+from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate
 
 
 class SendCycleOrdersUseCase:
@@ -20,7 +22,8 @@ class SendCycleOrdersUseCase:
     The plan of an opening the exchange did not execute is removed after; the plan of a position closed during the
     execution, because the exchange refused its stop loss, is removed by its closing (R3.1.2). The execution runs even
     without orders: a position of the flow without a stop loss gets the default one at every cycle, with the defaults of
-    the version in force (R3.1.2).
+    the version in force (R3.1.2). After an update the plan in force holds the levels the exchange has waiting, never
+    those it refused (R3.1.3).
     """
 
     def __init__(
@@ -29,11 +32,13 @@ class SendCycleOrdersUseCase:
         openings: FlowOpeningsPort,
         exit_plans: ExitPlanRepositoryPort,
         flows: FlowRepositoryPort,
+        protection_levels: FlowProtectionLevelsPort,
     ) -> None:
         self._execution = execution
         self._openings = openings
         self._exit_plans = exit_plans
         self._flows = flows
+        self._protection_levels = protection_levels
 
     def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[CycleOrder]) -> Sequence[object]:
         cycle = self._cycle_of(FlowId(flow_id), planned_at, orders)
@@ -44,7 +49,14 @@ class SendCycleOrdersUseCase:
         for opening in openings:
             if not self._executed_in(cycle, opening.asset):
                 self._exit_plans.remove(FlowId(flow_id), opening.asset)
+        for update in (order for order in cycle.orders if isinstance(order, ApprovedUpdate)):
+            self._put_in_force(FlowId(flow_id), update)
         return sent
+
+    def _put_in_force(self, flow_id: FlowId, update: ApprovedUpdate) -> None:
+        current = self._exit_plans.current(flow_id, update.asset) or ExitPlan()
+        placed = self._protection_levels.placed_levels(flow_id, update.asset)
+        self._exit_plans.save(flow_id, update.asset, current.updated(update.plan_change, placed))
 
     def _cycle_of(self, flow_id: FlowId, planned_at: datetime, orders: Sequence[CycleOrder]) -> CycleOrders:
         # The version the cycle read at its start, which its orders carry; without orders, the one in force.

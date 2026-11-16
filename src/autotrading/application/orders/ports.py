@@ -12,6 +12,7 @@ from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.orders.protection_order import ActiveProtection, ProtectionOrder
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
@@ -92,7 +93,9 @@ class ProtectionRepositoryPort(Protocol):
         """The protections recorded for the position of the account on the asset: one flow at most has it (R1.1.2)."""
         ...
 
-    def remove(self, account_id: UUID, asset: str) -> None: ...
+    def remove(self, account_id: UUID, asset: str, kind: ProtectionKind | None = None) -> None:
+        """Forgets the protections of the position, or only the one of the kind when it is replaced (R3.1.3)."""
+        ...
 
 
 class ProtectedPositionPort(Protocol):
@@ -197,9 +200,10 @@ class ApprovedOrderPort(Protocol):
         self,
         opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],
         closing: Callable[[str], T],
+        updating: Callable[[str, Decimal | None, Decimal | None, bool], T],
     ) -> T:
-        """Builds the order with the opening (asset, side, value, leverage, stop and target of the exit plan) or the
-        closing (asset) it needs.
+        """Builds the order with the opening (asset, side, value, leverage, stop and target of the exit plan), the
+        closing (asset) or the update of the exit plan (asset, new stop, new target, target removed) it needs.
         """
         ...
 
