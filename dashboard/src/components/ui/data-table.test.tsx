@@ -1,7 +1,26 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
+import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 
 import { DataTable } from './data-table';
+
+const Address = () => <output aria-label="indirizzo">{useLocation().pathname}</output>;
+
+const inRouter = (ui: ReactNode) => {
+  const router = createMemoryRouter([
+    {
+      path: '*',
+      element: (
+        <>
+          {ui}
+          <Address />
+        </>
+      ),
+    },
+  ]);
+  render(<RouterProvider router={router} />);
+};
 
 type Fruit = { readonly name: string; readonly colour: string };
 
@@ -130,5 +149,111 @@ describe('DataTable', () => {
     for (const cell of screen.getAllByRole('cell')) {
       expect(cell).toHaveClass('max-md:wrap-anywhere');
     }
+  });
+
+  it('keeps the table within its box on a wide screen, scrolling inside it with the first column fixed', () => {
+    render(
+      <DataTable label="Frutti" columns={COLUMNS} rows={FRUITS} rowKey={(fruit) => fruit.name} />,
+    );
+
+    const box = screen.getByRole('region', { name: 'Frutti' });
+    expect(box).toHaveClass('md:overflow-x-auto');
+    expect(within(box).getByRole('table', { name: 'Frutti' })).toBeInTheDocument();
+    const [firstHeader, secondHeader] = screen.getAllByRole('columnheader');
+    expect(firstHeader).toHaveClass('md:sticky', 'md:left-0');
+    expect(secondHeader).not.toHaveClass('md:sticky');
+    const [firstCell, secondCell] = screen.getAllByRole('cell');
+    expect(firstCell).toHaveClass('md:sticky', 'md:left-0');
+    expect(secondCell).not.toHaveClass('md:sticky');
+  });
+
+  describe('with rows that lead to a detail', () => {
+    const renderLinked = () =>
+      inRouter(
+        <DataTable
+          label="Frutti"
+          columns={[
+            ...COLUMNS,
+            { header: 'Scelta', cell: () => <input type="checkbox" aria-label="Scegli" /> },
+          ]}
+          rows={FRUITS}
+          rowKey={(fruit) => fruit.name}
+          rowHref={(fruit) => `/frutti/${fruit.name}`}
+        />,
+      );
+
+    it('links the first cell of each row to its detail, for keyboards and readers', () => {
+      renderLinked();
+
+      expect(screen.getByRole('link', { name: 'banana' })).toHaveAttribute(
+        'href',
+        '/frutti/banana',
+      );
+    });
+
+    it('opens the detail from any point of the row', async () => {
+      renderLinked();
+
+      await userEvent.click(screen.getByText('gialla'));
+
+      expect(screen.getByRole('status', { name: 'indirizzo' })).toHaveTextContent('/frutti/banana');
+    });
+
+    it('leaves a control of the row to do its own work', async () => {
+      renderLinked();
+
+      const [box] = screen.getAllByRole('checkbox', { name: 'Scegli' });
+      await userEvent.click(box as HTMLElement);
+
+      expect(box).toBeChecked();
+      expect(screen.getByRole('status', { name: 'indirizzo' })).toHaveTextContent(/^\/$/);
+    });
+  });
+
+  describe('with filters', () => {
+    const FILTERS = [
+      {
+        name: 'colour',
+        label: 'Colore',
+        all: 'Tutti',
+        options: [{ value: 'rossa', label: 'Rossi' }],
+      },
+    ];
+    const countOf = (total: number) => `${total} frutti`;
+
+    it('shows the filters above the table, with the count of the results', () => {
+      inRouter(
+        <DataTable
+          label="Frutti"
+          columns={COLUMNS}
+          rows={FRUITS}
+          rowKey={(fruit) => fruit.name}
+          filtering={{ filters: FILTERS, total: 12, countOf }}
+        />,
+      );
+
+      const bar = screen.getByRole('group', { name: 'Filtri di Frutti' });
+      expect(within(bar).getByRole('button', { name: 'Rossi' })).toBeInTheDocument();
+      expect(within(bar).getByText('12 frutti')).toBeInTheDocument();
+      expect(
+        bar.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('keeps the filters when nothing matches, so they can be changed', () => {
+      inRouter(
+        <DataTable
+          label="Frutti"
+          columns={COLUMNS}
+          rows={[]}
+          rowKey={(fruit) => fruit.name}
+          empty="Nessun frutto."
+          filtering={{ filters: FILTERS, total: 0, countOf }}
+        />,
+      );
+
+      expect(screen.getByRole('group', { name: 'Filtri di Frutti' })).toBeInTheDocument();
+      expect(screen.getByText('Nessun frutto.')).toBeInTheDocument();
+    });
   });
 });
