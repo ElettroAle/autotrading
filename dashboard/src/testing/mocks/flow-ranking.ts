@@ -1,3 +1,4 @@
+import { fakeClock } from './clock';
 import { periodAdmits, statisticsOf } from './flow-statistics';
 import type { FakeFlow } from './platform';
 
@@ -59,7 +60,7 @@ const byReturn = (one: Row, other: Row): number => {
  * The ranking of the flows as the API computes it (R2.4.2): the flows neither drafts nor archived with a cycle in the period, the
  * return and the drawdown on their equity, the statistics of the same period; a period it rejects throws.
  */
-export const rankingOf = (flows: FakeFlow[], search: URLSearchParams, now = Date.now()) => {
+export const rankingOf = (flows: FakeFlow[], search: URLSearchParams, now = fakeClock.now()) => {
   const admits = periodAdmits(search, now);
   return flows
     .filter((flow) => !OUT_OF_RANKING.includes(flow.status))

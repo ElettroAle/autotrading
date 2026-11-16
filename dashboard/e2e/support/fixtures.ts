@@ -16,6 +16,8 @@ export type DescribedFlow = { readonly name: string; readonly versions: FakeVers
  */
 export type ScenarioMemory = {
   account: string;
+  /** The user the background gave its flows to, for the flows a later step adds (R6.4.6). */
+  owner: string;
   tradingAccount: string;
   environments: string[];
   flow: string;
@@ -71,6 +73,7 @@ export const test = base.extend<Fixtures>({
   memory: async ({}, use) => {
     await use({
       account: '',
+      owner: '',
       tradingAccount: '',
       environments: [],
       flow: '',

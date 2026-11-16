@@ -150,7 +150,9 @@ When(
     memory.flow = flow;
     await openFlowSignedIn(dashboard, memory, account);
     await dashboard.period().selectOption({ label: PERIODS[period] ?? period });
-    await expect(dashboard.period().locator('option:checked')).toHaveText(PERIODS[period] ?? '');
+    await expect(dashboard.period().locator('option:checked')).toHaveText(
+      PERIODS[period] ?? period,
+    );
   },
 );
 

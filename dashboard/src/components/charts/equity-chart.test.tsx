@@ -13,6 +13,7 @@ import {
   selectionStarted,
   MIN_DOT_RADIUS,
   splitOffset,
+  timeDomainOf,
   tooltipLabel,
   tooltipValue,
   type ChartEvent,
@@ -384,5 +385,44 @@ describe('dotRadius, ADR equity-curve-larga-come-lo-schermo', () => {
 
   it('keeps the full size without points', () => {
     expect(dotRadius(0, 720)).toBe(4);
+  });
+});
+
+// ADR periodi-brevi-nel-selettore-condiviso: a short period may hold one cycle or none, and the chart says so itself.
+describe('a period with one cycle or none, ADR periodi-brevi-nel-selettore-condiviso', () => {
+  const ONE_POINT = [{ plannedAt: '2026-11-16T09:55:00Z', equity: 305 }];
+
+  it('shows the only point as a full size mark inside the chart', () => {
+    render(<EquityChart points={ONE_POINT} baseline={300} />);
+
+    const point = screen.getByRole('img', { name: /^Equity 305 / });
+    const left = Number(point.getAttribute('cx'));
+    expect(point).toHaveAttribute('r', '4');
+    expect(left).toBeGreaterThan(72);
+    expect(left).toBeLessThan(720);
+  });
+
+  it('centres the axis of time on the only point', () => {
+    expect(timeDomainOf([Date.parse('2026-11-16T09:55:00Z')])).toEqual([
+      Date.parse('2026-11-16T09:25:00Z'),
+      Date.parse('2026-11-16T10:25:00Z'),
+    ]);
+  });
+
+  it('keeps the axis of time from the first to the last instant with more of them', () => {
+    expect(timeDomainOf([3, 1, 2])).toEqual([1, 3]);
+  });
+
+  it('says there is no cycle in the period without points', () => {
+    render(<EquityChart points={[]} baseline={300} />);
+
+    expect(screen.getByText('Nessun ciclo nel periodo')).toBeInTheDocument();
+    expect(screen.queryByRole('figure', { name: 'Equity curve' })).not.toBeInTheDocument();
+  });
+
+  it('says what the page tells it without points', () => {
+    render(<EquityChart points={[]} baseline={300} empty="Nessun ciclo ancora eseguito" />);
+
+    expect(screen.getByText('Nessun ciclo ancora eseguito')).toBeInTheDocument();
   });
 });

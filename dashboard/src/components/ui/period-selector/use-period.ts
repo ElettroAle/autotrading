@@ -3,11 +3,18 @@ import { useSearchParams } from 'react-router';
 
 import { useSearchChange } from '@/hooks/use-search-change';
 
-/** The periods the API accepts, with the words the page shows (ADR 0122). */
+/**
+ * The periods the API accepts, with the words the page shows (ADR 0122), from the shortest (ADR
+ * periodi-brevi-nel-selettore-condiviso).
+ */
 export const PERIODS = [
-  { kind: 'all', label: 'Tutta la vita' },
+  { kind: '30m', label: '30 minuti' },
+  { kind: '1h', label: '1 ora' },
+  { kind: '12h', label: '12 ore' },
+  { kind: '24h', label: '24 ore' },
   { kind: '7d', label: '7 giorni' },
   { kind: '30d', label: '30 giorni' },
+  { kind: 'all', label: 'Tutta la vita' },
   { kind: 'range', label: 'Intervallo' },
 ] as const;
 
@@ -29,8 +36,19 @@ const PERIOD = 'period';
 const FROM = 'from';
 const TO = 'to';
 const PAGE = 'page';
-const DAY_MS = 24 * 60 * 60 * 1000;
-const LAST_DAYS: Partial<Record<PeriodKind, number>> = { '7d': 7, '30d': 30 };
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+// The same lengths the API gives the periods of the last minutes, hours or days (ADR
+// periodi-brevi-come-durata-nel-dominio).
+const LAST_DURATIONS_MS: Partial<Record<PeriodKind, number>> = {
+  '30m': 30 * MINUTE_MS,
+  '1h': HOUR_MS,
+  '12h': 12 * HOUR_MS,
+  '24h': 24 * HOUR_MS,
+  '7d': 7 * DAY_MS,
+  '30d': 30 * DAY_MS,
+};
 
 const isKind = (value: string | null): value is PeriodKind =>
   PERIODS.some((period) => period.kind === value);
@@ -109,14 +127,15 @@ export const isComplete = (period: Period): boolean =>
 
 /**
  * The instants a list of the API (cycles, closed positions) is asked for in the period: the same minutes the other
- * panels read, the last 7 or 30 days from now (ADR periodo-al-minuto).
+ * panels read, from the minute the length of the period before now (ADR periodo-al-minuto, ADR
+ * periodi-brevi-nel-selettore-condiviso).
  */
 export const listIntervalOf = (period: Period, now: Date): ListInterval => {
   if (period.kind === 'range') {
     return { from: period.from, to: period.to };
   }
-  const days = LAST_DAYS[period.kind];
-  return days === undefined ? {} : { from: minuteOf(new Date(now.getTime() - days * DAY_MS)) };
+  const duration = LAST_DURATIONS_MS[period.kind];
+  return duration === undefined ? {} : { from: minuteOf(new Date(now.getTime() - duration)) };
 };
 
 /** The minutes of two instants of a chart, the earlier first, in UTC (ADR periodo-al-minuto). */
