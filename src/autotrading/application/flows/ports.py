@@ -839,6 +839,14 @@ class AgentPromptPort(Protocol):
     def messages(self) -> Sequence[PromptMessagePort]: ...
 
 
+class AgentActionsPort(Protocol):
+    """It is ListAgentActionsUseCase: the actions the agent may take on an asset, which the system prompt names
+    (R1.4.8).
+    """
+
+    def execute(self) -> Sequence[str]: ...
+
+
 class AgentPromptComposerPort(Protocol):
     def execute(self, question: CycleQuestion) -> AgentPromptPort:
         """Composes what the agent receives; raises an error of the agent when the question cannot be composed."""

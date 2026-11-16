@@ -49,6 +49,7 @@ type ConfigurationRequest = {
   max_value_exposure_percent?: unknown;
   allocated_capital?: unknown;
   bring_to_minimum?: unknown;
+  system_prompt?: unknown;
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -297,6 +298,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     instructions: textOf(request.instructions).trim(),
     riskLimits,
     bringToMinimum: request.bring_to_minimum === true,
+    systemPrompt: typeof request.system_prompt === 'string' ? request.system_prompt : null,
     currentCapital: capital,
   });
 };
@@ -344,6 +346,11 @@ export const modifyFlow = (
       flow.bringToMinimum,
       (value) => value === true,
     ),
+    // A null sent on purpose goes back to the default; a missing one keeps the prompt in force (R1.4.8).
+    systemPrompt:
+      request.system_prompt === undefined
+        ? flow.systemPrompt
+        : optionalTextOf(request.system_prompt),
   };
   requireAssetsFree(user, flow.accountId ?? '', assets, flow);
   return nextVersionOf(flow, changes);

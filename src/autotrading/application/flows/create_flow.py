@@ -49,6 +49,8 @@ class CreateFlowCommand:
     instructions: str = ""
     cycle_minutes: int | None = None
     bring_to_minimum: bool = False
+    # None keeps the default of the platform (R1.4.8).
+    system_prompt: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +103,7 @@ class CreateFlowUseCase:
             ),
             allocated_capital=command.allocated_capital,
             bring_to_minimum=command.bring_to_minimum,
+            system_prompt=command.system_prompt,
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:
