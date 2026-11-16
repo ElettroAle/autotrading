@@ -1,7 +1,7 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
-import { formatAmount } from '@/utils/format-amount';
+import { formatAmount, formatPrice } from '@/utils/format-amount';
 
 import { useFlowState, type OpenPosition } from '../api/get-flow-state';
 
@@ -12,7 +12,7 @@ const columnsIn = (currency: string): DataTableColumn<OpenPosition>[] => [
   { header: 'Direzione', cell: (position) => position.side },
   { header: 'Dimensione', cell: (position) => formatAmount(position.size) },
   { header: 'Leva', cell: (position) => position.leverage },
-  { header: 'Prezzo di ingresso', cell: (position) => formatAmount(position.entry_price) },
+  { header: 'Prezzo di ingresso', cell: (position) => formatPrice(position.entry_price) },
   { header: 'Margine', cell: (position) => `${formatAmount(position.margin)} ${currency}` },
   {
     header: 'PnL',
