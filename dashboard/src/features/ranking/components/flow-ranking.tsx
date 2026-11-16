@@ -116,7 +116,7 @@ export const FlowRanking = () => {
   const ranking = useFlowRanking(period);
   if (ranking.isPending && ranking.fetchStatus === 'idle') {
     return (
-      <p className="text-slate-500">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
+      <p className="text-slate-500">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
     );
   }
   if (ranking.isPending) {

@@ -145,7 +145,7 @@ describe('FlowRanking', () => {
     await renderApp({ account: 'anna', url: '/ranking?period=range&from=2026-11-01' });
 
     expect(
-      await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
     ).toBeInTheDocument();
   });
 

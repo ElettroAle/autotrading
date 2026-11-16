@@ -98,7 +98,7 @@ describe('FlowStatistics', () => {
     fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=range&from=2026-11-01' });
 
-    expect(await panel()).toHaveTextContent("Scegli il primo e l'ultimo giorno dell'intervallo.");
+    expect(await panel()).toHaveTextContent("Scegli l'inizio e la fine dell'intervallo.");
   });
 
   it('tells why the statistics could not be read', async () => {

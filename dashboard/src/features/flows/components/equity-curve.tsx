@@ -71,7 +71,7 @@ export const EquityCurve = ({ flowId }: { flowId: string }) => {
         <EquityPoints flowId={flowId} period={period} />
       ) : (
         <p className="text-slate-600">
-          Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.
+          Scegli l&apos;inizio e la fine dell&apos;intervallo.
         </p>
       )}
     </section>

@@ -234,7 +234,7 @@ describe('CyclesList', () => {
       });
 
       expect(
-        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+        await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
       ).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Cicli' })).not.toBeInTheDocument();
     });

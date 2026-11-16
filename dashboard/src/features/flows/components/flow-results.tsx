@@ -29,7 +29,7 @@ export const FlowResults = ({ flowId }: { flowId: string }) => {
   const [period] = usePeriod();
   if (!isComplete(period)) {
     return (
-      <p className="text-slate-600">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
+      <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
     );
   }
   return <Results flowId={flowId} period={period} />;

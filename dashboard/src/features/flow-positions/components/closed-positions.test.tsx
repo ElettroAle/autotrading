@@ -222,7 +222,7 @@ describe('ClosedPositions', () => {
       await renderApp({ account: 'anna', url: `${URL}?period=range&to=2026-10-02T23:59Z` });
 
       expect(
-        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+        await screen.findByText("Scegli l'inizio e la fine dell'intervallo."),
       ).toBeInTheDocument();
     });
   });

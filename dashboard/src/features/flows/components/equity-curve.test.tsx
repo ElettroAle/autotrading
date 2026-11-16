@@ -68,7 +68,7 @@ describe('EquityCurve', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Periodo' }), 'Intervallo');
     expect(
       within(screen.getByRole('region', { name: 'Equity curve' })).getByText(
-        "Scegli il primo e l'ultimo giorno dell'intervallo.",
+        "Scegli l'inizio e la fine dell'intervallo.",
       ),
     ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Dal'), { target: { value: localInput(fiveDaysAgo) } });
