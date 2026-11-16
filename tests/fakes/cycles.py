@@ -24,7 +24,8 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.flows.cycle_filter import CycleDecision, CycleFilter
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -103,6 +104,22 @@ class InMemoryCycleRepositoryAdapter:
         )
         return of_flow[offset : offset + limit]
 
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        return sum(
+            1
+            for record in self.records
+            if record.flow_id == flow_id
+            and record.outcome is CycleOutcome.FAILED
+            and window.contains(record.planned_at)
+        )
+
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        matched = [record for record in self.newest(flow_id, 0, len(self.records)) if _matches(record, criteria)]
+        return matched[offset : offset + limit]
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        return len(self.matching(flow_id, criteria, 0, len(self.records)))
+
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         return next(
             (record for record in self.records if (record.flow_id, record.planned_at) == (flow_id, planned_at)), None
@@ -129,6 +146,15 @@ class InMemoryCycleHistoryAdapter:
 
     def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
         return self._cycles.newest(flow_id, offset, limit) if self._owns(flow_id) else []
+
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        return self._cycles.failed_within(flow_id, window) if self._owns(flow_id) else 0
+
+    def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
+        return self._cycles.matching(flow_id, criteria, offset, limit) if self._owns(flow_id) else []
+
+    def count(self, flow_id: UUID, criteria: CycleFilter) -> int:
+        return self._cycles.count(flow_id, criteria) if self._owns(flow_id) else 0
 
     def at(self, flow_id: UUID, planned_at: datetime) -> CycleRecord | None:
         return self._cycles.at(flow_id, planned_at) if self._owns(flow_id) else None
@@ -242,12 +268,23 @@ class FakeCycleEndAdapter:
         return self._flows.update(flow_id, anchor, executions)
 
 
+class FakeFlowActivityAdapter:
+    """Whether a flow runs cycles, from its status in the fake flows."""
+
+    def __init__(self, flows: FakeFlowsAdapter) -> None:
+        self._flows = flows
+
+    def execute(self, flow_id: UUID) -> bool:
+        return self._flows.flows[flow_id].status == ACTIVE
+
+
 class FakeFlowsAdapter:
     """The flows context as the cycle sees it: schedules, state, pause."""
 
     def __init__(self, failures: Failures) -> None:
         self.flows: dict[UUID, FakeFlow] = {}
         self.updates: list[tuple[UUID, Sequence[object]]] = []
+        self.reads: list[UUID] = []
         self._failures = failures
 
     def active_of_every_tenant(self) -> list[TenantScheduledFlow]:
@@ -258,6 +295,7 @@ class FakeFlowsAdapter:
         ]
 
     def read(self, flow_id: UUID, anchor: datetime) -> FlowSnapshot:  # noqa: ARG002 - the signature of the port
+        self.reads.append(flow_id)
         self._failures.raise_if_failing(flow_id, CycleStep.READ_FLOW_STATE)
         flow = self.flows[flow_id]
         return FlowSnapshot(flow.sources, {"flow": flow.name, "positions": sorted(flow.positions)})
@@ -426,3 +464,25 @@ class InMemoryCycleCheckpointsAdapter:
     @contextmanager
     def opened(self) -> Iterator[BaseCheckpointSaver[str]]:
         yield self.saver
+
+
+# The actions of the agent as the journal of the cycle records them in the document of the decision (R1.7.1).
+RECORDED_ACTIONS = {CycleDecision.OPENING: "apri", CycleDecision.CLOSING: "chiudi", CycleDecision.HOLDING: "mantieni"}
+
+
+def _matches(record: CycleRecord, criteria: CycleFilter) -> bool:
+    return (
+        (criteria.outcome is None or record.outcome is criteria.outcome)
+        and (criteria.decision is None or _decided(record, criteria.decision))
+        and criteria.window.contains(record.planned_at)
+    )
+
+
+def _decided(record: CycleRecord, decision: CycleDecision) -> bool:
+    document = record.document(CycleStep.AGENT_DECISION) or {}
+    decisions = document.get("decisioni", [])
+    items = decisions if isinstance(decisions, list) else []
+    actions = {item.get("action") for item in items if isinstance(item, dict)}
+    if decision is CycleDecision.NONE:
+        return not actions
+    return RECORDED_ACTIONS[decision] in actions

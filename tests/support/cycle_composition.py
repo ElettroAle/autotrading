@@ -11,6 +11,7 @@ from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolCon
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
+from autotrading.application.agent.list_agent_actions import ListAgentActionsUseCase
 from autotrading.application.agent.model_gateways import ModelGateways
 from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.flows.check_risk import CheckRiskUseCase
@@ -34,6 +35,7 @@ from autotrading.application.flows.ports import (
     PlannedFlowsPort,
 )
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
+from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
@@ -130,7 +132,7 @@ def run_cycle_for(
             services.clock,
         ),
         calls=ThreadPoolConcurrentCallsAdapter(),
-        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), services.clock),
+        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), ListAgentActionsUseCase(), services.clock),
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
                 ComposeAgentContextUseCase(),
@@ -149,6 +151,7 @@ def run_cycle_for(
         pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
         clock=services.clock,
         failures=ports.cycle_failure,
+        activity=ReadFlowActivityUseCase(ports.flows),
     )
     return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
 

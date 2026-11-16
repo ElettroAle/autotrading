@@ -128,7 +128,7 @@ export const DashboardLayout = ({ title, children }: { title: string; children: 
           ))}
         </nav>
         <main className="mx-auto w-full max-w-4xl min-w-0 p-4 md:p-6">
-          <h1 className="mb-4 text-2xl font-semibold">{title}</h1>
+          <h1 className="mb-4 text-2xl font-semibold wrap-anywhere">{title}</h1>
           <RefreshBar pageData={pageData} />
           {children}
         </main>

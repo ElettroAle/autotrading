@@ -18,6 +18,8 @@ CATALOG_TIMEOUT_SECONDS = 10.0
 # OpenRouter adds and retires models every day; a few minutes are enough to see them.
 REFRESH_SECONDS = 300.0
 TEXT = "text"
+# The call asks the answer in a strict format (ADR risposta-del-modello-con-schema-rigido): no model without it answers.
+STRICT_FORMAT = "structured_outputs"
 TEMPERATURE_MINIMUM, TEMPERATURE_MAXIMUM, DEFAULT_TEMPERATURE = Decimal(0), Decimal(2), Decimal(1)
 DEFAULT_MAX_TOKENS = Decimal(4096)
 REASONING_LEVELS = ("basso", "medio", "alto")
@@ -83,7 +85,10 @@ def _definition_of(entry: Entry) -> ModelDefinition | None:
     architecture = entry["architecture"]
     if not isinstance(architecture, Mapping) or TEXT not in _strings(architecture.get("output_modalities")):
         return None
-    parameters = tuple(_parameters(_strings(entry.get("supported_parameters")), _longest(entry)))
+    supported = _strings(entry.get("supported_parameters"))
+    if STRICT_FORMAT not in supported:
+        return None
+    parameters = tuple(_parameters(supported, _longest(entry)))
     return ModelDefinition(PREFIX + str(entry["id"]), parameters, _prices(entry))
 
 

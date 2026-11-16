@@ -62,7 +62,7 @@ describe('startApp', () => {
 
     render(await startApp());
 
-    expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('alfa');
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/dashboard/flows/flow-alfa');
   });
 });

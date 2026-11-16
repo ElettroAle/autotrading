@@ -59,6 +59,21 @@ describe('ClosedPositions', () => {
     ]);
   });
 
+  it('rounds the prices averaged over several fills (Bug 431)', async () => {
+    fakePlatform.recordClosedPositions('alfa', [
+      aClosedPosition({
+        closedAt: LAST,
+        openPrice: '63996.0322580645161290322580',
+        closePrice: '0.123456789',
+      }),
+    ]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const [first] = await rowsOf();
+    expect(within(first as HTMLElement).getByText('63.996,03')).toBeInTheDocument();
+    expect(within(first as HTMLElement).getByText('0,123457')).toBeInTheDocument();
+  });
+
   it('shows a gain in green and a loss in red', async () => {
     fakePlatform.recordClosedPositions('alfa', [
       aClosedPosition({ closedAt: LAST, pnl: '-2', margin: '100' }),
@@ -122,5 +137,93 @@ describe('ClosedPositions', () => {
     await renderApp({ account: 'anna', url: URL });
 
     expect(await screen.findByRole('alert')).toHaveTextContent('flusso non trovato');
+  });
+
+  describe('with filters', () => {
+    const SHORT_WON = { side: 'short', pnl: '3', fees: '0.1' };
+    const LONG_LOST = { side: 'long', pnl: '-2', fees: '0.1' };
+
+    it('shows only the lost positions, with how many they are', async () => {
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: LAST, ...SHORT_WON }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - HOUR), ...SHORT_WON }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - 2 * HOUR), ...LONG_LOST }),
+      ]);
+      const user = userEvent.setup();
+      await renderApp({ account: 'anna', url: URL });
+      expect(await screen.findByText('3 posizioni')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Perse' }));
+
+      expect(await screen.findByText('1 posizione')).toBeInTheDocument();
+      const [row] = await rowsOf();
+      expect(row).toHaveTextContent('long');
+    });
+
+    it('offers the side, the result and the assets of the flow', async () => {
+      fakePlatform.changeFlow('alfa', { assets: ['BTC', 'ETH'] });
+      fakePlatform.recordClosedPositions('alfa', closedBack(1));
+      await renderApp({ account: 'anna', url: `${URL}?side=short` });
+
+      expect(await screen.findByRole('group', { name: 'Direzione' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Short' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('group', { name: 'Risultato' })).toBeInTheDocument();
+      const assets = screen.getByRole('group', { name: 'Asset' });
+      expect(
+        await within(assets)
+          .findAllByRole('button')
+          .then((buttons) => buttons.map((b) => b.textContent)),
+      ).toEqual(['Tutti', 'BTC', 'ETH']);
+    });
+
+    it('shows the positions of one asset', async () => {
+      fakePlatform.changeFlow('alfa', { assets: ['BTC', 'ETH'] });
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: LAST, asset: 'ETH' }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - HOUR) }),
+      ]);
+      const user = userEvent.setup();
+      await renderApp({ account: 'anna', url: URL });
+
+      await user.click(await screen.findByRole('button', { name: 'ETH' }));
+
+      expect(await screen.findByText('1 posizione')).toBeInTheDocument();
+      expect(await rowsOf()).toHaveLength(1);
+    });
+  });
+
+  // ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune: the period of the page holds for the closed positions too.
+  describe('in the period of the page, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune', () => {
+    it('shows only the positions closed in the days of the period', async () => {
+      fakePlatform.recordClosedPositions('alfa', closedBack(48));
+      await renderApp({
+        account: 'anna',
+        url: `${URL}?period=range&from=2026-11-13&to=2026-11-13`,
+      });
+
+      const rows = await rowsOf();
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach((row) => expect(row).toHaveTextContent('13/11/2026'));
+    });
+
+    it('says no position was closed in the period', async () => {
+      fakePlatform.recordClosedPositions('alfa', closedBack(1));
+      await renderApp({
+        account: 'anna',
+        url: `${URL}?period=range&from=2026-10-01&to=2026-10-02`,
+      });
+
+      expect(
+        await screen.findByText('Nessuna posizione chiusa nel periodo scelto.'),
+      ).toBeInTheDocument();
+    });
+
+    it('waits for both days of a range', async () => {
+      await renderApp({ account: 'anna', url: `${URL}?period=range&to=2026-10-02` });
+
+      expect(
+        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      ).toBeInTheDocument();
+    });
   });
 });

@@ -46,6 +46,9 @@ accounts = Table(
     Column("name", Text, nullable=False),
     Column("exchange", Text, nullable=False),
     Column("exchange_account_fingerprint", Text, nullable=False),
+    # The fields the exchange declares public, in clear; empty for an account registered before they were kept
+    # (Bug 401, ADR campi-pubblici-del-conto-conservati-in-chiaro).
+    Column("exchange_account_public_fields", JSON),
     # Empty once the account is removed: the row stays for its history, the credentials do not (ADR 0025).
     Column("credentials_key_version", Integer),
     Column("credentials_ciphertext", LargeBinary),
@@ -390,4 +393,20 @@ flow_position_totals = Table(
     Column("asset", Text, primary_key=True),
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
     Column("size", Numeric, nullable=False),
+)
+
+# The messages to external systems until they are delivered: the queue of the outbox carries only their identity (ADR
+# outbox-delle-integrazioni-esterne-con-procrastinate).
+outbox_messages = Table(
+    "outbox_messages",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("integration", Text, nullable=False),
+    Column("payload", JSON, nullable=False),
+    Column("status", Text, nullable=False, server_default="pending"),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_error", Text),
 )

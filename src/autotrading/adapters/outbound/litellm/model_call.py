@@ -12,6 +12,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.ports import ModelReply
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
+from autotrading.domain.agent.answer_format import AnswerFormat
 from autotrading.domain.agent.errors import InvalidModelUsageError
 from autotrading.domain.agent.model_definition import PROVIDER_SEPARATOR
 from autotrading.domain.agent.model_parameter import ParameterValue
@@ -32,9 +33,10 @@ UNEXPECTED_ANSWER = "risposta del fornitore inattesa"
 
 type Settings = Mapping[str, ParameterValue]
 type Completion = Callable[..., object]
+type StrictFormatSupport = Callable[[str], bool]
 
 EFFORTS: Mapping[str, str] = {"basso": "low", "medio": "medium", "alto": "high"}
-JSON_ANSWER: Mapping[str, str] = {"type": "json_object"}
+ANY_JSON: Mapping[str, str] = {"type": "json_object"}
 
 
 class LiteLlmModelCallAdapter:
@@ -44,17 +46,40 @@ class LiteLlmModelCallAdapter:
     the context. No retry: the next cycle is the new attempt, a retry would spend the credit of the user again.
     """
 
-    def __init__(self, completion: Completion, timeout_seconds: float) -> None:
+    def __init__(
+        self, completion: Completion, supports_strict_format: StrictFormatSupport, timeout_seconds: float
+    ) -> None:
         self._completion = completion
+        self._supports_strict_format = supports_strict_format
         self._timeout_seconds = timeout_seconds
 
-    def call(self, model: str, key: ProviderKey, settings: Settings, messages: tuple[ModelMessage, ...]) -> ModelReply:
+    def call(
+        self,
+        model: str,
+        key: ProviderKey,
+        settings: Settings,
+        messages: tuple[ModelMessage, ...],
+        answer: AnswerFormat,
+    ) -> ModelReply:
         provider = ProviderName(model.partition(PROVIDER_SEPARATOR)[0])
-        answer = self._complete(provider, key, _request(model, key, settings, messages))
+        request = _request(model, key, settings, messages)
+        request["response_format"] = self._response_format(model, answer)
+        reply = self._complete(provider, key, request)
         try:
-            return _reply_of(answer)
+            return _reply_of(reply)
         except (IndexError, InvalidModelUsageError) as error:
             raise ModelUnavailableError(provider, UNEXPECTED_ANSWER) from error
+
+    def _response_format(self, model: str, answer: AnswerFormat) -> Mapping[str, object]:
+        """Enforced where the library declares the model able to (ADR risposta-del-modello-con-schema-rigido).
+
+        A capability the library declares for the model, never a branch per provider: any other model is asked for
+        JSON and its answer is read like every other. The library never validates the answer itself: it would fail
+        the call and lose the answer and its cost, which the cycle keeps (R1.4.5).
+        """
+        if not self._supports_strict_format(model):
+            return ANY_JSON
+        return {"type": "json_schema", "json_schema": {"name": answer.name, "strict": True, "schema": answer.schema}}
 
     def _complete(self, provider: ProviderName, key: ProviderKey, request: dict[str, object]) -> object:
         try:
@@ -86,7 +111,6 @@ def _request(model: str, key: ProviderKey, settings: Settings, messages: tuple[M
         "model": model,
         "messages": [{"role": _role(message), "content": message.content} for message in messages],
         "max_tokens": int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS))),
-        "response_format": JSON_ANSWER,
     }
     # The key travels as the parameters its provider declared, by name, in this call only (ADR 0159).
     request.update(key.values)

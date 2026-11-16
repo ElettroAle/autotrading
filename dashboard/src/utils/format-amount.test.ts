@@ -1,6 +1,8 @@
 import {
   formatAmount,
+  formatGain,
   formatPercent,
+  formatPrice,
   formatRate,
   formatRoundedAmount,
   formatRoundedResult,
@@ -73,4 +75,37 @@ describe('formatUsd', () => {
     expect(formatUsd('0')).toBe('0,00');
     expect(formatUsd('0.0031')).toBe('0,0031');
   });
+});
+
+describe('formatGain', () => {
+  it.each([
+    ['2.5', '+2,50'],
+    ['-1.2', '-1,20'],
+    ['0', '0,00'],
+    ['12345.678', '+12.345,68'],
+  ])('writes the gain %s with its sign and the cents as %s', (gain, written) => {
+    expect(formatGain(gain)).toBe(written);
+  });
+});
+
+// Proof of ADR formato-dei-prezzi-condiviso: one shared format for every price column.
+describe('formatPrice (ADR formato-dei-prezzi-condiviso)', () => {
+  it.each([
+    ['63996.0322580645161290322580', '63.996,03'],
+    ['3000', '3000'],
+    ['3150.5', '3150,5'],
+    ['1000', '1000'],
+    ['1000.005', '1000,01'],
+    ['91000.5', '91.000,5'],
+    ['999.123456789', '999,123'],
+    ['0.5', '0,5'],
+    ['0.000123456789', '0,000123457'],
+    ['12.3456789', '12,3457'],
+    ['0', '0'],
+  ])(
+    'writes the price %s at two decimals from 1000, at six significant digits below, as %s',
+    (price, written) => {
+      expect(formatPrice(price)).toBe(written);
+    },
+  );
 });

@@ -18,6 +18,7 @@ class AccountPosition:
     unrealized_pnl: Decimal
     leverage: int
     entry_price: Decimal
+    mark_price: Decimal
 
     @property
     def unrealized_pnl_percent(self) -> Decimal | None:

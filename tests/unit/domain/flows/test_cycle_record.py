@@ -1,8 +1,11 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
+
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.errors import UnknownCycleOutcomeError
 
 
 def test_a_skipped_cycle_keeps_only_its_planned_instant() -> None:
@@ -47,3 +50,16 @@ def test_a_step_the_cycle_never_got_to_has_no_document() -> None:
 
     assert record.document(CycleStep.ORDER_EXECUTION) is None
     assert (record.documents, record.cost) == ((), None)
+
+
+def test_an_outcome_is_named_by_its_italian_word() -> None:
+    assert CycleOutcome.named("fallito") is CycleOutcome.FAILED
+
+
+def test_an_outcome_nobody_records_is_refused_with_the_outcomes_to_choose_from() -> None:
+    with pytest.raises(
+        UnknownCycleOutcomeError, match="esito non valido: scegliere tra concluso, fallito, saltato"
+    ) as raised:
+        CycleOutcome.named("failed")
+
+    assert raised.value.outcomes == ("concluso", "fallito", "saltato")

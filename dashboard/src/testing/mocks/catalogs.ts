@@ -33,6 +33,17 @@ export type FakeSource = {
 /** The assets the exchange of the fake installation trades now, as the API lists them: by name (ADR 0147). */
 export const FAKE_TRADABLE_ASSETS: readonly string[] = ['BTC', 'ETH', 'SOL'];
 
+/** The default system prompt of the fake platform and the placeholders it declares (R1.4.8). */
+export const FAKE_SYSTEM_PROMPT = {
+  system_prompt: '{instructions}\n\nRegole operative:\n- leva da 1 a {max_leverage} su {assets}',
+  system_prompt_placeholders: [
+    { name: 'instructions', description: "le istruzioni dell'agente del flusso" },
+    { name: 'actions', description: 'le azioni ammesse per ogni asset' },
+    { name: 'max_leverage', description: 'la leva massima del flusso' },
+    { name: 'assets', description: 'gli asset del flusso' },
+  ],
+};
+
 const TEMPERATURE: FakeModelParameter = {
   key: 'temperature',
   label: 'temperatura',

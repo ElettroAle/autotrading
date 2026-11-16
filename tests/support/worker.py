@@ -7,6 +7,7 @@ from secrets import token_hex
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
+from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.orders.close_exchange_position import CloseExchangePositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
@@ -30,6 +31,7 @@ from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapt
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.platform import HYPERLIQUID, new_credentials
@@ -53,6 +55,9 @@ class Worker:
         self.flows = FlowStore()
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        # The worker of the outbox is up: a notification is delivered as soon as it is queued.
+        self.outbox = InMemoryOutboxAdapter()
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
         self.activity_reader = FakeActivityReaderAdapter()
         self.exchange.trades_on(self.order_exchange)
 
@@ -76,7 +81,7 @@ class Worker:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.messenger),
+            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 

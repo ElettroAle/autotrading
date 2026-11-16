@@ -13,6 +13,7 @@ from autotrading.adapters.outbound.sqlalchemy.tables import cycles
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_record import (
     AbsentSource,
     CycleFailure,
@@ -123,6 +124,19 @@ def test_the_costs_are_those_of_the_cycles_that_called_the_model(database: Engin
     ]
 
 
+def test_the_failed_cycles_are_counted_in_the_window(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    for hours in range(3):
+        repository.record(a_failed_cycle(flow_id, PLANNED + timedelta(hours=hours)))
+    repository.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(hours=1, minutes=15)))
+
+    window = TimeWindow(since=PLANNED + timedelta(hours=1), until=PLANNED + timedelta(hours=2))
+
+    assert repository.failed_within(flow_id, window) == 1
+    assert repository.failed_within(flow_id, TimeWindow()) == 3
+
+
 def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
     other_tenant, _ = new_flow(database)
@@ -133,6 +147,7 @@ def test_the_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
     assert other.at(flow_id, PLANNED) is None
     assert other.costs(flow_id) == []
     assert other.costs_within(flow_id, TimeWindow()) == []
+    assert other.failed_within(flow_id, TimeWindow()) == 0
 
 
 def test_a_tenant_cannot_record_a_cycle_of_a_flow_of_another_tenant(database: Engine) -> None:
@@ -172,3 +187,72 @@ def test_the_costs_within_a_window_are_those_of_the_cycles_planned_from_its_star
 
     assert [cost.planned_at for cost in repository.costs_within(flow_id, window)] == instants[1:3]
     assert [cost.planned_at for cost in repository.costs_within(flow_id, TimeWindow())] == instants
+
+
+def a_cycle_deciding(flow_id: UUID, minutes: int, *actions: str) -> CycleRecord:
+    decisions = [{"tipo": "Decision", "asset": "BTC", "action": action, "reasoning": "r"} for action in actions]
+    return CycleRecord(
+        flow_id,
+        PLANNED + timedelta(minutes=minutes),
+        CycleOutcome.COMPLETED,
+        documents=(
+            StepDocument(CycleStep.COMPOSE_CONTEXT, {"messaggi": []}),
+            StepDocument(CycleStep.AGENT_DECISION, {"risposta": "{}", "decisioni": decisions, "scartate": []}),
+        ),
+    )
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: PostgreSQL filters and counts, so the pages stay right.
+def test_the_cycles_are_filtered_by_outcome_decision_and_days_and_counted(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    opening = a_cycle_deciding(flow_id, 0, "apri")
+    closing_and_holding = a_cycle_deciding(flow_id, 15, "mantieni", "chiudi")
+    nothing_decided = a_cycle_deciding(flow_id, 30)
+    failed = a_failed_cycle(flow_id, PLANNED + timedelta(minutes=45))
+    skipped = CycleRecord.skipped(flow_id, PLANNED + timedelta(minutes=60))
+    next_day = a_cycle_deciding(flow_id, 24 * 60, "apri")
+    for record in (opening, closing_and_holding, nothing_decided, failed, skipped, next_day):
+        repository.record(record)
+
+    def matched(criteria: CycleFilter) -> list[datetime]:
+        return [record.planned_at for record in repository.matching(flow_id, criteria, 0, 50)]
+
+    assert matched(CycleFilter.named(outcome="fallito")) == [failed.planned_at]
+    assert matched(CycleFilter.named(decision="apertura")) == [next_day.planned_at, opening.planned_at]
+    assert matched(CycleFilter.named(decision="chiusura")) == [closing_and_holding.planned_at]
+    assert matched(CycleFilter.named(decision="mantenimento")) == [closing_and_holding.planned_at]
+    assert matched(CycleFilter.named(decision="nessuna")) == [
+        skipped.planned_at,
+        failed.planned_at,
+        nothing_decided.planned_at,
+    ]
+    day = PLANNED.date()
+    assert matched(CycleFilter.named(outcome="concluso", decision="apertura", first_day=day, last_day=day)) == [
+        opening.planned_at
+    ]
+    assert repository.count(flow_id, CycleFilter.named(outcome="concluso")) == 4
+    assert repository.count(flow_id, CycleFilter()) == 6
+
+
+def test_the_filtered_cycles_come_in_pages_and_leave_out_those_still_running(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    for minutes in range(0, 75, 15):
+        repository.record(a_cycle_deciding(flow_id, minutes, "apri"))
+    repository.claim(flow_id, PLANNED + timedelta(minutes=90))
+    criteria = CycleFilter.named(decision="nessuna")
+
+    page = repository.matching(flow_id, CycleFilter(), 1, 2)
+
+    assert [record.planned_at for record in page] == [PLANNED + timedelta(minutes=45), PLANNED + timedelta(minutes=30)]
+    assert (repository.matching(flow_id, criteria, 0, 50), repository.count(flow_id, criteria)) == ([], 0)
+
+
+def test_the_filtered_cycles_of_another_tenant_stay_invisible(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    other_tenant, _ = new_flow(database)
+    SqlAlchemyCycleRepositoryAdapter(database, tenant_id).record(a_failed_cycle(flow_id))
+    other = SqlAlchemyCycleRepositoryAdapter(database, other_tenant)
+
+    assert (other.matching(flow_id, CycleFilter(), 0, 50), other.count(flow_id, CycleFilter())) == ([], 0)

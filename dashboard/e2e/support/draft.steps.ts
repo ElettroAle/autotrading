@@ -11,6 +11,7 @@ import { onFlowPage } from './flow-page';
 const NOT_ASSIGNED = 'da assegnare';
 
 Then('non ha conto, capitale allocato né asset', async ({ dashboard }) => {
+  await dashboard.openConfiguration();
   await expect(dashboard.detail('Conto')).toHaveText(NOT_ASSIGNED);
   await expect(dashboard.detail('Capitale allocato')).toHaveText(NOT_ASSIGNED);
   await expect(dashboard.detail('Asset')).toHaveText(NOT_ASSIGNED);
@@ -28,6 +29,7 @@ When(
   ) => {
     await onFlowPage(dashboard, memory, account, flow);
     await dashboard.assign(accountName, String(capital), asset);
+    await dashboard.openConfiguration();
     await expect(dashboard.detail('Conto')).toHaveText(accountName);
   },
 );

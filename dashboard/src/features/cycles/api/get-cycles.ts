@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { ListDays } from '@/components/ui/period-selector/use-period';
+import type { TableFilterValues } from '@/hooks/use-table-filters';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
@@ -21,20 +23,33 @@ const cycleSummarySchema = z.object({
 const cyclePageSchema = z.object({
   page: z.number(),
   has_next: z.boolean(),
+  total: z.number(),
   cycles: z.array(cycleSummarySchema),
 });
 
 export type CycleSummary = z.infer<typeof cycleSummarySchema>;
 
-/** The cycles of a flow from the most recent, in the pages of the API (R1.7.3). */
-export const useCycles = (flowId: string, page: number) => {
+/**
+ * The cycles of a flow that match the filters, from the most recent, in the pages of the API, with how many match in
+ * all (R1.7.3, R6.4.4). The page shown stays while the next filters are read.
+ */
+export const useCycles = (
+  flowId: string,
+  page: number,
+  filters: TableFilterValues,
+  days: ListDays,
+) => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('cycles', flowId, page),
+    ...pageDataQuery('cycles', flowId, page, filters, days),
+    placeholderData: keepPreviousData,
     queryFn: async () =>
       readData(
         await api.GET('/flows/{flow_id}/cycles', {
-          params: { path: { flow_id: flowId }, query: { page } },
+          params: {
+            path: { flow_id: flowId },
+            query: { page, outcome: filters.outcome, decision: filters.decision, ...days },
+          },
         }),
         cyclePageSchema,
       ),

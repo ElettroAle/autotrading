@@ -150,6 +150,7 @@ def _row_of(account: Account) -> dict[str, object]:
         "name": account.name.value,
         "exchange": account.exchange.value,
         "exchange_account_fingerprint": account.exchange_account.fingerprint,
+        "exchange_account_public_fields": _public_fields_of(account.exchange_account),
         "credentials_key_version": account.credentials.key_version,
         "credentials_ciphertext": account.credentials.ciphertext,
     }
@@ -161,6 +162,10 @@ def _account_of(row: RowMapping) -> Account:
         TenantId(row["tenant_id"]),
         AccountName(row["name"]),
         ExchangeName(row["exchange"]),
-        ExchangeAccount(row["exchange_account_fingerprint"]),
+        ExchangeAccount(row["exchange_account_fingerprint"], row["exchange_account_public_fields"]),
         SealedCredentials(row["credentials_key_version"], row["credentials_ciphertext"]),
     )
+
+
+def _public_fields_of(exchange_account: ExchangeAccount) -> dict[str, str] | None:
+    return None if exchange_account.public_fields is None else dict(exchange_account.public_fields)

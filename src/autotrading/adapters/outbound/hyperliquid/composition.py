@@ -1,7 +1,12 @@
 from autotrading.adapters.configuration.source import ConfigurationSource
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
-from autotrading.adapters.outbound.hyperliquid.configuration import _order_settings_of, _settings_of
-from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
+from autotrading.adapters.outbound.hyperliquid.configuration import _order_settings_of
+from autotrading.adapters.outbound.hyperliquid.exchange import (
+    EXCHANGE_NAME,
+    TESTNET_EXCHANGE_NAME,
+    HyperliquidExchangeAdapter,
+    HyperliquidTestnetExchangeAdapter,
+)
 from autotrading.adapters.outbound.hyperliquid.executions import HyperliquidAccountExecutionsAdapter
 from autotrading.adapters.outbound.hyperliquid.market_data import (
     HyperliquidMarketDataAdapter,
@@ -22,19 +27,29 @@ type HyperliquidAdaptersOfInstallation = tuple[
 ]
 
 
-def hyperliquid_adapters(source: ConfigurationSource) -> HyperliquidAdaptersOfInstallation:
-    """The adapters by exchange name, for the use cases that pick the exchange of an account, and the market data,
-    all on the network the installation declares."""
-    settings = _settings_of(source)
-    testnet = settings.testnet
+def hyperliquid_adapters() -> HyperliquidAdaptersOfInstallation:
+    """The adapters by exchange name, Hyperliquid and Hyperliquid Testnet in every installation, for the use cases that
+    pick the exchange of an account; the market sources read the real market (R2.3.11)."""
     return (
-        {settings.name: HyperliquidExchangeAdapter.for_network(testnet=testnet)},
-        {settings.name: HyperliquidMarketsAdapter.for_network(testnet=testnet)},
-        {settings.name: HyperliquidOrderExchangeAdapter.for_network(testnet=testnet)},
-        {settings.name: HyperliquidAccountActivityAdapter.for_network(testnet=testnet)},
-        {settings.name: HyperliquidAccountExecutionsAdapter.for_network(testnet=testnet)},
-        HyperliquidPriceHistoryAdapter.for_network(testnet=testnet),
-        HyperliquidMarketDataAdapter.for_network(testnet=testnet),
+        {EXCHANGE_NAME: HyperliquidExchangeAdapter(), TESTNET_EXCHANGE_NAME: HyperliquidTestnetExchangeAdapter()},
+        {
+            EXCHANGE_NAME: HyperliquidMarketsAdapter.for_network(testnet=False),
+            TESTNET_EXCHANGE_NAME: HyperliquidMarketsAdapter.for_network(testnet=True),
+        },
+        {
+            EXCHANGE_NAME: HyperliquidOrderExchangeAdapter.for_network(testnet=False),
+            TESTNET_EXCHANGE_NAME: HyperliquidOrderExchangeAdapter.for_network(testnet=True),
+        },
+        {
+            EXCHANGE_NAME: HyperliquidAccountActivityAdapter.for_network(testnet=False),
+            TESTNET_EXCHANGE_NAME: HyperliquidAccountActivityAdapter.for_network(testnet=True),
+        },
+        {
+            EXCHANGE_NAME: HyperliquidAccountExecutionsAdapter.for_network(testnet=False),
+            TESTNET_EXCHANGE_NAME: HyperliquidAccountExecutionsAdapter.for_network(testnet=True),
+        },
+        HyperliquidPriceHistoryAdapter.for_network(testnet=False),
+        HyperliquidMarketDataAdapter.for_network(testnet=False),
     )
 
 

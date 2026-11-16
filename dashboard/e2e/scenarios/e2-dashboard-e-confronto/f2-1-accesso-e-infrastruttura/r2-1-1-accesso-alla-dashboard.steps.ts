@@ -79,14 +79,6 @@ Given("che l'accesso di {string} è scaduto", async ({ dashboard }, account: str
   await dashboard.page.clock.fastForward('02:00:00');
 });
 
-When(
-  '{string} apre la pagina del flusso {string}',
-  async ({ dashboard, memory }, account: string, flow: string) => {
-    memory.account = account;
-    await dashboard.openFlow(flow);
-  },
-);
-
 Then(
   "dopo l'accesso torna alla pagina del flusso {string}",
   async ({ dashboard, memory }, flow: string) => {

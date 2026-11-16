@@ -47,6 +47,12 @@ describe('DashboardLayout', () => {
     expect(screen.getByRole('button', { name: 'Aggiorna' })).toBeInTheDocument();
   });
 
+  it('breaks a title with a long word instead of pushing the page wider', () => {
+    renderLayout();
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveClass('wrap-anywhere');
+  });
+
   it('leads to every area of the dashboard from its navigation', () => {
     renderLayout();
 

@@ -1,6 +1,6 @@
 import type { UseFormRegisterReturn } from 'react-hook-form';
 
-import { InputField, SecretField } from './input-field';
+import { InputField, NOT_FOR_PASSWORD_MANAGERS, SecretField } from './input-field';
 
 /** A datum an exchange or a provider asks, as its adapter declares it to the API (R2.3.9, ADR 0158, ADR 0159). */
 export type DeclaredField = {
@@ -35,6 +35,8 @@ export const DeclaredFields = ({ fields, registerField, reasonOf }: DeclaredFiel
         key={field.name}
         label={field.label}
         error={error}
+        autoComplete="off"
+        {...NOT_FOR_PASSWORD_MANAGERS}
         {...registerField(field.name)}
       />
     );

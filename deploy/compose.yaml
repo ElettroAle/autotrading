@@ -75,8 +75,6 @@ services:
     command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/logging.json"]
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
-      # La rete di Hyperliquid la dichiara l'installazione, mai dedotta dal suo nome (Bug 277).
-      HYPERLIQUID_NETWORK: ${HYPERLIQUID_NETWORK:-}
       DATABASE_HOST: postgres
       DATABASE_NAME: autotrading
       DATABASE_USER: autotrading_app
@@ -116,7 +114,6 @@ services:
     image: ${API_IMAGE:-}
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
-      HYPERLIQUID_NETWORK: ${HYPERLIQUID_NETWORK:-}
       APP_VERSION: ${APP_VERSION:-}
       DATABASE_HOST: postgres
       DATABASE_NAME: autotrading

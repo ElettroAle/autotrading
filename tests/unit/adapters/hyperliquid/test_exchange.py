@@ -11,14 +11,20 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
-    INVALID_KEY_MESSAGE,
+    AGENT_NOT_AUTHORIZED_MESSAGE,
     MISSING_FIELD_MESSAGE,
     PROBE_COIN,
+    SIGNER_IS_AGENT_MESSAGE,
     TIMEOUT_SECONDS,
     HyperliquidExchangeAdapter,
     HyperliquidSdkAdapter,
+    HyperliquidTestnetExchangeAdapter,
 )
-from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.application.accounts.errors import (
+    CredentialFieldMalformedError,
+    ExchangeRejectedCredentialsError,
+    ExchangeUnavailableError,
+)
 from autotrading.application.flows.errors import FlowCredentialsRefusedError, FlowExchangeUnavailableError
 from autotrading.application.verification.errors import (
     VerificationCredentialsRejectedError,
@@ -40,8 +46,10 @@ BASE_URL = "https://api.hyperliquid-testnet.xyz"
 WALLET = EthereumAccount.create()
 ADDRESS = "0xAbCdEf0000000000000000000000000000000001"
 CREDENTIALS = hyperliquid_credentials(ADDRESS, WALLET.key.hex())
+KEY_DIGITS = WALLET.key.hex().removeprefix("0x")
 ACCEPTED = {"status": "ok", "response": {"type": "cancel", "data": {"statuses": [{"error": "never placed"}]}}}
 READ_AT_MS = 1_794_307_200_000
+READING_CALLS = ["exchange", "cancel", "info", "role", "user_state", "abstraction", "spot"]
 STATE = {
     "marginSummary": {"accountValue": "1234.56", "totalMarginUsed": "0.0"},
     "withdrawable": "1000.5",
@@ -53,6 +61,7 @@ LONG_BTC = {
     "szi": "0.02",
     "leverage": {"type": "cross", "value": 2},
     "entryPx": "60000.0",
+    "positionValue": "1225.0",
     "unrealizedPnl": "12.5",
     "liquidationPx": "31000.0",
     "marginUsed": "600.0",
@@ -65,6 +74,9 @@ class FakeSdk(HyperliquidSdkAdapter):
 
     cancel_answer: Any = field(default_factory=lambda: ACCEPTED)
     state: Any = field(default_factory=lambda: STATE)
+    abstraction: Any = "default"
+    role: Any = field(default_factory=lambda: {"role": "agent", "data": {"user": ADDRESS.lower()}})
+    spot: Any = field(default_factory=lambda: {"balances": []})
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -82,9 +94,25 @@ class FakeSdk(HyperliquidSdkAdapter):
             raise self.failure
         return self.cancel_answer
 
+    def user_role(self, user: str) -> Any:
+        self.calls.append(("role", user))
+        if isinstance(self.role, Exception):
+            raise self.role
+        return self.role
+
     def user_state(self, address: str) -> Any:
         self.calls.append(("user_state", address))
         return self.state
+
+    def query_user_abstraction_state(self, user: str) -> Any:
+        self.calls.append(("abstraction", user))
+        if isinstance(self.abstraction, Exception):
+            raise self.abstraction
+        return self.abstraction
+
+    def spot_user_state(self, address: str) -> Any:
+        self.calls.append(("spot", address))
+        return self.spot
 
 
 def read(sdk: FakeSdk, credentials: Credentials = CREDENTIALS) -> AccountState:
@@ -102,9 +130,18 @@ def test_reads_the_account_state_after_the_exchange_accepts_the_signer() -> None
         positions=(),
         read_at=datetime.fromtimestamp(READ_AT_MS / 1000, UTC),
     )
-    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+    assert [name for name, _ in sdk.calls] == [
+        "exchange",
+        "cancel",
+        "info",
+        "role",
+        "user_state",
+        "abstraction",
+        "spot",
+    ]
     assert sdk.calls[0][1] == (WALLET.address, BASE_URL, ADDRESS, TIMEOUT_SECONDS)
-    assert sdk.calls[3][1] == ADDRESS
+    assert sdk.calls[3][1] == WALLET.address
+    assert sdk.calls[4][1] == ADDRESS
 
 
 def test_the_probe_cancels_a_random_order_id_that_cannot_exist() -> None:
@@ -155,25 +192,101 @@ def test_an_exchange_that_does_not_answer_is_unavailable(failure: Exception) -> 
         read(FakeSdk(failure=failure))
 
 
-def test_a_malformed_key_is_rejected_without_reaching_the_exchange() -> None:
+@pytest.mark.parametrize(
+    ("key", "shape"),
+    [
+        ("not-a-key", "ricevuti 9 caratteri, di cui 7 non esadecimali"),
+        (ADDRESS, "ricevuti 42 caratteri"),
+        ("0x" + "ab" * 31, "ricevuti 64 caratteri"),
+        ("0x" + "zz" * 32, "ricevuti 66 caratteri, di cui 64 non esadecimali"),
+    ],
+)
+def test_a_key_of_the_wrong_shape_names_its_field_and_what_is_wrong_without_reaching_the_exchange(
+    key: str, shape: str
+) -> None:
     sdk = FakeSdk()
 
-    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
-        read(sdk, hyperliquid_credentials(ADDRESS, "not-a-key"))
+    with pytest.raises(CredentialFieldMalformedError) as raised:
+        read(sdk, hyperliquid_credentials(ADDRESS, key))
 
-    assert raised.value.exchange_message == INVALID_KEY_MESSAGE
+    assert raised.value.field == "secret_key"
+    assert raised.value.exchange_message == (
+        f"chiave dell'API wallet non valida: attese 64 cifre esadecimali, con o senza 0x; {shape}"
+    )
     assert sdk.calls == []
 
 
+@pytest.mark.parametrize(
+    ("address", "shape"),
+    [
+        ("1111111111111111111111111111111111111111", "ricevuti 40 caratteri"),
+        ("0x" + "1" * 39, "ricevuti 41 caratteri"),
+        ("0x" + "g" * 40, "ricevuti 42 caratteri, di cui 40 non esadecimali"),
+    ],
+)
+def test_an_address_of_the_wrong_shape_names_its_field_without_reaching_the_exchange(address: str, shape: str) -> None:
+    sdk = FakeSdk()
+
+    with pytest.raises(CredentialFieldMalformedError) as raised:
+        read(sdk, hyperliquid_credentials(address, WALLET.key.hex()))
+
+    assert raised.value.field == "account_address"
+    assert raised.value.exchange_message == (
+        f"indirizzo del conto non valido: atteso 0x seguito da 40 cifre esadecimali; {shape}"
+    )
+    assert sdk.calls == []
+
+
+def test_the_reason_of_a_wrong_shape_never_shows_the_value() -> None:
+    key = "0x" + "q7" * 32
+
+    with pytest.raises(CredentialFieldMalformedError) as raised:
+        read(FakeSdk(), hyperliquid_credentials(ADDRESS, key))
+
+    assert "q7" not in str(raised.value.details)
+
+
+@pytest.mark.parametrize("key", [KEY_DIGITS, "0x" + KEY_DIGITS.upper(), "0X" + KEY_DIGITS])
+def test_a_key_with_or_without_prefix_in_any_case_is_accepted(key: str) -> None:
+    sdk = FakeSdk()
+
+    read(sdk, hyperliquid_credentials(ADDRESS, key))
+
+    assert sdk.calls[0] == ("exchange", (WALLET.address, BASE_URL, ADDRESS, TIMEOUT_SECONDS))
+
+
 def test_positions_carry_side_size_leverage_prices_and_result() -> None:
-    short_eth = LONG_BTC | {"coin": "ETH", "szi": "-1.5", "leverage": {"type": "isolated", "value": 3}}
+    short_eth = LONG_BTC | {
+        "coin": "ETH",
+        "szi": "-1.5",
+        "leverage": {"type": "isolated", "value": 3},
+        "positionValue": "91875.0",
+    }
     entries = [{"type": "oneWay", "position": LONG_BTC}, {"type": "oneWay", "position": short_eth}]
 
     positions = read(FakeSdk(state=STATE | {"assetPositions": entries})).positions
 
     assert positions == (
-        Position("BTC", PositionSide.LONG, Decimal("0.02"), 2, Decimal(60000), Decimal("12.5"), Decimal(31000)),
-        Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(60000), Decimal("12.5"), Decimal(31000)),
+        Position(
+            "BTC",
+            PositionSide.LONG,
+            Decimal("0.02"),
+            2,
+            Decimal(60000),
+            Decimal(61250),
+            Decimal("12.5"),
+            Decimal(31000),
+        ),
+        Position(
+            "ETH",
+            PositionSide.SHORT,
+            Decimal("1.5"),
+            3,
+            Decimal(60000),
+            Decimal(61250),
+            Decimal("12.5"),
+            Decimal(31000),
+        ),
     )
 
 
@@ -203,13 +316,21 @@ def test_an_account_state_of_unexpected_shape_is_unavailable(state: object) -> N
         read(FakeSdk(state=state))
 
 
-@pytest.mark.parametrize(("testnet", "url"), [(True, TESTNET_API_URL), (False, MAINNET_API_URL)])
-def test_the_network_follows_the_installation(testnet: bool, url: str) -> None:
+def test_the_real_exchange_reads_the_account_on_the_real_network() -> None:
     sdk = FakeSdk()
 
-    HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=sdk).read_state(CREDENTIALS)
+    HyperliquidExchangeAdapter(sdk=sdk).read_state(CREDENTIALS)
 
-    assert sdk.calls[0][1][1] == url
+    assert sdk.calls[0][1][1] == MAINNET_API_URL
+
+
+def test_the_test_exchange_reads_the_account_on_the_testnet_the_same_way() -> None:
+    sdk = FakeSdk()
+
+    state = HyperliquidTestnetExchangeAdapter(sdk=sdk).read_state(CREDENTIALS)
+
+    assert sdk.calls[0][1][1] == TESTNET_API_URL
+    assert state == read(FakeSdk())
 
 
 VERIFICATION_ACCESS = VerificationAccess({"account_address": ADDRESS, "secret_key": WALLET.key.hex()})
@@ -223,7 +344,15 @@ def test_the_verification_reads_balance_margin_and_positions_proving_the_signer(
     assert reading == AccountReading(
         Decimal("1234.56"), Decimal("1000.5"), "USDC", (PositionReading("BTC", "long", Decimal("0.02"), 2),)
     )
-    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+    assert [name for name, _ in sdk.calls] == [
+        "exchange",
+        "cancel",
+        "info",
+        "role",
+        "user_state",
+        "abstraction",
+        "spot",
+    ]
 
 
 def test_a_signer_refused_is_a_failed_verification_step_without_the_message_of_the_exchange() -> None:
@@ -253,10 +382,25 @@ def test_the_cycle_reads_margin_and_positions_proving_the_signer() -> None:
     account = HyperliquidExchangeAdapter(BASE_URL, sdk).cycle_reading(CYCLE_ACCESS)
 
     position = CyclePosition(
-        "BTC", TradeSide.LONG, Decimal("0.02"), 2, Decimal("60000.0"), Decimal("12.5"), Decimal("31000.0")
+        "BTC",
+        TradeSide.LONG,
+        Decimal("0.02"),
+        2,
+        Decimal("60000.0"),
+        Decimal(61250),
+        Decimal("12.5"),
+        Decimal("31000.0"),
     )
     assert account == CycleAccount("USDC", Decimal("1000.5"), (position,))
-    assert [name for name, _ in sdk.calls] == ["exchange", "cancel", "info", "user_state"]
+    assert [name for name, _ in sdk.calls] == [
+        "exchange",
+        "cancel",
+        "info",
+        "role",
+        "user_state",
+        "abstraction",
+        "spot",
+    ]
 
 
 def test_a_signer_refused_is_a_refusal_of_the_credentials_of_the_flow() -> None:
@@ -281,9 +425,16 @@ def test_declares_the_address_of_the_account_and_the_key_of_the_api_wallet() -> 
     )
 
 
-@pytest.mark.parametrize(("testnet", "name"), [(True, "testnet"), (False, "mainnet")])
-def test_the_network_carries_the_name_hyperliquid_gives_it(testnet: bool, name: str) -> None:
-    assert HyperliquidExchangeAdapter.for_network(testnet=testnet, sdk=FakeSdk()).network_name() == name
+@pytest.mark.parametrize(
+    ("adapter", "real", "name"),
+    [(HyperliquidExchangeAdapter, True, "mainnet"), (HyperliquidTestnetExchangeAdapter, False, "testnet")],
+)
+def test_each_exchange_declares_its_network_with_the_name_hyperliquid_gives_it(
+    adapter: type[HyperliquidExchangeAdapter], real: bool, name: str
+) -> None:
+    exchange = adapter(sdk=FakeSdk())
+
+    assert (exchange.is_real(), exchange.network_name()) == (real, name)
 
 
 @pytest.mark.parametrize("missing", ["account_address", "secret_key"])
@@ -308,3 +459,93 @@ def test_a_verification_access_without_a_field_of_the_exchange_is_rejected() -> 
         HyperliquidExchangeAdapter(BASE_URL, FakeSdk()).verification_reading(
             VerificationAccess({"account_address": ADDRESS})
         )
+
+
+def test_sixty_four_hex_digits_that_are_no_key_of_the_curve_are_refused_by_field() -> None:
+    sdk = FakeSdk()
+
+    with pytest.raises(CredentialFieldMalformedError) as raised:
+        read(sdk, hyperliquid_credentials(ADDRESS, "0x" + "0" * 64))
+
+    assert (raised.value.field, raised.value.exchange_message) == ("secret_key", "chiave dell'API wallet non valida")
+    assert sdk.calls == []
+
+
+UNIFIED_SPOT = {"balances": [{"coin": "USDC", "token": 0, "total": "999.0", "hold": "0.0", "entryNtl": "0.0"}]}
+EMPTY_PERPS = {
+    "marginSummary": {"accountValue": "0.0"},
+    "withdrawable": "0.0",
+    "assetPositions": [],
+    "time": READ_AT_MS,
+}
+
+
+def test_a_unified_account_reads_the_usdc_it_holds_as_balance_and_available_margin() -> None:
+    sdk = FakeSdk(state=EMPTY_PERPS, abstraction="unifiedAccount", spot=UNIFIED_SPOT)
+
+    state = read(sdk)
+
+    assert (state.balance, state.available_margin) == (Balance(Decimal(999), "USDC"), Balance(Decimal(999), "USDC"))
+    assert ("abstraction", ADDRESS) in sdk.calls
+    assert ("spot", ADDRESS) in sdk.calls
+
+
+@pytest.mark.parametrize("answer", ["spot", "abstraction"])
+def test_a_mode_or_spot_state_the_exchange_does_not_give_makes_it_unavailable(answer: str) -> None:
+    sdk = FakeSdk(abstraction="unifiedAccount", spot={"balances": [{"coin": "USDC"}]})
+    if answer == "abstraction":
+        sdk = FakeSdk(abstraction=ServerError(500, "down"))
+
+    with pytest.raises(ExchangeUnavailableError):
+        read(sdk)
+
+
+def test_an_api_wallet_approved_for_the_account_address_in_any_case_is_accepted() -> None:
+    sdk = FakeSdk(role={"role": "agent", "data": {"user": ADDRESS.upper().replace("0X", "0x")}})
+
+    assert read(sdk).balance == Balance(Decimal("1234.56"), "USDC")
+
+
+def test_the_account_signing_for_itself_is_accepted() -> None:
+    sdk = FakeSdk(role={"role": "user"})
+
+    assert read(sdk, hyperliquid_credentials(WALLET.address, WALLET.key.hex())).balance.currency == "USDC"
+
+
+def test_an_api_wallet_approved_for_another_account_is_rejected_without_reading_the_state() -> None:
+    sdk = FakeSdk(role={"role": "agent", "data": {"user": "0x" + "1" * 40}})
+
+    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
+        read(sdk)
+
+    assert raised.value.exchange_message == AGENT_NOT_AUTHORIZED_MESSAGE
+    assert "user_state" not in [name for name, _ in sdk.calls]
+
+
+@pytest.mark.parametrize("role", [{"role": "user"}, {"role": "missing"}, {"role": "vault"}])
+def test_a_signer_that_is_no_api_wallet_of_the_account_is_rejected(role: object) -> None:
+    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
+        read(FakeSdk(role=role))
+
+    assert raised.value.exchange_message == AGENT_NOT_AUTHORIZED_MESSAGE
+
+
+def test_the_address_of_the_api_wallet_given_as_address_of_the_account_is_rejected() -> None:
+    sdk = FakeSdk(role={"role": "agent", "data": {"user": ADDRESS.lower()}})
+
+    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
+        read(sdk, hyperliquid_credentials(WALLET.address.lower(), WALLET.key.hex()))
+
+    assert raised.value.exchange_message == SIGNER_IS_AGENT_MESSAGE
+    assert KEY_DIGITS not in str(raised.value.details)
+
+
+@pytest.mark.parametrize("role", [None, {"data": {}}, {"role": "agent"}, {"role": "agent", "data": {}}, "agent"])
+def test_a_role_of_unexpected_shape_makes_the_exchange_unavailable(role: object) -> None:
+    with pytest.raises(ExchangeUnavailableError):
+        read(FakeSdk(role=role))
+
+
+def test_a_role_the_exchange_does_not_give_makes_it_unavailable() -> None:
+    with pytest.raises(ExchangeUnavailableError):
+        read(FakeSdk(role=ServerError(500, "down")))

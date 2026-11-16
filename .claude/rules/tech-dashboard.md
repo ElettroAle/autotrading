@@ -35,8 +35,10 @@ dashboard/
 - Le cartelle `utils` e simili sono ammesse solo qui, per scelta del proprietario: la regola «nessuna cartella
   `common`/`utils`/`shared`» resta per il codice Python.
 - Le regole di struttura stanno in `eslint.architecture.js` (`import/no-restricted-paths`, `import/no-cycle`,
-  `check-file`); `architecture/structure.test.ts` prova ogni regola rossa su un esempio che la viola, silenziosa su
-  uno conforme, e la dashboard intera senza violazioni.
+  `check-file`); `architecture/structure.test.ts` prova ogni regola rossa su un esempio che la viola e silenziosa su
+  uno conforme. La dashboard intera senza violazioni la verificano i job obbligatori di lint: `npm run lint:architecture`
+  (`quality / architettura`) e `npm run lint` (`quality / stile`), che include le stesse regole (ADR
+  struttura-della-dashboard-verificata-dai-job-di-lint).
 
 ## Librerie
 

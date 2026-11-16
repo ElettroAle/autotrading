@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Protocol
 
 from autotrading.domain.agent.agent_context import ModelMessage
+from autotrading.domain.agent.answer_format import AnswerFormat
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
@@ -94,10 +95,19 @@ class ModelCatalogPort(Protocol):
 
 
 class ModelCallPort(Protocol):
-    """Calls a model of the catalog with the key of the user, from the worker only (ADR 0007)."""
+    """Calls a model of the catalog with the key of the user, from the worker only (ADR 0007).
+
+    The model is asked to answer in the given format, enforced by the provider where the model supports it (ADR
+    risposta-del-modello-con-schema-rigido).
+    """
 
     def call(
-        self, model: str, key: ProviderKey, settings: Mapping[str, ParameterValue], messages: tuple[ModelMessage, ...]
+        self,
+        model: str,
+        key: ProviderKey,
+        settings: Mapping[str, ParameterValue],
+        messages: tuple[ModelMessage, ...],
+        answer: AnswerFormat,
     ) -> ModelReply:
         """Raises ModelKeyRejectedError or ModelCreditExhaustedError (permanent), or ModelUnavailableError."""
         ...
@@ -132,6 +142,9 @@ class QuestionPositionPort(Protocol):
 
     @property
     def entry_price(self) -> Decimal: ...
+
+    @property
+    def mark_price(self) -> Decimal: ...
 
     @property
     def unrealized_pnl(self) -> Decimal: ...
@@ -191,13 +204,12 @@ class AgentQuestionPort(Protocol):
     def settings(self) -> Mapping[str, ParameterValue]: ...
 
     @property
-    def instructions(self) -> str: ...
+    def system_prompt(self) -> str:
+        """The system message of the flow, already rendered with its values (R1.4.8)."""
+        ...
 
     @property
     def assets(self) -> Sequence[str]: ...
-
-    @property
-    def max_leverage(self) -> int: ...
 
     @property
     def started_at(self) -> datetime: ...

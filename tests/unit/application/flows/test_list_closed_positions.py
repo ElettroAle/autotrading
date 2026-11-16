@@ -10,6 +10,7 @@ from autotrading.application.flows.list_closed_positions import (
     ListClosedPositionsUseCase,
 )
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
+from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.errors import InvalidPageNumberError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.trade_intent import TradeSide
@@ -132,3 +133,45 @@ def test_a_flow_of_another_tenant_does_not_exist(flows: FlowStore, positions: Cl
 
     assert raised.value.status_code == 404
     assert str(raised.value) == "flusso non trovato"
+
+
+def test_the_page_says_how_many_positions_match_in_all(flows: FlowStore, positions: ClosedPositionStore) -> None:
+    flow = a_flow(TENANT)
+    flows.flows.append(flow)
+    positions.positions.extend(a_position(flow, timedelta(minutes=minute)) for minute in range(60))
+
+    page = use_case(flows, positions).execute(ListClosedPositionsCommand(flow.id.value, page=2))
+
+    assert (len(page.positions), page.total) == (10, 60)
+
+
+def test_the_positions_filtered_are_those_matching_every_filter(
+    flows: FlowStore, positions: ClosedPositionStore
+) -> None:
+    flow = a_flow(TENANT)
+    flows.flows.append(flow)
+    won_short = replace(a_position(flow, timedelta(hours=1)), side=TradeSide.SHORT, realized_pnl=Decimal(3))
+    lost_short = replace(a_position(flow, timedelta(hours=2)), side=TradeSide.SHORT, realized_pnl=Decimal(-1))
+    lost_long = replace(a_position(flow, timedelta(hours=3)), realized_pnl=Decimal(-2))
+    lost_eth = replace(lost_short, asset="ETH")
+    positions.positions.extend((won_short, lost_short, lost_long, lost_eth))
+
+    criteria = ClosedPositionFilter.named(asset="BTC", side="short", result="persa")
+    command = ListClosedPositionsCommand(flow.id.value, criteria=criteria)
+    page = use_case(flows, positions).execute(command)
+
+    assert (page.positions, page.total) == ((lost_short,), 1)
+
+
+def test_the_positions_filtered_by_days_are_those_closed_within_them(
+    flows: FlowStore, positions: ClosedPositionStore
+) -> None:
+    flow = a_flow(TENANT)
+    flows.flows.append(flow)
+    today, tomorrow = a_position(flow, timedelta(hours=1)), a_position(flow, timedelta(days=1))
+    positions.positions.extend((today, tomorrow))
+
+    criteria = ClosedPositionFilter.named(first_day=OPENED.date(), last_day=OPENED.date())
+    command = ListClosedPositionsCommand(flow.id.value, criteria=criteria)
+
+    assert use_case(flows, positions).execute(command).positions == (today,)

@@ -28,7 +28,8 @@ Given(
     await dashboard.openAndSignInAs(account);
     await expect(dashboard.flows()).toBeVisible();
     await dashboard.page.clock.setFixedTime(instantAt(time));
-    await dashboard.openFlow(flow);
+    // The cycles of the flow are in the tab Cicli of its page (R6.4.3).
+    await dashboard.openCyclesOf(flow);
     await expect(dashboard.lastUpdate()).toHaveText(`Ultimo aggiornamento: ${time}`);
   },
 );
@@ -88,7 +89,7 @@ When(
   '{string} apre la pagina del flusso {string} su uno schermo largo {int} pixel',
   async ({ dashboard }, _account: string, flow: string, width: number) => {
     await dashboard.page.setViewportSize({ width, height: PHONE_HEIGHT });
-    await dashboard.openFlow(flow);
+    await dashboard.openCyclesOf(flow);
     await expect(dashboard.cycles()).toBeVisible();
   },
 );
@@ -116,7 +117,7 @@ When(
   async ({ dashboard }, _account: string, flow: string, width: number) => {
     await dashboard.page.setViewportSize({ width, height: PHONE_HEIGHT });
     await expect(dashboard.flowName()).toHaveText(flow);
-    await dashboard.page.getByRole('link', { name: 'Versioni della configurazione' }).click();
+    await dashboard.page.getByRole('link', { name: 'Configurazione', exact: true }).click();
     await expect(dashboard.versions()).toBeVisible();
   },
 );
@@ -139,8 +140,9 @@ When('{string} preme {string}', async ({ dashboard }, _account: string, command:
 
 Then('torna alla pagina del flusso {string}', async ({ dashboard }, flow: string) => {
   await expect(dashboard.flowName()).toHaveText(flow);
+  // The page of the flow, on the tab it was left on (R6.4.3).
   await expect(dashboard.page).toHaveURL(
-    new RegExp(`/dashboard/flows/${fakePlatform.flowNamed(flow).id}$`),
+    new RegExp(`/dashboard/flows/${fakePlatform.flowNamed(flow).id}(/cycles)?$`),
   );
 });
 

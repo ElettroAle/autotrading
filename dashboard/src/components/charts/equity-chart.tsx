@@ -1,27 +1,54 @@
-import { useId } from 'react';
+import { useId, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  DefaultZIndexes,
+  ReferenceArea,
   ReferenceLine,
   Tooltip,
+  useXAxisScale,
+  useYAxisScale,
   XAxis,
   YAxis,
+  ZIndexLayer,
   type DotItemDotProps,
+  type MouseHandlerDataParam,
 } from 'recharts';
 
 export type EquityPoint = { readonly plannedAt: string; readonly equity: number };
+
+/** Something that happened at an instant, drawn on the curve: its label names it, its destination tells it in full. */
+export type ChartEvent = { readonly instant: string; readonly label: string; readonly to: string };
+
+/** A drag on the chart: pressed, and the instants of its first and last point on the axis of time; empty with no drag. */
+export type Selection = {
+  readonly pressed?: boolean;
+  readonly start?: number;
+  readonly end?: number;
+};
 
 type EquityChartProps = {
   readonly points: readonly EquityPoint[];
   /** The initial capital: the curve is green above it and red below it (RF-23.01). */
   readonly baseline: number;
+  /** The events marked on the curve with a red cross, a link to each (ADR cicli-falliti-sull-equity-curve). */
+  readonly events?: readonly ChartEvent[];
+  /** Called with the instants of the first and the last point of a drag on the chart, the earlier first. */
+  readonly onSelect?: (from: string, to: string) => void;
 };
+
+type EquityDatum = EquityPoint & { readonly time: number };
 
 export const ABOVE_COLOR = '#16a34a';
 export const BELOW_COLOR = '#dc2626';
+const SELECTION_COLOR = '#2563eb';
 const WIDTH = 720;
 const HEIGHT = 320;
+const MARK_SIZE = 6;
+// A finger needs more than the cross to hit it (ADR viste-e-comandi-della-pagina-del-flusso).
+const MARK_TOUCH_RADIUS = 12;
 
 const amountFormat = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
 const instantFormat = new Intl.DateTimeFormat('it-IT', {
@@ -34,10 +61,11 @@ const instantFormat = new Intl.DateTimeFormat('it-IT', {
 const dayFormat = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit' });
 
 const amountText = (value: number): string => amountFormat.format(value);
-const instantText = (instant: string): string => instantFormat.format(new Date(instant));
+const instantText = (instant: string | number): string => instantFormat.format(new Date(instant));
 
 /** What the tooltip of a point says: the instant of the cycle, then its equity. */
-export const tooltipLabel = (instant: unknown): string => instantText(String(instant));
+export const tooltipLabel = (instant: unknown): string =>
+  instantText(typeof instant === 'number' ? instant : String(instant));
 export const tooltipValue = (value: unknown): [string, string] => [
   amountText(Number(value)),
   'Equity',
@@ -58,6 +86,48 @@ export const splitOffset = (equities: readonly number[], baseline: number): numb
   return Math.min(1, Math.max(0, (highest - baseline) / (highest - lowest)));
 };
 
+const timeOf = (point: EquityPoint): number => Date.parse(point.plannedAt);
+
+/** The equity of the curve at an instant: on the line between the points around it, the nearest point outside them. */
+export const equityAt = (points: readonly EquityPoint[], time: number): number => {
+  const sorted = points.toSorted((first, second) => timeOf(first) - timeOf(second));
+  const after = sorted.findIndex((point) => timeOf(point) >= time);
+  const next = sorted[after];
+  const previous = sorted[after - 1];
+  if (next === undefined) {
+    return sorted.at(-1)?.equity ?? 0;
+  }
+  if (previous === undefined) {
+    return next.equity;
+  }
+  const share = (time - timeOf(previous)) / (timeOf(next) - timeOf(previous));
+  return previous.equity + share * (next.equity - previous.equity);
+};
+
+/** A drag starts on the point pressed; a press that finds no point, as a finger's first touch, waits for one. */
+export const selectionStarted = (at: number | undefined): Selection =>
+  at === undefined ? { pressed: true } : { pressed: true, start: at, end: at };
+
+/** A drag follows the point reached, starting from it if the press found none; away from the points it stays. */
+export const selectionMoved = (selection: Selection, at: number | undefined): Selection => {
+  if (selection.pressed !== true || at === undefined) {
+    return selection;
+  }
+  return { pressed: true, start: selection.start ?? at, end: at };
+};
+
+/** The instants a drag chooses, the earlier first; a press that never moved chooses nothing. */
+export const chosenRange = (selection: Selection): [number, number] | undefined => {
+  const { start, end } = selection;
+  if (start === undefined || end === undefined || start === end) {
+    return undefined;
+  }
+  return [Math.min(start, end), Math.max(start, end)];
+};
+
+const pointAt = (state: MouseHandlerDataParam): number | undefined =>
+  typeof state.activeLabel === 'number' ? state.activeLabel : undefined;
+
 const EquityDot = ({ cx, cy, payload, baseline }: DotItemDotProps & { baseline: number }) => {
   const point = payload as EquityPoint;
   const above = isAbove(point.equity, baseline);
@@ -67,6 +137,8 @@ const EquityDot = ({ cx, cy, payload, baseline }: DotItemDotProps & { baseline: 
       cy={cy}
       r={4}
       fill={above ? ABOVE_COLOR : BELOW_COLOR}
+      // A point only shows: the marks of the events above it take the pointer.
+      pointerEvents="none"
       role="img"
       aria-label={`Equity ${amountText(point.equity)} del ${instantText(point.plannedAt)}, nell'area ${above ? 'verde' : 'rossa'}`}
       data-planned-at={point.plannedAt}
@@ -74,9 +146,67 @@ const EquityDot = ({ cx, cy, payload, baseline }: DotItemDotProps & { baseline: 
   );
 };
 
-/** The equity curve of a flow, a point for each cycle, green above the initial capital and red below (ADR 0121). */
-export const EquityChart = ({ points, baseline }: EquityChartProps) => {
+const CROSS = `M${-MARK_SIZE},${-MARK_SIZE}L${MARK_SIZE},${MARK_SIZE}M${-MARK_SIZE},${MARK_SIZE}L${MARK_SIZE},${-MARK_SIZE}`;
+
+// Inside the chart, where its scales place each event on the curve at its instant.
+const EventMarks = ({
+  events,
+  points,
+}: {
+  events: readonly ChartEvent[];
+  points: readonly EquityPoint[];
+}) => {
+  const x = useXAxisScale();
+  const y = useYAxisScale();
+  if (x === undefined || y === undefined) {
+    return null;
+  }
+  // Above the curve, its points and its labels, so a mark takes the pointer wherever it lies.
+  return (
+    <ZIndexLayer zIndex={DefaultZIndexes.label + 1}>
+      {events.map((event) => {
+        const time = Date.parse(event.instant);
+        const left = x(time) ?? 0;
+        const top = y(equityAt(points, time)) ?? 0;
+        return (
+          <Link key={event.instant} to={event.to} aria-label={event.label}>
+            <g transform={`translate(${left} ${top})`}>
+              <circle r={MARK_TOUCH_RADIUS} fill="transparent" />
+              <path d={CROSS} stroke={BELOW_COLOR} strokeWidth={3} strokeLinecap="round" />
+            </g>
+          </Link>
+        );
+      })}
+    </ZIndexLayer>
+  );
+};
+
+const domainOf = (
+  data: readonly EquityDatum[],
+  events: readonly ChartEvent[],
+): [number, number] => {
+  const times = [
+    ...data.map((datum) => datum.time),
+    ...events.map((event) => Date.parse(event.instant)),
+  ];
+  return [Math.min(...times), Math.max(...times)];
+};
+
+/**
+ * The equity curve of a flow, a point for each cycle on an axis of time, green above the initial capital and red below
+ * (ADR 0121), with the events of the page as red crosses (ADR cicli-falliti-sull-equity-curve). A drag from a point to
+ * another, with the mouse or a finger, chooses an interval (ADR intervallo-trascinando-sull-equity-curve).
+ */
+export const EquityChart = ({ points, baseline, events = [], onSelect }: EquityChartProps) => {
   const id = `equity-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const [selection, setSelection] = useState<Selection>({});
+  // The release reads the drag as the last move left it, not as the last render saw it.
+  const latest = useRef<Selection>({});
+  const select = (next: Selection) => {
+    latest.current = next;
+    setSelection(next);
+  };
+  const data: EquityDatum[] = points.map((point) => ({ ...point, time: timeOf(point) }));
   const offset = splitOffset(
     points.map((point) => point.equity),
     baseline,
@@ -87,17 +217,47 @@ export const EquityChart = ({ points, baseline }: EquityChartProps) => {
       <stop offset={offset} stopColor={BELOW_COLOR} stopOpacity={suffix === 'fill' ? 0.3 : 1} />
     </linearGradient>
   );
+  const start = (state: MouseHandlerDataParam) => select(selectionStarted(pointAt(state)));
+  const move = (state: MouseHandlerDataParam) =>
+    select(selectionMoved(latest.current, pointAt(state)));
+  const end = (state: MouseHandlerDataParam) => {
+    const range = chosenRange(selectionMoved(latest.current, pointAt(state)));
+    select({});
+    if (range !== undefined) {
+      onSelect?.(new Date(range[0]).toISOString(), new Date(range[1]).toISOString());
+    }
+  };
+  const selecting =
+    onSelect === undefined
+      ? {}
+      : {
+          // A drag follows every move, so its release falls on the point the pointer left, not on one a frame behind.
+          throttledEvents: [],
+          onMouseDown: start,
+          onMouseMove: move,
+          onMouseUp: end,
+          onMouseLeave: () => select({}),
+          onTouchStart: start,
+          onTouchMove: move,
+          onTouchEnd: end,
+        };
+  const range = chosenRange(selection);
+  // A horizontal drag on the chart chooses an interval: on a touch screen it no longer scrolls sideways.
+  const touches = onSelect === undefined ? '' : ' touch-pan-y';
   return (
-    <figure aria-label="Equity curve" className="overflow-x-auto">
-      <AreaChart width={WIDTH} height={HEIGHT} data={[...points]} accessibilityLayer>
+    <figure aria-label="Equity curve" className={`overflow-x-auto${touches}`}>
+      <AreaChart width={WIDTH} height={HEIGHT} data={data} accessibilityLayer {...selecting}>
         <defs>
           {colours('fill')}
           {colours('stroke')}
         </defs>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis
-          dataKey="plannedAt"
-          tickFormatter={(instant: string) => dayFormat.format(new Date(instant))}
+          dataKey="time"
+          type="number"
+          scale="time"
+          domain={domainOf(data, events)}
+          tickFormatter={(time: number) => dayFormat.format(new Date(time))}
         />
         <YAxis domain={['auto', 'auto']} tickFormatter={amountText} width={72} />
         <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValue} />
@@ -118,6 +278,10 @@ export const EquityChart = ({ points, baseline }: EquityChartProps) => {
           )}
           isAnimationActive={false}
         />
+        {range === undefined ? null : (
+          <ReferenceArea x1={range[0]} x2={range[1]} fill={SELECTION_COLOR} fillOpacity={0.15} />
+        )}
+        <EventMarks events={events} points={points} />
       </AreaChart>
     </figure>
   );

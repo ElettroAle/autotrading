@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from autotrading.application.errors import ApplicationError
 
 
@@ -30,3 +32,26 @@ class BotUnreachableError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("bot non raggiungibile")
+
+
+class OutboxUnavailableError(ApplicationError):
+    """The outbox could not keep or serve the messages: a notification not queued is recorded, never raised."""
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("coda dei messaggi in uscita non disponibile")
+
+
+class UnknownOutboxIntegrationError(ApplicationError):
+    """A queued message names an integration no port delivers: no retry can ever deliver it."""
+
+    permanent = True
+
+    def __init__(self, integration: str) -> None:
+        super().__init__("integrazione in uscita sconosciuta")
+        self._integration = integration
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"integration": self._integration}

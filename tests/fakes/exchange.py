@@ -43,6 +43,7 @@ class FakeExchangeAdapter:
         self.requests: list[Credentials] = []
         self.shown: dict[Credentials, list[AccountState]] = {}
         self._orders: FakeOrderExchangeAdapter | None = None
+        self.refusal: ExchangeRejectedCredentialsError | None = None
 
     def is_real(self) -> bool:
         return self._real
@@ -79,6 +80,8 @@ class FakeExchangeAdapter:
         self.requests.append(credentials)
         if not self.reachable:
             raise ExchangeUnavailableError
+        if self.refusal is not None:
+            raise self.refusal
         state = self._states.get(credentials)
         if state is None:
             raise ExchangeRejectedCredentialsError(rejection_message(credentials))
@@ -117,6 +120,7 @@ class FakeExchangeAdapter:
                     p.size,
                     p.leverage,
                     p.entry_price,
+                    p.mark_price,
                     p.unrealized_pnl,
                     p.liquidation_price,
                 )
@@ -136,6 +140,7 @@ class FakeExchangeAdapter:
                 PositionSide(p.direction.value),
                 p.size,
                 p.leverage,
+                self._orders.markets[p.coin].mid_price,
                 self._orders.markets[p.coin].mid_price,
                 Decimal(0),
                 None,

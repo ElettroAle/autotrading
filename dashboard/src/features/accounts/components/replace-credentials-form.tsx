@@ -13,6 +13,8 @@ import {
   type CredentialsInput,
 } from '../api/replace-credentials';
 
+import { PublicFields } from './public-fields';
+
 const EMPTY_FORM: CredentialsInput = { credentials: {} };
 
 type ReplaceCredentialsFormProps = {
@@ -23,7 +25,8 @@ type ReplaceCredentialsFormProps = {
 
 /**
  * New credentials for an account, with the fields its exchange declares (R2.3.9), checked with the exchange before
- * they take the place of the old ones (R0.2.4).
+ * they take the place of the old ones (R0.2.4). The public fields the account keeps are shown and not asked: only an
+ * account registered before they were kept asks them all (Bug 401).
  */
 export const ReplaceCredentialsForm = ({
   account,
@@ -32,8 +35,9 @@ export const ReplaceCredentialsForm = ({
 }: ReplaceCredentialsFormProps) => {
   const replacement = useReplaceCredentials();
   const exchanges = useSupportedExchanges();
-  const fields =
+  const declared =
     exchanges.data?.find((exchange) => exchange.name === account.exchange)?.fields ?? [];
+  const fields = declared.filter((field) => field.secret || !(field.name in account.public_fields));
   const {
     register,
     handleSubmit,
@@ -71,6 +75,7 @@ export const ReplaceCredentialsForm = ({
       className="mt-2 space-y-3"
     >
       <FormAlert error={errors.root?.server} />
+      <PublicFields fields={declared} values={account.public_fields} />
       <DeclaredFields
         fields={fields}
         registerField={(name) => register(`credentials.${name}`)}

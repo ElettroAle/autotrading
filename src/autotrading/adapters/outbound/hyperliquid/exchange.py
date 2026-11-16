@@ -1,6 +1,7 @@
 import secrets
 from collections.abc import Mapping
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
+from typing import cast
 
 import requests
 from eth_account import Account as EthereumAccount
@@ -11,8 +12,12 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
-from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, user_state_of
-from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
+from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
+from autotrading.application.accounts.errors import (
+    CredentialFieldMalformedError,
+    ExchangeRejectedCredentialsError,
+    ExchangeUnavailableError,
+)
 from autotrading.application.flows.errors import FlowCredentialsRefusedError, FlowExchangeUnavailableError
 from autotrading.application.verification.errors import (
     VerificationCredentialsRejectedError,
@@ -36,7 +41,26 @@ PROBE_COIN = "BTC"
 MARGIN_CURRENCY = "USDC"
 INVALID_KEY_MESSAGE = "chiave dell'API wallet non valida"
 MISSING_FIELD_MESSAGE = "credenziali del conto incomplete"
-# The names Hyperliquid gives its networks, the ones the installation declares (Bug 277, R2.3.10).
+# The shapes of the two fields: a value of another shape is refused before reaching the exchange, saying what is wrong
+# in it and never a character of it (Bug 387).
+HEX_PREFIX = "0x"
+HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+KEY_DIGITS = 64
+ADDRESS_DIGITS = 40
+KEY_SHAPE = "attese 64 cifre esadecimali, con o senza 0x"
+INVALID_ADDRESS_MESSAGE = "indirizzo del conto non valido"
+ADDRESS_SHAPE = "atteso 0x seguito da 40 cifre esadecimali"
+# A signature proves the key, not the account: the exchange applies an action of an API wallet to the account that
+# approved it, whatever address the request names. The role of the signer ties it to the address (Bug 399).
+AGENT_ROLE = "agent"
+AGENT_NOT_AUTHORIZED_MESSAGE = "l'API wallet non è autorizzato per l'indirizzo del conto"
+SIGNER_IS_AGENT_MESSAGE = (
+    "l'indirizzo del conto è quello dell'API wallet: va indicato l'indirizzo del conto che lo ha approvato"
+)
+# The exchanges an account declares at registration: the use cases pick the adapter by this name (R2.3.11).
+EXCHANGE_NAME = "Hyperliquid"
+TESTNET_EXCHANGE_NAME = "Hyperliquid Testnet"
+# The names Hyperliquid gives its networks (R2.3.10).
 TESTNET = "testnet"
 MAINNET = "mainnet"
 # The names match the keys of the credentials already sealed, so nothing saved needs migrating (ADR 0158).
@@ -69,7 +93,10 @@ class HyperliquidExchangeAdapter:
     """
 
     def __init__(
-        self, base_url: str, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS
+        self,
+        base_url: str = MAINNET_API_URL,
+        sdk: HyperliquidSdkAdapter | None = None,
+        timeout: float = TIMEOUT_SECONDS,
     ) -> None:
         self._base_url = base_url
         self._sdk = sdk or HyperliquidSdkAdapter()
@@ -80,31 +107,30 @@ class HyperliquidExchangeAdapter:
         return self._base_url
 
     def is_real(self) -> bool:
-        return bool(self._base_url == MAINNET_API_URL)
+        return True
 
     def network_name(self) -> str:
-        return MAINNET if self.is_real() else TESTNET
+        return MAINNET
 
     def credential_fields(self) -> tuple[CredentialField, ...]:
         return CREDENTIAL_FIELDS
 
-    @classmethod
-    def for_network(cls, *, testnet: bool, sdk: HyperliquidSdkAdapter | None = None) -> HyperliquidExchangeAdapter:
-        # The network is chosen by the installation, never deduced from the credentials.
-        return cls(TESTNET_API_URL if testnet else MAINNET_API_URL, sdk)
-
     def read_state(self, credentials: Credentials) -> AccountState:
+        address = _address_of(credentials)
         wallet = _wallet_of(credentials)
         try:
-            address = _field(credentials, ACCOUNT_ADDRESS)
             exchange = self._sdk.exchange(wallet, self._base_url, address, self._timeout)
             _require_accepted(exchange.cancel_by_cloid(PROBE_COIN, _unused_cloid()), credentials)
-            state = self._sdk.info(self._base_url, self._timeout).user_state(address)
+            info = self._sdk.info(self._base_url, self._timeout)
+            _require_signer_of(info.user_role(wallet.address), wallet.address, address)
+            perps = info.user_state(address)
+            mode = info.query_user_abstraction_state(address)
+            spot = info.spot_user_state(address)
         except ClientError as error:
             raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
-        return _account_state_of(state)
+        return _account_state_of(perps, mode, spot)
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
@@ -142,12 +168,27 @@ class HyperliquidExchangeAdapter:
                     position.size,
                     position.leverage,
                     position.entry_price,
+                    position.mark_price,
                     position.unrealized_pnl,
                     position.liquidation_price,
                 )
                 for position in state.positions
             ),
         )
+
+
+class HyperliquidTestnetExchangeAdapter(HyperliquidExchangeAdapter):
+    """Hyperliquid Testnet, an exchange of its own an account can choose: the same exchange on the network of test,
+    without real money (R2.3.11, ADR hyperliquid-testnet-come-adapter-dedicato)."""
+
+    def __init__(self, sdk: HyperliquidSdkAdapter | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+        super().__init__(TESTNET_API_URL, sdk, timeout)
+
+    def is_real(self) -> bool:
+        return False
+
+    def network_name(self) -> str:
+        return TESTNET
 
 
 def _field(credentials: Credentials, name: str) -> str:
@@ -158,12 +199,40 @@ def _field(credentials: Credentials, name: str) -> str:
     return found
 
 
+def _address_of(credentials: Credentials) -> str:
+    address = _field(credentials, ACCOUNT_ADDRESS)
+    if not address.startswith(HEX_PREFIX) or not _hexadecimal(address.removeprefix(HEX_PREFIX), ADDRESS_DIGITS):
+        raise CredentialFieldMalformedError(
+            ACCOUNT_ADDRESS, f"{INVALID_ADDRESS_MESSAGE}: {ADDRESS_SHAPE}; {_shape_of(address)}"
+        )
+    return address
+
+
 def _wallet_of(credentials: Credentials) -> LocalAccount:
+    key = _field(credentials, API_WALLET_KEY)
+    if not _hexadecimal(_digits_of(key), KEY_DIGITS):
+        raise CredentialFieldMalformedError(API_WALLET_KEY, f"{INVALID_KEY_MESSAGE}: {KEY_SHAPE}; {_shape_of(key)}")
     try:
-        wallet: LocalAccount = EthereumAccount.from_key(_field(credentials, API_WALLET_KEY))
+        wallet: LocalAccount = EthereumAccount.from_key(key)
     except ValueError as error:
-        raise ExchangeRejectedCredentialsError(INVALID_KEY_MESSAGE) from error
+        # 64 hexadecimal digits that are no key of the curve, as zero.
+        raise CredentialFieldMalformedError(API_WALLET_KEY, INVALID_KEY_MESSAGE) from error
     return wallet
+
+
+def _digits_of(value: str) -> str:
+    return value[len(HEX_PREFIX) :] if value[: len(HEX_PREFIX)].lower() == HEX_PREFIX else value
+
+
+def _hexadecimal(digits: str, length: int) -> bool:
+    return len(digits) == length and set(digits) <= HEX_DIGITS
+
+
+def _shape_of(value: str) -> str:
+    """What is wrong in a value, told without any of its characters: its length and how many are no hex digits."""
+    foreign = sum(1 for character in _digits_of(value) if character not in HEX_DIGITS)
+    received = f"ricevuti {len(value)} caratteri"
+    return f"{received}, di cui {foreign} non esadecimali" if foreign else received
 
 
 def _unused_cloid() -> Cloid:
@@ -178,11 +247,31 @@ def _require_accepted(response: object, credentials: Credentials) -> None:
     raise ExchangeRejectedCredentialsError(_masked(str(message), credentials))
 
 
-def _account_state_of(state: object) -> AccountState:
+def _require_signer_of(role: object, signer: str, address: str) -> None:
+    # The account signs for itself only if it is no API wallet; an API wallet signs only for the account it serves.
+    try:
+        answer = cast("Mapping[str, object]", role)
+        declared = answer["role"]
+        served = cast("Mapping[str, object]", answer["data"])["user"] if declared == AGENT_ROLE else None
+    except (KeyError, TypeError) as error:
+        raise ExchangeUnavailableError from error
+    if signer.lower() == address.lower():
+        _require_not_agent(declared)
+        return
+    if not isinstance(served, str) or served.lower() != address.lower():
+        raise ExchangeRejectedCredentialsError(AGENT_NOT_AUTHORIZED_MESSAGE)
+
+
+def _require_not_agent(declared: object) -> None:
+    if declared == AGENT_ROLE:
+        raise ExchangeRejectedCredentialsError(SIGNER_IS_AGENT_MESSAGE)
+
+
+def _account_state_of(perps: object, mode: object, spot: object) -> AccountState:
     # An answer of unexpected shape is a fault of the exchange, never a reason to report invented values.
     try:
-        read = user_state_of(state)
-    except (KeyError, TypeError, ValueError, InvalidOperation) as error:
+        read = in_account_mode(user_state_of(perps), mode, spot)
+    except (KeyError, TypeError, ValueError, ArithmeticError) as error:
         raise ExchangeUnavailableError from error
     return AccountState(
         balance=Balance(read.account_value, MARGIN_CURRENCY),
@@ -199,6 +288,7 @@ def _position_of(position: _UserPosition) -> Position:
         size=abs(position.signed_size),
         leverage=position.leverage,
         entry_price=position.entry_price,
+        mark_price=position.mark_price,
         unrealized_pnl=position.unrealized_pnl,
         liquidation_price=position.liquidation_price,
     )

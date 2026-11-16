@@ -20,11 +20,14 @@ paths:
 - `LiteLlmModelGatewayAdapter` è la fabbrica concreta di `ModelGatewayPort` (abstract factory, ADR 0109): crea
   `LiteLlmModelCallAdapter` (`ModelCallPort`) e `LiteLlmModelCatalogAdapter` (`ModelCatalogPort` di `agent`,
   `FlowModelsPort` di `flows`). Riceve dalla composizione le funzioni della libreria (`completion`,
-  `get_supported_openai_params`) e la mappa dei modelli (`model_cost`). Serve tutti i fornitori abilitati tranne
+  `get_supported_openai_params`, `supports_response_schema`) e la mappa dei modelli (`model_cost`). Serve tutti i fornitori abilitati tranne
   OpenRouter, che ha la sua cartella.
 - **Nessun ramo per fornitore** (decisione del proprietario, ADR 0109): la chiamata usa i soli parametri dell'API
   OpenAI (`temperature`, `max_tokens`, `response_format`, `reasoning_effort`) con `drop_params=True`, `num_retries=0` e
-  il timeout dell'adapter (120 secondi); la traduzione è di LiteLLM. Un intervallo unico di temperatura (0-2): un
+  il timeout dell'adapter (120 secondi); la traduzione è di LiteLLM. `response_format` è `json_schema` rigido col
+  formato che il caso d'uso passa quando la libreria dichiara il modello capace (`supports_response_schema`, una
+  capacità del modello, non un ramo per fornitore), altrimenti `json_object`; mai la validazione della libreria, che
+  perderebbe risposta e costo (ADR risposta-del-modello-con-schema-rigido). Un intervallo unico di temperatura (0-2): un
   fornitore che accetta meno rifiuta la chiamata col suo motivo.
 - **Errori** (R1.2.3, R1.2.4): chiave rifiutata (401, 403) e credito esaurito (402, o 429 con la quota OpenAI esaurita
   nel messaggio) sono permanenti; tempo scaduto, rete, ogni altro rifiuto (stato e messaggio originale) e risposta

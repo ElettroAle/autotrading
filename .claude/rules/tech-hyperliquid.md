@@ -8,7 +8,11 @@ paths:
 # Adapter in uscita: Hyperliquid
 
 - Solo l'SDK ufficiale Hyperliquid, importato solo in questa cartella.
-- Mainnet o testnet si sceglie per configurazione dell'installazione, mai dedotto dalle credenziali.
+- Mainnet e testnet sono due exchange, «Hyperliquid» e «Hyperliquid Testnet», offerti in ogni installazione:
+  `HyperliquidTestnetExchangeAdapter` eredita da `HyperliquidExchangeAdapter` e ridefinisce solo rete e indirizzo
+  dell'API; gli altri adapter si costruiscono sull'indirizzo della testnet. Le fonti di mercato leggono la rete reale
+  (R2.3.11). Mai dedotto dalle credenziali.
+- Il prezzo di mercato di una posizione è `positionValue / |szi|` del `clearinghouseState` (R1.4.7).
 - Ogni ordine porta il `cloid` assegnato dalla piattaforma.
 - Ordini a mercato con lo scostamento massimo ricevuto dal caso d'uso.
 - La leva si imposta con il modo di margine ricevuto dal caso d'uso (`is_cross` dell'SDK vero solo per `CROSS`).
@@ -17,4 +21,6 @@ paths:
 - Le eccezioni dell'SDK e di rete si traducono negli errori del contratto della porta
   (es. `ExchangeUnavailableError`, `ExchangeRejectedOrderError` con il motivo dell'exchange).
 - Le credenziali non compaiono in log, errori o repr.
+- La prova firmata non basta: il ruolo del firmatario (`userRole`) lo lega all'indirizzo del conto, che firma per sé
+  o tramite un API wallet approvato proprio per quell'indirizzo (ADR firmatario-autorizzato-per-l-indirizzo-del-conto).
 - I test contro testnet hanno il marker `testnet` e non fanno parte della suite di default.

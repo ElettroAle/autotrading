@@ -13,6 +13,7 @@ dependencies = [
     "langgraph>=1.2",
     "langgraph-checkpoint-postgres>=3.0",
     "litellm>=1.109.1",
+    "procrastinate>=3.11",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
     "pynacl>=1.6.2",
@@ -127,6 +128,7 @@ forbidden_modules = [
     "litellm",
     "openai",
     "apscheduler",
+    "procrastinate",
 ]
 # The owner's named architectural exception (ADR 0104): LangGraph orchestrates the decision cycle, only here.
 ignore_imports = ["autotrading.application.flows.cycle_graph -> langgraph"]

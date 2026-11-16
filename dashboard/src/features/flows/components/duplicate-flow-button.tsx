@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router';
 
+import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { paths } from '@/config/paths';
 
 import { useDuplicateFlow } from '../api/duplicate-flow';
@@ -20,7 +21,7 @@ export const DuplicateFlowButton = ({ flowId }: { flowId: string }) => {
         type="button"
         disabled={duplicate.isPending}
         onClick={() => duplicate.mutate(flowId)}
-        className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100"
+        className={SECONDARY_COMMAND}
       >
         Duplica
       </button>

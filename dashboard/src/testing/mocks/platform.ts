@@ -1,4 +1,4 @@
-import { FAKE_TRADABLE_ASSETS } from './catalogs';
+import { FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
@@ -35,6 +35,7 @@ export type FakeConfiguration = {
   readonly instructions: string;
   readonly maxLeverage: number;
   readonly allocatedCapital: string;
+  readonly systemPrompt: string | null;
 };
 
 export type FakeVersion = {
@@ -71,6 +72,8 @@ export type FakeFlow = {
   instructions: string;
   riskLimits: FakeRiskLimits;
   bringToMinimum: boolean;
+  /** The system prompt the user wrote; null follows the default of the platform (R1.4.8). */
+  systemPrompt: string | null;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
   /** Why the flow paused, as the API says it (R1.2.4). */
@@ -83,7 +86,18 @@ export type FakeFlow = {
   readonly versions: FakeVersion[];
 };
 
-export type FakeAccount = { readonly id: string; readonly name: string; readonly balance: number };
+/**
+ * An account of the fake platform; its public credential fields are kept in clear, empty for an account registered
+ * before they were kept (Bug 401).
+ */
+export type FakeAccount = {
+  readonly id: string;
+  readonly name: string;
+  readonly balance: number;
+  publicFields: Record<string, string>;
+  /** The currency the account settles in, which the results of its flows are written in (R6.4.2). */
+  currency: string;
+};
 
 /** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
 export type FakeFlowChanges = Partial<Omit<FakeFlow, 'id' | 'name'>>;
@@ -104,6 +118,9 @@ export type FakeFlowConfiguration = {
   };
   allocated_capital: string | null;
   bring_to_minimum: boolean;
+  system_prompt: string;
+  system_prompt_is_default: boolean;
+  system_prompt_placeholders: { name: string; description: string }[];
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -122,6 +139,9 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   },
   allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
   bring_to_minimum: flow.bringToMinimum,
+  system_prompt: flow.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
+  system_prompt_is_default: flow.systemPrompt === null,
+  system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -144,6 +164,14 @@ const FIRST_CHAT_ID = 1001;
 export type FakeProviderKey = { readonly provider: string; registeredAt: string };
 
 export const FAKE_EXCHANGE = 'Hyperliquid';
+
+/** The currency an account settles in unless a test says otherwise. */
+export const SETTLEMENT_CURRENCY = 'USDC';
+// The account address every fake account is registered with, a public field of the exchange (Bug 401).
+export const FAKE_ACCOUNT_ADDRESS = '0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2';
+const registeredPublicFields = (): Record<string, string> => ({
+  account_address: FAKE_ACCOUNT_ADDRESS,
+});
 /** The exchanges the fake platform supports, as the API lists them (ADR 0152). */
 export const FAKE_SUPPORTED_EXCHANGES: readonly string[] = [FAKE_EXCHANGE];
 
@@ -251,6 +279,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   instructions: '',
   maxLeverage: 3,
   allocatedCapital: '100',
+  systemPrompt: null,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -304,7 +333,13 @@ const accountOf = (user: FakeUser, name: string): FakeAccount => {
   if (existing !== undefined) {
     return existing;
   }
-  const account = { id: `account-${name}`, name, balance: 1000 };
+  const account = {
+    id: `account-${name}`,
+    name,
+    balance: 1000,
+    publicFields: registeredPublicFields(),
+    currency: SETTLEMENT_CURRENCY,
+  };
   user.accounts.push(account);
   return account;
 };
@@ -335,6 +370,7 @@ const draftOf = (
   instructions: strategy.instructions ?? '',
   riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
   bringToMinimum: strategy.bringToMinimum ?? false,
+  systemPrompt: null,
   cycles: 0,
   pauseReason: null,
   currentCapital: 0,
@@ -490,6 +526,7 @@ export const fakePlatform = {
       instructions: '',
       riskLimits: DEFAULT_RISK_LIMITS,
       bringToMinimum: false,
+      systemPrompt: null,
       cycles: 0,
       pauseReason: null,
       currentCapital: 100,
@@ -502,12 +539,23 @@ export const fakePlatform = {
     return flow;
   },
 
+  /** The account was registered before its public fields were kept: a replacement asks them all (Bug 401). */
+  forgetPublicFieldsOf(account: string, name: string): void {
+    accountOf(userNamed(account), name).publicFields = {};
+  },
+
   /** The account belongs to the user, who has the Utente role: the user is created when missing. */
   giveAccountTo(account: string, name: string, balance: number): FakeAccount {
     if (!state.users.has(account)) {
       this.addUser(account, { hasUserRole: true });
     }
-    const created = { id: `account-${name}`, name, balance };
+    const created = {
+      id: `account-${name}`,
+      name,
+      balance,
+      publicFields: registeredPublicFields(),
+      currency: SETTLEMENT_CURRENCY,
+    };
     userNamed(account).accounts.push(created);
     return created;
   },
@@ -719,6 +767,18 @@ export const fakePlatform = {
       .find((candidate) => candidate.name === name);
     if (account === undefined) {
       throw new Error(`unknown fake account ${name}`);
+    }
+    return account;
+  },
+
+  /** The account the flow with the name trades on (R6.4.2). */
+  accountOfFlow(name: string): FakeAccount {
+    const { accountId } = fakePlatform.flowNamed(name);
+    const account = [...state.users.values()]
+      .flatMap((user) => user.accounts)
+      .find((candidate) => candidate.id === accountId);
+    if (account === undefined) {
+      throw new Error(`fake flow ${name} has no account`);
     }
     return account;
   },

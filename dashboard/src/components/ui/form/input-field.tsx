@@ -22,9 +22,27 @@ export const InputField = ({ label, error, id, ...input }: InputFieldProps) => {
   );
 };
 
-/** A secret: never shown while typed, never remembered by the browser (ADR 0130). */
+/**
+ * Keeps the best-known password managers from filling an input: on a password input they ignore `autocomplete="off"`
+ * and may put a saved password where a key was pasted (Bug 387).
+ */
+export const NOT_FOR_PASSWORD_MANAGERS = {
+  'data-lpignore': 'true',
+  'data-1p-ignore': 'true',
+  'data-bwignore': 'true',
+} as const;
+
+/**
+ * A secret: never shown while typed, never filled or remembered by the browser, which honours `new-password` where it
+ * ignores `off` (ADR 0130, Bug 387).
+ */
 export const SecretField = (props: Omit<InputFieldProps, 'type' | 'autoComplete'>) => (
-  <InputField {...props} type="password" autoComplete="off" />
+  <InputField
+    {...props}
+    {...NOT_FOR_PASSWORD_MANAGERS}
+    type="password"
+    autoComplete="new-password"
+  />
 );
 
 /** The reason of a refusal that concerns the whole form, at its head. */

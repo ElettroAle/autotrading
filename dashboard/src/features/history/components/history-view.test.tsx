@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { FILTER_FIELD } from '@/components/ui/filters';
 import {
   aHistoryCycle,
   aHistoryOrder,
@@ -64,6 +65,26 @@ describe('HistoryView', () => {
       'href',
       '/flows/flow-alfa/cycles/2026-11-03T11%3A00%3A00Z',
     );
+  });
+
+  it('opens a cycle from any point of its row', async () => {
+    records().cycles.push(aHistoryCycle(ownerAt(3), dayOf(3), ['BTC']));
+    const user = userEvent.setup();
+    const { router } = await renderApp({ account: 'anna', url: '/history' });
+
+    const [row] = await rowsOf('Cicli');
+    await user.click(within(row as HTMLElement).getByText('concluso'));
+
+    expect(router.state.location.pathname).toBe('/flows/flow-alfa/cycles/2026-11-03T11%3A00%3A00Z');
+  });
+
+  it('makes every filter as wide as a phone and as wide as its choices on a wide screen', async () => {
+    await renderApp({ account: 'anna', url: '/history' });
+
+    const filters = await screen.findByRole('group', { name: 'Filtri' });
+    for (const label of ['Flusso', 'Versione', 'Conto', 'Asset']) {
+      expect(within(filters).getByLabelText(label)).toHaveClass(...FILTER_FIELD.split(' '));
+    }
   });
 
   it('enables the version only with a flow, and shows only the cycles of the version chosen', async () => {
@@ -137,6 +158,31 @@ describe('HistoryView', () => {
     expect(first).toHaveTextContent('0,41');
     expect(second).toHaveTextContent('91.001');
     expect(screen.getByRole('row', { name: /principale/ })).toHaveTextContent('apertura long');
+  });
+
+  it('writes the prices of positions and executions below 1000 to six significant digits (Bug 431)', async () => {
+    const position = aHistoryPosition(ALFA, 'BTC', dayOf(1));
+    records().closedPositions.push({
+      ...position,
+      body: { ...position.body, open_price: '0.123456789', close_price: '0.1240000001' },
+    });
+    records().orders.push(
+      aHistoryOrder(ALFA, 'BTC', dayOf(1), [anExecution(dayOf(1), '0.000123456789', '1', '0')]),
+    );
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/history?tab=closed-positions' });
+
+    const [row] = await rowsOf('Posizioni chiuse');
+    expect(within(row as HTMLElement).getByText('0,123457')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText('0,124')).toBeInTheDocument();
+    await user.click(tab('Ordini'));
+    await rowsOf('Ordini');
+    await user.selectOptions(screen.getByLabelText('Conto'), 'principale');
+    await user.click(await screen.findByText('1 esecuzione'));
+    const [, execution] = within(screen.getByRole('table', { name: 'Esecuzioni' })).getAllByRole(
+      'row',
+    );
+    expect(within(execution as HTMLElement).getByText('0,000123457')).toBeInTheDocument();
   });
 
   it('shows an order of no flow, a closing and an order without executions', async () => {

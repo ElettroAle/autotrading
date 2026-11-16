@@ -1,10 +1,11 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.outbox_message import OutboxMessage
 from autotrading.domain.notifications.pending_link import PendingLink
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -82,4 +83,22 @@ class NotifierPort(Protocol):
 class BotStartLinkPort(Protocol):
     def start_link(self, code: str) -> str | None:
         """The link that opens the chat with the platform bot and sends it the code; none without an active bot."""
+        ...
+
+
+class OutboxPort(Protocol):
+    """The messages to external systems, kept with their tenant until delivered (ADR
+    outbox-delle-integrazioni-esterne-con-procrastinate).
+    """
+
+    def enqueue(self, message: OutboxMessage) -> None:
+        """Keeps the message and queues it in one transaction; raises OutboxUnavailableError when it cannot."""
+        ...
+
+    def process(self, deliver: Callable[[OutboxMessage], None]) -> None:
+        """Hands every queued message to deliver for as long as the service runs.
+
+        A transient error of deliver is retried with exponential backoff up to the last attempt, a permanent one
+        marks the message failed at once; raises OutboxUnavailableError when the queue cannot be served.
+        """
         ...

@@ -25,7 +25,9 @@ from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
 REFUSED = "connection refused"
-SHORT_ETH = Position("ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("-4.2"), None)
+SHORT_ETH = Position(
+    "ETH", PositionSide.SHORT, Decimal("1.5"), 3, Decimal(3000), Decimal("3002.8"), Decimal("-4.2"), None
+)
 
 
 @pytest.fixture

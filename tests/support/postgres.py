@@ -86,3 +86,20 @@ def migrated_database(workspace: Path) -> Iterator[Engine]:
         with admin.connect() as connection:
             connection.execute(text(f"DROP DATABASE IF EXISTS {database} WITH (FORCE)"))
         admin.dispose()
+
+
+@contextmanager
+def empty_database() -> Iterator[Engine]:
+    """Yields an engine connected as the administrator to a new database without any migration."""
+    database = f"autotrading_empty_{uuid4().hex[:12]}"
+    admin = _admin_engine("postgres")
+    with admin.connect() as connection:
+        connection.execute(text(f"CREATE DATABASE {database}"))
+    empty = _admin_engine(database)
+    try:
+        yield empty
+    finally:
+        empty.dispose()
+        with admin.connect() as connection:
+            connection.execute(text(f"DROP DATABASE IF EXISTS {database} WITH (FORCE)"))
+        admin.dispose()

@@ -39,6 +39,7 @@ When(
   '{string} duplica il flusso {string}',
   async ({ dashboard, memory }, account: string, flow: string) => {
     await onFlowPage(dashboard, memory, account, flow);
+    await dashboard.openConfiguration();
     await dashboard.command('Duplica');
   },
 );
@@ -48,6 +49,7 @@ Then(
   async ({ dashboard }, flow: string, status: string, version: number) => {
     await expect(dashboard.flowName()).toHaveText(flow);
     await expect(dashboard.status(status)).toBeVisible();
+    await dashboard.openConfiguration();
     await expect(dashboard.detail('Versione')).toHaveText(String(version));
   },
 );

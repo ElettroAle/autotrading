@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -6,6 +7,8 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.ledger import FlowTotals
 from tests.support.activity import a_position, an_activity
@@ -15,6 +18,7 @@ from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
+NOW = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -61,6 +65,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
                 size=Decimal("0.010"),
                 leverage=3,
                 entry_price=Decimal("60000.0"),
+                mark_price=Decimal("61200.0"),
             ),
             a_position("ETH"),
         ),
@@ -87,12 +92,51 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
                 "size": "0.01",
                 "leverage": "3",
                 "entry_price": "60000",
+                "mark_price": "61200",
                 "margin": "100",
                 "unrealized_pnl": "12",
                 "unrealized_pnl_percent": "12",
             }
         ],
+        "summary": {
+            "total_gain": "50",
+            "total_gain_percent": "10.00",
+            "period_gain": "0",
+            "period_gain_percent": "0.00",
+            "open_positions": 1,
+            "failed_cycles": 0,
+        },
     }
+
+
+def test_the_state_of_a_flow_answers_its_results_in_the_period_asked_for(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    platform.now = NOW
+    platform.cycles.record(CycleRecord(flow.id.value, NOW - timedelta(days=8), CycleOutcome.FAILED))
+    platform.cycles.record(CycleRecord(flow.id.value, NOW - timedelta(days=2), CycleOutcome.FAILED))
+    platform.cycles.record(CycleRecord(flow.id.value, NOW - timedelta(days=1), CycleOutcome.FAILED))
+    for days_ago, equity in ((8, "490"), (6, "500"), (1, "502")):
+        planned_at = NOW - timedelta(days=days_ago)
+        platform.equity_snapshots.snapshots[platform.tenant_of("anna"), flow.id.value, planned_at] = EquitySnapshot(
+            flow.id.value, planned_at, Decimal(500), Decimal(equity) - Decimal(500), Decimal(0), Decimal(0), Decimal(0)
+        )
+
+    summary = anna.get(f"/flows/{flow.id.value}/state?period=7d").json()["summary"]
+
+    assert (summary["period_gain"], summary["period_gain_percent"], summary["failed_cycles"]) == ("2", "0.40", 2)
+
+
+def test_the_state_of_a_flow_refuses_a_period_the_user_cannot_have_meant(client_of: Client, platform: Platform) -> None:
+    flow = flow_of(platform, "anna")
+
+    response = client_of("anna").get(f"/flows/{flow.id.value}/state?period=1y")
+
+    assert (response.status_code, reason_of(response)) == (
+        400,
+        {"detail": "periodo non valido: scegliere tra all, 7d, 30d, range"},
+    )
 
 
 def test_a_position_without_margin_answers_no_pnl_percent(client_of: Client, platform: Platform) -> None:

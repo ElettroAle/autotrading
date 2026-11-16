@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -17,6 +18,7 @@ from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
 OPENED = datetime(2026, 11, 12, 10, tzinfo=UTC)
+LATER = PositionEnd(Decimal(98000), datetime(2026, 11, 13, 10, tzinfo=UTC))
 
 
 @pytest.fixture
@@ -138,3 +140,42 @@ def test_the_closed_positions_of_a_flow_of_another_user_do_not_exist(client_of: 
 
     assert response.status_code == 404
     assert reason_of(response) == {"detail": "flusso non trovato"}
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: every paginated answer carries the total of the results.
+def test_the_closed_positions_answer_with_how_many_match_in_all(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.closed_positions.positions.extend(a_position(flow, timedelta(minutes=minutes)) for minutes in range(60))
+
+    assert anna.get(f"/flows/{flow.id.value}/closed-positions", params={"page": 2}).json()["total"] == 60
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: side and result join the filters of the existing reading.
+def test_the_closed_positions_are_filtered_by_side_result_asset_and_days(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    lost_short = replace(a_position(flow, timedelta(hours=1)), side=TradeSide.SHORT)
+    won_short = replace(a_position(flow, timedelta(hours=2)), side=TradeSide.SHORT, realized_pnl=Decimal(5))
+    won_long = a_position(flow, timedelta(hours=3))
+    platform.closed_positions.positions.extend(
+        (lost_short, won_short, won_long, replace(won_short, asset="ETH"), replace(lost_short, closing=LATER))
+    )
+
+    body = anna.get(
+        f"/flows/{flow.id.value}/closed-positions",
+        params={"side": "short", "result": "vinta", "asset": "BTC", "from": "2026-11-12", "to": "2026-11-12"},
+    ).json()
+
+    assert [(position["side"], position["pnl"]) for position in body["positions"]] == [("short", "5")]
+    assert body["total"] == 1
+
+
+# ADR filtri-dei-cicli-e-delle-posizioni-chiuse-nell-api: an unknown value is a 400 error of the project.
+def test_an_unknown_filter_of_the_closed_positions_is_a_bad_request(client_of: Client, platform: Platform) -> None:
+    flow = flow_of(platform, "anna")
+
+    response = client_of("anna").get(f"/flows/{flow.id.value}/closed-positions", params={"side": "buy"})
+
+    assert response.status_code == 400
+    assert reason_of(response) == {"detail": "direzione non valida: scegliere tra long, short"}

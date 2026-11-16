@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -7,10 +8,12 @@ from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.errors import (
     CredentialFieldRequiredError,
     CredentialsRequiredError,
+    PublicCredentialFieldNotReplaceableError,
     UnknownCredentialFieldError,
 )
 
 MASK = "***"
+INVISIBLE_FORMAT = "Cf"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,9 +38,27 @@ class Credentials:
         unknown = sorted(name for name in values if name not in names)
         if unknown:
             raise UnknownCredentialFieldError(unknown[0])
-        if not any(values.get(credential_field.name, "").strip() for credential_field in declared):
+        if not any(_cleaned(values.get(credential_field.name, "")) for credential_field in declared):
             raise CredentialsRequiredError
         return cls({credential_field.name: _required(credential_field, values) for credential_field in declared})
+
+    @classmethod
+    def replacing(
+        cls, fields: Iterable[CredentialField], public_fields: Mapping[str, str] | None, values: Mapping[str, str]
+    ) -> Credentials:
+        """New credentials of an account: only the secret fields, the public ones stay those kept (R0.2.4, Bug 401).
+
+        An account registered before its public fields were kept declares them all again.
+        """
+        declared = tuple(fields)
+        if public_fields is None:
+            return cls.declared(declared, values)
+        sent_public = [
+            declared_field for declared_field in declared if not declared_field.secret and declared_field.name in values
+        ]
+        if sent_public:
+            raise PublicCredentialFieldNotReplaceableError(sent_public[0].name, sent_public[0].label)
+        return cls.declared(declared, {**public_fields, **values})
 
     def value(self, name: str) -> str:
         found = self.values.get(name)
@@ -61,7 +82,14 @@ class Credentials:
 
 
 def _required(credential_field: CredentialField, values: Mapping[str, str]) -> str:
-    value = values.get(credential_field.name, "").strip()
+    value = _cleaned(values.get(credential_field.name, ""))
     if not value:
         raise CredentialFieldRequiredError(credential_field.name, credential_field.label)
     return value
+
+
+def _cleaned(value: str) -> str:
+    # A value copied from a password manager or a web page can carry invisible format characters (zero-width space,
+    # byte order mark): no credential of any exchange contains them, and they make a right value look wrong (Bug 387).
+    visible = "".join(character for character in value if unicodedata.category(character) != INVISIBLE_FORMAT)
+    return visible.strip()

@@ -10,6 +10,10 @@ const detail = (label: string) =>
   within(screen.getByLabelText('Configurazione')).getByText(label, { selector: 'dt' })
     .nextElementSibling?.textContent;
 
+// The configuration in force is under the command Configurazione of the page (R6.4.3).
+const openConfiguration = async () =>
+  userEvent.click(await screen.findByRole('link', { name: 'Configurazione' }));
+
 const assignmentForm = () => screen.getByRole('form', { name: 'Assegnazione della bozza' });
 
 /** Chooses an asset as a user does: typing its name and picking it among the tradable ones. */
@@ -36,26 +40,30 @@ describe('Draft flows', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
     expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Avvia' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('form', { name: 'Assegnazione della bozza' }),
+    ).not.toBeInTheDocument();
+    await openConfiguration();
+
     await waitFor(() => expect(detail('Conto')).toBe('principale'));
     expect(detail('Versione')).toBe('1');
     expect(detail('Modello')).toBe('openrouter/deepseek-chat');
     expect(detail('Fonti')).toBe('indicatori (peso 2)');
     expect(detail('Capitale allocato')).toBe('100 USDC');
     expect(detail('Asset')).toBe('BTC');
-    expect(screen.queryByRole('button', { name: 'Avvia' })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('form', { name: 'Assegnazione della bozza' }),
-    ).not.toBeInTheDocument();
   });
 
   it('duplicates the flow and opens the draft, labelled and without account, capital or assets', async () => {
-    const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Duplica' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/flows/flow-alfa%20(copia)'));
-    expect(await screen.findByRole('heading', { level: 2, name: 'alfa (copia)' })).toBeVisible();
-    expect(screen.getByText('Bozza')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa (copia)' })).toBeVisible();
+    expect(await screen.findByText('Bozza')).toBeInTheDocument();
+    await openConfiguration();
+    await screen.findByRole('heading', { level: 1, name: 'Configurazione di alfa (copia)' });
     expect(detail('Versione')).toBe('1');
     expect(detail('Fonti')).toBe('indicatori (peso 2)');
     expect([detail('Conto'), detail('Capitale allocato'), detail('Asset')]).toEqual([
@@ -67,7 +75,7 @@ describe('Draft flows', () => {
 
   it('tells why the flow could not be duplicated', async () => {
     fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Duplica' }));
 
@@ -85,6 +93,7 @@ describe('Draft flows', () => {
     await chooseAsset('BTC');
     await chooseAsset('ETH');
     await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
+    await openConfiguration();
 
     await waitFor(() => expect(detail('Conto')).toBe('secondario'));
     expect(detail('Versione')).toBe('2');
@@ -103,7 +112,8 @@ describe('Draft flows', () => {
     expect(await within(form).findByText('scegli un conto')).toBeInTheDocument();
     expect(within(form).getByText('il capitale allocato deve essere positivo')).toBeInTheDocument();
     expect(within(form).getByText('almeno un asset è obbligatorio')).toBeInTheDocument();
-    expect(detail('Versione')).toBe('1');
+    await openConfiguration();
+    await waitFor(() => expect(detail('Versione')).toBe('1'));
   });
 
   it('shows the refusal of the API beside the form', async () => {
@@ -188,9 +198,8 @@ describe('Draft flows', () => {
 
   it('names the account by its identifier while the accounts cannot be read', async () => {
     server.use(http.get('*/accounts', () => HttpResponse.json({}, { status: 503 })));
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
-    expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
     await waitFor(() => expect(detail('Conto')).toBe('account-principale'));
   });
 

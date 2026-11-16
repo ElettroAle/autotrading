@@ -31,6 +31,10 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - **Ledger** (registro delle operazioni): storico di ogni esecuzione e pagamento di funding di un conto, scritto una
   volta sola, con il flusso a cui appartiene o nessuno; **flow totals**: PnL realizzato, commissioni, funding e
   posizione attesa per asset di un flusso, aggiornati con le sole righe nuove (ADR 0063).
+- **System prompt**: modello di testo della configurazione (`None` = predefinito della piattaforma, che il flusso segue
+  finché l'utente non lo cambia), reso dal ciclo coi valori del flusso (R1.4.8). I segnaposti hanno un solo registro,
+  `PromptPlaceholder` in `domain/flows/system_prompt.py`: predefinito, controllo, sostituzione, API e dashboard ne
+  derivano, nessun nome di segnaposto ripetuto altrove (ADR system-prompt-del-flusso-come-modello-con-segnaposti).
 - **Risk limits**: leva massima (obbligatoria) ed esposizione per operazione sul margine e sul valore
   (almeno una), in percentuale dei soldi del flusso; opzione "porta al minimo" (R1.5.1-R1.5.4).
 - **Risk outcome** di una decisione: approvata, ridotta, bloccata (R1.5.x); scartata è di `agent` (R1.4.5).
@@ -59,6 +63,9 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   appartengono a nessun flusso.
 - Stati e transizioni sono regole del domain: avvia da fermo, pausa da attivo, riprendi da in pausa,
   archivia solo da fermo; un flusso archiviato non si avvia e non si modifica (ADR 0036).
+- Un ciclo parte solo per un flusso attivo: `RunCycleUseCase` legge lo stato dentro il lock e, per un flusso non più
+  attivo, finisce senza leggere, decidere, ordinare né registrare nulla (Bug 373, ADR
+  guardia-dello-stato-del-flusso-nel-ciclo). Un ciclo già in corso si conclude.
 - Il conto di un flusso non cambia mai. Un asset con posizione aperta non si toglie dalla configurazione.
 - Lo stop chiude sempre le posizioni del flusso (decisione del proprietario: senza stop loss sull'exchange
   una posizione lasciata aperta non è protetta), dopo il ciclo in corso; ogni posizione chiusa entra nello

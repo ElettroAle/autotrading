@@ -152,6 +152,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         instructions="aggressivo",
         risk_limits=RiskLimits(3, None, Decimal("12.50")),
         bring_to_minimum=True,
+        system_prompt="{instructions}",
     )
 
     assert differences(before, after) == (
@@ -166,6 +167,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("esposizione massima del valore", "nessuno", "12,5%"),
         ConfigurationDifference("capitale allocato", "100", "250,50"),
         ConfigurationDifference("porta al minimo", "no", "sì"),
+        ConfigurationDifference("system prompt", "predefinito", "{instructions}"),
     )
 
 
