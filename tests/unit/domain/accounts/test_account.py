@@ -1,6 +1,9 @@
+from decimal import Decimal
+
 import pytest
 
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
@@ -79,3 +82,16 @@ def test_the_public_fields_of_another_exchange_account_are_refused() -> None:
 
     with pytest.raises(CredentialsOfAnotherAccountError):
         account.with_exchange_account(exchange_account_of(ADDRESS.replace("1", "2"), OTHER_SECRET))
+
+
+def test_an_account_starts_with_the_default_deviation_threshold() -> None:
+    assert an_account(TenantId.new()).deviation_threshold == DeviationThreshold.default()
+
+
+def test_an_account_takes_a_new_deviation_threshold() -> None:
+    account = an_account(TenantId.new())
+
+    changed = account.with_deviation_threshold(DeviationThreshold(Decimal(3)))
+
+    assert changed.deviation_threshold == DeviationThreshold(Decimal(3))
+    assert changed.id == account.id

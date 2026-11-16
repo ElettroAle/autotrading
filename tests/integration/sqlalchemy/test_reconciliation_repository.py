@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -13,12 +14,14 @@ from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyP
 from autotrading.adapters.outbound.sqlalchemy.reconciliation_repository import (
     SqlAlchemyReconciliationRepositoryAdapter,
 )
-from autotrading.adapters.outbound.sqlalchemy.tables import unattributable_items
+from autotrading.adapters.outbound.sqlalchemy.tables import reconciliation_alarms, unattributable_items
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.account_reconciliation import AccountReading
+from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import PlatformOrder
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.orders.order import Order
 from autotrading.domain.tenancy.tenant import Tenant
@@ -146,3 +149,100 @@ def test_the_orders_of_the_platform_are_those_of_the_account_with_their_flow_and
     }
     assert orders.orders_among(other_account, asked) == {}
     assert orders.orders_among(account_id, ()) == {}
+
+
+# The balance of the account (R3.3.1)
+
+
+def an_alarm(account_id: UUID, opened_at: datetime = READ_AT) -> ReconciliationAlarm:
+    return ReconciliationAlarm.of(account_id, BalanceComparison(Decimal(1000), Decimal(980), opened_at))
+
+
+def alarm_rows_of(database: Engine, tenant_id: TenantId | None) -> list[RowMapping]:
+    # A query written without any tenant filter: only row level security stands between tenants.
+    with database.begin() as connection:
+        if tenant_id is not None:
+            connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
+        return list(connection.execute(select(reconciliation_alarms)).mappings())
+
+
+def test_a_reading_keeps_its_reference_and_its_comparison(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    comparison = BalanceComparison(Decimal("1000.5"), Decimal("980.25"), READ_AT)
+    repository.save_reading(AccountReading(account_id, READ_AT.replace(hour=9), {}, Decimal(1)))
+
+    repository.save_reading(AccountReading(account_id, READ_AT, {}, Decimal("1000.5"), comparison))
+
+    assert repository.last_reading(account_id) == AccountReading(account_id, READ_AT, {}, Decimal("1000.5"), comparison)
+
+
+def test_an_alarm_opens_once_while_it_stays_open(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+
+    assert repository.open(an_alarm(account_id)) is True
+    assert repository.open(an_alarm(account_id, READ_AT + timedelta(minutes=15))) is False
+
+    assert repository.open_alarm(account_id) == an_alarm(account_id)
+    assert len(alarm_rows_of(database, tenant_id)) == 1
+
+
+def test_two_cycles_of_the_account_together_open_one_alarm(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+
+    def open_alarm(_: int) -> bool:
+        return SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id).open(an_alarm(account_id))
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        opened = list(pool.map(open_alarm, range(4)))
+
+    assert opened.count(True) == 1
+    assert len(alarm_rows_of(database, tenant_id)) == 1
+
+
+def test_a_confirmed_alarm_closes_and_a_new_one_can_open(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    repository.open(an_alarm(account_id))
+    confirmed_at = READ_AT + timedelta(hours=1)
+
+    assert repository.confirm(account_id, confirmed_at) is True
+    assert repository.confirm(account_id, confirmed_at) is False
+    assert repository.open_alarm(account_id) is None
+    assert repository.open(an_alarm(account_id, READ_AT + timedelta(hours=2))) is True
+
+
+def test_the_alarms_of_the_account_come_from_the_most_recent(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    _, other_account = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    repository.open(an_alarm(account_id))
+    repository.confirm(account_id, READ_AT + timedelta(hours=1))
+    repository.open(an_alarm(account_id, READ_AT + timedelta(hours=2)))
+
+    alarms = repository.alarms_of(account_id)
+
+    assert [(alarm.opened_at, alarm.confirmed_at) for alarm in alarms] == [
+        (READ_AT + timedelta(hours=2), None),
+        (READ_AT, READ_AT + timedelta(hours=1)),
+    ]
+    assert repository.alarms_of(other_account) == []
+
+
+def test_the_alarms_of_a_tenant_are_invisible_to_another_and_without_a_tenant(database: Engine) -> None:
+    anna, account_id = new_account(database)
+    bruno, _ = new_account(database)
+    SqlAlchemyReconciliationRepositoryAdapter(database, anna).open(an_alarm(account_id))
+
+    assert (len(alarm_rows_of(database, bruno)), len(alarm_rows_of(database, None))) == (0, 0)
+    assert SqlAlchemyReconciliationRepositoryAdapter(database, bruno).open_alarm(account_id) is None
+    assert SqlAlchemyReconciliationRepositoryAdapter(database, bruno).confirm(account_id, READ_AT) is False
+
+
+def test_an_alarm_on_an_account_of_another_tenant_cannot_be_written(database: Engine) -> None:
+    _, account_id = new_account(database)
+    bruno, _ = new_account(database)
+
+    with pytest.raises(IntegrityError, match="reconciliation_alarms_account_of_tenant"):
+        SqlAlchemyReconciliationRepositoryAdapter(database, bruno).open(an_alarm(account_id))

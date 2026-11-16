@@ -327,6 +327,205 @@
         }
       }
     },
+    "/accounts/{account_id}/deviation-threshold": {
+      "put": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Set Deviation Threshold",
+        "operationId": "set_deviation_threshold_accounts__account_id__deviation_threshold_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviationThresholdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviationThresholdResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/reconciliation": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Read Account Reconciliation",
+        "operationId": "read_account_reconciliation_accounts__account_id__reconciliation_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountReconciliationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/reconciliation/alarms": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "List Reconciliation Alarms",
+        "operationId": "list_reconciliation_alarms_accounts__account_id__reconciliation_alarms_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReconciliationAlarmResponse"
+                  },
+                  "title": "Response List Reconciliation Alarms Accounts  Account Id  Reconciliation Alarms Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/reconciliation/confirmation": {
+      "post": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Confirm Reconciliation",
+        "operationId": "confirm_reconciliation_accounts__account_id__reconciliation_confirmation_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/exchanges": {
       "get": {
         "tags": [
@@ -3702,6 +3901,47 @@
         ],
         "title": "AccountReadingResponse"
       },
+      "AccountReconciliationResponse": {
+        "properties": {
+          "aligned": {
+            "type": "boolean",
+            "title": "Aligned"
+          },
+          "threshold_percent": {
+            "type": "string",
+            "title": "Threshold Percent"
+          },
+          "last_comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceComparisonResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "open_alarm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReconciliationAlarmResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "aligned",
+          "threshold_percent",
+          "last_comparison",
+          "open_alarm"
+        ],
+        "title": "AccountReconciliationResponse",
+        "description": "Whether the balance of the account is the expected one: aligned without an open alarm (R3.3.1)."
+      },
       "AccountRegistrationRequest": {
         "properties": {
           "name": {
@@ -3865,6 +4105,36 @@
           "currency"
         ],
         "title": "AmountResponse"
+      },
+      "BalanceComparisonResponse": {
+        "properties": {
+          "compared_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Compared At"
+          },
+          "expected_balance": {
+            "type": "string",
+            "title": "Expected Balance"
+          },
+          "read_balance": {
+            "type": "string",
+            "title": "Read Balance"
+          },
+          "deviation_percent": {
+            "type": "string",
+            "title": "Deviation Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "compared_at",
+          "expected_balance",
+          "read_balance",
+          "deviation_percent"
+        ],
+        "title": "BalanceComparisonResponse",
+        "description": "The last comparison of the balance of the account; amounts as strings (ADR 0018)."
       },
       "BalanceResponse": {
         "properties": {
@@ -4436,6 +4706,40 @@
         ],
         "title": "DefaultSystemPromptResponse",
         "description": "The system prompt a new flow starts with, and the placeholders it may use (R1.4.8)."
+      },
+      "DeviationThresholdRequest": {
+        "properties": {
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "percent"
+        ],
+        "title": "DeviationThresholdRequest",
+        "description": "The threshold of the balance deviation of the account, in percent of the expected balance (R3.3.1)."
+      },
+      "DeviationThresholdResponse": {
+        "properties": {
+          "percent": {
+            "type": "string",
+            "title": "Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "percent"
+        ],
+        "title": "DeviationThresholdResponse"
       },
       "DifferenceResponse": {
         "properties": {
@@ -6722,6 +7026,49 @@
           "key_fields"
         ],
         "title": "ProviderResponse"
+      },
+      "ReconciliationAlarmResponse": {
+        "properties": {
+          "expected_balance": {
+            "type": "string",
+            "title": "Expected Balance"
+          },
+          "read_balance": {
+            "type": "string",
+            "title": "Read Balance"
+          },
+          "deviation_percent": {
+            "type": "string",
+            "title": "Deviation Percent"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_balance",
+          "read_balance",
+          "deviation_percent",
+          "opened_at",
+          "confirmed_at"
+        ],
+        "title": "ReconciliationAlarmResponse",
+        "description": "An alarm on the balance of the account: open until confirmed (R3.3.1)."
       },
       "RiskLimitsResponse": {
         "properties": {

@@ -280,3 +280,28 @@ def test_a_flow_without_money_left_opens_nothing() -> None:
     outcome = check(funds="0", liquidity="0").outcome(opening("0.4", 1), EXCHANGE)
 
     assert isinstance(outcome, BlockedDecision)
+
+
+SUSPENDED = "allarme di riconciliazione sul conto test-1"
+
+
+def suspended_check(open_assets: frozenset[str] = frozenset()) -> RiskCheck:
+    limits = RiskLimits(50, Decimal(100))
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), open_assets, openings_suspended=SUSPENDED)
+    return RiskCheck(RiskPolicy(limits), state)
+
+
+def test_with_the_openings_suspended_an_opening_is_blocked_with_the_reason() -> None:
+    assert suspended_check().outcome(opening("0.03", 2, asset="ETH"), EXCHANGE) == BlockedDecision("ETH", SUSPENDED)
+
+
+def test_with_the_openings_suspended_a_close_is_still_approved() -> None:
+    assert suspended_check(frozenset({"BTC"})).outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
+
+
+def test_with_the_openings_suspended_a_hold_stays_a_hold() -> None:
+    assert suspended_check().outcome(HoldIntent("SOL"), None) == HeldPosition("SOL")
+
+
+def test_the_openings_are_not_suspended_unless_the_state_says_so() -> None:
+    assert check().outcome(opening("0.03", 2), EXCHANGE) == ApprovedOpening("BTC", TradeSide.LONG, Decimal(60), 2, ())

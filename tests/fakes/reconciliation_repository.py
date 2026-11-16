@@ -1,8 +1,11 @@
-"""Fake of the readings of the accounts and of the unattributable items, recorded once like the database does."""
+"""Fake of the readings of the accounts, of the unattributable items and of the alarms of reconciliation, recorded once
+like the database does."""
 
+from datetime import datetime
 from uuid import UUID
 
 from autotrading.domain.flows.account_reconciliation import AccountReading
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 
 
@@ -11,6 +14,7 @@ class InMemoryReconciliationRepositoryAdapter:
         self.readings: dict[UUID, AccountReading] = {}
         self.items: list[UnattributableItem] = []
         self.resolved: list[UnattributableItem] = []
+        self.alarms: list[ReconciliationAlarm] = []
 
     def last_reading(self, account_id: UUID) -> AccountReading | None:
         return self.readings.get(account_id)
@@ -34,6 +38,26 @@ class InMemoryReconciliationRepositoryAdapter:
         ]
         self.items = [item for item in self.items if item not in closed]
         self.resolved.extend(closed)
+
+    def open_alarm(self, account_id: UUID) -> ReconciliationAlarm | None:
+        return next((alarm for alarm in self.alarms if alarm.account_id == account_id and alarm.is_open), None)
+
+    def open(self, alarm: ReconciliationAlarm) -> bool:
+        if self.open_alarm(alarm.account_id) is not None:
+            return False
+        self.alarms.append(alarm)
+        return True
+
+    def confirm(self, account_id: UUID, at: datetime) -> bool:
+        alarm = self.open_alarm(account_id)
+        if alarm is None:
+            return False
+        self.alarms[self.alarms.index(alarm)] = alarm.confirmed(at)
+        return True
+
+    def alarms_of(self, account_id: UUID) -> list[ReconciliationAlarm]:
+        of_account = [alarm for alarm in self.alarms if alarm.account_id == account_id]
+        return sorted(of_account, key=lambda alarm: alarm.opened_at, reverse=True)
 
 
 def _same_case(item: UnattributableItem, recorded: UnattributableItem) -> bool:
