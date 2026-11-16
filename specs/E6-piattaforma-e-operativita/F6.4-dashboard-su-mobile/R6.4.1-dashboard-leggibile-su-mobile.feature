@@ -13,8 +13,8 @@ Funzionalità: R6.4.1 Dashboard leggibile su mobile
   configurazione; il titolo è il nome del flusso; l'avviso della rete non ripete la parola. Le sottopagine di un
   flusso (cicli, posizioni, versioni, modifica) mostrano di quale flusso sono. Nello storico ogni filtro ha
   l'etichetta sopra il suo campo. La pagina Notifiche spiega come collegare Telegram. Il confronto delle versioni
-  è disattivato con una sola versione. Gli esiti dei cicli recenti nell'elenco dei flussi hanno una legenda. Su
-  schermi larghi l'aspetto attuale resta.
+  è disattivato con una sola versione. Su schermi larghi l'aspetto attuale resta. La legenda degli esiti dei cicli
+  recenti nell'elenco dei flussi è tolta con la loro fila (R6.4.2).
 
   Scenario: Nessuno scorrimento orizzontale
     Dato uno schermo largo 360 pixel
@@ -55,10 +55,6 @@ Funzionalità: R6.4.1 Dashboard leggibile su mobile
     Dato che l'utente non ha collegato Telegram
     Quando apre la pagina Notifiche
     Allora legge i passi per collegare la chat con il codice
-
-  Scenario: Legenda dei cicli recenti
-    Quando l'utente apre l'elenco dei flussi
-    Allora gli esiti dei cicli recenti hanno una legenda che dice concluso e fallito
 
   Scenario: Schermi larghi invariati
     Dato uno schermo largo 1280 pixel

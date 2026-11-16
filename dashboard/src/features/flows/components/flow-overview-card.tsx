@@ -9,7 +9,7 @@ import { formatInstant } from '@/utils/format-instant';
 import type { FlowOverview } from '../api/get-flow-overviews';
 import { formatReturn, returnTone, type ReturnTone } from '../utils/flow-figures';
 
-import { RecentOutcomes } from './recent-outcomes';
+import { ResultsSummary } from './results-summary';
 
 const STYLE_BY_TONE: Readonly<Record<ReturnTone, string>> = {
   positive: 'text-green-700',
@@ -43,7 +43,11 @@ const lastCycleOf = ({ last_cycle }: FlowOverview): string =>
     ? 'nessuna'
     : `${formatInstant(last_cycle.planned_at)} · ${last_cycle.outcome}`;
 
-/** A flow at a glance: its status, where it runs, its cycles and how its capital is doing (R2.2.2). */
+/**
+ * A flow at a glance: its status, the summary of its results, how its capital is doing, then where and when it runs,
+ * in second place (R2.2.2, R6.4.2). The installation is said in the header, not on every card; the summary replaces the
+ * row of the outcomes of the last cycles (ADR riepilogo-dei-risultati-nella-dashboard).
+ */
 export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
   <article aria-label={flow.name} className="space-y-2">
     <Link to={paths.flow.getHref(flow.id)} className="font-medium text-blue-800 hover:underline">
@@ -52,14 +56,11 @@ export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
     <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
       <Fact term="Stato">{flow.status}</Fact>
       {flow.pause_reason !== null && <Fact term="Motivo della pausa">{flow.pause_reason}</Fact>}
-      <Fact term="Conto">{flow.account}</Fact>
-      <Fact term="Ambiente">{flow.environment}</Fact>
-      <Fact term="Modello">{flow.model}</Fact>
-      <Fact term="Versione">{flow.version}</Fact>
-      <Fact term="Ultima esecuzione">{lastCycleOf(flow)}</Fact>
-      {flow.next_cycle_at !== null && (
-        <Fact term="Prossima esecuzione prevista">{formatInstant(flow.next_cycle_at)}</Fact>
-      )}
+    </dl>
+    {flow.summary !== null && flow.currency !== null && (
+      <ResultsSummary flowId={flow.id} currency={flow.currency} summary={flow.summary} />
+    )}
+    <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
       <Fact term="Capitale iniziale">{capitalOf(flow.initial_capital, flow.currency)}</Fact>
       <Fact term="Capitale attuale">{capitalOf(flow.current_capital, flow.currency)}</Fact>
       <Fact
@@ -69,6 +70,17 @@ export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
         {formatReturn(flow.return_percent)}
       </Fact>
     </dl>
-    <RecentOutcomes outcomes={flow.recent_outcomes} />
+    <dl
+      aria-label="Dettagli"
+      className="grid gap-x-6 gap-y-1 text-xs text-slate-600 sm:grid-cols-2"
+    >
+      <Fact term="Conto">{flow.account}</Fact>
+      <Fact term="Modello">{flow.model}</Fact>
+      <Fact term="Versione">{flow.version}</Fact>
+      <Fact term="Ultima esecuzione">{lastCycleOf(flow)}</Fact>
+      {flow.next_cycle_at !== null && (
+        <Fact term="Prossima esecuzione prevista">{formatInstant(flow.next_cycle_at)}</Fact>
+      )}
+    </dl>
   </article>
 );

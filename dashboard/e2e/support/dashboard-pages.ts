@@ -174,8 +174,14 @@ export class DashboardPages {
     return this.flowSummary(name).getByLabel(term, { exact: true });
   }
 
-  recentOutcomes(name: string): Locator {
-    return this.flowSummary(name).getByRole('list', { name: 'Esito degli ultimi cicli' });
+  /** The summary of the results of the flow, on its page or in its card of the list (R6.4.2). */
+  results(within: Locator = this.content()): Locator {
+    return within.getByRole('region', { name: 'Riepilogo dei risultati' });
+  }
+
+  /** One value of a summary of the results, by the term it shows: «Guadagno totale», «Cicli falliti», ... */
+  result(term: string, within?: Locator): Locator {
+    return this.results(within).getByLabel(term, { exact: true });
   }
 
   /** The title of the page of a flow, its name, once the page has read the flow (R6.4.1). */
@@ -305,8 +311,9 @@ export class DashboardPages {
     return this.page.getByLabel('Chat collegata');
   }
 
+  // Exact: the summary of the results of a flow has a «Guadagno nel periodo» on the same page (R6.4.2).
   period(): Locator {
-    return this.page.getByLabel('Periodo');
+    return this.page.getByLabel('Periodo', { exact: true });
   }
 
   historyTab(name: string): Locator {

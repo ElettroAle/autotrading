@@ -13,3 +13,14 @@ describe('paths.comparison', () => {
     );
   });
 });
+
+describe('paths.flowCycles', () => {
+  it.each([
+    [1, '', '/flows/flow-alfa/cycles'],
+    [2, '', '/flows/flow-alfa/cycles?page=2'],
+    [1, 'fallito', '/flows/flow-alfa/cycles?outcome=fallito'],
+    [3, 'fallito', '/flows/flow-alfa/cycles?outcome=fallito&page=3'],
+  ])('leads to page %i of the cycles with the outcome «%s» as %s', (page, outcome, href) => {
+    expect(paths.flowCycles.getHref('flow-alfa', page, outcome)).toBe(href);
+  });
+});

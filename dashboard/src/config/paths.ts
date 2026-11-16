@@ -39,10 +39,20 @@ export const paths = {
     path: '/provider-keys',
     getHref: () => '/provider-keys',
   },
+  // The cycles of a flow filtered on an outcome, as the failed cycles of its results lead to them (R6.4.2).
   flowCycles: {
     path: '/flows/:flowId/cycles',
-    getHref: (flowId: string, page = 1) =>
-      `/flows/${encodeURIComponent(flowId)}/cycles${page === 1 ? '' : `?page=${page}`}`,
+    getHref: (flowId: string, page = 1, outcome = '') => {
+      const search = new URLSearchParams();
+      if (outcome !== '') {
+        search.set('outcome', outcome);
+      }
+      if (page !== 1) {
+        search.set('page', String(page));
+      }
+      const query = search.toString();
+      return `/flows/${encodeURIComponent(flowId)}/cycles${query === '' ? '' : `?${query}`}`;
+    },
   },
   flowPositions: {
     path: '/flows/:flowId/positions',

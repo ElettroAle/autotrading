@@ -15,6 +15,11 @@ const ROUNDED_RESULT = new Intl.NumberFormat(LOCALE, {
   maximumFractionDigits: 2,
   signDisplay: 'exceptZero',
 });
+const GAIN = new Intl.NumberFormat(LOCALE, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'exceptZero',
+});
 const USD = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 const PRICE_FROM_THOUSAND = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
 const PRICE_BELOW_THOUSAND = new Intl.NumberFormat(LOCALE, { maximumSignificantDigits: 6 });
@@ -52,6 +57,9 @@ export const formatRoundedAmount = (amount: string): string => ROUNDED.format(de
 /** An aggregate result to at most two decimals, signed unless even (R2.2.6). */
 export const formatRoundedResult = (amount: string): string =>
   ROUNDED_RESULT.format(decimal(amount));
+
+/** A gain of a flow with its sign and its cents, as the summary of its results reads: +2,50, -1,20, 0,00 (R6.4.2). */
+export const formatGain = (amount: string): string => GAIN.format(decimal(amount));
 
 /** A cost in USD: cents always, and the fractions of a cent a model call can cost. */
 export const formatUsd = (amount: string): string => USD.format(decimal(amount));

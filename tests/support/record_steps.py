@@ -12,7 +12,7 @@ from pytest_bdd import given, parsers, then, when
 from autotrading.application.agent.errors import ModelUnavailableError
 from autotrading.application.flows.errors import CycleFlowNotFoundError
 from autotrading.application.flows.list_cycles import ListCyclesCommand
-from autotrading.application.flows.list_flow_overviews import FlowOverview
+from autotrading.application.flows.list_flow_overviews import FlowOverview, ListFlowOverviewsCommand
 from autotrading.application.flows.read_cycle import ReadCycleCommand
 from autotrading.application.flows.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.agent.model_definition import ModelDefinition
@@ -187,7 +187,7 @@ def flow_opens_in_cycle(records: Records, flow: str, asset: str) -> None:
 
 @when(quoted('"{user}" consulta i propri flussi'))
 def consult_own_flows(records: Records, user: str) -> None:
-    consult(records, records.use_cases_of(user).list_flow_overviews.execute)
+    consult(records, lambda: records.use_cases_of(user).list_flow_overviews.execute(ListFlowOverviewsCommand()))
 
 
 @when(quoted('"{user}" consulta i cicli del flusso "{flow}"'))

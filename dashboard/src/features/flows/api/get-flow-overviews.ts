@@ -1,8 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { apiSearchOf, isComplete, type Period } from '@/components/ui/period-selector/use-period';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
+
+import { resultsSummarySchema } from './get-flow-results';
 
 const cycleOutcomeSchema = z.object({
   planned_at: z.string(),
@@ -24,18 +27,27 @@ const flowOverviewSchema = z.object({
   initial_capital: z.string().nullable(),
   current_capital: z.string().nullable(),
   return_percent: z.string().nullable(),
-  recent_outcomes: z.array(cycleOutcomeSchema),
+  // A draft has no account yet, so no results (ADR 0124).
+  summary: resultsSummarySchema.nullable(),
 });
-
-export type CycleOutcome = z.infer<typeof cycleOutcomeSchema>;
 
 export type FlowOverview = z.infer<typeof flowOverviewSchema>;
 
-/** The flows in use of the tenant with their state, their recent cycles and their capital (R1.7.3, ADR 0127). */
-export const useFlowOverviews = () => {
+/**
+ * The flows in use of the tenant with their state, their last cycle, their capital and their results in the period
+ * chosen above the list (R1.7.3, ADR 0127, R6.4.2). A range waits for both its days, the list keeping what it read.
+ */
+export const useFlowOverviews = (period: Period) => {
   const api = useApiClient();
+  const search = apiSearchOf(period);
   return useQuery({
-    ...pageDataQuery('flows', 'overview'),
-    queryFn: async () => readData(await api.GET('/flows/overview'), z.array(flowOverviewSchema)),
+    ...pageDataQuery('flows', 'overview', search),
+    queryFn: async () =>
+      readData(
+        await api.GET('/flows/overview', { querySerializer: () => search }),
+        z.array(flowOverviewSchema),
+      ),
+    enabled: isComplete(period),
+    placeholderData: keepPreviousData,
   });
 };

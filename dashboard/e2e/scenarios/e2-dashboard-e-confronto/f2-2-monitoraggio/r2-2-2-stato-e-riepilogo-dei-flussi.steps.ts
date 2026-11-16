@@ -11,9 +11,7 @@ const LAST_CYCLE_TIME = '10:07:00';
 const NEXT_CYCLE_TIME = '10:22:00';
 const CYCLE_MINUTES = 15;
 const MINUTE = 60_000;
-// More cycles than the summary shows, so that it is visible that only the last ten count.
 const RECORDED_CYCLES = 12;
-const SHOWN_OUTCOMES = 10;
 
 const cyclesUntilLast = () =>
   Array.from({ length: RECORDED_CYCLES }, (_, index) => {
@@ -82,21 +80,14 @@ Then(
   },
 );
 
-Then(
-  'mostra ultima esecuzione, prossima esecuzione prevista ed esito degli ultimi 10 cicli',
-  async ({ dashboard, memory }) => {
-    await expect(dashboard.flowFact(memory.flow, 'Ultima esecuzione')).toContainText(
-      LAST_CYCLE_TIME,
-    );
-    await expect(dashboard.flowFact(memory.flow, 'Prossima esecuzione prevista')).toContainText(
-      NEXT_CYCLE_TIME,
-    );
-    const outcomes = dashboard.recentOutcomes(memory.flow).getByRole('listitem');
-    await expect(outcomes).toHaveCount(SHOWN_OUTCOMES);
-    await expect(outcomes.nth(0)).toContainText(`concluso, ${LAST_CYCLE_TIME}`);
-    await expect(outcomes.nth(1)).toContainText('fallito');
-  },
-);
+Then('mostra ultima esecuzione e prossima esecuzione prevista', async ({ dashboard, memory }) => {
+  await expect(dashboard.flowFact(memory.flow, 'Ultima esecuzione')).toContainText(
+    `${LAST_CYCLE_TIME} · concluso`,
+  );
+  await expect(dashboard.flowFact(memory.flow, 'Prossima esecuzione prevista')).toContainText(
+    NEXT_CYCLE_TIME,
+  );
+});
 
 Then(
   'il flusso {string} mostra stato {string} con il motivo {string}',
