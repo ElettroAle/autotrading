@@ -1,6 +1,5 @@
 import { expect, type Locator } from '@playwright/test';
 
-import { paths } from '@/config/paths';
 import { aCompletedCycle, aFailedCycle, STEPS, type FakeCycle } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { aClosedPosition } from '@/testing/mocks/positions';
@@ -185,20 +184,11 @@ When(
   async ({ dashboard, memory }, account: string) => {
     recordCycles(memory, THE_FLOW, completedThenFailed(1, 1));
     await openAs(dashboard, memory, account, () => dashboard.openCyclesOf(memory.flow));
+    memory.chosenCycle = memory.cycles[1];
     // The outcome, away from the instant that links the cycle: the row itself opens it.
     await dashboard.cell(dashboard.cycleRows().nth(1), 'Esito').click();
   },
 );
-
-Then('vede il dettaglio di quel ciclo', async ({ dashboard, memory }) => {
-  const chosen = memory.cycles[1] as FakeCycle;
-  const flowId = fakePlatform.flowNamed(memory.flow).id;
-  await expect(dashboard.page).toHaveURL(
-    (url) => url.pathname === `/dashboard${paths.cycle.getHref(flowId, chosen.planned_at)}`,
-  );
-  await expect(dashboard.pageHeading()).toHaveText('Dettaglio del ciclo');
-  await expect(dashboard.failure()).toContainText(chosen.failure?.message ?? '');
-});
 
 Given(
   'uno schermo largo {int} pixel e uno largo {int} pixel',

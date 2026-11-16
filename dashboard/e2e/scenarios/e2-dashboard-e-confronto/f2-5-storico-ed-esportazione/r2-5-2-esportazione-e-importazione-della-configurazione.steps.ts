@@ -140,6 +140,7 @@ Then(
     const source = fakePlatform.flowNamed(original);
     await expect(dashboard.flowName()).toHaveText(flow);
     await expect(dashboard.status(status)).toBeVisible();
+    await dashboard.openConfiguration();
     await expect(dashboard.detail('Versione')).toHaveText(String(version));
     await expect(dashboard.detail('Modello')).toHaveText(source.model);
     await expect(dashboard.detail('Fonti')).toHaveText(

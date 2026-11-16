@@ -2,11 +2,11 @@ import { useId } from 'react';
 
 import { FILTER, FILTER_FIELD, FILTER_ROW } from '../filters';
 
-import { PERIODS, usePeriod, type PeriodKind } from './use-period';
+import { PERIODS, useMenuPeriod, type PeriodKind } from './use-period';
 
 /** The period of the panels of a page: the same choice for statistics, equity curve and ranking (ADR 0123). */
 export const PeriodSelector = () => {
-  const [period, choose] = usePeriod();
+  const [period, choose] = useMenuPeriod();
   const id = useId();
   return (
     <div className={`my-4 ${FILTER_ROW}`}>

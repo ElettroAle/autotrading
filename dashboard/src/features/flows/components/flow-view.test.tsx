@@ -19,9 +19,17 @@ describe('FlowView', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
     expect(screen.getByText('Stato: attivo')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Versioni della configurazione' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/versions',
+  });
+
+  // ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune: what does not depend on the period is out of the tabs.
+  it('leads to the configuration of the flow with a command out of the tabs', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
+
+    const configuration = await screen.findByRole('link', { name: 'Configurazione' });
+    expect(configuration).toHaveAttribute('href', '/flows/flow-alfa/versions');
+    expect(configuration).toHaveClass('min-h-11');
+    expect(screen.getByRole('navigation', { name: 'Dati del flusso' })).not.toContainElement(
+      configuration,
     );
   });
 
@@ -42,35 +50,47 @@ describe('FlowView', () => {
     expect(screen.queryByText(/rete di test/)).not.toBeInTheDocument();
   });
 
-  it('leads to the cycles of the flow', async () => {
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+  it('leads to the tabs of the flow, carrying the period of the page', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d&outcome=fallito' });
 
-    expect(await screen.findByRole('link', { name: 'Cicli del flusso' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/cycles',
+    const views = await screen.findByRole('navigation', { name: 'Dati del flusso' });
+    expect(
+      within(views)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['Panoramica', '/flows/flow-alfa?period=7d'],
+      ['Posizioni chiuse', '/flows/flow-alfa/closed-positions?period=7d'],
+      ['Cicli', '/flows/flow-alfa/cycles?period=7d'],
+    ]);
+  });
+
+  it('shows the positions open now in the overview, saying they hold whatever the period', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
+
+    const positions = await screen.findByRole('region', { name: 'Posizioni aperte attuali' });
+    expect(positions).toHaveTextContent(
+      'Le posizioni aperte adesso, qualunque sia il periodo scelto.',
     );
   });
 
-  it('leads to the open and the closed positions of the flow', async () => {
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+  it('leads from the old address of the open positions to the overview, with its period', async () => {
+    const { router } = await renderApp({
+      account: 'anna',
+      url: '/flows/flow-alfa/positions?period=7d',
+    });
 
-    expect(await screen.findByRole('link', { name: 'Posizioni aperte' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/positions',
-    );
-    expect(screen.getByRole('link', { name: 'Posizioni chiuse' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/closed-positions',
-    );
+    expect(await screen.findByRole('region', { name: 'Posizioni aperte attuali' })).toBeVisible();
+    expect(router.state.location.pathname).toBe('/flows/flow-alfa');
+    expect(router.state.location.search).toBe('?period=7d');
   });
 
-  it('leads to the editor of the configuration of the flow', async () => {
+  it('shows no list of the recent cycles, R6.4.3', async () => {
+    fakePlatform.concludeCycle('alfa', new Date(2026, 10, 14, 9, 45, 0));
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
-    expect(await screen.findByRole('link', { name: 'Modifica la configurazione' })).toHaveAttribute(
-      'href',
-      '/flows/flow-alfa/edit',
-    );
+    expect(await screen.findByRole('heading', { name: 'Equity curve' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Cicli recenti' })).not.toBeInTheDocument();
   });
 
   it('says a flow outside the tenant of the user does not exist, under the generic title', async () => {
@@ -80,42 +100,40 @@ describe('FlowView', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Flusso$/);
   });
 
-  it('shows the views of the flow as tabs, apart from the command that edits it', async () => {
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+  it('keeps the period and the tabs above the tab chosen', async () => {
+    fakePlatform.concludeCycle('alfa', new Date());
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });
 
-    const views = await screen.findByRole('navigation', { name: 'Dati del flusso' });
-    expect(
-      within(views)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual([
-      'Posizioni aperte',
-      'Posizioni chiuse',
-      'Cicli del flusso',
-      'Versioni della configurazione',
-    ]);
-    const edit = screen.getByRole('link', { name: 'Modifica la configurazione' });
-    expect(views).not.toContainElement(edit);
-    expect(edit).toHaveClass('min-h-11');
+    const period = await screen.findByLabelText('Periodo');
+    const views = screen.getByRole('navigation', { name: 'Dati del flusso' });
+    const cycles = await screen.findByRole('table', { name: 'Cicli' });
+    expect(period.compareDocumentPosition(views)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(views.compareDocumentPosition(cycles)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(views).getByRole('link', { name: 'Cicli' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
-  it('shows the status and the warning of the network before views, commands and configuration', async () => {
+  it('shows name, status with its commands and the warning of the network, then period, tabs and tab', async () => {
     fakePlatform.configureExchangeNetwork('test', 'sandbox');
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
+    const name = await screen.findByRole('heading', { level: 1, name: 'alfa' });
     const status = await screen.findByText('Stato: attivo');
     const notice = screen.getByRole('note');
-    const views = screen.getByRole('navigation', { name: 'Dati del flusso' });
     const commands = await screen.findByRole('group', { name: 'Comandi del flusso' });
-    const configuration = screen.getByLabelText('Configurazione', { exact: true });
-    const order = [status, notice, views, commands, configuration];
+    const period = screen.getByLabelText('Periodo');
+    const views = screen.getByRole('navigation', { name: 'Dati del flusso' });
+    const curve = screen.getByRole('heading', { name: 'Equity curve' });
+    const order = [name, status, notice, commands, period, views, curve];
     order.slice(1).forEach((element, index) => {
       expect(order[index]?.compareDocumentPosition(element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });
   });
 
-  // R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard: the summary comes first, in the period of the page.
-  it('shows the summary of the results at the top of the page, in the period of the page', async () => {
+  // R6.4.2 and R6.4.3: the summary opens the overview, below the period it is read in.
+  it('shows the summary of the results at the top of the overview, in the period of the page', async () => {
     fakePlatform.changeFlow('alfa', { allocatedCapital: 100, currentCapital: 102.5 });
     const now = Date.now();
     fakePlatform.recordEquity('alfa', new Date(now - 10 * DAY), 100);
@@ -130,8 +148,10 @@ describe('FlowView', () => {
     expect(within(results).getByLabelText('Guadagno nel periodo')).toHaveTextContent(
       '+0,40 USDC · +0,40%',
     );
-    const status = screen.getByText('Stato: attivo');
-    expect(results.compareDocumentPosition(status)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const views = screen.getByRole('navigation', { name: 'Dati del flusso' });
+    const curve = screen.getByRole('heading', { name: 'Equity curve' });
+    expect(views.compareDocumentPosition(results)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(results.compareDocumentPosition(curve)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('waits for both days of a range before reading the summary', async () => {
@@ -181,20 +201,21 @@ describe('FlowView', () => {
 
   it('keeps showing the flow and its cycles when a rereading fails', async () => {
     fakePlatform.concludeCycle('alfa', new Date(2026, 10, 14, 9, 45, 0));
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
-    await screen.findByRole('list', { name: 'Cicli recenti' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });
+    const cycles = await screen.findByRole('table', { name: 'Cicli' });
+    await within(cycles).findByText(/09:45:00/);
     fakePlatform.stopApi();
 
     await userEvent.click(screen.getByRole('button', { name: 'Aggiorna' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Dati non aggiornati');
     expect(screen.getByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Cicli recenti' })).toHaveTextContent('09:45:00');
+    expect(screen.getByRole('table', { name: 'Cicli' })).toHaveTextContent('09:45:00');
   });
 
   it('keeps a long name of a model within the configuration, breaking it where it does not fit', async () => {
     fakePlatform.changeFlow('alfa', { model: 'openrouter/~deepseek/deepseek-flash-latest' });
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     const configuration = await screen.findByLabelText('Configurazione', { exact: true });
     expect(configuration).toHaveClass('grid-cols-[max-content_minmax(0,1fr)]');

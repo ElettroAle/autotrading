@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import type { ListDays } from '@/components/ui/period-selector/use-period';
 import type { TableFilterValues } from '@/hooks/use-table-filters';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
@@ -31,17 +32,28 @@ export type ClosedPosition = z.infer<typeof closedPositionSchema>;
  * The closed positions of a flow that match the filters, from the most recent close, in the pages of the API, with how
  * many match in all (R1.7.2, R6.4.4). The page shown stays while the next filters are read.
  */
-export const useClosedPositions = (flowId: string, page: number, filters: TableFilterValues) => {
+export const useClosedPositions = (
+  flowId: string,
+  page: number,
+  filters: TableFilterValues,
+  days: ListDays,
+) => {
   const api = useApiClient();
   return useQuery({
-    ...pageDataQuery('closed-positions', flowId, page, filters),
+    ...pageDataQuery('closed-positions', flowId, page, filters, days),
     placeholderData: keepPreviousData,
     queryFn: async () =>
       readData(
         await api.GET('/flows/{flow_id}/closed-positions', {
           params: {
             path: { flow_id: flowId },
-            query: { page, asset: filters.asset, side: filters.side, result: filters.result },
+            query: {
+              page,
+              asset: filters.asset,
+              side: filters.side,
+              result: filters.result,
+              ...days,
+            },
           },
         }),
         closedPositionPageSchema,

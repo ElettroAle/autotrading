@@ -167,8 +167,10 @@ Then('il riepilogo dice {string} senza evidenza', async ({ dashboard }, words: s
 Then(
   'vede i cicli del flusso {string} filtrati sui falliti',
   async ({ dashboard }, flow: string) => {
-    await expect(dashboard.pageHeading()).toHaveText(`Cicli di ${flow}`);
-    await expect(dashboard.page).toHaveURL(/\/cycles\?outcome=fallito$/);
+    // The tab Cicli of the page of the flow, in the period of the page (R6.4.3).
+    await expect(dashboard.pageHeading()).toHaveText(flow);
+    await expect(dashboard.flowTab('Cicli')).toHaveAttribute('aria-current', 'page');
+    await expect(dashboard.page).toHaveURL(/\/cycles\?(.+&)?outcome=fallito$/);
     const rows = dashboard.page.getByRole('table', { name: 'Cicli' }).locator('tbody tr');
     await expect(rows).toHaveCount(2);
     await expect(rows).toContainText(['fallito', 'fallito']);
@@ -176,9 +178,11 @@ Then(
 );
 
 Then('vede le posizioni aperte del flusso {string}', async ({ dashboard }, flow: string) => {
-  await expect(dashboard.pageHeading()).toHaveText(`Posizioni aperte di ${flow}`);
-  await expect(dashboard.page).toHaveURL(/\/positions$/);
-  const rows = dashboard.page.getByRole('table', { name: 'Posizioni aperte' }).locator('tbody tr');
+  // The positions held now are in the overview of the flow (R6.4.3).
+  await expect(dashboard.pageHeading()).toHaveText(flow);
+  await expect(dashboard.flowTab('Panoramica')).toHaveAttribute('aria-current', 'page');
+  const current = dashboard.page.getByRole('region', { name: 'Posizioni aperte attuali' });
+  const rows = current.getByRole('table', { name: 'Posizioni aperte' }).locator('tbody tr');
   await expect(rows).toHaveCount(1);
 });
 

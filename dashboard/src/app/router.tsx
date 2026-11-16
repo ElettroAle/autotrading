@@ -9,6 +9,7 @@ import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
 import { EditFlowRoute } from './routes/app/edit-flow';
 import { FlowRoute } from './routes/app/flow';
+import { FlowOverviewRoute } from './routes/app/flow-overview';
 import { FlowVersionsRoute } from './routes/app/flow-versions';
 import { HistoryRoute } from './routes/app/history';
 import { HomeRoute } from './routes/app/home';
@@ -33,17 +34,24 @@ export const routes: RouteObject[] = [
       { index: true, element: <HomeRoute /> },
       { path: paths.accounts.path, element: <AccountsRoute /> },
       { path: paths.newFlow.path, element: <NewFlowRoute /> },
-      { path: paths.flow.path, element: <FlowRoute /> },
+      // The tabs of the page of the flow live under its head and its period (R6.4.3).
+      {
+        path: paths.flow.path,
+        element: <FlowRoute />,
+        children: [
+          { index: true, element: <FlowOverviewRoute /> },
+          { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
+          { path: paths.flowCycles.path, element: <CyclesRoute /> },
+        ],
+      },
       { path: paths.editFlow.path, element: <EditFlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
       { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },
       { path: paths.ranking.path, element: <RankingRoute /> },
-      { path: paths.flowCycles.path, element: <CyclesRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
       { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },
       { path: paths.flowPositions.path, element: <PositionsRoute /> },
-      { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
       { path: paths.comparison.path, element: <ComparisonRoute /> },
     ],
   },

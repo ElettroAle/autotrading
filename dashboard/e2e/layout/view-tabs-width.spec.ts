@@ -74,5 +74,12 @@ test('ADR schede-con-aspetto-e-ruolo-di-schede: every bar of tabs stays on one r
       PHONE_WIDTH,
     );
   }
-  expect(layouts.flow?.scrollsInside, 'the views of the flow scroll inside their bar').toBe(true);
+  // A bar wider than the screen scrolls inside itself, never the page: on one row and within the page, its tabs that
+  // do not fit can only scroll inside it. The three tabs of the flow fit at 360 pixels (R6.4.3).
+  for (const [name, layout] of Object.entries(layouts)) {
+    expect(
+      layout.scrollsInside || layout.right <= PHONE_WIDTH,
+      `${name}: fits or scrolls inside`,
+    ).toBe(true);
+  }
 });

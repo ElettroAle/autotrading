@@ -4,6 +4,12 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
+import {
+  isComplete,
+  listDaysOf,
+  usePeriod,
+  type ListDays,
+} from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
 import { formatInstant } from '@/utils/format-instant';
@@ -38,6 +44,13 @@ const CYCLE_FILTERS: readonly TableFilter[] = [
   },
 ];
 
+const emptyText = (filtered: boolean, days: ListDays): string => {
+  if (filtered) {
+    return 'Nessun ciclo con questi filtri.';
+  }
+  return days.from === undefined ? 'Nessun ciclo registrato.' : 'Nessun ciclo nel periodo scelto.';
+};
+
 const countOf = (total: number): string => (total === 1 ? '1 ciclo' : `${total} cicli`);
 
 const outcomeOf = (cycle: CycleSummary): string =>
@@ -52,14 +65,16 @@ const COLUMNS: DataTableColumn<CycleSummary>[] = [
   { header: 'Decisioni', cell: decisionsOf },
 ];
 
-/**
- * The cycles of the flow that match the filters of the address, from the most recent, in the pages of the API; each
- * row opens its cycle (R2.2.7, R6.4.4).
- */
-export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) => {
+type CyclesInDaysProps = {
+  readonly flowId: string;
+  readonly page: number;
+  readonly days: ListDays;
+};
+
+const CyclesInDays = ({ flowId, page, days }: CyclesInDaysProps) => {
   const { values } = useTableFilters(CYCLE_FILTERS);
   const [search] = useSearchParams();
-  const cycles = useCycles(flowId, page, values);
+  const cycles = useCycles(flowId, page, values, days);
   if (cycles.isPending) {
     return <Loading />;
   }
@@ -76,7 +91,7 @@ export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) =
         rows={cycles.data.cycles}
         rowKey={(cycle) => cycle.planned_at}
         rowHref={(cycle) => paths.cycle.getHref(flowId, cycle.planned_at)}
-        empty={filtered ? 'Nessun ciclo con questi filtri.' : 'Nessun ciclo registrato.'}
+        empty={emptyText(filtered, days)}
         filtering={{ filters: CYCLE_FILTERS, total: cycles.data.total, countOf }}
       />
       <Pagination
@@ -86,4 +101,18 @@ export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) =
       />
     </>
   );
+};
+
+/**
+ * The cycles of the flow in the period of the page that match the filters of the address, from the most recent, in the
+ * pages of the API; each row opens its cycle (R2.2.7, R6.4.4, R6.4.3).
+ */
+export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) => {
+  const [period] = usePeriod();
+  if (!isComplete(period)) {
+    return (
+      <p className="text-slate-600">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
+    );
+  }
+  return <CyclesInDays flowId={flowId} page={page} days={listDaysOf(period, new Date())} />;
 };

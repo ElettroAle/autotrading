@@ -173,4 +173,55 @@ describe('CyclesList', () => {
 
     expect(router.state.location.pathname).toBe('/flows/flow-alfa/cycles/2026-11-14T09%3A07%3A00Z');
   });
+
+  // ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune: the period of the page holds for the tab Cicli too.
+  // The API reads the days in UTC; the page shows the instants in the time zone of the browser, an hour ahead.
+  const DAY_13_IN_ROME = /13\/11\/2026|14\/11\/2026, 00:/;
+
+  describe('in the period of the page, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune', () => {
+    it('lists only the cycles of the days of the period', async () => {
+      fakePlatform.recordCycles('alfa', cyclesBack(200));
+      await renderApp({
+        account: 'anna',
+        url: '/flows/flow-alfa/cycles?period=range&from=2026-11-13&to=2026-11-13',
+      });
+
+      const rows = await rowsOf();
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach((row) => expect(row).toHaveTextContent(DAY_13_IN_ROME));
+    });
+
+    it('lists the cycles of an interval chosen on the chart', async () => {
+      fakePlatform.recordCycles('alfa', cyclesBack(200));
+      await renderApp({
+        account: 'anna',
+        url: '/flows/flow-alfa/cycles?period=7d&from=2026-11-13&to=2026-11-13',
+      });
+
+      const rows = await rowsOf();
+      rows.forEach((row) => expect(row).toHaveTextContent(DAY_13_IN_ROME));
+    });
+
+    it('says no cycle falls in the period', async () => {
+      fakePlatform.recordCycles('alfa', cyclesBack(1));
+      await renderApp({
+        account: 'anna',
+        url: '/flows/flow-alfa/cycles?period=range&from=2026-10-01&to=2026-10-02',
+      });
+
+      expect(await screen.findByText('Nessun ciclo nel periodo scelto.')).toBeInTheDocument();
+    });
+
+    it('waits for both days of a range', async () => {
+      await renderApp({
+        account: 'anna',
+        url: '/flows/flow-alfa/cycles?period=range&from=2026-10-01',
+      });
+
+      expect(
+        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('table', { name: 'Cicli' })).not.toBeInTheDocument();
+    });
+  });
 });

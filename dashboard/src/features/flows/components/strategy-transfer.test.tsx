@@ -62,7 +62,7 @@ describe('Strategy export and import', () => {
 
   it('saves the strategy file of the flow under the name the API gives it', async () => {
     const saved = watchSavedFiles();
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Esporta' }));
 
@@ -80,7 +80,7 @@ describe('Strategy export and import', () => {
       ),
     );
     const saved = watchSavedFiles();
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Esporta' }));
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { usePeriodSearch } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { formatGain, formatPercent } from '@/utils/format-amount';
 
@@ -16,6 +17,13 @@ const STYLE_BY_TONE: Readonly<Record<ReturnTone, string>> = {
 };
 
 const LINK = 'underline-offset-2 hover:underline';
+
+// The failed cycles of the summary are those of the period: their tab keeps it (R6.4.3).
+const failedCyclesHref = (flowId: string, periodSearch: string): string => {
+  const search = new URLSearchParams(periodSearch);
+  search.set('outcome', FAILED_OUTCOME);
+  return `${paths.flowCycles.getHref(flowId)}?${search.toString()}`;
+};
 
 const gainText = (amount: string, percent: string | null, currency: string): string => {
   const written = `${formatGain(amount)} ${currency}`;
@@ -60,6 +68,7 @@ const Gain = ({
 
 // Only failed cycles call for attention: none is said in plain words, without colour nor link (R6.4.2).
 const FailedCycles = ({ flowId, count }: { flowId: string; count: number }) => {
+  const periodSearch = usePeriodSearch();
   if (count === 0) {
     return (
       <Value term="Cicli falliti" className="text-slate-700">
@@ -69,7 +78,7 @@ const FailedCycles = ({ flowId, count }: { flowId: string; count: number }) => {
   }
   return (
     <Value term="Cicli falliti" className="text-red-700">
-      <Link to={paths.flowCycles.getHref(flowId, 1, FAILED_OUTCOME)} className={LINK}>
+      <Link to={failedCyclesHref(flowId, periodSearch)} className={LINK}>
         {counted(count, 'ciclo fallito', 'cicli falliti')}
       </Link>
     </Value>
@@ -86,27 +95,30 @@ type ResultsSummaryProps = {
  * How the flow is doing at a glance: gains in all and in the period, open positions and failed cycles, two columns on a
  * phone and four on a wide screen (R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard).
  */
-export const ResultsSummary = ({ flowId, currency, summary }: ResultsSummaryProps) => (
-  <section aria-label="Riepilogo dei risultati">
-    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Gain
-        term="Guadagno totale"
-        amount={summary.total_gain}
-        percent={summary.total_gain_percent}
-        currency={currency}
-      />
-      <Gain
-        term="Guadagno nel periodo"
-        amount={summary.period_gain}
-        percent={summary.period_gain_percent}
-        currency={currency}
-      />
-      <Value term="Posizioni aperte" className="text-slate-900">
-        <Link to={paths.flowPositions.getHref(flowId)} className={LINK}>
-          {counted(summary.open_positions, 'posizione aperta', 'posizioni aperte')}
-        </Link>
-      </Value>
-      <FailedCycles flowId={flowId} count={summary.failed_cycles} />
-    </dl>
-  </section>
-);
+export const ResultsSummary = ({ flowId, currency, summary }: ResultsSummaryProps) => {
+  const periodSearch = usePeriodSearch();
+  return (
+    <section aria-label="Riepilogo dei risultati">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Gain
+          term="Guadagno totale"
+          amount={summary.total_gain}
+          percent={summary.total_gain_percent}
+          currency={currency}
+        />
+        <Gain
+          term="Guadagno nel periodo"
+          amount={summary.period_gain}
+          percent={summary.period_gain_percent}
+          currency={currency}
+        />
+        <Value term="Posizioni aperte" className="text-slate-900">
+          <Link to={`${paths.flow.getHref(flowId)}${periodSearch}`} className={LINK}>
+            {counted(summary.open_positions, 'posizione aperta', 'posizioni aperte')}
+          </Link>
+        </Value>
+        <FailedCycles flowId={flowId} count={summary.failed_cycles} />
+      </dl>
+    </section>
+  );
+};

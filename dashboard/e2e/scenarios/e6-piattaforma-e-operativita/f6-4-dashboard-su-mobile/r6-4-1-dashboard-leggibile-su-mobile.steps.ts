@@ -18,12 +18,9 @@ const USER = 'utente';
 const THE_FLOW = 'prova-btc';
 // The least a command or a view needs to be touched with a finger (ADR viste-e-comandi-della-pagina-del-flusso).
 const TOUCHABLE_HEIGHT = 44;
-const FLOW_VIEWS = [
-  'Posizioni aperte',
-  'Posizioni chiuse',
-  'Cicli del flusso',
-  'Versioni della configurazione',
-];
+// The tabs of the page of the flow; versions and Modifica are under the command Configurazione (R6.4.3).
+const FLOW_VIEWS = ['Panoramica', 'Posizioni chiuse', 'Cicli'];
+const CONFIGURATION = 'Configurazione';
 const HISTORY_FILTERS = ['Flusso', 'Versione', 'Conto', 'Asset', 'Periodo'];
 
 type Box = {
@@ -110,6 +107,7 @@ Then(
   'il nome del modello resta entro il riquadro ed è leggibile per intero',
   async ({ dashboard, memory }) => {
     const model = fakePlatform.flowNamed(memory.flow).model;
+    await dashboard.openConfiguration();
     const value = dashboard.detail('Modello');
     await expect(value).toHaveText(model);
     const frame = await boxOf(dashboard.page.getByRole('region', { name: memory.flow }));
@@ -131,17 +129,20 @@ Then(
       await expect(link).toBeVisible();
       expect((await boxOf(link)).height).toBeGreaterThanOrEqual(TOUCHABLE_HEIGHT);
     }
-    const edit = dashboard.content().getByRole('link', { name: 'Modifica la configurazione' });
-    await expect(views.getByRole('link', { name: 'Modifica la configurazione' })).toHaveCount(0);
-    await expect(edit).toBeVisible();
-    expect((await boxOf(edit)).height).toBeGreaterThanOrEqual(TOUCHABLE_HEIGHT);
+    const configuration = dashboard
+      .content()
+      .getByRole('link', { name: CONFIGURATION, exact: true });
+    await expect(views.getByRole('link', { name: /Modifica/ })).toHaveCount(0);
+    await expect(views.getByRole('link', { name: CONFIGURATION, exact: true })).toHaveCount(0);
+    await expect(configuration).toBeVisible();
+    expect((await boxOf(configuration)).height).toBeGreaterThanOrEqual(TOUCHABLE_HEIGHT);
   },
 );
 
 Then('Avvia risalta come comando principale e Archivia come distruttivo', async ({ dashboard }) => {
   const start = dashboard.flowCommand('Avvia');
   const archive = dashboard.flowCommand('Archivia');
-  const other = dashboard.page.getByRole('button', { name: 'Duplica', exact: true });
+  const other = dashboard.content().getByRole('link', { name: CONFIGURATION, exact: true });
   expect(isWhite(await colourOf(start, 'backgroundColor'))).toBe(false);
   expect(isWhite(await colourOf(start, 'color'))).toBe(true);
   expect(isWhite(await colourOf(other, 'backgroundColor'))).toBe(true);
@@ -154,7 +155,9 @@ Then(
   async ({ dashboard }, title: string) => {
     await expect(dashboard.pageHeading()).toHaveText(title);
     const status = await boxOf(dashboard.flowStatus());
-    const configuration = await boxOf(dashboard.page.getByLabel('Configurazione', { exact: true }));
+    const configuration = await boxOf(
+      dashboard.content().getByRole('link', { name: CONFIGURATION, exact: true }),
+    );
     expect(status.y + status.height).toBeLessThanOrEqual(configuration.y);
   },
 );
@@ -165,7 +168,9 @@ When("l'utente apre i cicli del flusso {string}", async ({ dashboard, memory }, 
 });
 
 Then('la pagina mostra che sono i cicli di {string}', async ({ dashboard }, flow: string) => {
-  await expect(dashboard.pageHeading()).toHaveText(`Cicli di ${flow}`);
+  // The tab Cicli under the name of the flow, the title of its page (R6.4.3).
+  await expect(dashboard.pageHeading()).toHaveText(flow);
+  await expect(dashboard.flowTab('Cicli')).toHaveAttribute('aria-current', 'page');
 });
 
 When("l'utente apre lo storico", async ({ dashboard, memory }) => {
@@ -190,7 +195,7 @@ Given('che il flusso {string} ha una sola versione', ({ memory }, flow: string) 
 
 When("l'utente apre le versioni della configurazione", async ({ dashboard, memory }) => {
   await openFlowPage(dashboard, memory);
-  await dashboard.page.getByRole('link', { name: 'Versioni della configurazione' }).click();
+  await dashboard.openConfiguration();
   await expect(dashboard.versions()).toBeVisible();
 });
 
@@ -221,6 +226,7 @@ Then("l'impaginazione su più colonne resta", async ({ dashboard }) => {
   const menu = await boxOf(dashboard.menu());
   const content = await boxOf(dashboard.content());
   expect(menu.x + menu.width).toBeLessThanOrEqual(content.x);
+  await dashboard.openConfiguration();
   const label = await boxOf(
     dashboard.page.getByLabel('Configurazione', { exact: true }).locator('dt').first(),
   );
