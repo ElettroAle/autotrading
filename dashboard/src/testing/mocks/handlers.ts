@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
-import { apiInstant, summaryOf, type FakeCycle } from './cycles';
+import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
 import {
   changeAllocatedCapital,
   createFlow,
@@ -150,14 +150,36 @@ const flowState = (flowId: string) => ({
   positions: fakePlatform.openPositionsOf(flowId),
 });
 
-const closedPositionPage = (positions: FakeClosedPosition[], page: number) => {
+// The API counts a position won or lost by its result after the fees, as the statistics do (R6.4.4).
+const resultOf = (position: FakeClosedPosition): string | undefined => {
+  const net = Number(position.pnl) - Number(position.fees);
+  if (net > 0) {
+    return 'vinta';
+  }
+  return net < 0 ? 'persa' : undefined;
+};
+
+/** Whether the value of the row passes the filter of the query string with the name: a filter not asked admits it. */
+const admits = (request: Request, name: string, value: string | undefined): boolean => {
+  const asked = new URL(request.url).searchParams.get(name);
+  return asked === null || asked === value;
+};
+
+const closedPositionPage = (positions: FakeClosedPosition[], request: Request) => {
+  const page = pageOf(request);
   const start = (page - 1) * CLOSED_POSITIONS_PER_PAGE;
-  const sorted = [...positions].sort(
-    (one, other) => Date.parse(other.closed_at) - Date.parse(one.closed_at),
-  );
+  const sorted = positions
+    .filter(
+      (position) =>
+        admits(request, 'asset', position.asset) &&
+        admits(request, 'side', position.side) &&
+        admits(request, 'result', resultOf(position)),
+    )
+    .sort((one, other) => Date.parse(other.closed_at) - Date.parse(one.closed_at));
   return {
     page,
     has_next: sorted.length > start + CLOSED_POSITIONS_PER_PAGE,
+    total: sorted.length,
     positions: sorted.slice(start, start + CLOSED_POSITIONS_PER_PAGE),
   };
 };
@@ -210,12 +232,40 @@ const overviewOf = (user: FakeUser, flow: FakeFlow) => {
   };
 };
 
-const cyclePage = (cycles: FakeCycle[], page: number) => {
+// The decisions as the user filters them, from the actions the journal of the cycle records (R6.4.4).
+const DECISIONS: Record<string, string> = {
+  apri: 'apertura',
+  chiudi: 'chiusura',
+  mantieni: 'mantenimento',
+};
+
+const decisionsOf = (cycle: FakeCycle): string[] => {
+  const content = cycle.documents.find(
+    (document) => document.step === STEPS.agentDecision,
+  )?.content;
+  const decisions = (content?.decisioni ?? []) as { action?: string }[];
+  return decisions.map((decision) => DECISIONS[decision.action ?? ''] ?? '');
+};
+
+const admitsDecision = (request: Request, cycle: FakeCycle): boolean => {
+  const asked = new URL(request.url).searchParams.get('decision');
+  const decisions = decisionsOf(cycle);
+  if (asked === null) {
+    return true;
+  }
+  return asked === 'nessuna' ? decisions.length === 0 : decisions.includes(asked);
+};
+
+const cyclePage = (cycles: FakeCycle[], request: Request) => {
+  const page = pageOf(request);
   const start = (page - 1) * CYCLES_PER_PAGE;
-  const sorted = newestFirst(cycles);
+  const sorted = newestFirst(cycles).filter(
+    (cycle) => admits(request, 'outcome', cycle.outcome) && admitsDecision(request, cycle),
+  );
   return {
     page,
     has_next: sorted.length > start + CYCLES_PER_PAGE,
+    total: sorted.length,
     cycles: sorted.slice(start, start + CYCLES_PER_PAGE).map(summaryOf),
   };
 };
@@ -382,7 +432,7 @@ export const handlers = [
   ),
   http.get('*/flows/:flowId/cycles', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>
-      HttpResponse.json(cyclePage(fakePlatform.cyclesOf(flow.id), pageOf(request))),
+      HttpResponse.json(cyclePage(fakePlatform.cyclesOf(flow.id), request)),
     ),
   ),
   http.get('*/flows/:flowId/versions', ({ request, params }) =>
@@ -518,9 +568,7 @@ export const handlers = [
   ),
   http.get('*/flows/:flowId/closed-positions', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>
-      HttpResponse.json(
-        closedPositionPage(fakePlatform.closedPositionsOf(flow.id), pageOf(request)),
-      ),
+      HttpResponse.json(closedPositionPage(fakePlatform.closedPositionsOf(flow.id), request)),
     ),
   ),
 ];

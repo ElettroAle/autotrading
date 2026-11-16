@@ -1047,13 +1047,16 @@ export interface components {
         };
         /**
          * ClosedPositionPageResponse
-         * @description A page of the closed positions of a flow, from the most recent close (R1.7.2, R2.2.5).
+         * @description A page of the closed positions of a flow that match the filters, from the most recent close, with how many
+         *     match in all (R1.7.2, R2.2.5, R6.4.4).
          */
         ClosedPositionPageResponse: {
             /** Page */
             page: number;
             /** Has Next */
             has_next: boolean;
+            /** Total */
+            total: number;
             /** Positions */
             positions: components["schemas"]["ClosedPositionResponse"][];
         };
@@ -1168,12 +1171,17 @@ export interface components {
             documents: components["schemas"]["StepDocumentResponse"][];
             cost: components["schemas"]["CallCostResponse"] | null;
         };
-        /** CyclePageResponse */
+        /**
+         * CyclePageResponse
+         * @description A page of the cycles that match the filters, with how many match in all (R1.7.3, R6.4.4).
+         */
         CyclePageResponse: {
             /** Page */
             page: number;
             /** Has Next */
             has_next: boolean;
+            /** Total */
+            total: number;
             /** Cycles */
             cycles: components["schemas"]["CycleSummaryResponse"][];
         };
@@ -3518,6 +3526,15 @@ export interface operations {
         parameters: {
             query?: {
                 page?: number;
+                asset?: string | null;
+                /** @description long o short */
+                side?: string | null;
+                /** @description vinta o persa, dal PnL al netto delle commissioni */
+                result?: string | null;
+                /** @description primo giorno della chiusura */
+                from?: string | null;
+                /** @description ultimo giorno della chiusura */
+                to?: string | null;
             };
             header?: never;
             path: {
@@ -3749,6 +3766,14 @@ export interface operations {
         parameters: {
             query?: {
                 page?: number;
+                /** @description concluso o fallito */
+                outcome?: string | null;
+                /** @description apertura, chiusura, mantenimento o nessuna */
+                decision?: string | null;
+                /** @description primo giorno dell'intervallo */
+                from?: string | null;
+                /** @description ultimo giorno dell'intervallo */
+                to?: string | null;
             };
             header?: never;
             path: {

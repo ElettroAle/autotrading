@@ -1,12 +1,17 @@
+import { useSearchParams } from 'react-router';
+
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import { paths } from '@/config/paths';
+import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
 import { formatAmount, formatPrice } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
+import { searchWithPage } from '@/utils/page-number';
 
 import { useClosedPositions, type ClosedPosition } from '../api/get-closed-positions';
+import { useFlowAssets } from '../api/get-flow-assets';
 import { useFlowState } from '../api/get-flow-state';
 
 import { PnlAmount, PnlPercent } from './pnl';
@@ -27,13 +32,46 @@ const columnsIn = (currency: string | undefined): DataTableColumn<ClosedPosition
   { header: 'Motivo', cell: (position) => position.reason },
 ];
 
+// The values are those the API accepts; the assets are those of the flow (R6.4.4).
+const filtersFor = (assets: readonly string[]): TableFilter[] => [
+  {
+    name: 'side',
+    label: 'Direzione',
+    all: 'Tutte',
+    options: [
+      { value: 'long', label: 'Long' },
+      { value: 'short', label: 'Short' },
+    ],
+  },
+  {
+    name: 'result',
+    label: 'Risultato',
+    all: 'Tutte',
+    options: [
+      { value: 'vinta', label: 'Vinte' },
+      { value: 'persa', label: 'Perse' },
+    ],
+  },
+  {
+    name: 'asset',
+    label: 'Asset',
+    all: 'Tutti',
+    options: assets.map((asset) => ({ value: asset, label: asset })),
+  },
+];
+
+const countOf = (total: number): string => (total === 1 ? '1 posizione' : `${total} posizioni`);
+
 /**
- * The closed positions of the flow from the most recent close, in the pages of the API (R2.2.5). The currency comes
- * from the state of the flow, read from the exchange: without it the amounts still show, the history does not depend
- * on the exchange (ADR 0143).
+ * The closed positions of the flow that match the filters of the address, from the most recent close, in the pages of
+ * the API (R2.2.5, R6.4.4). The currency comes from the state of the flow, read from the exchange: without it the
+ * amounts still show, the history does not depend on the exchange (ADR 0143).
  */
 export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number }) => {
-  const positions = useClosedPositions(flowId, page);
+  const filters = filtersFor(useFlowAssets(flowId).data ?? []);
+  const { values } = useTableFilters(filters);
+  const [search] = useSearchParams();
+  const positions = useClosedPositions(flowId, page, values);
   const currency = useFlowState(flowId).data?.currency;
   if (positions.isPending) {
     return <Loading />;
@@ -42,6 +80,7 @@ export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number
   if (positions.data === undefined) {
     return <ErrorMessage error={positions.error} />;
   }
+  const filtered = Object.keys(values).length > 0;
   return (
     <>
       <DataTable
@@ -49,12 +88,17 @@ export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number
         columns={columnsIn(currency)}
         rows={positions.data.positions}
         rowKey={(position) => `${position.closed_at}-${position.asset}`}
-        empty="Nessuna posizione chiusa."
+        empty={
+          filtered ? 'Nessuna posizione chiusa con questi filtri.' : 'Nessuna posizione chiusa.'
+        }
+        filtering={{ filters, total: positions.data.total, countOf }}
       />
       <Pagination
         page={positions.data.page}
         hasNext={positions.data.has_next}
-        hrefOf={(target) => paths.flowClosedPositions.getHref(flowId, target)}
+        hrefOf={(target) =>
+          `${paths.flowClosedPositions.getHref(flowId)}${searchWithPage(search, target)}`
+        }
       />
     </>
   );

@@ -27,6 +27,15 @@ class TimeWindow:
     since: datetime | None = None
     until: datetime | None = None
 
+    @classmethod
+    def of_days(cls, first_day: date | None, last_day: date | None) -> TimeWindow:
+        """The days from the first to the last, both whole, in UTC; a missing day does not limit its side."""
+        if first_day is not None and last_day is not None and first_day > last_day:
+            raise RangeEndingBeforeStartError
+        since = None if first_day is None else _start_of(first_day)
+        until = None if last_day is None else _start_of(last_day + timedelta(days=1))
+        return cls(since, until)
+
     def contains(self, instant: datetime) -> bool:
         return (self.since is None or instant >= self.since) and (self.until is None or instant < self.until)
 

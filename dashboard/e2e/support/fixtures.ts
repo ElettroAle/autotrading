@@ -40,6 +40,8 @@ export type ScenarioMemory = {
   newCycleAt: string;
   /** What spilled past the screen on each page the user opened, by the name of the page (R6.4.1). */
   spilledByPage: Map<string, string[]>;
+  /** The widths of the screens the pages are opened on, one after the other (R6.4.4). */
+  screenWidths: number[];
 };
 
 type Fixtures = {
@@ -84,6 +86,7 @@ export const test = base.extend<Fixtures>({
       periodPage: '',
       newCycleAt: '',
       spilledByPage: new Map(),
+      screenWidths: [],
     });
   },
 });
