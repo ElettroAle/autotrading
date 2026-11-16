@@ -103,7 +103,7 @@ def flow_state_router(use_cases_of_request: Callable[..., TenantUseCases]) -> AP
     def read_flow_state(
         flow_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
-        period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
+        period: Annotated[str, Query(description="30m, 1h, 12h, 24h, 7d, 30d, all o range")] = "all",
         since: IntervalStart = None,
         until: IntervalEnd = None,
     ) -> FlowStateResponse:

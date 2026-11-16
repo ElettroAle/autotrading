@@ -11,13 +11,26 @@ from autotrading.domain.flows.errors import (
 
 
 class StatisticsPeriodKind(StrEnum):
-    ALL = "all"
+    """The periods in the order the user chooses them, from the shortest (R6.4.6)."""
+
+    LAST_30_MINUTES = "30m"
+    LAST_HOUR = "1h"
+    LAST_12_HOURS = "12h"
+    LAST_24_HOURS = "24h"
     LAST_7_DAYS = "7d"
     LAST_30_DAYS = "30d"
+    ALL = "all"
     RANGE = "range"
 
 
-LAST_DAYS = {StatisticsPeriodKind.LAST_7_DAYS: 7, StatisticsPeriodKind.LAST_30_DAYS: 30}
+LAST_DURATIONS = {
+    StatisticsPeriodKind.LAST_30_MINUTES: timedelta(minutes=30),
+    StatisticsPeriodKind.LAST_HOUR: timedelta(hours=1),
+    StatisticsPeriodKind.LAST_12_HOURS: timedelta(hours=12),
+    StatisticsPeriodKind.LAST_24_HOURS: timedelta(hours=24),
+    StatisticsPeriodKind.LAST_7_DAYS: timedelta(days=7),
+    StatisticsPeriodKind.LAST_30_DAYS: timedelta(days=30),
+}
 MINUTE = timedelta(minutes=1)
 
 
@@ -46,9 +59,10 @@ class TimeWindow:
 
 @dataclass(frozen=True, slots=True)
 class StatisticsPeriod:
-    """The period of the statistics of a flow: the whole life, the last 7 or 30 days, or a range (R2.2.6).
+    """The period of the statistics of a flow: the whole life, the last minutes, hours or days, or a range (R2.2.6).
 
-    A range holds its start and its end, both read to the minute (ADR periodo-al-minuto).
+    A range holds its start and its end, both read to the minute (ADR periodo-al-minuto); a period of the last N holds
+    the minutes from now less N to now (ADR periodi-brevi-come-durata-nel-dominio).
     """
 
     kind: StatisticsPeriodKind
@@ -73,8 +87,8 @@ class StatisticsPeriod:
         return cls(kinds[name], since, until)
 
     def window(self, now: datetime) -> TimeWindow:
-        if self.kind in LAST_DAYS:
-            return TimeWindow(since=now - timedelta(days=LAST_DAYS[self.kind]))
+        if self.kind in LAST_DURATIONS:
+            return TimeWindow.of_minutes(now - LAST_DURATIONS[self.kind], now)
         return TimeWindow.of_minutes(self.since, self.until)
 
 

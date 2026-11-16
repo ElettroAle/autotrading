@@ -92,7 +92,7 @@ def test_rejects_a_period_the_platform_does_not_know(client_of: Client) -> None:
     response = client_of("anna").get("/history/orders", params={"period": "1y"})
 
     assert response.status_code == 400
-    assert reason_of(response) == {"detail": "periodo non valido: scegliere tra all, 7d, 30d, range"}
+    assert reason_of(response) == {"detail": "periodo non valido: scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"}
 
 
 def test_rejects_a_page_the_platform_did_not_give(client_of: Client) -> None:
@@ -195,7 +195,7 @@ def test_a_filter_reaches_the_history_with_the_window_read_now(platform: Platfor
 
     query = history.queries[-1]
     assert (query.criteria.asset, query.criteria.account_id, query.criteria.flow_id) == ("BTC", ACCOUNT, None)
-    assert query.window == TimeWindow(since=platform.now - timedelta(days=7))
+    assert query.window == TimeWindow(since=platform.now - timedelta(days=7), until=platform.now + timedelta(minutes=1))
 
 
 def test_a_user_reads_only_the_history_of_their_tenant(platform: Platform, client_of: Client) -> None:
