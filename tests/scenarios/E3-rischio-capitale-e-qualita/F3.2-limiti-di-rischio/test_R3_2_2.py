@@ -220,7 +220,7 @@ def open_position(loss: MaximumLoss, asset: str) -> None:
     cycles.platform.hyperliquid.open_position(credentials, position(asset, size=size))
     # The account reads the position from the market data, the orders close it on the exchange of the orders.
     cycles.platform.order_exchange.hold(
-        TradingAccess(HYPERLIQUID, credentials.values), HeldPosition(asset, Direction.LONG, size, 1)
+        TradingAccess(HYPERLIQUID, credentials.values), HeldPosition(asset, Direction.LONG, size, 1, Decimal(100))
     )
     address = credentials.value("account_address")
     cycles.platform.activity_reader.activities[address] = an_activity(positions=(a_position(asset, size=size),))

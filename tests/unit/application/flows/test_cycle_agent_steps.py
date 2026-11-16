@@ -17,6 +17,7 @@ from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.risk_outcome import ApprovedOpening, BlockedDecision
@@ -53,15 +54,26 @@ class Composer:
 
 
 @dataclass(frozen=True, slots=True)
+class Plan:
+    target: Decimal | None = None
+    stop: Decimal | None = None
+    invalidation: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Decision:
     action: str
     asset: str
+    plan: Plan = Plan()
 
     def intent_with[O, C, H](
-        self, opening: Callable[[str, str, Decimal, int], O], closing: Callable[[str], C], holding: Callable[[str], H]
+        self,
+        opening: Callable[[str, str, Decimal, int, Plan], O],
+        closing: Callable[[str], C],
+        holding: Callable[[str], H],
     ) -> O | C | H:
         if self.action == "open":
-            return opening(self.asset, "long", Decimal("0.1"), 2)
+            return opening(self.asset, "long", Decimal("0.1"), 2, self.plan)
         if self.action == "close":
             return closing(self.asset)
         return holding(self.asset)
@@ -173,6 +185,21 @@ def test_the_risk_check_runs_on_the_limits_of_the_exchange_of_the_account() -> N
     assert isinstance(outcomes, tuple)
     assert [type(outcome) for outcome in outcomes] == [ApprovedOpening, BlockedDecision]
     assert review.orders[0].outcome == outcomes[0]
+
+
+def test_the_exit_plan_of_the_agent_reaches_the_risk_check() -> None:
+    plan = Plan(Decimal(110000), Decimal(105000), "chiusura sotto 98000")
+    decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Decision("open", "BTC", plan),))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    [order] = review.orders
+    assert isinstance(order.outcome, ApprovedOpening)
+    assert order.outcome.exit_plan == ExitPlan(target=Decimal(110000), invalidation="chiusura sotto 98000")
+    assert [adjustment.reason for adjustment in order.outcome.adjustments] == [
+        "stop 105000 scartato: incoerente con long al prezzo 100000"
+    ]
 
 
 def test_the_exchange_of_an_account_without_limits_is_unavailable() -> None:

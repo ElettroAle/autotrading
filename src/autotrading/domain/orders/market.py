@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from decimal import ROUND_DOWN, ROUND_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
 
 from autotrading.domain.orders.errors import (
     InvalidLeverageError,
@@ -18,6 +18,10 @@ class Market:
     size_decimals: int
     mid_price: Decimal
     min_order_value: Decimal
+    # What a price admits, when the exchange limits it: so many significant figures, though a whole price keeps every
+    # digit, and at most so many decimals (R3.1.2).
+    price_significant_figures: int | None = None
+    price_decimals: int | None = None
 
     def __post_init__(self) -> None:
         if self.max_leverage < 1 or self.size_decimals < 0 or self.mid_price <= 0 or self.min_order_value < 0:
@@ -45,3 +49,16 @@ class Market:
         if size <= 0:
             raise OrderSizeBelowStepError(self.coin, self.size_step)
         return size
+
+    def rounded_price(self, price: Decimal) -> Decimal:
+        """The price to the nearest one the exchange admits for an order at a price: a stop loss, a take profit."""
+        admitted = [limit for limit in (self._significant_decimals(price), self.price_decimals) if limit is not None]
+        if not admitted:
+            return price
+        return price.quantize(Decimal(1).scaleb(-max(min(admitted), 0)), rounding=ROUND_HALF_UP)
+
+    def _significant_decimals(self, price: Decimal) -> int | None:
+        """The decimals that keep the significant figures: none for a price whose whole part has them all."""
+        if self.price_significant_figures is None:
+            return None
+        return self.price_significant_figures - price.adjusted() - 1

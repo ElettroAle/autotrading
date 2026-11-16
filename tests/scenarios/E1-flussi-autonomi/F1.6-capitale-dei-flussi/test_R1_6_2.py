@@ -140,7 +140,17 @@ def run_cycle(bench: AttributionBench, flow: str) -> None:
 
 @when(step(r'parte un ciclo del flusso "{flow}" in cui l\'agente apre "{asset}"'))
 def cycle_opens(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
-    opening = {"asset": asset, "azione": "apri", "direzione": "long", "quota": 0.1, "leva": 1, "ragionamento": "r"}
+    opening = {
+        "asset": asset,
+        "azione": "apri",
+        "direzione": "long",
+        "quota": 0.1,
+        "leva": 1,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "ragionamento": "r",
+    }
     flow_cycles.model.text = json.dumps({"decisioni": [opening]})
     flow_cycles.run(flow)
 

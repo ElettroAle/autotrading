@@ -84,6 +84,8 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
     max_total_margin_exposure_percent: null,
     max_total_value_exposure_percent: null,
   },
+  default_stop_loss_percent: configuration.defaultStopLossPercent,
+  default_take_profit_percent: configuration.defaultTakeProfitPercent,
   allocated_capital: configuration.allocatedCapital,
   bring_to_minimum: false,
   system_prompt: configuration.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,

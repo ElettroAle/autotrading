@@ -72,6 +72,9 @@ class StrategyBody(BaseModel):
     max_daily_loss_percent: Decimal | None = None
     max_drawdown_percent: Decimal | None = None
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # Missing in the files written before them: a stop loss of 5% and no take profit (R3.1.2).
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
 
 
 class StrategyDocument(BaseModel):
@@ -111,6 +114,8 @@ class StrategyDocument(BaseModel):
                 max_daily_loss_percent=strategy.max_daily_loss_percent,
                 max_drawdown_percent=strategy.max_drawdown_percent,
                 openings_resume=strategy.openings_resume,
+                default_stop_loss_percent=strategy.protection_defaults.stop_loss_percent,
+                default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
             ),
         )
 
@@ -136,6 +141,8 @@ class StrategyDocument(BaseModel):
             max_daily_loss_percent=strategy.max_daily_loss_percent,
             max_drawdown_percent=strategy.max_drawdown_percent,
             openings_resume=strategy.openings_resume,
+            default_stop_loss_percent=strategy.default_stop_loss_percent,
+            default_take_profit_percent=strategy.default_take_profit_percent,
         )
 
     def _require_supported(self) -> None:

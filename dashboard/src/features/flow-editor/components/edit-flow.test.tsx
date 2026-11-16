@@ -174,6 +174,36 @@ describe('EditFlow', () => {
     });
   });
 
+  it('changes the stop loss and take profit defaults as new versions, and removes the take profit', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const stopLoss = await screen.findByLabelText('Stop loss predefinito (%)');
+    expect(stopLoss).toHaveValue('5');
+    await userEvent.clear(stopLoss);
+    await userEvent.type(stopLoss, '3,5');
+    await userEvent.type(field('Take profit predefinito (%)'), '8');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa'))).toMatchObject({
+      default_stop_loss_percent: '3.5',
+      default_take_profit_percent: '8',
+    });
+    await userEvent.clear(field('Take profit predefinito (%)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 3'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa'))).toMatchObject({
+      default_stop_loss_percent: '3.5',
+      default_take_profit_percent: null,
+    });
+  });
+
   it('removes an exposure limit the user empties, and refuses emptying both', async () => {
     fakePlatform.addConfiguredFlow('anna', 'alfa', {
       account_id: 'account-principale',

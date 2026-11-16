@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK
 from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -13,9 +14,10 @@ from autotrading.domain.flows.risk_outcome import (
     BlockedDecision,
     HeldPosition,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeSide
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
+from autotrading.domain.flows.trade_side import TradeSide
 
-EXCHANGE = AssetLimits(max_leverage=50, min_order_value=Decimal(10))
+EXCHANGE = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(60000))
 
 
 def check(
@@ -52,8 +54,10 @@ def check(
     return RiskCheck(RiskPolicy(limits, bring_to_minimum), state)
 
 
-def opening(fraction: str, leverage: int, asset: str = "BTC", side: TradeSide = TradeSide.LONG) -> OpenIntent:
-    return OpenIntent(asset, side, Decimal(fraction), leverage)
+def opening(
+    fraction: str, leverage: int, asset: str = "BTC", side: TradeSide = TradeSide.LONG, plan: ExitPlan | None = None
+) -> OpenIntent:
+    return OpenIntent(asset, side, Decimal(fraction), leverage, plan or ExitPlan())
 
 
 def approved(outcome: object) -> ApprovedOpening:
@@ -78,7 +82,9 @@ def test_a_leverage_above_the_flow_maximum_is_reduced_keeping_the_margin() -> No
 
 
 def test_the_flow_maximum_applies_before_the_exchange_maximum() -> None:
-    outcome = approved(check(max_leverage=50).outcome(opening("0.01", 60), AssetLimits(40, Decimal(10))))
+    outcome = approved(
+        check(max_leverage=50).outcome(opening("0.01", 60), AssetLimits(40, Decimal(10), Decimal(60000)))
+    )
 
     assert outcome.leverage == 40
     assert [(item.before, item.after) for item in outcome.adjustments] == [
@@ -89,7 +95,12 @@ def test_the_flow_maximum_applies_before_the_exchange_maximum() -> None:
 
 
 def test_a_leverage_equal_to_the_maxima_is_kept() -> None:
-    assert approved(check(max_leverage=40).outcome(opening("0.01", 40), AssetLimits(40, Decimal(10)))).adjustments == ()
+    assert (
+        approved(
+            check(max_leverage=40).outcome(opening("0.01", 40), AssetLimits(40, Decimal(10), Decimal(60000)))
+        ).adjustments
+        == ()
+    )
 
 
 def test_the_margin_limit_reduces_the_margin() -> None:
@@ -131,7 +142,9 @@ def test_a_value_exactly_at_the_limit_is_not_reduced() -> None:
 
 
 def test_a_decimal_percent_is_written_with_a_comma() -> None:
-    outcome = approved(check(margin=None, value="0.5").outcome(opening("0.006", 2), AssetLimits(50, Decimal(1))))
+    outcome = approved(
+        check(margin=None, value="0.5").outcome(opening("0.006", 2), AssetLimits(50, Decimal(1), Decimal(60000)))
+    )
 
     assert outcome.adjustments[0].reason == "esposizione del valore oltre il 0,5%"
 
@@ -474,3 +487,47 @@ def test_with_the_openings_suspended_a_hold_stays_a_hold() -> None:
 
 def test_the_openings_are_not_suspended_unless_the_state_says_so() -> None:
     assert check().outcome(opening("0.03", 2), EXCHANGE) == ApprovedOpening("BTC", TradeSide.LONG, Decimal(60), 2, ())
+
+
+def test_an_approved_opening_keeps_an_exit_plan_coherent_with_its_side() -> None:
+    plan = ExitPlan(Decimal(63000), Decimal(58500), "chiusura a 4 ore sotto 59000")
+
+    outcome = approved(check().outcome(opening("0.03", 2, plan=plan), EXCHANGE))
+
+    assert (outcome.exit_plan, outcome.adjustments) == (plan, ())
+
+
+def test_a_level_incoherent_with_the_market_price_of_the_exchange_is_discarded_and_recorded() -> None:
+    plan = ExitPlan(Decimal(63000), Decimal(61000), None)
+
+    outcome = approved(check().outcome(opening("0.03", 2, plan=plan), EXCHANGE))
+
+    assert outcome.exit_plan == ExitPlan(target=Decimal(63000))
+    assert outcome.adjustments == (
+        Adjustment(
+            AdjustmentKind.EXIT_PLAN,
+            Decimal(61000),
+            None,
+            "stop 61000 scartato: incoerente con long al prezzo 60000",
+        ),
+    )
+
+
+def test_the_exit_plan_is_checked_on_a_short_too() -> None:
+    plan = ExitPlan(target=Decimal(61000))
+
+    outcome = approved(check().outcome(opening("0.03", 2, side=TradeSide.SHORT, plan=plan), EXCHANGE))
+
+    assert outcome.exit_plan == ExitPlan()
+    assert [item.reason for item in outcome.adjustments] == [
+        "obiettivo 61000 scartato: incoerente con short al prezzo 60000"
+    ]
+
+
+def test_an_opening_brought_to_the_minimum_keeps_its_exit_plan_checked() -> None:
+    plan = ExitPlan(Decimal(59000), Decimal(58000), None)
+
+    outcome = approved(check(bring_to_minimum=True).outcome(opening("0.003", 2, plan=plan), EXCHANGE))
+
+    assert outcome.exit_plan == ExitPlan(stop=Decimal(58000))
+    assert [item.kind for item in outcome.adjustments] == [AdjustmentKind.VALUE, AdjustmentKind.EXIT_PLAN]

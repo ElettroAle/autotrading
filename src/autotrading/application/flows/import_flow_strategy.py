@@ -11,6 +11,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -39,6 +40,8 @@ class ImportFlowStrategyCommand:
     max_daily_loss_percent: Decimal | None = None
     max_drawdown_percent: Decimal | None = None
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
 
 
 class ImportFlowStrategyUseCase:
@@ -93,4 +96,7 @@ class ImportFlowStrategyUseCase:
             max_daily_loss_percent=command.max_daily_loss_percent,
             max_drawdown_percent=command.max_drawdown_percent,
             openings_resume=command.openings_resume,
+            protection_defaults=ProtectionDefaults.of(
+                command.default_stop_loss_percent, command.default_take_profit_percent
+            ),
         )

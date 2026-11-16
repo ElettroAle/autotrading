@@ -16,6 +16,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 
@@ -61,6 +62,10 @@ class ModifyFlowCommand:
     # A maximum loss taken away, back to no suspension for that loss (R3.2.2).
     remove_max_daily_loss: bool = False
     remove_max_drawdown: bool = False
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
+    # The default take profit taken away: the stop loss stays, it is mandatory (R3.1.2).
+    remove_default_take_profit: bool = False
 
 
 class ModifyFlowUseCase:
@@ -113,6 +118,7 @@ class ModifyFlowUseCase:
                 current.max_drawdown_percent, command.max_drawdown_percent, removed=command.remove_max_drawdown
             ),
             openings_resume=current.openings_resume if command.openings_resume is None else command.openings_resume,
+            protection_defaults=_protection_defaults(current.protection_defaults, command),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:
@@ -159,6 +165,16 @@ def _max_consecutive_failures(current: int | None, command: ModifyFlowCommand) -
     if command.remove_max_consecutive_failures:
         return None
     return current if command.max_consecutive_failures is None else command.max_consecutive_failures
+
+
+def _protection_defaults(current: ProtectionDefaults, command: ModifyFlowCommand) -> ProtectionDefaults:
+    stop = command.default_stop_loss_percent
+    return ProtectionDefaults(
+        current.stop_loss_percent if stop is None else stop,
+        _exposure(
+            current.take_profit_percent, command.default_take_profit_percent, removed=command.remove_default_take_profit
+        ),
+    )
 
 
 def _risk_limits(current: RiskLimits, command: ModifyFlowCommand) -> RiskLimits:

@@ -27,6 +27,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelParameterValue, ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -75,6 +76,9 @@ class _ConfigurationDocument(TypedDict):
     max_daily_loss_percent: NotRequired[str | None]
     max_drawdown_percent: NotRequired[str | None]
     openings_resume: NotRequired[str]
+    # Every version has them: the migration gave the versions saved before a stop loss of 5% (R3.1.2).
+    default_stop_loss_percent: str
+    default_take_profit_percent: str | None
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -291,6 +295,8 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         "max_daily_loss_percent": _text(configuration.max_daily_loss_percent),
         "max_drawdown_percent": _text(configuration.max_drawdown_percent),
         "openings_resume": configuration.openings_resume.value,
+        "default_stop_loss_percent": str(configuration.protection_defaults.stop_loss_percent),
+        "default_take_profit_percent": _text(configuration.protection_defaults.take_profit_percent),
     }
 
 
@@ -325,6 +331,9 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         max_daily_loss_percent=_decimal(document.get("max_daily_loss_percent")),
         max_drawdown_percent=_decimal(document.get("max_drawdown_percent")),
         openings_resume=OpeningsResume(document.get("openings_resume", OpeningsResume.MANUAL.value)),
+        protection_defaults=ProtectionDefaults(
+            Decimal(document["default_stop_loss_percent"]), _decimal(document["default_take_profit_percent"])
+        ),
     )
 
 

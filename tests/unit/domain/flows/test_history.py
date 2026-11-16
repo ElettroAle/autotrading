@@ -20,7 +20,7 @@ from autotrading.domain.flows.history import (
     OrderHistoryEntry,
 )
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, TimeWindow
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 NOW = datetime(2026, 11, 30, 12, 0, tzinfo=UTC)

@@ -77,6 +77,9 @@ class FlowCreationRequest(BaseModel):
     max_daily_loss_percent: Decimal | None = None
     max_drawdown_percent: Decimal | None = None
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # Null or missing: a stop loss of 5% and no take profit (R3.1.2).
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -100,6 +103,8 @@ class FlowCreationRequest(BaseModel):
             max_daily_loss_percent=self.max_daily_loss_percent,
             max_drawdown_percent=self.max_drawdown_percent,
             openings_resume=self.openings_resume,
+            default_stop_loss_percent=self.default_stop_loss_percent,
+            default_take_profit_percent=self.default_take_profit_percent,
         )
 
 
@@ -127,6 +132,9 @@ class FlowModificationRequest(BaseModel):
     max_daily_loss_percent: Decimal | None = None
     max_drawdown_percent: Decimal | None = None
     openings_resume: OpeningsResume | None = None
+    default_stop_loss_percent: Decimal | None = None
+    # A null sent on purpose removes the default take profit; a missing one keeps the version in force (R3.1.2).
+    default_take_profit_percent: Decimal | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -159,6 +167,9 @@ class FlowModificationRequest(BaseModel):
             openings_resume=self.openings_resume,
             remove_max_daily_loss=self._sent_as_null("max_daily_loss_percent"),
             remove_max_drawdown=self._sent_as_null("max_drawdown_percent"),
+            default_stop_loss_percent=self.default_stop_loss_percent,
+            default_take_profit_percent=self.default_take_profit_percent,
+            remove_default_take_profit=self._sent_as_null("default_take_profit_percent"),
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -260,6 +271,8 @@ class ConfigurationResponse(BaseModel):
     max_daily_loss_percent: str | None
     max_drawdown_percent: str | None
     openings_resume: OpeningsResume
+    default_stop_loss_percent: str
+    default_take_profit_percent: str | None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -283,6 +296,8 @@ class ConfigurationResponse(BaseModel):
             max_daily_loss_percent=_text(configuration.max_daily_loss_percent),
             max_drawdown_percent=_text(configuration.max_drawdown_percent),
             openings_resume=configuration.openings_resume,
+            default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
+            default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
         )
 
 
@@ -330,6 +345,8 @@ class FlowResponse(BaseModel):
     max_daily_loss_percent: str | None
     max_drawdown_percent: str | None
     openings_resume: OpeningsResume
+    default_stop_loss_percent: str
+    default_take_profit_percent: str | None
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -358,6 +375,8 @@ class FlowResponse(BaseModel):
             max_daily_loss_percent=_text(configuration.max_daily_loss_percent),
             max_drawdown_percent=_text(configuration.max_drawdown_percent),
             openings_resume=configuration.openings_resume,
+            default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
+            default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
         )
 
 

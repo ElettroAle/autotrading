@@ -24,6 +24,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from tests.support.flows import OPENROUTER_MODEL
@@ -49,6 +50,8 @@ def a_command(**changes: object) -> ImportFlowStrategyCommand:
         max_daily_loss_percent=Decimal(5),
         max_drawdown_percent=Decimal(10),
         openings_resume=OpeningsResume.NEXT_DAY,
+        default_stop_loss_percent=Decimal(4),
+        default_take_profit_percent=Decimal(12),
     )
     return replace(command, **changes)  # type: ignore[arg-type]  # each test names the part it changes
 
@@ -83,6 +86,7 @@ def test_the_import_saves_a_draft_at_its_first_version_with_the_strategy_checked
         max_daily_loss_percent=Decimal(5),
         max_drawdown_percent=Decimal(10),
         openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(4), Decimal(12)),
     ).draft_configuration(FIRST_VERSION)
     assert [(record.getMessage(), record.__dict__["flow_id"]) for record in caplog.records] == [
         ("strategia importata", str(draft.id.value))

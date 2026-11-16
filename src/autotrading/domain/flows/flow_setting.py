@@ -22,3 +22,5 @@ class FlowSetting(StrEnum):
     MAX_DAILY_LOSS = "max_daily_loss_percent"
     MAX_DRAWDOWN = "max_drawdown_percent"
     OPENINGS_RESUME = "openings_resume"
+    DEFAULT_STOP_LOSS = "default_stop_loss_percent"
+    DEFAULT_TAKE_PROFIT = "default_take_profit_percent"

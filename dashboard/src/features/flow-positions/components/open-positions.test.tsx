@@ -38,10 +38,31 @@ describe('OpenPositions', () => {
       'Dimensione0,01',
       'Leva3',
       'Prezzo di ingresso60.000',
+      'Obiettivo—',
+      'Stop—',
       'Margine200 USDC',
       'PnL+12 USDC',
       'PnL %+6,00%',
     ]);
+  });
+
+  // ADR piano-di-uscita-nella-dashboard: the plan grows the shared table, its invalidation is a detail of the row.
+  it('shows the exit plan in force: target and stop as prices, the invalidation under the position', async () => {
+    fakePlatform.holdPositions('alfa', [
+      anOpenPosition({
+        target: '63000',
+        stop: '58500.5',
+        invalidation: 'chiusura a 4 ore sotto 59000',
+      }),
+    ]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const cells = await cellsOfFirstRow();
+    expect(cells[5]?.textContent).toBe('Obiettivo63.000');
+    expect(cells[6]?.textContent).toBe('Stop58.500,5');
+    const table = screen.getByRole('table', { name: 'Posizioni aperte' });
+    const [, , detail] = within(table).getAllByRole('row');
+    expect(detail).toHaveTextContent('Invalidazionechiusura a 4 ore sotto 59000');
   });
 
   it('rounds an entry price averaged over several fills (Bug 431)', async () => {

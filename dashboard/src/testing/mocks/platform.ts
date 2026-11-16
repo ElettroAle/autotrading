@@ -59,6 +59,8 @@ export type FakeConfiguration = {
   readonly maxDailyLossPercent: string | null;
   readonly maxDrawdownPercent: string | null;
   readonly openingsResume: FakeOpeningsResume;
+  readonly defaultStopLossPercent: string;
+  readonly defaultTakeProfitPercent: string | null;
 };
 
 export type FakeVersion = {
@@ -97,6 +99,9 @@ export type FakeFlow = {
   cycleMinutes: number;
   instructions: string;
   riskLimits: FakeRiskLimits;
+  /** The stop loss and take profit defaults of the flow, in percent of the entry price (R3.1.2). */
+  defaultStopLossPercent: string;
+  defaultTakeProfitPercent: string | null;
   bringToMinimum: boolean;
   /** The system prompt the user wrote; null follows the default of the platform (R1.4.8). */
   systemPrompt: string | null;
@@ -154,6 +159,8 @@ export type FakeFlowConfiguration = {
     max_total_margin_exposure_percent: string | null;
     max_total_value_exposure_percent: string | null;
   };
+  default_stop_loss_percent: string;
+  default_take_profit_percent: string | null;
   allocated_capital: string | null;
   bring_to_minimum: boolean;
   system_prompt: string;
@@ -181,6 +188,8 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
     max_total_margin_exposure_percent: flow.riskLimits.maxTotalMarginExposurePercent,
     max_total_value_exposure_percent: flow.riskLimits.maxTotalValueExposurePercent,
   },
+  default_stop_loss_percent: flow.defaultStopLossPercent,
+  default_take_profit_percent: flow.defaultTakeProfitPercent,
   allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
   bring_to_minimum: flow.bringToMinimum,
   system_prompt: flow.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
@@ -322,6 +331,9 @@ const TRANSITIONS: Record<FakeFlowCommand, Transition> = {
 };
 const TRADABLE_ASSETS = new Set(FAKE_TRADABLE_ASSETS);
 
+// Every flow, new or existing, has a stop loss default; 5% when nobody gave one (R3.1.2).
+const DEFAULT_STOP_LOSS_PERCENT = '5';
+
 export const FIRST_CONFIGURATION: FakeConfiguration = {
   assets: ['BTC'],
   cycleMinutes: 15,
@@ -334,6 +346,8 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   maxDailyLossPercent: null,
   maxDrawdownPercent: null,
   openingsResume: 'manual',
+  defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
+  defaultTakeProfitPercent: null,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -423,6 +437,8 @@ const draftOf = (
   cycleMinutes: strategy.cycleMinutes,
   instructions: strategy.instructions ?? '',
   riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
+  defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
+  defaultTakeProfitPercent: null,
   bringToMinimum: strategy.bringToMinimum ?? false,
   systemPrompt: null,
   maxConsecutiveFailures: null,
@@ -586,6 +602,8 @@ export const fakePlatform = {
       cycleMinutes: 15,
       instructions: '',
       riskLimits: DEFAULT_RISK_LIMITS,
+      defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
+      defaultTakeProfitPercent: null,
       bringToMinimum: false,
       systemPrompt: null,
       maxConsecutiveFailures: null,

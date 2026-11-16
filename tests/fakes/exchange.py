@@ -15,7 +15,7 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.verification.reading import AccountReading, PositionReading
 from autotrading.domain.verification.verification_access import VerificationAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter

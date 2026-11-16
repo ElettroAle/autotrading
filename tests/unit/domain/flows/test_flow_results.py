@@ -9,7 +9,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 
 FLOW_ID = FlowId.new()
 FIRST_CYCLE = datetime(2026, 11, 9, 10, 0, tzinfo=UTC)

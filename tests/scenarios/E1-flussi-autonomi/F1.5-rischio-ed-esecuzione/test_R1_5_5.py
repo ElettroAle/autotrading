@@ -5,7 +5,13 @@ from uuid import UUID, uuid4
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersCommand, ExecuteFlowOrdersUseCase
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
+from autotrading.application.orders.execute_flow_orders import (
+    ExecuteFlowOrdersCommand,
+    ExecuteFlowOrdersUseCase,
+    FlowOrderProtection,
+)
+from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.flow_link import FlowLink
@@ -13,6 +19,10 @@ from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowO
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderStatus
+from autotrading.domain.orders.protection_request import ProtectionRequest
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
+from tests.fakes.trading_access import TENANT
 from tests.support.steps import quoted
 from tests.support.trading import HYPERLIQUID, Trading
 
@@ -20,6 +30,7 @@ scenarios("E1-flussi-autonomi/F1.5-rischio-ed-esecuzione/R1.5.5-esecuzione-delle
 
 OPENING_VALUE = Decimal(100)
 OPENING_LEVERAGE = 2
+DEFAULT_PROTECTION = ProtectionRequest(None, None, Decimal(5), None)
 
 
 class FlowExecution:
@@ -42,8 +53,17 @@ class FlowExecution:
 
     def execute(self, flow: str, cycle: str) -> None:
         trading = self.trading
+        exchanges, protection_exchanges = (
+            {HYPERLIQUID: trading.exchange},
+            {HYPERLIQUID: FakeProtectionExchangeAdapter()},
+        )
+        protections = InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT)
+        protection = FlowOrderProtection(
+            ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, trading.orders, trading.slippage),
+            CancelProtectionsUseCase(trading.accesses.use_case, protection_exchanges, protections),
+        )
         use_case = ExecuteFlowOrdersUseCase(
-            trading.accesses.use_case, {HYPERLIQUID: trading.exchange}, trading.orders, trading.slippage
+            trading.accesses.use_case, exchanges, trading.orders, trading.slippage, protection
         )
         command = ExecuteFlowOrdersCommand(
             trading.accounts[self.account], self.flows[flow], self.cycle(cycle), tuple(self.approved)
@@ -65,14 +85,14 @@ def execution() -> FlowExecution:
 
 
 def opening(asset: str) -> FlowOpening:
-    return FlowOpening(asset, Direction.LONG, OPENING_VALUE, OPENING_LEVERAGE)
+    return FlowOpening(asset, Direction.LONG, OPENING_VALUE, OPENING_LEVERAGE, DEFAULT_PROTECTION)
 
 
 @given(quoted('che "anna" ha il flusso "{flow}" sul conto "{account}" con una posizione long aperta su "{asset}"'))
 def flow_with_position(execution: FlowExecution, flow: str, account: str, asset: str) -> None:
     execution.flow(flow, account)
     access = execution.trading.access_of(account)
-    execution.trading.exchange.hold(access, HeldPosition(asset, Direction.LONG, Decimal("0.5"), 3))
+    execution.trading.exchange.hold(access, HeldPosition(asset, Direction.LONG, Decimal("0.5"), 3, Decimal(100)))
 
 
 @given(quoted('che il rischio approva la chiusura su "{closed}" e un\'apertura long su "{opened}"'))
@@ -108,7 +128,7 @@ def exchange_market(execution: FlowExecution, asset: str, minimum: str, price: s
 
 @given(quoted('che il rischio approva un\'apertura long su "{asset}" di valore {value} USDC'))
 def open_with_value(execution: FlowExecution, asset: str, value: str) -> None:
-    execution.approved = [FlowOpening(asset, Direction.LONG, Decimal(value), 1)]
+    execution.approved = [FlowOpening(asset, Direction.LONG, Decimal(value), 1, DEFAULT_PROTECTION)]
 
 
 @given(parsers.re(r"^che l\'exchange esegue l\'ordine a (?P<price>\d+) con commissione (?P<fee>\d+,\d+) USDC$"))

@@ -51,10 +51,19 @@ const STATE = {
   positions: [],
 };
 
+/** The exit plan of an opening as the journal records it (R3.1.1): prices as decimal strings, null when not given. */
+export type FakeExitPlan = {
+  readonly target: string | null;
+  readonly stop: string | null;
+  readonly invalidation: string | null;
+};
+
+const NO_EXIT_PLAN: FakeExitPlan = { target: null, stop: null, invalidation: null };
+
 export const reasoningOf = (asset: string) =>
   `RSI di ${asset} in risalita da 28 e previsione a un'ora sopra il prezzo: apro long con margine contenuto.`;
 
-const documentsOf = (asset: string): FakeStepDocument[] => [
+const documentsOf = (asset: string, exitPlan: FakeExitPlan): FakeStepDocument[] => [
   {
     step: STEPS.readFlowState,
     content: {
@@ -101,7 +110,13 @@ const documentsOf = (asset: string): FakeStepDocument[] => [
           asset,
           action: 'apri',
           reasoning: reasoningOf(asset),
-          opening: { tipo: 'TradeOpening', direction: 'long', margin_fraction: '0.1', leverage: 2 },
+          opening: {
+            tipo: 'TradeOpening',
+            direction: 'long',
+            margin_fraction: '0.1',
+            leverage: 2,
+            exit_plan: { tipo: 'ExitPlan', ...exitPlan },
+          },
         },
       ],
       scartate: [],
@@ -133,8 +148,12 @@ const documentsOf = (asset: string): FakeStepDocument[] => [
   { step: STEPS.updateFlowState, content: { stato: STATE } },
 ];
 
-/** A cycle that ran every step and opened a long position on the asset. */
-export const aCompletedCycle = (plannedAt: Date, asset = 'BTC'): FakeCycle => ({
+/** A cycle that ran every step and opened a long position on the asset, with the exit plan the agent gave. */
+export const aCompletedCycle = (
+  plannedAt: Date,
+  asset = 'BTC',
+  exitPlan: FakeExitPlan = NO_EXIT_PLAN,
+): FakeCycle => ({
   planned_at: apiInstant(plannedAt),
   started_at: apiInstant(new Date(plannedAt.getTime() + 2000)),
   delay_seconds: 2,
@@ -142,7 +161,7 @@ export const aCompletedCycle = (plannedAt: Date, asset = 'BTC'): FakeCycle => ({
   failure: null,
   steps: [...STEP_ORDER],
   absent_sources: [],
-  documents: documentsOf(asset),
+  documents: documentsOf(asset, exitPlan),
   cost: { input_tokens: 1200, output_tokens: 300, cost_usd: '0.0125' },
 });
 

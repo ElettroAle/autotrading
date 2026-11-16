@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
     ClosingAnswerPort,
+    ExitPlanRepositoryPort,
     FlowOpeningsPort,
     FlowPositionsPort,
     FlowRepositoryPort,
@@ -37,6 +38,7 @@ class StopPorts:
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
     closing_notice: PositionClosedNoticePort
+    exit_plans: ExitPlanRepositoryPort
 
 
 class StopFlowUseCase:
@@ -71,6 +73,7 @@ class StopFlowUseCase:
             return None
         if closing.fill is None:
             return PositionLeftOpen(asset, closing.refusal or "")
+        self._ports.exit_plans.remove(flow.id, asset)
         self._record(flow, asset, closing.fill, command.reason)
         return None
 

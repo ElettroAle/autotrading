@@ -60,6 +60,46 @@ describe('CycleView', () => {
     expect(await section("Risposta integrale dell'agente")).toHaveTextContent('"action": "open"');
   });
 
+  it('shows the exit plan of an opening with the shared format of prices (R3.1.1)', async () => {
+    await openCycle(
+      aCompletedCycle(PLANNED_AT, 'BTC', {
+        target: '63000',
+        stop: '58500.5',
+        invalidation: 'chiusura a 4 ore sotto 59000',
+      }),
+    );
+
+    const decisions = await section('Decisioni e ragionamento');
+    const plan = within(decisions).getByRole('group', { name: 'Piano di uscita di BTC' });
+    expect(
+      within(plan)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual(['Obiettivo', 'Stop', 'Invalidazione']);
+    expect(
+      within(plan)
+        .getAllByRole('definition')
+        .map((value) => value.textContent),
+    ).toEqual(['63.000', '58.500,5', 'chiusura a 4 ore sotto 59000']);
+  });
+
+  it('shows only the levels of the plan the agent gave', async () => {
+    await openCycle(
+      aCompletedCycle(PLANNED_AT, 'BTC', { target: null, stop: '58500', invalidation: null }),
+    );
+
+    const plan = await screen.findByRole('group', { name: 'Piano di uscita di BTC' });
+    expect(within(plan).queryByText('Obiettivo')).not.toBeInTheDocument();
+    expect(within(plan).getByText('Stop')).toBeInTheDocument();
+  });
+
+  it('shows no plan for an opening without levels', async () => {
+    await openCycle(aCompletedCycle(PLANNED_AT));
+
+    await section('Decisioni e ragionamento');
+    expect(screen.queryByRole('group', { name: /Piano di uscita/ })).not.toBeInTheDocument();
+  });
+
   it('shows the discarded decisions and the assets the agent left out', async () => {
     const cycle = aCompletedCycle(PLANNED_AT);
     await openCycle(

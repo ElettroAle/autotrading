@@ -1271,6 +1271,10 @@ export interface components {
             /** Max Drawdown Percent */
             max_drawdown_percent: string | null;
             openings_resume: components["schemas"]["OpeningsResume"];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent: string;
+            /** Default Take Profit Percent */
+            default_take_profit_percent: string | null;
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -1511,6 +1515,10 @@ export interface components {
             max_drawdown_percent?: number | string | null;
             /** @default manual */
             openings_resume: components["schemas"]["OpeningsResume"];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: number | string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: number | string | null;
         };
         /**
          * FlowEquityResponse
@@ -1574,6 +1582,10 @@ export interface components {
             /** Max Drawdown Percent */
             max_drawdown_percent?: number | string | null;
             openings_resume?: components["schemas"]["OpeningsResume"] | null;
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: number | string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: number | string | null;
         };
         /**
          * FlowOverviewResponse
@@ -1618,7 +1630,8 @@ export interface components {
         };
         /**
          * FlowPositionResponse
-         * @description An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin.
+         * @description An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a
+         *     position without margin, each level of the plan when the agent declared none.
          */
         FlowPositionResponse: {
             /** Asset */
@@ -1639,6 +1652,12 @@ export interface components {
             unrealized_pnl: string;
             /** Unrealized Pnl Percent */
             unrealized_pnl_percent: string | null;
+            /** Target Price */
+            target_price: string | null;
+            /** Stop Price */
+            stop_price: string | null;
+            /** Invalidation */
+            invalidation: string | null;
         };
         /**
          * FlowRankingResponse
@@ -1712,6 +1731,10 @@ export interface components {
             /** Max Drawdown Percent */
             max_drawdown_percent: string | null;
             openings_resume: components["schemas"]["OpeningsResume"];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent: string;
+            /** Default Take Profit Percent */
+            default_take_profit_percent: string | null;
         };
         /**
          * FlowResultsResponse
@@ -2446,6 +2469,10 @@ export interface components {
             max_drawdown_percent?: number | string | null;
             /** @default manual */
             openings_resume: components["schemas"]["OpeningsResume"];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: number | string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: number | string | null;
         };
         /**
          * StrategyBody
@@ -2480,6 +2507,10 @@ export interface components {
             max_drawdown_percent?: string | null;
             /** @default manual */
             openings_resume: components["schemas"]["OpeningsResume"];
+            /** Default Stop Loss Percent */
+            default_stop_loss_percent?: string | null;
+            /** Default Take Profit Percent */
+            default_take_profit_percent?: string | null;
         };
         /**
          * StrategyDocument

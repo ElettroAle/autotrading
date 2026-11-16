@@ -19,7 +19,8 @@ from autotrading.domain.flows.risk_outcome import (
     HeldPosition,
     RiskOutcome,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent, TradeSide
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeIntent
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 
 NUMBER = r"(?P<{}>\d+(?:,\d+)?)"

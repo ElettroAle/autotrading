@@ -26,7 +26,17 @@ def test_the_answer_is_an_object_of_decisions_and_nothing_else() -> None:
 def test_every_field_of_a_decision_is_required_and_no_other_is_allowed() -> None:
     entry = json.loads(json.dumps(decision_schema()))
 
-    assert entry["required"] == ["asset", "azione", "direzione", "quota", "leva", "ragionamento"]
+    assert entry["required"] == [
+        "asset",
+        "azione",
+        "direzione",
+        "quota",
+        "leva",
+        "obiettivo",
+        "stop",
+        "invalidazione",
+        "ragionamento",
+    ]
     assert entry["additionalProperties"] is False
 
 
@@ -37,14 +47,36 @@ def test_the_fields_only_an_opening_needs_may_be_null() -> None:
     assert properties["direzione"] == {"type": ["string", "null"], "enum": ["long", "short", None]}
     assert properties["quota"] == {"type": ["number", "null"]}
     assert properties["leva"] == {"type": ["integer", "null"]}
+    assert properties["obiettivo"] == properties["stop"] == {"type": ["number", "null"]}
+    assert properties["invalidazione"] == {"type": ["string", "null"]}
     assert properties["asset"] == properties["ragionamento"] == {"type": "string"}
 
 
 def test_an_answer_in_the_format_reads_as_conforming_decisions() -> None:
     answer = {
         "decisioni": [
-            {"asset": "BTC", "azione": "apri", "direzione": "long", "quota": 0.1, "leva": 3, "ragionamento": "rottura"},
-            {"asset": "ETH", "azione": "mantieni", "direzione": None, "quota": None, "leva": None, "ragionamento": "x"},
+            {
+                "asset": "BTC",
+                "azione": "apri",
+                "direzione": "long",
+                "quota": 0.1,
+                "leva": 3,
+                "obiettivo": 70000,
+                "stop": 60000,
+                "invalidazione": "chiusura sotto 61000",
+                "ragionamento": "rottura",
+            },
+            {
+                "asset": "ETH",
+                "azione": "mantieni",
+                "direzione": None,
+                "quota": None,
+                "leva": None,
+                "obiettivo": None,
+                "stop": None,
+                "invalidazione": None,
+                "ragionamento": "x",
+            },
         ]
     }
 

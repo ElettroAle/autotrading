@@ -1,11 +1,16 @@
+import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
+import { formatPrice } from '@/utils/format-amount';
+
 import type { StepDocument } from '../api/get-cycle';
 import {
   contextOf,
   decisionLabelOf,
   decisionsOf,
+  exitPlanOf,
   sourcesOf,
   type AgentDecision,
   type ContextMessage,
+  type Decision,
   type SourceReading,
 } from '../utils/cycle-documents';
 
@@ -57,6 +62,34 @@ const ContextSection = ({ messages }: { messages: ContextMessage[] }) => (
   </CycleSection>
 );
 
+const PlanLevel = ({ term, value }: { term: string; value: string | null }) =>
+  value === null ? null : (
+    <>
+      <dt className="font-medium text-slate-600">{term}</dt>
+      <dd className={DETAIL_VALUE}>{value}</dd>
+    </>
+  );
+
+// The levels of the plan as the agent gave them, with the shared label-value list (ADR piano-di-uscita-nella-dashboard).
+const ExitPlanOf = ({ decision }: { decision: Decision }) => {
+  const plan = exitPlanOf(decision);
+  if (plan === undefined) {
+    return null;
+  }
+  return (
+    <div role="group" aria-label={`Piano di uscita di ${decision.asset}`}>
+      <dl className={`${DETAILS_GRID} text-sm`}>
+        <PlanLevel
+          term="Obiettivo"
+          value={plan.target === null ? null : formatPrice(plan.target)}
+        />
+        <PlanLevel term="Stop" value={plan.stop === null ? null : formatPrice(plan.stop)} />
+        <PlanLevel term="Invalidazione" value={plan.invalidation} />
+      </dl>
+    </div>
+  );
+};
+
 const DecisionSections = ({ decision }: { decision: AgentDecision }) => (
   <>
     <CycleSection title={DECISIONS_TITLE}>
@@ -64,6 +97,7 @@ const DecisionSections = ({ decision }: { decision: AgentDecision }) => (
       {decision.decisioni.map((each) => (
         <div key={each.asset}>
           <h3 className="font-medium">{decisionLabelOf(each)}</h3>
+          <ExitPlanOf decision={each} />
           <RecordedText text={each.reasoning} />
         </div>
       ))}

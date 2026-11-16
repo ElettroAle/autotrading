@@ -3,7 +3,13 @@ import { z } from 'zod';
 // What the steps of a cycle produced, as the journal of the worker records it (R1.7.1). The API gives each document as
 // free JSON: a document of another shape is still shown, as it is.
 
-const openingSchema = z.object({ direction: z.string() });
+const exitPlanSchema = z.object({
+  target: z.string().nullable(),
+  stop: z.string().nullable(),
+  invalidation: z.string().nullable(),
+});
+
+const openingSchema = z.object({ direction: z.string(), exit_plan: exitPlanSchema.nullish() });
 
 const decisionSchema = z.object({
   asset: z.string(),
@@ -28,6 +34,7 @@ const sourcesSchema = z.object({
 });
 
 export type Decision = z.infer<typeof decisionSchema>;
+export type ExitPlan = z.infer<typeof exitPlanSchema>;
 export type AgentDecision = z.infer<typeof agentDecisionSchema>;
 export type ContextMessage = z.infer<typeof contextSchema>['messaggi'][number];
 export type SourceReading = z.infer<typeof sourcesSchema>['fonti'][number];
@@ -40,6 +47,14 @@ export const contextOf = (content: unknown): ContextMessage[] | undefined =>
 
 export const sourcesOf = (content: unknown): SourceReading[] | undefined =>
   sourcesSchema.safeParse(content).data?.fonti;
+
+/** The exit plan an opening declared (R3.1.1); none for another decision, or an opening without any level. */
+export const exitPlanOf = (decision: Decision): ExitPlan | undefined => {
+  const plan = decision.opening?.exit_plan ?? undefined;
+  return plan === undefined || Object.values(plan).every((level) => level === null)
+    ? undefined
+    : plan;
+};
 
 export const decisionLabelOf = (decision: Decision): string =>
   [decision.action, decision.opening?.direction, decision.asset]

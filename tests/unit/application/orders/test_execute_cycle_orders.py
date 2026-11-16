@@ -1,24 +1,36 @@
-"""The orders a cycle of a flow got through the risk check: sent, recorded, and then followed (R1.5.5, R1.7.2)."""
+"""The orders a cycle of a flow got through the risk check: sent, recorded, and then followed (R1.5.5, R1.7.2), with
+the protection of the positions of the flow (R3.1.2)."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import pytest
+
+from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
-from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase
+from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase, FlowOrderProtection
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
+from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
+from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.order import Order
+from autotrading.domain.orders.protection_kind import ProtectionKind
+from autotrading.domain.orders.protection_note import ProtectionNote
 from autotrading.domain.orders.slippage import Slippage
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
-from tests.fakes.trading_access import FakeTradingAccessAdapter
+from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
+from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, new_access
 
 FLOW_ID = uuid4()
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
+type Opened[T] = Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T]
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,16 +39,18 @@ class Opening:
     side: str
     value: Decimal
     leverage: int
+    stop: Decimal | None = None
+    target: Decimal | None = None
 
-    def order_with[T](self, opening: Callable[[str, str, Decimal, int], T], closing: Callable[[str], T]) -> T:  # noqa: ARG002
-        return opening(self.asset, self.side, self.value, self.leverage)
+    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T]) -> T:  # noqa: ARG002
+        return opening(self.asset, self.side, self.value, self.leverage, self.stop, self.target)
 
 
 @dataclass(frozen=True, slots=True)
 class Closing:
     asset: str
 
-    def order_with[T](self, opening: Callable[[str, str, Decimal, int], T], closing: Callable[[str], T]) -> T:  # noqa: ARG002
+    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T]) -> T:  # noqa: ARG002
         return closing(self.asset)
 
 
@@ -47,6 +61,9 @@ class CycleOrders:
     flow_name: str
     planned_at: datetime
     orders: tuple[Opening | Closing, ...]
+    assets: tuple[str, ...]
+    default_stop_loss_percent: Decimal
+    default_take_profit_percent: Decimal | None
 
 
 class Told:
@@ -55,43 +72,135 @@ class Told:
     def __init__(self) -> None:
         self.events: list[tuple[object, ...]] = []
 
-    def execute(self, *event: object) -> None:
-        self.events.append(event)
+    def execute(self, *event: object, **marks: object) -> None:
+        self.events.append((*event, *marks.values()))
 
     def follow(self) -> FollowFlowOrdersUseCase:
         return FollowFlowOrdersUseCase(FlowOrderFollowers(self, self, self))
 
 
-def test_the_orders_are_sent_closings_first_and_followed_with_the_name_of_the_flow() -> None:
-    accesses, exchange, orders, told = (
-        FakeTradingAccessAdapter(),
-        FakeOrderExchangeAdapter(),
-        InMemoryOrderRepositoryAdapter(),
-        Told(),
+@dataclass
+class Bench:
+    accesses: FakeTradingAccessAdapter = field(default_factory=FakeTradingAccessAdapter)
+    exchange: FakeOrderExchangeAdapter = field(default_factory=FakeOrderExchangeAdapter)
+    orders: InMemoryOrderRepositoryAdapter = field(default_factory=InMemoryOrderRepositoryAdapter)
+    protection_exchange: FakeProtectionExchangeAdapter = field(default_factory=FakeProtectionExchangeAdapter)
+    protections: InMemoryProtectionRepositoryAdapter = field(
+        default_factory=lambda: InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT)
     )
-    account_id = uuid4()
-    accesses.accesses[account_id] = new_access()
-    exchange.hold(accesses.accesses[account_id], HeldPosition("ETH", Direction.LONG, Decimal("0.5"), 4))
-    execute = ExecuteFlowOrdersUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, Slippage.default())
-    request = CycleOrders(
-        account_id, FLOW_ID, "Trend BTC", PLANNED_AT, (Opening("BTC", "short", Decimal(200), 3), Closing("ETH"))
-    )
+    told: Told = field(default_factory=Told)
+    account_id: UUID = field(default_factory=uuid4)
 
-    sent = ExecuteCycleOrdersUseCase(execute, told.follow()).execute(request)
+    def __post_init__(self) -> None:
+        self.accesses.accesses[self.account_id] = new_access()
+
+    def use_case(self) -> ExecuteCycleOrdersUseCase:
+        access, slippage = self.accesses.use_case, Slippage.default()
+        exchanges, protection_exchanges = {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}
+        cancel = CancelProtectionsUseCase(access, protection_exchanges, self.protections)
+        protect = ProtectFlowPositionUseCase(exchanges, protection_exchanges, self.protections, self.orders, slippage)
+        execute = ExecuteFlowOrdersUseCase(
+            access, exchanges, self.orders, slippage, FlowOrderProtection(protect, cancel)
+        )
+        protect_open = ProtectOpenPositionsUseCase(access, exchanges, protection_exchanges, self.protections)
+        return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)
+
+    def hold(self, asset: str, entry_price: Decimal = Decimal(100)) -> None:
+        position = HeldPosition(asset, Direction.LONG, Decimal("0.5"), 4, entry_price)
+        self.exchange.hold(self.accesses.accesses[self.account_id], position)
+
+    def cycle(self, *orders: Opening | Closing, take_profit: Decimal | None = None) -> CycleOrders:
+        return CycleOrders(
+            self.account_id, FLOW_ID, "Trend BTC", PLANNED_AT, orders, ("BTC", "ETH"), Decimal(5), take_profit
+        )
+
+
+@pytest.fixture
+def bench() -> Bench:
+    return Bench()
+
+
+def sent_orders(sent: tuple[object, ...]) -> list[Order]:
+    return [each for each in sent if isinstance(each, Order)]
+
+
+def test_the_orders_are_sent_closings_first_and_followed_with_the_name_of_the_flow(bench: Bench) -> None:
+    bench.hold("ETH")
+    cycle = bench.cycle(Opening("BTC", "short", Decimal(200), 3), Closing("ETH"))
+
+    sent = sent_orders(bench.use_case().execute(cycle))
 
     assert [order.request.market_order.coin for order in sent] == ["ETH", "BTC"]
     assert sent[1].request.market_order.direction is Direction.SHORT
-    assert orders.orders == list(sent)
-    closed, opened = told.events
+    assert bench.orders.orders == sent
+    closed, opened = bench.told.events
     assert closed[:4] == (FLOW_ID, PLANNED_AT, "ETH", sent[0].execution)
     assert opened[:4] == ("Trend BTC", "BTC", "short", 3)
 
 
-def test_a_cycle_without_orders_sends_and_follows_nothing() -> None:
-    accesses, orders, told = FakeTradingAccessAdapter(), InMemoryOrderRepositoryAdapter(), Told()
-    execute = ExecuteFlowOrdersUseCase(accesses.use_case, {}, orders, Slippage.default())
-
-    sent = ExecuteCycleOrdersUseCase(execute, told.follow()).execute(CycleOrders(uuid4(), FLOW_ID, "x", PLANNED_AT, ()))
+def test_a_cycle_without_orders_sends_and_follows_nothing(bench: Bench) -> None:
+    sent = bench.use_case().execute(bench.cycle())
 
     assert sent == ()
-    assert told.events == []
+    assert bench.told.events == []
+
+
+def test_an_opening_is_protected_with_the_exit_plan_of_the_agent_and_the_defaults_of_the_flow(bench: Bench) -> None:
+    bench.exchange.fill_at = (Decimal(100000), Decimal("0.04"))
+    opening = Opening("BTC", "long", Decimal(200), 3, stop=Decimal(97000))
+
+    bench.use_case().execute(bench.cycle(opening, take_profit=Decimal(10)))
+
+    assert [(order.kind, order.trigger_price) for order in bench.protection_exchange.placed] == [
+        (ProtectionKind.STOP_LOSS, Decimal(97000)),
+        (ProtectionKind.TAKE_PROFIT, Decimal(110000)),
+    ]
+
+
+def test_a_position_of_the_flow_without_a_stop_loss_gets_the_default_one(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+
+    sent = bench.use_case().execute(bench.cycle())
+
+    [stop] = bench.protection_exchange.placed
+    assert (stop.asset, stop.kind, stop.trigger_price) == ("ETH", ProtectionKind.STOP_LOSS, Decimal(2850))
+    [recorded] = bench.protections.placed(bench.account_id, "ETH")
+    assert (recorded.flow_id, recorded.trigger_price) == (FLOW_ID, Decimal(2850))
+    assert sent == ()
+
+
+def test_a_position_with_its_stop_loss_gets_no_other(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.use_case().execute(bench.cycle())
+
+    bench.use_case().execute(bench.cycle())
+
+    assert len(bench.protection_exchange.placed) == 1
+
+
+def test_a_default_stop_loss_the_exchange_refuses_is_noted_and_tried_at_the_next_cycle(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.protection_exchange.rejections[ProtectionKind.STOP_LOSS] = "Invalid trigger price"
+
+    sent = bench.use_case().execute(bench.cycle())
+
+    assert sent == (ProtectionNote("ETH", "stop loss non piazzato su ETH, Invalid trigger price"),)
+    assert bench.protections.placed(bench.account_id, "ETH") == ()
+    del bench.protection_exchange.rejections[ProtectionKind.STOP_LOSS]
+    bench.use_case().execute(bench.cycle())
+    assert len(bench.protections.placed(bench.account_id, "ETH")) == 1
+
+
+def test_a_closing_after_a_refused_stop_loss_is_followed_as_unprotected(bench: Bench) -> None:
+    bench.protection_exchange.rejections[ProtectionKind.STOP_LOSS] = "Invalid trigger price"
+
+    sent = bench.use_case().execute(bench.cycle(Opening("BTC", "long", Decimal(200), 3)))
+
+    opening, closing, note = sent
+    assert isinstance(opening, Order)
+    assert isinstance(closing, Order)
+    assert note == ProtectionNote("BTC", "posizione BTC chiusa: stop loss non piazzato, Invalid trigger price")
+    opened, closed = bench.told.events
+    assert opened[:2] == ("Trend BTC", "BTC")
+    assert closed[:3] == (FLOW_ID, PLANNED_AT, "BTC")
+    assert closed[-1] is True

@@ -7,7 +7,7 @@ import pytest
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.errors import InvalidClosedPositionError
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 OPENED = datetime(2026, 11, 12, 10, tzinfo=UTC)
@@ -62,13 +62,16 @@ def test_the_ends_keep_the_cycles_that_produced_them() -> None:
     assert (POSITION.opening.cycle, POSITION.closing.cycle) == (OPENED, None)
 
 
-def test_the_reasons_of_e1_speak_italian() -> None:
+def test_the_reasons_speak_italian() -> None:
     assert [reason.value for reason in CloseReason] == [
         "decisione dell'agente",
         "comando manuale",
         "stop del flusso",
         "rimozione del conto",
         "chiusa fuori dalla piattaforma",
+        "stop loss",
+        "take profit",
+        "stop loss non piazzato",
     ]
 
 

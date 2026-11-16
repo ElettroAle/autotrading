@@ -4606,6 +4606,21 @@
           },
           "openings_resume": {
             "$ref": "#/components/schemas/OpeningsResume"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -4625,7 +4640,9 @@
           "max_consecutive_failures",
           "max_daily_loss_percent",
           "max_drawdown_percent",
-          "openings_resume"
+          "openings_resume",
+          "default_stop_loss_percent",
+          "default_take_profit_percent"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -5287,6 +5304,34 @@
           "openings_resume": {
             "$ref": "#/components/schemas/OpeningsResume",
             "default": "manual"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -5576,6 +5621,34 @@
                 "type": "null"
               }
             ]
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -5785,6 +5858,39 @@
               }
             ],
             "title": "Unrealized Pnl Percent"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
           }
         },
         "type": "object",
@@ -5797,10 +5903,13 @@
           "mark_price",
           "margin",
           "unrealized_pnl",
-          "unrealized_pnl_percent"
+          "unrealized_pnl_percent",
+          "target_price",
+          "stop_price",
+          "invalidation"
         ],
         "title": "FlowPositionResponse",
-        "description": "An open position of the flow (R1.6.1, R2.2.4); the percent is absent for a position without margin."
+        "description": "An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a\nposition without margin, each level of the plan when the agent declared none."
       },
       "FlowRankingResponse": {
         "properties": {
@@ -5999,6 +6108,21 @@
           },
           "openings_resume": {
             "$ref": "#/components/schemas/OpeningsResume"
+          },
+          "default_stop_loss_percent": {
+            "type": "string",
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -6022,7 +6146,9 @@
           "max_consecutive_failures",
           "max_daily_loss_percent",
           "max_drawdown_percent",
-          "openings_resume"
+          "openings_resume",
+          "default_stop_loss_percent",
+          "default_take_profit_percent"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -7954,6 +8080,34 @@
           "openings_resume": {
             "$ref": "#/components/schemas/OpeningsResume",
             "default": "manual"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",
@@ -8050,6 +8204,28 @@
           "openings_resume": {
             "$ref": "#/components/schemas/OpeningsResume",
             "default": "manual"
+          },
+          "default_stop_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Stop Loss Percent"
+          },
+          "default_take_profit_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Take Profit Percent"
           }
         },
         "type": "object",

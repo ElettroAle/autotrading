@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -14,6 +14,7 @@ from autotrading.domain.flows.errors import (
 )
 from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -66,6 +67,8 @@ class FlowConfiguration:
     max_daily_loss_percent: Decimal | None = None
     max_drawdown_percent: Decimal | None = None
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # A stop loss of 5% and no take profit unless the user chooses others; the existing flows got the same (R3.1.2).
+    protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]

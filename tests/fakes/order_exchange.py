@@ -116,10 +116,11 @@ class FakeOrderExchangeAdapter:
             size, price, fee, self.realized_on_close if order.reduce_only else Decimal(0), EXECUTED_AT
         )
         self.executions[order.id] = execution
-        self._move_position(access, order, size)
+        self._move_position(access, order, execution)
         return execution
 
-    def _move_position(self, access: TradingAccess, order: MarketOrder, size: Decimal) -> None:
+    def _move_position(self, access: TradingAccess, order: MarketOrder, execution: Execution) -> None:
+        size, price = execution.filled_size, execution.average_price
         key = (access.value("account_address"), order.coin)
         current = self.positions.get(key)
         if order.reduce_only and current is not None:
@@ -130,7 +131,10 @@ class FakeOrderExchangeAdapter:
                 del self.positions[key]
             return
         held = Decimal(0) if current is None else current.size
-        self.positions[key] = HeldPosition(order.coin, order.direction, held + size, self.leverages.get(key, 1))
+        entry_price = price if current is None else current.entry_price
+        self.positions[key] = HeldPosition(
+            order.coin, order.direction, held + size, self.leverages.get(key, 1), entry_price
+        )
 
     def _require_reachable(self) -> None:
         exhausted = self.unreachable_after_orders is not None and len(self.executions) >= self.unreachable_after_orders

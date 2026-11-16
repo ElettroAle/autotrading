@@ -110,7 +110,7 @@ def hold_position(platform: Platform, user: str, account: str, asset: str, margi
         OpenTradingAccessCommand(account_id)
     )
     size = margin / platform.order_exchange.markets[asset].mid_price
-    platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, size, 1))
+    platform.order_exchange.hold(access, HeldPosition(asset, Direction.LONG, size, 1, Decimal(100)))
     reading = platform.account_activity.activities.get(account_id, an_activity())
     held = (*reading.positions, a_position(asset, margin=margin, size=size))
     platform.account_activity.activities[account_id] = replace(reading, positions=held)

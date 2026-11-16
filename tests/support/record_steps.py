@@ -179,7 +179,17 @@ def flow_runs_cycle(records: Records, flow: str) -> None:
 
 @when(quoted('il flusso "{flow}" esegue un ciclo concluso con un\'apertura su "{asset}"'))
 def flow_opens_in_cycle(records: Records, flow: str, asset: str) -> None:
-    opening = {"asset": asset, "azione": "apri", "direzione": "long", "quota": 0.5, "leva": 2, "ragionamento": "r"}
+    opening = {
+        "asset": asset,
+        "azione": "apri",
+        "direzione": "long",
+        "quota": 0.5,
+        "leva": 2,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "ragionamento": "r",
+    }
     records.flow_cycles.model.text = json.dumps({"decisioni": [opening]})
     records.flow_cycles.run(flow)
     assert recorded(records).outcome is CycleOutcome.COMPLETED

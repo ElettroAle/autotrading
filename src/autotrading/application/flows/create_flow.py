@@ -21,6 +21,7 @@ from autotrading.domain.flows.flow_configuration import FlowConfiguration, asset
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -61,6 +62,9 @@ class CreateFlowCommand:
     max_daily_loss_percent: Decimal | None = None
     max_drawdown_percent: Decimal | None = None
     openings_resume: OpeningsResume = OpeningsResume.MANUAL
+    # None for the stop loss of the platform; no take profit unless given (R3.1.2).
+    default_stop_loss_percent: Decimal | None = None
+    default_take_profit_percent: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +126,9 @@ class CreateFlowUseCase:
             max_daily_loss_percent=command.max_daily_loss_percent,
             max_drawdown_percent=command.max_drawdown_percent,
             openings_resume=command.openings_resume,
+            protection_defaults=ProtectionDefaults.of(
+                command.default_stop_loss_percent, command.default_take_profit_percent
+            ),
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

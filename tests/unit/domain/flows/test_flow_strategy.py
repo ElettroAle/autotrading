@@ -10,6 +10,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -31,6 +32,7 @@ def a_strategy() -> FlowStrategy:
         max_daily_loss_percent=Decimal(5),
         max_drawdown_percent=Decimal(10),
         openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
     )
 
 
@@ -46,6 +48,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         max_daily_loss_percent=Decimal(4),
         max_drawdown_percent=Decimal(8),
         openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(2), None),
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -62,6 +65,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         max_daily_loss_percent=Decimal(4),
         max_drawdown_percent=Decimal(8),
         openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal(2), None),
     )
 
 
@@ -74,6 +78,7 @@ def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
         max_daily_loss_percent=None,
         max_drawdown_percent=None,
         openings_resume=OpeningsResume.MANUAL,
+        protection_defaults=ProtectionDefaults(),
     )
 
     assert (

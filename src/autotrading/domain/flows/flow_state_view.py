@@ -1,12 +1,13 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.trade_side import TradeSide
 
 
 @dataclass(frozen=True, slots=True)
 class PositionView:
-    """An open position of the flow as the exchange shows it."""
+    """An open position of the flow as the exchange shows it, with the exit plan in force (R3.1.1)."""
 
     asset: str
     direction: TradeSide
@@ -16,6 +17,7 @@ class PositionView:
     mark_price: Decimal
     unrealized_pnl: Decimal
     liquidation_price: Decimal | None
+    exit_plan: ExitPlan = field(default_factory=ExitPlan)
 
 
 @dataclass(frozen=True, slots=True)

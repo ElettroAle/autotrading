@@ -7,12 +7,13 @@ from decimal import Decimal
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK, OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
@@ -136,3 +137,18 @@ def test_a_suspension_for_maximum_loss_comes_before_the_alarm_of_reconciliation(
 
 def test_without_an_alarm_the_openings_are_not_suspended() -> None:
     assert cycle_flow(attributed()).risk_state().openings_suspended is None
+
+
+def test_each_position_of_the_state_view_carries_its_exit_plan_in_force() -> None:
+    plan = ExitPlan(Decimal(130), Decimal(90), "chiusura sotto 95")
+    state = replace(attributed(margin=Decimal(50)), exit_plans={"BTC": plan})
+
+    [position] = cycle_flow(state).state_view().positions
+
+    assert position.exit_plan == plan
+
+
+def test_a_position_without_a_plan_shows_the_empty_one() -> None:
+    [position] = cycle_flow(attributed()).state_view().positions
+
+    assert position.exit_plan == ExitPlan()

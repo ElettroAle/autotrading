@@ -17,6 +17,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.openings_resume import OpeningsResume
+from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -158,6 +159,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         max_daily_loss_percent=Decimal(5),
         max_drawdown_percent=Decimal("12.5"),
         openings_resume=OpeningsResume.NEXT_DAY,
+        protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
     )
 
     assert differences(before, after) == (
@@ -179,6 +181,8 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("perdita giornaliera massima", "nessuno", "5%"),
         ConfigurationDifference("perdita massima dal picco", "nessuno", "12,5%"),
         ConfigurationDifference("ripresa delle aperture", "manuale", "il giorno dopo"),
+        ConfigurationDifference("stop loss predefinito", "5%", "2,5%"),
+        ConfigurationDifference("take profit predefinito", "nessuno", "10%"),
     )
 
 

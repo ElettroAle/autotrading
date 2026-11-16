@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from autotrading.domain.agent.decision import Decision, DiscardedDecision, TradeAction, TradeDirection, TradeOpening
 from autotrading.domain.agent.errors import DecisionNotConformingError
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 DECISIONS = "decisioni"
 ASSET, ACTION, DIRECTION, MARGIN_FRACTION, LEVERAGE, REASONING = (
@@ -16,6 +17,7 @@ ASSET, ACTION, DIRECTION, MARGIN_FRACTION, LEVERAGE, REASONING = (
     "leva",
     "ragionamento",
 )
+TARGET, STOP, INVALIDATION = "obiettivo", "stop", "invalidazione"
 UNREADABLE = "risposta non leggibile"
 FENCE = "```"
 LOWEST_LEVERAGE = 1
@@ -107,7 +109,9 @@ def _opening_of(entry: Mapping[str, object]) -> TradeOpening:
     direction = _text_of(entry, DIRECTION)
     if direction not in set(TradeDirection):
         raise DecisionNotConformingError.not_allowed(DIRECTION)
-    return TradeOpening(TradeDirection(direction), _margin_fraction_of(entry), _leverage_of(entry))
+    return TradeOpening(
+        TradeDirection(direction), _margin_fraction_of(entry), _leverage_of(entry), _exit_plan_of(entry)
+    )
 
 
 def _margin_fraction_of(entry: Mapping[str, object]) -> Decimal:
@@ -127,6 +131,38 @@ def _leverage_of(entry: Mapping[str, object]) -> int:
     if value < LOWEST_LEVERAGE:
         raise DecisionNotConformingError.range(LEVERAGE)
     return value
+
+
+def _exit_plan_of(entry: Mapping[str, object]) -> ExitPlan:
+    """Every part of the plan is optional, but its key is always there: null says the agent declared none (R3.1.1)."""
+    return ExitPlan(_price_of(entry, TARGET), _price_of(entry, STOP), _invalidation_of(entry))
+
+
+def _price_of(entry: Mapping[str, object], field: str) -> Decimal | None:
+    value = _keyed(entry, field)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | Decimal):
+        raise DecisionNotConformingError.type(field)
+    if value <= 0:
+        raise DecisionNotConformingError.range(field)
+    return Decimal(value)
+
+
+def _invalidation_of(entry: Mapping[str, object]) -> str | None:
+    value = _keyed(entry, INVALIDATION)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise DecisionNotConformingError.type(INVALIDATION)
+    return value.strip() or None
+
+
+def _keyed(entry: Mapping[str, object], field: str) -> object:
+    """The value of a key the rigid schema always wants, even when its value may be null."""
+    if field not in entry:
+        raise DecisionNotConformingError.missing(field)
+    return entry[field]
 
 
 def _text_of(entry: Mapping[str, object], field: str) -> str:

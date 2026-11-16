@@ -4,10 +4,11 @@ from uuid import uuid4
 import pytest
 
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState, PositionMismatch
 from autotrading.domain.flows.ledger import FlowTotals
-from autotrading.domain.flows.trade_intent import TradeSide
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -157,3 +158,23 @@ def test_the_money_of_the_flow_is_the_capital_plus_realized_pnl_and_funding_less
     )
 
     assert state.funds == Decimal(533)
+
+
+def test_the_exit_plan_in_force_is_kept_only_for_the_positions_open() -> None:
+    flow = flow_on("BTC", "SOL")
+    activity = an_activity(positions=(a_position("BTC"),))
+    plan = ExitPlan(Decimal(130), Decimal(90), "chiusura sotto 95")
+    stale = ExitPlan(stop=Decimal(10))
+
+    state = FlowState.attributed(flow, activity, totals_of(flow), {"BTC": plan, "SOL": stale})
+
+    assert state.exit_plans == {"BTC": plan}
+    assert state.exit_plan_of("BTC") == plan
+
+
+def test_a_position_without_a_plan_has_the_empty_one() -> None:
+    flow = flow_on("BTC")
+
+    state = FlowState.attributed(flow, an_activity(positions=(a_position("BTC"),)), totals_of(flow))
+
+    assert state.exit_plan_of("BTC") == ExitPlan()

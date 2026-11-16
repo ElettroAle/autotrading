@@ -1,12 +1,13 @@
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 
 from autotrading.domain.agent.decision import TradeDirection
 from autotrading.domain.agent.errors import InvalidAgentContextError
+from autotrading.domain.agent.exit_plan import ExitPlan
 
 MINUTE = timedelta(minutes=1)
 
@@ -24,7 +25,7 @@ class ModelMessage:
 
 @dataclass(frozen=True, slots=True)
 class PositionView:
-    """An open position of the flow as the exchange shows it."""
+    """An open position of the flow as the exchange shows it, with the exit plan in force (R3.1.1)."""
 
     asset: str
     direction: TradeDirection
@@ -34,6 +35,7 @@ class PositionView:
     mark_price: Decimal
     unrealized_pnl: Decimal
     liquidation_price: Decimal | None
+    exit_plan: ExitPlan = field(default_factory=ExitPlan)
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +132,7 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
 
 
 def _position_document(position: PositionView) -> dict[str, object]:
-    liquidation = position.liquidation_price
+    liquidation, plan = position.liquidation_price, position.exit_plan
     return {
         "asset": position.asset,
         "direzione": position.direction.value,
@@ -139,8 +141,15 @@ def _position_document(position: PositionView) -> dict[str, object]:
         "prezzo_di_ingresso": str(position.entry_price),
         "prezzo_di_mercato": str(position.mark_price),
         "pnl_non_realizzato": str(position.unrealized_pnl),
-        "prezzo_di_liquidazione": None if liquidation is None else str(liquidation),
+        "prezzo_di_liquidazione": _text_or_none(liquidation),
+        "obiettivo": _text_or_none(plan.target),
+        "stop": _text_or_none(plan.stop),
+        "invalidazione": plan.invalidation,
     }
+
+
+def _text_or_none(price: Decimal | None) -> str | None:
+    return None if price is None else str(price)
 
 
 def _source_document(source: SourceData) -> dict[str, object]:

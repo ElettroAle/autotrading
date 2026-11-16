@@ -7,7 +7,8 @@ from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.risk_check import RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, BlockedDecision, HeldPosition
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, TradeSide
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 
 EXCHANGE = "Hyperliquid"

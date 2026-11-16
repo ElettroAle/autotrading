@@ -15,6 +15,8 @@ from autotrading.domain.italian_text import money_text, number_text
 
 NONE = "nessuno"
 DEFAULT = "predefinito"
+DEFAULT_STOP_LOSS = "stop loss predefinito"
+DEFAULT_TAKE_PROFIT = "take profit predefinito"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,4 +89,6 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     ("perdita giornaliera massima", lambda configuration: _percent(configuration.max_daily_loss_percent)),
     ("perdita massima dal picco", lambda configuration: _percent(configuration.max_drawdown_percent)),
     ("ripresa delle aperture", lambda configuration: configuration.openings_resume.label),
+    (DEFAULT_STOP_LOSS, lambda configuration: _percent(configuration.protection_defaults.stop_loss_percent)),
+    (DEFAULT_TAKE_PROFIT, lambda configuration: _percent(configuration.protection_defaults.take_profit_percent)),
 )

@@ -44,10 +44,13 @@ class RiskState:
 
 @dataclass(frozen=True, slots=True)
 class AssetLimits:
-    """What the exchange accepts on an asset: its maximum leverage and the minimum value of an order."""
+    """What the exchange accepts on an asset, from one reading of its market: the maximum leverage, the minimum value of
+    an order and the market price the exit plan is checked on (R3.1.1).
+    """
 
     max_leverage: int
     min_order_value: Decimal
+    market_price: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +149,7 @@ class RiskCheck:
             return self._short_of_liquidity(intent.asset)
         if sizing.value < limits.min_order_value:
             return self._at_minimum(intent, sizing, limits)
-        return ApprovedOpening(intent.asset, intent.side, sizing.value, sizing.leverage, sizing.adjustments)
+        return _approved(intent, sizing, limits)
 
     def _within_leverage(self, intent: OpenIntent, limits: AssetLimits) -> _Sizing:
         """The margin stays the same: a lower leverage gives a smaller position (R1.5.2)."""
@@ -221,7 +224,7 @@ class RiskCheck:
         )
         if raised.margin > self._liquidity:
             return self._short_of_liquidity(intent.asset)
-        return ApprovedOpening(intent.asset, intent.side, raised.value, raised.leverage, raised.adjustments)
+        return _approved(intent, raised, limits)
 
     def _short_of_liquidity(self, asset: str) -> BlockedDecision:
         return BlockedDecision(asset, f"liquidità del flusso insufficiente: {self._money(self._liquidity)}")
@@ -239,6 +242,14 @@ def _within_total_exposure(sizing: _Sizing, limit: _TotalExposureLimit | None) -
     else:
         adjustment = Adjustment(limit.kind, sizing.value, limit.value_cap, limit.reason)
     return sizing.adjusted(limit.value_cap, sizing.leverage, adjustment)
+
+
+def _approved(intent: OpenIntent, sizing: _Sizing, limits: AssetLimits) -> ApprovedOpening:
+    """The opening as sized, with only the levels of its plan coherent with the market price of the exchange."""
+    plan, discarded = intent.exit_plan.coherent_with(intent.side, limits.market_price)
+    notes = tuple(Adjustment(AdjustmentKind.EXIT_PLAN, level.price, None, level.reason) for level in discarded)
+    adjustments = (*sizing.adjustments, *notes)
+    return ApprovedOpening(intent.asset, intent.side, sizing.value, sizing.leverage, adjustments, plan)
 
 
 def _capped_leverage(sizing: _Sizing, maximum: int, reason: str) -> _Sizing:
