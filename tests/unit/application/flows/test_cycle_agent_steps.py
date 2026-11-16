@@ -19,6 +19,7 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_side import TradeSide
@@ -74,16 +75,17 @@ class Decision:
     asset: str
     plan: Plan = Plan()
     change: Change = Change()
+    confidence: int = 70
 
     def intent_with[O, C, H, U](
         self,
-        opening: Callable[[str, str, Decimal, int, Plan], O],
+        opening: Callable[[str, str, Decimal, int, Plan, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, Change], U],
     ) -> O | C | H | U:
         if self.action == "open":
-            return opening(self.asset, "long", Decimal("0.1"), 2, self.plan)
+            return opening(self.asset, "long", Decimal("0.1"), 2, self.plan, self.confidence)
         if self.action == "close":
             return closing(self.asset)
         if self.action == "update":
@@ -200,6 +202,21 @@ def test_the_exit_plan_of_the_agent_reaches_the_risk_check() -> None:
     assert [adjustment.reason for adjustment in order.outcome.adjustments] == [
         "stop 105000 scartato: incoerente con long al prezzo 100000"
     ]
+
+
+def test_the_minimum_confidence_of_the_flow_blocks_a_weak_opening() -> None:
+    configuration = replace(FLOW.configuration, minimum_confidence=MinimumConfidence(60))
+    cycle_flow = replace(CYCLE_FLOW, flow=replace(FLOW, configuration=configuration))
+    weak, convinced = Decision("open", "BTC", confidence=40), Decision("open", "ETH", confidence=60)
+    decisions = CycleDecisions(cycle_flow, Reply(Response((weak, convinced))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC", "ETH"}))})
+
+    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    outcomes = review.outcomes
+    assert isinstance(outcomes, tuple)
+    assert outcomes[0] == BlockedDecision("BTC", "apertura BTC non eseguita: confidenza 40 sotto la minima 60")
+    assert [order.outcome.asset for order in review.orders] == ["ETH"]
 
 
 def test_the_exchange_of_an_account_without_limits_is_unavailable() -> None:

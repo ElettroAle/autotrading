@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -28,6 +29,8 @@ class FlowStrategy:
     system_prompt: str | None = None
     # The protection of every opening, a risk rule like the limits (R3.1.2).
     protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
+    # The confidence an opening needs, a risk rule like the limits; none unless the strategy has one (R3.1.4).
+    minimum_confidence: MinimumConfidence | None = None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -40,6 +43,7 @@ class FlowStrategy:
             configuration.bring_to_minimum,
             configuration.system_prompt,
             configuration.protection_defaults,
+            configuration.minimum_confidence,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -56,6 +60,7 @@ class FlowStrategy:
             bring_to_minimum=self.bring_to_minimum,
             system_prompt=self.system_prompt,
             protection_defaults=self.protection_defaults,
+            minimum_confidence=self.minimum_confidence,
         )
 
 

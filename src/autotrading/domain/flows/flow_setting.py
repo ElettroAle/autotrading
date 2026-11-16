@@ -18,3 +18,4 @@ class FlowSetting(StrEnum):
     SYSTEM_PROMPT = "system_prompt"
     DEFAULT_STOP_LOSS = "default_stop_loss_percent"
     DEFAULT_TAKE_PROFIT = "default_take_profit_percent"
+    MINIMUM_CONFIDENCE = "minimum_confidence"

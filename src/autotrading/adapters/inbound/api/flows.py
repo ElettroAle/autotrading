@@ -34,6 +34,7 @@ from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
@@ -68,6 +69,8 @@ class FlowCreationRequest(BaseModel):
     # Null or missing: a stop loss of 5% and no take profit (R3.1.2).
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
+    # Null or missing: no minimum confidence (R3.1.4).
+    minimum_confidence: int | None = None
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -87,6 +90,7 @@ class FlowCreationRequest(BaseModel):
             system_prompt=self.system_prompt,
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
+            minimum_confidence=self.minimum_confidence,
         )
 
 
@@ -110,6 +114,8 @@ class FlowModificationRequest(BaseModel):
     default_stop_loss_percent: Decimal | None = None
     # A null sent on purpose removes the default take profit; a missing one keeps the version in force (R3.1.2).
     default_take_profit_percent: Decimal | None = None
+    # A null sent on purpose removes the minimum confidence; a missing one keeps the version in force (R3.1.4).
+    minimum_confidence: int | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -134,6 +140,8 @@ class FlowModificationRequest(BaseModel):
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
             remove_default_take_profit=self._sent_as_null("default_take_profit_percent"),
+            minimum_confidence=self.minimum_confidence,
+            remove_minimum_confidence=self._sent_as_null("minimum_confidence"),
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -227,6 +235,7 @@ class ConfigurationResponse(BaseModel):
     system_prompt_placeholders: list[PromptPlaceholderResponse]
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
+    minimum_confidence: int | None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -248,6 +257,7 @@ class ConfigurationResponse(BaseModel):
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
+            minimum_confidence=_confidence(configuration.minimum_confidence),
         )
 
 
@@ -293,6 +303,7 @@ class FlowResponse(BaseModel):
     system_prompt_placeholders: list[PromptPlaceholderResponse]
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
+    minimum_confidence: int | None
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -319,6 +330,7 @@ class FlowResponse(BaseModel):
             system_prompt_placeholders=PromptPlaceholderResponse.all(),
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
+            minimum_confidence=_confidence(configuration.minimum_confidence),
         )
 
 
@@ -514,6 +526,10 @@ COMMANDS = {"start": FlowAction.START, "pause": FlowAction.PAUSE, "resume": Flow
 
 def _amount(value: Decimal | None) -> str | None:
     return None if value is None else amount_text(value)
+
+
+def _confidence(minimum: MinimumConfidence | None) -> int | None:
+    return None if minimum is None else minimum.value
 
 
 def _text(value: Decimal | None) -> str | None:

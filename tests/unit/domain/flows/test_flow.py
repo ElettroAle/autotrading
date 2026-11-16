@@ -16,6 +16,7 @@ from autotrading.domain.flows.flow_configuration import assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital_of_account
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -136,4 +137,14 @@ def test_bringing_an_opening_to_the_exchange_minimum_is_off_unless_chosen() -> N
     assert configuration.risk_policy == RiskPolicy(configuration.risk_limits, bring_to_minimum=False)
     assert replace(configuration, bring_to_minimum=True).risk_policy == RiskPolicy(
         configuration.risk_limits, bring_to_minimum=True
+    )
+
+
+def test_the_minimum_confidence_is_absent_unless_given_and_reaches_the_risk_policy() -> None:
+    configuration = a_configuration()
+
+    assert configuration.minimum_confidence is None
+    assert configuration.risk_policy.minimum_confidence is None
+    assert replace(configuration, minimum_confidence=MinimumConfidence(60)).risk_policy == RiskPolicy(
+        configuration.risk_limits, bring_to_minimum=False, minimum_confidence=MinimumConfidence(60)
     )

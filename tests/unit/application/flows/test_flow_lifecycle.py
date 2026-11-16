@@ -35,12 +35,14 @@ from autotrading.domain.flows.errors import (
     FlowCommandNotAllowedError,
     InvalidDefaultStopLossError,
     InvalidDefaultTakeProfitError,
+    InvalidMinimumConfidenceError,
     UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -293,6 +295,32 @@ def test_the_default_take_profit_removed_on_purpose_leaves_the_next_version_with
     assert (modified.configuration.version, modified.configuration.protection_defaults) == (3, ProtectionDefaults())
 
 
+def test_a_new_minimum_confidence_is_saved_in_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, minimum_confidence=60))
+
+    assert modified.configuration == replace(flow.configuration, version=2, minimum_confidence=MinimumConfidence(60))
+
+
+def test_a_change_without_a_minimum_confidence_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, minimum_confidence=60))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="prudente"))
+
+    assert modified.configuration.minimum_confidence == MinimumConfidence(60)
+
+
+def test_the_minimum_confidence_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, minimum_confidence=60))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_minimum_confidence=True))
+
+    assert (modified.configuration.version, modified.configuration.minimum_confidence) == (3, None)
+
+
 @pytest.mark.parametrize(
     ("changes", "error", "reason"),
     [
@@ -312,6 +340,8 @@ def test_the_default_take_profit_removed_on_purpose_leaves_the_next_version_with
             InvalidDefaultTakeProfitError,
             "il take profit predefinito è maggiore di 0",
         ),
+        ({"minimum_confidence": -1}, InvalidMinimumConfidenceError, "la confidenza minima va da 0 a 100"),
+        ({"minimum_confidence": 101}, InvalidMinimumConfidenceError, "la confidenza minima va da 0 a 100"),
     ],
 )
 def test_an_invalid_change_is_refused_and_the_version_in_force_stays(

@@ -92,9 +92,10 @@ DEFAULT_SYSTEM_PROMPT = "\n".join(
         ' "leva": <intero>, "obiettivo": <prezzo obiettivo o null>, "stop": <prezzo di stop o null>,'
         """ "invalidazione": "<condizione che invalida l'apertura>" o null,"""
         """ "togli_obiettivo": <true per togliere l'obiettivo, altrimenti false>,"""
+        ' "confidenza": <intero da 0 a 100, quanto sei convinto della decisione>,'
         ' "ragionamento": "<perché>"}}]}}',
         "direzione, quota e leva servono solo per apri; obiettivo, stop e invalidazione servono solo per apri e"
-        " aggiorna, togli_obiettivo solo per aggiorna; il ragionamento serve sempre.",
+        " aggiorna, togli_obiettivo solo per aggiorna; il ragionamento e la confidenza servono sempre.",
     )
 )
 

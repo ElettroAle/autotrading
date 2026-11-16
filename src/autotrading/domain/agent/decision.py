@@ -36,7 +36,8 @@ class TradeOpening:
 
 @dataclass(frozen=True, slots=True)
 class Decision:
-    """A conforming decision of the agent on one asset, with its reasoning (R1.4.4).
+    """A conforming decision of the agent on one asset, with its reasoning and how convinced of it the agent is, from 0
+    to 100 (R1.4.4, R3.1.4).
 
     Only an opening carries operational fields and only an update the change of the plan (R3.1.3); a close is always
     total.
@@ -45,18 +46,19 @@ class Decision:
     asset: str
     action: TradeAction
     reasoning: str
+    confidence: int
     opening: TradeOpening | None = None
     plan_change: ExitPlanChange | None = None
 
     def intent_with[O, C, H, U](
         self,
-        opening: Callable[[str, str, Decimal, int, ExitPlan], O],
+        opening: Callable[[str, str, Decimal, int, ExitPlan, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, ExitPlanChange], U],
     ) -> O | C | H | U:
         """What the decision asks, built by whoever checks it: an opening or an update without its fields holds the
-        asset.
+        asset; only an opening carries the confidence, the one decision a minimum confidence may stop (R3.1.4).
         """
         if self.action is TradeAction.CLOSE:
             return closing(self.asset)
@@ -65,7 +67,12 @@ class Decision:
         if self.action is TradeAction.OPEN and self.opening is not None:
             fields = self.opening
             return opening(
-                self.asset, fields.direction.value, fields.margin_fraction, fields.leverage, fields.exit_plan
+                self.asset,
+                fields.direction.value,
+                fields.margin_fraction,
+                fields.leverage,
+                fields.exit_plan,
+                self.confidence,
             )
         return holding(self.asset)
 

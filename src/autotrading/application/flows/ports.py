@@ -958,11 +958,13 @@ class DecisionPlanChangePort(Protocol):
 
 
 class AgentDecisionPort(Protocol):
-    """A conforming decision of the agent, turned by the risk check into what it asks (R1.4.4, R3.1.1, R3.1.3)."""
+    """A conforming decision of the agent, turned by the risk check into what it asks; an opening carries the
+    confidence of the agent (R1.4.4, R3.1.1, R3.1.3, R3.1.4).
+    """
 
     def intent_with[O, C, H, U](
         self,
-        opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort], O],
+        opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, DecisionPlanChangePort], U],

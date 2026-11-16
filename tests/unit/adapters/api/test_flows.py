@@ -93,8 +93,27 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "system_prompt_placeholders": PLACEHOLDERS,
         "default_stop_loss_percent": "5",
         "default_take_profit_percent": None,
+        "minimum_confidence": None,
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
+
+
+def test_the_minimum_confidence_is_created_changed_and_removed_with_a_null(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", minimum_confidence=60)).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"minimum_confidence": 75}).json()
+    removed = anna.patch(f"/flows/{flow_id}", json={"minimum_confidence": None}).json()
+
+    assert (untouched["minimum_confidence"], changed["minimum_confidence"]) == (60, 75)
+    assert (removed["version"], removed["minimum_confidence"]) == (4, None)
+    assert anna.get(f"/flows/{flow_id}/versions/3").json()["minimum_confidence"] == 75
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/4").json() == [
+        {"part": "confidenza minima", "before": "60", "after": "nessuna"},
+    ]
 
 
 def test_the_protection_defaults_are_created_changed_and_the_take_profit_removed_with_a_null(
@@ -355,6 +374,8 @@ def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform)
             "il take profit predefinito è maggiore di 0",
             "default_take_profit_percent",
         ),
+        ({"minimum_confidence": -1}, "la confidenza minima va da 0 a 100", "minimum_confidence"),
+        ({"minimum_confidence": 101}, "la confidenza minima va da 0 a 100", "minimum_confidence"),
     ],
 )
 def test_an_invalid_change_answers_with_the_reason_and_the_field_it_concerns(

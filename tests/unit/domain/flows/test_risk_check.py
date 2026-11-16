@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import (
@@ -29,18 +30,24 @@ def check(
     funds: str = "1000",
     open_assets: frozenset[str] = frozenset(),
     bring_to_minimum: bool = False,
+    minimum_confidence: int | None = None,
 ) -> RiskCheck:
     limits = RiskLimits(
         max_leverage, None if margin is None else Decimal(margin), None if value is None else Decimal(value)
     )
     state = RiskState("USDC", Decimal(funds), Decimal(liquidity), dict.fromkeys(open_assets, TradeSide.LONG))
-    return RiskCheck(RiskPolicy(limits, bring_to_minimum), state)
+    return RiskCheck(RiskPolicy(limits, bring_to_minimum, MinimumConfidence.optional(minimum_confidence)), state)
 
 
-def opening(
-    fraction: str, leverage: int, asset: str = "BTC", side: TradeSide = TradeSide.LONG, plan: ExitPlan | None = None
+def opening(  # noqa: PLR0917 - one argument per field of the intent
+    fraction: str,
+    leverage: int,
+    asset: str = "BTC",
+    side: TradeSide = TradeSide.LONG,
+    plan: ExitPlan | None = None,
+    confidence: int = 70,
 ) -> OpenIntent:
-    return OpenIntent(asset, side, Decimal(fraction), leverage, plan or ExitPlan())
+    return OpenIntent(asset, side, Decimal(fraction), leverage, confidence, plan or ExitPlan())
 
 
 def approved(outcome: object) -> ApprovedOpening:
@@ -383,3 +390,36 @@ def test_an_update_commits_no_liquidity() -> None:
     risk.outcome(UpdateIntent("BTC", ExitPlanChange(stop=Decimal(59000))), EXCHANGE)
 
     assert approved(risk.outcome(opening("0.06", 1, asset="ETH"), EXCHANGE)).margin == Decimal(60)
+
+
+def test_an_opening_below_the_minimum_confidence_is_blocked_with_the_reason() -> None:
+    outcome = check(minimum_confidence=60).outcome(opening("0.01", 2, confidence=40), EXCHANGE)
+
+    assert outcome == BlockedDecision("BTC", "apertura BTC non eseguita: confidenza 40 sotto la minima 60")
+
+
+@pytest.mark.parametrize("confidence", [60, 95])
+def test_an_opening_at_or_above_the_minimum_confidence_passes(confidence: int) -> None:
+    outcome = check(minimum_confidence=60).outcome(opening("0.01", 2, confidence=confidence), EXCHANGE)
+
+    assert isinstance(outcome, ApprovedOpening)
+
+
+def test_without_a_minimum_confidence_any_confidence_opens() -> None:
+    assert isinstance(check().outcome(opening("0.01", 2, confidence=0), EXCHANGE), ApprovedOpening)
+
+
+def test_a_weak_opening_commits_no_liquidity() -> None:
+    risk_check = check(minimum_confidence=60, liquidity="20")
+
+    risk_check.outcome(opening("0.01", 2, confidence=10), EXCHANGE)
+
+    assert isinstance(risk_check.outcome(opening("0.02", 1, "ETH"), EXCHANGE), ApprovedOpening)
+
+
+def test_closes_and_updates_ignore_the_minimum_confidence() -> None:
+    risk_check = check(minimum_confidence=100, open_assets=frozenset({"BTC", "ETH"}))
+    update = UpdateIntent("ETH", ExitPlanChange(stop=Decimal(59000)))
+
+    assert risk_check.outcome(CloseIntent("BTC"), None) == ApprovedClose("BTC")
+    assert isinstance(risk_check.outcome(update, EXCHANGE), ApprovedUpdate)

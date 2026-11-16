@@ -202,6 +202,37 @@ describe('EditFlow', () => {
     });
   });
 
+  it('sets the minimum confidence as a new version, refuses one out of range and removes it', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const minimum = await screen.findByLabelText('Confidenza minima (0-100)');
+    expect(minimum).toHaveValue('');
+    await userEvent.type(minimum, '60');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).minimum_confidence).toBe(60);
+    await userEvent.clear(field('Confidenza minima (0-100)'));
+    await userEvent.type(field('Confidenza minima (0-100)'), '101');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Confidenza minima (0-100)')).toHaveAccessibleDescription(
+        'la confidenza minima va da 0 a 100',
+      ),
+    );
+    await userEvent.clear(field('Confidenza minima (0-100)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 3'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).minimum_confidence).toBeNull();
+  });
+
   it('removes an exposure limit the user empties, and refuses emptying both', async () => {
     fakePlatform.addConfiguredFlow('anna', 'alfa', {
       account_id: 'account-principale',

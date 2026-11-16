@@ -53,6 +53,7 @@ const FLOW: Flow = {
   },
   default_stop_loss_percent: '5',
   default_take_profit_percent: null,
+  minimum_confidence: null,
   allocated_capital: '300',
   bring_to_minimum: false,
   system_prompt: '{instructions} su {assets}',
@@ -82,6 +83,7 @@ describe('creationRequestOf', () => {
       max_value_exposure_percent: null,
       default_stop_loss_percent: null,
       default_take_profit_percent: '10',
+      minimum_confidence: null,
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: null,
@@ -121,6 +123,7 @@ describe('formValuesOf', () => {
       max_value_exposure_percent: '',
       default_stop_loss_percent: '5',
       default_take_profit_percent: '',
+      minimum_confidence: '',
       allocated_capital: '300',
       bring_to_minimum: false,
       system_prompt: '',
@@ -215,6 +218,21 @@ describe('changesOf', () => {
     });
     expect(changesOf(withTakeProfit, emptied)).toEqual({
       settings: { default_take_profit_percent: null },
+    });
+  });
+
+  // R3.1.4: the minimum confidence is optional, so an emptied one is removed with a null.
+  it('sends the minimum confidence the user set, and null for one the user emptied', () => {
+    const withMinimum: Flow = { ...FLOW, minimum_confidence: 60 };
+
+    expect(formValuesOf(withMinimum).minimum_confidence).toBe('60');
+    expect(changesOf(FLOW, { ...formValuesOf(FLOW), minimum_confidence: ' 75 ' })).toEqual({
+      settings: { minimum_confidence: 75 },
+    });
+    expect(
+      changesOf(withMinimum, { ...formValuesOf(withMinimum), minimum_confidence: '' }),
+    ).toEqual({
+      settings: { minimum_confidence: null },
     });
   });
 

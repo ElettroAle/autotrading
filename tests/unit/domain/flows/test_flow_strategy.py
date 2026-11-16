@@ -9,6 +9,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -28,6 +29,7 @@ def a_strategy() -> FlowStrategy:
         bring_to_minimum=True,
         system_prompt="{instructions} su {assets}",
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
+        minimum_confidence=MinimumConfidence(55),
     )
 
 
@@ -40,6 +42,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         bring_to_minimum=True,
         system_prompt="{instructions}",
         protection_defaults=ProtectionDefaults(Decimal(2), None),
+        minimum_confidence=MinimumConfidence(70),
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -53,12 +56,17 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         bring_to_minimum=True,
         system_prompt="{instructions}",
         protection_defaults=ProtectionDefaults(Decimal(2), None),
+        minimum_confidence=MinimumConfidence(70),
     )
 
 
 def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
     strategy = replace(
-        a_strategy(), bring_to_minimum=False, system_prompt=None, protection_defaults=ProtectionDefaults()
+        a_strategy(),
+        bring_to_minimum=False,
+        system_prompt=None,
+        protection_defaults=ProtectionDefaults(),
+        minimum_confidence=None,
     )
 
     assert (

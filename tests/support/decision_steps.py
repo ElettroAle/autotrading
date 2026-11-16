@@ -41,12 +41,13 @@ def opening(asset: str, quota: object = 0.1, leverage: object = 3, reasoning: st
         "obiettivo": None,
         "stop": None,
         "invalidazione": None,
+        "confidenza": 70,
         "ragionamento": reasoning,
     }
 
 
 def decision(asset: str, action: str, reasoning: str = "motivo") -> dict[str, object]:
-    return {"asset": asset, "azione": action, "ragionamento": reasoning}
+    return {"asset": asset, "azione": action, "confidenza": 70, "ragionamento": reasoning}
 
 
 def recorded_decisions(flow_cycles: FlowCycles, flow: str = "alfa") -> dict[str, object]:

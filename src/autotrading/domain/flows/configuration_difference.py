@@ -11,6 +11,8 @@ NONE = "nessuno"
 DEFAULT = "predefinito"
 DEFAULT_STOP_LOSS = "stop loss predefinito"
 DEFAULT_TAKE_PROFIT = "take profit predefinito"
+MINIMUM_CONFIDENCE = "confidenza minima"
+NO_MINIMUM_CONFIDENCE = "nessuna"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,4 +68,8 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     ),
     (DEFAULT_STOP_LOSS, lambda configuration: _percent(configuration.protection_defaults.stop_loss_percent)),
     (DEFAULT_TAKE_PROFIT, lambda configuration: _percent(configuration.protection_defaults.take_profit_percent)),
+    (
+        MINIMUM_CONFIDENCE,
+        lambda configuration: str(configuration.minimum_confidence or NO_MINIMUM_CONFIDENCE),
+    ),
 )

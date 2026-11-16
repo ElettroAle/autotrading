@@ -4273,6 +4273,17 @@
               }
             ],
             "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -4290,7 +4301,8 @@
           "system_prompt_is_default",
           "system_prompt_placeholders",
           "default_stop_loss_percent",
-          "default_take_profit_percent"
+          "default_take_profit_percent",
+          "minimum_confidence"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -4875,6 +4887,17 @@
               }
             ],
             "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5115,6 +5138,17 @@
               }
             ],
             "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5542,6 +5576,17 @@
               }
             ],
             "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -5563,7 +5608,8 @@
           "system_prompt_is_default",
           "system_prompt_placeholders",
           "default_stop_loss_percent",
-          "default_take_profit_percent"
+          "default_take_profit_percent",
+          "minimum_confidence"
         ],
         "title": "FlowResponse",
         "description": "A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."
@@ -7355,6 +7401,17 @@
               }
             ],
             "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",
@@ -7436,6 +7493,17 @@
               }
             ],
             "title": "Default Take Profit Percent"
+          },
+          "minimum_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Confidence"
           }
         },
         "type": "object",

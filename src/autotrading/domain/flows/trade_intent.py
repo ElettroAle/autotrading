@@ -7,21 +7,28 @@ from autotrading.domain.flows.trade_side import TradeSide
 
 @dataclass(frozen=True, slots=True)
 class OpenIntent:
-    """What the agent wants to open on an asset: the share of the allocated capital as margin, the leverage and how it
-    means to leave the position (R3.1.1).
+    """What the agent wants to open on an asset: the share of the allocated capital as margin, the leverage, how
+    convinced of it the agent is (R3.1.4) and how it means to leave the position (R3.1.1).
     """
 
     asset: str
     side: TradeSide
     margin_fraction: Decimal
     leverage: int
+    confidence: int
     exit_plan: ExitPlan = field(default_factory=ExitPlan)
 
     @classmethod
-    def of(
-        cls, asset: str, side: str, margin_fraction: Decimal, leverage: int, exit_plan: ExitPlan | None = None
+    def of(  # noqa: PLR0913, PLR0917 - one argument per field the agent gives
+        cls,
+        asset: str,
+        side: str,
+        margin_fraction: Decimal,
+        leverage: int,
+        confidence: int,
+        exit_plan: ExitPlan | None = None,
     ) -> OpenIntent:
-        return cls(asset, TradeSide(side), margin_fraction, leverage, exit_plan or ExitPlan())
+        return cls(asset, TradeSide(side), margin_fraction, leverage, confidence, exit_plan or ExitPlan())
 
 
 @dataclass(frozen=True, slots=True)

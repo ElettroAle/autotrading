@@ -4,6 +4,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.trade_side import TradeSide
 
 
@@ -108,6 +109,10 @@ class BlockedDecision:
     @classmethod
     def without_position(cls, asset: str) -> BlockedDecision:
         return cls(asset, f"nessuna posizione aperta su {asset}")
+
+    @classmethod
+    def below_minimum_confidence(cls, asset: str, confidence: int, minimum: MinimumConfidence) -> BlockedDecision:
+        return cls(asset, f"apertura {asset} non eseguita: confidenza {confidence} sotto la minima {minimum}")
 
 
 @dataclass(frozen=True, slots=True)

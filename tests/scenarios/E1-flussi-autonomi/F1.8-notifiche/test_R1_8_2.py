@@ -68,6 +68,7 @@ def opening(asset: str, leverage: int = 3) -> dict[str, object]:
         "obiettivo": None,
         "stop": None,
         "invalidazione": None,
+        "confidenza": 70,
         "ragionamento": "r",
     }
 
@@ -135,7 +136,7 @@ def flow_closes(flow_cycles: FlowCycles, flow: str, asset: str, pnl: str) -> Non
     exchange = flow_cycles.platform.order_exchange
     exchange.hold(access_of(flow_cycles, flow), HeldPosition(asset, Direction.LONG, Decimal("0.0015"), 3, Decimal(100)))
     exchange.realized_on_close = Decimal(pnl.replace(",", "."))
-    answer(flow_cycles, {"asset": asset, "azione": "chiudi", "ragionamento": "r"})
+    answer(flow_cycles, {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "r"})
     flow_cycles.run(flow)
 
 
@@ -148,7 +149,7 @@ def position_closes_for(flow_cycles: FlowCycles, asset: str, flow: str, reason: 
     user_id = platform.user_id_of(owner)
     use_cases = platform.use_cases_of(owner)
     if reason == "decisione dell'agente":
-        answer(flow_cycles, {"asset": asset, "azione": "chiudi", "ragionamento": "r"})
+        answer(flow_cycles, {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "r"})
         # The opening took the cycle due now: the closing comes with the next one.
         flow_cycles.clock.current += CYCLE
         flow_cycles.run(flow)

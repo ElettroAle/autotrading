@@ -38,6 +38,7 @@ def test_every_field_of_a_decision_is_required_and_no_other_is_allowed() -> None
         "stop",
         "invalidazione",
         "togli_obiettivo",
+        "confidenza",
         "ragionamento",
     ]
     assert entry["additionalProperties"] is False
@@ -56,6 +57,12 @@ def test_the_fields_only_an_opening_needs_may_be_null() -> None:
     assert properties["asset"] == properties["ragionamento"] == {"type": "string"}
 
 
+def test_the_confidence_is_an_integer_from_0_to_100_in_every_decision() -> None:
+    properties = json.loads(json.dumps(decision_schema()))["properties"]
+
+    assert properties["confidenza"] == {"type": "integer", "minimum": 0, "maximum": 100}
+
+
 def test_an_answer_in_the_format_reads_as_conforming_decisions() -> None:
     answer = {
         "decisioni": [
@@ -68,6 +75,7 @@ def test_an_answer_in_the_format_reads_as_conforming_decisions() -> None:
                 "obiettivo": 70000,
                 "stop": 60000,
                 "invalidazione": "chiusura sotto 61000",
+                "confidenza": 75,
                 "ragionamento": "rottura",
             },
             {
@@ -79,6 +87,7 @@ def test_an_answer_in_the_format_reads_as_conforming_decisions() -> None:
                 "obiettivo": None,
                 "stop": None,
                 "invalidazione": None,
+                "confidenza": 40,
                 "ragionamento": "x",
             },
         ]
@@ -101,6 +110,7 @@ def test_an_update_in_the_format_reads_as_a_change_of_the_plan() -> None:
         "stop": 62000,
         "invalidazione": None,
         "togli_obiettivo": True,
+        "confidenza": 80,
         "ragionamento": "proteggo il guadagno",
     }
 

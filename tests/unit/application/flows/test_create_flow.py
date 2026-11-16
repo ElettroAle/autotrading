@@ -24,6 +24,7 @@ from autotrading.domain.flows.errors import (
 )
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_account import FakeFlowAccountAdapter
@@ -116,6 +117,16 @@ def test_the_protection_defaults_given_are_saved(flows: Flows) -> None:
     flow = flows.create.execute(command)
 
     assert flow.configuration.protection_defaults == ProtectionDefaults(Decimal("2.5"), Decimal(8))
+
+
+def test_a_flow_created_without_a_minimum_confidence_has_none(flows: Flows) -> None:
+    assert flows.create.execute(flows.command()).configuration.minimum_confidence is None
+
+
+def test_the_minimum_confidence_given_is_saved(flows: Flows) -> None:
+    flow = flows.create.execute(flows.command(minimum_confidence=60))
+
+    assert flow.configuration.minimum_confidence == MinimumConfidence(60)
 
 
 def test_the_creation_is_logged_with_the_flow_and_nothing_of_its_configuration(

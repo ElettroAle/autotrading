@@ -16,6 +16,7 @@ from autotrading.domain.flows.errors import (
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -155,6 +156,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         bring_to_minimum=True,
         system_prompt="{instructions}",
         protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
+        minimum_confidence=MinimumConfidence(60),
     )
 
     assert differences(before, after) == (
@@ -172,6 +174,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("system prompt", "predefinito", "{instructions}"),
         ConfigurationDifference("stop loss predefinito", "5%", "2,5%"),
         ConfigurationDifference("take profit predefinito", "nessuno", "10%"),
+        ConfigurationDifference("confidenza minima", "nessuna", "60"),
     )
 
 

@@ -18,7 +18,7 @@ from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenI
 
 class ReviewCycleRiskUseCase:
     """The decisions of the agent through the risk check of the flow, on the exchange of its account
-    (R1.5.1-R1.5.4).
+    (R1.5.1-R1.5.4), with the minimum confidence of the flow for the openings (R3.1.4).
     """
 
     def __init__(self, check_risk: CheckRiskUseCase) -> None:
@@ -45,11 +45,11 @@ class ReviewCycleRiskUseCase:
         return RiskReview(orders, tuple(outcomes))
 
 
-def _open_intent(
-    asset: str, side: str, margin_fraction: Decimal, leverage: int, exit_plan: DecisionExitPlanPort
+def _open_intent(  # noqa: PLR0913, PLR0917 - the fields of the opening the agent gives
+    asset: str, side: str, margin_fraction: Decimal, leverage: int, exit_plan: DecisionExitPlanPort, confidence: int
 ) -> OpenIntent:
     plan = ExitPlan(exit_plan.target, exit_plan.stop, exit_plan.invalidation)
-    return OpenIntent.of(asset, side, margin_fraction, leverage, plan)
+    return OpenIntent.of(asset, side, margin_fraction, leverage, confidence, plan)
 
 
 def _update_intent(asset: str, change: DecisionPlanChangePort) -> UpdateIntent:

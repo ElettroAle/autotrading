@@ -63,7 +63,14 @@ const NO_EXIT_PLAN: FakeExitPlan = { target: null, stop: null, invalidation: nul
 export const reasoningOf = (asset: string) =>
   `RSI di ${asset} in risalita da 28 e previsione a un'ora sopra il prezzo: apro long con margine contenuto.`;
 
-const documentsOf = (asset: string, exitPlan: FakeExitPlan): FakeStepDocument[] => [
+// How convinced of its decision the agent is, from 0 to 100, as the journal records it (R3.1.4).
+const CONFIDENCE = 75;
+
+const documentsOf = (
+  asset: string,
+  exitPlan: FakeExitPlan,
+  confidence: number,
+): FakeStepDocument[] => [
   {
     step: STEPS.readFlowState,
     content: {
@@ -110,6 +117,7 @@ const documentsOf = (asset: string, exitPlan: FakeExitPlan): FakeStepDocument[] 
           asset,
           action: 'apri',
           reasoning: reasoningOf(asset),
+          confidence,
           opening: {
             tipo: 'TradeOpening',
             direction: 'long',
@@ -148,11 +156,15 @@ const documentsOf = (asset: string, exitPlan: FakeExitPlan): FakeStepDocument[] 
   { step: STEPS.updateFlowState, content: { stato: STATE } },
 ];
 
-/** A cycle that ran every step and opened a long position on the asset, with the exit plan the agent gave. */
+/**
+ * A cycle that ran every step and opened a long position on the asset, with the exit plan and the confidence the agent
+ * gave.
+ */
 export const aCompletedCycle = (
   plannedAt: Date,
   asset = 'BTC',
   exitPlan: FakeExitPlan = NO_EXIT_PLAN,
+  confidence = CONFIDENCE,
 ): FakeCycle => ({
   planned_at: apiInstant(plannedAt),
   started_at: apiInstant(new Date(plannedAt.getTime() + 2000)),
@@ -161,7 +173,7 @@ export const aCompletedCycle = (
   failure: null,
   steps: [...STEP_ORDER],
   absent_sources: [],
-  documents: documentsOf(asset, exitPlan),
+  documents: documentsOf(asset, exitPlan, confidence),
   cost: { input_tokens: 1200, output_tokens: 300, cost_usd: '0.0125' },
 });
 

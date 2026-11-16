@@ -70,6 +70,7 @@ class PlanUpdates:
             "stop": None,
             "invalidazione": None,
             "togli_obiettivo": False,
+            "confidenza": 70,
             "ragionamento": "proteggo il guadagno",
         }
         self.decide(flow, {**decision, **plan})
@@ -138,6 +139,7 @@ def protected_position(  # noqa: PLR0917 - one argument per value of the step
         "stop": int(number(stop)),
         "invalidazione": None,
         "togli_obiettivo": False,
+        "confidenza": 70,
         "ragionamento": "rottura della resistenza",
     }
     updates.decide(flow, opening, "10:00")

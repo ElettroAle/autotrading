@@ -50,6 +50,7 @@ export type FakeConfiguration = {
   readonly systemPrompt: string | null;
   readonly defaultStopLossPercent: string;
   readonly defaultTakeProfitPercent: string | null;
+  readonly minimumConfidence: number | null;
 };
 
 export type FakeVersion = {
@@ -88,6 +89,8 @@ export type FakeFlow = {
   /** The stop loss and take profit defaults of the flow, in percent of the entry price (R3.1.2). */
   defaultStopLossPercent: string;
   defaultTakeProfitPercent: string | null;
+  /** The confidence an opening needs at least, from 0 to 100; null for none (R3.1.4). */
+  minimumConfidence: number | null;
   bringToMinimum: boolean;
   /** The system prompt the user wrote; null follows the default of the platform (R1.4.8). */
   systemPrompt: string | null;
@@ -137,6 +140,7 @@ export type FakeFlowConfiguration = {
   };
   default_stop_loss_percent: string;
   default_take_profit_percent: string | null;
+  minimum_confidence: number | null;
   allocated_capital: string | null;
   bring_to_minimum: boolean;
   system_prompt: string;
@@ -160,6 +164,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   },
   default_stop_loss_percent: flow.defaultStopLossPercent,
   default_take_profit_percent: flow.defaultTakeProfitPercent,
+  minimum_confidence: flow.minimumConfidence,
   allocated_capital: flow.allocatedCapital === null ? null : String(flow.allocatedCapital),
   bring_to_minimum: flow.bringToMinimum,
   system_prompt: flow.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
@@ -308,6 +313,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   systemPrompt: null,
   defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
   defaultTakeProfitPercent: null,
+  minimumConfidence: null,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -399,6 +405,7 @@ const draftOf = (
   riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
   defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
   defaultTakeProfitPercent: null,
+  minimumConfidence: null,
   bringToMinimum: strategy.bringToMinimum ?? false,
   systemPrompt: null,
   cycles: 0,
@@ -558,6 +565,7 @@ export const fakePlatform = {
       riskLimits: DEFAULT_RISK_LIMITS,
       defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
       defaultTakeProfitPercent: null,
+      minimumConfidence: null,
       bringToMinimum: false,
       systemPrompt: null,
       cycles: 0,

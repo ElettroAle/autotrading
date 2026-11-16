@@ -19,6 +19,8 @@ ASSET, ACTION, DIRECTION, MARGIN_FRACTION, LEVERAGE, REASONING = (
 )
 TARGET, STOP, INVALIDATION = "obiettivo", "stop", "invalidazione"
 REMOVE_TARGET = "togli_obiettivo"
+CONFIDENCE = "confidenza"
+LOWEST_CONFIDENCE, HIGHEST_CONFIDENCE = 0, 100
 UNREADABLE = "risposta non leggibile"
 FENCE = "```"
 LOWEST_LEVERAGE = 1
@@ -94,11 +96,12 @@ def _decision_of(entry: object, asset: str, flow_assets: tuple[str, ...]) -> Dec
         raise DecisionNotConformingError.foreign(asset)
     action = _action_of(entry)
     reasoning = _text_of(entry, REASONING)
+    confidence = _confidence_of(entry)
     if action is TradeAction.OPEN:
-        return Decision(asset, action, reasoning, _opening_of(entry))
+        return Decision(asset, action, reasoning, confidence, _opening_of(entry))
     if action is TradeAction.UPDATE:
-        return Decision(asset, action, reasoning, plan_change=_plan_change_of(entry))
-    return Decision(asset, action, reasoning)
+        return Decision(asset, action, reasoning, confidence, plan_change=_plan_change_of(entry))
+    return Decision(asset, action, reasoning, confidence)
 
 
 def _action_of(entry: Mapping[str, object]) -> TradeAction:
@@ -133,6 +136,16 @@ def _leverage_of(entry: Mapping[str, object]) -> int:
         raise DecisionNotConformingError.type(LEVERAGE)
     if value < LOWEST_LEVERAGE:
         raise DecisionNotConformingError.range(LEVERAGE)
+    return value
+
+
+def _confidence_of(entry: Mapping[str, object]) -> int:
+    """Every decision says how convinced of it the agent is, as a whole number (R3.1.4)."""
+    value = _present(entry, CONFIDENCE)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DecisionNotConformingError.type(CONFIDENCE)
+    if not LOWEST_CONFIDENCE <= value <= HIGHEST_CONFIDENCE:
+        raise DecisionNotConformingError.range(CONFIDENCE)
     return value
 
 

@@ -5,6 +5,7 @@ export type ConfigurationRow = { readonly part: string; readonly value: string }
 type Source = Configuration['sources'][number];
 
 const NONE = 'nessuno';
+const NO_MINIMUM_CONFIDENCE = 'nessuna';
 const DEFAULT = 'predefinito';
 
 const sortedEntries = (parameters: Record<string, string | number>): string[] =>
@@ -48,6 +49,10 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
     {
       part: 'take profit predefinito',
       value: percentText(configuration.default_take_profit_percent),
+    },
+    {
+      part: 'confidenza minima',
+      value: String(configuration.minimum_confidence ?? NO_MINIMUM_CONFIDENCE),
     },
     { part: 'capitale allocato', value: configuration.allocated_capital ?? NONE },
     { part: 'porta al minimo', value: configuration.bring_to_minimum ? 'sì' : 'no' },

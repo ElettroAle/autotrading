@@ -49,6 +49,7 @@ type ConfigurationRequest = {
   max_value_exposure_percent?: unknown;
   default_stop_loss_percent?: unknown;
   default_take_profit_percent?: unknown;
+  minimum_confidence?: unknown;
   allocated_capital?: unknown;
   bring_to_minimum?: unknown;
   system_prompt?: unknown;
@@ -78,6 +79,18 @@ const numberOf = (value: unknown, field: string): number => {
 
 const optionalTextOf = (value: unknown): string | null =>
   value === undefined || value === null ? null : String(value);
+
+// The range of the minimum confidence, as the API checks it (R3.1.4).
+const minimumConfidenceOf = (requested: unknown): number | null => {
+  if (requested === undefined || requested === null) {
+    return null;
+  }
+  const minimum = numberOf(requested, 'minimum_confidence');
+  if (minimum < 0 || minimum > 100) {
+    throw new Refusal(422, 'la confidenza minima va da 0 a 100', 'minimum_confidence');
+  }
+  return minimum;
+};
 
 const assetsOf = (requested: unknown): string[] => {
   const names = Array.isArray(requested) ? requested.map(textOf) : [];
@@ -254,6 +267,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       systemPrompt: flow.systemPrompt,
       defaultStopLossPercent: flow.defaultStopLossPercent,
       defaultTakeProfitPercent: flow.defaultTakeProfitPercent,
+      minimumConfidence: flow.minimumConfidence,
     },
   });
   return flow;
@@ -306,6 +320,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     systemPrompt: typeof request.system_prompt === 'string' ? request.system_prompt : null,
     defaultStopLossPercent: optionalTextOf(request.default_stop_loss_percent) ?? '5',
     defaultTakeProfitPercent: optionalTextOf(request.default_take_profit_percent),
+    minimumConfidence: minimumConfidenceOf(request.minimum_confidence),
     currentCapital: capital,
   });
 };
@@ -360,6 +375,11 @@ export const modifyFlow = (
       request.default_take_profit_percent === undefined
         ? flow.defaultTakeProfitPercent
         : optionalTextOf(request.default_take_profit_percent),
+    // A null minimum confidence sent on purpose removes it; a missing one keeps the one in force (R3.1.4).
+    minimumConfidence:
+      request.minimum_confidence === undefined
+        ? flow.minimumConfidence
+        : minimumConfidenceOf(request.minimum_confidence),
     bringToMinimum: changed(
       request.bring_to_minimum,
       flow.bringToMinimum,

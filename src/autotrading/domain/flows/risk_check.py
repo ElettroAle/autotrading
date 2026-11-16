@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from autotrading.domain.flows.exit_plan import DiscardedLevel
+from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_limits import HUNDRED, RiskLimits
 from autotrading.domain.flows.risk_outcome import (
     Adjustment,
@@ -21,10 +22,13 @@ from autotrading.domain.italian_text import money_text, number_text
 
 @dataclass(frozen=True, slots=True)
 class RiskPolicy:
-    """The risk limits of the flow and the option to bring an opening up to the exchange minimum (R1.5.4)."""
+    """The risk limits of the flow, the option to bring an opening up to the exchange minimum (R1.5.4) and the
+    confidence an opening needs at least, if the flow has one (R3.1.4).
+    """
 
     limits: RiskLimits
     bring_to_minimum: bool = False
+    minimum_confidence: MinimumConfidence | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +87,8 @@ class _Sizing:
 class RiskCheck:
     """Leverage, then exposure, then coherence with the state, then the exchange minimum (R1.5.1-R1.5.4).
 
-    An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
+    An opening the agent is less convinced of than the minimum confidence of the flow is blocked before any of them
+    (R3.1.4). An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
     The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
     so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065).
     """
@@ -123,6 +128,9 @@ class RiskCheck:
         return ApprovedUpdate(intent.asset, change, _exit_plan_notes(discarded))
 
     def _open(self, intent: OpenIntent, limits: AssetLimits) -> RiskOutcome:
+        minimum = self._policy.minimum_confidence
+        if minimum is not None and not minimum.admits(intent.confidence):
+            return BlockedDecision.below_minimum_confidence(intent.asset, intent.confidence, minimum)
         sizing = self._within_exposure(self._within_leverage(intent, limits))
         if intent.asset in self._state.open_assets:
             return BlockedDecision(intent.asset, f"posizione già aperta su {intent.asset}")

@@ -86,6 +86,13 @@ def test_the_default_asks_how_to_update_the_plan_of_an_open_position() -> None:
     )
 
 
+def test_the_default_asks_the_confidence_of_every_decision() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert '"confidenza": <intero da 0 a 100, quanto sei convinto della decisione>' in rendered
+    assert "il ragionamento e la confidenza servono sempre." in rendered
+
+
 def test_a_template_with_known_placeholders_and_doubled_braces_is_accepted() -> None:
     template = '{instructions} {{"leva": {max_leverage}}} {assets!r:>10}'
 

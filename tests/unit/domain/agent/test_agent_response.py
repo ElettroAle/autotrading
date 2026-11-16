@@ -24,6 +24,7 @@ def opening(asset: str = "BTC", **fields: object) -> dict[str, object]:
         "obiettivo": None,
         "stop": None,
         "invalidazione": None,
+        "confidenza": 75,
         "ragionamento": "rottura della resistenza",
     }
     decision.update(fields)
@@ -41,6 +42,7 @@ def update(asset: str = "BTC", **fields: object) -> dict[str, object]:
         "stop": None,
         "invalidazione": None,
         "togli_obiettivo": False,
+        "confidenza": 80,
         "ragionamento": "proteggo il guadagno",
     }
     decision.update(fields)
@@ -59,8 +61,8 @@ def test_one_decision_for_each_asset() -> None:
     response = read(
         answer(
             opening(),
-            {"asset": "ETH", "azione": "chiudi", "ragionamento": "obiettivo raggiunto"},
-            {"asset": "SOL", "azione": "mantieni", "ragionamento": "mercato laterale"},
+            {"asset": "ETH", "azione": "chiudi", "confidenza": 60, "ragionamento": "obiettivo raggiunto"},
+            {"asset": "SOL", "azione": "mantieni", "confidenza": 50, "ragionamento": "mercato laterale"},
         )
     )
 
@@ -79,6 +81,7 @@ def test_an_opening_keeps_its_fields_and_reasoning() -> None:
         "BTC",
         TradeAction.OPEN,
         "rottura della resistenza",
+        75,
         TradeOpening(TradeDirection.SHORT, Decimal("0.1"), 3),
     )
 
@@ -87,7 +90,7 @@ def test_an_opening_keeps_its_fields_and_reasoning() -> None:
 def test_hold_and_close_ignore_the_operational_fields(action: str) -> None:
     response = read(answer(opening("SOL", azione=action, leva=10, quota="tanta", ragionamento="mercato laterale")))
 
-    assert response.decisions == (Decision("SOL", TradeAction(action), "mercato laterale"),)
+    assert response.decisions == (Decision("SOL", TradeAction(action), "mercato laterale", 75),)
 
 
 def test_an_opening_keeps_its_exit_plan() -> None:
@@ -116,7 +119,7 @@ def test_a_blank_invalidation_is_no_invalidation() -> None:
 def test_hold_and_close_ignore_the_exit_plan() -> None:
     response = read(answer(opening("SOL", azione="mantieni", obiettivo="alto", stop=-3, invalidazione=1)))
 
-    assert response.decisions == (Decision("SOL", TradeAction.HOLD, "rottura della resistenza"),)
+    assert response.decisions == (Decision("SOL", TradeAction.HOLD, "rottura della resistenza", 75),)
 
 
 def test_the_asset_is_read_in_upper_case_and_the_texts_without_spaces() -> None:
@@ -165,6 +168,14 @@ def test_only_the_non_conforming_decisions_are_discarded() -> None:
         ({"obiettivo": ...}, "campo obbligatorio mancante: obiettivo"),
         ({"stop": ...}, "campo obbligatorio mancante: stop"),
         ({"invalidazione": ...}, "campo obbligatorio mancante: invalidazione"),
+        # The confidence is an integer from 0 to 100 in every decision (R3.1.4).
+        ({"confidenza": ...}, "campo obbligatorio mancante: confidenza"),
+        ({"confidenza": None}, "campo obbligatorio mancante: confidenza"),
+        ({"confidenza": -1}, "valore fuori dall'intervallo: confidenza"),
+        ({"confidenza": 101}, "valore fuori dall'intervallo: confidenza"),
+        ({"confidenza": 75.5}, "valore di tipo non ammesso: confidenza"),
+        ({"confidenza": "75"}, "valore di tipo non ammesso: confidenza"),
+        ({"confidenza": True}, "valore di tipo non ammesso: confidenza"),
     ],
 )
 def test_the_reasons_of_non_conformity(fields: dict[str, object], reason: str) -> None:
@@ -255,6 +266,7 @@ def test_an_update_carries_the_change_of_the_plan() -> None:
         "BTC",
         TradeAction.UPDATE,
         "proteggo il guadagno",
+        80,
         plan_change=ExitPlanChange(Decimal(68000), Decimal("62000.5"), "chiusura sotto 61000"),
     )
 
@@ -293,3 +305,15 @@ def test_an_update_ignores_the_fields_of_an_opening() -> None:
 )
 def test_the_reasons_of_non_conformity_of_an_update(fields: dict[str, object], reason: str) -> None:
     assert reasons(read(answer(update("BTC", **fields)))) == {"BTC": reason}
+
+
+@pytest.mark.parametrize("confidence", [0, 60, 100])
+def test_a_decision_keeps_its_confidence_from_0_to_100(confidence: int) -> None:
+    assert read(answer(opening(confidenza=confidence))).decisions[0].confidence == confidence
+
+
+@pytest.mark.parametrize("action", ["mantieni", "chiudi", "aggiorna"])
+def test_every_action_needs_its_confidence(action: str) -> None:
+    response = read(answer(update("BTC", azione=action, confidenza=...)))
+
+    assert reasons(response) == {"BTC": "campo obbligatorio mancante: confidenza"}
