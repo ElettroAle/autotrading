@@ -249,6 +249,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       instructions: flow.instructions,
       maxLeverage: flow.riskLimits.maxLeverage,
       allocatedCapital: String(flow.allocatedCapital ?? 0),
+      systemPrompt: flow.systemPrompt,
     },
   });
   return flow;

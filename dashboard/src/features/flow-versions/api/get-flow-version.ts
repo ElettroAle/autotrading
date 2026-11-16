@@ -24,6 +24,8 @@ const configurationSchema = z.object({
   }),
   allocated_capital: z.string().nullable(),
   bring_to_minimum: z.boolean(),
+  system_prompt: z.string(),
+  system_prompt_is_default: z.boolean(),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;
