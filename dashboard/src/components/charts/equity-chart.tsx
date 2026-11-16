@@ -7,6 +7,7 @@ import {
   DefaultZIndexes,
   ReferenceArea,
   ReferenceLine,
+  ResponsiveContainer,
   Tooltip,
   useXAxisScale,
   useYAxisScale,
@@ -44,8 +45,15 @@ type EquityDatum = EquityPoint & { readonly time: number };
 export const ABOVE_COLOR = '#16a34a';
 export const BELOW_COLOR = '#dc2626';
 const SELECTION_COLOR = '#2563eb';
-const WIDTH = 720;
+// The width the chart starts from until the browser measures its room (ADR equity-curve-larga-come-lo-schermo).
+const INITIAL_WIDTH = 720;
 const HEIGHT = 320;
+const DOT_RADIUS = 4;
+export const MIN_DOT_RADIUS = 1.5;
+// A point keeps a quarter of the room each cycle has on the axis, between the least and the full size.
+const ROOM_PER_RADIUS = 4;
+// The dates of the axis keep this much room between them, so the main dates show on any width.
+const TICK_GAP = 32;
 const MARK_SIZE = 6;
 // A finger needs more than the cross to hit it (ADR viste-e-comandi-della-pagina-del-flusso).
 const MARK_TOUCH_RADIUS = 12;
@@ -72,6 +80,12 @@ export const tooltipValue = (value: unknown): [string, string] => [
 ];
 
 const isAbove = (equity: number, baseline: number): boolean => equity >= baseline;
+
+/** The radius of the points of a curve this wide: smaller as they crowd, never below the least size. */
+export const dotRadius = (points: number, width: number): number => {
+  const room = width / Math.max(points, 1);
+  return Math.min(DOT_RADIUS, Math.max(MIN_DOT_RADIUS, room / ROOM_PER_RADIUS));
+};
 
 /**
  * Where, from the top of the chart, the colour turns from green to red: the initial capital between the highest and
@@ -128,14 +142,20 @@ export const chosenRange = (selection: Selection): [number, number] | undefined 
 const pointAt = (state: MouseHandlerDataParam): number | undefined =>
   typeof state.activeLabel === 'number' ? state.activeLabel : undefined;
 
-const EquityDot = ({ cx, cy, payload, baseline }: DotItemDotProps & { baseline: number }) => {
+const EquityDot = ({
+  cx,
+  cy,
+  payload,
+  baseline,
+  radius,
+}: DotItemDotProps & { baseline: number; radius: number }) => {
   const point = payload as EquityPoint;
   const above = isAbove(point.equity, baseline);
   return (
     <circle
       cx={cx}
       cy={cy}
-      r={4}
+      r={radius}
       fill={above ? ABOVE_COLOR : BELOW_COLOR}
       // A point only shows: the marks of the events above it take the pointer.
       pointerEvents="none"
@@ -195,11 +215,15 @@ const domainOf = (
 /**
  * The equity curve of a flow, a point for each cycle on an axis of time, green above the initial capital and red below
  * (ADR 0121), with the events of the page as red crosses (ADR cicli-falliti-sull-equity-curve). A drag from a point to
- * another, with the mouse or a finger, chooses an interval (ADR intervallo-trascinando-sull-equity-curve).
+ * another, with the mouse or a finger, chooses an interval (ADR intervallo-trascinando-sull-equity-curve). The chart is
+ * as wide as its room, never wider, with fewer dates and smaller points as they crowd (ADR
+ * equity-curve-larga-come-lo-schermo).
  */
 export const EquityChart = ({ points, baseline, events = [], onSelect }: EquityChartProps) => {
   const id = `equity-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [selection, setSelection] = useState<Selection>({});
+  const [width, setWidth] = useState(INITIAL_WIDTH);
+  const radius = dotRadius(points.length, width);
   // The release reads the drag as the last move left it, not as the last render saw it.
   const latest = useRef<Selection>({});
   const select = (next: Selection) => {
@@ -242,47 +266,55 @@ export const EquityChart = ({ points, baseline, events = [], onSelect }: EquityC
           onTouchEnd: end,
         };
   const range = chosenRange(selection);
-  // A horizontal drag on the chart chooses an interval: on a touch screen it no longer scrolls sideways.
-  const touches = onSelect === undefined ? '' : ' touch-pan-y';
+  // A horizontal drag on the chart chooses an interval: on a touch screen the page scrolls only up and down.
+  const touches = onSelect === undefined ? undefined : 'touch-pan-y';
   return (
-    <figure aria-label="Equity curve" className={`overflow-x-auto${touches}`}>
-      <AreaChart width={WIDTH} height={HEIGHT} data={data} accessibilityLayer {...selecting}>
-        <defs>
-          {colours('fill')}
-          {colours('stroke')}
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          dataKey="time"
-          type="number"
-          scale="time"
-          domain={domainOf(data, events)}
-          tickFormatter={(time: number) => dayFormat.format(new Date(time))}
-        />
-        <YAxis domain={['auto', 'auto']} tickFormatter={amountText} width={72} />
-        <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValue} />
-        <ReferenceLine
-          y={baseline}
-          stroke="#475569"
-          strokeDasharray="4 4"
-          label={`Capitale iniziale ${amountText(baseline)}`}
-        />
-        <Area
-          type="linear"
-          dataKey="equity"
-          baseValue={baseline}
-          stroke={`url(#${id}-stroke)`}
-          fill={`url(#${id}-fill)`}
-          dot={(props: DotItemDotProps) => (
-            <EquityDot key={props.index} {...props} baseline={baseline} />
+    <figure aria-label="Equity curve" className={touches}>
+      <ResponsiveContainer
+        width="100%"
+        height={HEIGHT}
+        initialDimension={{ width: INITIAL_WIDTH, height: HEIGHT }}
+        onResize={setWidth}
+      >
+        <AreaChart data={data} accessibilityLayer {...selecting}>
+          <defs>
+            {colours('fill')}
+            {colours('stroke')}
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="time"
+            type="number"
+            scale="time"
+            domain={domainOf(data, events)}
+            minTickGap={TICK_GAP}
+            tickFormatter={(time: number) => dayFormat.format(new Date(time))}
+          />
+          <YAxis domain={['auto', 'auto']} tickFormatter={amountText} width={72} />
+          <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValue} />
+          <ReferenceLine
+            y={baseline}
+            stroke="#475569"
+            strokeDasharray="4 4"
+            label={`Capitale iniziale ${amountText(baseline)}`}
+          />
+          <Area
+            type="linear"
+            dataKey="equity"
+            baseValue={baseline}
+            stroke={`url(#${id}-stroke)`}
+            fill={`url(#${id}-fill)`}
+            dot={(props: DotItemDotProps) => (
+              <EquityDot key={props.index} {...props} baseline={baseline} radius={radius} />
+            )}
+            isAnimationActive={false}
+          />
+          {range === undefined ? null : (
+            <ReferenceArea x1={range[0]} x2={range[1]} fill={SELECTION_COLOR} fillOpacity={0.15} />
           )}
-          isAnimationActive={false}
-        />
-        {range === undefined ? null : (
-          <ReferenceArea x1={range[0]} x2={range[1]} fill={SELECTION_COLOR} fillOpacity={0.15} />
-        )}
-        <EventMarks events={events} points={points} />
-      </AreaChart>
+          <EventMarks events={events} points={points} />
+        </AreaChart>
+      </ResponsiveContainer>
     </figure>
   );
 };

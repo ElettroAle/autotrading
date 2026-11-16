@@ -1,14 +1,16 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import {
   ABOVE_COLOR,
   BELOW_COLOR,
   chosenRange,
+  dotRadius,
   equityAt,
   EquityChart,
   selectionMoved,
   selectionStarted,
+  MIN_DOT_RADIUS,
   splitOffset,
   tooltipLabel,
   tooltipValue,
@@ -273,5 +275,89 @@ describe('the selection of an interval, ADR intervallo-trascinando-sull-equity-c
     render(<EquityChart points={POINTS} baseline={300} />);
 
     expect(screen.getByRole('figure', { name: 'Equity curve' })).not.toHaveClass('touch-pan-y');
+  });
+});
+
+// ADR equity-curve-larga-come-lo-schermo: the chart is as wide as the room it has, never wider, whatever its points; the
+// points shrink as they crowd.
+describe('the width of the chart, ADR equity-curve-larga-come-lo-schermo', () => {
+  const HOUR = 60 * 60 * 1000;
+  const MANY_POINTS = Array.from({ length: 300 }, (_, index) => ({
+    plannedAt: new Date(Date.parse('2026-10-01T00:00:00Z') + index * HOUR).toISOString(),
+    equity: 300 + (index % 7),
+  }));
+
+  // A browser measures the room of the chart, and tells it again whenever the room changes.
+  const onAScreen = (width: number) => {
+    class MeasuringObserver {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe() {
+        const entry = {
+          contentRect: DOMRect.fromRect({ width, height: 320 }),
+        } as ResizeObserverEntry;
+        this.callback([entry], this as unknown as ResizeObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', MeasuringObserver);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ width, height: 320 }),
+    );
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('follows the width of its room with many points, without scrolling sideways', async () => {
+    onAScreen(360);
+    render(<EquityChart points={MANY_POINTS} baseline={300} onSelect={() => undefined} />);
+
+    const figure = screen.getByRole('figure', { name: 'Equity curve' });
+    await waitFor(() => {
+      expect(within(figure).getByRole('application')).toHaveAttribute('width', '360');
+    });
+    expect(figure).not.toHaveClass('overflow-x-auto');
+  });
+
+  it('draws smaller points when they are many for its width', async () => {
+    onAScreen(360);
+    render(<EquityChart points={MANY_POINTS} baseline={300} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('img', { name: /^Equity / })[0]).toHaveAttribute(
+        'r',
+        String(MIN_DOT_RADIUS),
+      );
+    });
+  });
+
+  it('keeps the points at full size when they have room', async () => {
+    onAScreen(1280);
+    render(<EquityChart points={POINTS} baseline={300} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('img', { name: /^Equity / })[0]).toHaveAttribute('r', '4');
+    });
+  });
+});
+
+describe('dotRadius, ADR equity-curve-larga-come-lo-schermo', () => {
+  it('keeps the full size when the points have room', () => {
+    expect(dotRadius(3, 720)).toBe(4);
+  });
+
+  it('shrinks the points as they crowd', () => {
+    expect(dotRadius(90, 720)).toBe(2);
+  });
+
+  it('never draws a point smaller than the least size', () => {
+    expect(dotRadius(1000, 360)).toBe(MIN_DOT_RADIUS);
+  });
+
+  it('keeps the full size without points', () => {
+    expect(dotRadius(0, 720)).toBe(4);
   });
 });
