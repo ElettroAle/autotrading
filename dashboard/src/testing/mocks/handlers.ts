@@ -22,6 +22,7 @@ import {
 } from './flow-statistics';
 import { forecastAccuracyOf } from './forecast-accuracy';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
+import { lastDecisionOf } from './last-decision';
 import {
   configurationOf,
   FAKE_FLOW_COMMANDS,
@@ -516,6 +517,11 @@ export const handlers = [
           HttpResponse.json(differences(first, second)),
         ),
       ),
+    ),
+  ),
+  http.get('*/flows/:flowId/decisions/latest', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json(lastDecisionOf(fakePlatform.cyclesOf(flow.id))),
     ),
   ),
   http.get('*/flows/:flowId/cycles/:plannedAt', ({ request, params }) =>

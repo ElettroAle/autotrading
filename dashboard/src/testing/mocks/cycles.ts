@@ -194,6 +194,25 @@ export const aFailedCycle = (
   };
 };
 
+/** A decision of the agent as the journal records it: the direction only in the fields of an opening (R1.4.4). */
+export type FakeDecision = {
+  readonly asset: string;
+  readonly action: string;
+  readonly reasoning: string;
+  readonly confidence?: number;
+  readonly opening?: { readonly direction: string } | null;
+};
+
+/** The same cycle with other decisions of the agent in the document of its decision (R6.5.4). */
+export const withDecisions = (cycle: FakeCycle, decisions: FakeDecision[]): FakeCycle => ({
+  ...cycle,
+  documents: cycle.documents.map((document) =>
+    document.step === STEPS.agentDecision
+      ? { ...document, content: { ...document.content, decisioni: decisions } }
+      : document,
+  ),
+});
+
 /** The summary of the cycle in the list, as the API gives it (R1.7.3). */
 export const summaryOf = (cycle: FakeCycle) => ({
   planned_at: cycle.planned_at,
