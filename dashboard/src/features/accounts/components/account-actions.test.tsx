@@ -52,6 +52,22 @@ describe('AccountActions', () => {
     fakePlatform.addAccount('bruno', 'altrui');
   });
 
+  it('leads from each account to the history of its capital (R3.4.2)', async () => {
+    const account = fakePlatform.addAccount('anna', 'principale');
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+
+    const link = within(await accountItem('principale')).getByRole('link', {
+      name: 'Storico del capitale',
+    });
+    expect(link).toHaveAttribute('href', `/accounts/${account.id}/capital`);
+    await user.click(link);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Storico del capitale di principale' }),
+    ).toBeInTheDocument();
+  });
+
   it('replaces the credentials and confirms it, with the secret emptied', async () => {
     fakePlatform.addAccount('anna', 'principale');
     await renderApp({ account: 'anna', url: ACCOUNTS });

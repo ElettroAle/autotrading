@@ -99,6 +99,21 @@ export type FakeAccount = {
   currency: string;
 };
 
+/**
+ * A row of the history of the capital of an account, as the API answers it (R3.4.2): a change of the capital of one of
+ * its flows, or a deposit or a withdrawal of the account, which has no flow and no capital before and after.
+ */
+export type FakeCapitalChange = {
+  readonly accountId: string;
+  readonly changed_at: string;
+  readonly flow_id: string | null;
+  readonly flow: string | null;
+  readonly reason: string;
+  readonly amount: string;
+  readonly previous: string | null;
+  readonly new: string | null;
+};
+
 /** What a scenario or a test changes of a flow: its status, why it paused and its capital. */
 export type FakeFlowChanges = Partial<Omit<FakeFlow, 'id' | 'name'>>;
 
@@ -314,6 +329,7 @@ const state = {
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   cashOuts: [] as string[],
+  capitalChanges: [] as FakeCapitalChange[],
   signingIn: undefined as string | undefined,
   sessionsExpired: false,
   exchangeReachable: true,
@@ -466,6 +482,7 @@ export const fakePlatform = {
     state.openPositions.clear();
     state.closedPositions.clear();
     state.cashOuts.length = 0;
+    state.capitalChanges.length = 0;
     state.signingIn = undefined;
     state.sessionsExpired = false;
     state.exchangeReachable = true;
@@ -930,6 +947,15 @@ export const fakePlatform = {
     flow.currentCapital = kept;
     state.cashOuts.push(flow.id);
     return { flow, freed };
+  },
+
+  /** A row of the history of the capital, in any order: the fake API serves them from the most recent (R3.4.2). */
+  recordCapitalChange(change: FakeCapitalChange): void {
+    state.capitalChanges.push(change);
+  },
+
+  capitalChangesOfAccount(accountId: string): FakeCapitalChange[] {
+    return state.capitalChanges.filter((change) => change.accountId === accountId);
   },
 
   /** How many cash-outs of the flow with the name the fake API ran. */

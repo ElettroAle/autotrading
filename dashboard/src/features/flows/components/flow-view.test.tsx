@@ -62,6 +62,7 @@ describe('FlowView', () => {
       ['Panoramica', '/flows/flow-alfa?period=7d'],
       ['Posizioni chiuse', '/flows/flow-alfa/closed-positions?period=7d'],
       ['Cicli', '/flows/flow-alfa/cycles?period=7d'],
+      ['Capitale', '/flows/flow-alfa/capital?period=7d'],
     ]);
   });
 

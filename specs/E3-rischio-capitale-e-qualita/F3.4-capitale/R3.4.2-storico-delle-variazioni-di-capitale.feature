@@ -1,5 +1,5 @@
 # language: it
-@R3.4.2 @wip
+@R3.4.2
 Funzionalità: R3.4.2 Storico delle variazioni di capitale
   Come utente
   Voglio lo storico di ogni variazione del capitale dei miei flussi e dei miei conti

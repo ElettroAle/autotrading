@@ -1510,58 +1510,6 @@
         }
       }
     },
-    "/flows/{flow_id}/capital-changes": {
-      "get": {
-        "tags": [
-          "flussi"
-        ],
-        "summary": "List Capital Changes",
-        "operationId": "list_capital_changes_flows__flow_id__capital_changes_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "flow_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Flow Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CapitalChangeResponse"
-                  },
-                  "title": "Response List Capital Changes Flows  Flow Id  Capital Changes Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/flows/{flow_id}/duplicate": {
       "post": {
         "tags": [
@@ -1810,6 +1758,198 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FreeCapitalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/capital-changes": {
+      "get": {
+        "tags": [
+          "capitale"
+        ],
+        "summary": "List Capital Changes",
+        "operationId": "list_capital_changes_flows__flow_id__capital_changes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno dell'intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno dell'intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno dell'intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno dell'intervallo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapitalChangePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/capital-changes": {
+      "get": {
+        "tags": [
+          "capitale"
+        ],
+        "summary": "List Account Capital Changes",
+        "operationId": "list_account_capital_changes_accounts__account_id__capital_changes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno dell'intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno dell'intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno dell'intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno dell'intervallo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapitalChangePageResponse"
                 }
               }
             }
@@ -3979,6 +4119,43 @@
         ],
         "title": "CallCostResponse"
       },
+      "CapitalChangePageResponse": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/CapitalChangeResponse"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "has_next",
+          "total",
+          "currency",
+          "changes"
+        ],
+        "title": "CapitalChangePageResponse",
+        "description": "A page of the history of the capital, from the most recent row, with how many rows the period holds (R3.4.2)."
+      },
       "CapitalChangeRequest": {
         "properties": {
           "allocated_capital": {
@@ -4006,27 +4183,72 @@
             "format": "date-time",
             "title": "Changed At"
           },
-          "previous": {
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow"
+          },
+          "reason": {
             "type": "string",
+            "title": "Reason"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Previous"
           },
           "new": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "New"
-          },
-          "user_id": {
-            "type": "string",
-            "title": "User Id"
           }
         },
         "type": "object",
         "required": [
           "changed_at",
+          "flow_id",
+          "flow",
+          "reason",
+          "amount",
           "previous",
-          "new",
-          "user_id"
+          "new"
         ],
-        "title": "CapitalChangeResponse"
+        "title": "CapitalChangeResponse",
+        "description": "A row of the history of the capital (R3.4.2): a deposit or a withdrawal of the account has no flow and no capital\nbefore and after."
       },
       "CashOutOutcomeResponse": {
         "properties": {

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
+import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
 import {
@@ -370,6 +371,7 @@ type AssignmentRequest = { account_id: string; allocated_capital: string; assets
 export const handlers = [
   ...accountHandlers,
   ...providerKeyHandlers,
+  ...capitalChangeHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>
       HttpResponse.json({ user_id: user.account, tenant_id: user.tenantId }),

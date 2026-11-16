@@ -510,23 +510,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/flows/{flow_id}/capital-changes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Capital Changes */
-        get: operations["list_capital_changes_flows__flow_id__capital_changes_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/flows/{flow_id}/duplicate": {
         parameters: {
             query?: never;
@@ -607,6 +590,40 @@ export interface paths {
         };
         /** Read Free Capital */
         get: operations["read_free_capital_accounts__account_id__free_capital_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/capital-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Capital Changes */
+        get: operations["list_capital_changes_flows__flow_id__capital_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{account_id}/capital-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Account Capital Changes */
+        get: operations["list_account_capital_changes_accounts__account_id__capital_changes_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1043,24 +1060,50 @@ export interface components {
             /** Cost Usd */
             cost_usd: string | null;
         };
+        /**
+         * CapitalChangePageResponse
+         * @description A page of the history of the capital, from the most recent row, with how many rows the period holds (R3.4.2).
+         */
+        CapitalChangePageResponse: {
+            /** Page */
+            page: number;
+            /** Has Next */
+            has_next: boolean;
+            /** Total */
+            total: number;
+            /** Currency */
+            currency: string;
+            /** Changes */
+            changes: components["schemas"]["CapitalChangeResponse"][];
+        };
         /** CapitalChangeRequest */
         CapitalChangeRequest: {
             /** Allocated Capital */
             allocated_capital: number | string;
         };
-        /** CapitalChangeResponse */
+        /**
+         * CapitalChangeResponse
+         * @description A row of the history of the capital (R3.4.2): a deposit or a withdrawal of the account has no flow and no capital
+         *     before and after.
+         */
         CapitalChangeResponse: {
             /**
              * Changed At
              * Format: date-time
              */
             changed_at: string;
+            /** Flow Id */
+            flow_id: string | null;
+            /** Flow */
+            flow: string | null;
+            /** Reason */
+            reason: string;
+            /** Amount */
+            amount: string;
             /** Previous */
-            previous: string;
+            previous: string | null;
             /** New */
-            new: string;
-            /** User Id */
-            user_id: string;
+            new: string | null;
         };
         /**
          * CashOutOutcomeResponse
@@ -3371,37 +3414,6 @@ export interface operations {
             };
         };
     };
-    list_capital_changes_flows__flow_id__capital_changes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CapitalChangeResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     duplicate_flow_flows__flow_id__duplicate_post: {
         parameters: {
             query?: never;
@@ -3549,6 +3561,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FreeCapitalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_capital_changes_flows__flow_id__capital_changes_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description primo giorno dell'intervallo */
+                from?: string | null;
+                /** @description ultimo giorno dell'intervallo */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapitalChangePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_account_capital_changes_accounts__account_id__capital_changes_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description primo giorno dell'intervallo */
+                from?: string | null;
+                /** @description ultimo giorno dell'intervallo */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapitalChangePageResponse"];
                 };
             };
             /** @description Validation Error */
