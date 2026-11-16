@@ -51,13 +51,12 @@ class SqlAlchemyFlowLedgerAdapter:
             payments = frozenset((str(asset), paid_at) for asset, paid_at in connection.execute(funding))
         return LedgerKeys(executions, payments)
 
-    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> tuple[LedgerEntry, ...]:
+    def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
         with self._transaction() as connection:
             added = tuple(entry for entry in ledger.entries if self._add_execution(connection, account_id, entry))
-            for payment in ledger.funding:
-                self._add_funding(connection, account_id, payment)
+            paid = tuple(payment for payment in ledger.funding if self._add_funding(connection, account_id, payment))
             self._move_cursor(connection, account_id, cursor)
-        return added
+        return AccountLedger(added, paid)
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         identifiers = [flow_id.value for flow_id in flow_ids]
@@ -132,7 +131,7 @@ class SqlAlchemyFlowLedgerAdapter:
             self._add_to_position(connection, flow_id, execution.asset, execution.size)
         return True
 
-    def _add_funding(self, connection: Connection, account_id: UUID, entry: FundingEntry) -> None:
+    def _add_funding(self, connection: Connection, account_id: UUID, entry: FundingEntry) -> bool:
         payment = entry.payment
         flow_id = None if entry.flow_id is None else entry.flow_id.value
         statement = (
@@ -148,8 +147,11 @@ class SqlAlchemyFlowLedgerAdapter:
             .on_conflict_do_nothing(constraint="account_funding_once")
             .returning(account_funding.c.id)
         )
-        if connection.execute(statement).first() is not None and flow_id is not None:
+        if connection.execute(statement).first() is None:
+            return False
+        if flow_id is not None:
             self._add_to_totals(connection, flow_id, ZERO, ZERO, payment.amount)
+        return True
 
     def _add_to_totals(
         self, connection: Connection, flow_id: UUID, realized_pnl: Decimal, fee: Decimal, funding: Decimal

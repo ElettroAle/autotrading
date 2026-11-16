@@ -7,10 +7,12 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.identity_provider import IdentityProvider
@@ -106,6 +108,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
             "open_positions": 1,
             "failed_cycles": 0,
         },
+        "openings_suspended": None,
     }
 
 
@@ -166,3 +169,15 @@ def test_an_exchange_that_cannot_be_read_answers_unavailable(client_of: Client, 
     response = anna.get(f"/flows/{flow.id.value}/state")
 
     assert (response.status_code, reason_of(response)) == (503, {"detail": "exchange non raggiungibile, riprovare"})
+
+
+def test_the_state_of_a_flow_tells_why_its_openings_are_suspended(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    comparison = BalanceComparison(Decimal(1000), Decimal(980), NOW)
+    platform.readings.open(ReconciliationAlarm.of(flow.assigned_account_id, comparison))
+
+    state = anna.get(f"/flows/{flow.id.value}/state").json()
+
+    assert state["openings_suspended"] == "allarme di riconciliazione sul conto test-1"

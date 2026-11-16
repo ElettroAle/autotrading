@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.accounts.errors import AccountNameInUseError
@@ -72,6 +73,13 @@ class InMemoryAccountRepositoryAdapter:
         if account is None:
             raise FlowAccountNotFoundError
         return account.name.value
+
+    def deviation_threshold(self, account_id: UUID) -> Decimal:
+        """The threshold of the account as the flows context compares its balance with it (R3.3.1)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.deviation_threshold.percent
 
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         account = self.get(AccountId(account_id))

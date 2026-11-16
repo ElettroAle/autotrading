@@ -45,7 +45,7 @@ class FlowPositionResponse(BaseModel):
 
 class FlowStateResponse(BaseModel):
     """The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
-    for (R6.4.2); amounts as strings (ADR 0018).
+    for (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018).
     """
 
     flow_id: UUID
@@ -60,6 +60,7 @@ class FlowStateResponse(BaseModel):
     return_percent: str
     positions: list[FlowPositionResponse]
     summary: FlowResultsResponse
+    openings_suspended: str | None
 
     @classmethod
     def of(cls, results: FlowResults) -> FlowStateResponse:
@@ -77,6 +78,7 @@ class FlowStateResponse(BaseModel):
             return_percent=amount_text(state.return_percent),
             positions=[FlowPositionResponse.of(position) for position in state.positions],
             summary=FlowResultsResponse.of(results),
+            openings_suspended=results.openings_suspended,
         )
 
 

@@ -34,6 +34,8 @@ import {
 } from './platform';
 import type { FakeClosedPosition } from './positions';
 import { API_KEY_FIELD, providerKeyHandlers } from './provider-key-handlers';
+import { fakeReconciliation } from './reconciliation';
+import { reconciliationHandlers } from './reconciliation-handlers';
 import { problem, withUser } from './responses';
 
 const NO_LINKED_CHAT = 'nessuna chat collegata';
@@ -150,6 +152,14 @@ const pageOf = (request: Request): number =>
 const currencyOf = (user: FakeUser, flow: FakeFlow): string =>
   user.accounts.find((account) => account.id === flow.accountId)?.currency ?? CURRENCY;
 
+// The openings of every flow of an account with an open alarm of reconciliation are suspended (R3.3.1).
+const openingsSuspendedOf = (user: FakeUser, flow: FakeFlow): string | null => {
+  const account = user.accounts.find((candidate) => candidate.id === flow.accountId);
+  return account === undefined
+    ? null
+    : fakeReconciliation.openingsSuspendedOf(account.id, account.name);
+};
+
 const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
   resultsOf(
     flow,
@@ -171,6 +181,7 @@ const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
   return_percent: '2.4',
   positions: fakePlatform.openPositionsOf(flow.id),
   summary: resultsSummaryOf(flow, request),
+  openings_suspended: openingsSuspendedOf(user, flow),
 });
 
 // The API counts a position won or lost by its result after the fees, as the statistics do (R6.4.4).
@@ -368,6 +379,7 @@ type AssignmentRequest = { account_id: string; allocated_capital: string; assets
 
 export const handlers = [
   ...accountHandlers,
+  ...reconciliationHandlers,
   ...providerKeyHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>

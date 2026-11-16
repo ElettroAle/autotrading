@@ -67,3 +67,15 @@ def test_the_results_count_the_open_positions_and_keep_the_failed_cycles_and_the
     results = FlowResults.of(a_state(assets=("BTC", "ETH")), (), 2)
 
     assert (results.open_positions, results.failed_cycles, results.currency) == (2, 2, "USDC")
+
+
+def test_the_results_tell_why_the_openings_of_the_flow_are_suspended() -> None:
+    reason = "allarme di riconciliazione sul conto test-1"
+
+    results = FlowResults.of(a_state(), (), 0, openings_suspended=reason)
+
+    assert results.openings_suspended == reason
+
+
+def test_the_openings_are_not_suspended_unless_the_results_say_why() -> None:
+    assert FlowResults.of(a_state(), (), 0).openings_suspended is None

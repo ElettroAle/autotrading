@@ -8,13 +8,15 @@ from autotrading.domain.flows.account_reconciliation import (
     AccountReconciliation,
     OutsideClosing,
 )
+from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.ledger import Execution, ExecutionKind, LedgerEntry
+from autotrading.domain.flows.ledger import AccountLedger, Execution, ExecutionKind, FundingEntry, LedgerEntry
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.activity import READ_AT, a_fill, a_movement, a_position, an_activity
+from tests.support.activity import READ_AT, a_fill, a_movement, a_payment, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -26,8 +28,10 @@ def flow_on(*assets: str, status: FlowStatus = FlowStatus.ACTIVE) -> Flow:
     return a_flow(TENANT, account_id=ACCOUNT, status=status, configuration=a_configuration(assets=assets))
 
 
-def previous(open_assets: dict[FlowId, frozenset[str]] | None = None) -> AccountReading:
-    return AccountReading(ACCOUNT, BEFORE, open_assets or {})
+def previous(
+    open_assets: dict[FlowId, frozenset[str]] | None = None, reference: Decimal | None = None
+) -> AccountReading:
+    return AccountReading(ACCOUNT, BEFORE, open_assets or {}, reference)
 
 
 def of_platform(execution: Execution, flow: Flow | None = None) -> LedgerEntry:
@@ -43,9 +47,12 @@ def reconcile(
     activity: AccountActivity | None = None,
     *,
     recorded: tuple[LedgerEntry, ...] = (),
+    funding: tuple[FundingEntry, ...] = (),
     last: AccountReading | None = None,
+    threshold: Decimal = Decimal(1),
 ) -> AccountReconciliation:
-    return AccountReconciliation.of(ACCOUNT, flows, activity or an_activity(), last, recorded)
+    ledger = AccountLedger(recorded, funding)
+    return AccountReconciliation.of(ACCOUNT, flows, activity or an_activity(), last, ledger, threshold)
 
 
 def test_a_position_on_an_asset_of_no_flow_is_unattributable() -> None:
@@ -96,17 +103,12 @@ def test_without_a_previous_reading_the_past_executions_and_movements_are_the_st
     assert result.closed_outside == ()
 
 
-def test_a_movement_of_the_balance_after_the_last_reading_is_unattributable() -> None:
-    movements = (
-        a_movement(Decimal(200), movement_id="0x1"),
-        a_movement(Decimal(-5), moved_at=BEFORE, movement_id="0x2"),
-    )
+def test_a_movement_the_exchange_declares_is_no_unattributable_change_of_the_balance() -> None:
+    movements = (a_movement(Decimal(200), movement_id="0x1"),)
 
     result = reconcile([flow_on("BTC")], an_activity(movements=movements), last=previous())
 
-    assert result.items == (
-        UnattributableItem(ACCOUNT, UnattributableKind.BALANCE_CHANGE, "0x1", None, Decimal(200), READ_AT),
-    )
+    assert result.items == ()
 
 
 def test_a_position_of_a_flow_gone_from_the_exchange_was_closed_outside_the_platform() -> None:
@@ -205,10 +207,133 @@ def test_the_new_reading_keeps_the_open_assets_of_each_flow() -> None:
 
     result = reconcile([alfa, beta], an_activity(positions=(a_position("BTC"), a_position("DOGE"))))
 
-    assert result.reading == AccountReading(ACCOUNT, READ_AT, {alfa.id: frozenset({"BTC"}), beta.id: frozenset()})
+    assert result.reading.open_assets == {alfa.id: frozenset({"BTC"}), beta.id: frozenset()}
+    assert result.reading.read_at == READ_AT
 
 
 def test_the_assets_open_on_the_account_are_those_of_the_reading() -> None:
     result = reconcile([flow_on("BTC")], an_activity(positions=(a_position("BTC"), a_position("SOL"))))
 
     assert result.open_assets == frozenset({"BTC", "SOL"})
+
+
+# The balance of the account (R3.3.1)
+
+
+def test_the_first_reading_takes_the_balance_read_as_reference_without_comparing() -> None:
+    activity = an_activity(balance=Decimal(1000), positions=(a_position("BTC", unrealized_pnl=Decimal(30)),))
+
+    result = reconcile([flow_on("BTC")], activity)
+
+    assert result.comparison is None
+    assert result.alarm is None
+    assert result.reading.reference_balance == Decimal(970)
+
+
+def test_a_reading_saved_without_reference_takes_the_balance_read_as_reference() -> None:
+    result = reconcile([flow_on("BTC")], an_activity(balance=Decimal(980)), last=previous())
+
+    assert result.comparison is None
+    assert result.reading.reference_balance == Decimal(980)
+
+
+def test_the_read_balance_leaves_out_the_unrealized_pnl_of_the_open_positions() -> None:
+    activity = an_activity(balance=Decimal(1040), positions=(a_position("BTC", unrealized_pnl=Decimal(40)),))
+
+    result = reconcile([flow_on("BTC")], activity, last=previous(reference=Decimal(1000)))
+
+    assert result.comparison == BalanceComparison(Decimal(1000), Decimal(1000), READ_AT)
+    assert result.items == ()
+
+
+def test_the_executions_fees_and_funding_of_the_flows_explain_the_balance() -> None:
+    flow = flow_on("BTC")
+    fill = a_fill("BTC", uuid4(), realized_pnl=Decimal(30), fee=Decimal(2))
+    funding = (FundingEntry(a_payment("BTC", Decimal(-3)), flow.id),)
+
+    result = reconcile(
+        [flow],
+        an_activity(balance=Decimal(1025)),
+        recorded=(of_platform(fill, flow),),
+        funding=funding,
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1025), Decimal(1025), READ_AT)
+
+
+def test_the_executions_and_funding_of_no_flow_do_not_explain_the_balance() -> None:
+    fill = a_fill("BTC", None, realized_pnl=Decimal(30))
+    funding = (FundingEntry(a_payment("BTC", Decimal(5)), None),)
+
+    result = reconcile(
+        [flow_on("BTC")],
+        an_activity(balance=Decimal(1035)),
+        recorded=(unattributed(fill),),
+        funding=funding,
+        last=previous(reference=Decimal(1000)),
+        threshold=Decimal(10),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1000), Decimal(1035), READ_AT)
+
+
+def test_the_movements_declared_after_the_last_reading_explain_the_balance() -> None:
+    movements = (a_movement(Decimal(500), movement_id="0x1"), a_movement(Decimal(-300), moved_at=BEFORE))
+
+    result = reconcile(
+        [flow_on("BTC")],
+        an_activity(balance=Decimal(1500), movements=movements),
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1500), Decimal(1500), READ_AT)
+    assert result.items == ()
+    assert result.alarm is None
+
+
+def test_a_deviation_within_the_threshold_is_an_unexplained_change_of_the_balance() -> None:
+    result = reconcile([flow_on("BTC")], an_activity(balance=Decimal(995)), last=previous(reference=Decimal(1000)))
+
+    assert result.items == (
+        UnattributableItem(ACCOUNT, UnattributableKind.BALANCE_CHANGE, READ_AT.isoformat(), None, Decimal(-5), READ_AT),
+    )
+    assert result.alarm is None
+    assert result.reading.reference_balance == Decimal(995)
+    assert result.reading.comparison == BalanceComparison(Decimal(1000), Decimal(995), READ_AT)
+
+
+def test_a_balance_as_expected_records_nothing() -> None:
+    result = reconcile([flow_on("BTC")], an_activity(balance=Decimal(1000)), last=previous(reference=Decimal(1000)))
+
+    assert result.items == ()
+    assert result.alarm is None
+
+
+def test_a_deviation_beyond_the_threshold_raises_an_alarm_and_keeps_the_expected_balance_as_reference() -> None:
+    result = reconcile([flow_on("BTC")], an_activity(balance=Decimal(980)), last=previous(reference=Decimal(1000)))
+
+    assert result.alarm == ReconciliationAlarm(ACCOUNT, Decimal(1000), Decimal(980), Decimal(2), READ_AT)
+    assert result.items == ()
+    assert result.reading.reference_balance == Decimal(1000)
+
+
+def test_the_threshold_of_the_account_decides_the_alarm() -> None:
+    result = reconcile(
+        [flow_on("BTC")],
+        an_activity(balance=Decimal(980)),
+        last=previous(reference=Decimal(1000)),
+        threshold=Decimal(3),
+    )
+
+    assert result.alarm is None
+
+
+def test_a_confirmed_reading_takes_the_balance_read_as_reference() -> None:
+    result = reconcile([flow_on("BTC")], an_activity(balance=Decimal(980)), last=previous(reference=Decimal(1000)))
+
+    assert result.reading.confirmed().reference_balance == Decimal(980)
+
+
+def test_a_reading_without_comparison_keeps_its_reference_when_confirmed() -> None:
+    assert previous(reference=Decimal(1000)).confirmed().reference_balance == Decimal(1000)

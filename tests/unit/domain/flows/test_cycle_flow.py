@@ -9,6 +9,7 @@ from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
+from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.trade_intent import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -88,3 +89,15 @@ def test_the_state_view_shows_the_flow_alone_with_its_positions() -> None:
         Decimal("-18.00"),
         (PositionView("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(105), Decimal(5), Decimal(60)),),
     )
+
+
+def test_an_alarm_of_reconciliation_on_the_account_suspends_the_openings_of_the_flow() -> None:
+    alarm = ReconciliationAlarm(FLOW.assigned_account_id, Decimal(1000), Decimal(980), Decimal(2), READ_AT)
+
+    flow = replace(cycle_flow(attributed()), alarm=alarm)
+
+    assert flow.risk_state().openings_suspended == "allarme di riconciliazione sul conto test-1"
+
+
+def test_without_an_alarm_the_openings_are_not_suspended() -> None:
+    assert cycle_flow(attributed()).risk_state().openings_suspended is None

@@ -86,6 +86,7 @@ from tests.fakes.provider_keys import (
     ProviderKeyStore,
     ProviderKeyVault,
 )
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
 from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
@@ -141,6 +142,8 @@ class Platform:
         self.cycles = InMemoryCycleRepositoryAdapter()
         self.equity_snapshots = EquitySnapshotStore()
         self.histories: dict[TenantId, InMemoryFlowHistoryAdapter] = {}
+        # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
+        self.readings = InMemoryReconciliationRepositoryAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
@@ -228,6 +231,9 @@ class Platform:
             historical_cycles=self.history_of(tenant_id),
             historical_closed_positions=self.history_of(tenant_id),
             historical_orders=self.history_of(tenant_id),
+            reconciliation=self.readings,
+            account_thresholds=accounts,
+            account_names=accounts,
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
