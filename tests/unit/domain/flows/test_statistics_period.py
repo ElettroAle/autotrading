@@ -20,6 +20,7 @@ def test_the_last_30_days_start_30_days_before_now() -> None:
     assert StatisticsPeriod.named("30d").window(NOW) == TimeWindow(since=NOW - timedelta(days=30))
 
 
+# ADR periodo-al-minuto: a range and its window hold the minutes from the start to the end, both whole, in UTC.
 def test_a_range_covers_its_minutes_from_the_first_to_the_last_both_whole() -> None:
     period = StatisticsPeriod.named(
         "range", datetime(2026, 11, 16, 9, 15, 42, tzinfo=UTC), datetime(2026, 11, 16, 11, 40, 7, tzinfo=UTC)
@@ -85,6 +86,7 @@ def test_a_window_without_bounds_holds_every_instant() -> None:
     assert TimeWindow().contains(datetime(2000, 1, 1, tzinfo=UTC))
 
 
+# ADR periodo-al-minuto: truncation to the minute, the minute of the end included, an instant without a zone in UTC.
 def test_the_window_of_minutes_truncates_both_instants_and_holds_the_minute_of_the_end() -> None:
     window = TimeWindow.of_minutes(
         datetime(2026, 11, 16, 9, 15, 59, 999999, tzinfo=UTC), datetime(2026, 11, 16, 11, 40, 1, tzinfo=UTC)
