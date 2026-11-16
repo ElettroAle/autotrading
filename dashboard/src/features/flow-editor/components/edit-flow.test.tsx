@@ -172,6 +172,39 @@ describe('EditFlow', () => {
     });
   });
 
+  it('removes an exposure limit the user empties, and refuses emptying both', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', {
+      account_id: 'account-principale',
+      risk_limits: {
+        max_leverage: 3,
+        max_margin_exposure_percent: '20',
+        max_value_exposure_percent: '40',
+      },
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await userEvent.clear(await screen.findByLabelText('Esposizione massima del valore (%)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).risk_limits).toEqual({
+      max_leverage: 3,
+      max_margin_exposure_percent: '20',
+      max_value_exposure_percent: null,
+    });
+    await userEvent.clear(field('Esposizione massima del margine (%)'));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Esposizione massima del margine (%)')).toHaveAccessibleDescription(
+        'almeno un limite di esposizione è obbligatorio',
+      ),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).version).toBe(2);
+  });
+
   it('says there is nothing to save when nothing changed', async () => {
     giveAlfa();
     await renderApp({ account: 'anna', url: EDIT_ALFA });
