@@ -6,7 +6,7 @@ import { useFlowTitle } from '@/features/flows/hooks/use-flow-title';
 
 export const EditFlowRoute = () => {
   const { flowId = '' } = useParams();
-  const title = useFlowTitle(flowId, 'Configurazione');
+  const title = useFlowTitle(flowId, 'Modifica della configurazione');
   return (
     <DashboardLayout title={title}>
       <EditFlow flowId={flowId} />

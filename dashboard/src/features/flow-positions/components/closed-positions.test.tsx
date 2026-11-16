@@ -191,4 +191,39 @@ describe('ClosedPositions', () => {
       expect(await rowsOf()).toHaveLength(1);
     });
   });
+
+  // ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune: the period of the page holds for the closed positions too.
+  describe('in the period of the page, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune', () => {
+    it('shows only the positions closed in the days of the period', async () => {
+      fakePlatform.recordClosedPositions('alfa', closedBack(48));
+      await renderApp({
+        account: 'anna',
+        url: `${URL}?period=range&from=2026-11-13&to=2026-11-13`,
+      });
+
+      const rows = await rowsOf();
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach((row) => expect(row).toHaveTextContent('13/11/2026'));
+    });
+
+    it('says no position was closed in the period', async () => {
+      fakePlatform.recordClosedPositions('alfa', closedBack(1));
+      await renderApp({
+        account: 'anna',
+        url: `${URL}?period=range&from=2026-10-01&to=2026-10-02`,
+      });
+
+      expect(
+        await screen.findByText('Nessuna posizione chiusa nel periodo scelto.'),
+      ).toBeInTheDocument();
+    });
+
+    it('waits for both days of a range', async () => {
+      await renderApp({ account: 'anna', url: `${URL}?period=range&to=2026-10-02` });
+
+      expect(
+        await screen.findByText("Scegli il primo e l'ultimo giorno dell'intervallo."),
+      ).toBeInTheDocument();
+    });
+  });
 });

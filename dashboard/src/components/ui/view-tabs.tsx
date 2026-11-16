@@ -19,8 +19,10 @@ type SamePageViewsProps<Key extends string> = {
 // The look of every tab of the dashboard (ADR schede-con-aspetto-e-ruolo-di-schede): the tabs on a light bar of their
 // own, one row that scrolls inside itself on a narrow screen, the chosen tab white with dark text and a blue mark, the
 // others as commands not chosen. The tabs stay large enough to touch (ADR viste-e-comandi-della-pagina-del-flusso).
+// The bar is as wide as its tabs, never narrower than its space: its background follows the tabs that scroll, and the
+// scrolling starts from the first tab (Bug 439).
 const SCROLLER = 'mb-4 w-fit max-w-full overflow-x-auto';
-const BAR = 'flex flex-nowrap gap-1 rounded-lg bg-slate-100 p-1';
+const BAR = 'flex w-max min-w-full flex-nowrap gap-1 rounded-lg bg-slate-100 p-1';
 const TAB =
   'inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md border-b-2 px-3 font-medium focus-visible:outline-2 focus-visible:outline-blue-700';
 const CHOSEN = `${TAB} border-blue-700 bg-white text-slate-900 shadow-sm`;
@@ -28,15 +30,18 @@ const NOT_CHOSEN = `${TAB} border-transparent text-slate-600 hover:bg-white/60 h
 
 const lookOf = (chosen: boolean): string => (chosen ? CHOSEN : NOT_CHOSEN);
 
+// A view may carry the period of the page in its link: the page it shows is its path.
+const pathOf = (to: string): string => to.split('?')[0] ?? to;
+
 const PageViews = ({ label, views }: PageViewsProps) => {
   const { pathname } = useLocation();
   return (
     <nav aria-label={label} className={SCROLLER}>
       <ul className={BAR}>
         {views.map((view) => {
-          const current = view.to === pathname;
+          const current = pathOf(view.to) === pathname;
           return (
-            <li key={view.to} className="flex">
+            <li key={view.name} className="flex">
               <Link
                 to={view.to}
                 aria-current={current ? 'page' : undefined}

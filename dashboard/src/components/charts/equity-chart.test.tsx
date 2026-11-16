@@ -1,12 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import {
   ABOVE_COLOR,
   BELOW_COLOR,
+  chosenRange,
+  equityAt,
   EquityChart,
+  selectionMoved,
+  selectionStarted,
   splitOffset,
   tooltipLabel,
   tooltipValue,
+  type ChartEvent,
 } from './equity-chart';
 
 const POINTS = [
@@ -95,7 +101,177 @@ describe('the tooltip of a point', () => {
     expect(tooltipLabel('2026-11-12T09:15:00Z')).toMatch(/^12\/11\/2026, \d{2}:15$/);
   });
 
+  it('names the instant of the cycle from its place on the axis of time', () => {
+    expect(tooltipLabel(Date.parse('2026-11-12T09:15:00Z'))).toMatch(/^12\/11\/2026, \d{2}:15$/);
+  });
+
   it('gives the equity in Italian', () => {
     expect(tooltipValue(305.5)).toEqual(['305,5', 'Equity']);
+  });
+});
+
+const FAILED: ChartEvent = {
+  instant: '2026-11-12T09:35:00Z',
+  label: 'Ciclo fallito del 12/11/2026, 10:35:00',
+  to: '/flows/alfa/cycles/2026-11-12T09:35:00Z',
+};
+
+const renderWithEvents = (events: readonly ChartEvent[]) => {
+  const router = createMemoryRouter(
+    [{ path: '*', element: <EquityChart points={POINTS} baseline={300} events={events} /> }],
+    { initialEntries: ['/flows/alfa'] },
+  );
+  render(<RouterProvider router={router} />);
+};
+
+// ADR cicli-falliti-sull-equity-curve: the chart draws the events the page gives as red crosses on the curve, each a
+// link to its destination with a name of its own.
+describe('the events on the chart, ADR cicli-falliti-sull-equity-curve', () => {
+  it('draws a red cross for each event, a link to its destination named by its label', async () => {
+    renderWithEvents([FAILED]);
+
+    const mark = await screen.findByRole('link', { name: FAILED.label });
+    expect(mark).toHaveAttribute('href', FAILED.to);
+    expect(mark).toContainHTML(`stroke="${BELOW_COLOR}"`);
+  });
+
+  it('draws no mark without events', async () => {
+    renderWithEvents([]);
+    await screen.findAllByRole('img');
+
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+describe('equityAt', () => {
+  const points = [
+    { plannedAt: '2026-11-12T09:00:00Z', equity: 300 },
+    { plannedAt: '2026-11-12T10:00:00Z', equity: 320 },
+  ];
+
+  it('reads the equity between two points on the line that joins them', () => {
+    expect(equityAt(points, Date.parse('2026-11-12T09:15:00Z'))).toBe(305);
+  });
+
+  it('takes the equity of the first point before the curve begins', () => {
+    expect(equityAt(points, Date.parse('2026-11-12T08:00:00Z'))).toBe(300);
+  });
+
+  it('takes the equity of the last point after the curve ends', () => {
+    expect(equityAt(points, Date.parse('2026-11-12T11:00:00Z'))).toBe(320);
+  });
+
+  it('takes the equity of a point at its very instant', () => {
+    expect(equityAt(points, Date.parse('2026-11-12T10:00:00Z'))).toBe(320);
+  });
+});
+
+// ADR intervallo-trascinando-sull-equity-curve: a drag on the chart, with the mouse or a finger, chooses the instants
+// from one point to another.
+describe('the selection of an interval, ADR intervallo-trascinando-sull-equity-curve', () => {
+  it('starts on the point pressed', () => {
+    expect(selectionStarted(10)).toEqual({ pressed: true, start: 10, end: 10 });
+  });
+
+  it('starts from the first point reached when the press found none, as a finger does', () => {
+    expect(selectionMoved(selectionStarted(undefined), 30)).toEqual({
+      pressed: true,
+      start: 30,
+      end: 30,
+    });
+  });
+
+  it('follows the point reached while dragging', () => {
+    expect(selectionMoved(selectionStarted(10), 30)).toEqual({ pressed: true, start: 10, end: 30 });
+  });
+
+  it('keeps the point reached last when the drag leaves the points', () => {
+    const dragged = { pressed: true, start: 10, end: 30 };
+
+    expect(selectionMoved(dragged, undefined)).toEqual(dragged);
+  });
+
+  it('moves nothing when nothing is pressed', () => {
+    expect(selectionMoved({}, 30)).toEqual({});
+  });
+
+  it('chooses the instants from the earlier to the later point', () => {
+    expect(chosenRange({ pressed: true, start: 30, end: 10 })).toEqual([10, 30]);
+  });
+
+  it('chooses nothing with a press that never moved', () => {
+    expect(chosenRange(selectionStarted(10))).toBeUndefined();
+  });
+
+  it('chooses nothing without a drag', () => {
+    expect(chosenRange({})).toBeUndefined();
+  });
+
+  it('gives the page the instants of a drag across the chart', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ width: 720, height: 320 }),
+    );
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(720);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(320);
+    const chosen: [string, string][] = [];
+    render(
+      <EquityChart
+        points={POINTS}
+        baseline={300}
+        onSelect={(from, to) => chosen.push([from, to])}
+      />,
+    );
+    const chart = screen.getByRole('application');
+    // The chart reads the point under the pointer once the frame is drawn.
+    const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+
+    fireEvent.mouseDown(chart, { clientX: 80, clientY: 100 });
+    fireEvent.mouseMove(chart, { clientX: 80, clientY: 100 });
+    await settle();
+    fireEvent.mouseMove(chart, { clientX: 715, clientY: 100 });
+    await settle();
+    fireEvent.mouseUp(chart, { clientX: 715, clientY: 100 });
+
+    expect(chosen).toEqual([['2026-11-12T09:15:00.000Z', '2026-11-12T09:45:00.000Z']]);
+    vi.restoreAllMocks();
+  });
+
+  it('forgets a drag that leaves the chart', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ width: 720, height: 320 }),
+    );
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(720);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(320);
+    const chosen: [string, string][] = [];
+    render(
+      <EquityChart
+        points={POINTS}
+        baseline={300}
+        onSelect={(from, to) => chosen.push([from, to])}
+      />,
+    );
+    const chart = screen.getByRole('application');
+    const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+
+    fireEvent.mouseDown(chart, { clientX: 80, clientY: 100 });
+    fireEvent.mouseMove(chart, { clientX: 80, clientY: 100 });
+    await settle();
+    fireEvent.mouseLeave(chart);
+    fireEvent.mouseUp(chart, { clientX: 715, clientY: 100 });
+
+    expect(chosen).toEqual([]);
+    vi.restoreAllMocks();
+  });
+
+  it('lets the page scroll only up and down when the chart offers the selection', () => {
+    render(<EquityChart points={POINTS} baseline={300} onSelect={() => undefined} />);
+
+    expect(screen.getByRole('figure', { name: 'Equity curve' })).toHaveClass('touch-pan-y');
+  });
+
+  it('leaves the touches to the page when the chart offers no selection', () => {
+    render(<EquityChart points={POINTS} baseline={300} />);
+
+    expect(screen.getByRole('figure', { name: 'Equity curve' })).not.toHaveClass('touch-pan-y');
   });
 });

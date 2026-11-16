@@ -61,12 +61,13 @@ describe('ResultsSummary', () => {
     expect(valueOf(summary, 'Guadagno nel periodo')).toHaveTextContent('+0,40 USDT · +0,40%');
   });
 
-  it('leads from the open positions to their view', async () => {
+  // The open positions are in the overview of the flow (R6.4.3).
+  it('leads from the open positions to the overview of the flow', async () => {
     const summary = await show(GAINING);
 
     expect(within(summary).getByRole('link', { name: /1 posizione aperta/ })).toHaveAttribute(
       'href',
-      '/flows/flow-alfa/positions',
+      '/flows/flow-alfa',
     );
   });
 

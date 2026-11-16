@@ -47,11 +47,12 @@ describe('useFlowTitle', () => {
   });
 
   it.each([
-    ['/flows/flow-alfa/cycles', 'Cicli di alfa'],
-    ['/flows/flow-alfa/positions', 'Posizioni aperte di alfa'],
-    ['/flows/flow-alfa/closed-positions', 'Posizioni chiuse di alfa'],
-    ['/flows/flow-alfa/versions', 'Versioni della configurazione di alfa'],
-    ['/flows/flow-alfa/edit', 'Configurazione di alfa'],
+    // The tabs share the head of the page of the flow, titled with its name (R6.4.3).
+    ['/flows/flow-alfa/cycles', 'alfa'],
+    ['/flows/flow-alfa/positions', 'alfa'],
+    ['/flows/flow-alfa/closed-positions', 'alfa'],
+    ['/flows/flow-alfa/versions', 'Configurazione di alfa'],
+    ['/flows/flow-alfa/edit', 'Modifica della configurazione di alfa'],
   ])('names the flow in the title of %s', async (url, expected) => {
     await renderApp({ account: 'anna', url });
 

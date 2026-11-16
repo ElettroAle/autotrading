@@ -28,7 +28,7 @@ describe('AccountsRoute', () => {
   // Bug 437: the flow page and the flow editor read the accounts with schemas of their own; the accounts page must not
   // receive their reduced accounts from the cache.
   it.each([
-    ['the page of a flow', '/flows/flow-alfa'],
+    ['the configuration of a flow', '/flows/flow-alfa/versions'],
     ['the editor of a flow', '/flows/new'],
   ])('shows the allocated capital after %s', async (_page, url) => {
     fakePlatform.addUser('anna', { hasUserRole: true });

@@ -20,6 +20,8 @@ export type ScenarioMemory = {
   environments: string[];
   flow: string;
   cycles: FakeCycle[];
+  /** The cycle the user chose, whose detail the page should show. */
+  chosenCycle: FakeCycle | undefined;
   histories: Map<string, FakeFlowHistory>;
   described: DescribedFlow | undefined;
   compared: number[];
@@ -71,6 +73,7 @@ export const test = base.extend<Fixtures>({
       environments: [],
       flow: '',
       cycles: [],
+      chosenCycle: undefined,
       histories: new Map(),
       described: undefined,
       compared: [],

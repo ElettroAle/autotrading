@@ -1,15 +1,10 @@
-import { useParams } from 'react-router';
+import { Navigate, useLocation, useParams } from 'react-router';
 
-import { DashboardLayout } from '@/components/layouts/dashboard-layout';
-import { OpenPositions } from '@/features/flow-positions/components/open-positions';
-import { useFlowTitle } from '@/features/flows/hooks/use-flow-title';
+import { paths } from '@/config/paths';
 
+/** The open positions are in the overview of the flow (R6.4.3): their old address leads there, with its period. */
 export const PositionsRoute = () => {
   const { flowId = '' } = useParams();
-  const title = useFlowTitle(flowId, 'Posizioni aperte');
-  return (
-    <DashboardLayout title={title}>
-      <OpenPositions flowId={flowId} />
-    </DashboardLayout>
-  );
+  const { search } = useLocation();
+  return <Navigate to={`${paths.flow.getHref(flowId)}${search}`} replace />;
 };

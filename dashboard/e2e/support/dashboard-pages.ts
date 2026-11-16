@@ -93,10 +93,10 @@ export class DashboardPages {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
 
-  /** From the page of the flow, as a user gets there. */
+  /** From the command Configurazione of the page of the flow, as a user gets there (R6.4.3). */
   async openVersionsOf(name: string): Promise<void> {
     await this.flows().getByRole('link', { name, exact: true }).click();
-    await this.page.getByRole('link', { name: 'Versioni della configurazione' }).click();
+    await this.page.getByRole('link', { name: 'Configurazione', exact: true }).click();
     await expect(this.versions()).toBeVisible();
   }
 
@@ -268,8 +268,16 @@ export class DashboardPages {
       .and(this.page.getByText(text, { exact: true }));
   }
 
+  /** A tab of the page of the flow (R6.4.3). */
+  flowTab(name: string): Locator {
+    return this.page
+      .getByRole('navigation', { name: 'Dati del flusso' })
+      .getByRole('link', { name, exact: true });
+  }
+
+  /** The cycles of the flow in the tab Cicli of its page (R6.4.3). */
   cycles(): Locator {
-    return this.page.getByRole('list', { name: 'Cicli recenti' });
+    return this.page.getByRole('table', { name: 'Cicli' });
   }
 
   lastUpdate(): Locator {
@@ -422,7 +430,19 @@ export class DashboardPages {
     return this.page.getByRole('table', { name: 'Confronto delle versioni' });
   }
 
-  /** The value the page of a flow shows for one part of its configuration. */
+  /**
+   * The configuration of the flow on the page, under the command Configurazione of the page of the flow (R6.4.3): from
+   * the page of the flow it chooses the command, on the configuration it stays.
+   */
+  async openConfiguration(): Promise<void> {
+    const configuration = this.page.getByLabel('Configurazione', { exact: true });
+    if (!(await configuration.isVisible())) {
+      await this.page.getByRole('link', { name: 'Configurazione', exact: true }).click();
+    }
+    await expect(configuration).toBeVisible();
+  }
+
+  /** The value the configuration of a flow shows for one part of it. */
   detail(label: string): Locator {
     return this.page
       .getByLabel('Configurazione')
@@ -494,6 +514,7 @@ export class DashboardPages {
 
   /** Exports the strategy of the flow on the page and gives the file the browser saved, with its name. */
   async exportStrategy(): Promise<{ name: string; content: string }> {
+    await this.openConfiguration();
     const download = this.page.waitForEvent('download');
     await this.command('Esporta');
     const saved = await download;

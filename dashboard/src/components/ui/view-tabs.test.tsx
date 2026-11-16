@@ -102,6 +102,43 @@ describe('ViewTabs, ADR schede-con-aspetto-e-ruolo-di-schede', () => {
       expect(screen.getByRole('link', { name: 'Classifica' })).not.toHaveClass('bg-white');
     });
 
+    it('marks the view of the current page when its link carries the period of the page', () => {
+      const router = createMemoryRouter(
+        [
+          {
+            path: '*',
+            element: (
+              <ViewTabs
+                label="Dati del flusso"
+                views={[
+                  { name: 'Panoramica', to: '/flows/alfa?period=7d' },
+                  { name: 'Cicli', to: '/flows/alfa/cycles?period=7d' },
+                ]}
+              />
+            ),
+          },
+        ],
+        { initialEntries: ['/flows/alfa/cycles?period=7d&outcome=fallito'] },
+      );
+      render(<RouterProvider router={router} />);
+
+      expect(screen.getByRole('link', { name: 'Cicli' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('link', { name: 'Panoramica' })).not.toHaveAttribute('aria-current');
+      expect(screen.getByRole('link', { name: 'Panoramica' })).toHaveAttribute(
+        'href',
+        '/flows/alfa?period=7d',
+      );
+    });
+
+    // Bug 439: the bar is as wide as its tabs, so its background follows them when the bar scrolls, and it starts
+    // from the first tab.
+    it('makes the bar as wide as its tabs, at least as wide as the space it has (Bug 439)', () => {
+      openAt('/');
+
+      const views = screen.getByRole('navigation', { name: 'Viste dei flussi' });
+      expect(within(views).getByRole('list')).toHaveClass('w-max', 'min-w-full');
+    });
+
     it('keeps the views on one row that scrolls inside itself on a narrow screen', () => {
       openAt('/');
 
@@ -124,6 +161,12 @@ describe('ViewTabs, ADR schede-con-aspetto-e-ruolo-di-schede', () => {
       ).toEqual(['Cicli', 'Posizioni chiuse', 'Ordini']);
       expect(tab('Ordini')).toHaveAttribute('aria-selected', 'true');
       expect(tab('Cicli')).toHaveAttribute('aria-selected', 'false');
+    });
+
+    it('makes the group as wide as its tabs (Bug 439)', () => {
+      showTabs();
+
+      expect(screen.getByRole('tablist', { name: 'Storici' })).toHaveClass('w-max', 'min-w-full');
     });
 
     it('gives the tabs the same look as the views that are pages', () => {

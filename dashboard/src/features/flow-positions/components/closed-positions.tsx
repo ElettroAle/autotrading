@@ -4,6 +4,12 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
+import {
+  isComplete,
+  listDaysOf,
+  usePeriod,
+  type ListDays,
+} from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
 import { formatAmount, formatPrice } from '@/utils/format-amount';
@@ -62,16 +68,31 @@ const filtersFor = (assets: readonly string[]): TableFilter[] => [
 
 const countOf = (total: number): string => (total === 1 ? '1 posizione' : `${total} posizioni`);
 
+const emptyText = (filtered: boolean, days: ListDays): string => {
+  if (filtered) {
+    return 'Nessuna posizione chiusa con questi filtri.';
+  }
+  return days.from === undefined
+    ? 'Nessuna posizione chiusa.'
+    : 'Nessuna posizione chiusa nel periodo scelto.';
+};
+
+type PositionsInDaysProps = {
+  readonly flowId: string;
+  readonly page: number;
+  readonly days: ListDays;
+};
+
 /**
  * The closed positions of the flow that match the filters of the address, from the most recent close, in the pages of
  * the API (R2.2.5, R6.4.4). The currency comes from the state of the flow, read from the exchange: without it the
  * amounts still show, the history does not depend on the exchange (ADR 0143).
  */
-export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number }) => {
+const PositionsInDays = ({ flowId, page, days }: PositionsInDaysProps) => {
   const filters = filtersFor(useFlowAssets(flowId).data ?? []);
   const { values } = useTableFilters(filters);
   const [search] = useSearchParams();
-  const positions = useClosedPositions(flowId, page, values);
+  const positions = useClosedPositions(flowId, page, values, days);
   const currency = useFlowState(flowId).data?.currency;
   if (positions.isPending) {
     return <Loading />;
@@ -88,9 +109,7 @@ export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number
         columns={columnsIn(currency)}
         rows={positions.data.positions}
         rowKey={(position) => `${position.closed_at}-${position.asset}`}
-        empty={
-          filtered ? 'Nessuna posizione chiusa con questi filtri.' : 'Nessuna posizione chiusa.'
-        }
+        empty={emptyText(filtered, days)}
         filtering={{ filters, total: positions.data.total, countOf }}
       />
       <Pagination
@@ -102,4 +121,15 @@ export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number
       />
     </>
   );
+};
+
+/** The closed positions of the flow in the period of the page (R6.4.3), as the filters of the address narrow them. */
+export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number }) => {
+  const [period] = usePeriod();
+  if (!isComplete(period)) {
+    return (
+      <p className="text-slate-600">Scegli il primo e l&apos;ultimo giorno dell&apos;intervallo.</p>
+    );
+  }
+  return <PositionsInDays flowId={flowId} page={page} days={listDaysOf(period, new Date())} />;
 };

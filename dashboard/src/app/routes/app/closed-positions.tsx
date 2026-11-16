@@ -1,17 +1,11 @@
 import { useParams, useSearchParams } from 'react-router';
 
-import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { ClosedPositions } from '@/features/flow-positions/components/closed-positions';
-import { useFlowTitle } from '@/features/flows/hooks/use-flow-title';
 import { pageOf } from '@/utils/page-number';
 
+/** The tab Posizioni chiuse of the page of the flow (R6.4.3). */
 export const ClosedPositionsRoute = () => {
   const { flowId = '' } = useParams();
-  const title = useFlowTitle(flowId, 'Posizioni chiuse');
   const [search] = useSearchParams();
-  return (
-    <DashboardLayout title={title}>
-      <ClosedPositions flowId={flowId} page={pageOf(search.get('page'))} />
-    </DashboardLayout>
-  );
+  return <ClosedPositions flowId={flowId} page={pageOf(search.get('page'))} />;
 };
