@@ -13,8 +13,10 @@ import pytest
 from autotrading.adapters.inbound.api.worker import create_worker_api
 from autotrading.adapters.outbound.worker.notifications import TIMEOUT_SECONDS, WorkerNotificationAdapter
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Amount, Notification
+from autotrading.domain.notifications.notification_email import NotificationEmail
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
@@ -39,6 +41,15 @@ def test_the_worker_delivers_the_notification_to_the_chat_of_the_tenant(worker: 
     adapter_on(worker).execute(CLOSED)
 
     assert worker.messenger.received_by(CHAT) == ["alfa: chiusa BTC, PnL 4,20 USDC"]
+
+
+def test_the_test_notification_keeps_the_subject_of_its_email_on_the_way_to_the_worker(worker: Worker) -> None:
+    worker.emails[TENANT] = NotificationEmail(TENANT, EmailAddress.parse("anna@example.com"))
+
+    adapter_on(worker).execute(Notification.test())
+
+    [email] = worker.mailer.received_by("anna@example.com")
+    assert email.subject == "AutoTrading: prova delle notifiche"
 
 
 def test_another_tenant_never_reaches_the_chat(worker: Worker) -> None:
@@ -87,7 +98,7 @@ def test_the_request_names_the_tenant_carries_the_token_and_waits_a_bounded_time
     [request] = seen
     assert request.url.path == f"/tenants/{TENANT.value}/notifications"
     assert request.headers["Authorization"] == f"Bearer {TOKEN}"
-    assert request.content == b'{"subject":"alfa","event":"chiusa BTC, PnL 4,20 USDC"}'
+    assert request.content == b'{"subject":"alfa","event":"chiusa BTC, PnL 4,20 USDC","headline":null}'
     assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS
 
 

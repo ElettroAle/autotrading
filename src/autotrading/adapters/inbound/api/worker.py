@@ -83,9 +83,10 @@ class VerificationRequest(UserRequest):
 
 
 class NotificationRequest(BaseModel):
-    # Built by the API from its own events: the worker only delivers it to the chat of the tenant.
+    # Built by the API from its own events: the worker only delivers it to the channels of the tenant.
     subject: str
     event: str
+    headline: str | None = None
 
 
 class BotPolling:
@@ -242,7 +243,7 @@ def create_worker_api(
 
     @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])
     def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:
-        for_tenant(TenantId(tenant_id)).notify.execute(Notification(request.subject, request.event))
+        for_tenant(TenantId(tenant_id)).notify.execute(Notification(request.subject, request.event, request.headline))
         return {"status": "ok"}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])

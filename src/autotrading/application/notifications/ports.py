@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.notification_email import NotificationEmail
 from autotrading.domain.notifications.outbox_message import OutboxMessage
 from autotrading.domain.notifications.pending_link import PendingLink
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -54,6 +56,32 @@ class MessengerPort(Protocol):
         ...
 
 
+class NotificationEmailRepositoryPort(Protocol):
+    """Bound to the tenant of the request: the only address its notifications go to by email (R3.5.2)."""
+
+    def get(self) -> NotificationEmail | None: ...
+
+    def set(self, email: NotificationEmail) -> None:
+        """Keeps the address, replacing the one kept before."""
+        ...
+
+    def remove(self) -> None:
+        """Forgets the address; nothing to forget is no error."""
+        ...
+
+
+class MailerPort(Protocol):
+    def send(self, address: EmailAddress, subject: str, text: str) -> None:
+        """Raises MessageNotDeliveredError when the mail service does not take the email."""
+        ...
+
+
+class MailServicePort(Protocol):
+    def is_configured(self) -> bool:
+        """Whether the installation has a mail service: without one no email leaves (R3.5.2)."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class BotMessage:
     chat_id: ChatId
@@ -76,7 +104,7 @@ class LinkStores:
 
 class NotifierPort(Protocol):
     def execute(self, notification: Notification) -> None:
-        """Delivers the notification to the chats of the tenant; a delivery that fails is recorded, never raised."""
+        """Delivers the notification to the channels of the tenant; a delivery that fails is recorded, never raised."""
         ...
 
 

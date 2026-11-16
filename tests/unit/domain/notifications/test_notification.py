@@ -69,3 +69,24 @@ def test_an_opening_is_told_by_its_value_in_whole_units() -> None:
     notification = Notification.position_opened("alfa", "BTC", "long", 3, Amount(Decimal("20.006"), "USDC"))
 
     assert notification.text == "alfa: aperta long BTC, leva 3, 20 USDC"
+
+
+@pytest.mark.parametrize(
+    ("notification", "subject"),
+    [
+        (Notification.flow_paused("alfa", "credito esaurito"), "alfa: in pausa"),
+        (Notification.cycle_failed("alfa", "timeout, riprova"), "alfa: ciclo fallito"),
+        (Notification.unattributable_position("conto-1", "SOL"), "conto-1: posizione non attribuibile su SOL"),
+        (Notification.test(), "AutoTrading: prova delle notifiche"),
+    ],
+)
+def test_the_subject_of_an_email_names_the_flow_or_account_and_the_event_without_its_details(
+    notification: Notification, subject: str
+) -> None:
+    assert notification.email_subject == subject
+
+
+def test_the_text_of_an_email_is_the_text_of_the_notification() -> None:
+    notification = Notification.flow_paused("alfa", "credito esaurito")
+
+    assert notification.text == "alfa: in pausa, credito esaurito"

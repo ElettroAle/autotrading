@@ -29,7 +29,7 @@ class WorkerNotificationAdapter:
         try:
             response = self._client.post(
                 f"/tenants/{self._tenant_id.value}/notifications",
-                json={"subject": notification.subject, "event": notification.event},
+                json={"subject": notification.subject, "event": notification.event, "headline": notification.headline},
                 headers={"Authorization": f"Bearer {self._token}"},
                 timeout=TIMEOUT_SECONDS,
             )

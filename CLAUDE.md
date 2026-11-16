@@ -79,7 +79,7 @@ src/autotrading/
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
                                 alternative_me/, coinmarketcap/, litellm/, openrouter/, forecaster/,
-                                apscheduler/
+                                apscheduler/, smtp/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -300,6 +300,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-libsodium.md` | `adapters/outbound/libsodium/**` |
 | `tech-json.md` | `adapters/outbound/json/**` |
 | `tech-telegram.md` | `adapters/outbound/telegram/**` |
+| `tech-smtp.md` | `adapters/outbound/smtp/**` |
 | `tech-worker.md` | `adapters/outbound/worker/**` |
 | `tech-rss.md` | `adapters/outbound/rss/**` |
 | `tech-alternative-me.md` | `adapters/outbound/alternative_me/**` |

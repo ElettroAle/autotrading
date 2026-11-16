@@ -134,6 +134,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle; procrastinate is the
     # queue of the outbox on the same database (ADR outbox-delle-integrazioni-esterne-con-procrastinate).
     "adapters/outbound/sqlalchemy": frozenset({"sqlalchemy", "psycopg", "procrastinate"}),
+    # The mail service is reached with smtplib of the standard library (ADR canale-email-delle-notifiche-con-smtp).
+    "adapters/outbound/smtp": frozenset(),
     "adapters/outbound/system_clock": frozenset(),
     "adapters/outbound/telegram": frozenset({"httpx"}),
     "adapters/outbound/threads": frozenset(),

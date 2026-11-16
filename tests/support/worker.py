@@ -28,7 +28,13 @@ from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVau
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -55,9 +61,12 @@ class Worker:
         self.flows = FlowStore()
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.activity_reader = FakeActivityReaderAdapter()
         self.exchange.trades_on(self.order_exchange)
 
@@ -81,7 +90,12 @@ class Worker:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
+            notify=NotifyUseCase(
+                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+                InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+                self.mail_service,
+                self.outbox,
+            ),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 

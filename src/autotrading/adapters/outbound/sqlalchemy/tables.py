@@ -200,6 +200,15 @@ telegram_chats = Table(
     Column("linked_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
+# At most one address per tenant for its notifications by email, valid at once without a verification (R3.5.2).
+notification_emails = Table(
+    "notification_emails",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("address", Text, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
 # One row per planned instant of a flow: taking the row is what keeps a planned cycle unique (ADR 0041, ADR 0046).
 cycles = Table(
     "cycles",

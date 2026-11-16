@@ -70,9 +70,15 @@ from tests.fakes.linked_chat_repository import (
     InMemoryLinkedChatRepositoryAdapter,
     LinkedChatStore,
 )
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -124,9 +130,12 @@ class Platform:
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.bot_username: str | None = None
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
@@ -215,6 +224,9 @@ class Platform:
             bot_identity=FakeBotIdentityAdapter(self.bot_username),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             notifier=self.worker_for(tenant_id).notify,
+            notification_emails=InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            mail_service=self.mail_service,
+            outbox=self.outbox,
             clock=lambda: self.now,
             closed_positions=closed_positions,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
@@ -255,7 +267,12 @@ class Platform:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
+            notify=NotifyUseCase(
+                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+                InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+                self.mail_service,
+                self.outbox,
+            ),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
         )
 
@@ -277,7 +294,12 @@ class Platform:
         inbox.waiting = [BotMessage(chat_id, text)]
         test_notification = SendTestNotificationUseCase(
             InMemoryLinkedChatLookupAdapter(self.chats),
-            lambda tenant_id: NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
+            lambda tenant_id: NotifyUseCase(
+                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+                InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+                self.mail_service,
+                self.outbox,
+            ),
             self.messenger,
         )
         AnswerBotMessagesUseCase(inbox, self.link_chat(), test_notification).execute()

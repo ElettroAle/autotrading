@@ -15,3 +15,10 @@ class InvalidOutboxMessageError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("messaggio in uscita senza chat o testo")
+
+
+class InvalidEmailAddressError(DomainError):
+    """An address without the form of an email: the user writes it again."""
+
+    def __init__(self) -> None:
+        super().__init__("indirizzo email non valido")

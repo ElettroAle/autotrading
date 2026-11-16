@@ -19,6 +19,7 @@ from autotrading.adapters.inbound.api.flow_statistics import flow_statistics_rou
 from autotrading.adapters.inbound.api.flows import flows_router
 from autotrading.adapters.inbound.api.history import history_router
 from autotrading.adapters.inbound.api.models import models_router
+from autotrading.adapters.inbound.api.notification_email import notification_email_router
 from autotrading.adapters.inbound.api.operations import operations_router
 from autotrading.adapters.inbound.api.orders import orders_router
 from autotrading.adapters.inbound.api.provider_keys import provider_keys_router
@@ -107,6 +108,7 @@ def create_api(
     protected.include_router(provider_keys_router(use_cases_of_request))
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
+    protected.include_router(notification_email_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request, current_user))
     protected.include_router(assets_router(use_cases_of_request))
     protected.include_router(flow_state_router(use_cases_of_request))

@@ -6,6 +6,9 @@ from autotrading.domain.notifications.errors import InvalidNotificationError
 
 # An opening is told by the value it put on the market, in whole units: the cents add nothing to the event.
 WHOLE_UNIT = Decimal(1)
+# The details of an event follow its first comma: the subject of an email tells the event alone (R3.5.2).
+DETAILS_SEPARATOR = ", "
+TEST_EMAIL_SUBJECT = "AutoTrading: prova delle notifiche"
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +26,7 @@ class Notification:
 
     subject: str
     event: str
+    headline: str | None = None
 
     def __post_init__(self) -> None:
         if not self.subject.strip():
@@ -32,9 +36,17 @@ class Notification:
     def text(self) -> str:
         return f"{self.subject}: {self.event}"
 
+    @property
+    def email_subject(self) -> str:
+        """The subject of the email that carries the notification; its text is the same as on the chat (R3.5.2)."""
+        if self.headline is not None:
+            return self.headline
+        event, *_ = self.event.split(DETAILS_SEPARATOR, 1)
+        return f"{self.subject}: {event}"
+
     @classmethod
     def test(cls) -> Notification:
-        return cls("notifica di prova", "le notifiche dei tuoi flussi arrivano qui")
+        return cls("notifica di prova", "le notifiche dei tuoi flussi arrivano qui", TEST_EMAIL_SUBJECT)
 
     @classmethod
     def position_opened(cls, flow: str, asset: str, direction: str, leverage: int, value: Amount) -> Notification:

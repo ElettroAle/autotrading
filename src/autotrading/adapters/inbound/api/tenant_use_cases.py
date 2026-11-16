@@ -80,16 +80,23 @@ from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCa
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase, StopPorts
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
+from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
 from autotrading.application.notifications.ports import (
     BotStartLinkPort,
     LinkCodeRepositoryPort,
     LinkedChatRepositoryPort,
+    MailServicePort,
+    NotificationEmailRepositoryPort,
     NotifierPort,
+    OutboxPort,
 )
+from autotrading.application.notifications.remove_notification_email import RemoveNotificationEmailUseCase
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
 from autotrading.application.notifications.send_linked_chat_test_notification import (
     SendLinkedChatTestNotificationUseCase,
 )
+from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
+from autotrading.application.notifications.set_notification_email import SetNotificationEmailUseCase
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import ManualClosingRecorderPort, PositionClosingPort
@@ -131,6 +138,9 @@ class TenantPorts:
     bot_identity: BotStartLinkPort
     linked_chats: LinkedChatRepositoryPort
     notifier: NotifierPort
+    notification_emails: NotificationEmailRepositoryPort
+    mail_service: MailServicePort
+    outbox: OutboxPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
     cycle_history: CycleHistoryPort
@@ -174,6 +184,10 @@ class TenantUseCases:
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
     send_test_notification: SendLinkedChatTestNotificationUseCase
+    get_notification_email: GetNotificationEmailUseCase
+    set_notification_email: SetNotificationEmailUseCase
+    remove_notification_email: RemoveNotificationEmailUseCase
+    send_test_email: SendTestEmailUseCase
     modify_flow: ModifyFlowUseCase
     get_flow_version: GetFlowVersionUseCase
     list_flow_versions: ListFlowVersionsUseCase
@@ -245,6 +259,10 @@ class TenantUseCases:
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
             send_test_notification=SendLinkedChatTestNotificationUseCase(ports.linked_chats, ports.notifier),
+            get_notification_email=GetNotificationEmailUseCase(ports.notification_emails, ports.mail_service),
+            set_notification_email=SetNotificationEmailUseCase(tenant_id, ports.notification_emails),
+            remove_notification_email=RemoveNotificationEmailUseCase(ports.notification_emails),
+            send_test_email=SendTestEmailUseCase(ports.notification_emails, ports.mail_service, ports.outbox),
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             list_flow_versions=ListFlowVersionsUseCase(ports.flows),
