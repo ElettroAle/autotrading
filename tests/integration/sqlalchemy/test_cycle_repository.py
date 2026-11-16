@@ -124,16 +124,6 @@ def test_the_costs_are_those_of_the_cycles_that_called_the_model(database: Engin
     ]
 
 
-def test_an_outcome_keeps_only_the_cycles_that_had_it(database: Engine) -> None:
-    tenant_id, flow_id = new_flow(database)
-    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
-    failed = a_failed_cycle(flow_id)
-    repository.record(failed)
-    repository.record(CycleRecord.skipped(flow_id, PLANNED + timedelta(minutes=15)))
-
-    assert repository.newest(flow_id, 0, 50, CycleOutcome.FAILED) == [failed]
-
-
 def test_the_failed_cycles_are_counted_in_the_window(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
     repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)

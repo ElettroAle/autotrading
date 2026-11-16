@@ -25,7 +25,7 @@ from autotrading.application.flows.ports import (
 from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_filter import CycleDecision, CycleFilter
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
@@ -104,6 +104,15 @@ class InMemoryCycleRepositoryAdapter:
         )
         return of_flow[offset : offset + limit]
 
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        return sum(
+            1
+            for record in self.records
+            if record.flow_id == flow_id
+            and record.outcome is CycleOutcome.FAILED
+            and window.contains(record.planned_at)
+        )
+
     def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
         matched = [record for record in self.newest(flow_id, 0, len(self.records)) if _matches(record, criteria)]
         return matched[offset : offset + limit]
@@ -137,6 +146,9 @@ class InMemoryCycleHistoryAdapter:
 
     def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
         return self._cycles.newest(flow_id, offset, limit) if self._owns(flow_id) else []
+
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        return self._cycles.failed_within(flow_id, window) if self._owns(flow_id) else 0
 
     def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
         return self._cycles.matching(flow_id, criteria, offset, limit) if self._owns(flow_id) else []

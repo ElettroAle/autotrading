@@ -11,11 +11,7 @@ export const CyclesRoute = () => {
   const [search] = useSearchParams();
   return (
     <DashboardLayout title={title}>
-      <CyclesList
-        flowId={flowId}
-        page={pageOf(search.get('page'))}
-        outcome={search.get('outcome') ?? ''}
-      />
+      <CyclesList flowId={flowId} page={pageOf(search.get('page'))} />
     </DashboardLayout>
   );
 };

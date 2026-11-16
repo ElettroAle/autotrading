@@ -1354,7 +1354,7 @@ export interface components {
         /**
          * FlowOverviewResponse
          * @description A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most
-         *     recent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127).
+         *     recent, how its capital is doing and its results in the period asked for (R1.7.3, R2.2.2, ADR 0127, R6.4.2).
          */
         FlowOverviewResponse: {
             /**
@@ -1389,6 +1389,7 @@ export interface components {
             return_percent: string | null;
             /** Recent Outcomes */
             recent_outcomes: components["schemas"]["LastCycleResponse"][];
+            summary: components["schemas"]["FlowResultsResponse"] | null;
         };
         /**
          * FlowPositionResponse
@@ -1475,8 +1476,29 @@ export interface components {
             bring_to_minimum: boolean;
         };
         /**
+         * FlowResultsResponse
+         * @description How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains
+         *     in the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without
+         *     initial capital.
+         */
+        FlowResultsResponse: {
+            /** Total Gain */
+            total_gain: string;
+            /** Total Gain Percent */
+            total_gain_percent: string | null;
+            /** Period Gain */
+            period_gain: string;
+            /** Period Gain Percent */
+            period_gain_percent: string | null;
+            /** Open Positions */
+            open_positions: number;
+            /** Failed Cycles */
+            failed_cycles: number;
+        };
+        /**
          * FlowStateResponse
-         * @description The state of a flow attributed from the exchange at the request (R1.6.1); amounts as strings (ADR 0018).
+         * @description The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
+         *     for (R6.4.2); amounts as strings (ADR 0018).
          */
         FlowStateResponse: {
             /**
@@ -1504,6 +1526,7 @@ export interface components {
             return_percent: string;
             /** Positions */
             positions: components["schemas"]["FlowPositionResponse"][];
+            summary: components["schemas"]["FlowResultsResponse"];
         };
         /**
          * FlowStatisticsResponse
@@ -3416,7 +3439,14 @@ export interface operations {
     };
     read_flow_state_flows__flow_id__state_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description all, 7d, 30d o range */
+                period?: string;
+                /** @description primo giorno di un intervallo */
+                from?: string | null;
+                /** @description ultimo giorno di un intervallo */
+                to?: string | null;
+            };
             header?: never;
             path: {
                 flow_id: string;
@@ -3667,7 +3697,14 @@ export interface operations {
     };
     list_flow_overviews_flows_overview_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description all, 7d, 30d o range */
+                period?: string;
+                /** @description primo giorno di un intervallo */
+                from?: string | null;
+                /** @description ultimo giorno di un intervallo */
+                to?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3681,6 +3718,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowOverviewResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -22,7 +22,7 @@ from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrders
 from autotrading.domain.flows.cycle_question import CycleQuestion
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
@@ -959,9 +959,7 @@ class CycleJournalPort(Protocol):
 class CycleHistoryPort(Protocol):
     """Bound to the tenant of the request: it never shows the cycles of a flow of another tenant."""
 
-    def newest(self, flow_id: UUID, offset: int, limit: int, outcome: CycleOutcome | None = None) -> list[CycleRecord]:
-        """The cycles of the flow from the most recent planned instant; with an outcome, only the cycles that had it."""
-        ...
+    def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]: ...
 
     def matching(self, flow_id: UUID, criteria: CycleFilter, offset: int, limit: int) -> list[CycleRecord]:
         """The cycles of the flow that match the filter, from the most recent planned instant (R6.4.4)."""

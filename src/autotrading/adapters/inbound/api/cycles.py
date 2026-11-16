@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_cycles import ListCyclesCommand
-from autotrading.application.flows.list_flow_overviews import FlowOverview
+from autotrading.application.flows.list_flow_overviews import FlowOverview, ListFlowOverviewsCommand
 from autotrading.application.flows.read_cycle import ReadCycleCommand
 from autotrading.application.flows.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.flows.call_cost import CallCost
@@ -160,7 +161,7 @@ class LastCycleResponse(BaseModel):
 
 class FlowOverviewResponse(BaseModel):
     """A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most
-    recent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127).
+    recent, how its capital is doing and its results in the period asked for (R1.7.3, R2.2.2, ADR 0127, R6.4.2).
     """
 
     id: UUID
@@ -180,6 +181,8 @@ class FlowOverviewResponse(BaseModel):
     current_capital: str | None
     return_percent: str | None
     recent_outcomes: list[LastCycleResponse]
+    # Empty for a draft, which has no account yet (ADR 0124).
+    summary: FlowResultsResponse | None
 
     @classmethod
     def of(cls, overview: FlowOverview) -> FlowOverviewResponse:
@@ -203,6 +206,7 @@ class FlowOverviewResponse(BaseModel):
                 LastCycleResponse(planned_at=record.planned_at, outcome=record.outcome.value)
                 for record in overview.recent_cycles
             ],
+            summary=None if overview.results is None else FlowResultsResponse.of(overview.results),
         )
 
 
@@ -222,8 +226,12 @@ def cycles_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRou
     @router.get("/flows/overview")
     def list_flow_overviews(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        period: Annotated[str, Query(description="all, 7d, 30d o range")] = "all",
+        first_day: Annotated[date | None, Query(alias="from", description="primo giorno di un intervallo")] = None,
+        last_day: Annotated[date | None, Query(alias="to", description="ultimo giorno di un intervallo")] = None,
     ) -> list[FlowOverviewResponse]:
-        return [FlowOverviewResponse.of(overview) for overview in use_cases.list_flow_overviews.execute()]
+        command = ListFlowOverviewsCommand(period, first_day, last_day)
+        return [FlowOverviewResponse.of(overview) for overview in use_cases.list_flow_overviews.execute(command)]
 
     @router.get("/flows/{flow_id}/cycles")
     def list_cycles(

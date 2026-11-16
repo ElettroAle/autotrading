@@ -117,6 +117,15 @@ class SqlAlchemyCycleRepositoryAdapter:
             row = connection.execute(query).mappings().first()
         return None if row is None else record_of(row)
 
+    def failed_within(self, flow_id: UUID, window: TimeWindow) -> int:
+        query = select(func.count()).where(
+            cycles.c.flow_id == flow_id,
+            cycles.c.outcome == CycleOutcome.FAILED.name.lower(),
+            within(cycles.c.planned_at, window),
+        )
+        with self._transaction() as connection:
+            return connection.execute(query).scalar_one()
+
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         return self.costs_within(flow_id, TimeWindow())
 

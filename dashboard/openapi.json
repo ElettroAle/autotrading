@@ -2549,27 +2549,89 @@
         ],
         "summary": "List Flow Overviews",
         "operationId": "list_flow_overviews_flows_overview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "all, 7d, 30d o range",
+              "default": "all",
+              "title": "Period"
+            },
+            "description": "all, 7d, 30d o range"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primo giorno di un intervallo",
+              "title": "From"
+            },
+            "description": "primo giorno di un intervallo"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ultimo giorno di un intervallo",
+              "title": "To"
+            },
+            "description": "ultimo giorno di un intervallo"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FlowOverviewResponse"
                   },
-                  "type": "array",
                   "title": "Response List Flow Overviews Flows Overview Get"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/flows/{flow_id}/cycles": {
@@ -4897,6 +4959,16 @@
             },
             "type": "array",
             "title": "Recent Outcomes"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowResultsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4915,10 +4987,11 @@
           "initial_capital",
           "current_capital",
           "return_percent",
-          "recent_outcomes"
+          "recent_outcomes",
+          "summary"
         ],
         "title": "FlowOverviewResponse",
-        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent and how its capital is doing (R1.7.3, R2.2.2, ADR 0127)."
+        "description": "A flow in use with its last cycle, the next planned one, the outcomes of its last ten cycles from the most\nrecent, how its capital is doing and its results in the period asked for (R1.7.3, R2.2.2, ADR 0127, R6.4.2)."
       },
       "FlowPositionResponse": {
         "properties": {
