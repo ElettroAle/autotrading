@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
-/** A draft has only the strategy: account, capital and assets come before it starts (ADR 0124). */
+/** A draft runs no cycle: account, capital and assets are set in its configuration before it starts (ADR 0124). */
 export const DRAFT_STATUS = 'bozza';
 
 export const FLOWS_QUERY_KEY = ['flows'];

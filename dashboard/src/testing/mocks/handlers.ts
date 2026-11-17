@@ -444,8 +444,6 @@ const attachmentOf = (flowName: string): string => {
   return `attachment; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 };
 
-type AssignmentRequest = { account_id: string; allocated_capital: string; assets?: string[] };
-
 export const handlers = [
   // Before the routes of one flow, as on the API: the fixed path is not the identifier of a flow (R3.2.3).
   ...emergencyClosingHandlers,
@@ -704,19 +702,6 @@ export const handlers = [
       return HttpResponse.json(flowResponse(fakePlatform.importStrategy(user, name, document)), {
         status: 201,
       });
-    }),
-  ),
-  http.put('*/flows/:flowId/assignment', ({ request, params }) =>
-    withUser(request, async (user) => {
-      const body = (await request.json()) as AssignmentRequest;
-      const assignment = {
-        accountId: body.account_id,
-        allocatedCapital: Number(body.allocated_capital),
-        assets: body.assets ?? [],
-      };
-      return HttpResponse.json(
-        flowResponse(fakePlatform.assign(user, String(params.flowId), assignment)),
-      );
     }),
   ),
   http.post('*/flows/:flowId/start', ({ request, params }) =>

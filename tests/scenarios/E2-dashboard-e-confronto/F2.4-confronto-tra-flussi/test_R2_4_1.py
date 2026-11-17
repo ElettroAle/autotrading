@@ -7,6 +7,7 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.errors import FlowNotFoundError
+from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.domain.flows.free_capital import FreeCapital
 from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, shared by the features
@@ -128,6 +129,26 @@ def copy_strategy(
         original.risk_limits,
         original.cycle_interval,
     )
+
+
+@then(quoted('ha il conto "{account}" e il capitale allocato del flusso "{original}"'))
+def copy_assignment(platform: Platform, lifecycle: Lifecycle, draft: Draft, account: str, original: str) -> None:
+    copy = flow_named(platform, lifecycle.user, draft.name)
+    assert copy.account_id == account_id_of(platform, lifecycle.user, account)
+    capital = flow_named(platform, lifecycle.user, original).configuration.allocated_capital
+    assert copy.configuration.allocated_capital == capital
+
+
+@then("non ha asset")
+def copy_without_assets(platform: Platform, lifecycle: Lifecycle, draft: Draft) -> None:
+    assert flow_named(platform, lifecycle.user, draft.name).configuration.assets == ()
+
+
+@when(quoted('"{user}" sceglie per il flusso "{name}" l\'asset "{asset}"'))
+def choose_asset(platform: Platform, lifecycle: Lifecycle, user: str, name: str, asset: str) -> None:
+    command = ModifyFlowCommand(flow_named(platform, user, name).id, assets=(asset,))
+    attempt(lifecycle, lambda: platform.use_cases_of(user).modify_flow.execute(command))
+    assert lifecycle.error is None
 
 
 @when(quoted('passa un intervallo intero del flusso "{name}"'))

@@ -46,6 +46,12 @@ export const flowSchema = z.object({
 
 export type Flow = z.infer<typeof flowSchema>;
 
+/**
+ * A draft takes account, capital and assets in its configuration; any other flow keeps its account and changes its
+ * capital with its own command (ADR bozza-configurata-dall-editor-e-duplica-con-conto).
+ */
+export const isDraft = (flow: Flow): boolean => flow.status === 'bozza';
+
 /** The flow with the configuration version in force; the API lists only the flows of the tenant (R0.1.3). */
 export const useFlow = (flowId: string) => {
   const api = useApiClient();

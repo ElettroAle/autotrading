@@ -69,6 +69,15 @@ const FLOW: Flow = {
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
 
+// A draft as an imported file makes it: the strategy alone (R2.5.2).
+const DRAFT: Flow = {
+  ...FLOW,
+  status: 'bozza',
+  account_id: null,
+  allocated_capital: null,
+  assets: [],
+};
+
 describe('creationRequestOf', () => {
   it('sends the configuration the user filled, leaving to the API the defaults of the blank values', () => {
     expect(creationRequestOf(filled())).toEqual({
@@ -384,6 +393,29 @@ describe('changesOf', () => {
     expect(changesOf(limited, { ...formValuesOf(limited), max_drawdown_percent: '' })).toEqual({
       settings: { max_drawdown_percent: null },
     });
+  });
+
+  it('sends a new name, trimmed, with the settings (ADR nome-del-flusso-modificabile)', () => {
+    const values = { ...formValuesOf(FLOW), name: ' beta ', instructions: 'audace' };
+
+    expect(changesOf(FLOW, values)).toEqual({ settings: { name: 'beta', instructions: 'audace' } });
+  });
+
+  it('sends account, capital and assets of a draft with its configuration (ADR assegnazione-della-bozza)', () => {
+    const values = {
+      ...formValuesOf(DRAFT),
+      account_id: 'account-secondario',
+      allocated_capital: '200,5',
+      assets: ['ETH'],
+    };
+
+    expect(changesOf(DRAFT, values)).toEqual({
+      settings: { account_id: 'account-secondario', assets: ['ETH'], allocated_capital: '200.5' },
+    });
+  });
+
+  it('sends nothing for a draft whose account, capital and assets are left blank', () => {
+    expect(changesOf(DRAFT, formValuesOf(DRAFT))).toEqual({ settings: {} });
   });
 
   it('keeps the capital apart, as it changes through its own request', () => {

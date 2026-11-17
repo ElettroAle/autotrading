@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 import pytest
 
@@ -20,7 +21,7 @@ def drafts() -> Drafts:
     return Drafts()
 
 
-def test_the_copy_is_saved_as_a_draft_with_the_strategy_at_its_first_version(
+def test_the_copy_is_saved_as_a_draft_with_strategy_account_and_capital_at_its_first_version(
     drafts: Drafts, caplog: pytest.LogCaptureFixture
 ) -> None:
     original = drafts.original()
@@ -32,9 +33,10 @@ def test_the_copy_is_saved_as_a_draft_with_the_strategy_at_its_first_version(
     assert (copy.name, copy.status, copy.account_id, copy.configuration.version) == (
         FlowName("alfa (copia)"),
         FlowStatus.DRAFT,
-        None,
+        drafts.account_id,
         FIRST_VERSION,
     )
+    assert (copy.configuration.allocated_capital, copy.configuration.assets) == (Decimal(100), ())
     assert drafts.repository.get(original.id) == original
     assert [(record.getMessage(), record.__dict__["flow_id"]) for record in caplog.records] == [
         ("flusso duplicato", str(copy.id.value))

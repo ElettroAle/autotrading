@@ -32,10 +32,25 @@ type FlowFormProps = {
   readonly sources: Source[];
   readonly systemPrompt: DefaultSystemPrompt;
   readonly submitLabel: string;
-  /** Whether the name is fixed: the API changes every setting of a flow but its name (R1.1.3). */
-  readonly nameFixed?: boolean;
+  /** Whether the account is chosen: at creation and on a draft; any other flow keeps its own (ADR
+   * assegnazione-della-bozza-nel-form-di-configurazione). */
+  readonly accountChosen?: boolean;
   readonly onSave: (values: FlowFormValues) => Promise<unknown>;
 };
+
+/** The account of the flow, read and not chosen, by its name when the accounts are read (R1.1.1). */
+const FixedAccount = ({ accountId, accounts }: { accountId: string; accounts: Account[] }) => (
+  <FormField id="flow-account" label="Conto" error={undefined}>
+    {(control) => (
+      <input
+        {...control}
+        readOnly
+        value={accounts.find((account) => account.id === accountId)?.name ?? accountId}
+        className={FORM_CONTROL}
+      />
+    )}
+  </FormField>
+);
 
 /**
  * The whole configuration of a flow in one form (ADR 0131): the choices of sources and models come from the catalogs,
@@ -49,7 +64,7 @@ export const FlowForm = ({
   sources,
   systemPrompt,
   submitLabel,
-  nameFixed = false,
+  accountChosen = true,
   onSave,
 }: FlowFormProps) => {
   const form = useForm<FlowFormValues>({ resolver: zodResolver(flowFormSchema), values });
@@ -85,27 +100,24 @@ export const FlowForm = ({
           </p>
         )}
         <FormField id="flow-name" label="Nome" error={errors.name?.message}>
-          {(control) => (
-            <input
-              {...control}
-              {...register('name')}
-              readOnly={nameFixed}
-              className={FORM_CONTROL}
-            />
-          )}
+          {(control) => <input {...control} {...register('name')} className={FORM_CONTROL} />}
         </FormField>
-        <FormField id="flow-account" label="Conto" error={errors.account_id?.message}>
-          {(control) => (
-            <select {...control} {...register('account_id')} className={FORM_CONTROL}>
-              <option value="">Scegli un conto</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </FormField>
+        {accountChosen ? (
+          <FormField id="flow-account" label="Conto" error={errors.account_id?.message}>
+            {(control) => (
+              <select {...control} {...register('account_id')} className={FORM_CONTROL}>
+                <option value="">Scegli un conto</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
+        ) : (
+          <FixedAccount accountId={values.account_id} accounts={accounts} />
+        )}
         <Controller
           control={control}
           name="assets"

@@ -9,6 +9,10 @@ import { renderApp } from '@/testing/test-utils';
 
 const DAY = 24 * 60 * 60_000;
 
+// ADR-spaziatura-tra-stato-e-avviso-della-rete (Bug 581): the badge of the status and the notice of the network
+// share a flex container with the standard gap, with no margin of their own.
+const STATUS_AND_NETWORK = ['flex', 'flex-wrap', 'items-center', 'gap-2'];
+
 describe('FlowView', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
@@ -167,6 +171,19 @@ describe('FlowView', () => {
     expect(
       screen.queryByRole('region', { name: 'Riepilogo dei risultati' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the badge of a draft apart from the notice of the test network, with the standard gap', async () => {
+    fakePlatform.configureExchangeNetwork('test', 'sandbox');
+    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+
+    const status = await screen.findByRole('group', { name: 'Stato del flusso' });
+    const badge = within(status).getByText('Bozza');
+    const notice = await within(status).findByText(/rete di test "sandbox"/);
+    expect(status).toHaveClass(...STATUS_AND_NETWORK);
+    expect(badge.className).not.toMatch(/\bm[trblxy]?-/);
+    expect(notice.className).not.toMatch(/\bm[trblxy]?-/);
   });
 
   it('shows no summary for a draft, which has no account yet', async () => {

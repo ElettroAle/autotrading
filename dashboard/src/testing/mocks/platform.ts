@@ -1,4 +1,4 @@
-import { FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
+import { FAKE_SYSTEM_PROMPT } from './catalogs';
 import { fakeClock } from './clock';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
@@ -287,12 +287,6 @@ export type FlowOptions = Partial<Omit<FakeFlow, 'id' | 'name' | 'accountId'>> &
   readonly accountName?: string;
 };
 
-export type Assignment = {
-  readonly accountId: string;
-  readonly allocatedCapital: number;
-  readonly assets: string[];
-};
-
 /** The strategy file of a flow, as the API writes it: no account, capital, assets or keys (R2.5.2, ADR 0140). */
 export type FakeStrategyDocument = {
   readonly format: string;
@@ -374,7 +368,6 @@ const TRANSITIONS: Record<FakeFlowCommand, Transition> = {
   stop: { from: [ACTIVE, PAUSED], to: STOPPED, refusal: refusedFor('ferma') },
   archive: { from: [STOPPED], to: ARCHIVED, refusal: () => 'si archivia solo un flusso fermo' },
 };
-const TRADABLE_ASSETS = new Set(FAKE_TRADABLE_ASSETS);
 
 // Every flow, new or existing, has a stop loss default; 5% when nobody gave one (R3.1.2).
 const DEFAULT_STOP_LOSS_PERCENT = '5';
@@ -1028,7 +1021,13 @@ export const fakePlatform = {
     const original = flowOf(user, flowId);
     const name = `${original.name} (copia)`;
     requireFreeName(user, name);
-    const copy = draftOf(name, original);
+    // The copy keeps account and capital of the original, not its assets: two flows of one account never share
+    // one (RF-02.05, ADR bozza-configurata-dall-editor-e-duplica-con-conto).
+    const copy = {
+      ...draftOf(name, original),
+      accountId: original.accountId,
+      allocatedCapital: original.allocatedCapital,
+    };
     user.flows.push(copy);
     return copy;
   },
@@ -1072,36 +1071,6 @@ export const fakePlatform = {
     });
     user.flows.push(draft);
     return draft;
-  },
-
-  assign(user: FakeUser, flowId: string, assignment: Assignment): FakeFlow {
-    const flow = flowOf(user, flowId);
-    if (flow.status !== DRAFT) {
-      throw new FakeRefusal(409, 'conto, capitale e asset si assegnano solo a un flusso in bozza');
-    }
-    const assets = [
-      ...new Set(assignment.assets.map((asset) => asset.trim().toUpperCase()).filter(Boolean)),
-    ];
-    if (assets.length === 0) {
-      throw new FakeRefusal(422, 'almeno un asset è obbligatorio');
-    }
-    const account = user.accounts.find((candidate) => candidate.id === assignment.accountId);
-    if (account === undefined) {
-      throw new FakeRefusal(404, 'conto non trovato');
-    }
-    const refused = assets.filter((asset) => !TRADABLE_ASSETS.has(asset));
-    if (refused.length > 0) {
-      throw new FakeRefusal(422, `asset non negoziabile sull'exchange: ${refused.join(', ')}`);
-    }
-    const free = freeCapital(user, account);
-    if (assignment.allocatedCapital > free) {
-      throw new FakeRefusal(422, `capitale allocato oltre il capitale libero: ${free} USDC`);
-    }
-    flow.accountId = account.id;
-    flow.allocatedCapital = assignment.allocatedCapital;
-    flow.assets = assets;
-    flow.version += 1;
-    return flow;
   },
 
   start(user: FakeUser, flowId: string): FakeFlow {

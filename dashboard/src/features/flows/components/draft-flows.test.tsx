@@ -15,18 +15,6 @@ const detail = (label: string) =>
 const openConfiguration = async () =>
   userEvent.click(await screen.findByRole('link', { name: 'Configurazione' }));
 
-const assignmentForm = () => screen.getByRole('form', { name: 'Assegnazione della bozza' });
-
-/** Chooses an asset as a user does: typing its name and picking it among the tradable ones. */
-const chooseAsset = async (asset: string) => {
-  await userEvent.type(await screen.findByLabelText('Asset', { exact: true }), asset);
-  await userEvent.click(
-    within(screen.getByRole('list', { name: 'Asset negoziabili' })).getByRole('button', {
-      name: asset,
-    }),
-  );
-};
-
 describe('Draft flows', () => {
   beforeEach(() => {
     fakePlatform.addUser('anna', { hasUserRole: true });
@@ -42,9 +30,7 @@ describe('Draft flows', () => {
 
     expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Avvia' })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('form', { name: 'Assegnazione della bozza' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('note', { name: 'Da configurare' })).not.toBeInTheDocument();
     await openConfiguration();
 
     await waitFor(() => expect(detail('Conto')).toBe('principale'));
@@ -55,7 +41,7 @@ describe('Draft flows', () => {
     expect(detail('Asset')).toBe('BTC');
   });
 
-  it('duplicates the flow and opens the draft, labelled and without account, capital or assets', async () => {
+  it('duplicates the flow and opens the draft, labelled, with account and capital of the original and no assets', async () => {
     const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Duplica' }));
@@ -68,8 +54,8 @@ describe('Draft flows', () => {
     expect(detail('Versione')).toBe('1');
     expect(detail('Fonti')).toBe('indicatori (peso 2)');
     expect([detail('Conto'), detail('Capitale allocato'), detail('Asset')]).toEqual([
-      'da assegnare',
-      'da assegnare',
+      'principale',
+      '100 USDC',
       'da assegnare',
     ]);
   });
@@ -85,116 +71,17 @@ describe('Draft flows', () => {
     );
   });
 
-  it('assigns account, capital and assets to the draft as its next version', async () => {
+  it('says on the overview of the copy what it lacks to start and leads to its configuration', async () => {
     fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+    const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
 
-    await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
-    await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '200');
-    await chooseAsset('BTC');
-    await chooseAsset('ETH');
-    await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
-    await openConfiguration();
-
-    await waitFor(() => expect(detail('Conto')).toBe('secondario'));
-    expect(detail('Versione')).toBe('2');
-    expect(detail('Capitale allocato')).toBe('200 USDC');
-    expect(detail('Asset')).toBe('BTC, ETH');
-  });
-
-  it('asks for every field of the assignment before sending it', async () => {
-    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
-
-    await userEvent.type(await screen.findByLabelText('Capitale allocato (USDC)'), '-3');
-    await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
-
-    const form = assignmentForm();
-    expect(await within(form).findByText('scegli un conto')).toBeInTheDocument();
-    expect(within(form).getByText('il capitale allocato deve essere positivo')).toBeInTheDocument();
-    expect(within(form).getByText('almeno un asset è obbligatorio')).toBeInTheDocument();
-    await openConfiguration();
-    await waitFor(() => expect(detail('Versione')).toBe('1'));
-  });
-
-  it('shows the refusal of the API beside the form', async () => {
-    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
-
-    await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
-    await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '5000');
-    await chooseAsset('BTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
-
-    expect(await within(assignmentForm()).findByRole('alert')).toHaveTextContent(
-      'capitale allocato oltre il capitale libero: 1000 USDC',
+    expect(await screen.findByRole('note', { name: 'Da configurare' })).toHaveTextContent(
+      "Prima dell'avvio manca: asset",
     );
-  });
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'Configura' }));
 
-  it('shows beside each field what the API finds invalid in it', async () => {
-    server.use(
-      http.put('*/flows/:flowId/assignment', () =>
-        HttpResponse.json(
-          {
-            detail: 'richiesta non valida',
-            errors: [{ loc: ['body', 'allocated_capital'], msg: 'numero non valido' }],
-          },
-          { status: 422 },
-        ),
-      ),
-    );
-    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
-
-    await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
-    await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '200');
-    await chooseAsset('BTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
-
-    expect(await within(assignmentForm()).findByText('numero non valido')).toBeInTheDocument();
-    expect(within(assignmentForm()).getByRole('alert')).toHaveTextContent('richiesta non valida');
-  });
-
-  it('keeps at form level what the API finds invalid outside the fields of the form', async () => {
-    server.use(
-      http.put('*/flows/:flowId/assignment', () =>
-        HttpResponse.json(
-          { detail: 'richiesta non valida', errors: [{ loc: ['body'], msg: 'corpo assente' }] },
-          { status: 422 },
-        ),
-      ),
-    );
-    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
-
-    await userEvent.selectOptions(await screen.findByLabelText('Conto'), 'secondario');
-    await userEvent.type(screen.getByLabelText('Capitale allocato (USDC)'), '200');
-    await chooseAsset('BTC');
-    await userEvent.click(screen.getByRole('button', { name: 'Assegna' }));
-
-    expect(await within(assignmentForm()).findByRole('alert')).toHaveTextContent(
-      'richiesta non valida',
-    );
-    expect(within(assignmentForm()).queryByText('corpo assente')).not.toBeInTheDocument();
-  });
-
-  it('sends no assignment while the API cannot list the assets', async () => {
-    server.use(
-      http.get('*/assets', () =>
-        HttpResponse.json(
-          { detail: 'exchange non raggiungibile, riprovare' },
-          { status: 503, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
-      ),
-    );
-    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
-
-    const form = await screen.findByRole('form', { name: 'Assegnazione della bozza' });
-    expect(await within(form).findByRole('alert')).toHaveTextContent(
-      'Impossibile leggere gli asset negoziabili: exchange non raggiungibile, riprovare',
-    );
-    expect(within(form).getByRole('button', { name: 'Assegna' })).toBeDisabled();
+    expect(router.state.location.pathname).toBe('/flows/flow-alfa%20(copia)/edit');
   });
 
   it('names the account by its identifier while the accounts cannot be read', async () => {
@@ -207,11 +94,7 @@ describe('Draft flows', () => {
   it('starts the assigned draft', async () => {
     const anna = fakePlatform.user('anna');
     const copy = fakePlatform.duplicate(anna, 'flow-alfa');
-    fakePlatform.assign(anna, copy.id, {
-      accountId: 'account-secondario',
-      allocatedCapital: 200,
-      assets: ['BTC'],
-    });
+    fakePlatform.changeFlow(copy.name, { accountId: 'account-secondario', assets: ['BTC'] });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
@@ -223,11 +106,7 @@ describe('Draft flows', () => {
   it('offers to start the assigned draft in green with the icon play (R6.5.3)', async () => {
     const anna = fakePlatform.user('anna');
     const copy = fakePlatform.duplicate(anna, 'flow-alfa');
-    fakePlatform.assign(anna, copy.id, {
-      accountId: 'account-secondario',
-      allocatedCapital: 200,
-      assets: ['BTC'],
-    });
+    fakePlatform.changeFlow(copy.name, { accountId: 'account-secondario', assets: ['BTC'] });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
 
     const start = await screen.findByRole('button', { name: 'Avvia' });
@@ -240,11 +119,7 @@ describe('Draft flows', () => {
     fakePlatform.configureExchangeNetwork('real');
     const anna = fakePlatform.user('anna');
     const copy = fakePlatform.duplicate(anna, 'flow-alfa');
-    fakePlatform.assign(anna, copy.id, {
-      accountId: 'account-secondario',
-      allocatedCapital: 200,
-      assets: ['BTC'],
-    });
+    fakePlatform.changeFlow(copy.name, { accountId: 'account-secondario', assets: ['BTC'] });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
@@ -260,11 +135,7 @@ describe('Draft flows', () => {
     fakePlatform.configureExchangeNetwork('real');
     const anna = fakePlatform.user('anna');
     const copy = fakePlatform.duplicate(anna, 'flow-alfa');
-    fakePlatform.assign(anna, copy.id, {
-      accountId: 'account-secondario',
-      allocatedCapital: 200,
-      assets: ['BTC'],
-    });
+    fakePlatform.changeFlow(copy.name, { accountId: 'account-secondario', assets: ['BTC'] });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
@@ -280,9 +151,7 @@ describe('Draft flows', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Avvia' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Avvio rifiutato: conto, capitale allocato e asset mancanti',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Avvio rifiutato: asset mancante');
     expect(screen.getByText('Bozza')).toBeInTheDocument();
   });
 });

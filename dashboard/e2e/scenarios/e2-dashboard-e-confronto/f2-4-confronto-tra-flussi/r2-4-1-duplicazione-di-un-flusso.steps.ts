@@ -62,6 +62,29 @@ Then(
   },
 );
 
+Then(
+  'ha il conto {string} e il capitale allocato del flusso {string}',
+  async ({ dashboard }, accountName: string, original: string) => {
+    await expect(dashboard.detail('Conto')).toHaveText(accountName);
+    await expect(dashboard.detail('Capitale allocato')).toHaveText(
+      `${fakePlatform.flowNamed(original).allocatedCapital} USDC`,
+    );
+  },
+);
+
+Then('non ha asset', async ({ dashboard }) => {
+  await expect(dashboard.detail('Asset')).toHaveText('da assegnare');
+});
+
+When(
+  "{string} sceglie per il flusso {string} l'asset {string}",
+  async ({ dashboard, memory }, account: string, flow: string, asset: string) => {
+    await onFlowPage(dashboard, memory, account, flow);
+    await dashboard.configureDraft({ assets: asset });
+    expect(fakePlatform.flowNamed(flow).assets).toEqual([asset]);
+  },
+);
+
 When('passa un intervallo intero del flusso {string}', async ({ memory }, flow: string) => {
   memory.freeCapital = fakePlatform.freeCapitalOf('anna', 'principale');
   fakePlatform.passMinutes(fakePlatform.flowNamed(flow).cycleMinutes);
@@ -79,7 +102,7 @@ Then(
 );
 
 When(
-  '{string} avvia il flusso {string} senza assegnare conto, capitale e asset',
+  '{string} avvia il flusso {string} senza scegliere gli asset',
   async ({ dashboard, memory }, account: string, flow: string) => {
     await onFlowPage(dashboard, memory, account, flow);
     await dashboard.command('Avvia');

@@ -4,14 +4,15 @@ from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid4
 
-from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand, AssignDraftFlowUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand, ChangeFlowStatusUseCase
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand, DuplicateFlowUseCase
+from autotrading.application.flows.modify_flow import ModifyFlowCommand, ModifyFlowUseCase
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.markets import FakeMarketsAdapter
@@ -42,7 +43,8 @@ class Drafts:
         self.running_verifications: RunningVerifications = set()
         verifications = InMemoryRunningVerificationsAdapter(self.running_verifications)
         self.duplicate = DuplicateFlowUseCase(self.repository)
-        self.assign = AssignDraftFlowUseCase(self.repository, checks)
+        self.activity = FakeAccountActivityAdapter()
+        self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)
         self.change_status = ChangeFlowStatusUseCase(self.repository, verifications, self.accounts.ports())
 
     def original(self, name: str = "alfa", assets: tuple[str, ...] = ("BTC",), capital: int = 100) -> Flow:
@@ -58,8 +60,9 @@ class Drafts:
         return self.duplicate.execute(DuplicateFlowCommand(self.original().id))
 
     def assigned_draft(self, assets: tuple[str, ...] = ("ETH",), capital: int = 200) -> Flow:
-        command = AssignDraftFlowCommand(self.draft().id, self.account_id, Decimal(capital), assets)
-        return self.assign.execute(command)
+        """The copy with the assets chosen in its configuration and the capital the test sets."""
+        command = ModifyFlowCommand(self.draft().id, allocated_capital=Decimal(capital), assets=assets)
+        return self.modify.execute(command)
 
     def start(self, flow: Flow) -> Flow:
         return self.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.START))

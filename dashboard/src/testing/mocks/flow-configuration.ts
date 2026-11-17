@@ -409,16 +409,77 @@ const changed = <T>(requested: unknown, current: T, read: (value: unknown) => T)
 const sentOr = (requested: unknown, current: string | null): unknown =>
   requested === undefined ? current : requested;
 
-/** PATCH /flows/{id}: only the parts sent change, as the next configuration version. */
+const DRAFT = 'bozza';
+
+// The name of another flow of the user is taken (ADR nome-del-flusso-modificabile).
+const renamed = (user: FakeUser, flow: FakeFlow, requested: unknown): string => {
+  if (requested === undefined || requested === null) {
+    return flow.name;
+  }
+  const name = textOf(requested).trim();
+  if (name === '') {
+    throw new Refusal(422, 'nome del flusso obbligatorio', 'name');
+  }
+  if (user.flows.some((other) => other !== flow && other.name === name)) {
+    throw new Refusal(409, 'nome già usato da un altro flusso', 'name');
+  }
+  return name;
+};
+
+/**
+ * Account and capital a modification sends: a draft takes them, within the free capital of the account; any other flow
+ * keeps its own (R1.1.7, ADR bozza-configurata-dall-editor-e-duplica-con-conto).
+ */
+const assignmentOf = (
+  user: FakeUser,
+  flow: FakeFlow,
+  request: ConfigurationRequest,
+): Pick<FakeFlow, 'accountId' | 'allocatedCapital'> => {
+  const accountId = request.account_id === undefined ? flow.accountId : textOf(request.account_id);
+  const capital =
+    request.allocated_capital === undefined
+      ? flow.allocatedCapital
+      : capitalOf(request.allocated_capital);
+  if (flow.status !== DRAFT && accountId !== flow.accountId) {
+    throw new Refusal(422, 'il conto di un flusso non si cambia', 'account_id');
+  }
+  if (flow.status !== DRAFT && capital !== flow.allocatedCapital) {
+    throw new Refusal(
+      422,
+      'il capitale allocato di un flusso avviato si cambia con il comando del capitale',
+      'allocated_capital',
+    );
+  }
+  if (flow.status === DRAFT && accountId !== null) {
+    const free = freeCapitalOf(user, accountOf(user, accountId));
+    if (capital !== null && capital > free) {
+      throw new Refusal(
+        422,
+        `capitale allocato oltre il capitale libero: ${moneyText(free, CURRENCY)}`,
+        'allocated_capital',
+      );
+    }
+  }
+  return { accountId, allocatedCapital: capital };
+};
+
+// Only the name sent: the name is not part of the strategy, so the version stays (ADR nome-del-flusso-modificabile).
+const nameAlone = (request: ConfigurationRequest): boolean =>
+  Object.keys(request).every((key) => key === 'name');
+
+/** PATCH /flows/{id}: only the parts sent change, as the next configuration version; a new name alone, as it is. */
 export const modifyFlow = (
   user: FakeUser,
   flowId: string,
   request: ConfigurationRequest,
 ): FakeFlow => {
   const flow = flowOf(user, flowId);
-  if (request.account_id !== undefined && request.account_id !== flow.accountId) {
-    throw new Refusal(422, 'il conto di un flusso non si cambia', 'account_id');
+  const name = renamed(user, flow, request.name);
+  if (nameAlone(request)) {
+    flow.name = name;
+    return flow;
   }
+  const assignment = assignmentOf(user, flow, request);
   const assets = changed(request.assets, flow.assets, assetsOf);
   const model =
     request.model === undefined && request.model_parameters === undefined
@@ -485,8 +546,11 @@ export const modifyFlow = (
         ? flow.openingsResume
         : openingsResumeOf(request.openings_resume),
   };
-  requireAssetsFree(user, flow.accountId ?? '', assets, flow);
-  return nextVersionOf(flow, changes);
+  // A draft takes nothing on its account until it starts: the conflict on the assets waits for the start (ADR 0124).
+  if (flow.status !== DRAFT) {
+    requireAssetsFree(user, flow.accountId ?? '', assets, flow);
+  }
+  return nextVersionOf(flow, { ...changes, ...assignment, name });
 };
 
 /** PUT /flows/{id}/allocated-capital: the new capital, within what the account has free, as a new version. */

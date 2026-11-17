@@ -13,7 +13,6 @@ from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
-from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
 from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
@@ -114,9 +113,15 @@ class FlowCreationRequest(BaseModel):
 
 
 class FlowModificationRequest(BaseModel):
-    """Only the parts the user changes; the others keep the version in force (R1.1.3)."""
+    """Only the parts the user changes; the others keep the version in force (R1.1.3).
 
+    Account and allocated capital are taken by a draft (ADR bozza-configurata-dall-editor-e-duplica-con-conto); the
+    name by every flow not archived (ADR nome-del-flusso-modificabile).
+    """
+
+    name: str | None = None
     account_id: UUID | None = None
+    allocated_capital: Decimal | None = None
     assets: list[str] | None = None
     cycle_minutes: int | None = None
     model: str | None = None
@@ -146,7 +151,9 @@ class FlowModificationRequest(BaseModel):
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
             flow_id=FlowId(flow_id),
+            name=self.name,
             account_id=self.account_id,
+            allocated_capital=self.allocated_capital,
             assets=None if self.assets is None else tuple(self.assets),
             model=self.model,
             model_parameters=self.model_parameters,
@@ -183,17 +190,6 @@ class FlowModificationRequest(BaseModel):
 
     def _sent_as_null(self, field: str) -> bool:
         return field in self.model_fields_set and getattr(self, field) is None
-
-
-class DraftAssignmentRequest(BaseModel):
-    """Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason."""
-
-    account_id: UUID
-    allocated_capital: Decimal
-    assets: list[str] = Field(default_factory=list)
-
-    def command(self, flow_id: UUID) -> AssignDraftFlowCommand:
-        return AssignDraftFlowCommand(FlowId(flow_id), self.account_id, self.allocated_capital, tuple(self.assets))
 
 
 class ModelSelectionResponse(BaseModel):
@@ -578,14 +574,6 @@ def flows_router(
             StrategyDocument.of(exported.strategy).model_dump(mode="json"),
             headers={"Content-Disposition": attachment_of(exported.flow_name.value)},
         )
-
-    @router.put("/flows/{flow_id}/assignment")
-    def assign_draft_flow(
-        flow_id: UUID,
-        request: DraftAssignmentRequest,
-        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
-    ) -> FlowResponse:
-        return FlowResponse.of(use_cases.assign_draft_flow.execute(request.command(flow_id)))
 
     @router.post("/flows/{flow_id}/openings/resume", status_code=204)
     def resume_flow_openings(

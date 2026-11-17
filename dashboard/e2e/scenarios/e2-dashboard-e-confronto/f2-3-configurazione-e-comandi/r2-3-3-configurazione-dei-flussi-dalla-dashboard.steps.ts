@@ -174,6 +174,18 @@ When(
 );
 
 When(
+  '{string} rinomina il flusso {string} in {string}',
+  async ({ dashboard, memory }, account: string, name: string, newName: string) => {
+    expectSignedIn(memory, account);
+    await dashboard.openFlowEditor(name);
+    await dashboard.field('Nome').fill(newName);
+    await dashboard.button(SAVE).click();
+    await expect(dashboard.message('Modifiche salvate')).toBeVisible();
+    await dashboard.open('/');
+  },
+);
+
+When(
   '{string} aggiunge {string} al flusso {string}',
   async ({ dashboard, memory }, account: string, asset: string, name: string) => {
     expectSignedIn(memory, account);
