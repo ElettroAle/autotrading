@@ -21,7 +21,12 @@ const flowSchema = z.object({ name: z.string() });
 
 const clientWith = (accessToken: () => Promise<string> = () => Promise.resolve('token-1')) => {
   const onSessionExpired = vi.fn();
-  return { api: createApiClient({ accessToken, onSessionExpired }), onSessionExpired };
+  const onAccessRefused = vi.fn();
+  return {
+    api: createApiClient({ accessToken, onSessionExpired, onAccessRefused }),
+    onSessionExpired,
+    onAccessRefused,
+  };
 };
 
 const readIdentity = async (api: ApiClient) => readData(await api.GET('/me'), identitySchema);
@@ -78,19 +83,24 @@ describe('createApiClient', () => {
     expect(received).toEqual(['/flows/flow%20alfa/cycles?page=2']);
   });
 
+  // A token the API refuses would come back refused after a renewal too: the user signs in, the browser never bounces.
   it('sends the user to sign in again when the API no longer accepts the token', async () => {
     server.use(http.get('*/me', () => HttpResponse.json({}, { status: 401 })));
-    const { api, onSessionExpired } = clientWith();
+    const { api, onSessionExpired, onAccessRefused } = clientWith();
 
     await expect(readIdentity(api)).rejects.toBeInstanceOf(SessionExpiredError);
-    expect(onSessionExpired).toHaveBeenCalledOnce();
+    expect(onAccessRefused).toHaveBeenCalledOnce();
+    expect(onSessionExpired).not.toHaveBeenCalled();
   });
 
-  it('sends the user to sign in again when no token can be had', async () => {
-    const { api, onSessionExpired } = clientWith(() => Promise.reject(new SessionExpiredError()));
+  it('renews the session when no token can be had', async () => {
+    const { api, onSessionExpired, onAccessRefused } = clientWith(() =>
+      Promise.reject(new SessionExpiredError()),
+    );
 
     await expect(readIdentity(api)).rejects.toBeInstanceOf(SessionExpiredError);
     expect(onSessionExpired).toHaveBeenCalledOnce();
+    expect(onAccessRefused).not.toHaveBeenCalled();
   });
 
   it('sends a JSON body with the access token of the user, and reads the answer', async () => {

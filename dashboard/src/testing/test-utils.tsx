@@ -1,4 +1,8 @@
-import { loadExternalTokens, type IPublicClientApplication } from '@azure/msal-browser';
+import {
+  loadExternalTokens,
+  type INavigationClient,
+  type IPublicClientApplication,
+} from '@azure/msal-browser';
 import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { createMemoryRouter } from 'react-router';
@@ -14,6 +18,12 @@ export const TEST_CONFIG: RuntimeConfig = { environment: 'dev', ...FAKE_IDENTITY
 
 export const TEST_REDIRECT_URI = 'http://localhost:3000/dashboard/';
 
+// jsdom cannot leave the page: a redirect to the identity provider stays where it is, as one the browser blocked.
+const stayingNavigation: INavigationClient = {
+  navigateInternal: () => Promise.resolve(false),
+  navigateExternal: () => Promise.resolve(false),
+};
+
 /** A client of the fake identity provider, with the account already signed in when one is given. */
 export const authClientFor = async (account?: string): Promise<IPublicClientApplication> => {
   if (account !== undefined) {
@@ -25,6 +35,7 @@ export const authClientFor = async (account?: string): Promise<IPublicClientAppl
     );
   }
   const client = createAuthClient(FAKE_IDENTITY_PROVIDER, TEST_REDIRECT_URI);
+  client.setNavigationClient(stayingNavigation);
   await completeSignIn(client);
   return client;
 };

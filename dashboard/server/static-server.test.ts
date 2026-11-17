@@ -75,14 +75,44 @@ describe('dashboard server', () => {
     expect(await response.text()).toBe('<html>app</html>');
   });
 
-  it('allows the browser to reach only the dashboard itself and the identity provider', async () => {
+  // ADR content-security-policy-rigida-della-dashboard: the tokens live in localStorage, so no script but the
+  // dashboard's own may run, nothing else may be loaded and the page sits in no frame.
+  const directivesOf = (policy: string): Map<string, string> =>
+    new Map(
+      policy.split(';').map((directive) => {
+        const [name = '', ...sources] = directive.trim().split(' ');
+        return [name, sources.join(' ')];
+      }),
+    );
+
+  it('serves the strict content security policy of the dashboard (ADR content-security-policy-rigida-della-dashboard)', async () => {
     const response = await fetch(`${origin}/dashboard/`);
     const policy = response.headers.get('content-security-policy') ?? '';
 
-    expect(policy).toContain("default-src 'self'");
-    expect(policy).toContain("connect-src 'self' https://login.example.test");
-    expect(policy).toContain("frame-ancestors 'none'");
+    expect(Object.fromEntries(directivesOf(policy))).toEqual({
+      'default-src': "'none'",
+      'script-src': "'self'",
+      'style-src': "'self'",
+      'img-src': "'self' data:",
+      'font-src': "'self'",
+      'connect-src': "'self' https://login.example.test",
+      'manifest-src': "'self'",
+      'frame-src': "'none'",
+      'frame-ancestors': "'none'",
+      'object-src': "'none'",
+      'base-uri': "'none'",
+      'form-action': "'self'",
+    });
+    expect(policy).not.toContain('unsafe-inline');
+    expect(policy).not.toContain('unsafe-eval');
+  });
+
+  it('serves the other security headers of the dashboard', async () => {
+    const response = await fetch(`${origin}/dashboard/`);
+
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000');
   });
 
   it('allows only the dashboard itself while the identity provider is not configured', async () => {
@@ -97,7 +127,7 @@ describe('dashboard server', () => {
 
     const response = await fetch(`${origin}/dashboard/`);
 
-    expect(response.headers.get('content-security-policy')).toContain("connect-src 'self';");
+    expect(response.headers.get('content-security-policy')).toContain("; connect-src 'self';");
   });
 
   it('never serves a file outside the built site', async () => {

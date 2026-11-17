@@ -115,17 +115,28 @@ const fileHeaders = (sitePath: string): Record<string, string> => ({
   'Cache-Control': sitePath.startsWith('/assets/') ? IMMUTABLE : REVALIDATE,
 });
 
+// The tokens live in localStorage (ADR accesso-persistente-con-cache-msal-in-localstorage): only the scripts and styles of
+// the build may run, the page reaches only the API on its own origin and the identity provider, and nothing frames it
+// or is framed (ADR content-security-policy-rigida-della-dashboard).
 const securityHeaders = (config: RuntimeConfig): Record<string, string> => ({
   'Content-Security-Policy': [
-    "default-src 'self'",
-    `connect-src 'self' ${issuerOrigin(config.issuer)}`.trimEnd(),
+    "default-src 'none'",
+    "script-src 'self'",
+    "style-src 'self'",
     "img-src 'self' data:",
+    "font-src 'self'",
+    `connect-src 'self' ${issuerOrigin(config.issuer)}`.trimEnd(),
+    "manifest-src 'self'",
+    "frame-src 'none'",
     "frame-ancestors 'none'",
-    "base-uri 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
     "form-action 'self'",
   ].join('; '),
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
+  // Tailscale Serve answers the installation only over HTTPS (ADR 0013).
+  'Strict-Transport-Security': 'max-age=31536000',
 });
 
 // The browser exchanges the authorization code and refreshes the token with the identity provider (ADR 0118).

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { paths as dashboardPaths } from '@/config/paths';
 
 import type { paths } from './api-schema';
-import { SessionExpiredError, useAccessToken } from './auth';
+import { SessionExpiredError, useAccessToken, useSessionRenewal } from './auth';
 import { problemDetailsOf, type FieldProblem } from './problem-details';
 
 /** An answer of the API other than success, with the reason its Problem Details give (ADR 0027). */
@@ -31,13 +31,20 @@ export type DownloadedFile = { readonly name: string; readonly content: Blob };
 
 type ApiClientOptions = {
   readonly accessToken: () => Promise<string>;
+  /** No token could be had: the session is renewed (ADR accesso-persistente-con-cache-msal-in-localstorage). */
   readonly onSessionExpired: () => void;
+  /** The API refused the token: a renewal would give one it refuses again, so the user signs in. */
+  readonly onAccessRefused: () => void;
 };
 
 const UNAUTHORIZED = 401;
 
 // Dashboard and API share the origin under Tailscale Serve: no CORS, no address to configure (ADR 0117).
-export const createApiClient = ({ accessToken, onSessionExpired }: ApiClientOptions): ApiClient => {
+export const createApiClient = ({
+  accessToken,
+  onSessionExpired,
+  onAccessRefused,
+}: ApiClientOptions): ApiClient => {
   const client = createClient<paths>({ baseUrl: window.location.origin });
   client.use({
     async onRequest({ request }) {
@@ -50,7 +57,7 @@ export const createApiClient = ({ accessToken, onSessionExpired }: ApiClientOpti
     },
     onResponse({ response }) {
       if (response.status === UNAUTHORIZED) {
-        onSessionExpired();
+        onAccessRefused();
         throw new SessionExpiredError();
       }
     },
@@ -142,16 +149,19 @@ export const documentBody = <Body>(document: string) => ({
 
 export const useApiClient = (): ApiClient => {
   const accessToken = useAccessToken();
+  const renewSession = useSessionRenewal();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
-  return useMemo(
-    () =>
-      createApiClient({
-        accessToken,
-        onSessionExpired: () => {
-          void navigate(dashboardPaths.login.getHref(pathname), { replace: true });
-        },
-      }),
-    [accessToken, navigate, pathname],
-  );
+  const { pathname, search } = useLocation();
+  return useMemo(() => {
+    const page = `${pathname}${search}`;
+    return createApiClient({
+      accessToken,
+      onSessionExpired: () => {
+        renewSession(page);
+      },
+      onAccessRefused: () => {
+        void navigate(dashboardPaths.login.getHref(page), { replace: true });
+      },
+    });
+  }, [accessToken, renewSession, navigate, pathname, search]);
 };
