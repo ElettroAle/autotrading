@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { emergencyQuestion, scopeQuery } from './emergency-question';
+import { emergencyCommandLabel, emergencyQuestion, scopeQuery } from './emergency-question';
 
 const FLOW = { kind: 'flow', flowId: 'flow-alfa', flowName: 'alfa' } as const;
 const ACCOUNT = { kind: 'account', accountId: 'account-test-1', accountName: 'test-1' } as const;
@@ -29,6 +29,14 @@ describe('emergencyQuestion', () => {
     expect(emergencyQuestion(FLOW, 0)).toBe(
       'Chiudere 0 posizioni del flusso alfa e metterlo in pausa?',
     );
+  });
+});
+
+describe('emergencyCommandLabel', () => {
+  it('names the flow, the account or every flow', () => {
+    expect(emergencyCommandLabel(FLOW)).toBe('Chiusura di emergenza del flusso alfa');
+    expect(emergencyCommandLabel(ACCOUNT)).toBe('Chiusura di emergenza del conto test-1');
+    expect(emergencyCommandLabel(ALL)).toBe('Chiusura di emergenza di tutti i flussi');
   });
 });
 

@@ -3,7 +3,7 @@ import {
   type INavigationClient,
   type IPublicClientApplication,
 } from '@azure/msal-browser';
-import { render } from '@testing-library/react';
+import { render, screen, within, type ByRoleMatcher } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { createMemoryRouter } from 'react-router';
 
@@ -56,4 +56,33 @@ export const renderInApp = async (ui: ReactNode, { account }: { account?: string
   const authClient = await authClientFor(account);
   const router = createMemoryRouter([{ path: '*', element: ui }]);
   render(<App config={TEST_CONFIG} authClient={authClient} router={router} />);
+};
+
+// What a user sees as a part of a page: its commands, its links, its titles, its tables, its lists and its boxes.
+const PARTS_OF_A_PAGE: readonly ByRoleMatcher[] = [
+  'button',
+  'link',
+  'heading',
+  'table',
+  'list',
+  'region',
+  'group',
+  'form',
+  'alertdialog',
+];
+
+const isWithinOrBefore = (part: HTMLElement, box: HTMLElement): boolean =>
+  part === box ||
+  box.contains(part) ||
+  (part.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/**
+ * The parts of the content of the page that come after the box, outside it: none when the box is at the bottom of the
+ * page (ADR zona-di-emergenza-in-fondo-alla-pagina).
+ */
+export const partsAfter = (box: HTMLElement): HTMLElement[] => {
+  const content = screen.getByRole('main');
+  return PARTS_OF_A_PAGE.flatMap((role) => within(content).queryAllByRole(role)).filter(
+    (part) => !isWithinOrBefore(part, box),
+  );
 };

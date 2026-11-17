@@ -8,7 +8,7 @@ import { Loading } from '@/components/ui/loading';
 import { useCloseInEmergency } from '../api/close-in-emergency';
 import { useEmergencyClosingPreview } from '../api/get-emergency-closing-preview';
 import type { EmergencyScope } from '../types/emergency-scope';
-import { emergencyQuestion } from '../utils/emergency-question';
+import { emergencyCommandLabel, emergencyQuestion } from '../utils/emergency-question';
 
 import { EmergencyClosingOutcome } from './emergency-closing-outcome';
 
@@ -50,7 +50,8 @@ const Confirmation = ({ scope, pending, onConfirm, onCancel }: ConfirmationProps
 
 /**
  * The emergency closing of a flow, of the flows of an account or of every flow: one command for the three scopes,
- * which the pages compose (ADR chiusura-di-emergenza-nella-dashboard).
+ * which the pages compose in their emergency zone (ADR chiusura-di-emergenza-nella-dashboard, ADR
+ * zona-di-emergenza-in-fondo-alla-pagina).
  */
 export const EmergencyClosingCommand = ({ scope }: { readonly scope: EmergencyScope }) => {
   const [confirming, setConfirming] = useState(false);
@@ -74,7 +75,7 @@ export const EmergencyClosingCommand = ({ scope }: { readonly scope: EmergencySc
           disabled={closing.isPending}
           className={DESTRUCTIVE_COMMAND}
         >
-          Chiusura di emergenza
+          {emergencyCommandLabel(scope)}
         </button>
       )}
       {confirming && (
