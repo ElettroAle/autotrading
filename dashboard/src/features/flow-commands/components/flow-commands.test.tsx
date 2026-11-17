@@ -339,5 +339,25 @@ describe('FlowCommands', () => {
       const rows = within(await screen.findByRole('table', { name: 'Cicli' })).getAllByRole('row');
       expect(rows.at(-1)).toHaveTextContent('su richiesta');
     });
+
+    // Bug 574, ADR-chiavi-delle-letture-del-flusso-con-l-id: the curve is read again once the cycle ends.
+    it('reads the equity curve of the flow again, drawing the point of the new cycle', async () => {
+      fakePlatform.recordEquity('alfa', new Date(Date.now() - 60 * 60_000), 300);
+      // The cycle records its equity as the worker does; returning nothing lets the platform answer.
+      server.use(
+        http.post('*/flows/:flowId/cycles', () => {
+          fakePlatform.recordEquity('alfa', new Date(), 310);
+        }),
+      );
+      await renderApp({ account: 'anna', url: FLOW_PAGE });
+      const curve = await screen.findByRole('figure', { name: 'Equity curve' });
+      expect(within(curve).getAllByRole('img', { name: /^Equity / })).toHaveLength(1);
+
+      await click(RUN_NOW);
+
+      await expect
+        .poll(() => within(curve).queryAllByRole('img', { name: /^Equity / }))
+        .toHaveLength(2);
+    });
   });
 });
