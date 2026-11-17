@@ -109,3 +109,16 @@ def test_the_preview_counts_the_flows_and_their_open_positions() -> None:
 
 def test_the_preview_of_no_flow_counts_nothing() -> None:
     assert EmergencyClosingPreview.of([], {}) == EmergencyClosingPreview(flows=0, positions=0)
+
+
+def test_an_emergency_closing_counts_the_positions_it_closed_and_names_the_flows_it_paused() -> None:
+    outcomes = (
+        FlowEmergencyOutcome(FlowId.new(), "alfa", closed=("BTC", "ETH")),
+        FlowEmergencyOutcome(FlowId.new(), "beta", left_open=(PositionLeftOpen("SOL", "Order rejected"),)),
+        FlowEmergencyOutcome(FlowId.new(), "gamma", failure="exchange non raggiungibile, riprovare"),
+        FlowEmergencyOutcome(FlowId.new(), "delta", closed=("DOGE",)),
+    )
+    closing = EmergencyClosing(TENANT, EmergencyScope(), datetime(2026, 11, 16, tzinfo=UTC), outcomes)
+
+    assert closing.positions_closed == 3
+    assert closing.paused_flows == ("alfa", "beta", "gamma", "delta")

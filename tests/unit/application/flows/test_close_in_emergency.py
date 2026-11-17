@@ -25,6 +25,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.emergency_closing_log import InMemoryEmergencyClosingLogAdapter
+from tests.fakes.emergency_closing_notices import FakeEmergencyClosingNoticeAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryAutomaticPauseAdapter, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
@@ -80,6 +81,8 @@ class Emergency:
         self.positions = ScriptedPositions(self.events)
         self.closed = ClosedPositionStore()
         self.log: list[EmergencyClosing] = []
+        self.notices = FakeEmergencyClosingNoticeAdapter()
+        self.closing_notices = FakePositionClosedNoticeAdapter()
         accounts = FakeAccountThresholdsAdapter({self.account_id: "test-1", self.other_account_id: "test-2"})
         closings = CloseFlowPositionsUseCase(
             ClosingPorts(
@@ -87,7 +90,7 @@ class Emergency:
                 self.positions,
                 Openings(),
                 InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id),
-                FakePositionClosedNoticeAdapter(),
+                self.closing_notices,
                 InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id),
             )
         )
@@ -99,6 +102,7 @@ class Emergency:
                 closings,
                 InMemoryEmergencyClosingLogAdapter(self.log, self.tenant_id),
                 lambda: NOW,
+                self.notices,
             ),
         )
 
@@ -212,3 +216,24 @@ def test_refuses_a_flow_of_another_tenant_and_closes_nothing(emergency: Emergenc
     assert emergency.events == []
     assert emergency.log == []
     assert emergency.store.pause_reasons == {}
+    assert emergency.notices.told == []
+
+
+def test_the_emergency_closing_is_told_once_with_the_positions_closed_and_the_flows_paused(
+    emergency: Emergency,
+) -> None:
+    emergency.flow("alfa", "BTC")
+    emergency.flow("beta", "ETH")
+    emergency.flow("gamma", "SOL")
+    emergency.positions.answers = {"BTC": closed_by(FILL), "ETH": closed_by(FILL), "SOL": refused("Order rejected")}
+
+    emergency.run(EmergencyScope())
+
+    assert emergency.notices.told == [(2, ("alfa", "beta", "gamma"))]
+    assert emergency.closing_notices.told == []
+
+
+def test_an_emergency_closing_with_nothing_in_its_scope_is_told_all_the_same(emergency: Emergency) -> None:
+    emergency.run(EmergencyScope(account_id=emergency.account_id))
+
+    assert emergency.notices.told == [(0, ())]

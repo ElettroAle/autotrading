@@ -56,6 +56,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.accounts import an_account
@@ -200,7 +201,11 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        worker,
+        providers_of(),
     )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
@@ -228,7 +233,11 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        worker,
+        providers_of(),
     )
 
     with pytest.raises(ExchangeUnavailableError):
@@ -333,7 +342,7 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
         create_engine("sqlite://"),
         opener,
         (environment, Slippage.default(), hyperliquid),
-        InMemoryOutboxAdapter(),
+        (InMemoryOutboxAdapter(), FakeMailServiceAdapter()),
         cycles_of_installation(opener),
     )
 
@@ -364,7 +373,11 @@ def test_the_cycle_asked_for_now_is_asked_to_the_worker_for_the_tenant(
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        worker,
+        providers_of(),
     )
 
     with pytest.raises(CycleWorkerUnavailableError):
@@ -387,7 +400,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        dev_installation_on_testnet(),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
         worker,
         providers_of(),
     )
@@ -415,7 +428,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        dev_installation_on_testnet(),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
         worker,
         providers_of(),
     )
@@ -466,7 +479,11 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        worker,
+        providers_of(),
     )
 
     factory(TenantId.new())

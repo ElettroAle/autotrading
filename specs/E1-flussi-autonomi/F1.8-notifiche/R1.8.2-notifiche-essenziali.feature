@@ -7,8 +7,8 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
 
   Si notificano: apertura e chiusura di una posizione, ciclo fallito, ordine rifiutato dall'exchange, pausa
   automatica di un flusso, posizione o movimento non attribuibile su un conto.
-  Ogni notifica nomina il flusso (o il conto) e l'evento, con i valori essenziali: per un'apertura asset,
-  direzione, leva e valore; per una chiusura asset e PnL; per un errore il messaggio originale.
+  Ogni notifica nomina il flusso (o il conto) e l'evento, con i valori essenziali uno per riga (R3.5.4): per
+  un'apertura asset, direzione, leva e valore; per una chiusura asset e PnL; per un errore il messaggio originale.
   Una notifica non contiene mai credenziali. Le notifiche vanno solo alla chat collegata al tenant (R1.8.1).
   Un invio che fallisce si registra e non fa fallire il ciclo.
   Ogni chiusura di una posizione di un flusso si notifica una volta, qualunque ne sia il motivo (decisione
@@ -23,22 +23,22 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
 
   Schema dello scenario: Eventi notificati
     Quando <evento>
-    Allora la chat "chat-anna" riceve una notifica che contiene "<testo>"
+    Allora la chat "chat-anna" riceve una notifica "<titolo>" con le righe "<righe>"
     E la chat "chat-bruno" non riceve la notifica
 
     Esempi:
-      | evento                                                                | testo                                    |
-      | il flusso "alfa" apre long su "BTC" con leva 3 e valore 150 USDC        | alfa: aperta long BTC, leva 3, 150 USDC   |
-      | il flusso "alfa" chiude la posizione su "BTC" con PnL 4,20 USDC        | alfa: chiusa BTC, PnL 4,20 USDC          |
-      | un ciclo del flusso "alfa" fallisce con il messaggio "timeout"        | alfa: ciclo fallito, timeout             |
-      | l'exchange rifiuta un ordine del flusso "alfa" con "Order rejected"   | alfa: ordine rifiutato, Order rejected   |
-      | il flusso "alfa" va in pausa per "credito esaurito presso openrouter" | alfa: in pausa, credito esaurito presso openrouter |
-      | sul conto di "alfa" compare una posizione non attribuibile su "SOL"   | posizione non attribuibile su SOL        |
+      | evento                                                                | titolo                     | righe                                                  |
+      | il flusso "alfa" apre long su "BTC" con leva 3 e valore 150 USDC      | 🟢 alfa: posizione aperta   | Asset: BTC; Direzione: long; Leva: 3; Valore: 150 USDC |
+      | il flusso "alfa" chiude la posizione su "BTC" con PnL 4,20 USDC       | ✅ alfa: posizione chiusa   | Asset: BTC; PnL: 4,20 USDC                             |
+      | un ciclo del flusso "alfa" fallisce con il messaggio "timeout"        | ⚠️ alfa: ciclo fallito     | Errore: timeout                                        |
+      | l'exchange rifiuta un ordine del flusso "alfa" con "Order rejected"   | ⚠️ alfa: ordine rifiutato  | Errore: Order rejected                                 |
+      | il flusso "alfa" va in pausa per "credito esaurito presso openrouter" | ⏸️ alfa: in pausa          | Motivo: credito esaurito presso openrouter             |
+      | sul conto di "alfa" compare una posizione non attribuibile su "SOL"   | posizione non attribuibile | Asset: SOL                                             |
 
   Schema dello scenario: Ogni chiusura notificata una volta
     Dato che il flusso "alfa" ha una posizione aperta su "BTC"
     Quando la posizione su "BTC" del flusso "alfa" si chiude per <motivo> con PnL 4,20 USDC
-    Allora la chat "chat-anna" riceve una sola notifica che contiene "alfa: chiusa BTC, PnL 4,20 USDC"
+    Allora la chat "chat-anna" riceve una sola notifica "✅ alfa: posizione chiusa" con le righe "Asset: BTC; PnL: 4,20 USDC"
 
     Esempi:
       | motivo                 |

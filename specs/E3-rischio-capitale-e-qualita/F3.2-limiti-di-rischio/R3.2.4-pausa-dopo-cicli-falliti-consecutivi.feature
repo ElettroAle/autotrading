@@ -21,7 +21,7 @@ Funzionalità: R3.2.4 Pausa dopo cicli falliti consecutivi
     Dato che gli ultimi 2 cicli di "alfa" sono falliti
     Quando il ciclo successivo di "alfa" fallisce con "timeout del modello"
     Allora il flusso "alfa" è in pausa con motivo "3 cicli falliti consecutivi: timeout del modello"
-    E "anna" riceve la notifica "alfa: in pausa, 3 cicli falliti consecutivi: timeout del modello"
+    E "anna" riceve la notifica "⏸️ alfa: in pausa" con le righe "Motivo: 3 cicli falliti consecutivi: timeout del modello"
 
   Scenario: Un ciclo riuscito azzera il conteggio
     Dato che gli ultimi 2 cicli di "alfa" sono falliti

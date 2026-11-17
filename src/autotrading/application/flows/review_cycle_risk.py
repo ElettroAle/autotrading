@@ -8,12 +8,15 @@ from autotrading.application.flows.ports import (
     DecisionPlanChangePort,
     FlowLossGuardPort,
     FlowSnapshot,
+    OpeningBlockedNoticePort,
+    OpeningReducedNoticePort,
     RiskReview,
 )
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.exit_plan import ExitPlan
-from autotrading.domain.flows.risk_outcome import approved_of
+from autotrading.domain.flows.opening_review import blocked_openings, reduced_openings
+from autotrading.domain.flows.risk_outcome import RiskOutcome, approved_of
 from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, UpdateIntent
 
 
@@ -21,12 +24,21 @@ class ReviewCycleRiskUseCase:
     """The decisions of the agent through the risk check of the flow, on the exchange of its account
     (R1.5.1-R1.5.4), with the minimum confidence of the flow for the openings (R3.1.4).
 
-    The guard of the losses comes first: openings suspended for maximum loss are blocked by the check (R3.2.2).
+    The guard of the losses comes first: openings suspended for maximum loss are blocked by the check (R3.2.2). Every
+    opening reduced or blocked is told before the orders go (R3.5.1).
     """
 
-    def __init__(self, check_risk: CheckRiskUseCase, loss_guard: FlowLossGuardPort) -> None:
+    def __init__(
+        self,
+        check_risk: CheckRiskUseCase,
+        loss_guard: FlowLossGuardPort,
+        reduced_notice: OpeningReducedNoticePort,
+        blocked_notice: OpeningBlockedNoticePort,
+    ) -> None:
         self._check_risk = check_risk
         self._loss_guard = loss_guard
+        self._reduced_notice = reduced_notice
+        self._blocked_notice = blocked_notice
 
     def execute(
         self,
@@ -46,8 +58,20 @@ class ReviewCycleRiskUseCase:
             cycle_flow.exchange,
         )
         outcomes = self._check_risk.execute(command)
+        self._tell_openings(cycle_flow, command, outcomes)
         orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
         return RiskReview(orders, tuple(outcomes))
+
+    def _tell_openings(
+        self, cycle_flow: CycleFlow, command: CheckRiskCommand, outcomes: tuple[RiskOutcome, ...]
+    ) -> None:
+        flow_name = cycle_flow.flow.name.value
+        for reduction in reduced_openings(command.intents, outcomes, command.state.funds):
+            self._reduced_notice.execute(
+                flow_name, reduction.asset, reduction.requested_margin, reduction.approved_margin
+            )
+        for blocked in blocked_openings(command.intents, outcomes):
+            self._blocked_notice.execute(flow_name, blocked.asset, blocked.cause)
 
 
 def _open_intent(  # noqa: PLR0913, PLR0917 - the fields of the opening the agent gives

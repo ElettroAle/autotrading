@@ -12,13 +12,13 @@ import {
   type ListInterval,
 } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
+import { useFlowAssets } from '@/hooks/use-flow-assets';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
 import { formatAmount, formatPrice } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
 import { searchWithPage } from '@/utils/page-number';
 
 import { useClosedPositions, type ClosedPosition } from '../api/get-closed-positions';
-import { useFlowAssets } from '../api/get-flow-assets';
 import { useFlowState } from '../api/get-flow-state';
 
 import { PnlAmount, PnlPercent } from './pnl';

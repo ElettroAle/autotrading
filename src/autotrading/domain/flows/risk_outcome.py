@@ -106,6 +106,15 @@ class BlockedDecision:
     reason: str
 
     @classmethod
+    def opening(cls, asset: str, cause: str) -> BlockedDecision:
+        return cls(asset, f"{_opening_not_executed(asset)}{cause}")
+
+    @property
+    def cause(self) -> str:
+        """Why the decision is blocked, without naming the opening the reason may begin with (R3.5.1)."""
+        return self.reason.removeprefix(_opening_not_executed(self.asset))
+
+    @classmethod
     def untradable(cls, asset: str) -> BlockedDecision:
         return cls(asset, f"asset non negoziabile sull'exchange: {asset}")
 
@@ -115,7 +124,11 @@ class BlockedDecision:
 
     @classmethod
     def below_minimum_confidence(cls, asset: str, confidence: int, minimum: MinimumConfidence) -> BlockedDecision:
-        return cls(asset, f"apertura {asset} non eseguita: confidenza {confidence} sotto la minima {minimum}")
+        return cls.opening(asset, f"confidenza {confidence} sotto la minima {minimum}")
+
+
+def _opening_not_executed(asset: str) -> str:
+    return f"apertura {asset} non eseguita: "
 
 
 @dataclass(frozen=True, slots=True)

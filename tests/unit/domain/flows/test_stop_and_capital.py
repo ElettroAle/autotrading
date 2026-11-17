@@ -176,3 +176,10 @@ def test_a_position_closed_outside_keeps_the_result_the_exchange_reported() -> N
     closing = OutsideClosing(flow.id, "BTC", Decimal(-7), Decimal("0.05"), CLOSED_AT)
 
     assert opening(TradeSide.LONG).closed_outside(flow, closing).realized_pnl == Decimal(-7)
+
+
+def test_a_position_liquidated_enters_the_history_as_a_closing_outside_the_platform() -> None:
+    flow = a_flow(TENANT)
+    closing = OutsideClosing(flow.id, "BTC", Decimal(-48), Decimal("0.05"), CLOSED_AT, liquidation=True)
+
+    assert opening(TradeSide.LONG).closed_outside(flow, closing).reason is CloseReason.OUTSIDE_PLATFORM

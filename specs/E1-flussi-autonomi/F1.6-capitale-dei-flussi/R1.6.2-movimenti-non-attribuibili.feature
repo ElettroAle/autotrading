@@ -58,7 +58,7 @@ Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
     Quando parte un ciclo del flusso "alfa" in cui l'agente apre "BTC"
     Allora nessun ordine è inviato
     E il flusso "alfa" è in pausa con il motivo "posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
-    E "anna" riceve la notifica "alfa: in pausa, posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
+    E "anna" riceve la notifica "⏸️ alfa: in pausa" con le righe "Motivo: posizione BTC diversa da quella del flusso: attesa 0,1, sul conto 0,2"
 
   Scenario: Esecuzione del flusso pubblicata in ritardo
     Dato che il flusso "alfa" ha aperto 0,1 "BTC" con i propri ordini

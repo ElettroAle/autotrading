@@ -251,7 +251,7 @@ def test_a_confirmed_removal_stops_the_flows_then_removes_the_account_then_archi
     assert removal.closings.closed == [(account.id.value, "BTC", USER), (account.id.value, "ETH", USER)]
     assert len(removal.cycles.waited) == 2
     assert [position.reason for position in removal.closed.positions] == [CloseReason.ACCOUNT_REMOVAL] * 2
-    assert [(name, asset) for name, asset, _ in removal.notices.told] == [("attivo", "BTC"), ("pausa", "ETH")]
+    assert [(name, asset) for name, asset, _, _ in removal.notices.told] == [("attivo", "BTC"), ("pausa", "ETH")]
     assert removal.accounts.accounts == []
     statuses = removal.statuses()
     assert [statuses[name] for name in ("attivo", "pausa", "fermo", "altro conto")] == [

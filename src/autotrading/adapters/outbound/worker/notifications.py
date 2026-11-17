@@ -29,7 +29,7 @@ class WorkerNotificationAdapter:
         try:
             response = self._client.post(
                 f"/tenants/{self._tenant_id.value}/notifications",
-                json={"subject": notification.subject, "event": notification.event},
+                json=_body_of(notification),
                 headers={"Authorization": f"Bearer {self._token}"},
                 timeout=TIMEOUT_SECONDS,
             )
@@ -44,3 +44,16 @@ class WorkerNotificationAdapter:
             "invio della notifica al worker fallito",
             extra={"tenant_id": str(self._tenant_id.value), "subject": notification.subject, "cause": cause},
         )
+
+
+def _body_of(notification: Notification) -> dict[str, object]:
+    event = notification.event
+    status = notification.flow_status
+    return {
+        "subject": notification.subject,
+        "headline": notification.headline,
+        "icon": notification.icon,
+        "lines": [{"label": line.label, "value": line.value} for line in notification.lines],
+        "flow_status": None if status is None else status.text,
+        "event": None if event is None else event.value,
+    }

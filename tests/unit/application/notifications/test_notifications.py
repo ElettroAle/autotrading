@@ -47,14 +47,21 @@ from tests.fakes.linked_chat_repository import (
     InMemoryLinkedChatRepositoryAdapter,
     LinkedChatStore,
 )
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
+from tests.support.notifications import channel_choices
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
 FAILED = Notification.cycle_failed("alfa", "timeout")
-TEST_TEXT = "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
+TEST_TEXT = Notification.test().text
 
 
 class Telegram:
@@ -64,9 +71,12 @@ class Telegram:
         self.codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.now = NOW
         self.bot = FakeBotIdentityAdapter("autotrading_bot")
 
@@ -95,7 +105,13 @@ class Telegram:
         return GetLinkedChatUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)).execute()
 
     def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
-        return NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox)
+        return NotifyUseCase(
+            InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            self.mail_service,
+            self.outbox,
+            channel_choices(tenant_id),
+        )
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:
         self.notify_for(tenant_id).execute(notification)
@@ -315,7 +331,7 @@ def test_a_notification_goes_to_the_chat_of_its_tenant_only(telegram: Telegram) 
 
     telegram.notify(ANNA)
 
-    assert telegram.messenger.sent == [(CHAT, "alfa: ciclo fallito, timeout")]
+    assert telegram.messenger.sent == [(CHAT, FAILED.text)]
 
 
 def test_without_a_linked_chat_nothing_is_sent(telegram: Telegram) -> None:
@@ -336,9 +352,7 @@ def test_a_notification_telegram_does_not_take_is_recorded_without_failing(
     [record] = caplog.records
     assert record.getMessage() == "invio della notifica fallito"
     assert record.__dict__["tenant_id"] == str(ANNA.value)
-    assert [message.payload["text"] for message in telegram.outbox.in_state(OutboxState.PENDING)] == [
-        "alfa: ciclo fallito, timeout"
-    ]
+    assert [message.payload["text"] for message in telegram.outbox.in_state(OutboxState.PENDING)] == [FAILED.text]
 
 
 def test_every_message_but_the_test_command_is_a_link_attempt(telegram: Telegram) -> None:

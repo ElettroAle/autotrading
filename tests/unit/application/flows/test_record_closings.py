@@ -85,8 +85,8 @@ class Bench:
         self.protection_closing.execute(closing)
         return closing
 
-    def close_outside(self, realized_pnl: Decimal = Decimal("2")) -> OutsideClosing:
-        closing = OutsideClosing(self.flow.id, "BTC", realized_pnl, Decimal("0.04"), CLOSED)
+    def close_outside(self, realized_pnl: Decimal = Decimal("2"), *, liquidation: bool = False) -> OutsideClosing:
+        closing = OutsideClosing(self.flow.id, "BTC", realized_pnl, Decimal("0.04"), CLOSED, liquidation)
         self.outside_closing.execute(closing)
         return closing
 
@@ -104,14 +104,14 @@ def test_a_cycle_closing_enters_the_history_with_the_agent_reason_and_its_cycle_
     fill = ClosingFill(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
     position = OPENING.closed(bench.flow, "BTC", fill, CloseReason.AGENT, cycle=CYCLE)
     assert bench.history.positions == [position]
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", position.pnl)]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", position.pnl, "decisione dell'agente")]
 
 
 def test_a_cycle_closing_the_flow_never_opened_is_told_on_its_own(bench: Bench) -> None:
     bench.close_in_cycle()
 
     assert bench.history.positions == []
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("1.5"))]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("1.5"), "decisione dell'agente")]
 
 
 def test_a_position_closed_outside_enters_the_history_of_the_flow_then_is_told(bench: Bench) -> None:
@@ -121,7 +121,20 @@ def test_a_position_closed_outside_enters_the_history_of_the_flow_then_is_told(b
 
     position = OPENING.closed_outside(bench.flow, closing)
     assert bench.history.positions == [position]
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", position.pnl)]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", position.pnl, "chiusa fuori dalla piattaforma")]
+
+
+@pytest.mark.parametrize("opened", [True, False])
+def test_a_position_liquidated_is_told_as_a_liquidation_and_kept_as_a_closing_outside(
+    bench: Bench, *, opened: bool
+) -> None:
+    if opened:
+        bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+
+    bench.close_outside(Decimal(-48), liquidation=True)
+
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal(-48), "liquidazione")]
+    assert [position.reason for position in bench.history.positions] == [CloseReason.OUTSIDE_PLATFORM] * opened
 
 
 def test_a_position_closed_outside_the_flow_never_opened_is_told_and_logged(
@@ -131,7 +144,7 @@ def test_a_position_closed_outside_the_flow_never_opened_is_told_and_logged(
         bench.close_outside()
 
     assert bench.history.positions == []
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("2"))]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("2"), "chiusa fuori dalla piattaforma")]
     (record,) = caplog.records
     assert record.getMessage() == "posizione chiusa fuori senza apertura del flusso"
     assert (record.__dict__["flow_id"], record.__dict__["asset"]) == (str(bench.flow.id.value), "BTC")
@@ -146,7 +159,7 @@ def test_a_loss_beyond_the_value_of_the_position_is_told_and_logged(
         bench.close_outside(Decimal(-150))
 
     assert bench.history.positions == []
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal(-150))]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal(-150), "chiusa fuori dalla piattaforma")]
     (record,) = caplog.records
     assert record.getMessage() == "esito della chiusura fuori non rappresentabile"
 
@@ -206,7 +219,7 @@ def test_a_closing_by_protection_enters_the_history_with_its_reason_and_the_outc
     position = OPENING.closed_by_protection(bench.flow, closing)
     assert bench.history.positions == [position]
     assert (position.reason, position.pnl, position.fees) == (reason, Decimal("-5.1"), Decimal("0.07"))
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("-5.1"))]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("-5.1"), reason.value)]
     assert bench.exit_plans.current(bench.flow.id, "BTC") is None
     assert bench.cancellation.cancelled == [ProtectedPosition(bench.flow.assigned_account_id, "BTC")]
 
@@ -218,7 +231,7 @@ def test_a_closing_by_protection_the_flow_never_opened_is_told_and_logged(
         bench.close_by_protection()
 
     assert bench.history.positions == []
-    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("-5.1"))]
+    assert bench.notices.told == [(bench.flow.name.value, "BTC", Decimal("-5.1"), "stop loss")]
     (record,) = caplog.records
     assert record.getMessage() == "posizione chiusa da una protezione senza apertura del flusso"
     assert len(bench.cancellation.cancelled) == 1

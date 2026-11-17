@@ -27,6 +27,7 @@ from autotrading.application.notifications.answer_bot_messages import AnswerBotM
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
@@ -59,6 +60,10 @@ from tests.fakes.account_transfers import FakeAccountTransfersAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
 from tests.fakes.bot_inbox import FakeBotInboxAdapter
+from tests.fakes.channel_preferences_repository import (
+    ChannelPreferencesStore,
+    InMemoryChannelPreferencesRepositoryAdapter,
+)
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
@@ -78,6 +83,7 @@ from tests.fakes.flow_repository import (
     InMemoryFlowRepositoryAdapter,
     InMemoryFlowTimingAdapter,
 )
+from tests.fakes.flow_status import FakeFlowStatusAdapter
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.link_code_repository import (
@@ -90,9 +96,16 @@ from tests.fakes.linked_chat_repository import (
     InMemoryLinkedChatRepositoryAdapter,
     LinkedChatStore,
 )
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
+from tests.fakes.notified_flows import InMemoryNotifiedFlowsAdapter
 from tests.fakes.on_demand_cycles import FakeOnDemandCycleAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -118,6 +131,7 @@ from tests.support.activity import an_activity
 from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.model_catalog import PLATFORM_MODELS
+from tests.support.notifications import channel_choices
 from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
@@ -155,9 +169,15 @@ class Platform:
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.channel_preferences: ChannelPreferencesStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
+        # The state of the flows the notifications close with: none unless a test sets it (R3.5.4).
+        self.flow_status = FakeFlowStatusAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.bot_username: str | None = None
         self.activity_reader = FakeActivityReaderAdapter()
         # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
@@ -226,7 +246,9 @@ class Platform:
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
-        closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        closing_notice = NotifyPositionClosedUseCase(
+            NotifyFlowEventUseCase(self.worker_for(tenant_id).notify, self.flow_status), HYPERLIQUID_SETTLEMENT_CURRENCY
+        )
         exit_plans = InMemoryExitPlanRepositoryAdapter(self.exit_plans, tenant_id)
         closing_ports = ClosingPorts(
             self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
@@ -274,10 +296,17 @@ class Platform:
             bot_identity=FakeBotIdentityAdapter(self.bot_username),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             notifier=self.worker_for(tenant_id).notify,
+            flow_status=self.flow_status,
+            notification_emails=InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            mail_service=self.mail_service,
+            outbox=self.outbox,
+            channel_preferences=InMemoryChannelPreferencesRepositoryAdapter(self.channel_preferences, tenant_id),
+            notified_flows=InMemoryNotifiedFlowsAdapter(self.flows, tenant_id),
             clock=lambda: self.now,
             closed_positions=closed_positions,
             exit_plans=exit_plans,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
+            decision_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
@@ -339,7 +368,7 @@ class Platform:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
+            notify=self.notify_for(tenant_id),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             record_account_executions=RecordAccountExecutionsUseCase(
@@ -354,6 +383,16 @@ class Platform:
                 self.worker_clock,
                 self.cycle_run_of(tenant_id),
             ),
+        )
+
+    def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
+        """What the worker composes to queue the notifications of a tenant on the channels it chose (R3.5.3)."""
+        return NotifyUseCase(
+            InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            self.mail_service,
+            self.outbox,
+            channel_choices(tenant_id, self.channel_preferences, self.flows),
         )
 
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
@@ -382,7 +421,7 @@ class Platform:
         inbox.waiting = [BotMessage(chat_id, text)]
         test_notification = SendTestNotificationUseCase(
             InMemoryLinkedChatLookupAdapter(self.chats),
-            lambda tenant_id: NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
+            self.notify_for,
             self.messenger,
         )
         AnswerBotMessagesUseCase(inbox, self.link_chat(), test_notification).execute()

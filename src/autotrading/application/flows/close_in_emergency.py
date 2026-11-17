@@ -5,7 +5,11 @@ from datetime import datetime
 
 from autotrading.application.flows.close_flow_positions import CloseFlowPositionsCommand, CloseFlowPositionsUseCase
 from autotrading.application.flows.list_emergency_flows import ListEmergencyFlowsCommand, ListEmergencyFlowsUseCase
-from autotrading.application.flows.ports import AutomaticPausePort, EmergencyClosingLogPort
+from autotrading.application.flows.ports import (
+    AutomaticPausePort,
+    EmergencyClosingLogPort,
+    EmergencyClosingNoticePort,
+)
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.emergency_closing import (
@@ -35,6 +39,7 @@ class EmergencyClosingPorts:
     closings: CloseFlowPositionsUseCase
     log: EmergencyClosingLogPort
     clock: Callable[[], datetime]
+    notice: EmergencyClosingNoticePort
 
 
 class CloseInEmergencyUseCase:
@@ -44,7 +49,7 @@ class CloseInEmergencyUseCase:
     The active flows pause first, with the reason of the emergency, so no cycle opens again; a paused flow keeps its
     pause and its reason. Then the positions of each flow close the way the stop and the cash-out close them: a
     closing that fails is reported with its flow and does not stop the others. The closing is recorded with its
-    instant, its scope and its outcome.
+    instant, its scope and its outcome, then told once: its positions are not told one by one (R3.5.1).
     """
 
     def __init__(self, tenant_id: TenantId, ports: EmergencyClosingPorts) -> None:
@@ -57,6 +62,7 @@ class CloseInEmergencyUseCase:
         outcomes = tuple(self._close(flow, command.user_id) for flow in flows)
         closing = EmergencyClosing(self._tenant_id, command.scope, self._ports.clock(), outcomes)
         self._ports.log.record(closing)
+        self._ports.notice.execute(closing.positions_closed, closing.paused_flows)
         operations.warning(
             "chiusura di emergenza",
             extra={"scope": command.scope.kind.value, "flows": [str(flow.id.value) for flow in flows]},
