@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
+import { CommandButton } from '@/components/ui/command-button';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { showRefusal } from '@/lib/form-errors';
 import { formatAmount } from '@/utils/format-amount';
@@ -65,12 +65,12 @@ export const DeviationThresholdForm = ({
         {...register('percent')}
       />
       <div className="flex gap-2">
-        <button type="submit" disabled={setThreshold.isPending} className={PRIMARY_COMMAND}>
+        <CommandButton tone="primary" type="submit" disabled={setThreshold.isPending}>
           Salva la soglia
-        </button>
-        <button type="button" onClick={onCancel} className={SECONDARY_COMMAND}>
+        </CommandButton>
+        <CommandButton tone="secondary" onClick={onCancel}>
           Annulla
-        </button>
+        </CommandButton>
       </div>
     </form>
   );

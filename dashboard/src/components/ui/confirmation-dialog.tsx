@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
+import { CommandButton } from './command-button';
 import { ErrorMessage } from './error-message';
 
 type ConfirmationDialogProps = {
@@ -39,21 +40,12 @@ export const ConfirmationDialog = ({
         {children}
       </div>
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={pending}
-          className="rounded bg-red-700 px-3 py-1.5 text-white disabled:opacity-50"
-        >
+        <CommandButton tone="stop" onClick={onConfirm} disabled={pending}>
           {confirmLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded border border-slate-300 px-3 py-1.5"
-        >
+        </CommandButton>
+        <CommandButton tone="secondary" onClick={onCancel}>
           Annulla
-        </button>
+        </CommandButton>
       </div>
       {error && <ErrorMessage error={error} prefix="Operazione non riuscita" />}
     </div>

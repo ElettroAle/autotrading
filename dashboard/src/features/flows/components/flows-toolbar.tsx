@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
 
-import { PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
+import { CommandButton } from '@/components/ui/command-button';
+import { PRIMARY_COMMAND } from '@/components/ui/commands';
 import { paths } from '@/config/paths';
 
 import { ImportStrategyForm } from './import-strategy-form';
@@ -16,15 +17,14 @@ export const FlowsToolbar = () => {
         <Link to={paths.newFlow.getHref()} className={PRIMARY_COMMAND}>
           Nuovo flusso
         </Link>
-        <button
-          type="button"
+        <CommandButton
+          tone="secondary"
           aria-expanded={importOpen}
           aria-controls={importId}
           onClick={() => setImportOpen((open) => !open)}
-          className={SECONDARY_COMMAND}
         >
           Importa
-        </button>
+        </CommandButton>
       </div>
       <div id={importId}>{importOpen && <ImportStrategyForm />}</div>
     </div>

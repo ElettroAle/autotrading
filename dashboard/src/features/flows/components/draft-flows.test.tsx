@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { GO_COMMAND } from '@/components/ui/commands';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
@@ -217,6 +218,22 @@ describe('Draft flows', () => {
 
     expect(await screen.findByText('Stato: attivo')).toBeInTheDocument();
     expect(screen.queryByText('Bozza')).not.toBeInTheDocument();
+  });
+
+  it('offers to start the assigned draft in green with the icon play (R6.5.3)', async () => {
+    const anna = fakePlatform.user('anna');
+    const copy = fakePlatform.duplicate(anna, 'flow-alfa');
+    fakePlatform.assign(anna, copy.id, {
+      accountId: 'account-secondario',
+      allocatedCapital: 200,
+      assets: ['BTC'],
+    });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+
+    const start = await screen.findByRole('button', { name: 'Avvia' });
+
+    expect(start).toHaveAttribute('class', GO_COMMAND);
+    expect(within(start).getByRole('img', { hidden: true })).toHaveAttribute('data-icon', 'play');
   });
 
   it('starts a draft on an account that trades real money only once the user confirms it', async () => {

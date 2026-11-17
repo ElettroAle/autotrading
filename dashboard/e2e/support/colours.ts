@@ -42,6 +42,14 @@ export const isRed = ({ red, green, blue }: Rgb): boolean =>
 export const isBlue = ({ red, green, blue, alpha }: Rgb): boolean =>
   alpha > 0 && blue > 100 && blue > 1.5 * Math.max(red, green);
 
+// A green tone: the green channel well above the other two, as the commands that set a flow running.
+export const isGreen = ({ red, green, blue }: Rgb): boolean =>
+  green > 90 && green > 1.4 * Math.max(red, blue);
+
+// An amber tone: much red, less green and almost no blue, as the command that holds a flow.
+export const isAmber = ({ red, green, blue }: Rgb): boolean =>
+  red > 180 && green > 70 && green < 0.8 * red && blue < 0.4 * green;
+
 /** How light a colour looks, from 0 (black) to 255 (white). */
 export const lightnessOf = ({ red, green, blue }: Rgb): number =>
   0.2126 * red + 0.7152 * green + 0.0722 * blue;

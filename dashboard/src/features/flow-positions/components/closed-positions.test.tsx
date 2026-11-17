@@ -26,6 +26,18 @@ describe('ClosedPositions', () => {
     fakePlatform.giveFlowTo('anna', 'alfa');
   });
 
+  it('shows the direction with its icon (R6.5.3)', async () => {
+    fakePlatform.recordClosedPositions('alfa', [
+      aClosedPosition({ closedAt: LAST, side: 'short' }),
+    ]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const [first] = await rowsOf();
+    expect(
+      within(within(first as HTMLElement).getByText('short')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'arrow-down');
+  });
+
   it('shows every column of a closed position, from the most recent close', async () => {
     fakePlatform.recordClosedPositions('alfa', [
       ...closedBack(2).slice(1),
