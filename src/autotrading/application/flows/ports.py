@@ -53,6 +53,7 @@ from autotrading.domain.flows.loss_guard import LossReferences
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.flows.recorded_decision import DecidedCycle, RecordedDecision
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -567,6 +568,19 @@ class LedgerRecordingPort(Protocol):
         ...
 
 
+class OnDemandCyclePort(Protocol):
+    """Bound to the tenant of the request: runs a cycle of a flow now (R6.5.2, ADR
+    comando-del-ciclo-su-richiesta-nell-api).
+
+    Only the worker runs the cycles: in the API it is the client that asks the worker to run RunCycleOnDemandUseCase
+    and waits for the cycle to end. A failed cycle is its record, not an error.
+    """
+
+    def run(self, flow_id: UUID) -> CycleRecord:
+        """Raises FlowNotFoundError, FlowNotActiveError, CycleInProgressError, or CycleWorkerUnavailableError."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class FlowAccountPorts:
     """Where a flow learns of its account: the accounts of the tenant, what the exchange shows of them now and the
@@ -1066,6 +1080,20 @@ class AgentDecisionPort(Protocol):
     confidence of the agent (R1.4.4, R3.1.1, R3.1.3, R3.1.4).
     """
 
+    @property
+    def asset(self) -> str: ...
+
+    @property
+    def action(self) -> str:
+        """The word of the action the agent took: apri, chiudi, mantieni or aggiorna (R6.5.4)."""
+        ...
+
+    @property
+    def reasoning(self) -> str: ...
+
+    @property
+    def confidence(self) -> int: ...
+
     def intent_with[O, C, H, U](
         self,
         opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
@@ -1226,6 +1254,10 @@ class CycleJournalPort(Protocol):
         """Tokens and cost of the model call behind the decision of the agent (R1.4.6)."""
         ...
 
+    def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
+        """The decisions of the agent one by asset, as the cycle records them beside its documents (R6.5.4)."""
+        ...
+
 
 class CycleHistoryPort(Protocol):
     """Bound to the tenant of the request: it never shows the cycles of a flow of another tenant."""
@@ -1254,6 +1286,12 @@ class CycleHistoryPort(Protocol):
 
     def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
         """The cost of every cycle of the flow that called the model, planned in the window (R2.2.6)."""
+        ...
+
+    def last_decided(self, flow_id: UUID) -> DecidedCycle | None:
+        """The most recent completed cycle of the flow in which the agent decided, with its decisions; None without
+        one (R6.5.4).
+        """
         ...
 
 

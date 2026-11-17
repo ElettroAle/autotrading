@@ -48,6 +48,17 @@ describe('CyclesList', () => {
     ).toHaveAttribute('data-icon', 'arrow-up');
   });
 
+  // R6.5.2, ADR pulsante-esegui-ora-nella-pagina-del-flusso.
+  it('marks a cycle the user asked for now, and only that one', async () => {
+    const asked = { ...aCompletedCycle(LAST), trigger: 'on_demand' as const };
+    fakePlatform.recordCycles('alfa', [asked, aCompletedCycle(new Date(LAST.getTime() - QUARTER))]);
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });
+
+    const [first, second] = await rowsOf();
+    expect(first).toHaveTextContent('14/11/2026, 10:07:00 · su richiesta');
+    expect(second).not.toHaveTextContent('su richiesta');
+  });
+
   it('leads from each cycle to its own page', async () => {
     fakePlatform.recordCycles('alfa', cyclesBack(1));
     await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });

@@ -6,9 +6,9 @@ import pytest
 from autotrading.application.flows.errors import CycleFlowNotFoundError
 from autotrading.application.flows.list_cycles import ListCyclesCommand, ListCyclesUseCase
 from autotrading.domain.flows.cycle_filter import CycleFilter
-from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
-from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.errors import InvalidPageNumberError
+from autotrading.domain.flows.recorded_decision import RecordedDecision
 from tests.fakes.cycles import FakeFlowDirectoryAdapter, InMemoryCycleRepositoryAdapter
 
 FIRST = datetime(2026, 11, 12, tzinfo=UTC)
@@ -98,13 +98,8 @@ def test_a_flow_of_another_tenant_does_not_exist(
 
 
 def a_cycle_deciding(minute: int, *actions: str, outcome: CycleOutcome = CycleOutcome.COMPLETED) -> CycleRecord:
-    decisions = [{"tipo": "Decision", "asset": "BTC", "action": action} for action in actions]
-    return CycleRecord(
-        FLOW,
-        FIRST + timedelta(minutes=minute),
-        outcome,
-        documents=(StepDocument(CycleStep.AGENT_DECISION, {"decisioni": decisions}),),
-    )
+    decisions = tuple(RecordedDecision.named("BTC", action, None, 50, "motivo") for action in actions)
+    return CycleRecord(FLOW, FIRST + timedelta(minutes=minute), outcome, decisions=decisions)
 
 
 def test_the_page_says_how_many_cycles_match_in_all(

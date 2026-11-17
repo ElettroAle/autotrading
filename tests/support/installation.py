@@ -1,15 +1,24 @@
 """The configuration an installation gives each service, with the secrets as files, as on the machine."""
 
 import base64
+from collections.abc import Callable
 from pathlib import Path
 from secrets import token_hex
 
 from nacl.public import PrivateKey
+from sqlalchemy import create_engine
 
 from autotrading.adapters.outbound.hyperliquid.composition import (
     HyperliquidAdaptersOfInstallation,
     hyperliquid_adapters,
 )
+from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
+from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
+from autotrading.bootstrap import WorkerCycle, cycle_of
+from autotrading.domain.orders.slippage import Slippage
+from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.outbox import InMemoryOutboxAdapter
+from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 
 # Generated per run, as prepare-installation.sh generates it per machine.
 WORKER_TOKEN = token_hex(16)
@@ -57,3 +66,15 @@ def dev_installation_on_testnet() -> tuple[str, HyperliquidAdaptersOfInstallatio
     """The dev installation with Hyperliquid and Hyperliquid Testnet, as bootstrap hands them to the use cases
     (R2.3.11)."""
     return "dev", hyperliquid_adapters()
+
+
+def cycles_of_installation(opener: SodiumCredentialOpenerAdapter) -> Callable[[TenantId], WorkerCycle]:
+    """The cycles of the worker of an installation dev on the testnet, on a database that is never reached."""
+    environment, hyperliquid = dev_installation_on_testnet()
+    return cycle_of(
+        create_engine("sqlite://"),
+        (opener, SodiumProviderKeyOpenerAdapter({})),
+        (environment, Slippage.default(), hyperliquid),
+        InMemoryOutboxAdapter(),
+        ({}, FakePriceForecasterAdapter()),
+    )

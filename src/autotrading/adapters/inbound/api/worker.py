@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.account_activity import AccountActivityResponse, AccountTransferResponse
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
+from autotrading.adapters.inbound.api.cycles import CycleDetailResponse
 from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
@@ -28,6 +29,7 @@ from autotrading.application.flows.record_account_executions import (
     RecordAccountExecutionsCommand,
     RecordAccountExecutionsUseCase,
 )
+from autotrading.application.flows.run_cycle_on_demand import RunCycleOnDemandCommand, RunCycleOnDemandUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotInboxPort, BotStartLinkPort
 from autotrading.application.orders.close_exchange_position import (
@@ -70,6 +72,7 @@ class WorkerUseCases:
     read_account_activity: ReadAccountActivityUseCase
     read_account_transfers: ReadAccountTransfersUseCase
     record_account_executions: RecordAccountExecutionsUseCase
+    run_cycle_on_demand: RunCycleOnDemandUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +273,13 @@ def create_worker_api(
         command = CloseExchangePositionCommand(account_id, coin, OrderSource(OrderOrigin.MANUAL, request.user_id))
         order = for_tenant(TenantId(tenant_id)).close_exchange_position.execute(command)
         return OrderOutcomeResponse.of(OrderOutcome.of(order))
+
+    @api.post("/tenants/{tenant_id}/flows/{flow_id}/cycles", dependencies=[Depends(require_api)])
+    def run_cycle_now(tenant_id: UUID, flow_id: UUID) -> CycleDetailResponse:
+        """A cycle of the flow now, the same as a planned one, answered when it ends (ADR
+        ciclo-su-richiesta-nel-worker): a failed cycle is its record, a refusal is a Problem Details."""
+        command = RunCycleOnDemandCommand(flow_id)
+        return CycleDetailResponse.of(for_tenant(TenantId(tenant_id)).run_cycle_on_demand.execute(command))
 
     @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])
     def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:

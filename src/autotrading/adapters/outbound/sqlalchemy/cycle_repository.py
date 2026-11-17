@@ -1,15 +1,15 @@
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
 from typing import TypedDict, cast
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, Select, func, or_, select
-from sqlalchemy.dialects.postgresql import JSONB, insert
+from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, Select, exists, func, or_, select
+from sqlalchemy.dialects.postgresql import insert
 
-from autotrading.adapters.outbound.sqlalchemy.tables import cycles, flows
+from autotrading.adapters.outbound.sqlalchemy.tables import cycle_decisions, cycles, flows
 from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.application.flows.errors import UnrecordableDocumentError
 from autotrading.domain.flows.call_cost import CallCost
@@ -22,15 +22,16 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.recorded_decision import DecidedCycle, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]
+DECISION_KEY = ["flow_id", "planned_at", "position"]
 RECORDED = cycles.c.outcome.is_not(None)
-# The decisions of the agent as the journal of the cycle records them, each with its action (R1.4.6, R1.7.1).
-DECISIONS = "decisioni"
-RECORDED_ACTIONS = {CycleDecision.OPENING: "apri", CycleDecision.CLOSING: "chiudi", CycleDecision.HOLDING: "mantieni"}
+COMPLETED = CycleOutcome.COMPLETED.name.lower()
 
 
 class _AbsentSourceColumn(TypedDict):
@@ -41,6 +42,15 @@ class _AbsentSourceColumn(TypedDict):
 class _DocumentColumn(TypedDict):
     step: str
     content: Mapping[str, object]
+
+
+class _DecisionRow(TypedDict):
+    planned_at: datetime
+    asset: str
+    action: str
+    direction: str | None
+    confidence: int | None
+    reasoning: str
 
 
 class _CycleRow(TypedDict):
@@ -56,6 +66,7 @@ class _CycleRow(TypedDict):
     input_tokens: int | None
     output_tokens: int | None
     cost_usd: Decimal | None
+    trigger: str
 
 
 class SqlAlchemyCycleRepositoryAdapter:
@@ -79,8 +90,15 @@ class SqlAlchemyCycleRepositoryAdapter:
     def record(self, record: CycleRecord) -> None:
         row = row_of(record, self._tenant_id)
         statement = insert(cycles).values(row).on_conflict_do_update(index_elements=KEY, set_=row)
+        decisions = decision_rows_of(record, self._tenant_id)
         with self._transaction() as connection:
             connection.execute(statement)
+            # In the same transaction: a cycle is never recorded without its decisions. Recorded again after a
+            # failure, it keeps those it had.
+            if decisions:
+                connection.execute(
+                    insert(cycle_decisions).values(decisions).on_conflict_do_nothing(index_elements=DECISION_KEY)
+                )
 
     def newest(self, flow_id: UUID, offset: int, limit: int) -> list[CycleRecord]:
         query = (
@@ -150,6 +168,22 @@ class SqlAlchemyCycleRepositoryAdapter:
                 for row in connection.execute(query).mappings()
             ]
 
+    def last_decided(self, flow_id: UUID) -> DecidedCycle | None:
+        latest = (
+            select(func.max(cycle_decisions.c.planned_at))
+            .join(cycles, _of_the_cycle())
+            .where(cycle_decisions.c.flow_id == flow_id, cycles.c.outcome == COMPLETED)
+            .correlate(None)
+            .scalar_subquery()
+        )
+        query = (
+            select(cycle_decisions)
+            .where(cycle_decisions.c.flow_id == flow_id, cycle_decisions.c.planned_at == latest)
+            .order_by(cycle_decisions.c.position)
+        )
+        with self._transaction() as connection:
+            return decided_cycle_of(list(connection.execute(query).mappings()))
+
     @contextmanager
     def _transaction(self) -> Iterator[Connection]:
         with self._engine.begin() as connection:
@@ -186,17 +220,15 @@ def matching(criteria: CycleFilter) -> ColumnElement[bool]:
 
 
 def _decided(decision: CycleDecision) -> ColumnElement[bool]:
-    # A document contains another when one of its steps holds every key of the other: any decision is an object.
-    documents = cycles.c.documents.cast(JSONB)
-    if decision is CycleDecision.NONE:
-        decided: ColumnElement[bool] = documents.contains(_decision_documents({}))
-        return ~decided
-    taken: ColumnElement[bool] = documents.contains(_decision_documents({"action": RECORDED_ACTIONS[decision]}))
-    return taken
+    # A cycle matches an action when the agent took it on at least one asset; no decision when it took none.
+    action = decision.action
+    if action is None:
+        return ~exists().where(_of_the_cycle())
+    return exists().where(_of_the_cycle(), cycle_decisions.c.action == action.value)
 
 
-def _decision_documents(decision: Mapping[str, str]) -> list[object]:
-    return [{"step": CycleStep.AGENT_DECISION.name.lower(), "content": {DECISIONS: [decision]}}]
+def _of_the_cycle() -> ColumnElement[bool]:
+    return (cycle_decisions.c.flow_id == cycles.c.flow_id) & (cycle_decisions.c.planned_at == cycles.c.planned_at)
 
 
 def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
@@ -217,7 +249,37 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
         "input_tokens": None if cost is None else cost.input_tokens,
         "output_tokens": None if cost is None else cost.output_tokens,
         "cost_usd": None if cost is None else cost.cost_usd,
+        "trigger": record.trigger.value,
     }
+
+
+def decision_rows_of(record: CycleRecord, tenant_id: TenantId) -> list[dict[str, object]]:
+    return [
+        {
+            "tenant_id": tenant_id.value,
+            "flow_id": record.flow_id,
+            "planned_at": record.planned_at,
+            "position": position,
+            "asset": decision.asset,
+            "action": decision.action.value,
+            "direction": None if decision.direction is None else decision.direction.value,
+            "confidence": decision.confidence,
+            "reasoning": decision.reasoning,
+        }
+        for position, decision in enumerate(record.decisions)
+    ]
+
+
+def decided_cycle_of(columns: Sequence[RowMapping | Mapping[str, object]]) -> DecidedCycle | None:
+    """The decisions of one cycle in their order; None without any."""
+    rows = [cast("_DecisionRow", row) for row in columns]
+    if not rows:
+        return None
+    return DecidedCycle(rows[0]["planned_at"], tuple(_decision_of(row) for row in rows))
+
+
+def _decision_of(row: _DecisionRow) -> RecordedDecision:
+    return RecordedDecision.named(row["asset"], row["action"], row["direction"], row["confidence"], row["reasoning"])
 
 
 def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
@@ -235,6 +297,7 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
             StepDocument(_step(document["step"]), document["content"]) for document in row["documents"] or ()
         ),
         cost=_cost_of(row),
+        trigger=CycleTrigger(row["trigger"]),
     )
 
 

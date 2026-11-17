@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
@@ -26,6 +27,7 @@ from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
+from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleCommand
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.cash_out import CashOutOutcome
@@ -37,7 +39,6 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
-from autotrading.domain.flows.openings_suspension import OpeningsSuspension, OpeningsSuspensionCause
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
@@ -392,28 +393,6 @@ class FlowResponse(BaseModel):
         )
 
 
-class OpeningsSuspensionResponse(BaseModel):
-    """The openings of a flow suspended: the reason, since when, the cause and whether the user resumes them from the
-    flow, true only after a maximum loss (R3.2.2, R3.3.1).
-    """
-
-    reason: str
-    suspended_at: datetime
-    cause: OpeningsSuspensionCause
-    resumable: bool
-
-    @classmethod
-    def of(cls, suspension: OpeningsSuspension | None) -> OpeningsSuspensionResponse | None:
-        if suspension is None:
-            return None
-        return cls(
-            reason=suspension.reason,
-            suspended_at=suspension.suspended_at,
-            cause=suspension.cause,
-            resumable=suspension.resumable,
-        )
-
-
 class FreeCapitalResponse(BaseModel):
     amount: str
     currency: str
@@ -572,6 +551,16 @@ def flows_router(
     ) -> FlowResponse:
         command = ChangeAllocatedCapitalCommand(FlowId(flow_id), request.allocated_capital, user_id)
         return FlowResponse.of(use_cases.change_allocated_capital.execute(command))
+
+    # Before the commands of the status, whose path would take "cycles" for an action.
+    @router.post("/flows/{flow_id}/cycles", status_code=status.HTTP_201_CREATED)
+    def run_cycle_now(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> CycleSummaryResponse:
+        """A cycle of the flow now, run by the worker and answered when it ends (R6.5.2): a failed cycle is the
+        cycle created, a flow not active or a cycle in progress a refusal."""
+        command = RequestOnDemandCycleCommand(flow_id)
+        return CycleSummaryResponse.of(use_cases.request_on_demand_cycle.execute(command))
 
     @router.post("/flows/{flow_id}/duplicate", status_code=status.HTTP_201_CREATED)
     def duplicate_flow(

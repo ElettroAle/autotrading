@@ -28,15 +28,17 @@ from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
-from tests.support.installation import dev_installation_on_testnet, worker_configuration
+from tests.support.installation import cycles_of_installation, dev_installation_on_testnet, worker_configuration
 
 FAKE_BOT = "BOT-FAKE_BOT-FAKE"
 DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 
 def factory(engine: Engine, outbox: OutboxPort) -> Callable[[TenantId], WorkerUseCases]:
+    opener = SodiumCredentialOpenerAdapter({})
+    environment, hyperliquid = dev_installation_on_testnet()
     return worker_use_cases(
-        engine, SodiumCredentialOpenerAdapter({}), dev_installation_on_testnet(), Slippage.default(), outbox
+        engine, opener, (environment, Slippage.default(), hyperliquid), outbox, cycles_of_installation(opener)
     )
 
 
