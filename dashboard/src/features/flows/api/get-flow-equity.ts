@@ -30,7 +30,7 @@ export const useFlowEquity = (flowId: string, period: Period) => {
   const api = useApiClient();
   const path = equityPath(flowId, period);
   return useQuery({
-    ...pageDataQuery('flow-equity', path),
+    ...pageDataQuery('flow-equity', flowId, path),
     queryFn: async () =>
       readData(
         await api.GET('/flows/{flow_id}/equity', {

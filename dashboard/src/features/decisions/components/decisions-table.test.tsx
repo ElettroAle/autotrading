@@ -41,6 +41,16 @@ const rowsOf = async () => {
 const cellOf = (row: HTMLElement, column: number): HTMLElement =>
   within(row).getAllByRole('cell')[column] as HTMLElement;
 
+// The reasoning without the command beside it, which opens and closes it (ADR testo-lungo-espandibile).
+const reasoningOf = (row: HTMLElement): string => {
+  const cell = cellOf(row, 5);
+  const command = within(cell).getByRole('button');
+  return (
+    within(cell).getByText((_, element) => element?.id === command.getAttribute('aria-controls'))
+      .textContent ?? ''
+  );
+};
+
 describe('DecisionsTable', () => {
   beforeEach(() => {
     fakePlatform.giveFlowTo('anna', 'alfa');
@@ -71,9 +81,23 @@ describe('DecisionsTable', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa/decisions' });
 
     const [first] = (await rowsOf()) as [HTMLElement];
-    const reasoning = cellOf(first, 5).textContent ?? '';
+    const reasoning = reasoningOf(first);
     expect(reasoning.endsWith('…')).toBe(true);
-    expect(LONG_REASONING.includes(reasoning.replace('Ragionamento', '').slice(0, -1))).toBe(true);
+    expect(LONG_REASONING.startsWith(reasoning.slice(0, -1))).toBe(true);
+  });
+
+  // Bug 576, ADR-testo-lungo-espandibile: the whole reasoning is read in the row, which stays on the page.
+  it('opens the whole reasoning in its row with «Leggi tutto» and closes it with «Riduci»', async () => {
+    fakePlatform.recordCycles('alfa', decidedCycles());
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/decisions' });
+    const [first] = (await rowsOf()) as [HTMLElement];
+
+    await userEvent.click(within(first).getByRole('button', { name: 'Leggi tutto' }));
+
+    expect(reasoningOf(first)).toBe(LONG_REASONING);
+    expect(screen.getByRole('table', { name: 'Decisioni' })).toBeInTheDocument();
+    await userEvent.click(within(first).getByRole('button', { name: 'Riduci' }));
+    expect(reasoningOf(first).endsWith('…')).toBe(true);
   });
 
   it('shows the action and the direction with their icons (R6.5.3)', async () => {

@@ -19,6 +19,7 @@ import { Given, Then, When, type ScenarioMemory } from '../../../support/fixture
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const SHORTENED_LENGTH = 160;
+const READ_ALL = /\s*Leggi tutto$/;
 // A cycle older than the week, so the period of 7 days has decisions to leave out.
 const OLDER_DAYS = 10;
 const REASONING =
@@ -174,7 +175,8 @@ Then(
     await expect(dashboard.cell(first, 'Azione')).toContainText('apri');
     await expect(dashboard.cell(first, 'Direzione')).toContainText('long');
     await expect(dashboard.cell(first, 'Confidenza')).toContainText('60');
-    const reasoning = (await cellTexts(dashboard, 'Ragionamento'))[0] ?? '';
+    // The command «Leggi tutto» beside the shortened text opens it whole (ADR testo-lungo-espandibile).
+    const reasoning = ((await cellTexts(dashboard, 'Ragionamento'))[0] ?? '').replace(READ_ALL, '');
     expect(reasoning.endsWith('…')).toBe(true);
     expect(reasoning.length).toBeLessThanOrEqual(SHORTENED_LENGTH + 1);
     expect(REASONING.startsWith(reasoning.slice(0, -1))).toBe(true);
