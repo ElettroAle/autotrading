@@ -1,5 +1,6 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 
+import { MIN_DOT_RADIUS } from './chart-frame';
 import {
   COMPARISON_COLORS,
   ComparisonChart,
@@ -85,5 +86,74 @@ describe('ComparisonChart', () => {
       '-0,50%',
       '0,00%',
     ]);
+  });
+});
+
+// ADR grafici-condivisi-larghi-come-lo-schermo: the compared curves are as wide as their room, never wider, and their
+// points shrink as they crowd, as the equity curve of a flow.
+describe('the width of the comparison chart, ADR grafici-condivisi-larghi-come-lo-schermo', () => {
+  const HOUR = 60 * 60 * 1000;
+  const MANY = {
+    id: 'flow-many',
+    name: 'molti',
+    points: Array.from({ length: 300 }, (_, index) => ({
+      plannedAt: new Date(Date.parse('2026-10-01T00:00:00Z') + index * HOUR).toISOString(),
+      changePercent: index % 7,
+    })),
+  };
+
+  const onAScreen = (width: number) => {
+    class MeasuringObserver {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe() {
+        const entry = {
+          contentRect: DOMRect.fromRect({ width, height: 320 }),
+        } as ResizeObserverEntry;
+        this.callback([entry], this as unknown as ResizeObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', MeasuringObserver);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ width, height: 320 }),
+    );
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('is as wide as a phone screen, with nothing to scroll sideways', async () => {
+    onAScreen(360);
+    render(<ComparisonChart series={[ALFA, BETA]} />);
+
+    const figure = screen.getByRole('figure', { name: 'Equity curve sovrapposte' });
+    await waitFor(() => {
+      expect(within(figure).getByRole('application')).toHaveAttribute('width', '360');
+    });
+    expect(figure).not.toHaveClass('overflow-x-auto');
+  });
+
+  it('draws smaller points when they are many for its width', async () => {
+    onAScreen(360);
+    render(<ComparisonChart series={[MANY]} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('img', { name: /^molti / })[0]).toHaveAttribute(
+        'r',
+        String(MIN_DOT_RADIUS),
+      );
+    });
+  });
+
+  it('keeps the points at full size when they have room', async () => {
+    onAScreen(1280);
+    render(<ComparisonChart series={[ALFA, BETA]} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('img', { name: /^alfa / })[0]).toHaveAttribute('r', '4');
+    });
   });
 });
