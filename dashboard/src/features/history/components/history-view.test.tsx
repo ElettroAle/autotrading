@@ -185,6 +185,26 @@ describe('HistoryView', () => {
     expect(within(execution as HTMLElement).getByText('0,000123457')).toBeInTheDocument();
   });
 
+  it('shows the direction of closed positions and orders with its icon (R6.5.3)', async () => {
+    records().closedPositions.push(aHistoryPosition(ALFA, 'BTC', dayOf(1)));
+    records().orders.push(aHistoryOrder(ALFA, 'BTC', dayOf(1), []));
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/history?tab=closed-positions' });
+
+    const [position] = await rowsOf('Posizioni chiuse');
+    expect(
+      within(within(position as HTMLElement).getByText('long')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'arrow-up');
+    expect(position).toHaveTextContent('long 2x');
+    await user.click(tab('Ordini'));
+    await rowsOf('Ordini');
+    await user.selectOptions(screen.getByLabelText('Conto'), 'principale');
+    const [order] = await rowsOf('Ordini');
+    expect(
+      within(within(order as HTMLElement).getByText('long')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'arrow-up');
+  });
+
   it('shows an order of no flow, a closing and an order without executions', async () => {
     const order = aHistoryOrder(ALFA, 'ETH', dayOf(2), []);
     const single = aHistoryOrder(ALFA, 'BTC', dayOf(1), [

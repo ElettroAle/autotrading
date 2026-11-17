@@ -1,7 +1,8 @@
 // The structure of the dashboard, from bulletproof-react (ADR 0116): dependencies flow one way, shared code ──> features
 // ──> app, no feature imports another, production never imports the testing code, the server and the application
 // never import each other. One chart library, Recharts, used only by the shared charts of src/components/charts
-// (ADR 0121). The query string changes through the shared hook of src/hooks/use-search-change.ts, never with a function
+// (ADR 0121). One icon library, lucide-react, used only by the shared icons of src/components/ui/icons (ADR
+// icone-con-lucide-react-e-comandi-condivisi). The query string changes through the shared hook of src/hooks/use-search-change.ts, never with a function
 // of the last render (ADR 0166). Every rule is proved red on a violating example in architecture/structure.test.ts.
 import { readdirSync } from 'node:fs';
 
@@ -100,6 +101,15 @@ const RECHARTS_OUTSIDE_THE_CHARTS = {
     'Recharts si usa solo nei grafici condivisi di src/components/charts: le funzionalità passano i dati (ADR 0121)',
 };
 
+// Features and shared components name an icon of src/components/ui/icons, never draw one.
+const ICONS = 'src/components/ui/icons/**';
+
+const LUCIDE_OUTSIDE_THE_ICONS = {
+  group: ['lucide-react', 'lucide-react/*'],
+  message:
+    'lucide-react si usa solo nelle icone condivise di src/components/ui/icons: comandi, azioni e direzioni ne nominano una (ADR icone-con-lucide-react-e-comandi-condivisi)',
+};
+
 // React Router hands the function of setSearchParams the query string of the last render, not the last one asked for:
 // changes made before the page shows the previous one would overwrite each other (ADR 0166).
 const SEARCH_CHANGE = 'src/hooks/use-search-change.ts';
@@ -189,13 +199,13 @@ export default tseslint.config(
   },
   {
     files: SOURCE_FILES,
-    ignores: [CHARTS, API_CLIENT],
+    ignores: [CHARTS, API_CLIENT, ICONS],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           paths: [OPENAPI_FETCH_OUTSIDE_THE_CLIENT],
-          patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS],
+          patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS, LUCIDE_OUTSIDE_THE_ICONS],
         },
       ],
     },
@@ -205,7 +215,9 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS] },
+        {
+          patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS, LUCIDE_OUTSIDE_THE_ICONS],
+        },
       ],
     },
   },
@@ -214,7 +226,22 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [OPENAPI_FETCH_OUTSIDE_THE_CLIENT], patterns: [OTHER_CHART_LIBRARIES] },
+        {
+          paths: [OPENAPI_FETCH_OUTSIDE_THE_CLIENT],
+          patterns: [OTHER_CHART_LIBRARIES, LUCIDE_OUTSIDE_THE_ICONS],
+        },
+      ],
+    },
+  },
+  {
+    files: [ICONS],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [OPENAPI_FETCH_OUTSIDE_THE_CLIENT],
+          patterns: [OTHER_CHART_LIBRARIES, RECHARTS_OUTSIDE_THE_CHARTS],
+        },
       ],
     },
   },
