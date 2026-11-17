@@ -229,6 +229,19 @@ export const useSignOut = () => {
   }, [instance]);
 };
 
+/**
+ * The name of the signed-in user from the identity token MSAL already holds, the username when the token has none:
+ * no call to the API, no personal data kept (ADR area-utente-in-alto-a-destra).
+ */
+export const useSignedInUserName = (): string | undefined => {
+  const { instance, accounts } = useMsal();
+  const account = instance.getActiveAccount() ?? accounts[0];
+  if (account === undefined) {
+    return undefined;
+  }
+  return account.name !== undefined && account.name !== '' ? account.name : account.username;
+};
+
 const SignInRequired = ({ returnTo }: { returnTo: string }) => {
   const renewSession = useSessionRenewal();
   useEffect(() => {

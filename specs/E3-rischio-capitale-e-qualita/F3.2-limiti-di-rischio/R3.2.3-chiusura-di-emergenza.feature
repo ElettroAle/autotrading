@@ -17,7 +17,8 @@ Funzionalità: R3.2.3 Chiusura di emergenza
   registra con data, ora, ambito ed esito.
   La dashboard chiede una conferma che nomina l'ambito e il numero di posizioni da chiudere.
   Nella dashboard il comando sta da solo nel riquadro "Zona di emergenza", in fondo alla pagina del flusso, della
-  pagina dei conti e dell'elenco dei flussi, lontano dagli altri comandi (Bug 545).
+  pagina dei conti e della pagina "Generale" delle impostazioni, lontano dagli altri comandi (Bug 545); l'elenco dei
+  flussi, la pagina d'uso quotidiano, non lo offre (Bug 563).
   I flussi riprendono solo per comando dell'utente (R1.1.4).
   Fuori ambito: la procedura di verifica dell'esecuzione, già disponibile (R0.4.1).
 
@@ -97,10 +98,11 @@ Funzionalità: R3.2.3 Chiusura di emergenza
     Allora il riquadro "Zona di emergenza" in fondo alla pagina contiene la chiusura di emergenza dei conti "test-1" e "test-2"
     E i comandi dei conti non contengono la chiusura di emergenza
 
-  Scenario: Zona di emergenza in fondo all'elenco dei flussi
-    Quando "anna" apre nella dashboard l'elenco dei flussi
+  Scenario: Zona di emergenza nelle impostazioni generali
+    Quando "anna" apre nella dashboard le impostazioni generali
     Allora la chiusura di emergenza di tutti i flussi sta nel riquadro "Zona di emergenza" in fondo alla pagina
     E il riquadro "Zona di emergenza" non contiene altri comandi
+    E l'elenco dei flussi non contiene la chiusura di emergenza
 
   Scenario: Conferma dalla zona di emergenza
     Quando "anna" sceglie la chiusura di emergenza del flusso "alfa" nel riquadro "Zona di emergenza"
