@@ -1,10 +1,40 @@
+import { expect, type Locator } from '@playwright/test';
+
 import { fakePlatform } from '@/testing/mocks/platform';
 import { anOpenPosition } from '@/testing/mocks/positions';
 
-import { Given, When } from '../../../support/fixtures';
+import type { DashboardPages } from '../../../support/dashboard-pages';
+import { Given, Then, When } from '../../../support/fixtures';
 
-// R3.2.3, ADR chiusura-di-emergenza-nella-dashboard: the confirmation of the dashboard; the other scenarios run on the
-// use cases with pytest-bdd.
+// R3.2.3, ADR chiusura-di-emergenza-nella-dashboard: the confirmation of the dashboard; ADR
+// zona-di-emergenza-in-fondo-alla-pagina: the command alone in the zone at the bottom of the page. The other scenarios
+// run on the use cases with pytest-bdd.
+const EMERGENCY = /Chiusura di emergenza/;
+
+const zoneNamed = (dashboard: DashboardPages, name: string): Locator =>
+  dashboard.content().getByRole('region', { name, exact: true });
+
+// Every part of the content that comes after the zone, outside it: none when the zone is at the bottom of the page.
+const partsAfter = async (zone: Locator): Promise<string[]> =>
+  zone.evaluate((box) => {
+    const content = box.closest('main');
+    if (content === null) {
+      return ['the zone is outside the content of the page'];
+    }
+    return [...content.querySelectorAll('*')]
+      .filter(
+        (part) =>
+          !box.contains(part) &&
+          (part.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_PRECEDING) !== 0 &&
+          !part.contains(box),
+      )
+      .map((part) => part.outerHTML);
+  });
+
+const expectAtTheBottom = async (zone: Locator): Promise<void> => {
+  await expect(zone).toBeVisible();
+  expect(await partsAfter(zone)).toEqual([]);
+};
 const activeFlowWithPosition = (
   account: string,
   accountName: string,
@@ -48,9 +78,103 @@ When(
     memory.account = account;
     await dashboard.openAccounts();
     await dashboard.signInAs(account);
-    await dashboard
-      .accountRow(accountName)
-      .getByRole('button', { name: 'Chiusura di emergenza' })
+    await zoneNamed(dashboard, 'Zona di emergenza')
+      .getByRole('button', { name: `Chiusura di emergenza del conto ${accountName}`, exact: true })
       .click();
   },
 );
+
+When(
+  '{string} apre nella dashboard la pagina del flusso {string}',
+  async ({ dashboard }, account: string, flow: string) => {
+    await dashboard.openFlowAs(account, flow);
+    await dashboard.waitUntilRead();
+  },
+);
+
+When(
+  '{string} apre nella dashboard la pagina dei conti',
+  async ({ dashboard }, account: string) => {
+    await dashboard.openAccounts();
+    await dashboard.signInAs(account);
+    await expect(dashboard.page.getByRole('table', { name: 'Conti' })).toBeVisible();
+    await dashboard.waitUntilRead();
+  },
+);
+
+When(
+  "{string} apre nella dashboard l'elenco dei flussi",
+  async ({ dashboard }, account: string) => {
+    await dashboard.openAndSignInAs(account);
+    await expect(dashboard.flows()).toBeVisible();
+    await dashboard.waitUntilRead();
+  },
+);
+
+When(
+  '{string} sceglie la chiusura di emergenza del flusso {string} nel riquadro {string}',
+  async ({ dashboard, memory }, account: string, flow: string, zone: string) => {
+    memory.account = account;
+    memory.flow = flow;
+    await dashboard.openFlowAs(account, flow);
+    await zoneNamed(dashboard, zone)
+      .getByRole('button', { name: `Chiusura di emergenza del flusso ${flow}`, exact: true })
+      .click();
+  },
+);
+
+Then(
+  'la chiusura di emergenza del flusso {string} sta nel riquadro {string} in fondo alla pagina',
+  async ({ dashboard }, flow: string, name: string) => {
+    const zone = zoneNamed(dashboard, name);
+    await expect(
+      zone.getByRole('button', { name: `Chiusura di emergenza del flusso ${flow}`, exact: true }),
+    ).toBeVisible();
+    await expectAtTheBottom(zone);
+  },
+);
+
+Then(
+  'la chiusura di emergenza di tutti i flussi sta nel riquadro {string} in fondo alla pagina',
+  async ({ dashboard }, name: string) => {
+    const zone = zoneNamed(dashboard, name);
+    await expect(
+      zone.getByRole('button', { name: 'Chiusura di emergenza di tutti i flussi', exact: true }),
+    ).toBeVisible();
+    await expectAtTheBottom(zone);
+  },
+);
+
+Then(
+  'il riquadro {string} in fondo alla pagina contiene la chiusura di emergenza dei conti {string} e {string}',
+  async ({ dashboard }, name: string, first: string, second: string) => {
+    const zone = zoneNamed(dashboard, name);
+    await expect(zone.getByRole('button')).toHaveText([
+      `Chiusura di emergenza del conto ${first}`,
+      `Chiusura di emergenza del conto ${second}`,
+    ]);
+    await expectAtTheBottom(zone);
+  },
+);
+
+Then('il riquadro {string} non contiene altri comandi', async ({ dashboard }, name: string) => {
+  const zone = zoneNamed(dashboard, name);
+  await expect(zone.getByRole('button')).toHaveCount(1);
+  await expect(zone.getByRole('button')).toHaveText(EMERGENCY);
+  await expect(zone.getByRole('link')).toHaveCount(0);
+});
+
+Then(
+  'i comandi del flusso {string} non contengono la chiusura di emergenza',
+  async ({ dashboard }, flow: string) => {
+    const head = dashboard.content().getByRole('region', { name: flow, exact: true });
+    await expect(head.getByRole('group', { name: 'Comandi del flusso' })).toBeVisible();
+    await expect(head.getByRole('button', { name: EMERGENCY })).toHaveCount(0);
+  },
+);
+
+Then('i comandi dei conti non contengono la chiusura di emergenza', async ({ dashboard }) => {
+  const accounts = dashboard.page.getByRole('table', { name: 'Conti' });
+  await expect(accounts.getByRole('button').first()).toBeVisible();
+  await expect(accounts.getByRole('button', { name: EMERGENCY })).toHaveCount(0);
+});

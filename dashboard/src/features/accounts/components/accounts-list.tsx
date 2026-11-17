@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
@@ -34,9 +32,7 @@ const AccountOnExchange = ({ account }: { account: Account }) => {
   return <PublicFields fields={fields} values={account.public_fields} />;
 };
 
-const columnsWith = (
-  renderCommands: (account: Account) => ReactNode,
-): DataTableColumn<Account>[] => [
+const COLUMNS: DataTableColumn<Account>[] = [
   { header: 'Nome', cell: (account) => account.name },
   { header: "Conto sull'exchange", cell: (account) => <AccountOnExchange account={account} /> },
   {
@@ -54,24 +50,12 @@ const columnsWith = (
   { header: 'Riconciliazione', cell: (account) => <ReconciliationStatus account={account} /> },
   {
     header: 'Comandi',
-    cell: (account) => (
-      <div className="space-y-2">
-        <AccountActions account={account} />
-        {renderCommands(account)}
-      </div>
-    ),
+    cell: (account) => <AccountActions account={account} />,
   },
 ];
 
-type AccountsListProps = {
-  /** The commands another feature adds to each account, as the page composes them (R3.2.3). */
-  readonly renderCommands?: (account: Account) => ReactNode;
-};
-
-const NO_COMMANDS = (): ReactNode => null;
-
 /** Every account of the tenant with what the API says of it; what comes from the exchange may fail alone (ADR 0126). */
-export const AccountsList = ({ renderCommands = NO_COMMANDS }: AccountsListProps) => {
+export const AccountsList = () => {
   const accounts = useAccounts();
   if (accounts.isPending) {
     return <Loading />;
@@ -86,7 +70,7 @@ export const AccountsList = ({ renderCommands = NO_COMMANDS }: AccountsListProps
   return (
     <DataTable
       label="Conti"
-      columns={columnsWith(renderCommands)}
+      columns={COLUMNS}
       rows={accounts.data}
       rowKey={(account) => account.id}
     />

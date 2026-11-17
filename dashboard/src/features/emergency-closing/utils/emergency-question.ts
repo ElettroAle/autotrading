@@ -19,6 +19,21 @@ export const emergencyQuestion = (scope: EmergencyScope, positions: number): str
   }
 };
 
+/**
+ * The command of the emergency closing, naming its scope, so the zone it stands in reads by itself (ADR
+ * zona-di-emergenza-in-fondo-alla-pagina).
+ */
+export const emergencyCommandLabel = (scope: EmergencyScope): string => {
+  switch (scope.kind) {
+    case 'flow':
+      return `Chiusura di emergenza del flusso ${scope.flowName}`;
+    case 'account':
+      return `Chiusura di emergenza del conto ${scope.accountName}`;
+    case 'all':
+      return 'Chiusura di emergenza di tutti i flussi';
+  }
+};
+
 /** The scope as the API reads it: a flow, an account, or neither for every flow. */
 export const scopeQuery = (scope: EmergencyScope): { flow_id?: string; account_id?: string } => {
   switch (scope.kind) {
