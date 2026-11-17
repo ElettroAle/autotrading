@@ -1,3 +1,5 @@
+import { useSearchParams } from 'react-router';
+
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
 import { DirectionLabel } from '@/components/ui/direction-label';
@@ -44,6 +46,9 @@ const invalidationOf = ({ invalidation }: OpenPosition) =>
  */
 export const OpenPositions = ({ flowId }: { flowId: string }) => {
   const state = useFlowState(flowId);
+  // The link of a notification points at the position by its asset (ADR posizione-evidenziata-dall-indirizzo).
+  const [search] = useSearchParams();
+  const asset = search.get('asset');
   if (state.isPending) {
     return <Loading />;
   }
@@ -58,6 +63,7 @@ export const OpenPositions = ({ flowId }: { flowId: string }) => {
       rows={state.data.positions}
       rowKey={(position) => position.asset}
       rowDetail={invalidationOf}
+      highlightedRow={(position) => position.asset === asset}
       empty="Nessuna posizione aperta."
     />
   );

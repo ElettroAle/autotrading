@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.domain.notifications.notification import Amount, Notification
@@ -13,6 +14,8 @@ class NotifyOpeningReducedUseCase:
         self._notifier = notifier
         self._currency = currency
 
-    def execute(self, flow_name: str, asset: str, requested_margin: Decimal, approved_margin: Decimal) -> None:
+    def execute(
+        self, flow_id: UUID, flow_name: str, asset: str, requested_margin: Decimal, approved_margin: Decimal
+    ) -> None:
         requested, approved = Amount(requested_margin, self._currency), Amount(approved_margin, self._currency)
-        self._notifier.execute(Notification.opening_reduced(flow_name, asset, requested, approved))
+        self._notifier.execute(Notification.opening_reduced(flow_id, flow_name, asset, requested, approved))

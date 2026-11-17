@@ -3,6 +3,7 @@ outbox-delle-integrazioni-esterne-con-procrastinate).
 """
 
 import logging
+from uuid import uuid4
 
 import pytest
 
@@ -26,11 +27,11 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import channel_choices
+from tests.support.notifications import notification_routes
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
-FAILED = Notification.cycle_failed("alfa", "timeout")
+FAILED = Notification.cycle_failed(uuid4(), "alfa", "timeout")
 
 
 class Outbox:
@@ -50,7 +51,7 @@ class Outbox:
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             self.mail_servers.repository(tenant_id),
             self.outbox,
-            channel_choices(tenant_id),
+            notification_routes(tenant_id),
         ).execute(notification)
 
     def process(self) -> None:

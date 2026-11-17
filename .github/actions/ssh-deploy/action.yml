@@ -38,6 +38,10 @@ inputs:
     description: Scope chiesto dalla pagina OpenAPI
     required: false
     default: ""
+  dashboard-url:
+    description: Indirizzo HTTPS della dashboard per i link delle notifiche; vuoto, notifiche senza link
+    required: false
+    default: ""
   telegram-bot-token:
     description: Token del bot Telegram dal segreto dell'environment; vuoto lascia il bot com'è (ADR 0071)
     required: false
@@ -62,6 +66,7 @@ runs:
         AUTH_AUDIENCE: ${{ inputs.auth-audience }}
         AUTH_CLIENT_ID: ${{ inputs.auth-client-id }}
         AUTH_SCOPE: ${{ inputs.auth-scope }}
+        DASHBOARD_URL: ${{ inputs.dashboard-url }}
         TELEGRAM_BOT_TOKEN: ${{ inputs.telegram-bot-token }}
       # Tailscale SSH: identity from the tailnet, no SSH key (ADR 0013).
       run: |
@@ -69,12 +74,14 @@ runs:
         ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
           -o BatchMode=yes)
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
-        # Public configuration only: issuer, audience, client id and scope are not secrets (ADR 0016).
+        # Public configuration only: issuer, audience, client id, scope and the address of the dashboard are not secrets
+        # (ADR 0016, ADR destinazioni-delle-notifiche-nella-dashboard).
         {
           printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION"
           printf 'FORECASTER_IMAGE=%s\nDASHBOARD_IMAGE=%s\n' "$FORECASTER_IMAGE" "$DASHBOARD_IMAGE"
           printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
+          printf 'DASHBOARD_URL=%s\n' "$DASHBOARD_URL"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
         # Memory and disk of the installation, sampled from before the pull until the services are up, go to the summary
         # of the job (ADR 0162, Bug 252). The report runs on exit, so a failed release stops the sampling too; the measure

@@ -126,4 +126,29 @@ describe('OpenPositions', () => {
       'exchange non raggiungibile, riprovare',
     );
   });
+
+  // ADR posizione-evidenziata-dall-indirizzo: the link of a notification points at the position by its asset.
+  describe('the position of the address', () => {
+    it('highlights the row of the asset of the address', async () => {
+      fakePlatform.holdPositions('alfa', [
+        anOpenPosition({ asset: 'BTC' }),
+        anOpenPosition({ asset: 'ETH' }),
+      ]);
+      await renderApp({ account: 'anna', url: `${URL}?asset=ETH` });
+
+      const table = await screen.findByRole('table', { name: 'Posizioni aperte' });
+      const eth = within(table).getByRole('row', { current: true });
+      expect(within(eth).getByText('ETH')).toBeInTheDocument();
+      expect(within(eth).getByText('Dalla notifica')).toBeInTheDocument();
+      expect(eth).toHaveFocus();
+    });
+
+    it('highlights no row when the asset of the address is not held any more', async () => {
+      fakePlatform.holdPositions('alfa', [anOpenPosition({ asset: 'BTC' })]);
+      await renderApp({ account: 'anna', url: `${URL}?asset=ETH` });
+
+      const table = await screen.findByRole('table', { name: 'Posizioni aperte' });
+      expect(within(table).queryByRole('row', { current: true })).not.toBeInTheDocument();
+    });
+  });
 });

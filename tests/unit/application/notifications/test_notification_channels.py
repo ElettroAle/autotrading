@@ -21,7 +21,7 @@ from autotrading.application.notifications.get_notification_channels import (
     NotificationChannels,
 )
 from autotrading.application.notifications.notify import NotifyUseCase
-from autotrading.application.notifications.ports import ChannelChoicePorts, NotifiedFlow
+from autotrading.application.notifications.ports import NotificationRoutes, NotifiedFlow
 from autotrading.application.notifications.remove_flow_channel_exception import (
     RemoveFlowChannelExceptionCommand,
     RemoveFlowChannelExceptionUseCase,
@@ -52,6 +52,7 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.mail_servers import MailServers
 
@@ -59,9 +60,11 @@ ANNA, BRUNO = TenantId.new(), TenantId.new()
 ALFA, BETA = NotifiedFlow(uuid4(), "alfa"), NotifiedFlow(uuid4(), "beta")
 CHAT = ChatId(42)
 ADDRESS = EmailAddress.parse("anna@example.com")
-FAILED_ALFA = Notification.cycle_failed("alfa", "modello non raggiungibile")
-FAILED_BETA = Notification.cycle_failed("beta", "modello non raggiungibile")
-ALARM = Notification.reconciliation_alarm("test-1", Amount(Decimal(980), "USDC"), Amount(Decimal(1000), "USDC"))
+FAILED_ALFA = Notification.cycle_failed(ALFA.flow_id, "alfa", "modello non raggiungibile")
+FAILED_BETA = Notification.cycle_failed(BETA.flow_id, "beta", "modello non raggiungibile")
+ALARM = Notification.reconciliation_alarm(
+    uuid4(), "test-1", Amount(Decimal(980), "USDC"), Amount(Decimal(1000), "USDC")
+)
 TELEGRAM = frozenset({NotificationChannel.TELEGRAM})
 EMAIL = frozenset({NotificationChannel.EMAIL})
 BOTH = frozenset(NotificationChannel)
@@ -120,7 +123,7 @@ class Channels:
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             self.servers.repository(tenant_id),
             self.outbox,
-            ChannelChoicePorts(self.repository(tenant_id), self.flows),
+            NotificationRoutes(self.repository(tenant_id), FakeNotificationLinkAdapter(dashboard=False)),
         ).execute(notification)
 
     def chat_texts(self) -> list[str]:
@@ -280,13 +283,16 @@ def test_the_exception_of_the_flow_of_the_event_wins_over_the_general_choice(cha
     assert channels.chat_texts() == [FAILED_ALFA.text]
 
 
-def test_an_event_of_a_flow_no_more_listed_follows_the_general_choice(channels: Channels) -> None:
+def test_the_exception_follows_the_flow_by_its_id_never_by_its_name(channels: Channels) -> None:
+    """ADR destinazioni-delle-notifiche-nella-dashboard: the notification names its flow by its id."""
     channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
-    channels.flows.flows = (BETA,)
+    renamed = Notification.cycle_failed(ALFA.flow_id, "alfa-rinominato", "modello non raggiungibile")
+    namesake = Notification.cycle_failed(uuid4(), "alfa", "modello non raggiungibile")
 
-    channels.notify(FAILED_ALFA)
+    channels.notify(renamed)
+    channels.notify(namesake)
 
-    assert channels.chat_texts() == [FAILED_ALFA.text]
+    assert channels.chat_texts() == [namesake.text]
 
 
 def test_an_event_of_the_account_follows_the_general_choice(channels: Channels) -> None:
@@ -299,7 +305,7 @@ def test_an_event_of_the_account_follows_the_general_choice(channels: Channels) 
 
 
 def test_the_risk_decisions_are_silent_until_the_user_chooses(channels: Channels) -> None:
-    channels.notify(Notification.opening_blocked("alfa", "BTC", "confidenza 40 sotto la minima 60"))
+    channels.notify(Notification.opening_blocked(ALFA.flow_id, "alfa", "BTC", "confidenza 40 sotto la minima 60"))
 
     assert channels.chat_texts() == []
     assert channels.email_texts() == []

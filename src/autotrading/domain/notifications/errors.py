@@ -10,6 +10,15 @@ class InvalidNotificationError(DomainError):
         super().__init__("notifica senza flusso o conto")
 
 
+class InvalidNotificationTargetError(DomainError):
+    """A position a notification leads to without the asset, or the instant it closed, that finds it: a defect of the
+    caller, never of the user (R3.5.6).
+    """
+
+    def __init__(self) -> None:
+        super().__init__("destinazione della notifica senza la posizione")
+
+
 class InvalidOutboxMessageError(DomainError):
     """A queued message that does not carry what its integration needs: no retry can ever deliver it."""
 

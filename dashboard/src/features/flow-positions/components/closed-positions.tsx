@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DirectionLabel } from '@/components/ui/direction-label';
@@ -78,6 +78,33 @@ const emptyText = (filtered: boolean, interval: ListInterval): string => {
     : 'Nessuna posizione chiusa nel periodo scelto.';
 };
 
+/** The closing a notification points at, by asset and instant (ADR posizione-evidenziata-dall-indirizzo). */
+type NotifiedClosing = { readonly asset: string; readonly closedAt: number };
+
+const notifiedClosingOf = (search: URLSearchParams): NotifiedClosing | undefined => {
+  const asset = search.get('asset');
+  const closedAt = Date.parse(search.get('closed_at') ?? '');
+  return asset === null || Number.isNaN(closedAt) ? undefined : { asset, closedAt };
+};
+
+const isNotified = (position: ClosedPosition, closing: NotifiedClosing | undefined): boolean =>
+  closing !== undefined &&
+  position.asset === closing.asset &&
+  Date.parse(position.closed_at) === closing.closedAt;
+
+// The tab shows one page: an older closing is in the history, narrowed to the flow and the asset.
+const historyHrefOf = (flowId: string, asset: string): string =>
+  `${paths.history.getHref()}?${new URLSearchParams({ tab: 'closed-positions', flow: flowId, asset }).toString()}`;
+
+const ClosingNotOnThePage = ({ flowId, asset }: { flowId: string; asset: string }) => (
+  <p role="status" className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm">
+    L&apos;operazione della notifica non è in questa pagina.{' '}
+    <Link to={historyHrefOf(flowId, asset)} className="font-medium text-blue-800 hover:underline">
+      Cercala nello Storico
+    </Link>
+  </p>
+);
+
 type PositionsInIntervalProps = {
   readonly flowId: string;
   readonly page: number;
@@ -103,13 +130,19 @@ const PositionsInInterval = ({ flowId, page, interval }: PositionsInIntervalProp
     return <ErrorMessage error={positions.error} />;
   }
   const filtered = Object.keys(values).length > 0;
+  const notified = notifiedClosingOf(search);
+  const rows = positions.data.positions;
   return (
     <>
+      {notified !== undefined && !rows.some((position) => isNotified(position, notified)) && (
+        <ClosingNotOnThePage flowId={flowId} asset={notified.asset} />
+      )}
       <DataTable
         label="Posizioni chiuse"
         columns={columnsIn(currency)}
-        rows={positions.data.positions}
+        rows={rows}
         rowKey={(position) => `${position.closed_at}-${position.asset}`}
+        highlightedRow={(position) => isNotified(position, notified)}
         empty={emptyText(filtered, interval)}
         filtering={{ filters, total: positions.data.total, countOf }}
       />

@@ -1,6 +1,8 @@
 ---
 paths:
   - "dashboard/**"
+  - "src/autotrading/adapters/outbound/dashboard/**"
+  - "tests/unit/adapters/dashboard/**"
 ---
 
 # Dashboard React + TypeScript
@@ -8,6 +10,12 @@ paths:
 Decisioni in ADR 0116 (struttura e controlli), 0117 (container e percorso `/dashboard`), 0118 (accesso Entra), 0121
 (grafici), accesso-persistente-con-cache-msal-in-localstorage, content-security-policy-rigida-della-dashboard e
 prove-dell-accesso-che-dura.
+
+## Adapter in uscita delle pagine (ADR destinazioni-delle-notifiche-nella-dashboard)
+
+- `src/autotrading/adapters/outbound/dashboard/` è l'unico punto del Python che conosce le rotte della dashboard e il suo
+  indirizzo: `DashboardNotificationLinkAdapter` realizza `NotificationLinkPort` con la sola libreria standard, senza
+  chiamare la dashboard. L'indirizzo è `DASHBOARD_URL` del worker (facoltativo: senza, le notifiche partono senza link).
 
 ## Progetto
 

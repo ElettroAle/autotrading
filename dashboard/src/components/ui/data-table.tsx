@@ -29,6 +29,8 @@ type DataTableProps<T> = {
   readonly filtering?: TableFiltering;
   /** What a row adds under it across every column, as a text that wraps; nothing for a row without it. */
   readonly rowDetail?: (row: T) => ReactNode;
+  /** The row the address points at: it stands out, is announced as current and comes into view. */
+  readonly highlightedRow?: (row: T) => boolean;
 };
 
 const ARROWS: Record<SortDirection, string> = { ascending: '▲', descending: '▼' };
@@ -78,15 +80,43 @@ const isOnAControl = (event: MouseEvent): boolean =>
   event.target instanceof Element && event.target.closest(CONTROLS) !== null;
 
 const ROW =
-  'block rounded border border-slate-200 bg-white p-2 md:table-row md:rounded-none md:border-0 md:border-b md:p-0';
+  'block rounded border border-slate-200 p-2 md:table-row md:rounded-none md:border-0 md:border-b md:p-0';
+// The highlighted row says so with a text too, never with the colour alone (ADR posizione-evidenziata-dall-indirizzo).
+const HIGHLIGHTED = 'bg-amber-50';
+const HIGHLIGHT_TEXT = 'Dalla notifica';
+
+const backgroundOf = (highlighted: boolean): string => (highlighted ? HIGHLIGHTED : 'bg-white');
+
+// One function for every row, so React calls it once when the row appears, never again at a later rendering.
+const bringIntoView = (row: HTMLTableRowElement | null) => {
+  if (row === null) {
+    return;
+  }
+  // Optional because a layout-less document (jsdom) has no scrollIntoView.
+  row.scrollIntoView?.({ block: 'center' });
+  row.focus({ preventScroll: true });
+};
+
+/** What a row of the table is told about itself: highlighted, it is current, focusable and brought into view. */
+const highlightOf = (highlighted: boolean) =>
+  highlighted
+    ? { 'aria-current': true as const, tabIndex: -1, ref: bringIntoView }
+    : { 'aria-current': undefined, tabIndex: undefined, ref: undefined };
+
+const HighlightText = () => (
+  <span className="ml-2 rounded bg-amber-200 px-1 text-xs font-medium text-amber-900">
+    {HIGHLIGHT_TEXT}
+  </span>
+);
 
 type CellsProps<T> = {
   readonly row: T;
   readonly columns: readonly DataTableColumn<T>[];
   readonly href?: string;
+  readonly highlighted: boolean;
 };
 
-const Cells = <T,>({ row, columns, href }: CellsProps<T>) =>
+const Cells = <T,>({ row, columns, href, highlighted }: CellsProps<T>) =>
   columns.map((column, index) => (
     <td
       key={column.header}
@@ -102,10 +132,22 @@ const Cells = <T,>({ row, columns, href }: CellsProps<T>) =>
       ) : (
         column.cell(row)
       )}
+      {index === 0 && highlighted && <HighlightText />}
     </td>
   ));
 
-const LinkedRow = <T,>({ row, columns, href }: CellsProps<T> & { readonly href: string }) => {
+const PlainRow = <T,>({ row, columns, highlighted }: CellsProps<T>) => (
+  <tr className={`${ROW} ${backgroundOf(highlighted)}`} {...highlightOf(highlighted)}>
+    <Cells row={row} columns={columns} highlighted={highlighted} />
+  </tr>
+);
+
+const LinkedRow = <T,>({
+  row,
+  columns,
+  href,
+  highlighted,
+}: CellsProps<T> & { readonly href: string }) => {
   const navigate = useNavigate();
   // The link of the first cell is the way of keyboards and readers; the press on the row is a shortcut for a pointer.
   const open = (event: MouseEvent) => {
@@ -114,8 +156,12 @@ const LinkedRow = <T,>({ row, columns, href }: CellsProps<T> & { readonly href: 
     }
   };
   return (
-    <tr onClick={open} className={`${ROW} cursor-pointer hover:bg-slate-50`}>
-      <Cells row={row} columns={columns} href={href} />
+    <tr
+      onClick={open}
+      className={`${ROW} ${backgroundOf(highlighted)} cursor-pointer hover:bg-slate-50`}
+      {...highlightOf(highlighted)}
+    >
+      <Cells row={row} columns={columns} href={href} highlighted={highlighted} />
     </tr>
   );
 };
@@ -143,6 +189,7 @@ const Table = <T,>({
   onSort,
   rowHref,
   rowDetail,
+  highlightedRow,
 }: TableProps<T>) => (
   // Wider than its box, the table scrolls inside it: the page never scrolls (R6.4.4).
   <div role="region" aria-label={label} className="md:overflow-x-auto">
@@ -164,11 +211,14 @@ const Table = <T,>({
         {rows.map((row) => (
           <Fragment key={rowKey(row)}>
             {rowHref === undefined ? (
-              <tr className={ROW}>
-                <Cells row={row} columns={columns} />
-              </tr>
+              <PlainRow row={row} columns={columns} highlighted={highlightedRow?.(row) ?? false} />
             ) : (
-              <LinkedRow row={row} columns={columns} href={rowHref(row)} />
+              <LinkedRow
+                row={row}
+                columns={columns}
+                href={rowHref(row)}
+                highlighted={highlightedRow?.(row) ?? false}
+              />
             )}
             <DetailRow detail={rowDetail?.(row)} width={columns.length} />
           </Fragment>

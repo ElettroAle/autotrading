@@ -87,6 +87,9 @@ services:
       # La libreria LiteLLM usa la mappa dei modelli della sua versione, senza scaricarla da internet (ADR 0148).
       LITELLM_OFFLINE_MODE: "true"
       FORECASTER_URL: http://forecaster:8000
+      # Indirizzo HTTPS della dashboard a cui portano i link delle notifiche; vuoto, le notifiche partono senza link
+      # (ADR destinazioni-delle-notifiche-nella-dashboard).
+      DASHBOARD_URL: ${DASHBOARD_URL:-}
     secrets:
       - postgres_app_password
       - credentials_private_key_v1

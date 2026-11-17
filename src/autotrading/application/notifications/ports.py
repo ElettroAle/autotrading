@@ -5,13 +5,14 @@ from uuid import UUID
 
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
-from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.flow_status import FlowStatusFigures
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.mail_server import MailServer
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.notifications.notification_email import NotificationEmail
-from autotrading.domain.notifications.outbox_message import OutboxMessage
+from autotrading.domain.notifications.notification_link import NotificationLink
+from autotrading.domain.notifications.notification_target import NotificationTarget
+from autotrading.domain.notifications.outbox_message import EmailMessage, OutboxMessage
 from autotrading.domain.notifications.pending_link import PendingLink
 from autotrading.domain.notifications.sealed_mail_password import SealedMailPassword
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -56,8 +57,11 @@ class LinkedChatLookupPort(Protocol):
 
 
 class MessengerPort(Protocol):
-    def send(self, chat_id: ChatId, text: str) -> None:
-        """Raises MessageNotDeliveredError when Telegram does not take the message."""
+    def send(self, chat_id: ChatId, text: str, links: Sequence[NotificationLink] = ()) -> None:
+        """Sends the text with a button under it for each link (ADR link-nei-messaggi-telegram-ed-email).
+
+        Raises MessageNotDeliveredError when Telegram does not take the message.
+        """
         ...
 
 
@@ -76,9 +80,9 @@ class NotificationEmailRepositoryPort(Protocol):
 
 
 class MailerPort(Protocol):
-    def send(self, server: MailServer, password: str, address: EmailAddress, subject: str, text: str) -> None:
-        """Sends the email from the mail server of the tenant, logged in with its opened password (ADR
-        invio-dal-server-di-posta-del-tenant).
+    def send(self, server: MailServer, password: str, email: EmailMessage) -> None:
+        """Sends the email, its links at the bottom of the text, from the mail server of the tenant, logged in with its
+        opened password (ADR invio-dal-server-di-posta-del-tenant, ADR link-nei-messaggi-telegram-ed-email).
 
         Raises MailServerRefusedLoginError when the server refuses user and password, EmailNotDeliveredError when it
         does not take the email for any other reason.
@@ -165,12 +169,22 @@ class NotifiedFlowsPort(Protocol):
         ...
 
 
+class NotificationLinkPort(Protocol):
+    def link(self, target: NotificationTarget) -> NotificationLink | None:
+        """The page of the dashboard the target leads to; none when the installation names no dashboard, and the
+        notification leaves without it (ADR destinazioni-delle-notifiche-nella-dashboard).
+        """
+        ...
+
+
 @dataclass(frozen=True, slots=True)
-class ChannelChoicePorts:
-    """What tells the channel of a notification: the choices of the tenant and the flows its exceptions name."""
+class NotificationRoutes:
+    """Where a notification goes: the channels the tenant chose for its event, or for the exception of its flow, and
+    the pages of the dashboard it leads to.
+    """
 
     preferences: ChannelPreferencesRepositoryPort
-    flows: NotifiedFlowsPort
+    links: NotificationLinkPort
 
 
 @dataclass(frozen=True, slots=True)

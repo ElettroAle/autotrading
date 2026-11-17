@@ -41,7 +41,7 @@ class GuardFlowLossUseCase:
             return None
         suspension = OpeningsSuspension(breach, now)
         self._openings.suspend(flow.flow.id.value, suspension)
-        self._notices.execute(flow.flow.name.value, breach)
+        self._notices.execute(flow.flow.id.value, flow.flow.name.value, breach)
         return suspension
 
     def _status_at(self, flow: CycleFlow, now: datetime) -> OpeningsStatus:

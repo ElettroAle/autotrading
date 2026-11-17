@@ -65,13 +65,13 @@ class ReviewCycleRiskUseCase:
     def _tell_openings(
         self, cycle_flow: CycleFlow, command: CheckRiskCommand, outcomes: tuple[RiskOutcome, ...]
     ) -> None:
-        flow_name = cycle_flow.flow.name.value
+        flow_id, flow_name = cycle_flow.flow.id.value, cycle_flow.flow.name.value
         for reduction in reduced_openings(command.intents, outcomes, command.state.funds):
             self._reduced_notice.execute(
-                flow_name, reduction.asset, reduction.requested_margin, reduction.approved_margin
+                flow_id, flow_name, reduction.asset, reduction.requested_margin, reduction.approved_margin
             )
         for blocked in blocked_openings(command.intents, outcomes):
-            self._blocked_notice.execute(flow_name, blocked.asset, blocked.cause)
+            self._blocked_notice.execute(flow_id, flow_name, blocked.asset, blocked.cause)
 
 
 def _open_intent(  # noqa: PLR0913, PLR0917 - the fields of the opening the agent gives

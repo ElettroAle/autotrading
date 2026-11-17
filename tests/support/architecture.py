@@ -119,6 +119,9 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     # The scheduler of the cycles of the worker (docs/architecture.md:144, ADR 0112).
     "adapters/outbound/apscheduler": frozenset({"apscheduler"}),
     "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
+    # The routes of the dashboard and its address, composed with the standard library: no request reaches it (ADR
+    # destinazioni-delle-notifiche-nella-dashboard).
+    "adapters/outbound/dashboard": frozenset(),
     # The internal API of the forecaster service (ADR 0107): Prophet stays inside the service.
     "adapters/outbound/forecaster": frozenset({"httpx"}),
     # eth_account and requests are the signing and transport libraries of the official Hyperliquid SDK.

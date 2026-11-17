@@ -3,6 +3,7 @@ import logging
 import httpx
 
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.notification_target import NotificationTarget
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 TIMEOUT_SECONDS = 10.0
@@ -56,4 +57,17 @@ def _body_of(notification: Notification) -> dict[str, object]:
         "lines": [{"label": line.label, "value": line.value} for line in notification.lines],
         "flow_status": None if status is None else status.text,
         "event": None if event is None else event.value,
+        "targets": [_target_body(target) for target in notification.targets],
+    }
+
+
+def _target_body(target: NotificationTarget) -> dict[str, str | None]:
+    """A page the notification leads to: the worker alone composes its link (ADR
+    destinazioni-delle-notifiche-nella-dashboard).
+    """
+    return {
+        "kind": target.kind.value,
+        "owner_id": str(target.owner_id),
+        "asset": target.asset,
+        "closed_at": None if target.closed_at is None else target.closed_at.isoformat(),
     }

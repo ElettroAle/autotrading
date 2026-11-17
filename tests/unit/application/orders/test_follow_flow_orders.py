@@ -31,16 +31,18 @@ class Rejections:
     def __init__(self, recorded: RecordedEvents) -> None:
         self._recorded = recorded
 
-    def execute(self, flow_name: str, message: str) -> None:
-        self._recorded.events.append(("rifiutato", flow_name, message))
+    def execute(self, flow_id: UUID, flow_name: str, message: str) -> None:
+        self._recorded.events.append(("rifiutato", flow_id, flow_name, message))
 
 
 class Openings:
     def __init__(self, recorded: RecordedEvents) -> None:
         self._recorded = recorded
 
-    def execute(self, flow_name: str, asset: str, direction: str, leverage: int, value: Decimal) -> None:
-        self._recorded.events.append(("aperto", flow_name, asset, direction, leverage, value))
+    def execute(  # noqa: PLR0917 - the signature of the port
+        self, flow_id: UUID, flow_name: str, asset: str, direction: str, leverage: int, value: Decimal
+    ) -> None:
+        self._recorded.events.append(("aperto", flow_id, flow_name, asset, direction, leverage, value))
 
 
 class Closings:
@@ -67,7 +69,7 @@ def a_closing() -> Order:
 
 def test_a_refused_order_is_told_with_the_message_of_the_exchange() -> None:
     assert follow(a_rejected_order(ACCOUNT)) == [
-        ("rifiutato", "Trend BTC", "Insufficient margin to place order. asset=0")
+        ("rifiutato", FLOW, "Trend BTC", "Insufficient margin to place order. asset=0")
     ]
 
 
@@ -78,7 +80,7 @@ def test_an_order_without_outcome_tells_nothing() -> None:
 def test_an_executed_opening_is_told_with_direction_leverage_and_the_value_it_put_on_the_market() -> None:
     opening = Order.executed(a_request(ACCOUNT), EXECUTION)
 
-    assert follow(opening) == [("aperto", "Trend BTC", "BTC", "long", 2, EXECUTION.value)]
+    assert follow(opening) == [("aperto", FLOW, "Trend BTC", "BTC", "long", 2, EXECUTION.value)]
 
 
 def test_an_executed_closing_is_recorded_for_the_flow_and_cycle_with_its_execution() -> None:

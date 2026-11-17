@@ -16,6 +16,8 @@ from autotrading.application.notifications.errors import EmailNotDeliveredError,
 from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.mail_security import MailSecurity
 from autotrading.domain.notifications.mail_server import MailServer, MailServerAddress
+from autotrading.domain.notifications.notification_link import NotificationLink
+from autotrading.domain.notifications.outbox_message import EmailMessage as Email
 from autotrading.domain.notifications.sealed_mail_password import SealedMailPassword
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -91,7 +93,7 @@ def server(monkeypatch: pytest.MonkeyPatch) -> type[InMemorySmtpServer]:
 
 
 def sent_through(server: MailServer) -> InMemorySmtpServer:
-    SmtpMailerAdapter().send(server, PASSWORD, ANNA, "alfa: in pausa", "alfa: in pausa, credito")
+    SmtpMailerAdapter().send(server, PASSWORD, Email(ANNA, "alfa: in pausa", "alfa: in pausa, credito"))
     [connection] = InMemorySmtpServer.opened
     return connection
 
@@ -110,7 +112,7 @@ def test_an_email_with_emoji_on_several_lines_keeps_subject_and_text_intact_as_p
     status = "Flusso: 312,40 USDC · PnL +12,40 USDC · nessuna posizione aperta · in pausa"
     text = f"{subject}\n\nMotivo: credito esaurito\n{status}"
 
-    SmtpMailerAdapter().send(a_server(), PASSWORD, ANNA, subject, text)
+    SmtpMailerAdapter().send(a_server(), PASSWORD, Email(ANNA, subject, text))
 
     [connection] = InMemorySmtpServer.opened
     [message] = connection.messages
@@ -148,7 +150,7 @@ def test_a_login_refused_by_the_server_tells_the_user_to_check_user_and_password
     InMemorySmtpServer.refuse_at = "login"
 
     with pytest.raises(MailServerRefusedLoginError) as raised:
-        SmtpMailerAdapter().send(a_server(), PASSWORD, ANNA, "s", "t")
+        SmtpMailerAdapter().send(a_server(), PASSWORD, Email(ANNA, "s", "t"))
 
     assert str(raised.value) == "il server di posta ha rifiutato l'accesso: controlla utente e password"
     assert isinstance(raised.value.__cause__, smtplib.SMTPAuthenticationError)
@@ -162,7 +164,7 @@ def test_a_refusal_of_the_server_is_an_email_not_delivered_that_keeps_its_cause_
     adapter = SmtpMailerAdapter()
 
     with pytest.raises(EmailNotDeliveredError) as raised:
-        adapter.send(a_server(), PASSWORD, ANNA, "s", "t")
+        adapter.send(a_server(), PASSWORD, Email(ANNA, "s", "t"))
 
     assert type(raised.value) is EmailNotDeliveredError
     assert isinstance(raised.value.__cause__, (smtplib.SMTPException, OSError))
@@ -173,3 +175,23 @@ def test_a_refusal_of_the_server_is_an_email_not_delivered_that_keeps_its_cause_
 
 def test_the_adapter_holds_no_server_of_its_own() -> None:
     assert repr(SmtpMailerAdapter()) == "SmtpMailerAdapter()"
+
+
+def test_the_links_of_a_notification_end_the_text_of_its_email() -> None:
+    """ADR link-nei-messaggi-telegram-ed-email: a blank line, then a line for each link, in plain text."""
+    links = (
+        NotificationLink("Apri flusso", "https://example.org/dashboard/flows/1"),
+        NotificationLink("Apri operazione", "https://example.org/dashboard/flows/1/positions?asset=BTC"),
+    )
+
+    SmtpMailerAdapter().send(a_server(), PASSWORD, Email(ANNA, "alfa: posizione aperta", "Asset: BTC", links))
+
+    [connection] = InMemorySmtpServer.opened
+    [message] = connection.messages
+    assert message.get_content_type() == "text/plain"
+    assert message.get_content().splitlines() == [
+        "Asset: BTC",
+        "",
+        "Apri flusso: https://example.org/dashboard/flows/1",
+        "Apri operazione: https://example.org/dashboard/flows/1/positions?asset=BTC",
+    ]

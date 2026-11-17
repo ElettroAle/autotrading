@@ -1,11 +1,14 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
 from autotrading.domain.italian_text import money_text
 from autotrading.domain.notifications.errors import InvalidNotificationError
 from autotrading.domain.notifications.flow_status import FlowStatusLine
 from autotrading.domain.notifications.notification_event import LOSS_ICON, NotificationEvent
+from autotrading.domain.notifications.notification_target import NotificationTarget, TargetKind
 
 # An opening is told by the value it put on the market, in whole units: the cents add nothing to the event.
 WHOLE_UNIT = Decimal(1)
@@ -40,7 +43,8 @@ class Notification:
     per line and, for a flow, the state of the flow at the bottom (R1.8.2, R3.5.1, R3.5.4); never a credential.
 
     The same text goes to every channel (ADR notifica-strutturata-con-icona-titolo-e-valori); the test notification is
-    no event.
+    no event. The targets are the pages of the dashboard it leads to: its flow and the position it tells, or the alarms
+    of its account (ADR destinazioni-delle-notifiche-nella-dashboard).
     """
 
     subject: str
@@ -49,6 +53,7 @@ class Notification:
     event: NotificationEvent | None
     icon: str
     flow_status: FlowStatusLine | None = None
+    targets: tuple[NotificationTarget, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.subject.strip():
@@ -77,15 +82,26 @@ class Notification:
             return None
         return self.subject
 
+    @property
+    def flow_id(self) -> UUID | None:
+        """The identity of the flow the event belongs to, from the page of the flow it leads to."""
+        return next((target.owner_id for target in self.targets if target.kind is TargetKind.FLOW), None)
+
     def with_flow_status(self, status: FlowStatusLine) -> Notification:
         return replace(self, flow_status=status)
 
     @classmethod
     def told(
-        cls, event: NotificationEvent, subject: str, headline: str, *lines: NotificationLine, icon: str | None = None
+        cls,
+        event: NotificationEvent,
+        subject: str,
+        headline: str,
+        *lines: NotificationLine,
+        icon: str | None = None,
+        targets: tuple[NotificationTarget, ...] = (),
     ) -> Notification:
         """The notification of an event, with the icon of its type unless its outcome gives another one."""
-        return cls(subject, headline, lines, event, event.icon if icon is None else icon)
+        return cls(subject, headline, lines, event, event.icon if icon is None else icon, targets=targets)
 
     @classmethod
     def test(cls) -> Notification:
@@ -93,7 +109,9 @@ class Notification:
         return cls(TEST_SUBJECT, "prova delle notifiche", (line,), None, TEST_ICON)
 
     @classmethod
-    def position_opened(cls, flow: str, asset: str, direction: str, leverage: int, value: Amount) -> Notification:
+    def position_opened(  # noqa: PLR0913, PLR0917 - the flow, by its id and name, and the values of the opening
+        cls, flow_id: UUID, flow: str, asset: str, direction: str, leverage: int, value: Amount
+    ) -> Notification:
         whole = Amount(value.value.quantize(WHOLE_UNIT), value.currency)
         return cls.told(
             NotificationEvent.POSITION_OPENED,
@@ -103,53 +121,67 @@ class Notification:
             NotificationLine("Direzione", direction),
             NotificationLine("Leva", str(leverage)),
             NotificationLine("Valore", str(whole)),
+            targets=(NotificationTarget.flow(flow_id), NotificationTarget.open_position(flow_id, asset)),
         )
 
     @classmethod
-    def position_closed(cls, flow: str, asset: str, pnl: Amount, reason: str) -> Notification:
+    def position_closed(  # noqa: PLR0913, PLR0917 - the flow, by its id and name, and the values of the closing
+        cls, flow_id: UUID, flow: str, asset: str, pnl: Amount, reason: str, closed_at: datetime
+    ) -> Notification:
         """One notification for the closing, with the reason when the closing is an event of its own (R3.5.1); a
         closing of its own kind tells its outcome by the icon (R3.5.4).
         """
         event = NotificationEvent.of_closing(reason)
         if event is NotificationEvent.LIQUIDATION:
-            return cls.position_liquidated(flow, asset, pnl)
+            return cls.position_liquidated(flow_id, flow, asset, pnl, closed_at)
         values = (NotificationLine("Asset", asset), NotificationLine("PnL", str(pnl)))
+        targets = _closing_targets(flow_id, asset, closed_at)
         if event is NotificationEvent.POSITION_CLOSED:
             icon = event.icon if pnl.value > 0 else LOSS_ICON
-            return cls.told(NotificationEvent.POSITION_CLOSED, flow, "posizione chiusa", *values, icon=icon)
-        return cls.told(event, flow, f"chiusa per {reason}", *values)
+            return cls.told(event, flow, "posizione chiusa", *values, icon=icon, targets=targets)
+        return cls.told(event, flow, f"chiusa per {reason}", *values, targets=targets)
 
     @classmethod
-    def position_liquidated(cls, flow: str, asset: str, pnl: Amount) -> Notification:
+    def position_liquidated(
+        cls, flow_id: UUID, flow: str, asset: str, pnl: Amount, closed_at: datetime
+    ) -> Notification:
         return cls.told(
             NotificationEvent.LIQUIDATION,
             flow,
             "posizione liquidata",
             NotificationLine("Asset", asset),
             NotificationLine("PnL", str(pnl)),
+            targets=_closing_targets(flow_id, asset, closed_at),
         )
 
     @classmethod
-    def cycle_failed(cls, flow: str, message: str) -> Notification:
-        return cls.told(NotificationEvent.CYCLE_FAILED, flow, "ciclo fallito", NotificationLine("Errore", message))
+    def cycle_failed(cls, flow_id: UUID, flow: str, message: str) -> Notification:
+        return cls.of_flow(
+            NotificationEvent.CYCLE_FAILED, flow_id, flow, "ciclo fallito", NotificationLine("Errore", message)
+        )
 
     @classmethod
-    def order_rejected(cls, flow: str, message: str) -> Notification:
-        return cls.told(NotificationEvent.ORDER_REJECTED, flow, "ordine rifiutato", NotificationLine("Errore", message))
+    def order_rejected(cls, flow_id: UUID, flow: str, message: str) -> Notification:
+        return cls.of_flow(
+            NotificationEvent.ORDER_REJECTED, flow_id, flow, "ordine rifiutato", NotificationLine("Errore", message)
+        )
 
     @classmethod
-    def flow_paused(cls, flow: str, reason: str) -> Notification:
-        return cls.told(NotificationEvent.FLOW_PAUSED, flow, "in pausa", NotificationLine("Motivo", reason))
+    def flow_paused(cls, flow_id: UUID, flow: str, reason: str) -> Notification:
+        return cls.of_flow(NotificationEvent.FLOW_PAUSED, flow_id, flow, "in pausa", NotificationLine("Motivo", reason))
 
     @classmethod
-    def openings_suspended(cls, flow: str, reason: str) -> Notification:
-        return cls.told(NotificationEvent.MAXIMUM_LOSS, flow, "aperture sospese", NotificationLine("Motivo", reason))
+    def openings_suspended(cls, flow_id: UUID, flow: str, reason: str) -> Notification:
+        return cls.of_flow(
+            NotificationEvent.MAXIMUM_LOSS, flow_id, flow, "aperture sospese", NotificationLine("Motivo", reason)
+        )
 
     @classmethod
-    def opening_reduced(cls, flow: str, asset: str, requested: Amount, approved: Amount) -> Notification:
+    def opening_reduced(cls, flow_id: UUID, flow: str, asset: str, requested: Amount, approved: Amount) -> Notification:
         """The margin the agent asked for and the one the risk check let through (R3.5.1)."""
-        return cls.told(
+        return cls.of_flow(
             NotificationEvent.OPENING_REDUCED,
+            flow_id,
             flow,
             "apertura ridotta",
             NotificationLine("Asset", asset),
@@ -158,9 +190,10 @@ class Notification:
         )
 
     @classmethod
-    def opening_blocked(cls, flow: str, asset: str, cause: str) -> Notification:
-        return cls.told(
+    def opening_blocked(cls, flow_id: UUID, flow: str, asset: str, cause: str) -> Notification:
+        return cls.of_flow(
             NotificationEvent.OPENING_BLOCKED,
+            flow_id,
             flow,
             "apertura non eseguita",
             NotificationLine("Asset", asset),
@@ -168,36 +201,40 @@ class Notification:
         )
 
     @classmethod
-    def unattributable_position(cls, account: str, asset: str) -> Notification:
-        return cls.told(
+    def unattributable_position(cls, account_id: UUID, account: str, asset: str) -> Notification:
+        return cls.of_account(
             NotificationEvent.UNATTRIBUTABLE_POSITION,
+            account_id,
             account,
             "posizione non attribuibile",
             NotificationLine("Asset", asset),
         )
 
     @classmethod
-    def unattributable_fill(cls, account: str, asset: str) -> Notification:
-        return cls.told(
+    def unattributable_fill(cls, account_id: UUID, account: str, asset: str) -> Notification:
+        return cls.of_account(
             NotificationEvent.UNATTRIBUTABLE_FILL,
+            account_id,
             account,
             "esecuzione non attribuibile",
             NotificationLine("Asset", asset),
         )
 
     @classmethod
-    def unattributable_movement(cls, account: str, amount: Amount) -> Notification:
-        return cls.told(
+    def unattributable_movement(cls, account_id: UUID, account: str, amount: Amount) -> Notification:
+        return cls.of_account(
             NotificationEvent.UNATTRIBUTABLE_MOVEMENT,
+            account_id,
             account,
             "movimento non attribuibile",
             NotificationLine("Importo", str(amount)),
         )
 
     @classmethod
-    def reconciliation_alarm(cls, account: str, read: Amount, expected: Amount) -> Notification:
-        return cls.told(
+    def reconciliation_alarm(cls, account_id: UUID, account: str, read: Amount, expected: Amount) -> Notification:
+        return cls.of_account(
             NotificationEvent.RECONCILIATION_ALARM,
+            account_id,
             account,
             "allarme di riconciliazione",
             NotificationLine("Saldo letto", str(read)),
@@ -205,8 +242,24 @@ class Notification:
         )
 
     @classmethod
-    def cash_out_done(cls, flow: str, freed: Amount) -> Notification:
-        return cls.told(NotificationEvent.CASH_OUT, flow, "incasso eseguito", NotificationLine("Importo", str(freed)))
+    def cash_out_done(cls, flow_id: UUID, flow: str, freed: Amount) -> Notification:
+        return cls.of_flow(
+            NotificationEvent.CASH_OUT, flow_id, flow, "incasso eseguito", NotificationLine("Importo", str(freed))
+        )
+
+    @classmethod
+    def of_flow(
+        cls, event: NotificationEvent, flow_id: UUID, flow: str, headline: str, *lines: NotificationLine
+    ) -> Notification:
+        """An event of a flow, which leads to the page of the flow (R3.5.6)."""
+        return cls.told(event, flow, headline, *lines, targets=(NotificationTarget.flow(flow_id),))
+
+    @classmethod
+    def of_account(
+        cls, event: NotificationEvent, account_id: UUID, account: str, headline: str, *lines: NotificationLine
+    ) -> Notification:
+        """An event of an account, which leads to the alarms of the account (R3.5.6)."""
+        return cls.told(event, account, headline, *lines, targets=(NotificationTarget.account_alarms(account_id),))
 
     @classmethod
     def emergency_closing_done(cls, positions_closed: int, paused_flows: Sequence[str]) -> Notification:
@@ -218,3 +271,7 @@ class Notification:
             NotificationLine("Posizioni chiuse", str(positions_closed)),
             NotificationLine("Flussi in pausa", ", ".join(paused_flows) or "nessuno"),
         )
+
+
+def _closing_targets(flow_id: UUID, asset: str, closed_at: datetime) -> tuple[NotificationTarget, ...]:
+    return (NotificationTarget.flow(flow_id), NotificationTarget.closed_position(flow_id, asset, closed_at))

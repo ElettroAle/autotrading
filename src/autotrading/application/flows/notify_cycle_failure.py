@@ -13,4 +13,4 @@ class NotifyCycleFailureUseCase:
 
     def execute(self, flow_id: UUID, reason: str) -> None:
         flow = self._flows.get(FlowId(flow_id))
-        self._notice.execute(flow.name.value, reason)
+        self._notice.execute(flow.id.value, flow.name.value, reason)

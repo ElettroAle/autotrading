@@ -106,6 +106,7 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.notified_flows import InMemoryNotifiedFlowsAdapter
 from tests.fakes.on_demand_cycles import FakeOnDemandCycleAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
@@ -133,7 +134,7 @@ from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.mail_servers import MailServers
 from tests.support.model_catalog import PLATFORM_MODELS
-from tests.support.notifications import channel_choices
+from tests.support.notifications import notification_routes
 from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
@@ -175,6 +176,8 @@ class Platform:
         self.channel_preferences: ChannelPreferencesStore = {}
         self.mail_servers = MailServers()
         self.mailer = FakeMailerAdapter()
+        # No dashboard to lead to unless a test names one (ADR destinazioni-delle-notifiche-nella-dashboard).
+        self.links = FakeNotificationLinkAdapter(dashboard=False)
         # The state of the flows the notifications close with: none unless a test sets it (R3.5.4).
         self.flow_status = FakeFlowStatusAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
@@ -402,7 +405,7 @@ class Platform:
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             self.mail_servers.repository(tenant_id),
             self.outbox,
-            channel_choices(tenant_id, self.channel_preferences, self.flows),
+            notification_routes(tenant_id, self.channel_preferences, self.links),
         )
 
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:

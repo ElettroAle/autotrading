@@ -63,7 +63,7 @@ class CashOutProfitsUseCase:
         change = CapitalChange.cashed_out(closed, capital, self._ports.clock(), command.user_id)
         kept = changed if capital != closed.allocated_capital else flow
         self._flows.add_capital_change(kept, change)
-        self._ports.notice.execute(flow.name.value, change.amount)
+        self._ports.notice.execute(flow.id.value, flow.name.value, change.amount)
         operations.info("profitti incassati", extra={"flow_id": str(flow.id.value), "freed": str(change.amount)})
         return CashOutOutcome(kept, change.amount)
 

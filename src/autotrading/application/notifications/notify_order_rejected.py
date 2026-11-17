@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.domain.notifications.notification import Notification
 
@@ -8,5 +10,5 @@ class NotifyOrderRejectedUseCase:
     def __init__(self, notifier: NotifyFlowEventUseCase) -> None:
         self._notifier = notifier
 
-    def execute(self, flow_name: str, message: str) -> None:
-        self._notifier.execute(Notification.order_rejected(flow_name, message))
+    def execute(self, flow_id: UUID, flow_name: str, message: str) -> None:
+        self._notifier.execute(Notification.order_rejected(flow_id, flow_name, message))
