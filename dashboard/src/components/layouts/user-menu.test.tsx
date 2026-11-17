@@ -128,10 +128,20 @@ describe('UserMenu', () => {
     expect(logout).toHaveBeenCalledOnce();
   });
 
-  it('cuts a long name on a phone instead of pushing the bar wider', async () => {
+  // ADR intestazione-su-una-riga.
+  it('shows only the icon under 768 pixels, keeping the name for screen readers', async () => {
     await renderMenu('anna');
 
-    expect(await screen.findByText('anna')).toHaveClass('truncate', 'max-w-28', 'md:max-w-48');
+    const name = await screen.findByText('anna');
+    expect(name).toHaveClass('max-md:sr-only');
+    expect(name).not.toHaveClass('max-w-28');
+    expect(userButton()).toBeInTheDocument();
+  });
+
+  it('cuts a long name from 768 pixels instead of pushing the bar wider', async () => {
+    await renderMenu('anna');
+
+    expect(await screen.findByText('anna')).toHaveClass('truncate', 'max-w-48');
   });
 
   it('is large enough to be touched on a phone', async () => {

@@ -8,6 +8,7 @@ import { SignOutButton } from './sign-out-button';
 /**
  * The area of the signed-in user, on the right of the bar on top: the name opens a menu that holds «Esci». The menu
  * closes with Esc, giving the focus back to the name, and with a click outside it (ADR area-utente-in-alto-a-destra).
+ * Under 768 pixels only the icon shows, the name stays the name of the command (ADR intestazione-su-una-riga).
  */
 export const UserMenu = () => {
   const name = useSignedInUserName();
@@ -58,8 +59,10 @@ export const UserMenu = () => {
         className="flex min-h-11 max-w-full min-w-11 items-center gap-1 rounded px-2 text-sm hover:bg-slate-100"
       >
         <Icon name="user" />
-        <span className="max-w-28 min-w-0 truncate md:max-w-48">{name}</span>
-        <Icon name="chevron-down" />
+        <span className="max-w-48 min-w-0 truncate max-md:sr-only">{name}</span>
+        <span className="max-md:hidden">
+          <Icon name="chevron-down" />
+        </span>
       </button>
       {open ? (
         <ul
