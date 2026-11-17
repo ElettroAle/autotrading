@@ -30,10 +30,10 @@ def test_an_assigned_draft_starts(drafts: Drafts) -> None:
     assert drafts.repository.get(draft.id).status is FlowStatus.ACTIVE
 
 
-def test_a_draft_without_assignment_does_not_start(drafts: Drafts) -> None:
+def test_a_copy_without_assets_does_not_start(drafts: Drafts) -> None:
     draft = drafts.draft()
 
-    with pytest.raises(FlowAssignmentMissingError, match=r"^conto, capitale allocato e asset mancanti$"):
+    with pytest.raises(FlowAssignmentMissingError, match=r"^asset mancante$"):
         drafts.start(draft)
 
     assert drafts.repository.get(draft.id).status is FlowStatus.DRAFT

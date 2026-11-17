@@ -148,6 +148,21 @@ class SqlAlchemyFlowRepositoryAdapter:
         if not changed:
             raise FlowNotFoundError
 
+    def rename(self, flow: Flow) -> None:
+        if flow.tenant_id != self._tenant_id:
+            raise CrossTenantAccessError
+        statement = update(flows).where(flows.c.id == flow.id.value).values(name=flow.name.value)
+        try:
+            with self._transaction() as connection:
+                changed = connection.execute(statement).rowcount
+        except IntegrityError as error:
+            # Another flow took the name after the use case checked it.
+            if NAME_UNIQUE_IN_TENANT in str(error.orig):
+                raise FlowNameInUseError from error
+            raise
+        if not changed:
+            raise FlowNotFoundError
+
     def add_version(self, flow: Flow) -> None:
         if flow.tenant_id != self._tenant_id:
             raise CrossTenantAccessError

@@ -580,18 +580,33 @@ export class DashboardPages {
     return { name: saved.suggestedFilename(), content: Buffer.concat(chunks).toString('utf-8') };
   }
 
-  async assign(account: string, capital: string, assets: string): Promise<void> {
-    const form = this.page.getByRole('form', { name: 'Assegnazione della bozza' });
-    await form.getByLabel('Conto').selectOption({ label: account });
-    await form.getByLabel('Capitale allocato (USDC)').fill(capital);
-    for (const asset of assets.split(',').map((name) => name.trim())) {
-      await form.getByLabel('Asset', { exact: true }).fill(asset);
-      await form
-        .getByRole('list', { name: 'Asset negoziabili' })
-        .getByRole('button', { name: asset, exact: true })
-        .click();
+  /**
+   * Sets what a draft lacks in its configuration, reached from the overview, and saves it (ADR
+   * assegnazione-della-bozza-nel-form-di-configurazione): account and capital when given, then the assets.
+   */
+  async configureDraft(draft: {
+    readonly account?: string;
+    readonly capital?: string;
+    readonly assets: string;
+  }): Promise<void> {
+    await this.page
+      .getByRole('note', { name: 'Da configurare' })
+      .getByRole('link', { name: 'Configura' })
+      .click();
+    const form = this.page.getByRole('form', { name: 'Configurazione del flusso' });
+    if (draft.account !== undefined) {
+      await this.field('Conto', form).selectOption({ label: draft.account });
     }
-    await form.getByRole('button', { name: 'Assegna' }).click();
+    if (draft.capital !== undefined) {
+      await this.field('Capitale allocato', form).fill(draft.capital);
+    }
+    for (const asset of draft.assets.split(',').map((name) => name.trim())) {
+      await this.chooseAsset(asset);
+    }
+    await form.getByRole('button', { name: 'Salva le modifiche' }).click();
+    await expect(
+      this.page.getByRole('status').filter({ hasText: /^Modifiche salvate/ }),
+    ).toBeVisible();
   }
 
   ranking(): Locator {

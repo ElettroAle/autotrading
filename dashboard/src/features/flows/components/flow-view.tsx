@@ -56,7 +56,13 @@ export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) =>
   return (
     <>
       <section aria-label={flow.name} className="mb-4 rounded border border-slate-200 bg-white p-4">
-        <div className="space-y-2">
+        {/* One gap between the status and the notice of the network, with no margin of their own (ADR
+            spaziatura-tra-stato-e-avviso-della-rete). */}
+        <div
+          role="group"
+          aria-label="Stato del flusso"
+          className="flex flex-wrap items-center gap-2"
+        >
           <FlowStatus flow={flow} />
           {account !== undefined && !realMoney ? (
             <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />

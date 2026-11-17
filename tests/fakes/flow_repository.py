@@ -103,6 +103,14 @@ class InMemoryFlowRepositoryAdapter:
     def change_status(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), status=flow.status))
 
+    def rename(self, flow: Flow) -> None:
+        current = self.get(flow.id)
+        if any(
+            each.name == flow.name and each.id != flow.id and each.status != FlowStatus.ARCHIVED for each in self.list()
+        ):
+            raise FlowNameInUseError
+        self._replace(replace(current, name=flow.name))
+
     def add_version(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), configuration=flow.configuration))
         self._store.save_version(flow)
@@ -121,7 +129,7 @@ class InMemoryFlowRepositoryAdapter:
 
     def add_assignment(self, flow: Flow) -> None:
         self._replace(replace(self.get(flow.id), account_id=flow.account_id, configuration=flow.configuration))
-        self._store.versions[flow.id].append(flow.configuration)
+        self._store.save_version(flow)
 
     def capital_changes(self, flow_ids: Iterable[FlowId], window: TimeWindow, limit: int) -> tuple[CapitalChange, ...]:
         # As the identity of the rows of the database: of two changes of a flow at one instant, the later saved first.

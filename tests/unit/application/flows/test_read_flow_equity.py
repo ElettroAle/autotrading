@@ -10,6 +10,8 @@ from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -107,7 +109,10 @@ def test_a_flow_without_cycles_has_no_point(flows: FlowStore, store: EquitySnaps
 
 
 def test_a_draft_has_no_initial_capital_and_no_point(flows: FlowStore, store: EquitySnapshotStore) -> None:
-    draft = a_flow_with_capital(flows).duplicated()
+    # A draft made from a file has no capital yet: a copy carries the capital of the original (ADR
+    # bozza-configurata-dall-editor-e-duplica-con-conto).
+    original = a_flow_with_capital(flows)
+    draft = Flow.drafted(TENANT, FlowName("bozza"), FlowStrategy.of(original.configuration))
     flows.flows.append(draft)
 
     equity = use_case(flows, store).execute(ReadFlowEquityCommand(draft.id.value))

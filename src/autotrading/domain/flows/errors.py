@@ -184,18 +184,19 @@ class FlowAssignmentMissingError(DomainError):
         self.missing = missing
 
 
-class FlowNotDraftError(DomainError):
-    """Account, capital and assets of a flow already out of draft change only through their own commands."""
-
-    status_code = 409
-
-    def __init__(self) -> None:
-        super().__init__("conto, capitale e asset si assegnano solo a un flusso in bozza")
-
-
 class AccountNotChangeableError(FlowSettingError):
     def __init__(self) -> None:
         super().__init__("il conto di un flusso non si cambia", FlowSetting.ACCOUNT)
+
+
+class CapitalNotChangeableError(FlowSettingError):
+    """Out of draft the capital changes only with its own command, which keeps its history (R1.1.7)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "il capitale allocato di un flusso avviato si cambia con il comando del capitale",
+            FlowSetting.ALLOCATED_CAPITAL,
+        )
 
 
 class AssetsAssignedToOtherFlowError(FlowSettingError):

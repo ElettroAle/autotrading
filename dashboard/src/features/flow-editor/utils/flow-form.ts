@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { Flow } from '../api/get-flow';
+import { isDraft, type Flow } from '../api/get-flow';
 
 // The form checks only the shape of what the user types; the rules and their reasons stay with the API (ADR 0130).
 const NUMBER = /^\s*(\d+([.,]\d+)?)?\s*$/;
@@ -98,8 +98,11 @@ type SettingsRequest = {
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
 
-/** What a modification sends: the changed settings, and the new capital when it changed. */
-export type FlowChanges = { settings: Partial<SettingsRequest>; capital?: string };
+/** What the configuration of a flow saves besides its settings: its name, and the capital of a draft. */
+type ModificationRequest = SettingsRequest & { name: string; allocated_capital: string };
+
+/** What a modification sends: the changed settings, and the new capital of a flow out of draft when it changed. */
+export type FlowChanges = { settings: Partial<ModificationRequest>; capital?: string };
 
 export const emptyFormValues = (): FlowFormValues => ({
   name: '',
@@ -255,10 +258,17 @@ const NULL_IS_A_VALUE = new Set<keyof SettingsRequest>([
   'minimum_confidence',
 ]);
 
+/** The new name, when the user changed it (ADR nome-del-flusso-modificabile). */
+const nameChangeOf = (flow: Flow, values: FlowFormValues): Partial<ModificationRequest> => {
+  const name = values.name.trim();
+  return name === flow.name ? {} : { name };
+};
+
 /**
  * Only the settings the user changed (R1.1.3): a part left out keeps the value in force, so an emptied one is not
- * sent, unless its null says something; a new model goes with its parameters, as they belong to it. The capital
- * stays apart (R1.1.7).
+ * sent, unless its null says something; a new model goes with its parameters, as they belong to it. The capital of a
+ * draft goes with them; that of any other flow stays apart, with its own command (R1.1.7, ADR
+ * assegnazione-della-bozza-nel-form-di-configurazione).
  */
 export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
   const before = settingsOf(formValuesOf(flow));
@@ -268,9 +278,17 @@ export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
       (after[key] !== null || NULL_IS_A_VALUE.has(key)) && !sameValue(before[key], after[key]),
   );
   const keys = changed.includes(MODEL) ? [...new Set([...changed, MODEL_PARAMETERS])] : changed;
-  const settings = Object.fromEntries(keys.map((key) => [key, after[key]]));
+  const settings = {
+    ...nameChangeOf(flow, values),
+    ...Object.fromEntries(keys.map((key) => [key, after[key]])),
+  };
   const capital = decimalOf(values.allocated_capital);
-  return capital === decimalOf(flow.allocated_capital ?? '') ? { settings } : { settings, capital };
+  if (capital === decimalOf(flow.allocated_capital ?? '')) {
+    return { settings };
+  }
+  return isDraft(flow)
+    ? { settings: { ...settings, allocated_capital: capital } }
+    : { settings, capital };
 };
 
 const FORM_FIELDS = new Set<string>(Object.keys(flowFormSchema.shape));

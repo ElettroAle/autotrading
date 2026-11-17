@@ -1,4 +1,5 @@
-"""Steps shared by the features that make a draft: assigning account, capital and assets, and starting it.
+"""Steps shared by the features that make a draft: assigning account, capital and assets in its configuration, and
+starting it.
 
 A scenario module imports them all, beside those of the life of a flow; pytest-bdd keeps each step as a fixture of
 that module. The module that makes the draft (a copy, an imported file) names it in the `draft` fixture.
@@ -9,8 +10,8 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import then, when
 
-from autotrading.application.flows.assign_draft_flow import AssignDraftFlowCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
+from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.domain.flows.errors import AssetsAssignedToOtherFlowError
 from autotrading.domain.flows.flow_action import FlowAction
 from tests.support.flows import account_id_of
@@ -41,14 +42,19 @@ def draft_without_assignment(platform: Platform, lifecycle: Lifecycle, draft: Dr
 def assign(
     platform: Platform, lifecycle: Lifecycle, user: str, name: str, *, account: str, capital: str, asset: str
 ) -> None:
-    command = AssignDraftFlowCommand(
-        flow_named(platform, user, name).id, account_id_of(platform, user, account), Decimal(capital), (asset,)
+    # The editor is the one way in: account, capital and assets are saved with the configuration (ADR
+    # bozza-configurata-dall-editor-e-duplica-con-conto).
+    command = ModifyFlowCommand(
+        flow_named(platform, user, name).id,
+        account_id=account_id_of(platform, user, account),
+        allocated_capital=Decimal(capital),
+        assets=(asset,),
     )
-    attempt(lifecycle, lambda: platform.use_cases_of(user).assign_draft_flow.execute(command))
+    attempt(lifecycle, lambda: platform.use_cases_of(user).modify_flow.execute(command))
     assert lifecycle.error is None
 
 
-@when(quoted('"{user}" avvia il flusso "{name}" senza assegnare conto, capitale e asset'))
+@when(quoted('"{user}" avvia il flusso "{name}" senza scegliere gli asset'))
 @when(quoted('"{user}" avvia il flusso "{name}"'))
 def start(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
     change = ChangeFlowStatusCommand(flow_named(platform, user, name).id, FlowAction.START)

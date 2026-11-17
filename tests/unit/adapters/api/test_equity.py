@@ -10,6 +10,9 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.flow_strategy import FlowStrategy
 from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
@@ -169,9 +172,12 @@ def test_a_flow_without_cycles_answers_no_point(client_of: Client, platform: Pla
 
 def test_a_draft_answers_no_initial_capital_and_no_point(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
-    draft = anna.post(f"/flows/{flow_of(platform, 'anna')}/duplicate").json()
+    # A draft made from a file has no capital yet: a copy carries the capital of the original (ADR
+    # bozza-configurata-dall-editor-e-duplica-con-conto).
+    draft = Flow.drafted(platform.tenant_of("anna"), FlowName("bozza"), FlowStrategy.of(a_configuration()))
+    platform.flows.flows.append(draft)
 
-    assert anna.get(f"/flows/{draft['id']}/equity").json() == {"initial_capital": None, "points": []}
+    assert anna.get(f"/flows/{draft.id.value}/equity").json() == {"initial_capital": None, "points": []}
 
 
 def test_the_equity_of_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:

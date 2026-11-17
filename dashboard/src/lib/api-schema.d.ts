@@ -765,23 +765,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/flows/{flow_id}/assignment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Assign Draft Flow */
-        put: operations["assign_draft_flow_flows__flow_id__assignment_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/flows/{flow_id}/openings/resume": {
         parameters: {
             query?: never;
@@ -1742,21 +1725,6 @@ export interface components {
             after: string;
         };
         /**
-         * DraftAssignmentRequest
-         * @description Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason.
-         */
-        DraftAssignmentRequest: {
-            /**
-             * Account Id
-             * Format: uuid
-             */
-            account_id: string;
-            /** Allocated Capital */
-            allocated_capital: number | string;
-            /** Assets */
-            assets?: string[];
-        };
-        /**
          * EmergencyClosingPreviewResponse
          * @description The flows of the scope and the positions they hold now, for the confirmation (ADR chiusura-di-emergenza-nella-
          *     dashboard).
@@ -1997,10 +1965,17 @@ export interface components {
         /**
          * FlowModificationRequest
          * @description Only the parts the user changes; the others keep the version in force (R1.1.3).
+         *
+         *     Account and allocated capital are taken by a draft (ADR bozza-configurata-dall-editor-e-duplica-con-conto); the
+         *     name by every flow not archived (ADR nome-del-flusso-modificabile).
          */
         FlowModificationRequest: {
+            /** Name */
+            name?: string | null;
             /** Account Id */
             account_id?: string | null;
+            /** Allocated Capital */
+            allocated_capital?: number | string | null;
             /** Assets */
             assets?: string[] | null;
             /** Cycle Minutes */
@@ -4817,41 +4792,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyDocument-Output"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    assign_draft_flow_flows__flow_id__assignment_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DraftAssignmentRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FlowResponse"];
                 };
             };
             /** @description Validation Error */
