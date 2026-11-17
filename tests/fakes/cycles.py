@@ -29,8 +29,9 @@ from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.flow_cost import CycleCost
-from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
+from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -148,6 +149,22 @@ class InMemoryCycleRepositoryAdapter:
         latest = next(decided, None)
         return None if latest is None else DecidedCycle(latest.planned_at, latest.decisions)
 
+    def decisions_matching(
+        self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow, offset: int, limit: int
+    ) -> list[DatedDecision]:
+        matched = [
+            DatedDecision(record.planned_at, decision)
+            for record in self.newest(flow_id, 0, len(self.records))
+            if record.outcome is CycleOutcome.COMPLETED and window.contains(record.planned_at)
+            for decision in sorted(record.decisions, key=lambda decision: decision.asset)
+            if criteria.matches(decision)
+        ]
+        return matched[offset : offset + limit]
+
+    def decisions_count(self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> int:
+        every = sum(len(record.decisions) for record in self.records)
+        return len(self.decisions_matching(flow_id, criteria, window, 0, every))
+
 
 class InMemoryCycleHistoryAdapter:
     """The cycles of every tenant, bound to one like the real adapter under row level security."""
@@ -180,6 +197,14 @@ class InMemoryCycleHistoryAdapter:
 
     def last_decided(self, flow_id: UUID) -> DecidedCycle | None:
         return self._cycles.last_decided(flow_id) if self._owns(flow_id) else None
+
+    def decisions_matching(
+        self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow, offset: int, limit: int
+    ) -> list[DatedDecision]:
+        return self._cycles.decisions_matching(flow_id, criteria, window, offset, limit) if self._owns(flow_id) else []
+
+    def decisions_count(self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> int:
+        return self._cycles.decisions_count(flow_id, criteria, window) if self._owns(flow_id) else 0
 
     def _owns(self, flow_id: UUID) -> bool:
         return any(flow.id.value == flow_id for flow in self._flows.of(self._tenant_id))

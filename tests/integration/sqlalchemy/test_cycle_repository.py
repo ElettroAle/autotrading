@@ -23,8 +23,9 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.flow_cost import CycleCost
-from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
+from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant import Tenant
@@ -380,3 +381,75 @@ def test_a_recorded_decision_cannot_be_deleted(database: Engine) -> None:
         connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
         with pytest.raises(ProgrammingError, match="permission denied"):
             connection.execute(cycle_decisions.delete())
+
+
+CLOSING = RecordedDecision("ADA", DecisionAction.CLOSE, None, 55, "obiettivo raggiunto")
+SHORTING = RecordedDecision("ETH", DecisionAction.OPEN, TradeSide.SHORT, 61, "trend ribassista")
+
+
+def at(minutes: int) -> datetime:
+    return PLANNED + timedelta(minutes=minutes)
+
+
+def a_history(database: Engine) -> tuple[SqlAlchemyCycleRepositoryAdapter, UUID]:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    repository.record(a_completed_cycle(flow_id, 0, HOLDING))
+    repository.record(a_completed_cycle(flow_id, 15, OPENING, SHORTING, CLOSING))
+    failed_after_deciding = replace(
+        a_completed_cycle(flow_id, 30, OPENING),
+        outcome=CycleOutcome.FAILED,
+        failure=CycleFailure(CycleStep.RISK_CHECK, "FakeTransientError", "timeout"),
+    )
+    repository.record(failed_after_deciding)
+    return repository, flow_id
+
+
+# ADR storico-delle-decisioni-nell-api: the history reads the table of the decisions of the completed cycles.
+def test_the_history_lists_the_decisions_of_completed_cycles_newest_first_then_by_asset(database: Engine) -> None:
+    repository, flow_id = a_history(database)
+
+    found = repository.decisions_matching(flow_id, DecisionFilter(), TimeWindow(), 0, 50)
+
+    assert found == [
+        DatedDecision(at(15), CLOSING),
+        DatedDecision(at(15), OPENING),
+        DatedDecision(at(15), SHORTING),
+        DatedDecision(at(0), HOLDING),
+    ]
+    assert repository.decisions_count(flow_id, DecisionFilter(), TimeWindow()) == len(found)
+
+
+def test_the_history_is_paged_with_offset_and_limit(database: Engine) -> None:
+    repository, flow_id = a_history(database)
+
+    found = repository.decisions_matching(flow_id, DecisionFilter(), TimeWindow(), 1, 2)
+
+    assert found == [DatedDecision(at(15), OPENING), DatedDecision(at(15), SHORTING)]
+
+
+def test_the_history_is_filtered_by_asset_action_direction_and_window(database: Engine) -> None:
+    repository, flow_id = a_history(database)
+    openings = DecisionFilter(action=DecisionAction.OPEN)
+    shorts = DecisionFilter(asset="ETH", action=DecisionAction.OPEN, direction=TradeSide.SHORT)
+    first_cycle = TimeWindow.of_minutes(at(0), at(0))
+
+    assert repository.decisions_matching(flow_id, openings, TimeWindow(), 0, 50) == [
+        DatedDecision(at(15), OPENING),
+        DatedDecision(at(15), SHORTING),
+    ]
+    assert repository.decisions_matching(flow_id, shorts, TimeWindow(), 0, 50) == [DatedDecision(at(15), SHORTING)]
+    assert repository.decisions_matching(flow_id, DecisionFilter(), first_cycle, 0, 50) == [
+        DatedDecision(at(0), HOLDING)
+    ]
+    assert repository.decisions_count(flow_id, openings, TimeWindow()) == 2
+    assert repository.decisions_count(flow_id, DecisionFilter(asset="ETH"), first_cycle) == 1
+
+
+def test_the_history_of_another_tenant_stays_invisible(database: Engine) -> None:
+    _, flow_id = a_history(database)
+    other_tenant, _ = new_flow(database)
+    other = SqlAlchemyCycleRepositoryAdapter(database, other_tenant)
+
+    assert other.decisions_matching(flow_id, DecisionFilter(), TimeWindow(), 0, 50) == []
+    assert other.decisions_count(flow_id, DecisionFilter(), TimeWindow()) == 0

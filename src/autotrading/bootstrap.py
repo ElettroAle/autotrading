@@ -273,6 +273,7 @@ def tenant_use_cases(
             exit_plans,
         )
         history = SqlAlchemyFlowHistoryAdapter(engine, tenant_id)
+        cycle_history = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -313,7 +314,8 @@ def tenant_use_cases(
             clock=system_clock_adapters().now,
             closed_positions=closed_positions,
             exit_plans=exit_plans,
-            cycle_history=SqlAlchemyCycleRepositoryAdapter(engine, tenant_id),
+            cycle_history=cycle_history,
+            decision_history=cycle_history,
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),

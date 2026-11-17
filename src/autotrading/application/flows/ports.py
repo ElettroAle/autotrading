@@ -26,6 +26,7 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.evaluated_forecast import EvaluatedForecast
@@ -53,7 +54,7 @@ from autotrading.domain.flows.loss_guard import LossReferences
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
-from autotrading.domain.flows.recorded_decision import DecidedCycle, RecordedDecision
+from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, RecordedDecision
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -1306,6 +1307,22 @@ class CycleHistoryPort(Protocol):
         """The most recent completed cycle of the flow in which the agent decided, with its decisions; None without
         one (R6.5.4).
         """
+        ...
+
+
+class DecisionHistoryPort(Protocol):
+    """Bound to the tenant of the request: it never shows the decisions of a flow of another tenant (R6.5.5)."""
+
+    def decisions_matching(
+        self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow, offset: int, limit: int
+    ) -> list[DatedDecision]:
+        """The decisions of the completed cycles of the flow planned in the window that match the filter, one by
+        asset, from the most recent planned instant and then by asset.
+        """
+        ...
+
+    def decisions_count(self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> int:
+        """How many decisions of the completed cycles of the flow planned in the window match the filter."""
         ...
 
 

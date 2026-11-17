@@ -278,6 +278,7 @@ class Platform:
             closed_positions=closed_positions,
             exit_plans=exit_plans,
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
+            decision_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),

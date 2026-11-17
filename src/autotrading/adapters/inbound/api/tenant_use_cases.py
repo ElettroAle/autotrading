@@ -48,6 +48,7 @@ from autotrading.application.flows.list_account_operations import ListAccountOpe
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
 from autotrading.application.flows.list_cycles import ListCyclesUseCase
+from autotrading.application.flows.list_decisions import ListDecisionsUseCase
 from autotrading.application.flows.list_emergency_flows import ListEmergencyFlowsUseCase
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsUseCase
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
@@ -64,6 +65,7 @@ from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
+    DecisionHistoryPort,
     EmergencyClosingLogPort,
     EquitySnapshotRepositoryPort,
     ExitPlanRepositoryPort,
@@ -164,6 +166,7 @@ class TenantPorts:
     closed_positions: ClosedPositionRepositoryPort
     exit_plans: ExitPlanRepositoryPort
     cycle_history: CycleHistoryPort
+    decision_history: DecisionHistoryPort
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
@@ -231,6 +234,7 @@ class TenantUseCases:
     read_cycle: ReadCycleUseCase
     read_last_decision: ReadLastDecisionUseCase
     request_on_demand_cycle: RequestOnDemandCycleUseCase
+    list_decisions: ListDecisionsUseCase
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
     read_forecast_accuracy: ReadForecastAccuracyUseCase
@@ -334,6 +338,7 @@ class TenantUseCases:
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_last_decision=ReadLastDecisionUseCase(ports.flow_directory, ports.cycle_history),
             request_on_demand_cycle=RequestOnDemandCycleUseCase(ports.flows, ports.on_demand_cycles),
+            list_decisions=ListDecisionsUseCase(ports.flow_directory, ports.decision_history, ports.clock),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_statistics=ReadFlowStatisticsUseCase(
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock

@@ -984,6 +984,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Decisions
+         * @description The decisions of the completed cycles of the flow in the period, one by cycle and asset, newest first.
+         */
+        get: operations["list_decisions_flows__flow_id__decisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/decisions/latest": {
         parameters: {
             query?: never;
@@ -1509,6 +1529,42 @@ export interface components {
             day: string;
             /** Cost Usd */
             cost_usd: string;
+        };
+        /**
+         * DatedDecisionResponse
+         * @description A decision of the history with the planned instant of its cycle, which leads to its detail (R6.5.5).
+         */
+        DatedDecisionResponse: {
+            /** Asset */
+            asset: string;
+            /** Action */
+            action: string;
+            /** Direction */
+            direction: string | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Reasoning */
+            reasoning: string;
+            /**
+             * Planned At
+             * Format: date-time
+             */
+            planned_at: string;
+        };
+        /**
+         * DecisionPageResponse
+         * @description A page of the decisions that match the filters in the period, with how many match in all (ADR
+         *     storico-delle-decisioni-nell-api).
+         */
+        DecisionPageResponse: {
+            /** Page */
+            page: number;
+            /** Has Next */
+            has_next: boolean;
+            /** Total */
+            total: number;
+            /** Decisions */
+            decisions: components["schemas"]["DatedDecisionResponse"][];
         };
         /**
          * DecisionResponse
@@ -4852,6 +4908,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowCostResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_decisions_flows__flow_id__decisions_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description un asset del flusso */
+                asset?: string | null;
+                /** @description apri, chiudi, mantieni o aggiorna */
+                action?: string | null;
+                /** @description long o short */
+                direction?: string | null;
+                /** @description all, 7d, 30d o range */
+                period?: string;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionPageResponse"];
                 };
             };
             /** @description Validation Error */

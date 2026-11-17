@@ -359,6 +359,22 @@ class UnknownDecisionDirectionError(InvalidRecordedDecisionError):
         self.direction = direction
 
 
+class InvalidDecisionFilterError(DomainError):
+    """A filter of the history of the decisions of a flow with a value no decision has (R6.5.5)."""
+
+
+class UnknownFilteredActionError(InvalidDecisionFilterError):
+    def __init__(self, actions: tuple[str, ...]) -> None:
+        super().__init__("azione non valida: scegliere tra " + ", ".join(actions))
+        self.actions = actions
+
+
+class UnknownFilteredDirectionError(InvalidDecisionFilterError):
+    def __init__(self, directions: tuple[str, ...]) -> None:
+        super().__init__("direzione non valida: scegliere tra " + ", ".join(directions))
+        self.directions = directions
+
+
 class InvalidClosedPositionFilterError(DomainError):
     """A filter of the closed positions of a flow with a value no position has (R6.4.4)."""
 
