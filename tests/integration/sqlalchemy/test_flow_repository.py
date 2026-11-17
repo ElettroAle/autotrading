@@ -366,9 +366,9 @@ def test_an_assignment_on_the_account_of_another_tenant_is_refused(database: Eng
 
 
 def test_the_database_refuses_a_flow_out_of_draft_without_account(database: Engine) -> None:
-    tenant_id, account_id = new_account(database)
+    tenant_id, _ = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
-    draft = a_flow(tenant_id, account_id=account_id).duplicated()
+    draft = a_draft(tenant_id)
     repository.add(draft)
 
     with pytest.raises(IntegrityError, match="flows_account_outside_draft"):
@@ -382,9 +382,9 @@ def stop_without_account(database: Engine, tenant_id: TenantId, flow_id: FlowId)
 
 
 def test_a_draft_archived_keeps_no_account(database: Engine) -> None:
-    tenant_id, account_id = new_account(database)
+    tenant_id, _ = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
-    draft = a_flow(tenant_id, account_id=account_id).duplicated()
+    draft = a_draft(tenant_id)
     repository.add(draft)
 
     repository.change_status(draft.archived())
