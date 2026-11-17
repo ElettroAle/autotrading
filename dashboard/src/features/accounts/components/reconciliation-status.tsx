@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { CommandButton } from '@/components/ui/command-button';
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
@@ -104,20 +105,16 @@ export const ReconciliationStatus = ({ account }: { readonly account: Account })
       <ReconciliationDetails account={account} reconciliation={reconciliation.data} />
       <div className="flex flex-wrap gap-2">
         {reconciliation.data.open_alarm !== null && (
-          <button
-            type="button"
-            onClick={() => setAction('confirming')}
-            className={SECONDARY_COMMAND}
-          >
+          <CommandButton tone="secondary" onClick={() => setAction('confirming')}>
             Ho verificato
-          </button>
+          </CommandButton>
         )}
         <Link to={paths.accountAlarms.getHref(account.id)} className={SECONDARY_COMMAND}>
           Allarmi
         </Link>
-        <button type="button" onClick={() => setAction('threshold')} className={SECONDARY_COMMAND}>
+        <CommandButton tone="secondary" onClick={() => setAction('threshold')}>
           Modifica la soglia
-        </button>
+        </CommandButton>
       </div>
       {action === 'confirming' && <ConfirmAlarm account={account} onDone={done} />}
       {action === 'threshold' && (

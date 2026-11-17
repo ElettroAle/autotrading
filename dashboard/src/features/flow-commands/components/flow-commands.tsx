@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { DESTRUCTIVE_COMMAND, PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
+import { CommandButton, type CommandTone } from '@/components/ui/command-button';
 import { ErrorMessage } from '@/components/ui/error-message';
+import type { IconName } from '@/components/ui/icons/icon';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 import { paths } from '@/config/paths';
 import { formatAmount } from '@/utils/format-amount';
@@ -24,13 +25,15 @@ const LABELS: Readonly<Record<FlowCommand, string>> = {
   archive: 'Archivia',
 };
 
-// The command that sets the flow running leads, the archiving cannot be undone (R6.4.1).
-const STYLES: Readonly<Record<FlowCommand, string>> = {
-  start: PRIMARY_COMMAND,
-  resume: PRIMARY_COMMAND,
-  pause: SECONDARY_COMMAND,
-  stop: SECONDARY_COMMAND,
-  archive: DESTRUCTIVE_COMMAND,
+type CommandLook = { readonly tone: CommandTone; readonly icon?: IconName };
+
+// Each command of the status has a colour and an icon of its own, the archiving cannot be undone (R6.4.1, R6.5.3).
+const LOOKS: Readonly<Record<FlowCommand, CommandLook>> = {
+  start: { tone: 'go', icon: 'play' },
+  resume: { tone: 'go', icon: 'play' },
+  pause: { tone: 'hold', icon: 'pause' },
+  stop: { tone: 'stop', icon: 'square' },
+  archive: { tone: 'destructive' },
 };
 
 type ConfirmedCommand = Extract<FlowCommand, 'stop' | 'archive' | 'start'>;
@@ -119,25 +122,23 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
       {confirming === null && (
         <div role="group" aria-label="Comandi del flusso" className="flex flex-wrap gap-2">
           {commandsAllowedIn(status).map((command) => (
-            <button
+            <CommandButton
               key={command}
-              type="button"
+              {...LOOKS[command]}
               onClick={() => request(command)}
               disabled={busy}
-              className={STYLES[command]}
             >
               {LABELS[command]}
-            </button>
+            </CommandButton>
           ))}
           {profitable && (
-            <button
-              type="button"
+            <CommandButton
+              tone="secondary"
               onClick={() => setConfirming('cash-out')}
               disabled={busy}
-              className={SECONDARY_COMMAND}
             >
               Incassa i profitti
-            </button>
+            </CommandButton>
           )}
         </div>
       )}

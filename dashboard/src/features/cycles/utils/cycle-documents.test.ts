@@ -1,4 +1,4 @@
-import { contextOf, decisionLabelsOf, decisionsOf, sourcesOf } from './cycle-documents';
+import { contextOf, decisionsOf, sourcesOf } from './cycle-documents';
 
 const OPENING = {
   tipo: 'Decision',
@@ -34,16 +34,6 @@ describe('decisionsOf', () => {
   it('gives nothing for a document of another shape', () => {
     expect(decisionsOf({ risultato: [] })).toBeUndefined();
     expect(decisionsOf(null)).toBeUndefined();
-  });
-});
-
-describe('decisionLabelsOf', () => {
-  it('names each decision by action, direction of an opening and asset', () => {
-    expect(decisionLabelsOf(AGENT_DECISION)).toEqual(['apri long BTC', 'mantieni ETH']);
-  });
-
-  it('names no decision when the cycle never got to the agent', () => {
-    expect(decisionLabelsOf(null)).toEqual([]);
   });
 });
 

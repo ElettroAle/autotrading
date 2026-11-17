@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
+import { CommandButton } from '@/components/ui/command-button';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert } from '@/components/ui/form/input-field';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
@@ -82,20 +83,16 @@ export const ReplaceCredentialsForm = ({
         reasonOf={(name) => errors.credentials?.[name]?.message}
       />
       <div className="flex gap-2">
-        <button
+        <CommandButton
+          tone="primary"
           type="submit"
           disabled={replacement.isPending || !exchanges.isSuccess}
-          className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50"
         >
           Sostituisci
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded border border-slate-300 px-3 py-1.5"
-        >
+        </CommandButton>
+        <CommandButton tone="secondary" onClick={onCancel}>
           Annulla
-        </button>
+        </CommandButton>
       </div>
     </form>
   );

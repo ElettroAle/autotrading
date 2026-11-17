@@ -45,7 +45,11 @@ dashboard/
 React Router, TanStack Query per i dati dell'API, React Hook Form + Zod per i form (Zod anche per validare le
 risposte), Tailwind per lo stile, MSAL (`@azure/msal-browser`, `@azure/msal-react`) per l'accesso. Grafici: Recharts,
 unica libreria (ADR 0121), importata solo dai grafici condivisi di `src/components/charts`; le funzionalità passano i
-dati (`eslint.architecture.js`). Chiamate HTTP con `fetch`, dal client di `src/lib/api-client.ts`.
+dati (`eslint.architecture.js`). Icone: lucide-react, unica libreria, importata solo da `src/components/ui/icons`;
+comandi, azioni dell'agente e direzioni usano i componenti condivisi `CommandButton`, `ActionLabel` e `DirectionLabel`
+di `src/components/ui`, l'icona accanto al testo e nascosta ai lettori di schermo (ADR
+icone-con-lucide-react-e-comandi-condivisi, ADR icone-condivise-di-azioni-e-direzioni). Chiamate HTTP con `fetch`,
+dal client di `src/lib/api-client.ts`.
 
 ## Accesso (ADR 0118)
 
@@ -71,7 +75,7 @@ dati (`eslint.architecture.js`). Chiamate HTTP con `fetch`, dal client di `src/l
 - Unit test con Vitest + Testing Library accanto al modulo (`<modulo>.test.ts(x)`); l'API e l'identity provider sono i
   finti MSW di `src/testing/mocks`, che tengono lo stato della piattaforma finta (`fakePlatform`). MSAL è quello vero.
 - Scenari: i `.feature` dei requisiti della dashboard, elencati in `features` di `dashboard/playwright.config.ts` (oggi
-  `specs/E2-*`, `specs/E3-*` e `specs/E6-*/F6.4-*`), eseguiti da `playwright-bdd` sulla build servita da `server/`, con il browser
+  `specs/E2-*`, `specs/E3-*`, `specs/E6-*/F6.4-*` e `specs/E6-*/F6.5-*`), eseguiti da `playwright-bdd` sulla build servita da `server/`, con il browser
   instradato agli stessi finti MSW. Passi in `e2e/scenarios/<epic>/<feature>/<requisito>.steps.ts`, in kebab-case;
   passi condivisi e fixture in `e2e/support/`. Ogni `Allora` e ogni `E` ha la propria asserzione.
 - Ogni prova si vede rossa prima di diventare verde. Copertura di righe e rami oltre il 90% (`vitest --coverage`),

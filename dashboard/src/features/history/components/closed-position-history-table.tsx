@@ -1,4 +1,5 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { DirectionLabel } from '@/components/ui/direction-label';
 import {
   formatPrice,
   formatRate,
@@ -16,7 +17,14 @@ const COLUMNS: DataTableColumn<HistoryPosition>[] = [
   { header: 'Chiusura', cell: (position) => formatInstant(position.closed_at) },
   { header: 'Flusso', cell: (position) => position.flow },
   { header: 'Asset', cell: (position) => position.asset },
-  { header: 'Direzione', cell: (position) => `${position.side} ${position.leverage}x` },
+  {
+    header: 'Direzione',
+    cell: (position) => (
+      <>
+        <DirectionLabel value={position.side} /> {position.leverage}x
+      </>
+    ),
+  },
   { header: 'Prezzo di apertura', cell: (position) => formatPrice(position.open_price) },
   { header: 'Prezzo di chiusura', cell: (position) => formatPrice(position.close_price) },
   {

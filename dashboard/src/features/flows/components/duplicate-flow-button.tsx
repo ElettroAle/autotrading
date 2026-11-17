@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 
-import { SECONDARY_COMMAND } from '@/components/ui/commands';
+import { CommandButton } from '@/components/ui/command-button';
 import { paths } from '@/config/paths';
 
 import { useDuplicateFlow } from '../api/duplicate-flow';
@@ -17,14 +17,13 @@ export const DuplicateFlowButton = ({ flowId }: { flowId: string }) => {
   });
   return (
     <div>
-      <button
-        type="button"
+      <CommandButton
+        tone="secondary"
         disabled={duplicate.isPending}
         onClick={() => duplicate.mutate(flowId)}
-        className={SECONDARY_COMMAND}
       >
         Duplica
-      </button>
+      </CommandButton>
       <CommandRefusal refusal="Duplicazione rifiutata" error={duplicate.error} />
     </div>
   );
