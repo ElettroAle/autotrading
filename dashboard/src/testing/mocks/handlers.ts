@@ -23,6 +23,7 @@ import {
 } from './flow-statistics';
 import { forecastAccuracyOf } from './forecast-accuracy';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
+import { notificationChannelHandlers } from './notification-channel-handlers';
 import { notificationEmailHandlers } from './notification-email-handlers';
 import {
   configurationOf,
@@ -427,6 +428,7 @@ export const handlers = [
   ...reconciliationHandlers,
   ...providerKeyHandlers,
   ...notificationEmailHandlers,
+  ...notificationChannelHandlers,
   ...capitalChangeHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>

@@ -2,6 +2,7 @@ import { FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
+import { fakeNotificationChannels } from './notification-channels';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 import { fakeReconciliation } from './reconciliation';
 
@@ -596,6 +597,7 @@ export const fakePlatform = {
     state.exchangeNetworkName = 'testnet';
     state.apiAnswers = true;
     fakeReconciliation.reset();
+    fakeNotificationChannels.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
