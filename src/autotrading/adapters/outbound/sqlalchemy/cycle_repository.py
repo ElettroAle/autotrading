@@ -22,6 +22,7 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.flow_cost import CycleCost
 from autotrading.domain.flows.recorded_decision import DecidedCycle, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
@@ -65,6 +66,7 @@ class _CycleRow(TypedDict):
     input_tokens: int | None
     output_tokens: int | None
     cost_usd: Decimal | None
+    trigger: str
 
 
 class SqlAlchemyCycleRepositoryAdapter:
@@ -247,6 +249,7 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
         "input_tokens": None if cost is None else cost.input_tokens,
         "output_tokens": None if cost is None else cost.output_tokens,
         "cost_usd": None if cost is None else cost.cost_usd,
+        "trigger": record.trigger.value,
     }
 
 
@@ -294,6 +297,7 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
             StepDocument(_step(document["step"]), document["content"]) for document in row["documents"] or ()
         ),
         cost=_cost_of(row),
+        trigger=CycleTrigger(row["trigger"]),
     )
 
 

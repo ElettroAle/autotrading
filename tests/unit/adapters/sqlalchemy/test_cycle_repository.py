@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -23,6 +24,7 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -62,6 +64,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "input_tokens": 2000,
         "output_tokens": 500,
         "cost_usd": Decimal("0.0031"),
+        "trigger": "scheduled",
     }
 
 
@@ -162,6 +165,15 @@ def test_the_saved_decisions_of_a_cycle_read_back_as_they_were() -> None:
 
 def test_no_saved_decision_reads_as_no_decided_cycle() -> None:
     assert decided_cycle_of([]) is None
+
+
+def test_a_cycle_asked_for_now_is_saved_and_read_back_as_asked() -> None:
+    asked = replace(FAILED, trigger=CycleTrigger.ON_DEMAND)
+
+    row = row_of(asked, TENANT)
+
+    assert row["trigger"] == "on_demand"
+    assert record_of(row) == asked
 
 
 def test_the_consecutive_failures_count_the_failed_cycles_after_the_last_completed_one_since_the_anchor() -> None:

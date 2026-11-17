@@ -612,6 +612,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cycles */
+        get: operations["list_cycles_flows__flow_id__cycles_get"];
+        put?: never;
+        /**
+         * Run Cycle Now
+         * @description A cycle of the flow now, run by the worker and answered when it ends (R6.5.2): a failed cycle is the
+         *     cycle created, a flow not active or a cycle in progress a refusal.
+         */
+        post: operations["run_cycle_now_flows__flow_id__cycles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/duplicate": {
         parameters: {
             query?: never;
@@ -920,23 +942,6 @@ export interface paths {
         };
         /** List Flow Overviews */
         get: operations["list_flow_overviews_flows_overview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/flows/{flow_id}/cycles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Cycles */
-        get: operations["list_cycles_flows__flow_id__cycles_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1433,7 +1438,7 @@ export interface components {
         };
         /**
          * CycleDetailResponse
-         * @description A cycle with everything recorded about it (R1.7.1).
+         * @description A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2).
          */
         CycleDetailResponse: {
             /**
@@ -1455,6 +1460,8 @@ export interface components {
             /** Documents */
             documents: components["schemas"]["StepDocumentResponse"][];
             cost: components["schemas"]["CallCostResponse"] | null;
+            /** Trigger */
+            trigger: string;
         };
         /**
          * CyclePageResponse
@@ -1472,7 +1479,8 @@ export interface components {
         };
         /**
          * CycleSummaryResponse
-         * @description A cycle in the list: its instants, its outcome and the decisions of the agent (R1.7.3).
+         * @description A cycle in the list: its instants, its outcome, the decisions of the agent and what started it (R1.7.3,
+         *     R6.5.2).
          */
         CycleSummaryResponse: {
             /**
@@ -1489,6 +1497,8 @@ export interface components {
             decisions: {
                 [key: string]: unknown;
             } | null;
+            /** Trigger */
+            trigger: string;
         };
         /** DailyCostResponse */
         DailyCostResponse: {
@@ -2158,6 +2168,8 @@ export interface components {
             decisions: {
                 [key: string]: unknown;
             } | null;
+            /** Trigger */
+            trigger: string;
             /**
              * Flow Id
              * Format: uuid
@@ -4096,6 +4108,78 @@ export interface operations {
             };
         };
     };
+    list_cycles_flows__flow_id__cycles_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description concluso o fallito */
+                outcome?: string | null;
+                /** @description apertura, chiusura, mantenimento o nessuna */
+                decision?: string | null;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CyclePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_cycle_now_flows__flow_id__cycles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleSummaryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     duplicate_flow_flows__flow_id__duplicate_post: {
         parameters: {
             query?: never;
@@ -4705,47 +4789,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowOverviewResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_cycles_flows__flow_id__cycles_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                /** @description concluso o fallito */
-                outcome?: string | null;
-                /** @description apertura, chiusura, mantenimento o nessuna */
-                decision?: string | null;
-                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                from?: string | null;
-                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                to?: string | null;
-            };
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CyclePageResponse"];
                 };
             };
             /** @description Validation Error */

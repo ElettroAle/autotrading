@@ -84,7 +84,6 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.cycles import (
     FakeClockAdapter,
     InMemoryCycleCheckpointsAdapter,
-    InMemoryCycleRepositoryAdapter,
     InMemoryFlowLockAdapter,
 )
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
@@ -157,7 +156,10 @@ class FlowCycles:
         self.platform.model_catalog = scenario_catalog()
         self.clock = FakeClockAdapter(at("10:00"))
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
-        self.records = InMemoryCycleRepositoryAdapter()
+        # The table of the cycles is one: what the worker records is what the API reads.
+        self.records = self.platform.cycles
+        # One lock per installation, as the advisory locks of PostgreSQL: a cycle asked for now meets the one running.
+        self.lock = InMemoryFlowLockAdapter()
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
         self.sentiments = {
@@ -176,6 +178,9 @@ class FlowCycles:
         self.running: threading.Thread | None = None
         self.readings = self.platform.readings
         self.equity_snapshots = EquitySnapshotStore()
+        self.platform.worker_clock = self.clock
+        # Composed when a cycle is asked for: the cycle uses the worker, which holds this run.
+        self.platform.cycle_run_of = lambda tenant_id: lambda command: self.run_cycle_of(tenant_id).execute(command)
 
     # The platform
 
@@ -418,8 +423,7 @@ class FlowCycles:
         record_actual_prices(self.directory, self.ports_of, self.services())
 
     def run_cycle_of(self, tenant_id: TenantId) -> WorkerCycle:
-        lock = InMemoryFlowLockAdapter()
-        return run_cycle_for(self.ports_of, self.services(), lambda _tenant: self.records, lock, tenant_id)
+        return run_cycle_for(self.ports_of, self.services(), lambda _tenant: self.records, self.lock, tenant_id)
 
     def anchor_of(self, flow: Flow) -> datetime:
         """As the trigger of the database: a flow is anchored at the instant it is first seen active (ADR 0042)."""

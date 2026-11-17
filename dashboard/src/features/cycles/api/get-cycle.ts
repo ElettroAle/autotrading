@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
 
-import { failureSchema } from './get-cycles';
+import { failureSchema, triggerSchema } from './get-cycles';
 
 const cycleSchema = z.object({
   planned_at: z.string(),
@@ -22,12 +22,13 @@ const cycleSchema = z.object({
       cost_usd: z.string().nullable(),
     })
     .nullable(),
+  trigger: triggerSchema,
 });
 
 export type Cycle = z.infer<typeof cycleSchema>;
 export type StepDocument = Cycle['documents'][number];
 
-/** A cycle with everything recorded about it (R1.7.1). */
+/** A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2). */
 export const useCycle = (flowId: string, plannedAt: string) => {
   const api = useApiClient();
   return useQuery({

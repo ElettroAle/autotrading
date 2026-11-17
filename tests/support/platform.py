@@ -1,5 +1,6 @@
 """The platform as the scenarios see it: the use cases of a tenant built on the fake adapters, as bootstrap does."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from secrets import token_hex
 from uuid import UUID
@@ -19,6 +20,7 @@ from autotrading.application.flows.read_account_executions import ReadAccountExe
 from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
+from autotrading.application.flows.run_cycle_on_demand import CycleRun, RunCycleOnDemandCommand, RunCycleOnDemandUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
@@ -60,7 +62,7 @@ from tests.fakes.bot_inbox import FakeBotInboxAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
-from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
+from tests.fakes.cycles import FakeClockAdapter, InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
 from tests.fakes.emergency_closing_log import InMemoryEmergencyClosingLogAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
@@ -91,6 +93,7 @@ from tests.fakes.linked_chat_repository import (
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.on_demand_cycles import FakeOnDemandCycleAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
@@ -119,6 +122,11 @@ from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
+
+
+def no_cycle_run_of(_tenant_id: TenantId) -> CycleRun:
+    """A worker that composes no cycle: every instant asked for is already taken."""
+    return lambda _command: None
 
 
 def new_credentials() -> Credentials:
@@ -171,6 +179,9 @@ class Platform:
         # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
+        # The cycles the worker runs on request, with its clock: none until a scenario composes them (FlowCycles).
+        self.worker_clock = FakeClockAdapter(STARTED_AT)
+        self.cycle_run_of: Callable[[TenantId], CycleRun] = no_cycle_run_of
         # The emergency closings of every tenant, as their record keeps them (R3.2.3).
         self.emergency_closings: list[EmergencyClosing] = []
         # One exchange behind both ports: what the orders open is what the readings show.
@@ -203,7 +214,11 @@ class Platform:
         account_state = FakeAccountStateAdapter(lambda: self.worker_for(tenant_id).read_exchange_state)
         position_closing = FakePositionClosingAdapter(lambda: self.worker_for(tenant_id).close_exchange_position)
         verification = FakeVerificationAdapter(lambda: self.worker_for(tenant_id).run_exchange_verification)
+        on_demand_cycles = FakeOnDemandCycleAdapter(
+            lambda flow_id: self.worker_for(tenant_id).run_cycle_on_demand.execute(RunCycleOnDemandCommand(flow_id))
+        )
         account_state.reachable = position_closing.reachable = verification.reachable = self.worker_reachable
+        on_demand_cycles.reachable = self.worker_reachable
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
@@ -249,6 +264,7 @@ class Platform:
             ledger_recording=FakeLedgerRecordingAdapter(
                 RecordAccountExecutionsUseCase(flows, self.account_activity, self.platform_orders, self.ledger)
             ),
+            on_demand_cycles=on_demand_cycles,
             flow_operations=InMemoryFlowOperationsAdapter(
                 self.ledger,
                 lambda: [account.id.value for account in accounts.list()],
@@ -331,6 +347,12 @@ class Platform:
                 ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
                 self.platform_orders,
                 self.ledger,
+            ),
+            run_cycle_on_demand=RunCycleOnDemandUseCase(
+                InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
+                InMemoryFlowTimingAdapter(self.flows, tenant_id),
+                self.worker_clock,
+                self.cycle_run_of(tenant_id),
             ),
         )
 

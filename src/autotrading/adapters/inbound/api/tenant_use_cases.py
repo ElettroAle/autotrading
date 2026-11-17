@@ -79,6 +79,7 @@ from autotrading.application.flows.ports import (
     HistoricalCyclesPort,
     HistoricalOrdersPort,
     LedgerRecordingPort,
+    OnDemandCyclePort,
     OpeningsSuspensionPort,
     ReconciliationRepositoryPort,
     RunningVerificationsPort,
@@ -101,6 +102,7 @@ from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCa
 from autotrading.application.flows.read_last_decision import ReadLastDecisionUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
+from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
@@ -152,6 +154,7 @@ class TenantPorts:
     account_transfers: AccountTransfersPort
     flow_ledger: FlowLedgerPort
     ledger_recording: LedgerRecordingPort
+    on_demand_cycles: OnDemandCyclePort
     flow_operations: FlowOperationsPort
     link_codes: LinkCodeRepositoryPort
     bot_identity: BotStartLinkPort
@@ -227,6 +230,7 @@ class TenantUseCases:
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
     read_last_decision: ReadLastDecisionUseCase
+    request_on_demand_cycle: RequestOnDemandCycleUseCase
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
     read_forecast_accuracy: ReadForecastAccuracyUseCase
@@ -329,6 +333,7 @@ class TenantUseCases:
             list_cycles=ListCyclesUseCase(ports.flow_directory, ports.cycle_history),
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_last_decision=ReadLastDecisionUseCase(ports.flow_directory, ports.cycle_history),
+            request_on_demand_cycle=RequestOnDemandCycleUseCase(ports.flows, ports.on_demand_cycles),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_statistics=ReadFlowStatisticsUseCase(
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock

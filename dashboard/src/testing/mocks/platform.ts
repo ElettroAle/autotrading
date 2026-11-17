@@ -345,6 +345,10 @@ export const DEFAULT_RISK_LIMITS: FakeRiskLimits = {
 const DRAFT = 'bozza';
 const STOPPED = 'fermo';
 const ACTIVE = 'attivo';
+const SECOND = 1000;
+// The reasons the API gives when it refuses a cycle asked for now (R6.5.2).
+const FLOW_NOT_ACTIVE = 'il flusso non è attivo';
+const CYCLE_IN_PROGRESS = 'un ciclo del flusso è già in corso';
 const ARCHIVED = 'archiviato';
 const PAUSED = 'in pausa';
 
@@ -400,6 +404,8 @@ const state = {
   linkedChats: new Map<string, FakeChat>(),
   linkCodes: new Map<string, FakeLinkCode>(),
   cycles: new Map<string, FakeCycle[]>(),
+  cyclesInProgress: new Set<string>(),
+  workerClock: undefined as Date | undefined,
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   cashOuts: [] as string[],
@@ -576,6 +582,8 @@ export const fakePlatform = {
     state.linkedChats.clear();
     state.linkCodes.clear();
     state.cycles.clear();
+    state.cyclesInProgress.clear();
+    state.workerClock = undefined;
     state.openPositions.clear();
     state.closedPositions.clear();
     state.cashOuts.length = 0;
@@ -815,6 +823,34 @@ export const fakePlatform = {
   concludeCycle(flowName: string, plannedAt: Date): void {
     const flowId = flowIdOf(flowName);
     state.cycles.set(flowId, [...(state.cycles.get(flowId) ?? []), aCompletedCycle(plannedAt)]);
+  },
+
+  /** From now on the worker reads this instant as now: a cycle asked for now is planned at it (R6.5.2). */
+  setWorkerClock(instant: Date): void {
+    state.workerClock = instant;
+  },
+
+  /** A cycle of the flow is under way: a cycle asked for now is refused until it ends (R6.5.2). */
+  holdCycle(flowName: string): void {
+    state.cyclesInProgress.add(flowIdOf(flowName));
+  },
+
+  /**
+   * The worker runs a full cycle of the active flow now, planned at the instant of the request, and records it as asked
+   * for (R6.5.2); a flow not active or with a cycle under way refuses it, as the API does.
+   */
+  runCycleNow(user: FakeUser, flowId: string): FakeCycle {
+    const flow = flowOf(user, flowId);
+    if (flow.status !== ACTIVE) {
+      throw new FakeRefusal(409, FLOW_NOT_ACTIVE);
+    }
+    if (state.cyclesInProgress.has(flow.id)) {
+      throw new FakeRefusal(409, CYCLE_IN_PROGRESS);
+    }
+    const now = state.workerClock ?? new Date(Math.floor(Date.now() / SECOND) * SECOND);
+    const cycle: FakeCycle = { ...aCompletedCycle(now), trigger: 'on_demand' };
+    state.cycles.set(flow.id, [...(state.cycles.get(flow.id) ?? []), cycle]);
+    return cycle;
   },
 
   /** From now on the API does not answer: every request fails on the network (R2.1.2). */
