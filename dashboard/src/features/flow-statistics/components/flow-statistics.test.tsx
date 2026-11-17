@@ -58,6 +58,27 @@ describe('FlowStatistics', () => {
     expect(await valueOf('PnL medio delle perdenti')).toHaveTextContent('non disponibile');
   });
 
+  // ADR periodi-brevi-nel-selettore-condiviso: a short period may hold no operation, and the panel says so.
+  it('says there is no operation in the period', async () => {
+    fakePlatform.addFlow('anna', 'beta');
+    await renderApp({ account: 'anna', url: '/flows/flow-beta' });
+
+    expect(
+      await within(await panel()).findByText('Nessuna operazione nel periodo'),
+    ).toBeInTheDocument();
+    expect(await valueOf('Costo del modello IA')).toHaveTextContent('0,00 USD');
+  });
+
+  it('says nothing of missing operations when the period has some', async () => {
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await valueOf('Numero di operazioni')).toHaveTextContent('4');
+    expect(
+      within(await panel()).queryByText('Nessuna operazione nel periodo'),
+    ).not.toBeInTheDocument();
+  });
+
   it('reads the statistics of the period of the page', async () => {
     fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });

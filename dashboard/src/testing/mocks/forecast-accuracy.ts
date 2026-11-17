@@ -1,3 +1,4 @@
+import { fakeClock } from './clock';
 import { contains, windowOf } from './flow-statistics';
 import type { FakeForecast } from './platform';
 
@@ -16,7 +17,7 @@ const byAssetThenHorizon = (first: FakeForecast, second: FakeForecast): number =
 export const forecastAccuracyOf = (
   forecasts: FakeForecast[],
   search: URLSearchParams,
-  now = Date.now(),
+  now = fakeClock.now(),
 ) => {
   const window = windowOf(search, now);
   const expired = forecasts

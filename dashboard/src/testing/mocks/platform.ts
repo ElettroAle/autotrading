@@ -1,4 +1,5 @@
 import { FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
+import { fakeClock } from './clock';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
@@ -577,6 +578,7 @@ const holderOf = (user: FakeUser, flow: FakeFlow): FakeFlow | undefined =>
 
 export const fakePlatform = {
   reset(): void {
+    fakeClock.release();
     state.users.clear();
     state.chats.clear();
     state.linkedChats.clear();

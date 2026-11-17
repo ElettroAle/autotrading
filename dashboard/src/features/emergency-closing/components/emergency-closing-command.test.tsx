@@ -9,8 +9,11 @@ import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
 // ADR chiusura-di-emergenza-nella-dashboard: one command for the three scopes, on the page of the flow, on the page of
-// the accounts and on the list of the flows, with the shared confirmation.
-const COMMAND = 'Chiusura di emergenza';
+// the accounts and on the list of the flows, with the shared confirmation. The command names its scope, so the zone it
+// sits in reads by itself (ADR zona-di-emergenza-in-fondo-alla-pagina).
+const COMMAND = 'Chiusura di emergenza di tutti i flussi';
+const FLOW_COMMAND = 'Chiusura di emergenza del flusso alfa';
+const ACCOUNT_COMMAND = 'Chiusura di emergenza del conto test-1';
 const CONFIRMATION = 'Conferma della chiusura di emergenza';
 const CONFIRM = 'Chiudi e metti in pausa';
 const OUTCOME = 'Esito della chiusura di emergenza';
@@ -20,15 +23,6 @@ const click = async (name: string): Promise<void> => {
 };
 
 const confirmation = async () => screen.findByRole('alertdialog', { name: CONFIRMATION });
-
-const rowOf = async (name: string): Promise<HTMLElement> => {
-  const rows = await screen.findAllByRole('row');
-  const row = rows.find((candidate) => within(candidate).queryByText(name) !== null);
-  if (row === undefined) {
-    throw new Error(`no row with ${name}`);
-  }
-  return row;
-};
 
 const outcomeOf = (flows: object[]) =>
   http.post('*/flows/emergency-closings', () => HttpResponse.json({ flows }));
@@ -57,7 +51,7 @@ describe('the emergency closing', () => {
   it('of a flow asks to confirm with its name and its positions, closing nothing before', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
-    await click(COMMAND);
+    await click(FLOW_COMMAND);
 
     expect(await confirmation()).toHaveTextContent(
       'Chiudere 1 posizione del flusso alfa e metterlo in pausa?',
@@ -68,7 +62,7 @@ describe('the emergency closing', () => {
 
   it('of a flow closes its positions once confirmed and shows the outcome of the flow', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
-    await click(COMMAND);
+    await click(FLOW_COMMAND);
     await confirmation();
 
     await click(CONFIRM);
@@ -86,7 +80,7 @@ describe('the emergency closing', () => {
   it('of an account names the account and the positions of its flows', async () => {
     await renderApp({ account: 'anna', url: '/accounts' });
 
-    await userEvent.click(within(await rowOf('test-1')).getByRole('button', { name: COMMAND }));
+    await click(ACCOUNT_COMMAND);
 
     expect(await confirmation()).toHaveTextContent(
       'Chiudere 2 posizioni dei flussi del conto test-1 e metterli in pausa?',

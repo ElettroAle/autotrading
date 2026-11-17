@@ -47,6 +47,31 @@ describe('PeriodSelector', () => {
     expect(periodRead()).toEqual({ kind: '7d', from: '', to: '' });
   });
 
+  // ADR periodi-brevi-nel-selettore-condiviso: the short periods ride in the address as the API names them.
+  it('keeps a short period in the query string of the page', async () => {
+    renderAt('/flows/alfa');
+
+    await userEvent.selectOptions(screen.getByLabelText('Periodo'), '1 ora');
+
+    expect(searchShown()).toBe('?period=1h');
+    expect(periodRead()).toEqual({ kind: '1h', from: '', to: '' });
+  });
+
+  it('offers the periods from the shortest', () => {
+    renderAt('/flows/alfa');
+
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      '30 minuti',
+      '1 ora',
+      '12 ore',
+      '24 ore',
+      '7 giorni',
+      '30 giorni',
+      'Tutta la vita',
+      'Intervallo',
+    ]);
+  });
+
   it('reads the period the page opens with', () => {
     renderAt('/flows/alfa?period=30d');
 

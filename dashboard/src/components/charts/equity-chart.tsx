@@ -47,6 +47,8 @@ type EquityChartProps = {
   readonly events?: readonly ChartEvent[];
   /** Called with the instants of the first and the last point of a drag on the chart, the earlier first. */
   readonly onSelect?: (from: string, to: string) => void;
+  /** What the chart says without points; by default, that the period has no cycle. */
+  readonly empty?: string;
 };
 
 type EquityDatum = EquityPoint & { readonly time: number };
@@ -67,6 +69,9 @@ const TICK_GAP = 32;
 const MARK_SIZE = 6;
 // A finger needs more than the cross to hit it (ADR viste-e-comandi-della-pagina-del-flusso).
 const MARK_TOUCH_RADIUS = 12;
+// A lone point sits in the middle of an hour of axis, so it shows as a point and not on the edge of the chart.
+const LONE_POINT_MARGIN_MS = 30 * 60 * 1000;
+const NO_CYCLE = 'Nessun ciclo nel periodo';
 
 const amountFormat = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
 const instantFormat = new Intl.DateTimeFormat('it-IT', {
@@ -222,16 +227,20 @@ const EventMarks = ({
   );
 };
 
-const domainOf = (
-  data: readonly EquityDatum[],
-  events: readonly ChartEvent[],
-): [number, number] => {
-  const times = [
+/** The axis of time from the first to the last instant, centred on a lone one (ADR periodi-brevi-nel-selettore-condiviso). */
+export const timeDomainOf = (times: readonly number[]): [number, number] => {
+  const first = Math.min(...times);
+  const last = Math.max(...times);
+  return first === last
+    ? [first - LONE_POINT_MARGIN_MS, last + LONE_POINT_MARGIN_MS]
+    : [first, last];
+};
+
+const domainOf = (data: readonly EquityDatum[], events: readonly ChartEvent[]): [number, number] =>
+  timeDomainOf([
     ...data.map((datum) => datum.time),
     ...events.map((event) => Date.parse(event.instant)),
-  ];
-  return [Math.min(...times), Math.max(...times)];
-};
+  ]);
 
 /**
  * The equity curve of a flow, a point for each cycle on an axis of time, green above the initial capital and red below
@@ -239,9 +248,22 @@ const domainOf = (
  * cicli-falliti-sull-equity-curve), changes of the capital as violet diamonds (ADR
  * rendimento-composto-tra-le-variazioni-di-capitale). A drag from a point to another, with the mouse or a finger,
  * chooses an interval (ADR intervallo-trascinando-sull-equity-curve). The chart is as wide as its room, never wider,
- * with fewer dates and smaller points as they crowd (ADR equity-curve-larga-come-lo-schermo).
+ * with fewer dates and smaller points as they crowd (ADR equity-curve-larga-come-lo-schermo). A lone point shows in the
+ * middle of the chart, and without points the chart says so (ADR periodi-brevi-nel-selettore-condiviso).
  */
-export const EquityChart = ({ points, baseline, events = [], onSelect }: EquityChartProps) => {
+export const EquityChart = ({ points, empty = NO_CYCLE, ...chart }: EquityChartProps) =>
+  points.length === 0 ? (
+    <p className="text-slate-600">{empty}</p>
+  ) : (
+    <EquityArea points={points} {...chart} />
+  );
+
+const EquityArea = ({
+  points,
+  baseline,
+  events = [],
+  onSelect,
+}: Omit<EquityChartProps, 'empty'>) => {
   const id = `equity-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [selection, setSelection] = useState<Selection>({});
   const [width, setWidth] = useState(INITIAL_WIDTH);

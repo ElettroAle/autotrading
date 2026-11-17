@@ -112,7 +112,7 @@ describe('EquityCurve', () => {
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Periodo' }), '30 giorni');
 
-    expect(await screen.findByText('Nessun ciclo nel periodo scelto')).toBeInTheDocument();
+    expect(await screen.findByText('Nessun ciclo nel periodo')).toBeInTheDocument();
   });
 
   it('tells why the curve could not be read', async () => {

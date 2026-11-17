@@ -31,6 +31,11 @@ describe('CommandButton', () => {
     expect(STOP_COMMAND).toContain('bg-red-700');
   });
 
+  it('writes the text of the pause in white, as the owner asked', () => {
+    expect(HOLD_COMMAND).toContain('text-white');
+    expect(HOLD_COMMAND).not.toContain('text-slate-950');
+  });
+
   it('shows the icon next to the text, named by the text alone', () => {
     render(
       <CommandButton tone="hold" icon="pause">

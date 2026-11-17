@@ -49,23 +49,17 @@ const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) =>
   }
   // A draft has no capital and no cycle yet (ADR 0124): it shows no curve.
   const { points, initialCapital } = equity.data;
-  if (points.length > 0 && initialCapital !== null) {
-    return (
-      <EquityChart
-        points={points}
-        baseline={initialCapital}
-        events={[
-          ...(failed.data ?? []).map((plannedAt) => failedCycleEvent(flowId, plannedAt)),
-          ...(changes.data ?? []).map((change) => capitalChangeEvent(flowId, change)),
-        ]}
-        onSelect={(from, to) => chooseInterval(intervalOfInstants(from, to))}
-      />
-    );
-  }
   return (
-    <p className="text-slate-600">
-      {period.kind === 'all' ? 'Nessun ciclo ancora eseguito' : 'Nessun ciclo nel periodo scelto'}
-    </p>
+    <EquityChart
+      points={initialCapital === null ? [] : points}
+      baseline={initialCapital ?? 0}
+      events={[
+        ...(failed.data ?? []).map((plannedAt) => failedCycleEvent(flowId, plannedAt)),
+        ...(changes.data ?? []).map((change) => capitalChangeEvent(flowId, change)),
+      ]}
+      onSelect={(from, to) => chooseInterval(intervalOfInstants(from, to))}
+      {...(period.kind === 'all' ? { empty: 'Nessun ciclo ancora eseguito' } : {})}
+    />
   );
 };
 

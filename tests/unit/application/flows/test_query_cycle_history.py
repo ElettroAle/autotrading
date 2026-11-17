@@ -46,7 +46,7 @@ def test_reads_the_period_at_the_instant_of_the_clock() -> None:
 
     use_case.execute(QueryCycleHistoryCommand(HistoryFilter(period=StatisticsPeriod.named("7d")), after))
 
-    assert history.queries[-1].window == TimeWindow(since=NOW - timedelta(days=7))
+    assert history.queries[-1].window == TimeWindow(since=NOW - timedelta(days=7), until=NOW + timedelta(minutes=1))
     assert history.queries[-1].after == after
 
 

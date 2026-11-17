@@ -1,3 +1,4 @@
+import { fakeClock } from './clock';
 import { contains, windowOf } from './flow-statistics';
 
 /**
@@ -220,7 +221,7 @@ const newerFirst = (one: FakeHistoryRow<unknown>, other: FakeHistoryRow<unknown>
 export const historyPage = <T>(
   rows: readonly FakeHistoryRow<T>[],
   search: URLSearchParams,
-  now = Date.now(),
+  now = fakeClock.now(),
 ): { readonly found: T[]; readonly next: string | null } => {
   const flow = search.get('flow_id');
   const account = search.get('account_id');

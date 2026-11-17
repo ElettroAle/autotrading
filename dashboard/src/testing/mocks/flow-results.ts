@@ -1,3 +1,4 @@
+import { fakeClock } from './clock';
 import type { FakeCycle } from './cycles';
 import { contains, windowOf } from './flow-statistics';
 import type { FakeFlow } from './platform';
@@ -21,7 +22,7 @@ export const resultsOf = (
   cycles: readonly FakeCycle[],
   openPositions: number,
   search: URLSearchParams,
-  now = Date.now(),
+  now = fakeClock.now(),
 ) => {
   const window = windowOf(search, now);
   const initial = flow.allocatedCapital ?? 0;

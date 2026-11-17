@@ -16,7 +16,7 @@ export const DESTRUCTIVE_COMMAND = `${COMMAND} border border-red-300 bg-white te
 export const GO_COMMAND = `${COMMAND} bg-green-700 text-white hover:bg-green-800`;
 
 /** A command that holds a flow, as «Pausa»: dark text, as amber is too light for white to read on it. */
-export const HOLD_COMMAND = `${COMMAND} bg-amber-600 text-slate-950 hover:bg-amber-500`;
+export const HOLD_COMMAND = `${COMMAND} bg-amber-600 text-white hover:bg-amber-500`;
 
 /** A command that stops a flow, or confirms an operation that cannot be undone, as «Stop». */
 export const STOP_COMMAND = `${COMMAND} bg-red-700 text-white hover:bg-red-800`;

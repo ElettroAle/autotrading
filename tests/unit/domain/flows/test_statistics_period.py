@@ -6,18 +6,41 @@ from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind, TimeWindow
 
 NOW = datetime(2026, 11, 14, 15, 30, tzinfo=UTC)
+MINUTE = timedelta(minutes=1)
 
 
 def test_the_whole_life_has_no_bounds() -> None:
     assert StatisticsPeriod.named("all").window(NOW) == TimeWindow()
 
 
-def test_the_last_7_days_start_7_days_before_now() -> None:
-    assert StatisticsPeriod.named("7d").window(NOW) == TimeWindow(since=NOW - timedelta(days=7))
+# ADR periodi-brevi-come-durata-nel-dominio: a period of the last N holds the minutes from N before now to now.
+@pytest.mark.parametrize(
+    ("name", "duration"),
+    [
+        ("30m", timedelta(minutes=30)),
+        ("1h", timedelta(hours=1)),
+        ("12h", timedelta(hours=12)),
+        ("24h", timedelta(hours=24)),
+        ("7d", timedelta(days=7)),
+        ("30d", timedelta(days=30)),
+    ],
+)
+def test_a_period_of_the_last_n_holds_the_minutes_from_n_before_now_to_now(name: str, duration: timedelta) -> None:
+    assert StatisticsPeriod.named(name).window(NOW) == TimeWindow(since=NOW - duration, until=NOW + MINUTE)
 
 
-def test_the_last_30_days_start_30_days_before_now() -> None:
-    assert StatisticsPeriod.named("30d").window(NOW) == TimeWindow(since=NOW - timedelta(days=30))
+def test_the_last_hour_at_10_15_holds_from_9_15_included_to_the_current_minute() -> None:
+    window = StatisticsPeriod.named("1h").window(datetime(2026, 11, 16, 10, 15, 42, tzinfo=UTC))
+
+    assert window == TimeWindow(
+        since=datetime(2026, 11, 16, 9, 15, tzinfo=UTC), until=datetime(2026, 11, 16, 10, 16, tzinfo=UTC)
+    )
+    assert window.contains(datetime(2026, 11, 16, 9, 15, tzinfo=UTC))
+    assert not window.contains(datetime(2026, 11, 16, 9, 14, 59, tzinfo=UTC))
+
+
+def test_the_periods_go_from_the_shortest_to_the_range() -> None:
+    assert [kind.value for kind in StatisticsPeriodKind] == ["30m", "1h", "12h", "24h", "7d", "30d", "all", "range"]
 
 
 # ADR periodo-al-minuto: a range and its window hold the minutes from the start to the end, both whole, in UTC.
@@ -44,10 +67,10 @@ def test_a_range_within_one_minute_is_valid() -> None:
 
 def test_an_unknown_period_is_rejected() -> None:
     with pytest.raises(InvalidStatisticsPeriodError) as raised:
-        StatisticsPeriod.named("1y")
+        StatisticsPeriod.named("2h")
 
     assert raised.value.status_code == 400
-    assert str(raised.value) == "periodo non valido: scegliere tra all, 7d, 30d, range"
+    assert str(raised.value) == "periodo non valido: scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"
 
 
 @pytest.mark.parametrize(("since", "until"), [(None, NOW), (NOW, None)])
@@ -65,7 +88,7 @@ def test_a_range_cannot_end_before_it_starts() -> None:
     assert str(raised.value) == "periodo non valido: l'inizio è successivo alla fine"
 
 
-@pytest.mark.parametrize("name", ["all", "7d", "30d"])
+@pytest.mark.parametrize("name", ["30m", "1h", "12h", "24h", "7d", "30d", "all"])
 def test_only_a_range_takes_a_start_and_an_end(name: str) -> None:
     with pytest.raises(InvalidStatisticsPeriodError) as raised:
         StatisticsPeriod.named(name, NOW, None)
