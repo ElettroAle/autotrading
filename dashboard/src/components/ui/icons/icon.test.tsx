@@ -13,6 +13,8 @@ const NAMES: readonly IconName[] = [
   'refresh',
   'circle-check',
   'circle-alert',
+  'user',
+  'chevron-down',
 ];
 
 describe('Icon', () => {

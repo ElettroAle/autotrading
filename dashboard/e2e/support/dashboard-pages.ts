@@ -400,6 +400,14 @@ export class DashboardPages {
       .locator(':scope > tbody > tr');
   }
 
+  /** A total of the search above a history, by its label: the value beside it (Bug 569). */
+  historyTotal(label: string): Locator {
+    return this.page
+      .getByLabel('Totali della ricerca', { exact: true })
+      .getByText(label, { exact: true })
+      .locator('xpath=following-sibling::dd');
+  }
+
   statistics(): Locator {
     return this.page.getByRole('region', { name: 'Statistiche' });
   }

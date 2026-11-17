@@ -47,15 +47,13 @@ describe('DashboardLayout', () => {
     expect(screen.getByRole('button', { name: 'Aggiorna' })).toBeInTheDocument();
   });
 
-  // ADR accesso-persistente-con-cache-msal-in-localstorage: «Esci» lives in the shared layout, on every page of the data.
-  it('offers the way out in the navigation of the page', () => {
+  // ADR area-utente-in-alto-a-destra: «Esci» lives in the menu of the user, on top of the page, not in the navigation.
+  it('keeps the way out out of the navigation of the page', () => {
     renderLayout();
 
-    expect(
-      within(screen.getByRole('navigation', { name: 'Navigazione' })).getByRole('button', {
-        name: 'Esci',
-      }),
-    ).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', { name: 'Navigazione' });
+    expect(within(navigation).queryByRole('button', { name: 'Esci' })).toBeNull();
+    expect(within(navigation).queryByRole('menuitem', { name: 'Esci' })).toBeNull();
   });
 
   it('breaks a title with a long word instead of pushing the page wider', () => {
@@ -77,6 +75,10 @@ describe('DashboardLayout', () => {
       'href',
       '/history',
     );
+    expect(within(navigation).getByRole('link', { name: 'Generale' })).toHaveAttribute(
+      'href',
+      '/settings/general',
+    );
     expect(within(navigation).getByRole('link', { name: 'Chiavi' })).toHaveAttribute(
       'href',
       '/provider-keys',
@@ -96,7 +98,7 @@ describe('DashboardLayout', () => {
       within(settings)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Chiavi', 'Notifiche']);
+    ).toEqual(['Generale', 'Chiavi', 'Notifiche']);
     expect(within(settings).queryByRole('link', { name: 'Flussi' })).toBeNull();
   });
 
@@ -109,6 +111,7 @@ describe('DashboardLayout', () => {
     ['/comparison?flow=flow-alfa', 'Flussi'],
     ['/accounts', 'Conti'],
     ['/history?tab=orders', 'Storico'],
+    ['/settings/general', 'Generale'],
     ['/provider-keys', 'Chiavi'],
     ['/notifications', 'Notifiche'],
   ])('marks the entry of the area of %s, and only that one', (url, entry) => {

@@ -105,6 +105,7 @@ from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter
@@ -165,6 +166,7 @@ class FlowCycles:
         self.lock = InMemoryFlowLockAdapter()
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
+        self.pause = FakePauseAdapter()
         self.sentiments = {
             name: FakeSentimentAdapter(name) for name in (SENTIMENT_ALTERNATIVE_ME.name, SENTIMENT_COINMARKETCAP.name)
         }
@@ -309,6 +311,7 @@ class FlowCycles:
                 "models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(self.platform.model_catalog), self.model)
             },
             provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),
+            pause=self.pause,
             sentiments=self.sentiments,
             news=self.news,
             prices=self.prices,

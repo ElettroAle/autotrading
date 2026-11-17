@@ -152,3 +152,10 @@ def test_an_empty_page_has_no_next() -> None:
 
     assert page.entries == ()
     assert page.next is None
+
+
+def test_only_the_query_without_a_cursor_reads_the_first_page() -> None:
+    first = HistoryQuery.of(HistoryFilter(), NOW, None)
+    later = HistoryQuery.of(HistoryFilter(), NOW, HistoryCursor(NOW, FLOW))
+
+    assert (first.first_page, later.first_page) == (True, False)

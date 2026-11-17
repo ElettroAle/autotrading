@@ -1,15 +1,18 @@
 """The histories of the flows in memory, filtered as the SQL adapter filters them (R2.5.1, ADR 0138)."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.flows.history import (
     ClosedPositionHistoryEntry,
+    ClosedPositionHistoryTotals,
     CycleHistoryEntry,
     HistoryEntry,
     HistoryQuery,
     OrderHistoryEntry,
+    OrderHistoryTotals,
 )
 
 
@@ -49,6 +52,7 @@ class InMemoryFlowHistoryAdapter:
     def __init__(self, store: HistoryStore) -> None:
         self.store = store
         self.queries: list[HistoryQuery] = []
+        self.totals_queries: list[HistoryQuery] = []
 
     def cycles(self, query: HistoryQuery) -> list[CycleHistoryEntry]:
         return self._newest(self.store.cycles, query)
@@ -58,6 +62,23 @@ class InMemoryFlowHistoryAdapter:
 
     def orders(self, query: HistoryQuery) -> list[OrderHistoryEntry]:
         return self._newest(self.store.orders, query)
+
+    def closed_position_totals(self, query: HistoryQuery) -> ClosedPositionHistoryTotals:
+        positions = [entry.position for entry in self._every(self.store.closed_positions, query)]
+        return ClosedPositionHistoryTotals(
+            sum((position.pnl for position in positions), Decimal(0)),
+            sum((position.fees for position in positions), Decimal(0)),
+        )
+
+    def order_totals(self, query: HistoryQuery) -> OrderHistoryTotals:
+        executions = [execution for order in self._every(self.store.orders, query) for execution in order.executions]
+        return OrderHistoryTotals(sum((execution.fee for execution in executions), Decimal(0)))
+
+    def _every[T: HistoryEntry](self, rows: list[HistoryRow[T]], query: HistoryQuery) -> list[T]:
+        """Every row the filters admit, whatever the cursor, as the totals read them."""
+        self.totals_queries.append(query)
+        whole = replace(query, after=None)
+        return [row.entry for row in rows if row.admitted_by(whole)]
 
     def _newest[T: HistoryEntry](self, rows: list[HistoryRow[T]], query: HistoryQuery) -> list[T]:
         self.queries.append(query)

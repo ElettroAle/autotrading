@@ -15,6 +15,7 @@ import { FlowRoute } from './routes/app/flow';
 import { FlowCapitalRoute } from './routes/app/flow-capital';
 import { FlowOverviewRoute } from './routes/app/flow-overview';
 import { FlowVersionsRoute } from './routes/app/flow-versions';
+import { GeneralSettingsRoute } from './routes/app/general-settings';
 import { HistoryRoute } from './routes/app/history';
 import { HomeRoute } from './routes/app/home';
 import { NewFlowRoute } from './routes/app/new-flow';
@@ -55,6 +56,7 @@ export const routes: RouteObject[] = [
       { path: paths.editFlow.path, element: <EditFlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
+      { path: paths.generalSettings.path, element: <GeneralSettingsRoute /> },
       { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },
       { path: paths.ranking.path, element: <RankingRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },

@@ -20,10 +20,10 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 # The PnL of `ClosedPosition`: the one the exchange reported, or else the price move on the value of the margin.
 _SIGN = case((closed_positions.c.side == TradeSide.LONG.value, 1), else_=-1)
 _PRICE_MOVE = (closed_positions.c.close_price - closed_positions.c.open_price) / closed_positions.c.open_price
-_PNL = func.coalesce(
+CLOSED_POSITION_PNL = func.coalesce(
     closed_positions.c.realized_pnl, closed_positions.c.margin * closed_positions.c.leverage * _PRICE_MOVE * _SIGN
 )
-_NET_PNL = _PNL - closed_positions.c.fees
+_NET_PNL = CLOSED_POSITION_PNL - closed_positions.c.fees
 
 
 class _ClosedPositionRow(TypedDict):

@@ -297,6 +297,7 @@ def test_an_answer_in_another_shape_is_transient(answer: object) -> None:
         call(Library(answer), "openai/gpt")
 
     assert raised.value.original == "risposta del fornitore inattesa"
+    assert not raised.value.permanent
 
 
 # ADR-uso-riportato-nell-errore-della-chiamata-al-modello: a call the provider may have charged says so in its error.

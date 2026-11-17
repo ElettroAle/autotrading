@@ -21,7 +21,7 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.history import HistoryCursor, HistoryFilter, HistoryQuery
+from autotrading.domain.flows.history import HistoryCursor, HistoryFilter, HistoryQuery, OrderHistoryTotals
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant import Tenant
@@ -250,3 +250,40 @@ def test_the_window_of_the_last_days_reads_from_its_start(database: Engine, anna
     found = anna.adapter(database).cycles(HistoryQuery(HistoryFilter(), window))
 
     assert [entry.record.planned_at for entry in found] == [day(29), day(28), day(27)]
+
+
+# ADR totali-dello-storico-sul-risultato-filtrato: PostgreSQL sums every row of the filters, whatever the page, under
+# row level security.
+def test_the_totals_of_the_closed_positions_are_those_of_the_whole_filter(
+    database: Engine, anna: TenantHistory
+) -> None:
+    period = StatisticsPeriod.named("range", day(10, hour=0), day(20, hour=23))
+    criteria = HistoryFilter(period=period, asset="ETH")
+    adapter = anna.adapter(database)
+    page = adapter.closed_positions(query_of(criteria, limit=2))
+
+    first = adapter.closed_position_totals(query_of(criteria, limit=2))
+    later = adapter.closed_position_totals(query_of(criteria, page[1].cursor, limit=2))
+
+    # Eleven positions, each with 4 of PnL from the price move and 0.3 of fees.
+    assert (round(first.pnl, 6), first.fees) == (Decimal(44), Decimal("3.3"))
+    assert later == first
+
+
+def test_the_totals_of_the_orders_are_the_fees_of_their_executions(database: Engine, anna: TenantHistory) -> None:
+    adapter = anna.adapter(database)
+
+    of_account = adapter.order_totals(query_of(HistoryFilter(account_id=anna.account_id)))
+    of_version = adapter.order_totals(query_of(HistoryFilter(flow_id=anna.flow_id, version=1)))
+
+    assert of_account == OrderHistoryTotals(Decimal("2.2"))
+    assert of_version == OrderHistoryTotals(Decimal("1.65"))
+
+
+def test_a_tenant_sums_nothing_of_the_history_of_another(database: Engine, anna: TenantHistory) -> None:
+    adapter = new_tenant_history(database, "omega").adapter(database)
+
+    positions = adapter.closed_position_totals(query_of(HistoryFilter(asset="BTC")))
+    executions = adapter.order_totals(query_of(HistoryFilter(account_id=anna.account_id)))
+
+    assert (positions.pnl, positions.fees, executions.fees) == (Decimal(0), Decimal(0), Decimal(0))

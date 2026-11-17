@@ -113,6 +113,12 @@ class ModelCallPort(Protocol):
         ...
 
 
+class PausePort(Protocol):
+    """Waits before the use case asks the model again in the same cycle (ADR ritentativo-del-modello-nel-ciclo)."""
+
+    def pause(self, seconds: float) -> None: ...
+
+
 class ModelGatewayPort(Protocol):
     """Abstract factory of one model gateway: the call and the catalog of the same models, one family (ADR 0109).
 

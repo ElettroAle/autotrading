@@ -36,6 +36,23 @@ describe('FlowsList', () => {
     expect(screen.queryByText('omega')).not.toBeInTheDocument();
   });
 
+  // Bug 572: the boxes of the flows stuck together.
+  it('ADR-riquadri-dei-flussi-separati: shows each flow in a separate box, spaced from the others', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    fakePlatform.addFlow('anna', 'beta');
+    await renderApp({ account: 'anna' });
+
+    const flows = await screen.findByRole('list', { name: 'Flussi' });
+    expect(flows).toHaveClass('space-y-3');
+    expect(flows).not.toHaveClass('divide-y');
+    expect(flows).not.toHaveClass('border');
+    const boxes = within(flows).getAllByRole('listitem');
+    expect(boxes).toHaveLength(2);
+    boxes.forEach((box) =>
+      expect(box).toHaveClass('rounded', 'border', 'border-slate-200', 'bg-white', 'p-4'),
+    );
+  });
+
   it('shows where an active flow runs, its last and next cycle and a gain in green', async () => {
     fakePlatform.addFlow('anna', 'alfa');
     fakePlatform.changeFlow('alfa', { allocatedCapital: 300, currentCapital: 330 });
