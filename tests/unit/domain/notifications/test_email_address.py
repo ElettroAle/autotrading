@@ -20,6 +20,7 @@ def test_an_address_without_the_form_of_an_email_is_refused(text: str) -> None:
         EmailAddress.parse(text)
 
     assert raised.value.status_code == 400
+    assert raised.value.details == {"address": text.strip()}
 
 
 def test_an_address_never_exists_without_the_form_of_an_email() -> None:

@@ -15,7 +15,7 @@ class EmailAddress:
 
     def __post_init__(self) -> None:
         if not self.accepts(self.value):
-            raise InvalidEmailAddressError
+            raise InvalidEmailAddressError(self.value)
 
     @classmethod
     def parse(cls, text: str) -> EmailAddress:

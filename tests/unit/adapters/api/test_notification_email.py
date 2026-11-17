@@ -56,7 +56,7 @@ def test_an_address_without_the_form_of_an_email_is_refused(client_of: Client, a
     response = client_of("anna").put("/notifications/email", json={"address": address})
 
     assert response.status_code == 400
-    assert reason_of(response) == {"detail": "indirizzo email non valido"}
+    assert reason_of(response) == {"detail": "indirizzo email non valido", "address": address}
 
 
 def test_a_removed_address_answers_with_no_content_and_is_no_more(client_of: Client) -> None:

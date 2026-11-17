@@ -34,5 +34,10 @@ class AccountEventWithoutFlowExceptionError(DomainError):
 class InvalidEmailAddressError(DomainError):
     """An address without the form of an email: the user writes it again."""
 
-    def __init__(self) -> None:
+    def __init__(self, address: str) -> None:
         super().__init__("indirizzo email non valido")
+        self.address = address
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"address": self.address}

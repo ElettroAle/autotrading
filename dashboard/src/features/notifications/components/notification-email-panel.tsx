@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { PRIMARY_COMMAND, SECONDARY_COMMAND } from '@/components/ui/commands';
+import { CommandButton } from '@/components/ui/command-button';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { InputField } from '@/components/ui/form/input-field';
 import { Loading } from '@/components/ui/loading';
@@ -22,14 +22,9 @@ const TestEmail = () => {
   const test = useSendTestEmail();
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => test.mutate()}
-        disabled={test.isPending}
-        className={SECONDARY_COMMAND}
-      >
+      <CommandButton tone="secondary" onClick={() => test.mutate()} disabled={test.isPending}>
         Invia email di prova
-      </button>
+      </CommandButton>
       {test.isSuccess && (
         <p role="status" className="mt-1 text-green-800">
           Email di prova inviata
@@ -44,14 +39,9 @@ const RemoveAddress = () => {
   const remove = useRemoveNotificationEmail();
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => remove.mutate()}
-        disabled={remove.isPending}
-        className={SECONDARY_COMMAND}
-      >
+      <CommandButton tone="secondary" onClick={() => remove.mutate()} disabled={remove.isPending}>
         Togli
-      </button>
+      </CommandButton>
       {remove.isError && <ErrorMessage error={remove.error} prefix={COMMAND_FAILED} />}
     </div>
   );
@@ -91,9 +81,9 @@ const AddressForm = ({ address }: { readonly address: string | null }) => {
         error={errors.address}
         {...register('address')}
       />
-      <button type="submit" disabled={save.isPending} className={PRIMARY_COMMAND}>
+      <CommandButton tone="primary" type="submit" disabled={save.isPending}>
         Salva
-      </button>
+      </CommandButton>
     </form>
   );
 };
