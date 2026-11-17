@@ -10,16 +10,23 @@ import {
 
 export type ChannelChoice = {
   readonly event: NotificationEvent;
-  readonly channel: NotificationChannel;
+  readonly channels: readonly NotificationChannel[];
 };
 
-/** Chooses the channel of a type of event for all the flows: it counts from the next notification (R3.5.3). */
+/**
+ * Chooses the channels of a type of event for all the flows, none for no notification: it counts from the next
+ * notification (R3.5.3).
+ */
 export const useChooseNotificationChannel = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (choice: ChannelChoice) =>
-      readDone(await api.PUT('/notifications/channels', { body: choice })),
+      readDone(
+        await api.PUT('/notifications/channels', {
+          body: { event: choice.event, channels: [...choice.channels] },
+        }),
+      ),
     onSettled: () => queryClient.invalidateQueries({ queryKey: NOTIFICATION_CHANNELS_QUERY_KEY }),
   });
 };

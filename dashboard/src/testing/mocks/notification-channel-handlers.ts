@@ -5,6 +5,7 @@ import {
   FAKE_EVENT_TYPES,
   fakeNotificationChannels,
   type FakeChannel,
+  type FakeChoice,
 } from './notification-channels';
 import { fakePlatform } from './platform';
 import { problem, withUser } from './responses';
@@ -17,13 +18,16 @@ const MAIL_SERVER_MISSING = 'server di posta non configurato';
 const isChannel = (value: unknown): value is FakeChannel =>
   FAKE_CHANNELS.some((channel) => channel === value);
 
+const isChoice = (value: unknown): value is FakeChannel[] =>
+  Array.isArray(value) && value.every(isChannel);
+
 const typeOf = (event: unknown) => FAKE_EVENT_TYPES.find((type) => type.event === event);
 
 // The same warnings the API computes: a chosen channel with nothing linked sends nothing (R3.5.3), and no email
 // leaves without the mail server of the user (R3.5.5).
-const warningsOf = (account: string, channel: FakeChannel): string[] => {
-  const reachesChat = ['Telegram', 'entrambi'].includes(channel);
-  const reachesEmail = ['email', 'entrambi'].includes(channel);
+const warningsOf = (account: string, channels: FakeChoice): string[] => {
+  const reachesChat = channels.includes('Telegram');
+  const reachesEmail = channels.includes('email');
   return [
     ...(reachesChat && fakePlatform.linkedChatOf(account) === undefined
       ? [TELEGRAM_NOT_LINKED]
@@ -37,19 +41,25 @@ const warningsOf = (account: string, channel: FakeChannel): string[] => {
   ];
 };
 
-const eventChannel = (account: string, event: string, channel: FakeChannel) => ({
+const eventChannel = (account: string, event: string, channels: FakeChoice) => ({
   event,
-  channel,
+  channels,
   of_flow: typeOf(event)?.ofFlow ?? true,
-  warnings: warningsOf(account, channel),
+  warnings: warningsOf(account, channels),
 });
+
+// Every channel of the platform with what the user misses to reach it (ADR canali-delle-notifiche-come-insieme).
+const channelState = (account: string, channel: FakeChannel) => {
+  const warnings = warningsOf(account, [channel]);
+  return { channel, configured: warnings.length === 0, warnings };
+};
 
 const flowsOf = (account: string) =>
   fakePlatform.flowsOf(account).filter((flow) => flow.status !== ARCHIVED);
 
 const channelsOf = (account: string) => ({
   events: FAKE_EVENT_TYPES.map(({ event }) =>
-    eventChannel(account, event, fakeNotificationChannels.channelOf(account, event)),
+    eventChannel(account, event, fakeNotificationChannels.channelsOf(account, event)),
   ),
   flows: flowsOf(account)
     .sort((first, second) => first.name.localeCompare(second.name))
@@ -57,10 +67,11 @@ const channelsOf = (account: string) => ({
       flow_id: flow.id,
       name: flow.name,
       exceptions: [...fakeNotificationChannels.exceptionsOf(account, flow.id)].map(
-        ([event, channel]) => eventChannel(account, event, channel),
+        ([event, channels]) => eventChannel(account, event, channels),
       ),
     })),
-  warnings: warningsOf(account, 'entrambi'),
+  channels: FAKE_CHANNELS.map((channel) => channelState(account, channel)),
+  warnings: warningsOf(account, FAKE_CHANNELS),
 });
 
 const invalid = () =>
@@ -78,19 +89,19 @@ export const notificationChannelHandlers = [
   ),
   http.put('*/notifications/channels', ({ request }) =>
     withUser(request, async (user) => {
-      const { event, channel } = await bodyOf(request);
-      if (typeOf(event) === undefined || !isChannel(channel)) {
+      const { event, channels } = await bodyOf(request);
+      if (typeOf(event) === undefined || !isChoice(channels)) {
         return invalid();
       }
-      fakeNotificationChannels.choose(user.account, String(event), channel);
+      fakeNotificationChannels.choose(user.account, String(event), channels);
       return new HttpResponse(null, { status: 204 });
     }),
   ),
   http.put('*/notifications/channels/flows/:flowId/:event', ({ request, params }) =>
     withUser(request, async (user) => {
-      const { channel } = await bodyOf(request);
+      const { channels } = await bodyOf(request);
       const type = typeOf(params.event);
-      if (type === undefined || !isChannel(channel)) {
+      if (type === undefined || !isChoice(channels)) {
         return invalid();
       }
       if (!flowsOf(user.account).some((flow) => flow.id === params.flowId)) {
@@ -104,7 +115,7 @@ export const notificationChannelHandlers = [
           { event: type.event },
         );
       }
-      fakeNotificationChannels.except(user.account, String(params.flowId), type.event, channel);
+      fakeNotificationChannels.except(user.account, String(params.flowId), type.event, channels);
       return new HttpResponse(null, { status: 204 });
     }),
   ),
