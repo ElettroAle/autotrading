@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 
 import {
-  DESTRUCTIVE_COMMAND,
   GO_COMMAND,
   HOLD_COMMAND,
   SECONDARY_COMMAND,
@@ -16,7 +15,6 @@ import { renderApp } from '@/testing/test-utils';
 
 const FLOW_PAGE = '/flows/flow-alfa';
 const STOP_CONFIRMATION = 'Conferma dello stop';
-const ARCHIVE_CONFIRMATION = "Conferma dell'archiviazione";
 const RUN_NOW = 'Esegui ora';
 const CYCLE_IN_PROGRESS = 'un ciclo del flusso è già in corso';
 
@@ -44,7 +42,8 @@ describe('FlowCommands', () => {
   it.each([
     ['attivo', ['Pausa', 'Stop', RUN_NOW]],
     ['in pausa', ['Riprendi', 'Stop']],
-    ['fermo', ['Avvia', 'Archivia']],
+    // Archivia is in the settings of the flow, not among the commands of every day (Bug 560).
+    ['fermo', ['Avvia']],
   ])('offers for a flow %s only the commands its status admits', async (status, expected) => {
     alfa.status = status;
     await renderApp({ account: 'anna', url: FLOW_PAGE });
@@ -55,7 +54,6 @@ describe('FlowCommands', () => {
   it.each([
     ['fermo', 'Avvia', GO_COMMAND],
     ['in pausa', 'Riprendi', GO_COMMAND],
-    ['fermo', 'Archivia', DESTRUCTIVE_COMMAND],
     ['attivo', 'Pausa', HOLD_COMMAND],
     ['attivo', 'Stop', STOP_COMMAND],
     ['attivo', RUN_NOW, SECONDARY_COMMAND],
@@ -89,16 +87,6 @@ describe('FlowCommands', () => {
       expect(within(button).getByRole('img', { hidden: true })).toHaveAttribute('data-icon', icon);
     },
   );
-
-  it('shows Archivia without an icon', async () => {
-    alfa.status = 'fermo';
-    await renderApp({ account: 'anna', url: FLOW_PAGE });
-
-    const button = await within(
-      await screen.findByRole('group', { name: 'Comandi del flusso' }),
-    ).findByRole('button', { name: 'Archivia' });
-    expect(within(button).queryByRole('img', { hidden: true })).toBeNull();
-  });
 
   it('pauses the flow and then offers to resume it', async () => {
     await renderApp({ account: 'anna', url: FLOW_PAGE });
@@ -185,7 +173,7 @@ describe('FlowCommands', () => {
     expect(await screen.findByText('Stato: fermo')).toBeInTheDocument();
     expect(fakePlatform.openPositionsOf(alfa.id)).toEqual([]);
     expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
-    expect(await offeredCommands()).toEqual(['Avvia', 'Archivia']);
+    expect(await offeredCommands()).toEqual(['Avvia']);
   });
 
   it('says the stop closes nothing when the flow has no open position', async () => {
@@ -228,32 +216,6 @@ describe('FlowCommands', () => {
     expect(screen.queryByRole('alertdialog', { name: STOP_CONFIRMATION })).toBeNull();
     expect(await offeredCommands()).toEqual(['Pausa', 'Stop', RUN_NOW]);
     expect(fakePlatform.flowNamed('alfa').status).toBe('attivo');
-  });
-
-  it('asks to confirm the archiving, saying it is final and leaves no position to manage', async () => {
-    alfa.status = 'fermo';
-    await renderApp({ account: 'anna', url: FLOW_PAGE });
-
-    await click('Archivia');
-
-    expect(screen.getByRole('alertdialog', { name: ARCHIVE_CONFIRMATION })).toHaveTextContent(
-      "L'archiviazione è definitiva: il flusso non si potrà più avviare né modificare. Un flusso fermo non ha posizioni aperte da gestire e il suo capitale allocato torna libero sul conto.",
-    );
-    expect(fakePlatform.flowNamed('alfa').status).toBe('fermo');
-  });
-
-  it('archives the flow once the user confirms and goes back to the flows in use', async () => {
-    alfa.status = 'fermo';
-    fakePlatform.addFlow('anna', 'beta');
-    const { router } = await renderApp({ account: 'anna', url: FLOW_PAGE });
-
-    await click('Archivia');
-    await click("Conferma l'archiviazione");
-
-    expect(await screen.findByRole('link', { name: 'beta' })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/');
-    expect(screen.queryByRole('link', { name: 'alfa' })).toBeNull();
-    expect(fakePlatform.flowNamed('alfa').status).toBe('archiviato');
   });
 
   it('shows the reason the API gives for a command it refuses', async () => {

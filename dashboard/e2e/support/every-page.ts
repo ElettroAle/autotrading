@@ -95,7 +95,8 @@ export const preparePagesWithLongWords = (
     flowPositions: paths.flowPositions.getHref(flow.id),
     flowClosedPositions: paths.flowClosedPositions.getHref(flow.id),
     cycle: paths.cycle.getHref(flow.id, failed.planned_at),
-    flowVersions: paths.flowVersions.getHref(flow.id),
+    flowSettings: paths.flowSettings.getHref(flow.id),
+    oldFlowVersions: paths.oldFlowVersions.getHref(flow.id),
     ranking: paths.ranking.getHref(),
     comparison: paths.comparison.getHref([flow.id]),
   };

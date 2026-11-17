@@ -14,7 +14,7 @@ import { EditFlowRoute } from './routes/app/edit-flow';
 import { FlowRoute } from './routes/app/flow';
 import { FlowCapitalRoute } from './routes/app/flow-capital';
 import { FlowOverviewRoute } from './routes/app/flow-overview';
-import { FlowVersionsRoute } from './routes/app/flow-versions';
+import { FlowSettingsRoute, OldFlowVersionsRoute } from './routes/app/flow-settings';
 import { GeneralSettingsRoute } from './routes/app/general-settings';
 import { HistoryRoute } from './routes/app/history';
 import { HomeRoute } from './routes/app/home';
@@ -60,7 +60,8 @@ export const routes: RouteObject[] = [
       { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },
       { path: paths.ranking.path, element: <RankingRoute /> },
       { path: paths.cycle.path, element: <CycleRoute /> },
-      { path: paths.flowVersions.path, element: <FlowVersionsRoute /> },
+      { path: paths.flowSettings.path, element: <FlowSettingsRoute /> },
+      { path: paths.oldFlowVersions.path, element: <OldFlowVersionsRoute /> },
       { path: paths.flowPositions.path, element: <PositionsRoute /> },
       { path: paths.comparison.path, element: <ComparisonRoute /> },
     ],

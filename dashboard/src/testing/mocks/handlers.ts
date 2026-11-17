@@ -38,6 +38,7 @@ import {
   configurationOf,
   FAKE_FLOW_COMMANDS,
   fakePlatform,
+  missingBeforeStartOf,
   type FakeFlowCommand,
   type FakeOpeningsResume,
   type FakeConfiguration,
@@ -435,6 +436,7 @@ const flowResponse = (flow: FakeFlow) => ({
   name: flow.name,
   status: flow.status,
   ...configurationOf(flow),
+  missing: missingBeforeStartOf(flow),
 });
 
 /** As the API names the file after the flow: a plain name for every client, the full one encoded (RFC 6266). */

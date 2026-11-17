@@ -39,11 +39,11 @@ describe('EditFlow', () => {
     fakePlatform.saveProviderKey('anna', 'openrouter', '2026-11-14T09:00:00+00:00');
   });
 
-  it('opens from the command Configurazione of the page of the flow, with the configuration in force', async () => {
+  it('opens from the settings of the flow, behind the gear of its page, with the configuration in force', async () => {
     giveAlfa();
     const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Configurazione' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Impostazioni del flusso' }));
     await userEvent.click(await screen.findByRole('link', { name: 'Modifica' }));
 
     expect(router.state.location.pathname).toBe(EDIT_ALFA);

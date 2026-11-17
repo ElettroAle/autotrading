@@ -92,6 +92,18 @@ def test_a_draft_of_a_strategy_alone_has_no_account_capital_or_assets() -> None:
     assert an_empty_draft().missing_assignment == ("conto", "capitale allocato", "asset")
 
 
+def test_a_draft_lacks_before_its_start_what_its_assignment_lacks() -> None:
+    assert an_empty_draft().missing_before_start == ("conto", "capitale allocato", "asset")
+
+
+def test_a_flow_out_of_draft_lacks_nothing_before_its_start() -> None:
+    assert a_strategy_flow().missing_before_start == ()
+
+
+def test_an_archived_draft_lacks_nothing_before_a_start_it_will_never_have() -> None:
+    assert an_empty_draft().archived().missing_before_start == ()
+
+
 def test_a_draft_takes_another_account_and_capital_in_the_same_version() -> None:
     other_account = uuid4()
 

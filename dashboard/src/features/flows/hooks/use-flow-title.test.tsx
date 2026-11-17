@@ -51,7 +51,7 @@ describe('useFlowTitle', () => {
     ['/flows/flow-alfa/cycles', 'alfa'],
     ['/flows/flow-alfa/positions', 'alfa'],
     ['/flows/flow-alfa/closed-positions', 'alfa'],
-    ['/flows/flow-alfa/versions', 'Configurazione di alfa'],
+    ['/flows/flow-alfa/settings', 'Impostazioni di alfa'],
     ['/flows/flow-alfa/edit', 'Modifica della configurazione di alfa'],
   ])('names the flow in the title of %s', async (url, expected) => {
     await renderApp({ account: 'anna', url });

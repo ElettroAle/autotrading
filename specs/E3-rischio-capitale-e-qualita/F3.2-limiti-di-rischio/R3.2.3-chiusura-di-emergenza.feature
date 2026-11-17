@@ -16,9 +16,10 @@ Funzionalità: R3.2.3 Chiusura di emergenza
   Ogni chiusura entra nello storico delle posizioni chiuse con il motivo "chiusura di emergenza". Il comando si
   registra con data, ora, ambito ed esito.
   La dashboard chiede una conferma che nomina l'ambito e il numero di posizioni da chiudere.
-  Nella dashboard il comando sta da solo nel riquadro "Zona di emergenza", in fondo alla pagina del flusso, della
-  pagina dei conti e della pagina "Generale" delle impostazioni, lontano dagli altri comandi (Bug 545); l'elenco dei
-  flussi, la pagina d'uso quotidiano, non lo offre (Bug 563).
+  Nella dashboard il comando sta da solo nel riquadro "Zona di emergenza", in fondo alla pagina dei conti e della
+  pagina "Generale" delle impostazioni, lontano dagli altri comandi (Bug 545); l'elenco dei flussi, la pagina d'uso
+  quotidiano, non lo offre (Bug 563). La chiusura di emergenza di un flusso sta nel riquadro "Zona pericolosa" in
+  fondo alla pagina Impostazioni del flusso, con Archivia, e non nella pagina del flusso (Bug 560).
   I flussi riprendono solo per comando dell'utente (R1.1.4).
   Fuori ambito: la procedura di verifica dell'esecuzione, già disponibile (R0.4.1).
 
@@ -87,11 +88,10 @@ Funzionalità: R3.2.3 Chiusura di emergenza
     Allora il comando viene rifiutato come flusso inesistente
     E la posizione di "omega" resta aperta
 
-  Scenario: Zona di emergenza in fondo alla pagina del flusso
-    Quando "anna" apre nella dashboard la pagina del flusso "alfa"
-    Allora la chiusura di emergenza del flusso "alfa" sta nel riquadro "Zona di emergenza" in fondo alla pagina
-    E il riquadro "Zona di emergenza" non contiene altri comandi
-    E i comandi del flusso "alfa" non contengono la chiusura di emergenza
+  Scenario: Zona pericolosa in fondo alle impostazioni del flusso
+    Quando "anna" apre nella dashboard le impostazioni del flusso "alfa"
+    Allora la chiusura di emergenza del flusso "alfa" sta nel riquadro "Zona pericolosa" in fondo alla pagina
+    E la pagina del flusso "alfa" non contiene la chiusura di emergenza
 
   Scenario: Zona di emergenza in fondo alla pagina dei conti
     Quando "anna" apre nella dashboard la pagina dei conti
@@ -104,7 +104,7 @@ Funzionalità: R3.2.3 Chiusura di emergenza
     E il riquadro "Zona di emergenza" non contiene altri comandi
     E l'elenco dei flussi non contiene la chiusura di emergenza
 
-  Scenario: Conferma dalla zona di emergenza
-    Quando "anna" sceglie la chiusura di emergenza del flusso "alfa" nel riquadro "Zona di emergenza"
+  Scenario: Conferma dalla zona pericolosa
+    Quando "anna" sceglie la chiusura di emergenza del flusso "alfa" nel riquadro "Zona pericolosa"
     Allora la dashboard chiede conferma con "Chiudere 1 posizione del flusso alfa e metterlo in pausa?"
     E nessuna posizione viene chiusa finché "anna" non conferma

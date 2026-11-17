@@ -2168,6 +2168,8 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
+            /** Missing */
+            missing: string[];
         };
         /**
          * FlowResultsResponse

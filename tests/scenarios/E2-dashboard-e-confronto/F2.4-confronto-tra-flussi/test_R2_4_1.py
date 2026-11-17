@@ -9,6 +9,8 @@ from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
 from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, shared by the features
 from tests.support.draft_steps import Draft
@@ -24,10 +26,11 @@ scenarios("E2-dashboard-e-confronto/F2.4-confronto-tra-flussi/R2.4.1-duplicazion
 
 
 class Duplication:
-    """The free capital of an account before time passed."""
+    """The free capital of an account before time passed, and the draft the user opened."""
 
     def __init__(self) -> None:
         self.free_capital: FreeCapital | None = None
+        self.opened: Flow | None = None
 
 
 @pytest.fixture
@@ -187,3 +190,24 @@ def status_kept(platform: Platform, lifecycle: Lifecycle, name: str, status: str
 @then("la richiesta è rifiutata come flusso inesistente")
 def request_refused_as_missing(lifecycle: Lifecycle) -> None:
     assert isinstance(lifecycle.error, FlowNotFoundError)
+
+
+def listed(parts: tuple[str, ...]) -> str:
+    """The parts as the dashboard lists them: «conto, capitale allocato e asset»."""
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} e {parts[-1]}"
+
+
+@when(quoted('"{user}" apre la bozza "{name}"'))
+def open_draft(platform: Platform, duplication: Duplication, user: str, name: str) -> None:
+    duplication.opened = flow_named(platform, user, name)
+
+
+@then(quoted('Avvia è disattivato con accanto "{text}" e il rimando "{link}"'))
+def start_disabled(duplication: Duplication, text: str, link: str) -> None:
+    # playwright-bdd runs the page (Bug 560); here the same scenario proves that the API gives it what it shows: what
+    # the draft lacks, which disables Avvia and fills the text, on a draft whose configuration the link opens.
+    draft = duplication.opened
+    assert draft is not None
+    assert draft.missing_before_start != ()
+    assert text == f"Per avviarla manca: {listed(draft.missing_before_start)}"
+    assert (draft.status, link) == (FlowStatus.DRAFT, "Configura")

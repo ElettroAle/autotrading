@@ -179,3 +179,30 @@ def test_the_name_of_another_flow_answers_with_the_reason(client_of: Client, pla
         409,
         {"detail": "nome già usato da un altro flusso", "field": "name"},
     )
+
+
+def test_a_partial_draft_answers_with_what_it_lacks_to_start(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    copy = anna.post(f"/flows/{an_original(anna, platform, 'anna')['id']}/duplicate").json()
+
+    listed = {flow["name"]: flow["missing"] for flow in anna.get("/flows").json()}
+
+    assert copy["missing"] == ["asset"]
+    assert listed["alfa (copia)"] == ["asset"]
+
+
+def test_a_complete_draft_answers_with_nothing_missing(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    copy = anna.post(f"/flows/{an_original(anna, platform, 'anna')['id']}/duplicate").json()
+
+    configured = anna.patch(f"/flows/{copy['id']}", json={"assets": ["ETH"]})
+
+    assert (configured.json()["status"], configured.json()["missing"]) == ("bozza", [])
+
+
+def test_a_flow_out_of_draft_answers_with_nothing_missing(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+
+    original = an_original(anna, platform, "anna")
+
+    assert (original["status"], original["missing"]) == ("fermo", [])

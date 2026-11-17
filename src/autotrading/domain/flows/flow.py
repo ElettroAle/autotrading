@@ -69,6 +69,16 @@ class Flow(TenantOwned):
         return tuple(part for part, missing in parts if missing)
 
     @property
+    def missing_before_start(self) -> tuple[str, ...]:
+        """What the start still waits for: only a draft lacks its assignment.
+
+        ADR mancanze-della-bozza-dichiarate-dall-api.
+        """
+        if self.status is not FlowStatus.DRAFT:
+            return ()
+        return self.missing_assignment
+
+    @property
     def assigned_account_id(self) -> UUID:
         """The account of a flow that has one: every flow out of draft (ADR 0124)."""
         if self.account_id is None:

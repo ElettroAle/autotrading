@@ -14,7 +14,7 @@ export const onFlowPage = async (
     memory.account = account;
     await dashboard.openFlowAs(account, flow);
   }
-  // The configuration of the flow names it too («Configurazione di alfa»): only its page has the name alone as title.
+  // The settings of the flow name it too («Impostazioni di alfa»): only its page has the name alone as title.
   const onTheFlow = await dashboard.page
     .getByRole('heading', { level: 1, name: flow, exact: true })
     .isVisible();

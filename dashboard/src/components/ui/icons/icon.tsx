@@ -9,6 +9,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Settings,
   Square,
   X,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const DRAWINGS = {
   'circle-alert': CircleAlert,
   user: CircleUser,
   'chevron-down': ChevronDown,
+  settings: Settings,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;

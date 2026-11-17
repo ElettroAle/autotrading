@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
 
 import { CommandButton, type CommandTone } from '@/components/ui/command-button';
 import { CommandRefusal } from '@/components/ui/command-refusal';
 import { ErrorMessage } from '@/components/ui/error-message';
 import type { IconName } from '@/components/ui/icons/icon';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
-import { paths } from '@/config/paths';
 import { formatAmount } from '@/utils/format-amount';
 
 import { useCashOutProfits, type CashOutOutcome } from '../api/cash-out-profits';
@@ -14,36 +12,36 @@ import { useFlowState } from '../api/get-flow-state';
 import { useRunCycleNow } from '../api/run-cycle-now';
 import { useRunFlowCommand } from '../api/run-flow-command';
 import { hasProfits } from '../utils/cash-out-question';
-import { commandsAllowedIn, type FlowCommand } from '../utils/flow-transitions';
+import { operatingCommandsIn, type OperatingCommand } from '../utils/flow-transitions';
 
 import { CashOutConfirmation } from './cash-out-confirmation';
-import { ArchiveConfirmation, StopConfirmation } from './command-confirmation';
+import { StopConfirmation } from './command-confirmation';
 
-const LABELS: Readonly<Record<FlowCommand, string>> = {
+const LABELS: Readonly<Record<OperatingCommand, string>> = {
   start: 'Avvia',
   pause: 'Pausa',
   resume: 'Riprendi',
   stop: 'Stop',
-  archive: 'Archivia',
 };
 
 type CommandLook = { readonly tone: CommandTone; readonly icon?: IconName };
 
-// Each command of the status has a colour and an icon of its own, the archiving cannot be undone (R6.4.1, R6.5.3).
-const LOOKS: Readonly<Record<FlowCommand, CommandLook>> = {
+// Each command of the status has a colour and an icon of its own (R6.4.1, R6.5.3).
+const LOOKS: Readonly<Record<OperatingCommand, CommandLook>> = {
   start: { tone: 'go', icon: 'play' },
   resume: { tone: 'go', icon: 'play' },
   pause: { tone: 'hold', icon: 'pause' },
   stop: { tone: 'stop', icon: 'square' },
-  archive: { tone: 'destructive' },
 };
 
-type ConfirmedCommand = Extract<FlowCommand, 'stop' | 'archive' | 'start'>;
+type ConfirmedCommand = Extract<OperatingCommand, 'stop' | 'start'>;
 
-// The stop closes the positions and the archiving is final: both run only once the user confirms (ADR 0132). A start
-// on an account that trades real money is confirmed too (Bug 277).
-const needsConfirmation = (command: FlowCommand, realMoney: boolean): command is ConfirmedCommand =>
-  command === 'stop' || command === 'archive' || (command === 'start' && realMoney);
+// The stop closes the positions: it runs only once the user confirms (ADR 0132). A start on an account that trades real
+// money is confirmed too (Bug 277).
+const needsConfirmation = (
+  command: OperatingCommand,
+  realMoney: boolean,
+): command is ConfirmedCommand => command === 'stop' || (command === 'start' && realMoney);
 
 type Confirming = ConfirmedCommand | 'cash-out';
 
@@ -81,23 +79,18 @@ type FlowCommandsProps = {
   readonly realMoney: boolean;
 };
 
-/** The commands the status of the flow admits, with the reason of a command the API refuses (R2.3.4). */
+/**
+ * The commands of every day the status of the flow admits, with the reason of a command the API refuses (R2.3.4);
+ * Archivia is in the settings of the flow (ADR impostazioni-del-flusso-dall-ingranaggio).
+ */
 export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowCommandsProps) => {
   const [confirming, setConfirming] = useState<Confirming | null>(null);
   const state = useFlowState(flowId);
   const cashOut = useCashOutProfits(flowId);
   const cycleNow = useRunCycleNow(flowId);
-  const navigate = useNavigate();
-  const run = useRunFlowCommand(flowId, {
-    onSuccess: (command) => {
-      // An archived flow is no longer among the flows in use: its page would find nothing.
-      if (command === 'archive') {
-        void navigate(paths.home.getHref());
-      }
-    },
-  });
+  const run = useRunFlowCommand(flowId);
 
-  const request = (command: FlowCommand) => {
+  const request = (command: OperatingCommand) => {
     if (needsConfirmation(command, realMoney)) {
       setConfirming(command);
       return;
@@ -127,7 +120,7 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
     <div className="mt-3 space-y-2">
       {confirming === null && (
         <div role="group" aria-label="Comandi del flusso" className="flex flex-wrap gap-2">
-          {commandsAllowedIn(status).map((command) => (
+          {operatingCommandsIn(status).map((command) => (
             <CommandButton
               key={command}
               {...LOOKS[command]}
@@ -163,9 +156,6 @@ export const FlowCommands = ({ flowId, flowName, status, realMoney }: FlowComman
       )}
       {confirming === 'start' && (
         <RealMoneyStartConfirmation onConfirm={() => confirm('start')} {...confirmation} />
-      )}
-      {confirming === 'archive' && (
-        <ArchiveConfirmation onConfirm={() => confirm('archive')} {...confirmation} />
       )}
       {confirming === 'cash-out' && state.data !== undefined && (
         <CashOutConfirmation

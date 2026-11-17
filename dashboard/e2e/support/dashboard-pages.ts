@@ -104,11 +104,39 @@ export class DashboardPages {
     await this.open(`/flows/${fakePlatform.flowNamed(flowName).id}/cycles`);
   }
 
-  /** From the command Configurazione of the page of the flow, as a user gets there (R6.4.3). */
+  /** From the gear of the page of the flow, as a user gets there (ADR impostazioni-del-flusso-dall-ingranaggio). */
   async openVersionsOf(name: string): Promise<void> {
     await this.flows().getByRole('link', { name, exact: true }).click();
-    await this.page.getByRole('link', { name: 'Configurazione', exact: true }).click();
+    await this.settingsGear().click();
     await expect(this.versions()).toBeVisible();
+  }
+
+  /** The gear at the top right of the head of the flow, which opens its settings (Bug 560). */
+  settingsGear(): Locator {
+    return this.content().getByRole('link', { name: 'Impostazioni del flusso', exact: true });
+  }
+
+  /** The zone of a page with that name, a region of its content. */
+  zone(name: string): Locator {
+    return this.content().getByRole('region', { name, exact: true });
+  }
+
+  /**
+   * The reason of the refusal of a request the dashboard no longer lets the user send, sent as the API would receive it:
+   * the start of a draft that lacks something keeps its refusal on the API (R2.4.1, Bug 560).
+   */
+  async refusalOf(account: string, method: string, path: string): Promise<string> {
+    return this.page.evaluate(
+      async (request) => {
+        const answer = await fetch(request.path, {
+          method: request.method,
+          headers: { Authorization: `Bearer ${request.token}` },
+        });
+        const problem = (await answer.json()) as { detail?: string };
+        return problem.detail ?? '';
+      },
+      { token: accessTokenOf(account), method, path },
+    );
   }
 
   async compare(first: number, second: number): Promise<void> {
@@ -486,13 +514,13 @@ export class DashboardPages {
   }
 
   /**
-   * The configuration of the flow on the page, under the command Configurazione of the page of the flow (R6.4.3): from
-   * the page of the flow it chooses the command, on the configuration it stays.
+   * The configuration of the flow on the page, in the settings of the flow behind the gear of its page (ADR
+   * impostazioni-del-flusso-dall-ingranaggio): from the page of the flow it chooses the gear, on the settings it stays.
    */
   async openConfiguration(): Promise<void> {
     const configuration = this.page.getByLabel('Configurazione', { exact: true });
     if (!(await configuration.isVisible())) {
-      await this.page.getByRole('link', { name: 'Configurazione', exact: true }).click();
+      await this.settingsGear().click();
     }
     await expect(configuration).toBeVisible();
   }

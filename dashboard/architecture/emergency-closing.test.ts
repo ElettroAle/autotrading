@@ -34,7 +34,7 @@ const SHARED_CONFIRMATION = "from '@/components/ui/confirmation-dialog'";
  * voce-generale-con-la-zona-pericolosa).
  */
 const PAGES = [
-  'app/routes/app/flow.tsx',
+  'app/routes/app/flow-settings.tsx',
   'app/routes/app/accounts.tsx',
   'app/routes/app/general-settings.tsx',
 ];

@@ -107,6 +107,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "default_stop_loss_percent": "5",
         "default_take_profit_percent": None,
         "minimum_confidence": None,
+        "missing": [],
     }
     assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
 

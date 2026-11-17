@@ -18,9 +18,8 @@ const USER = 'utente';
 const THE_FLOW = 'prova-btc';
 // The least a command or a view needs to be touched with a finger (ADR viste-e-comandi-della-pagina-del-flusso).
 const TOUCHABLE_HEIGHT = 44;
-// The tabs of the page of the flow; versions and Modifica are under the command Configurazione (R6.4.3).
+// The tabs of the page of the flow; versions and Modifica are in its settings, behind the gear (Bug 560).
 const FLOW_VIEWS = ['Panoramica', 'Posizioni chiuse', 'Cicli'];
-const CONFIGURATION = 'Configurazione';
 const HISTORY_FILTERS = ['Flusso', 'Versione', 'Conto', 'Asset', 'Periodo'];
 
 type Box = {
@@ -129,23 +128,24 @@ Then(
       await expect(link).toBeVisible();
       expect((await boxOf(link)).height).toBeGreaterThanOrEqual(TOUCHABLE_HEIGHT);
     }
-    const configuration = dashboard
-      .content()
-      .getByRole('link', { name: CONFIGURATION, exact: true });
+    const settings = dashboard.settingsGear();
     await expect(views.getByRole('link', { name: /Modifica/ })).toHaveCount(0);
-    await expect(views.getByRole('link', { name: CONFIGURATION, exact: true })).toHaveCount(0);
-    await expect(configuration).toBeVisible();
-    expect((await boxOf(configuration)).height).toBeGreaterThanOrEqual(TOUCHABLE_HEIGHT);
+    await expect(views.getByRole('link', { name: 'Impostazioni del flusso' })).toHaveCount(0);
+    await expect(settings).toBeVisible();
+    expect((await boxOf(settings)).height).toBeGreaterThanOrEqual(TOUCHABLE_HEIGHT);
   },
 );
 
+// Archivia stands in the zone of danger of the settings of the flow, behind the gear (Bug 560).
 Then('Avvia risalta come comando principale e Archivia come distruttivo', async ({ dashboard }) => {
   const start = dashboard.flowCommand('Avvia');
-  const archive = dashboard.flowCommand('Archivia');
-  const other = dashboard.content().getByRole('link', { name: CONFIGURATION, exact: true });
+  const gear = dashboard.settingsGear();
   expect(isWhite(await colourOf(start, 'backgroundColor'))).toBe(false);
   expect(isWhite(await colourOf(start, 'color'))).toBe(true);
-  expect(isWhite(await colourOf(other, 'backgroundColor'))).toBe(true);
+  expect(isWhite(await colourOf(gear, 'backgroundColor'))).toBe(true);
+  await gear.click();
+  const archive = dashboard.zone('Zona pericolosa').getByRole('button', { name: 'Archivia' });
+  const other = dashboard.button('Duplica');
   expect(isRed(await colourOf(archive, 'color'))).toBe(true);
   expect(isRed(await colourOf(other, 'color'))).toBe(false);
 });
@@ -154,11 +154,11 @@ Then(
   'il titolo è {string} e lo stato viene prima della configurazione',
   async ({ dashboard }, title: string) => {
     await expect(dashboard.pageHeading()).toHaveText(title);
+    // The configuration is in the settings, behind the gear that follows the status (Bug 560).
     const status = await boxOf(dashboard.flowStatus());
-    const configuration = await boxOf(
-      dashboard.content().getByRole('link', { name: CONFIGURATION, exact: true }),
-    );
-    expect(status.y + status.height).toBeLessThanOrEqual(configuration.y);
+    const configuration = await boxOf(dashboard.settingsGear());
+    await expect(dashboard.page.getByLabel('Configurazione', { exact: true })).toHaveCount(0);
+    expect(status.x + status.width).toBeLessThanOrEqual(configuration.x);
   },
 );
 
