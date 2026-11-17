@@ -43,6 +43,7 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -99,6 +100,8 @@ class NotificationRequest(BaseModel):
     subject: str
     event: str
     headline: str | None = None
+    # The type of the event; none for the test notification (R3.5.1).
+    kind: NotificationEvent | None = None
 
 
 class BotPolling:
@@ -274,7 +277,9 @@ def create_worker_api(
 
     @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])
     def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:
-        for_tenant(TenantId(tenant_id)).notify.execute(Notification(request.subject, request.event, request.headline))
+        for_tenant(TenantId(tenant_id)).notify.execute(
+            Notification(request.subject, request.event, request.headline, request.kind)
+        )
         return {"status": "ok"}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])

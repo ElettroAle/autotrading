@@ -93,7 +93,7 @@ def test_a_position_of_a_flow_closed_by_hand_enters_its_history_with_the_manual_
 
     position = OPENING.closed(flow, "BTC", FILL, CloseReason.MANUAL)
     assert bench.history.positions == [position]
-    assert bench.notices.told == [(flow.name.value, "BTC", position.pnl)]
+    assert bench.notices.told == [(flow.name.value, "BTC", position.pnl, "comando manuale")]
 
 
 @pytest.mark.parametrize("status", [FlowStatus.ACTIVE, FlowStatus.PAUSED, FlowStatus.STOPPED])

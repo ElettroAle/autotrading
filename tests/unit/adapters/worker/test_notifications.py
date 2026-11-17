@@ -23,7 +23,7 @@ from tests.support.worker import TENANT, TOKEN, Worker
 
 CHAT = ChatId(4242)
 REFUSED = "connection refused"
-CLOSED = Notification.position_closed("alfa", "BTC", Amount(Decimal("4.20"), "USDC"))
+CLOSED = Notification.position_closed("alfa", "BTC", Amount(Decimal("4.20"), "USDC"), "stop del flusso")
 
 
 @pytest.fixture
@@ -98,7 +98,9 @@ def test_the_request_names_the_tenant_carries_the_token_and_waits_a_bounded_time
     [request] = seen
     assert request.url.path == f"/tenants/{TENANT.value}/notifications"
     assert request.headers["Authorization"] == f"Bearer {TOKEN}"
-    assert request.content == b'{"subject":"alfa","event":"chiusa BTC, PnL 4,20 USDC","headline":null}'
+    assert request.content == (
+        b'{"subject":"alfa","event":"chiusa BTC, PnL 4,20 USDC","headline":null,"kind":"chiusura di una posizione"}'
+    )
     assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS
 
 
@@ -107,3 +109,36 @@ def test_the_adapter_never_shows_its_token() -> None:
 
     assert repr(adapter) == f"WorkerNotificationAdapter(tenant_id={TENANT.value})"
     assert TOKEN not in repr(adapter)
+
+
+def test_the_test_notification_reaches_the_worker_without_a_type_of_event() -> None:
+    seen: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"status": "ok"})
+
+    client = httpx.Client(transport=httpx.MockTransport(answer), base_url="http://worker")
+
+    WorkerNotificationAdapter(client, TOKEN, TENANT).execute(Notification.test())
+
+    [request] = seen
+    assert b'"kind":null' in request.content
+
+
+def test_the_worker_refuses_a_type_of_event_it_does_not_know_and_delivers_nothing(worker: Worker) -> None:
+    client = served_in_memory(create_worker_api(TOKEN, worker.for_tenant))
+    body = {"subject": "alfa", "event": "chiusa BTC, PnL 4,20 USDC", "headline": None, "kind": "evento inventato"}
+
+    response = client.post(
+        f"/tenants/{TENANT.value}/notifications", json=body, headers={"Authorization": f"Bearer {TOKEN}"}
+    )
+
+    assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY
+    assert worker.messenger.received_by(CHAT) == []
+
+
+def test_the_worker_delivers_a_notification_with_its_type_of_event(worker: Worker) -> None:
+    adapter_on(worker).execute(Notification.cash_out_done("alfa", Amount(Decimal(118), "USDC")))
+
+    assert worker.messenger.received_by(CHAT) == ["alfa: incassati 118 USDC"]

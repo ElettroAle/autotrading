@@ -357,7 +357,7 @@ def test_each_position_closed_enters_the_history_with_the_reason_of_the_stop(flo
         )
     ]
     (position,) = flows.closed.positions
-    assert flows.notices.told == [(flow.name.value, "BTC", position.pnl)]
+    assert flows.notices.told == [(flow.name.value, "BTC", position.pnl, reason.value)]
 
 
 def test_a_stop_closes_for_the_stop_of_the_flow_unless_told_otherwise(flows: Flows) -> None:

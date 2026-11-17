@@ -30,6 +30,10 @@ class OpenIntent:
     ) -> OpenIntent:
         return cls(asset, TradeSide(side), margin_fraction, leverage, confidence, exit_plan or ExitPlan())
 
+    def margin_on(self, funds: Decimal) -> Decimal:
+        """The margin the agent asks for: its share of the money of the flow (R1.5.1, ADR 0078)."""
+        return self.margin_fraction * funds
+
 
 @dataclass(frozen=True, slots=True)
 class CloseIntent:

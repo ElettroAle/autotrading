@@ -35,3 +35,7 @@ def test_an_update_intent_may_remove_the_target() -> None:
     intent = UpdateIntent.of("BTC", None, None, None, remove_target=True)
 
     assert intent.plan_change == ExitPlanChange(remove_target=True)
+
+
+def test_the_margin_an_opening_asks_for_is_its_share_of_the_money_of_the_flow() -> None:
+    assert OpenIntent.of("BTC", "long", Decimal("0.15"), 3, 70).margin_on(Decimal(1000)) == Decimal(150)

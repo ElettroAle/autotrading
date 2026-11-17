@@ -48,6 +48,8 @@ from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCa
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
+from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
@@ -94,6 +96,8 @@ class TenantCyclePorts:
     openings_suspensions: OpeningsSuspensionPort
     loss_references: LossReferencesPort
     openings_suspended_notice: NotifyOpeningsSuspendedUseCase
+    opening_reduced_notice: NotifyOpeningReducedUseCase
+    opening_blocked_notice: NotifyOpeningBlockedUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +158,8 @@ def run_cycle_for(
             GuardFlowLossUseCase(
                 ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock
             ),
+            ports.opening_reduced_notice,
+            ports.opening_blocked_notice,
         ),
         orders=ports.send_orders,
         end=ports.end_cycle,

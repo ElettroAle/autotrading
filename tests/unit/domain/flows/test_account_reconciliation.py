@@ -9,6 +9,7 @@ from autotrading.domain.flows.account_reconciliation import (
     OutsideClosing,
 )
 from autotrading.domain.flows.balance_comparison import BalanceComparison
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
@@ -142,6 +143,27 @@ def test_a_position_of_a_flow_gone_from_the_exchange_was_closed_outside_the_plat
     assert result.closed_outside == (
         OutsideClosing(flow.id, "BTC", Decimal(-50), Decimal(2), READ_AT - timedelta(minutes=1)),
     )
+
+
+def test_a_position_of_a_flow_liquidated_was_closed_outside_by_a_liquidation() -> None:
+    flow = flow_on("BTC")
+    liquidation = a_fill("BTC", None, realized_pnl=Decimal(-48), liquidation=True)
+    recorded = (LedgerEntry(liquidation, flow.id, ExecutionKind.LIQUIDATION),)
+
+    result = reconcile([flow], recorded=recorded, last=previous({flow.id: frozenset({"BTC"})}))
+
+    [closing] = result.closed_outside
+    assert (closing.liquidation, closing.reason_told) == (True, CloseReason.LIQUIDATION)
+
+
+def test_a_position_closed_outside_without_a_liquidation_keeps_the_reason_of_a_closing_outside() -> None:
+    flow = flow_on("BTC")
+    recorded = (unattributed(a_fill("BTC", None, realized_pnl=Decimal(-7))),)
+
+    result = reconcile([flow], recorded=recorded, last=previous({flow.id: frozenset({"BTC"})}))
+
+    [closing] = result.closed_outside
+    assert (closing.liquidation, closing.reason_told) == (False, CloseReason.OUTSIDE_PLATFORM)
 
 
 def test_a_position_closed_outside_without_executions_closes_at_the_reading() -> None:

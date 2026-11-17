@@ -163,6 +163,8 @@ from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
+from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -505,6 +507,8 @@ def cycle_of(
                     NotifyOpeningsSuspendedUseCase(notify),
                     clock,
                 ),
+                NotifyOpeningReducedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                NotifyOpeningBlockedUseCase(notify),
             ),
             orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(

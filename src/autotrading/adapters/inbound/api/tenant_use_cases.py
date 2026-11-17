@@ -104,6 +104,8 @@ from autotrading.application.flows.resume_flow_openings import ResumeFlowOpening
 from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
+from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
+from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
 from autotrading.application.notifications.ports import (
     BotStartLinkPort,
     LinkCodeRepositoryPort,
@@ -325,6 +327,7 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.ledger_recording,
                     ports.clock,
+                    NotifyCashOutDoneUseCase(ports.notifier, ports.settlement_currency),
                 ),
             ),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
@@ -394,6 +397,7 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.emergency_closings,
                     ports.clock,
+                    NotifyEmergencyClosingDoneUseCase(ports.notifier),
                 ),
             ),
             preview_emergency_closing=PreviewEmergencyClosingUseCase(

@@ -60,4 +60,4 @@ class RecordManualClosingUseCase:
             return
         position = opening.closed(flow, asset, closing, CloseReason.MANUAL)
         self._closed_positions.add(position)
-        self._notice.execute(flow.name.value, asset, position.pnl)
+        self._notice.execute(flow.name.value, asset, position.pnl, CloseReason.MANUAL.value)

@@ -132,9 +132,7 @@ class RiskCheck:
         if isinstance(intent, CloseIntent):
             return self._close(intent)
         if isinstance(intent, OpenIntent) and self._state.openings_suspended is not None:
-            return BlockedDecision(
-                intent.asset, f"apertura {intent.asset} non eseguita: {self._state.openings_suspended}"
-            )
+            return BlockedDecision.opening(intent.asset, self._state.openings_suspended)
         if isinstance(intent, OpenIntent) and limits is not None:
             return self._committed(self._open(intent, limits))
         if isinstance(intent, UpdateIntent):
@@ -170,7 +168,7 @@ class RiskCheck:
         sizing = self._within_exposure(self._within_leverage(intent, limits))
         total_limit = self._total_limit(sizing.leverage)
         if total_limit is not None and total_limit.exhausted:
-            return BlockedDecision(intent.asset, f"apertura {intent.asset} non eseguita: {total_limit.reason} esaurita")
+            return BlockedDecision.opening(intent.asset, f"{total_limit.reason} esaurita")
         sizing = _within_total_exposure(sizing, total_limit)
         if intent.asset in self._state.open_assets:
             return BlockedDecision(intent.asset, f"posizione già aperta su {intent.asset}")
@@ -182,7 +180,7 @@ class RiskCheck:
 
     def _within_leverage(self, intent: OpenIntent, limits: AssetLimits) -> _Sizing:
         """The margin stays the same: a lower leverage gives a smaller position (R1.5.2)."""
-        margin = intent.margin_fraction * self._state.funds
+        margin = intent.margin_on(self._state.funds)
         sizing = _Sizing(margin * intent.leverage, intent.leverage, ())
         flow_maximum = self._policy.limits.max_leverage
         reason = f"leva oltre il massimo del flusso: {flow_maximum}"

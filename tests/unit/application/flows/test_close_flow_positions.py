@@ -42,7 +42,11 @@ class Openings:
         return OPENING if asset == "BTC" else None
 
 
-def closings_of(answers: dict[str, ClosingAnswer]) -> tuple[FlowClosings, ClosedPositionStore]:
+def closings_of(
+    answers: dict[str, ClosingAnswer],
+    reason: CloseReason = CloseReason.EMERGENCY,
+    notices: FakePositionClosedNoticeAdapter | None = None,
+) -> tuple[FlowClosings, ClosedPositionStore]:
     flow = a_flow(
         TENANT, status=FlowStatus.ACTIVE, account_id=uuid4(), configuration=a_configuration(assets=tuple(answers))
     )
@@ -52,10 +56,10 @@ def closings_of(answers: dict[str, ClosingAnswer]) -> tuple[FlowClosings, Closed
         ScriptedPositions(answers),
         Openings(),
         InMemoryClosedPositionRepositoryAdapter(store, TENANT),
-        FakePositionClosedNoticeAdapter(),
+        notices or FakePositionClosedNoticeAdapter(),
         InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
     )
-    command = CloseFlowPositionsCommand(flow, USER, CloseReason.EMERGENCY)
+    command = CloseFlowPositionsCommand(flow, USER, reason)
     return CloseFlowPositionsUseCase(ports).execute(command), store
 
 
@@ -82,3 +86,21 @@ def test_nothing_to_close_closes_nothing() -> None:
     closings, _ = closings_of({"BTC": NOTHING_TO_CLOSE})
 
     assert closings == FlowClosings()
+
+
+def test_each_closing_is_told_with_the_reason_of_the_command() -> None:
+    notices = FakePositionClosedNoticeAdapter()
+
+    _, store = closings_of({"BTC": closed_by(FILL)}, CloseReason.CASH_OUT, notices)
+
+    [position] = store.positions
+    assert notices.told == [("alfa", "BTC", position.pnl, "incasso")]
+
+
+def test_the_closings_of_an_emergency_enter_the_history_without_being_told_one_by_one() -> None:
+    notices = FakePositionClosedNoticeAdapter()
+
+    _, store = closings_of({"BTC": closed_by(FILL)}, CloseReason.EMERGENCY, notices)
+
+    assert len(store.positions) == 1
+    assert notices.told == []
