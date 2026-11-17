@@ -78,6 +78,21 @@ describe('AppHeader', () => {
     expect(backCommand()).toHaveClass('min-h-11', 'min-w-11');
   });
 
+  // ADR intestazione-su-una-riga.
+  it('keeps the bar on one line, the name of the platform cut with dots when there is no room', () => {
+    openDashboardAt(['/history']);
+
+    expect(screen.getByRole('banner')).toHaveClass('flex-nowrap');
+    expect(screen.getByRole('banner')).not.toHaveClass('flex-wrap');
+    expect(screen.getByRole('link', { name: 'AutoTrading' })).toHaveClass('truncate', 'min-w-0');
+  });
+
+  it('keeps the command to go back whole when the name of the platform is cut', () => {
+    openDashboardAt(['/history']);
+
+    expect(backCommand()).toHaveClass('shrink-0');
+  });
+
   it('shows the name of the platform without a link outside the pages of the dashboard', () => {
     render(
       <RuntimeConfigProvider config={TEST_CONFIG}>

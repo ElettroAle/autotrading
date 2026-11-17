@@ -5,6 +5,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleUser,
+  Menu,
   Pause,
   Play,
   Plus,
@@ -30,6 +31,7 @@ const DRAWINGS = {
   user: CircleUser,
   'chevron-down': ChevronDown,
   settings: Settings,
+  menu: Menu,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;
