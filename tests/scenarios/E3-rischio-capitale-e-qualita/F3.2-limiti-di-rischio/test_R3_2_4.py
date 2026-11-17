@@ -15,7 +15,7 @@ from autotrading.domain.notifications.linked_chat import LinkedChat
 from tests.fakes.cycles import FakeTransientError
 from tests.support.flow_cycle_steps import position
 from tests.support.flow_cycles import FlowCycles
-from tests.support.notifications import chat_named
+from tests.support.notifications import chat_named, told_in
 from tests.support.steps import quoted
 
 scenarios("E3-rischio-capitale-e-qualita/F3.2-limiti-di-rischio/R3.2.4-pausa-dopo-cicli-falliti-consecutivi.feature")
@@ -160,10 +160,10 @@ def paused_with_reason(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
     assert (paused.status, flow_cycles.platform.flows.pause_reasons.get(paused.id)) == (FlowStatus.PAUSED, reason)
 
 
-@then(quoted('"{user}" riceve la notifica "{text}"'))
-def notified(flow_cycles: FlowCycles, user: str, text: str) -> None:
+@then(quoted('"{user}" riceve la notifica "{title}" con le righe "{values}"'))
+def notified(flow_cycles: FlowCycles, user: str, title: str, values: str) -> None:
     received = flow_cycles.platform.messenger.received_by(chat_named(user))
-    assert text in received, received
+    assert told_in(received, title, values), received
 
 
 @then(quoted('il flusso "{flow}" non ha il massimo di cicli falliti consecutivi'))

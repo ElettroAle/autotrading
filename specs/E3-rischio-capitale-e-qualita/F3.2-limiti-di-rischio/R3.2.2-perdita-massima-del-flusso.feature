@@ -28,7 +28,7 @@ Funzionalità: R3.2.2 Perdita massima del flusso
     Dato che alle 00:00 UTC di oggi il valore di "alfa" era 1000 USDC
     Quando un ciclo di "alfa" legge il valore 940 USDC
     Allora le aperture di "alfa" sono sospese con motivo "perdita giornaliera 6% oltre il 5%"
-    E "anna" riceve la notifica "alfa: aperture sospese, perdita giornaliera 6% oltre il 5%"
+    E "anna" riceve la notifica "⏸️ alfa: aperture sospese" con le righe "Motivo: perdita giornaliera 6% oltre il 5%"
 
   Scenario: Perdita dal picco oltre la soglia
     Dato che il valore più alto raggiunto da "alfa" è 1200 USDC

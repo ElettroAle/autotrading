@@ -65,7 +65,7 @@ def test_a_notification_is_queued_for_the_chat_of_its_tenant_and_not_sent_yet(bo
 
     [message] = box.outbox.messages
     assert (message.tenant_id, message.integration) == (ANNA, CHAT_MESSAGE)
-    assert message.payload == {"chat_id": CHAT.value, "text": "alfa: ciclo fallito, timeout"}
+    assert message.payload == {"chat_id": CHAT.value, "text": FAILED.text}
     assert box.messenger.sent == []
 
 
@@ -97,8 +97,8 @@ def test_processing_delivers_each_queued_message_to_its_chat(box: Outbox) -> Non
     box.process()
 
     assert box.messenger.sent == [
-        (CHAT, "alfa: ciclo fallito, timeout"),
-        (OTHER_CHAT, "notifica di prova: le notifiche dei tuoi flussi arrivano qui"),
+        (CHAT, FAILED.text),
+        (OTHER_CHAT, Notification.test().text),
     ]
     assert box.outbox.in_state(OutboxState.DELIVERED) == box.outbox.messages
 
@@ -108,7 +108,7 @@ def test_a_message_queued_while_processing_is_delivered_at_once(box: Outbox) -> 
 
     box.notify(ANNA)
 
-    assert box.messenger.received_by(CHAT) == ["alfa: ciclo fallito, timeout"]
+    assert box.messenger.received_by(CHAT) == [FAILED.text]
 
 
 def test_a_delivery_the_messenger_does_not_take_is_recorded_and_left_to_the_retries(
@@ -136,7 +136,7 @@ def test_a_transient_failure_is_delivered_once_the_backoff_has_passed(box: Outbo
 
     box.outbox.let_backoff_pass()
 
-    assert box.messenger.received_by(CHAT) == ["alfa: ciclo fallito, timeout"]
+    assert box.messenger.received_by(CHAT) == [FAILED.text]
     [message] = box.outbox.messages
     assert box.outbox.attempts[message.id] == 2
 

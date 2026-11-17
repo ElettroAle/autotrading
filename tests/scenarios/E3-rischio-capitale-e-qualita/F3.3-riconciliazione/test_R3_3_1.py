@@ -22,7 +22,7 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from tests.support.activity import READ_AT, a_movement, an_activity
 from tests.support.decision_steps import answer, opening
 from tests.support.flow_cycles import FlowCycles
-from tests.support.notifications import chat_named
+from tests.support.notifications import chat_named, told_in
 from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 
@@ -254,9 +254,10 @@ def openings_are_not_suspended(flow_cycles: FlowCycles, first: str, second: str)
     assert not openings_suspended(flow_cycles, second)
 
 
-@then(quoted('"{user}" riceve la notifica "{text}"'))
-def user_notified(flow_cycles: FlowCycles, user: str, text: str) -> None:
-    assert text in flow_cycles.platform.messenger.received_by(chat_named(user))
+@then(quoted('"{user}" riceve la notifica "{title}" con le righe "{values}"'))
+def user_notified(flow_cycles: FlowCycles, user: str, title: str, values: str) -> None:
+    received = flow_cycles.platform.messenger.received_by(chat_named(user))
+    assert told_in(received, title, values), received
 
 
 @then(quoted('"{user}" non riceve un\'altra notifica di allarme'))

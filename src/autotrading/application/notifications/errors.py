@@ -69,6 +69,17 @@ class OutboxUnavailableError(ApplicationError):
         super().__init__("coda dei messaggi in uscita non disponibile")
 
 
+class FlowStatusUnavailableError(ApplicationError):
+    """The state of the flow could not be read: the notification leaves without it, and the failure is recorded (ADR
+    stato-del-flusso-in-ogni-notifica).
+    """
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("stato del flusso non disponibile")
+
+
 class UnknownOutboxIntegrationError(ApplicationError):
     """A queued message names an integration no port delivers: no retry can ever deliver it."""
 

@@ -33,11 +33,11 @@ Funzionalità: R3.5.2 Notifiche via email
   Scenario: Email di prova
     Dato che "anna" ha indicato l'indirizzo "anna@example.com"
     Quando "anna" chiede un'email di prova
-    Allora "anna@example.com" riceve un'email con oggetto "AutoTrading: prova delle notifiche"
+    Allora "anna@example.com" riceve un'email con oggetto "🔔 AutoTrading: prova delle notifiche"
   Scenario: Notifica ricevuta per email
     Dato che "anna" ha indicato l'indirizzo "anna@example.com"
     Quando il flusso "alfa" va in pausa per "credito esaurito"
-    Allora "anna@example.com" riceve un'email con oggetto "alfa: in pausa" e testo "alfa: in pausa, credito esaurito"
+    Allora "anna@example.com" riceve un'email con oggetto "⏸️ alfa: in pausa" e le righe "Motivo: credito esaurito"
   Scenario: Indirizzo cambiato
     Dato che "anna" ha indicato l'indirizzo "anna@example.com"
     Quando "anna" indica l'indirizzo "anna2@example.com" e il flusso "alfa" va in pausa

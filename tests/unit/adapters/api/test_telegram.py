@@ -9,6 +9,7 @@ from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.link_code import ALPHABET
+from autotrading.domain.notifications.notification import Notification
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
@@ -100,7 +101,7 @@ def test_a_test_notification_reaches_the_linked_chat_by_the_road_of_the_real_one
     response = anna.post("/telegram/test-notification")
 
     assert response.status_code == 204
-    assert platform.messenger.received_by(CHAT)[-1] == "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
+    assert platform.messenger.received_by(CHAT)[-1] == Notification.test().text
 
 
 def test_a_test_notification_without_a_linked_chat_is_a_conflict(platform: Platform, client_of: Client) -> None:

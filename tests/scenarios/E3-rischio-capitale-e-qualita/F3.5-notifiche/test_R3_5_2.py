@@ -9,11 +9,13 @@ from autotrading.application.notifications.get_notification_email import Notific
 from autotrading.application.notifications.set_notification_email import SetNotificationEmailCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.notifications.notification_event import PAUSE_ICON
 from autotrading.domain.notifications.outbox_message import EMAIL_MESSAGE
 from tests.fakes.cycles import FakePermanentError
 from tests.fakes.outbox import OutboxState
 from tests.support.decision_steps import answer, opening
 from tests.support.flow_cycles import FlowCycles
+from tests.support.notifications import told_in
 from tests.support.steps import quoted
 
 scenarios("E3-rischio-capitale-e-qualita/F3.5-notifiche/R3.5.2-notifiche-via-email.feature")
@@ -22,7 +24,7 @@ CAPITAL = Decimal(1000)
 MID_PRICE = Decimal(100000)
 OPENING_FEE = Decimal("0.07")
 PAUSE_REASON = "credito esaurito"
-PAUSED_SUBJECT = "{flow}: in pausa"
+PAUSED_SUBJECT = f"{PAUSE_ICON} {{flow}}: in pausa"
 
 
 @pytest.fixture(name="flow_cycles")
@@ -158,10 +160,10 @@ def receives_subject(flow_cycles: FlowCycles, address: str, subject: str) -> Non
     assert subject in subjects_received_by(flow_cycles, address)
 
 
-@then(quoted('"{address}" riceve un\'email con oggetto "{subject}" e testo "{text}"'))
-def receives_subject_and_text(flow_cycles: FlowCycles, address: str, subject: str, text: str) -> None:
-    received = [(email.subject, email.text) for email in flow_cycles.platform.mailer.received_by(address)]
-    assert (subject, text) in received, received
+@then(quoted('"{address}" riceve un\'email con oggetto "{subject}" e le righe "{values}"'))
+def receives_subject_and_values(flow_cycles: FlowCycles, address: str, subject: str, values: str) -> None:
+    received = [email.text for email in flow_cycles.platform.mailer.received_by(address) if email.subject == subject]
+    assert told_in(received, subject, values), received
 
 
 @then(quoted('"{address}" riceve l\'email'))

@@ -1,13 +1,13 @@
 from decimal import Decimal
 
-from autotrading.application.notifications.ports import NotifierPort
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.domain.notifications.notification import Amount, Notification
 
 
 class NotifyCashOutDoneUseCase:
     """Tells the user a cash-out of a flow was made, with the money it freed in the settlement currency (R3.5.1)."""
 
-    def __init__(self, notifier: NotifierPort, currency: str) -> None:
+    def __init__(self, notifier: NotifyFlowEventUseCase, currency: str) -> None:
         self._notifier = notifier
         self._currency = currency
 

@@ -15,6 +15,8 @@ from autotrading.domain.notifications.linked_chat import LinkedChat
 from tests.support.activity import READ_AT, a_fill, a_position, an_activity
 from tests.support.attribution import AttributionBench, amount, step
 from tests.support.flow_cycles import FlowCycles
+from tests.support.notifications import told_in
+from tests.support.steps import quoted
 
 CHAT = ChatId(4242)
 
@@ -181,9 +183,10 @@ def verification_of_no_flow(bench: AttributionBench, flow: str) -> None:
     assert bench.flow(flow).id not in bench.ledger.totals
 
 
-@then(step(r'"anna" riceve la notifica "{reason}"'))
-def notified(flow_cycles: FlowCycles, reason: str) -> None:
-    assert reason in flow_cycles.platform.messenger.received_by(CHAT)
+@then(quoted('"anna" riceve la notifica "{title}" con le righe "{values}"'))
+def notified(flow_cycles: FlowCycles, title: str, values: str) -> None:
+    received = flow_cycles.platform.messenger.received_by(CHAT)
+    assert told_in(received, title, values), received
 
 
 @then(step(r'è registrata per il conto "{account}" una posizione non attribuibile su "{asset}"'))

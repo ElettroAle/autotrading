@@ -22,7 +22,7 @@ class SendTestEmailUseCase:
     def execute(self) -> None:
         email = self._address_to_test()
         test = Notification.test()
-        self._outbox.enqueue(OutboxMessage.to_email(email, test.email_subject, test.text))
+        self._outbox.enqueue(OutboxMessage.to_email(email, test.title, test.text))
 
     def _address_to_test(self) -> NotificationEmail:
         if not self._mail_service.is_configured():

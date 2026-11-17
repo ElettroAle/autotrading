@@ -46,7 +46,7 @@ class NotifyUseCase:
             messages.append(OutboxMessage.to_chat(chat, notification.text))
         email = self._emails.get()
         if email is not None and self._mail_service.is_configured():
-            messages.append(OutboxMessage.to_email(email, notification.email_subject, notification.text))
+            messages.append(OutboxMessage.to_email(email, notification.title, notification.text))
         return messages
 
     def _enqueue(self, message: OutboxMessage, notification: Notification) -> None:

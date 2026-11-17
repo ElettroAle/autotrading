@@ -25,7 +25,7 @@ from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.activity import READ_AT, a_fill, a_position, an_activity
 from tests.support.flow_cycles import DAY, FlowCycles, at
 from tests.support.lifecycle_steps import hold_position
-from tests.support.notifications import chat_named
+from tests.support.notifications import chat_named, told_in
 from tests.support.steps import quoted
 
 scenarios("E3-rischio-capitale-e-qualita/F3.5-notifiche/R3.5.1-eventi-notificabili-completi.feature")
@@ -159,7 +159,7 @@ def events(flow_cycles: FlowCycles) -> Events:
 
 @pytest.fixture
 def notified() -> dict[str, str]:
-    """The text the scenario expects in the notification, read back for the chats that must not receive it."""
+    """The title the scenario expects of the notification, read back for the chats that must not receive it."""
     return {}
 
 
@@ -295,17 +295,17 @@ def risk_reduces_an_opening(events: Events, flow: str, asset: str) -> None:
 # Then
 
 
-@then(quoted('la chat "{chat}" riceve una notifica che contiene "{text}"'))
-def chat_receives(events: Events, notified: dict[str, str], chat: str, text: str) -> None:
-    notified["text"] = text
+@then(quoted('la chat "{chat}" riceve una notifica "{title}" con le righe "{values}"'))
+def chat_receives(events: Events, notified: dict[str, str], chat: str, title: str, values: str) -> None:
+    notified["title"] = title
     received = events.received_by(chat)
-    assert any(text in message for message in received), received
+    assert told_in(received, title, values), received
 
 
 @then(quoted('la chat "{chat}" non riceve la notifica'))
 def chat_does_not_receive(events: Events, notified: dict[str, str], chat: str) -> None:
     received = events.received_by(chat)
-    assert not any(notified["text"] in message for message in received)
+    assert not any(notified["title"] in message for message in received)
     assert received == []
 
 
@@ -313,7 +313,7 @@ def chat_does_not_receive(events: Events, notified: dict[str, str], chat: str) -
 def chat_receives_one_closing(events: Events, chat: str) -> None:
     # The account may tell its own events (an execution without an order of the platform): only the flow tells the
     # closing.
-    of_the_flow = [message for message in events.received_by(chat) if message.startswith("alfa: ")]
+    of_the_flow = [message for message in events.received_by(chat) if " alfa: " in message.splitlines()[0]]
     assert len(of_the_flow) == 1, of_the_flow
     assert "BTC" in of_the_flow[0]
 

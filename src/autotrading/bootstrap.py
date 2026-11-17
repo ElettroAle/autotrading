@@ -57,6 +57,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_openings import SqlAlchemyFlo
 from autotrading.adapters.outbound.sqlalchemy.flow_operations import SqlAlchemyFlowOperationsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_protection_levels import SqlAlchemyFlowProtectionLevelsAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.flow_status import SqlAlchemyFlowStatusAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
@@ -162,6 +163,7 @@ from autotrading.application.notifications.deliver_outbox_message import Deliver
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
 from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
@@ -258,8 +260,9 @@ def tenant_use_cases(
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
         flow_positions = CloseFlowPositionUseCase(position_closing)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
+        flow_status = SqlAlchemyFlowStatusAdapter(engine, tenant_id, HYPERLIQUID_SETTLEMENT_CURRENCY)
         closing_notice = NotifyPositionClosedUseCase(
-            notifier,
+            NotifyFlowEventUseCase(notifier, flow_status),
             HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
         flow_openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
@@ -309,6 +312,7 @@ def tenant_use_cases(
             bot_identity=bot_identity,
             linked_chats=SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
             notifier=notifier,
+            flow_status=flow_status,
             notification_emails=SqlAlchemyNotificationEmailRepositoryAdapter(engine, tenant_id),
             mail_service=mail_service,
             outbox=outbox,
@@ -425,8 +429,11 @@ def cycle_of(
         openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
         exit_plans = SqlAlchemyExitPlanRepositoryAdapter(engine, tenant_id)
         notify = notify_for(engine, notifications, tenant_id)
+        notify_flow = NotifyFlowEventUseCase(
+            notify, SqlAlchemyFlowStatusAdapter(engine, tenant_id, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        )
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
-        closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        closing_notice = NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = ReadAccountActivityUseCase(accounts, opener, activity_readers)
         ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         protections = SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)
@@ -473,8 +480,8 @@ def cycle_of(
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
-                NotifyOrderRejectedUseCase(notify),
-                NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                NotifyOrderRejectedUseCase(notify_flow),
+                NotifyPositionOpenedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
                 RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
@@ -504,11 +511,11 @@ def cycle_of(
                 GuardFlowLossUseCase(
                     SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
                     SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
-                    NotifyOpeningsSuspendedUseCase(notify),
+                    NotifyOpeningsSuspendedUseCase(notify_flow),
                     clock,
                 ),
-                NotifyOpeningReducedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                NotifyOpeningBlockedUseCase(notify),
+                NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                NotifyOpeningBlockedUseCase(notify_flow),
             ),
             orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(
@@ -538,14 +545,14 @@ def cycle_of(
         )
         cycles = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
         pause = PauseAffectedFlowsUseCase(
-            flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify)
+            flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify_flow)
         )
         guards = CycleGuards(
             cycles=cycles,
             lock=lock,
             pause=pause,
             clock=clock,
-            failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
+            failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify_flow)),
             activity=ReadFlowActivityUseCase(flows),
             consecutive_failures=PauseAfterConsecutiveFailuresUseCase(flows, cycles, pause),
         )

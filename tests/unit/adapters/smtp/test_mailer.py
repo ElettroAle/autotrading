@@ -93,6 +93,22 @@ def test_an_email_carries_sender_address_subject_and_text() -> None:
     assert message.get_content().strip() == "alfa: in pausa, credito"
 
 
+def test_an_email_with_emoji_on_several_lines_keeps_subject_and_text_intact_as_plain_text() -> None:
+    """ADR resa-della-notifica-per-telegram-ed-email: text/plain in UTF-8, the subject encoded by EmailMessage."""
+    subject = "\u23f8\ufe0f alfa: in pausa"
+    status = "Flusso: 312,40 USDC · PnL +12,40 USDC · nessuna posizione aperta · in pausa"
+    text = f"{subject}\n\nMotivo: credito esaurito\n{status}"
+
+    SmtpMailerAdapter("smtp.example", 587, SENDER, None).send(ANNA, subject, text)
+
+    [connection] = InMemorySmtpServer.opened
+    [message] = connection.messages
+    assert message["Subject"] == subject
+    assert message.get_content_type() == "text/plain"
+    assert message.get_content_charset() == "utf-8"
+    assert message.get_content() == f"{text}\n"
+
+
 def test_on_the_submission_port_the_connection_is_secured_with_starttls_and_then_closed() -> None:
     connection = sent_through(587)
 

@@ -20,7 +20,8 @@ from autotrading.domain.notifications.notification_event import NotificationEven
 from tests.support.architecture import SOURCE_ROOT
 
 NOTIFICATION = SOURCE_ROOT / "domain" / "notifications" / "notification.py"
-NO_EVENT = frozenset({"test"})
+# The test notification is no event; `told` is the one road every factory of an event takes.
+NO_EVENT = frozenset({"test", "told"})
 REALIZED_BY = {
     "PositionClosedNoticePort": NotifyPositionClosedUseCase,
     "OpeningReducedNoticePort": NotifyOpeningReducedUseCase,
@@ -34,13 +35,13 @@ WITHOUT_ITS_TYPE = """
 class Notification:
     @classmethod
     def cycle_failed(cls, flow, message):
-        return cls(flow, f"ciclo fallito, {message}")
+        return cls(flow, "ciclo fallito", (NotificationLine("Errore", message),), None, WARNING_ICON)
 """
 WITH_ITS_TYPE = """
 class Notification:
     @classmethod
     def cycle_failed(cls, flow, message):
-        return cls(flow, f"ciclo fallito, {message}", kind=NotificationEvent.CYCLE_FAILED)
+        return cls.told(NotificationEvent.CYCLE_FAILED, flow, "ciclo fallito", NotificationLine("Errore", message))
 """
 
 
@@ -61,18 +62,30 @@ def _is_classmethod(decorator: ast.expr) -> bool:
 
 
 def untyped_notifications(source: str) -> list[str]:
-    """The factories building a notification with no type of event, as name and line."""
+    """The factories building a notification without the type of its event, as name and line: by the constructor
+    rather than by `told`, which takes the type first (ADR notifica-strutturata-con-icona-titolo-e-valori).
+    """
     return [
         f"{name}:{node.lineno}"
         for name, factory in factories_of(source).items()
         if name not in NO_EVENT
         for node in ast.walk(factory)
-        if _builds_notification(node) and not any(keyword.arg == "kind" for keyword in node.keywords)
+        if _builds_by_constructor(node) or (_builds_by_told(node) and not node.args)
     ]
 
 
-def _builds_notification(node: ast.AST) -> TypeGuard[ast.Call]:
+def _builds_by_constructor(node: ast.AST) -> TypeGuard[ast.Call]:
     return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "cls"
+
+
+def _builds_by_told(node: ast.AST) -> TypeGuard[ast.Call]:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "cls"
+        and node.func.attr == "told"
+    )
 
 
 def told_events(source: str) -> set[str]:
