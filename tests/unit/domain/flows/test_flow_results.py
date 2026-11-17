@@ -10,6 +10,7 @@ from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -108,13 +109,13 @@ def test_the_results_count_the_open_positions_and_keep_the_failed_cycles_and_the
     assert (results.open_positions, results.failed_cycles, results.currency) == (2, 2, "USDC")
 
 
-def test_the_results_tell_why_the_openings_of_the_flow_are_suspended() -> None:
-    reason = "allarme di riconciliazione sul conto test-1"
+def test_the_results_carry_the_suspension_of_the_openings_of_the_flow() -> None:
+    suspension = OpeningsSuspension("perdita giornaliera 6% oltre il 5%", datetime(2026, 11, 16, tzinfo=UTC))
 
-    results = FlowResults.of(a_state(), (), 0, openings_suspended=reason)
+    results = FlowResults.of(a_state(), (), 0, openings_suspension=suspension)
 
-    assert results.openings_suspended == reason
+    assert results.openings_suspension == suspension
 
 
-def test_the_openings_are_not_suspended_unless_the_results_say_why() -> None:
-    assert FlowResults.of(a_state(), (), 0).openings_suspended is None
+def test_the_openings_are_not_suspended_unless_the_results_carry_a_suspension() -> None:
+    assert FlowResults.of(a_state(), (), 0).openings_suspension is None

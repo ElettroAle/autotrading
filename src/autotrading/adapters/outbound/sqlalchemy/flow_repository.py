@@ -27,6 +27,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelParameterValue, ModelSelection, SourceSelection
@@ -54,6 +55,9 @@ class _RiskLimitsDocument(TypedDict):
     max_leverage: int
     max_margin_exposure_percent: str | None
     max_value_exposure_percent: str | None
+    # Absent in the versions saved before the overall limits existed: no overall limit (R3.2.1).
+    max_total_margin_exposure_percent: NotRequired[str | None]
+    max_total_value_exposure_percent: NotRequired[str | None]
 
 
 class _ConfigurationDocument(TypedDict):
@@ -69,6 +73,11 @@ class _ConfigurationDocument(TypedDict):
     allocated_capital: str | None
     bring_to_minimum: NotRequired[bool]
     system_prompt: NotRequired[str | None]
+    max_consecutive_failures: NotRequired[int | None]
+    # Absent in the versions saved before the maximum losses existed: none, and the manual resume (R3.2.2).
+    max_daily_loss_percent: NotRequired[str | None]
+    max_drawdown_percent: NotRequired[str | None]
+    openings_resume: NotRequired[str]
     # Every version has them: the migration gave the versions saved before a stop loss of 5% (R3.1.2).
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
@@ -296,10 +305,16 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "max_leverage": limits.max_leverage,
             "max_margin_exposure_percent": _text(limits.max_margin_exposure_percent),
             "max_value_exposure_percent": _text(limits.max_value_exposure_percent),
+            "max_total_margin_exposure_percent": _text(limits.max_total_margin_exposure_percent),
+            "max_total_value_exposure_percent": _text(limits.max_total_value_exposure_percent),
         },
         "allocated_capital": _text(configuration.allocated_capital),
         "bring_to_minimum": configuration.bring_to_minimum,
         "system_prompt": configuration.system_prompt,
+        "max_consecutive_failures": configuration.max_consecutive_failures,
+        "max_daily_loss_percent": _text(configuration.max_daily_loss_percent),
+        "max_drawdown_percent": _text(configuration.max_drawdown_percent),
+        "openings_resume": configuration.openings_resume.value,
         "default_stop_loss_percent": str(configuration.protection_defaults.stop_loss_percent),
         "default_take_profit_percent": _text(configuration.protection_defaults.take_profit_percent),
         "minimum_confidence": None
@@ -326,12 +341,19 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
             limits["max_leverage"],
             _decimal(limits["max_margin_exposure_percent"]),
             _decimal(limits["max_value_exposure_percent"]),
+            _decimal(limits.get("max_total_margin_exposure_percent")),
+            _decimal(limits.get("max_total_value_exposure_percent")),
         ),
         allocated_capital=_decimal(document["allocated_capital"]),
         # Versions saved before the option existed read with it off, its default (ADR 0051).
         bring_to_minimum=document.get("bring_to_minimum", False),
         # Versions saved before the system prompt existed follow the default of the platform (R1.4.8).
         system_prompt=document.get("system_prompt"),
+        # Versions saved before the maximum existed have none: the flow keeps trying at every cycle (R3.2.4).
+        max_consecutive_failures=document.get("max_consecutive_failures"),
+        max_daily_loss_percent=_decimal(document.get("max_daily_loss_percent")),
+        max_drawdown_percent=_decimal(document.get("max_drawdown_percent")),
+        openings_resume=OpeningsResume(document.get("openings_resume", OpeningsResume.MANUAL.value)),
         protection_defaults=ProtectionDefaults(
             Decimal(document["default_stop_loss_percent"]), _decimal(document["default_take_profit_percent"])
         ),

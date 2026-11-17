@@ -452,6 +452,19 @@ class RecordedCycleFailuresAdapter:
         self.told.append((flow_id, reason))
 
 
+class RecordedConsecutiveFailurePausesAdapter:
+    """The failed cycles that asked for the pause after consecutive failures, with the failures told by then."""
+
+    def __init__(self, notices: RecordedCycleFailuresAdapter) -> None:
+        self.asked: list[tuple[UUID, AutotradingError]] = []
+        self.told_before: list[list[tuple[UUID, str]]] = []
+        self._notices = notices
+
+    def execute(self, flow_id: UUID, error: AutotradingError) -> None:
+        self.asked.append((flow_id, error))
+        self.told_before.append(list(self._notices.told))
+
+
 class InMemoryCycleCheckpointsAdapter:
     """The checkpoints of the cycles kept in memory, serialized as the checkpointer in PostgreSQL serializes them."""
 

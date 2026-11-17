@@ -8,6 +8,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -55,14 +56,26 @@ class CycleFlow:
     def _funds(self) -> CycleFunds:
         return CycleFunds(self.attributed, self.account.available_margin)
 
-    def risk_state(self) -> RiskState:
+    def risk_state(self, *, loss_suspension: OpeningsSuspension | None = None) -> RiskState:
+        """The margin of the open positions is the one the exchange declares, as in the liquidity (ADR 0067); their
+        value is at the mark price (R3.2.1). The openings are suspended by what the guard of the losses found (R3.2.2)
+        or by an alarm of reconciliation on the account (R3.3.1).
+        """
+        attributed = self.attributed
+        suspension = self.openings_suspension(loss_suspension)
         return RiskState(
             currency=self.account.currency,
-            funds=self.attributed.funds,
+            funds=attributed.funds,
             available_liquidity=self.available_liquidity,
             open_positions=frozendict({position.asset: position.side for position in self.positions}),
-            openings_suspended=None if self.alarm is None else self.alarm.suspension_reason(self.account_name),
+            open_margin=attributed.margin,
+            open_value=sum((position.size * position.mark_price for position in attributed.positions), Decimal(0)),
+            openings_suspended=None if suspension is None else suspension.blocked_reason,
         )
+
+    def openings_suspension(self, loss_suspension: OpeningsSuspension | None) -> OpeningsSuspension | None:
+        alarm_suspension = None if self.alarm is None else self.alarm.suspension(self.account_name)
+        return OpeningsSuspension.first_of(loss_suspension, alarm_suspension)
 
     @property
     def sources(self) -> tuple[str, ...]:

@@ -12,14 +12,17 @@ class AdjustmentKind(StrEnum):
     LEVERAGE = "leva"
     MARGIN = "margine"
     VALUE = "valore"
+    TOTAL_MARGIN = "margine complessivo"
+    TOTAL_VALUE = "valore complessivo"
     EXIT_PLAN = "piano di uscita"
 
 
 @dataclass(frozen=True, slots=True)
 class Adjustment:
-    """A change the risk check made to an opening, recorded with what the agent asked and why (R1.5.1-R1.5.4).
+    """A change the risk check made to an opening, recorded with what the agent asked and why.
 
-    A level of the exit plan incoherent with the side is removed: nothing comes after it (R3.1.1).
+    Per operation (R1.5.1-R1.5.4) or on the sum of the open positions of the flow (R3.2.1). A level of the exit plan
+    incoherent with the side is removed: nothing comes after it (R3.1.1).
     """
 
     kind: AdjustmentKind

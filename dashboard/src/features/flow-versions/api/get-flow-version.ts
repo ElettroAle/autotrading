@@ -21,6 +21,8 @@ const configurationSchema = z.object({
     max_leverage: z.number().nullable(),
     max_margin_exposure_percent: z.string().nullable(),
     max_value_exposure_percent: z.string().nullable(),
+    max_total_margin_exposure_percent: z.string().nullable(),
+    max_total_value_exposure_percent: z.string().nullable(),
   }),
   default_stop_loss_percent: z.string(),
   default_take_profit_percent: z.string().nullable(),
@@ -29,6 +31,10 @@ const configurationSchema = z.object({
   bring_to_minimum: z.boolean(),
   system_prompt: z.string(),
   system_prompt_is_default: z.boolean(),
+  max_consecutive_failures: z.number().nullable(),
+  max_daily_loss_percent: z.string().nullable(),
+  max_drawdown_percent: z.string().nullable(),
+  openings_resume: z.enum(['manual', 'next_day']),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

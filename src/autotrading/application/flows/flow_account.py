@@ -26,7 +26,9 @@ def read_free_capital(
     totals = accounts.ledger.totals_of(flow_ids)
     changes = flows.capital_changes_of(flow_ids)
     states = [
-        FlowState.attributed(flow, activity, totals.get(flow.id) or FlowTotals(flow.id), changes.get(flow.id, ()))
+        FlowState.attributed(
+            flow, activity, totals.get(flow.id) or FlowTotals(flow.id), capital_changes=changes.get(flow.id, ())
+        )
         for flow in holding
     ]
     return FreeCapital.of(activity.balance, activity.currency, states)

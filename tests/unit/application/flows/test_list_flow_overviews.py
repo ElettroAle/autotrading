@@ -25,6 +25,7 @@ from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnap
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -53,7 +54,11 @@ class Bench:
         self.equity = InMemoryEquitySnapshotRepositoryAdapter(EquitySnapshotStore(), TENANT)
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         suspension = ReadOpeningsSuspensionUseCase(
-            flows, InMemoryReconciliationRepositoryAdapter(), FakeAccountThresholdsAdapter({ACCOUNT: "test-1"})
+            flows,
+            InMemoryOpeningsSuspensionAdapter(self.store, TENANT),
+            InMemoryReconciliationRepositoryAdapter(),
+            FakeAccountThresholdsAdapter({ACCOUNT: "test-1"}),
+            lambda: NOW,
         )
         results = ReadFlowResultsUseCase(
             ReadFlowStateUseCase(

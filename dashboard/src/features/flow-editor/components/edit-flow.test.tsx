@@ -26,6 +26,8 @@ const giveAlfa = () =>
       max_leverage: 3,
       max_margin_exposure_percent: '10',
       max_value_exposure_percent: null,
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: null,
     },
     allocated_capital: '300',
   });
@@ -240,6 +242,8 @@ describe('EditFlow', () => {
         max_leverage: 3,
         max_margin_exposure_percent: '20',
         max_value_exposure_percent: '40',
+        max_total_margin_exposure_percent: null,
+        max_total_value_exposure_percent: null,
       },
     });
     await renderApp({ account: 'anna', url: EDIT_ALFA });
@@ -254,6 +258,8 @@ describe('EditFlow', () => {
       max_leverage: 3,
       max_margin_exposure_percent: '20',
       max_value_exposure_percent: null,
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: null,
     });
     await userEvent.clear(field('Esposizione massima del margine (%)'));
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
@@ -264,6 +270,37 @@ describe('EditFlow', () => {
       ),
     );
     expect(configurationOf(fakePlatform.flowNamed('alfa')).version).toBe(2);
+  });
+
+  // ADR esposizione-complessiva-nel-controllo-del-rischio: the overall limits beside the limits per operation.
+  it('changes and removes an overall exposure limit, as a new version', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', {
+      account_id: 'account-principale',
+      risk_limits: {
+        max_leverage: 3,
+        max_margin_exposure_percent: '10',
+        max_value_exposure_percent: null,
+        max_total_margin_exposure_percent: '30',
+        max_total_value_exposure_percent: null,
+      },
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const totalMargin = await screen.findByLabelText(
+      'Esposizione complessiva massima del margine (%)',
+    );
+    expect(totalMargin).toHaveValue('30');
+    await userEvent.clear(totalMargin);
+    await userEvent.type(field('Esposizione complessiva massima del valore (%)'), '150,5');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).risk_limits).toMatchObject({
+      max_total_margin_exposure_percent: null,
+      max_total_value_exposure_percent: '150.5',
+    });
   });
 
   it('says there is nothing to save when nothing changed', async () => {

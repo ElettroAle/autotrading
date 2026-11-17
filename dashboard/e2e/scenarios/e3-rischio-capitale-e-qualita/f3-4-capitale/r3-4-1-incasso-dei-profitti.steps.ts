@@ -1,12 +1,11 @@
-import { expect } from '@playwright/test';
-
-import { fakePlatform, flowIdOf } from '@/testing/mocks/platform';
+import { fakePlatform } from '@/testing/mocks/platform';
 import { anOpenPosition } from '@/testing/mocks/positions';
 
-import { Given, Then, When } from '../../../support/fixtures';
+import { Given, When } from '../../../support/fixtures';
 import { onFlowPage } from '../../../support/flow-page';
 
-// R3.4.1, ADR incasso-dei-profitti-nella-dashboard: the other scenarios run on the use cases with pytest-bdd.
+// R3.4.1, ADR incasso-dei-profitti-nella-dashboard: the other scenarios run on the use cases with pytest-bdd. The
+// confirmation is checked by the steps it shares with the emergency closing (e2e/support/confirmation.steps.ts).
 Given(
   'che {string} ha sul conto {string} il flusso attivo {string} con capitale allocato {int} USDC',
   async ({ memory }, account: string, accountName: string, flow: string, capital: number) => {
@@ -33,22 +32,5 @@ When(
   async ({ dashboard, memory }, account: string, flow: string) => {
     await onFlowPage(dashboard, memory, account, flow);
     await dashboard.page.getByRole('button', { name: 'Incassa i profitti' }).click();
-  },
-);
-
-Then('la dashboard chiede conferma con {string}', async ({ dashboard }, question: string) => {
-  const confirmation = dashboard.page.getByRole('alertdialog', { name: "Conferma dell'incasso" });
-  await expect(confirmation).toContainText(question);
-});
-
-Then(
-  'nessuna posizione viene chiusa finché {string} non conferma',
-  async ({ dashboard, memory }, account: string) => {
-    expect(memory.account).toBe(account);
-    await expect(
-      dashboard.page.getByRole('alertdialog', { name: "Conferma dell'incasso" }),
-    ).toBeVisible();
-    expect(fakePlatform.cashOutsOf(memory.flow)).toBe(0);
-    expect(fakePlatform.openPositionsOf(flowIdOf(memory.flow))).toHaveLength(1);
   },
 );

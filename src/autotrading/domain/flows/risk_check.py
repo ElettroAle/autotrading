@@ -37,14 +37,17 @@ class RiskState:
 
     Quotas and percentage limits are measured on the money of the flow, not on the capital allocated to it: after
     losses the openings shrink, after gains they grow (ADR 0078). The side of each open position checks the levels of
-    an update of its exit plan (R3.1.3). With an alarm of reconciliation on its account the openings of the flow are
-    suspended, with the reason (R3.3.1).
+    an update of its exit plan (R3.1.3). The margin and the value of its open positions are what the overall exposure
+    limits measure (R3.2.1). Suspended openings, for maximum loss (R3.2.2) or for an alarm of reconciliation on the
+    account (R3.3.1), block every opening of the cycle with the reason of the suspension.
     """
 
     currency: str
     funds: Decimal
     available_liquidity: Decimal
     open_positions: Mapping[str, TradeSide]
+    open_margin: Decimal = Decimal(0)
+    open_value: Decimal = Decimal(0)
     openings_suspended: str | None = None
 
     @property
@@ -73,6 +76,27 @@ class _ExposureLimit:
 
 
 @dataclass(frozen=True, slots=True)
+class _TotalExposureLimit:
+    """The largest value an overall exposure limit still allows for an opening at a given leverage: the residual."""
+
+    measure: AdjustmentKind
+    percent: Decimal
+    value_cap: Decimal
+
+    @property
+    def kind(self) -> AdjustmentKind:
+        return AdjustmentKind.TOTAL_MARGIN if self.measure is AdjustmentKind.MARGIN else AdjustmentKind.TOTAL_VALUE
+
+    @property
+    def exhausted(self) -> bool:
+        return self.value_cap <= 0
+
+    @property
+    def reason(self) -> str:
+        return f"esposizione complessiva del {self.measure.value} al {number_text(self.percent)}%"
+
+
+@dataclass(frozen=True, slots=True)
 class _Sizing:
     value: Decimal
     leverage: int
@@ -92,19 +116,25 @@ class RiskCheck:
     An opening the agent is less convinced of than the minimum confidence of the flow is blocked before any of them
     (R3.1.4). An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
     The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
-    so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065).
+    so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065). The overall
+    exposure limits come after the limit per operation and the openings consume their residual in the same order
+    (R3.2.1).
     """
 
     def __init__(self, policy: RiskPolicy, state: RiskState) -> None:
         self._policy = policy
         self._state = state
         self._liquidity = state.available_liquidity
+        self._open_margin = state.open_margin
+        self._open_value = state.open_value
 
     def outcome(self, intent: TradeIntent, limits: AssetLimits | None) -> RiskOutcome:
         if isinstance(intent, CloseIntent):
             return self._close(intent)
         if isinstance(intent, OpenIntent) and self._state.openings_suspended is not None:
-            return BlockedDecision(intent.asset, self._state.openings_suspended)
+            return BlockedDecision(
+                intent.asset, f"apertura {intent.asset} non eseguita: {self._state.openings_suspended}"
+            )
         if isinstance(intent, OpenIntent) and limits is not None:
             return self._committed(self._open(intent, limits))
         if isinstance(intent, UpdateIntent):
@@ -114,6 +144,8 @@ class RiskCheck:
     def _committed(self, outcome: RiskOutcome) -> RiskOutcome:
         if isinstance(outcome, ApprovedOpening):
             self._liquidity -= outcome.margin
+            self._open_margin += outcome.margin
+            self._open_value += outcome.value
         return outcome
 
     def _close(self, intent: CloseIntent) -> RiskOutcome:
@@ -136,6 +168,10 @@ class RiskCheck:
         if minimum is not None and not minimum.admits(intent.confidence):
             return BlockedDecision.below_minimum_confidence(intent.asset, intent.confidence, minimum)
         sizing = self._within_exposure(self._within_leverage(intent, limits))
+        total_limit = self._total_limit(sizing.leverage)
+        if total_limit is not None and total_limit.exhausted:
+            return BlockedDecision(intent.asset, f"apertura {intent.asset} non eseguita: {total_limit.reason} esaurita")
+        sizing = _within_total_exposure(sizing, total_limit)
         if intent.asset in self._state.open_assets:
             return BlockedDecision(intent.asset, f"posizione già aperta su {intent.asset}")
         if sizing.margin > self._liquidity:
@@ -180,12 +216,35 @@ class RiskCheck:
         ]
         return min(configured, key=lambda limit: limit.value_cap)
 
+    def _total_limit(self, leverage: int) -> _TotalExposureLimit | None:
+        """With both overall limits configured, the one leaving the smaller residual wins (R3.2.1)."""
+        funds = self._state.funds
+        limits = self._policy.limits
+        configured = [
+            _TotalExposureLimit(
+                AdjustmentKind.MARGIN, percent, (funds * percent / HUNDRED - self._open_margin) * leverage
+            )
+            for percent in (limits.max_total_margin_exposure_percent,)
+            if percent is not None
+        ] + [
+            _TotalExposureLimit(AdjustmentKind.VALUE, percent, funds * percent / HUNDRED - self._open_value)
+            for percent in (limits.max_total_value_exposure_percent,)
+            if percent is not None
+        ]
+        return min(configured, key=lambda limit: limit.value_cap, default=None)
+
+    def _exposure_cap(self, leverage: int) -> Decimal:
+        """The largest value every exposure limit allows, per operation and overall."""
+        cap = self._binding_limit(leverage).value_cap
+        total_limit = self._total_limit(leverage)
+        return cap if total_limit is None else min(cap, total_limit.value_cap)
+
     def _at_minimum(self, intent: OpenIntent, sizing: _Sizing, limits: AssetLimits) -> RiskOutcome:
         minimum = limits.min_order_value
         if not self._policy.bring_to_minimum:
             reason = f"valore sotto il minimo dell'exchange per {intent.asset}: {self._money(minimum)}"
             return BlockedDecision(intent.asset, reason)
-        if minimum > self._binding_limit(sizing.leverage).value_cap:
+        if minimum > self._exposure_cap(sizing.leverage):
             return BlockedDecision(intent.asset, "minimo dell'exchange oltre il limite di esposizione")
         raised = sizing.adjusted(
             minimum,
@@ -201,6 +260,17 @@ class RiskCheck:
 
     def _money(self, amount: Decimal) -> str:
         return f"{money_text(amount)} {self._state.currency}"
+
+
+def _within_total_exposure(sizing: _Sizing, limit: _TotalExposureLimit | None) -> _Sizing:
+    """An opening beyond the residual is reduced to it, at its leverage (R3.2.1)."""
+    if limit is None or sizing.value <= limit.value_cap:
+        return sizing
+    if limit.measure is AdjustmentKind.MARGIN:
+        adjustment = Adjustment(limit.kind, sizing.margin, limit.value_cap / sizing.leverage, limit.reason)
+    else:
+        adjustment = Adjustment(limit.kind, sizing.value, limit.value_cap, limit.reason)
+    return sizing.adjusted(limit.value_cap, sizing.leverage, adjustment)
 
 
 def _approved(intent: OpenIntent, sizing: _Sizing, limits: AssetLimits) -> ApprovedOpening:

@@ -15,6 +15,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -29,9 +30,13 @@ CONFIGURATION = replace(
     model=ModelSelection("openrouter/deepseek-chat", {"temperature": Decimal("0.70"), "reasoning_effort": "1"}),
     sources=(SourceSelection("notizie", 7, {"hours": 6}),),
     instructions="prudente",
-    risk_limits=RiskLimits(3, None, Decimal("12.5")),
+    risk_limits=RiskLimits(3, None, Decimal("12.5"), Decimal("30.5"), Decimal(200)),
     bring_to_minimum=True,
     system_prompt="{instructions} su {assets}",
+    max_consecutive_failures=3,
+    max_daily_loss_percent=Decimal("5.5"),
+    max_drawdown_percent=Decimal(10),
+    openings_resume=OpeningsResume.NEXT_DAY,
     protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
     minimum_confidence=MinimumConfidence(60),
 )
@@ -47,10 +52,20 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         },
         "sources": [{"name": "notizie", "weight": 7, "parameters": {"hours": 6}}],
         "instructions": "prudente",
-        "risk_limits": {"max_leverage": 3, "max_margin_exposure_percent": None, "max_value_exposure_percent": "12.5"},
+        "risk_limits": {
+            "max_leverage": 3,
+            "max_margin_exposure_percent": None,
+            "max_value_exposure_percent": "12.5",
+            "max_total_margin_exposure_percent": "30.5",
+            "max_total_value_exposure_percent": "200",
+        },
         "allocated_capital": "400.50",
         "bring_to_minimum": True,
         "system_prompt": "{instructions} su {assets}",
+        "max_consecutive_failures": 3,
+        "max_daily_loss_percent": "5.5",
+        "max_drawdown_percent": "10",
+        "openings_resume": "next_day",
         "default_stop_loss_percent": "2.5",
         "default_take_profit_percent": "10",
         "minimum_confidence": 60,
@@ -101,6 +116,37 @@ def test_a_version_saved_before_the_system_prompt_follows_the_default() -> None:
     del document["system_prompt"]
 
     assert configuration_of(1, document).system_prompt is None
+
+
+def test_a_version_saved_without_maximum_of_consecutive_failures_has_none() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    del document["max_consecutive_failures"]
+
+    assert configuration_of(1, document).max_consecutive_failures is None
+
+
+def test_a_version_saved_before_the_maximum_losses_has_none_and_resumes_by_hand() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    for key in ("max_daily_loss_percent", "max_drawdown_percent", "openings_resume"):
+        del document[key]
+
+    configuration = configuration_of(1, document)
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (None, None, OpeningsResume.MANUAL)
+
+
+def test_a_version_saved_without_overall_exposure_limits_has_none() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    del document["risk_limits"]["max_total_margin_exposure_percent"]
+    del document["risk_limits"]["max_total_value_exposure_percent"]
+
+    limits = configuration_of(1, document).risk_limits
+
+    assert (limits.max_total_margin_exposure_percent, limits.max_total_value_exposure_percent) == (None, None)
 
 
 def test_a_version_without_default_take_profit_reads_back_without_it() -> None:
