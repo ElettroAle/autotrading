@@ -9,6 +9,8 @@ Funzionalità: R1.4.6 Costo delle chiamate al modello
   il flusso. Il costo è quello riportato dal fornitore; se il fornitore non lo riporta, si calcola dai prezzi
   del catalogo, e se neppure quelli sono noti il costo si registra come non disponibile.
   Per ogni flusso è consultabile il costo totale dall'avvio e per giorno UTC.
+  Anche una chiamata che il ciclo non può usare registra l'uso riportato dal fornitore; una chiamata partita di cui
+  nessuno conosce il costo conta tra le chiamate senza costo noto (Bug 541).
 
   Fuori ambito: limiti di spesa sulla piattaforma, stima del costo prima del salvataggio della configurazione.
 
@@ -36,3 +38,15 @@ Funzionalità: R1.4.6 Costo delle chiamate al modello
     Quando "anna" consulta il costo del flusso "alfa"
     Allora il costo totale dall'avvio è 0,03 USD
     E il costo di ieri è 0,02 USD e quello di oggi 0,01 USD
+
+  Scenario: Chiamata pagata senza risposta utilizzabile
+    Dato che il fornitore riporta per la chiamata 3000 token in ingresso, 4000 in uscita e costo 0,002 USD senza testo di risposta
+    Quando il ciclo del flusso "alfa" chiede la decisione all'agente
+    Allora il ciclo fallisce nel passo della decisione dell'agente
+    E il ciclo registra 3000 token in ingresso, 4000 in uscita e costo 0,002 USD
+
+  Scenario: Chiamata senza risposta dal fornitore
+    Dato che il fornitore non risponde entro il tempo massimo
+    Quando il ciclo del flusso "alfa" chiede la decisione all'agente
+    Allora il ciclo fallisce nel passo della decisione dell'agente
+    E il costo del flusso conta una chiamata senza costo noto
