@@ -9,7 +9,11 @@ from uuid import UUID
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from autotrading.application.agent.errors import ModelUnavailableError
+from autotrading.application.agent.errors import (
+    ModelCreditExhaustedError,
+    ModelKeyRejectedError,
+    ModelUnavailableError,
+)
 from autotrading.application.flows.errors import CycleFlowNotFoundError
 from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.application.flows.list_flow_overviews import FlowOverview, ListFlowOverviewsCommand
@@ -148,6 +152,39 @@ def provider_reports_usage_without_text(records: Records, tokens_in: str, tokens
     )
 
 
+def _temporary_error(message: str, tokens_in: str, tokens_out: str, cost: str) -> ModelUnavailableError:
+    usage = ModelUsage(int(tokens_in), int(tokens_out), amount(cost))
+    return ModelUnavailableError(ProviderName("openrouter"), message, usage=usage, sent=True)
+
+
+TEMPORARY_ERROR = (
+    r"l'errore temporaneo "
+    r'"(?P<message>[^"]+)"'
+    r" riportando (?P<tokens_in>\d+) token in ingresso, "
+    r"(?P<tokens_out>\d+) in uscita e costo (?P<cost>[\d,]+) USD$"
+)
+
+
+@given(parsers.re(r"^che il fornitore risponde alla prima chiamata con " + TEMPORARY_ERROR))
+def provider_fails_first_call(records: Records, message: str, tokens_in: str, tokens_out: str, cost: str) -> None:
+    records.flow_cycles.model.first_failures.append(_temporary_error(message, tokens_in, tokens_out, cost))
+
+
+@given(parsers.re(r"^che il fornitore risponde a ogni chiamata con " + TEMPORARY_ERROR))
+def provider_fails_every_call(records: Records, message: str, tokens_in: str, tokens_out: str, cost: str) -> None:
+    records.flow_cycles.model.failure = _temporary_error(message, tokens_in, tokens_out, cost)
+
+
+@given("che il fornitore rifiuta la chiave")
+def provider_rejects_key(records: Records) -> None:
+    records.flow_cycles.model.failure = ModelKeyRejectedError(ProviderName("openrouter"))
+
+
+@given("che il fornitore dichiara il credito esaurito")
+def provider_credit_exhausted(records: Records) -> None:
+    records.flow_cycles.model.failure = ModelCreditExhaustedError(ProviderName("openrouter"))
+
+
 @given("che il fornitore non risponde entro il tempo massimo")
 def provider_times_out(records: Records) -> None:
     records.flow_cycles.model.failure = ModelUnavailableError(
@@ -283,6 +320,32 @@ def fails_in_decision(records: Records) -> None:
     assert record.outcome is CycleOutcome.FAILED
     assert record.failure is not None
     assert record.failure.step is CycleStep.AGENT_DECISION
+
+
+@then(quoted('il ciclo fallisce nel passo della decisione dell\'agente con il motivo "{reason}"'))
+def fails_in_decision_with_reason(records: Records, reason: str) -> None:
+    record = recorded(records)
+    assert record.failure is not None
+    assert record.failure.step is CycleStep.AGENT_DECISION
+    assert reason in record.failure.message
+
+
+@then("il ciclo si conclude con la decisione dell'agente")
+def completes_with_decision(records: Records) -> None:
+    record = recorded(records)
+    assert record.outcome is CycleOutcome.COMPLETED
+    assert record.document(CycleStep.AGENT_DECISION) is not None
+
+
+CALLS = r"^il fornitore riceve (?P<count>\d+) chiamat[ae] (?:con attese di (?P<pauses>.+) secondi|senza attese)$"
+
+
+@then(parsers.re(CALLS))
+def provider_receives_calls(records: Records, count: str, pauses: str | None) -> None:
+    flow_cycles = records.flow_cycles
+    waited = [] if pauses is None else [float(each) for each in pauses.split(" e ")]
+    assert len(flow_cycles.model.calls) == int(count)
+    assert flow_cycles.pause.pauses == waited
 
 
 @then("il costo del flusso conta una chiamata senza costo noto")

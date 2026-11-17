@@ -4,6 +4,7 @@ import { ActionLabel } from '@/components/ui/action-label';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DirectionLabel } from '@/components/ui/direction-label';
 import { ErrorMessage } from '@/components/ui/error-message';
+import { ExpandableText } from '@/components/ui/expandable-text';
 import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import { isComplete, usePeriod, type Period } from '@/components/ui/period-selector/use-period';
@@ -12,7 +13,6 @@ import { useFlowAssets } from '@/hooks/use-flow-assets';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
 import { formatInstant } from '@/utils/format-instant';
 import { searchWithPage } from '@/utils/page-number';
-import { shortenText } from '@/utils/shorten-text';
 
 import { useDecisions, type DatedDecision } from '../api/list-decisions';
 
@@ -49,7 +49,7 @@ const filtersFor = (assets: readonly string[]): TableFilter[] => [
   },
 ];
 
-// The values are the API's: the table only shortens the reasoning, the detail of the cycle shows it whole.
+// The values are the API's: the table shortens the reasoning, which opens whole in its row (ADR testo-lungo-espandibile).
 const COLUMNS: DataTableColumn<DatedDecision>[] = [
   { header: 'Istante', cell: (decision) => formatInstant(decision.planned_at) },
   { header: 'Asset', cell: (decision) => decision.asset },
@@ -64,7 +64,10 @@ const COLUMNS: DataTableColumn<DatedDecision>[] = [
     cell: (decision) =>
       decision.confidence === null ? NOT_AVAILABLE : String(decision.confidence),
   },
-  { header: 'Ragionamento', cell: (decision) => shortenText(decision.reasoning) },
+  {
+    header: 'Ragionamento',
+    cell: (decision) => <ExpandableText text={decision.reasoning} />,
+  },
 ];
 
 const countOf = (total: number): string => (total === 1 ? '1 decisione' : `${total} decisioni`);

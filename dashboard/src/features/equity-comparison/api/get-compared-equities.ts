@@ -29,7 +29,7 @@ export const useComparedEquities = (flowIds: readonly string[], period: Period) 
     queries: flowIds.map((flowId) => {
       const path = equityPath(flowId, period);
       return {
-        ...pageDataQuery('compared-equity', path),
+        ...pageDataQuery('compared-equity', flowId, path),
         queryFn: async () =>
           readData(
             await api.GET('/flows/{flow_id}/equity', {
