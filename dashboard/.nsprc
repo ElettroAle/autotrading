@@ -1,0 +1,7 @@
+{
+  "GHSA-fc5q-39xc-vjpf": {
+    "active": true,
+    "notes": "Aggiunta il 2026-11-17. ReDoS in picomatch: nessuna correzione, la 4.0.7 è l'ultima versione ed è vulnerabile. Arriva solo dagli strumenti di sviluppo (vite, vitest, eslint, Playwright), non nell'immagine: npm audit --omit=dev non trova vulnerabilità.",
+    "expiry": "2026-12-01"
+  }
+}
