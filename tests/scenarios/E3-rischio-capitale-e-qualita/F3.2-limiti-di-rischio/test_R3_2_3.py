@@ -43,6 +43,8 @@ scenarios("E3-rischio-capitale-e-qualita/F3.2-limiti-di-rischio/R3.2.3-chiusura-
 
 STOP_PRICE = Decimal(95000)
 EMERGENCY_COMMAND = "Chiusura di emergenza"
+# The emergency closing of a flow sits with Archivia at the bottom of the settings of the flow (Bug 560).
+FLOW_ZONE = "Zona pericolosa"
 
 
 @dataclass
@@ -234,8 +236,8 @@ def choose_on_account(emergency: Emergency, platform: Platform, user: str, accou
     )
 
 
-@when(quoted('"{user}" apre nella dashboard la pagina del flusso "{name}"'))
-def open_flow_page(emergency: Emergency, user: str, name: str) -> None:
+@when(quoted('"{user}" apre nella dashboard le impostazioni del flusso "{name}"'))
+def open_flow_settings(emergency: Emergency, user: str, name: str) -> None:
     flow = emergency.flow(name)
     emergency.open_page(user, {f"{EMERGENCY_COMMAND} del flusso {name}": EmergencyScope(flow_id=flow.id)})
 
@@ -259,8 +261,8 @@ def open_general_settings(emergency: Emergency, user: str) -> None:
 
 @when(quoted('"{user}" sceglie la chiusura di emergenza del flusso "{name}" nel riquadro "{zone}"'))
 def choose_flow_in_zone(emergency: Emergency, user: str, name: str, zone: str) -> None:
-    assert zone == "Zona di emergenza"
-    open_flow_page(emergency, user, name)
+    assert zone == FLOW_ZONE
+    open_flow_settings(emergency, user, name)
     positions = emergency.zone[f"{EMERGENCY_COMMAND} del flusso {name}"]
     emergency.confirmation = f"Chiudere {_positions_text(positions)} del flusso {name} e metterlo in pausa?"
 
@@ -377,7 +379,7 @@ def nothing_closed(emergency: Emergency, platform: Platform, user: str) -> None:
 
 @then(quoted('la chiusura di emergenza del flusso "{name}" sta nel riquadro "{zone}" in fondo alla pagina'))
 def flow_closing_in_zone(emergency: Emergency, name: str, zone: str) -> None:
-    assert zone == "Zona di emergenza"
+    assert zone == FLOW_ZONE
     assert emergency.zone == {f"{EMERGENCY_COMMAND} del flusso {name}": 1}
 
 
@@ -405,8 +407,8 @@ def zone_alone(emergency: Emergency, zone: str) -> None:
     assert len(emergency.zone) == 1
 
 
-@then(quoted('i comandi del flusso "{name}" non contengono la chiusura di emergenza'))
-def flow_commands_without_emergency(emergency: Emergency, name: str) -> None:
+@then(quoted('la pagina del flusso "{name}" non contiene la chiusura di emergenza'))
+def flow_page_without_emergency(emergency: Emergency, name: str) -> None:
     # The commands of the flow are those its status admits; the emergency closing is none of them.
     status = emergency.flow(name).status
     assert [action for action in FlowAction if status in action.starts_from] == [FlowAction.PAUSE, FlowAction.STOP]

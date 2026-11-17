@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
+import { Icon } from '@/components/ui/icons/icon';
 import { Loading } from '@/components/ui/loading';
 import { isRealMoney, TestNetworkNotice } from '@/components/ui/network-notice';
 import { paths } from '@/config/paths';
@@ -34,8 +35,8 @@ type FlowViewProps = {
 
 /**
  * The head of the page of the flow: its status with the commands of the status, the warning of the network and the
- * openings suspended (R3.3.2), then the command Configurazione, which holds what does not depend on the period (R6.4.3, ADR
- * pagina-del-flusso-a-schede-sotto-un-periodo-comune).
+ * openings suspended (R3.3.2), with a gear at the top right that opens the settings of the flow, a page and not a tab,
+ * so reading and writing do not mix (ADR impostazioni-del-flusso-dall-ingranaggio).
  */
 export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) => {
   const flows = useFlows();
@@ -58,28 +59,33 @@ export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) =>
       <section aria-label={flow.name} className="mb-4 rounded border border-slate-200 bg-white p-4">
         {/* One gap between the status and the notice of the network, with no margin of their own (ADR
             spaziatura-tra-stato-e-avviso-della-rete). */}
-        <div
-          role="group"
-          aria-label="Stato del flusso"
-          className="flex flex-wrap items-center gap-2"
-        >
-          <FlowStatus flow={flow} />
-          {account !== undefined && !realMoney ? (
-            <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
-          ) : null}
+        <div className="flex items-start gap-2">
+          <div
+            role="group"
+            aria-label="Stato del flusso"
+            className="flex flex-wrap items-center gap-2"
+          >
+            <FlowStatus flow={flow} />
+            {account !== undefined && !realMoney ? (
+              <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
+            ) : null}
+          </div>
+          <Link
+            to={paths.flowSettings.getHref(flow.id)}
+            aria-label="Impostazioni del flusso"
+            title="Impostazioni del flusso"
+            className={`${SECONDARY_COMMAND} ml-auto`}
+          >
+            <Icon name="settings" />
+          </Link>
         </div>
         {flow.status === DRAFT_STATUS ? (
           <div className="mt-3">
-            <StartFlowButton flowId={flow.id} realMoney={realMoney} />
+            <StartFlowButton flowId={flow.id} realMoney={realMoney} missing={flow.missing} />
           </div>
         ) : (
           renderCommands(flow, realMoney)
         )}
-        <div className="mt-3">
-          <Link to={paths.flowVersions.getHref(flow.id)} className={SECONDARY_COMMAND}>
-            Configurazione
-          </Link>
-        </div>
       </section>
       {children}
     </>

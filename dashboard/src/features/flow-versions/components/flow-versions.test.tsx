@@ -8,7 +8,7 @@ import { renderApp } from '@/testing/test-utils';
 
 const OPENROUTER = 'openrouter/deepseek-chat';
 const ANTHROPIC = 'anthropic/claude-haiku';
-const VERSIONS_URL = '/flows/flow-alfa/versions';
+const VERSIONS_URL = '/flows/flow-alfa/settings';
 
 const compare = async (first: string, second: string) => {
   const user = userEvent.setup();
@@ -93,7 +93,7 @@ describe('FlowVersions', () => {
     fakePlatform.addFlow('anna', 'beta', {
       versions: versionsWith({}, { systemPrompt: '{instructions}\nMai contro trend' }),
     });
-    await renderApp({ account: 'anna', url: '/flows/flow-beta/versions?first=1&second=2' });
+    await renderApp({ account: 'anna', url: '/flows/flow-beta/settings?first=1&second=2' });
 
     const comparison = await screen.findByRole('table', { name: 'Confronto delle versioni' });
     const parts = within(comparison)
@@ -141,7 +141,7 @@ describe('FlowVersions', () => {
   });
 
   it('tells why the versions could not be read', async () => {
-    await renderApp({ account: 'anna', url: '/flows/flow-omega/versions' });
+    await renderApp({ account: 'anna', url: '/flows/flow-omega/settings' });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Impossibile leggere i dati: flusso non trovato',

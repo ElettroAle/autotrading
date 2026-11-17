@@ -101,17 +101,43 @@ Then(
   },
 );
 
+// The dashboard keeps Avvia disabled while the draft lacks something (Bug 560): the start the user would ask for goes
+// to the API as it is, which still refuses it with its reason.
 When(
   '{string} avvia il flusso {string} senza scegliere gli asset',
   async ({ dashboard, memory }, account: string, flow: string) => {
     await onFlowPage(dashboard, memory, account, flow);
-    await dashboard.command('Avvia');
+    await expect(dashboard.button('Avvia')).toBeDisabled();
+    const flowId = encodeURIComponent(fakePlatform.flowNamed(flow).id);
+    memory.refusal = await dashboard.refusalOf(account, 'POST', `/flows/${flowId}/start`);
   },
 );
 
-Then("l'avvio è rifiutato con il motivo {string}", async ({ dashboard }, reason: string) => {
-  await expect(dashboard.warning(`Avvio rifiutato: ${reason}`)).toBeVisible();
+Then("l'avvio è rifiutato con il motivo {string}", async ({ memory }, reason: string) => {
+  expect(memory.refusal).toBe(reason);
 });
+
+When(
+  '{string} apre la bozza {string}',
+  async ({ dashboard, memory }, account: string, flow: string) => {
+    await onFlowPage(dashboard, memory, account, flow);
+    await expect(dashboard.draftLabel()).toBeVisible();
+  },
+);
+
+Then(
+  'Avvia è disattivato con accanto {string} e il rimando {string}',
+  async ({ dashboard }, text: string, link: string) => {
+    await expect(dashboard.button('Avvia')).toBeDisabled();
+    const missing = dashboard.content().getByRole('group', { name: 'Avvio della bozza' });
+    await expect(missing.getByText(text, { exact: true })).toBeVisible();
+    // The configuration of the draft is its editor (ADR assegnazione-della-bozza-nel-form-di-configurazione).
+    await expect(missing.getByRole('link', { name: link, exact: true })).toHaveAttribute(
+      'href',
+      /\/edit$/,
+    );
+  },
+);
 
 Then(
   'il flusso {string} resta nello stato {string}',

@@ -12,8 +12,9 @@ Funzionalità: R2.4.1 Duplicazione di un flusso
   capitale. Finché il flusso è una bozza, conto, capitale allocato e asset si impostano nella sua
   configurazione e si salvano con lei; l'avvio di una bozza verifica che conto, capitale e almeno un asset ci
   siano e che nessun asset sia già usato da un altro flusso sullo stesso conto (RF-02.05, R1.1.2), poi il
-  flusso diventa attivo. La copia ha storia propria e parte dalla versione 1. Disponibile dalla dashboard e
-  dall'interfaccia programmatica.
+  flusso diventa attivo. Nella dashboard Avvia resta disattivato finché manca qualcosa, con accanto l'elenco di ciò
+  che manca e il rimando "Configura" alla configurazione del flusso (Bug 560). La copia ha storia propria e parte
+  dalla versione 1. Disponibile dalla dashboard e dall'interfaccia programmatica.
 
   Fuori ambito: la copia dei cicli o delle posizioni dell'originale.
 
@@ -51,6 +52,11 @@ Funzionalità: R2.4.1 Duplicazione di un flusso
     Quando "anna" avvia il flusso "alfa (copia)" senza scegliere gli asset
     Allora l'avvio è rifiutato con il motivo "asset mancante"
     E il flusso "alfa (copia)" resta nello stato "bozza"
+
+  Scenario: Avvia disattivato finché manca qualcosa
+    Dato che "anna" ha duplicato il flusso "alfa"
+    Quando "anna" apre la bozza "alfa (copia)"
+    Allora Avvia è disattivato con accanto "Per avviarla manca: asset" e il rimando "Configura"
 
   Scenario: Stesso asset sullo stesso conto rifiutato all'avvio
     Dato che "anna" ha duplicato il flusso "alfa"

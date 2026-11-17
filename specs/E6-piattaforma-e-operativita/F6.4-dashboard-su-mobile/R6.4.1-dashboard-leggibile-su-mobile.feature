@@ -9,12 +9,12 @@ Funzionalità: R6.4.1 Dashboard leggibile su mobile
   punti non ottimizzati. Le liste etichetta-valore vanno a capo anche con parole lunghe senza spazi (nomi dei
   modelli, indirizzi): nessuna pagina scorre in orizzontale. Nella pagina del flusso le viste (posizioni aperte e
   chiuse, cicli, versioni) compaiono come schede o comandi riconoscibili, separate dall'azione Modifica; tra i
-  comandi Avvia risalta come principale e Archivia come distruttivo; stato e risultati vengono prima della
-  configurazione; il titolo è il nome del flusso; l'avviso della rete non ripete la parola. Le sottopagine di un
-  flusso (cicli, posizioni, versioni, modifica) mostrano di quale flusso sono. Nello storico ogni filtro ha
-  l'etichetta sopra il suo campo. La pagina Notifiche spiega come collegare Telegram. Il confronto delle versioni
-  è disattivato con una sola versione. Su schermi larghi l'aspetto attuale resta. La legenda degli esiti dei cicli
-  recenti nell'elenco dei flussi è tolta con la loro fila (R6.4.2).
+  comandi Avvia risalta come principale e Archivia, nelle impostazioni del flusso (Bug 560), come distruttivo; stato
+  e risultati vengono prima della configurazione; il titolo è il nome del flusso; l'avviso della rete non ripete la
+  parola. Le sottopagine di un flusso (cicli, posizioni, versioni, modifica) mostrano di quale flusso sono. Nello
+  storico ogni filtro ha l'etichetta sopra il suo campo. La pagina Notifiche spiega come collegare Telegram. Il
+  confronto delle versioni è disattivato con una sola versione. Su schermi larghi l'aspetto attuale resta. La
+  legenda degli esiti dei cicli recenti nell'elenco dei flussi è tolta con la loro fila (R6.4.2).
 
   Scenario: Nessuno scorrimento orizzontale
     Dato uno schermo largo 360 pixel

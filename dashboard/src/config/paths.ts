@@ -93,7 +93,14 @@ export const paths = {
     getHref: (flowId: string, plannedAt: string) =>
       `/flows/${encodeURIComponent(flowId)}/cycles/${encodeURIComponent(plannedAt)}`,
   },
-  flowVersions: {
+  // Configuration, versions and the zone of danger of a flow, behind the gear of its page (ADR
+  // impostazioni-del-flusso-dall-ingranaggio).
+  flowSettings: {
+    path: '/flows/:flowId/settings',
+    getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/settings`,
+  },
+  // The old address of the configuration of a flow, which leads to its settings.
+  oldFlowVersions: {
     path: '/flows/:flowId/versions',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/versions`,
   },

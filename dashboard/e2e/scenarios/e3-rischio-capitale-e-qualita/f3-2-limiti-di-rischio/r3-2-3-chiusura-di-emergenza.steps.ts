@@ -7,8 +7,9 @@ import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When } from '../../../support/fixtures';
 
 // R3.2.3, ADR chiusura-di-emergenza-nella-dashboard: the confirmation of the dashboard; ADR
-// zona-di-emergenza-in-fondo-alla-pagina: the command alone in the zone at the bottom of the page. The other scenarios
-// run on the use cases with pytest-bdd.
+// zona-di-emergenza-in-fondo-alla-pagina: the command alone in the zone at the bottom of the page; ADR
+// impostazioni-del-flusso-dall-ingranaggio: the emergency closing of a flow at the bottom of its settings. The other
+// scenarios run on the use cases with pytest-bdd.
 const EMERGENCY = /Chiusura di emergenza/;
 
 const zoneNamed = (dashboard: DashboardPages, name: string): Locator =>
@@ -84,11 +85,24 @@ When(
   },
 );
 
+// The settings of the flow, from the gear of its page, as a user gets there (Bug 560).
+const openFlowSettings = async (
+  dashboard: DashboardPages,
+  account: string,
+  flow: string,
+): Promise<void> => {
+  await dashboard.openFlowAs(account, flow);
+  await dashboard.settingsGear().click();
+  await expect(dashboard.pageHeading()).toHaveText(`Impostazioni di ${flow}`);
+  await dashboard.waitUntilRead();
+};
+
 When(
-  '{string} apre nella dashboard la pagina del flusso {string}',
-  async ({ dashboard }, account: string, flow: string) => {
-    await dashboard.openFlowAs(account, flow);
-    await dashboard.waitUntilRead();
+  '{string} apre nella dashboard le impostazioni del flusso {string}',
+  async ({ dashboard, memory }, account: string, flow: string) => {
+    memory.account = account;
+    memory.flow = flow;
+    await openFlowSettings(dashboard, account, flow);
   },
 );
 
@@ -118,7 +132,7 @@ When(
   async ({ dashboard, memory }, account: string, flow: string, zone: string) => {
     memory.account = account;
     memory.flow = flow;
-    await dashboard.openFlowAs(account, flow);
+    await openFlowSettings(dashboard, account, flow);
     await zoneNamed(dashboard, zone)
       .getByRole('button', { name: `Chiusura di emergenza del flusso ${flow}`, exact: true })
       .click();
@@ -167,11 +181,16 @@ Then('il riquadro {string} non contiene altri comandi', async ({ dashboard }, na
 });
 
 Then(
-  'i comandi del flusso {string} non contengono la chiusura di emergenza',
+  'la pagina del flusso {string} non contiene la chiusura di emergenza',
   async ({ dashboard }, flow: string) => {
+    await dashboard.openFlow(flow);
     const head = dashboard.content().getByRole('region', { name: flow, exact: true });
     await expect(head.getByRole('group', { name: 'Comandi del flusso' })).toBeVisible();
-    await expect(head.getByRole('button', { name: EMERGENCY })).toHaveCount(0);
+    await expect(dashboard.flowTab('Panoramica')).toBeVisible();
+    await dashboard.waitUntilRead();
+    await expect(dashboard.content().getByRole('button', { name: EMERGENCY })).toHaveCount(0);
+    await expect(zoneNamed(dashboard, 'Zona pericolosa')).toHaveCount(0);
+    await expect(zoneNamed(dashboard, 'Zona di emergenza')).toHaveCount(0);
   },
 );
 

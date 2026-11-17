@@ -26,15 +26,38 @@ describe('FlowView', () => {
     expect(screen.getByText('Stato: attivo')).toBeInTheDocument();
   });
 
-  // ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune: what does not depend on the period is out of the tabs.
-  it('leads to the configuration of the flow with a command out of the tabs', async () => {
+  // ADR impostazioni-del-flusso-dall-ingranaggio: the settings open from a gear at the top right of the head of the
+  // flow, a page and not a tab, so reading and writing do not mix.
+  it('leads to the settings of the flow with a gear in the head, out of the tabs', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
 
-    const configuration = await screen.findByRole('link', { name: 'Configurazione' });
-    expect(configuration).toHaveAttribute('href', '/flows/flow-alfa/versions');
-    expect(configuration).toHaveClass('min-h-11');
+    const settings = await screen.findByRole('link', { name: 'Impostazioni del flusso' });
+    expect(settings).toHaveAttribute('href', '/flows/flow-alfa/settings');
+    expect(settings).toHaveClass('min-h-11', 'ml-auto');
+    expect(within(settings).getByRole('img', { hidden: true })).toHaveAttribute(
+      'data-icon',
+      'settings',
+    );
+    expect(screen.getByRole('region', { name: 'alfa' })).toContainElement(settings);
     expect(screen.getByRole('navigation', { name: 'Dati del flusso' })).not.toContainElement(
-      configuration,
+      settings,
+    );
+  });
+
+  it('offers no command Configurazione on the page of the flow', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    await screen.findByRole('link', { name: 'Impostazioni del flusso' });
+    expect(screen.queryByRole('link', { name: 'Configurazione' })).not.toBeInTheDocument();
+  });
+
+  it('leads to the settings of a draft too', async () => {
+    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)' });
+
+    expect(await screen.findByRole('link', { name: 'Impostazioni del flusso' })).toHaveAttribute(
+      'href',
+      '/flows/flow-alfa%20(copia)/settings',
     );
   });
 
@@ -235,7 +258,7 @@ describe('FlowView', () => {
 
   it('keeps a long name of a model within the configuration, breaking it where it does not fit', async () => {
     fakePlatform.changeFlow('alfa', { model: 'openrouter/~deepseek/deepseek-flash-latest' });
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa/versions' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/settings' });
 
     const configuration = await screen.findByLabelText('Configurazione', { exact: true });
     expect(configuration).toHaveClass('grid-cols-[max-content_minmax(0,1fr)]');

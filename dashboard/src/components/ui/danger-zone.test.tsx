@@ -15,6 +15,18 @@ describe('DangerZone', () => {
     expect(within(zone).getByRole('heading', { name: 'Zona di emergenza' })).toBeVisible();
   });
 
+  // ADR impostazioni-del-flusso-dall-ingranaggio: the settings of a flow keep Archivia there too, a zone of danger.
+  it('takes the title the page gives it', () => {
+    render(
+      <DangerZone title="Zona pericolosa">
+        <button type="button">Archivia</button>
+      </DangerZone>,
+    );
+
+    const zone = screen.getByRole('region', { name: 'Zona pericolosa' });
+    expect(within(zone).getByRole('heading', { name: 'Zona pericolosa' })).toBeVisible();
+  });
+
   it('holds only the commands it is given', () => {
     render(
       <DangerZone>

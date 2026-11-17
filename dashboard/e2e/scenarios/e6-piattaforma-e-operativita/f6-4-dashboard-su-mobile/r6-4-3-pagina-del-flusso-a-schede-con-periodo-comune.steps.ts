@@ -7,8 +7,8 @@ import { aClosedPosition, anOpenPosition } from '@/testing/mocks/positions';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
 
-// R6.4.3, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune, intervallo-trascinando-sull-equity-curve and
-// cicli-falliti-sull-equity-curve.
+// R6.4.3, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune, intervallo-trascinando-sull-equity-curve,
+// cicli-falliti-sull-equity-curve and impostazioni-del-flusso-dall-ingranaggio.
 const DAY = 24 * 60 * 60_000;
 const HISTORY_DAYS = 30;
 const INITIAL_CAPITAL = 1000;
@@ -22,6 +22,8 @@ const NOVEMBER = 10;
 const YEAR = 2026;
 const PERIODS: Readonly<Record<string, string>> = { 'ultima settimana': '7 giorni' };
 const FLOW_TABS = 'Dati del flusso';
+// How far from the right edge of the head of the flow the gear may sit: the padding of the head.
+const GEAR_MARGIN = 24;
 const REMOVE_INTERVAL = "Togli l'intervallo";
 
 const cycleOfDay = (year: number, month: number, day: number): Date =>
@@ -84,6 +86,19 @@ const openFlowSignedIn = async (
     await dashboard.signInAs(account);
   }
   await expect(dashboard.flowName()).toHaveText(memory.flow);
+};
+
+type Box = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+const boxOf = async (locator: Locator): Promise<Box> => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box ?? { x: 0, y: 0, width: 0, height: 0 };
 };
 
 const centreOf = async (locator: Locator): Promise<{ x: number; y: number }> => {
@@ -292,18 +307,25 @@ Then("la pagina non mostra l'elenco dei cicli recenti", async ({ dashboard }) =>
 });
 
 When(
-  '{string} sceglie Configurazione nella pagina del flusso {string}',
+  "{string} sceglie l'ingranaggio in alto a destra nella pagina del flusso {string}",
   async ({ dashboard, memory }, account: string, flow: string) => {
     memory.flow = flow;
     await openFlowSignedIn(dashboard, memory, account);
-    await dashboard.content().getByRole('link', { name: 'Configurazione', exact: true }).click();
+    const gear = dashboard.settingsGear();
+    const head = await boxOf(dashboard.content().getByRole('region', { name: flow, exact: true }));
+    const place = await boxOf(gear);
+    // At the top right of the head of the flow: in its upper half, against its right edge.
+    expect(place.y + place.height / 2).toBeLessThan(head.y + head.height / 2);
+    expect(head.x + head.width - (place.x + place.width)).toBeLessThanOrEqual(GEAR_MARGIN);
+    await gear.click();
   },
 );
 
 Then(
-  'vede configurazione, versioni e i comandi Modifica, Duplica ed Esporta, senza il periodo',
+  'vede la pagina Impostazioni del flusso con configurazione, versioni e i comandi Modifica, Duplica ed Esporta, senza il periodo',
   async ({ dashboard, memory }) => {
-    await expect(dashboard.pageHeading()).toHaveText(`Configurazione di ${memory.flow}`);
+    await expect(dashboard.pageHeading()).toHaveText(`Impostazioni di ${memory.flow}`);
+    await expect(tabs(dashboard)).toHaveCount(0);
     await expect(dashboard.page.getByLabel('Configurazione', { exact: true })).toBeVisible();
     await expect(dashboard.versions()).toBeVisible();
     await expect(
@@ -312,6 +334,45 @@ Then(
     await expect(dashboard.button('Duplica')).toBeVisible();
     await expect(dashboard.button('Esporta')).toBeVisible();
     await expect(dashboard.period()).toHaveCount(0);
+  },
+);
+
+Then(
+  'la pagina del flusso non offre Configurazione, Archivia né la chiusura di emergenza',
+  async ({ dashboard }) => {
+    await expect(dashboard.equityPoints().first()).toBeVisible();
+    await dashboard.waitUntilRead();
+    await expect(dashboard.settingsGear()).toBeVisible();
+    await expect(
+      dashboard.content().getByRole('link', { name: 'Configurazione', exact: true }),
+    ).toHaveCount(0);
+    await expect(dashboard.content().getByRole('button', { name: 'Archivia' })).toHaveCount(0);
+    await expect(
+      dashboard.content().getByRole('button', { name: /Chiusura di emergenza/ }),
+    ).toHaveCount(0);
+  },
+);
+
+When(
+  '{string} apre le impostazioni del flusso {string}',
+  async ({ dashboard, memory }, account: string, flow: string) => {
+    memory.flow = flow;
+    await openFlowSignedIn(dashboard, memory, account);
+    await dashboard.settingsGear().click();
+    await expect(dashboard.pageHeading()).toHaveText(`Impostazioni di ${flow}`);
+  },
+);
+
+Then(
+  'il riquadro {string} in fondo alla pagina contiene la chiusura di emergenza del flusso {string} e Archivia',
+  async ({ dashboard }, name: string, flow: string) => {
+    const zone = dashboard.zone(name);
+    await expect(zone.getByRole('button')).toHaveText([
+      `Chiusura di emergenza del flusso ${flow}`,
+      'Archivia',
+    ]);
+    // The last part of the page: no part of its content comes after the zone.
+    await expect(dashboard.content().locator('section').last()).toHaveAttribute('aria-label', name);
   },
 );
 

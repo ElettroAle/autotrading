@@ -117,7 +117,7 @@ When(
   async ({ dashboard }, _account: string, flow: string, width: number) => {
     await dashboard.page.setViewportSize({ width, height: PHONE_HEIGHT });
     await expect(dashboard.flowName()).toHaveText(flow);
-    await dashboard.page.getByRole('link', { name: 'Configurazione', exact: true }).click();
+    await dashboard.settingsGear().click();
     await expect(dashboard.versions()).toBeVisible();
   },
 );

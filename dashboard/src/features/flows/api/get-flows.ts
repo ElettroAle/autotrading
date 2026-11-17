@@ -19,6 +19,8 @@ const flowSchema = z.object({
   allocated_capital: z.string().nullable(),
   model: z.object({ name: z.string() }),
   sources: z.array(z.object({ name: z.string(), weight: z.number() })),
+  // What a draft lacks to start, as the API declares it (ADR mancanze-della-bozza-dichiarate-dall-api).
+  missing: z.array(z.string()),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

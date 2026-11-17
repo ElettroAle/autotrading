@@ -355,6 +355,7 @@ class FlowResponse(BaseModel):
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
+    missing: list[str]
 
     @classmethod
     def of(cls, flow: Flow) -> FlowResponse:
@@ -386,6 +387,7 @@ class FlowResponse(BaseModel):
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
+            missing=list(flow.missing_before_start),
         )
 
 

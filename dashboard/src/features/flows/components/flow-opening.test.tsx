@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 
 import { fakePlatform } from '@/testing/mocks/platform';
+import { server } from '@/testing/mocks/server';
 import { renderInApp } from '@/testing/test-utils';
 
 import { useFlows } from '../api/get-flows';
@@ -48,6 +50,34 @@ describe('FlowOpening', () => {
 
     expect(await screen.findByRole('note', { name: 'Da configurare' })).toHaveTextContent(
       'Pronta per essere avviata',
+    );
+  });
+
+  // ADR mancanze-della-bozza-dichiarate-dall-api: the API says what the draft lacks; the dashboard keeps no copy of the
+  // rule, so it shows what the API names even when the other fields of the draft are all set.
+  it('says what the API declares the draft lacks, not what its fields would suggest', async () => {
+    server.use(
+      http.get('*/flows', () =>
+        HttpResponse.json([
+          {
+            id: 'flow-bozza',
+            name: 'bozza',
+            status: 'bozza',
+            account_id: 'account-principale',
+            version: 1,
+            assets: ['ETH'],
+            allocated_capital: '100',
+            model: { name: 'openrouter/deepseek-chat' },
+            sources: [],
+            missing: ['capitale allocato'],
+          },
+        ]),
+      ),
+    );
+    await renderInApp(<Probe flowId="flow-bozza" />, { account: 'anna' });
+
+    expect(await screen.findByRole('note', { name: 'Da configurare' })).toHaveTextContent(
+      "Prima dell'avvio manca: capitale allocato",
     );
   });
 

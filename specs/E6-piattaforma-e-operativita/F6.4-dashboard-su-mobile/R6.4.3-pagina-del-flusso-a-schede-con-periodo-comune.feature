@@ -15,8 +15,11 @@ Funzionalità: R6.4.3 Pagina del flusso a schede con periodo comune
   comando per toglierlo. Periodo,
   intervallo e scheda stanno nell'indirizzo della pagina: ricaricare o tornare indietro li conserva. Ogni ciclo
   fallito compare sull'equity curve come un segno rosso riconoscibile, che porta al dettaglio del ciclo; i cicli
-  conclusi non hanno segni. L'elenco dei cicli recenti nella pagina è tolto. Configurazione, versioni, modifica,
-  duplica ed esporta stanno fuori dalle schede, nel comando Configurazione, perché non dipendono dal periodo.
+  conclusi non hanno segni. L'elenco dei cicli recenti nella pagina è tolto. La pagina del flusso contiene solo
+  lettura e comandi d'esercizio (Avvia, Pausa, Riprendi, Stop, Esegui ora). Un ingranaggio in alto a destra apre la
+  pagina Impostazioni del flusso, non una scheda, per non mescolare lettura e scrittura: configurazione con Modifica,
+  Duplica ed Esporta, versioni e, in fondo, il riquadro "Zona pericolosa" con la chiusura di emergenza del flusso e
+  Archivia (Bug 560).
 
   Contesto:
     Dato che "anna" ha il flusso "alfa" con cicli e posizioni chiuse negli ultimi 30 giorni
@@ -50,9 +53,18 @@ Funzionalità: R6.4.3 Pagina del flusso a schede con periodo comune
     Quando "anna" apre la pagina del flusso "alfa"
     Allora la pagina non mostra l'elenco dei cicli recenti
 
-  Scenario: Configurazione fuori dalle schede
-    Quando "anna" sceglie Configurazione nella pagina del flusso "alfa"
-    Allora vede configurazione, versioni e i comandi Modifica, Duplica ed Esporta, senza il periodo
+  Scenario: Impostazioni dall'ingranaggio
+    Quando "anna" sceglie l'ingranaggio in alto a destra nella pagina del flusso "alfa"
+    Allora vede la pagina Impostazioni del flusso con configurazione, versioni e i comandi Modifica, Duplica ed Esporta, senza il periodo
+
+  Scenario: Pagina del flusso senza impostazioni
+    Quando "anna" apre la pagina del flusso "alfa"
+    Allora la pagina del flusso non offre Configurazione, Archivia né la chiusura di emergenza
+
+  Scenario: Zona pericolosa delle impostazioni di un flusso fermo
+    Dato che il flusso "alfa" è fermo
+    Quando "anna" apre le impostazioni del flusso "alfa"
+    Allora il riquadro "Zona pericolosa" in fondo alla pagina contiene la chiusura di emergenza del flusso "alfa" e Archivia
 
   Scenario: Posizioni aperte attuali
     Quando "anna" apre la Panoramica del flusso "alfa" con il periodo "ultima settimana"

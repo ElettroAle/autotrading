@@ -366,7 +366,11 @@ const TRANSITIONS: Record<FakeFlowCommand, Transition> = {
   pause: { from: [ACTIVE], to: PAUSED, refusal: refusedFor('pausa') },
   resume: { from: [PAUSED], to: ACTIVE, refusal: refusedFor('riprendi') },
   stop: { from: [ACTIVE, PAUSED], to: STOPPED, refusal: refusedFor('ferma') },
-  archive: { from: [STOPPED], to: ARCHIVED, refusal: () => 'si archivia solo un flusso fermo' },
+  archive: {
+    from: [STOPPED, DRAFT],
+    to: ARCHIVED,
+    refusal: () => 'si archivia solo un flusso fermo',
+  },
 };
 
 // Every flow, new or existing, has a stop loss default; 5% when nobody gave one (R3.1.2).
@@ -559,6 +563,10 @@ const missingOf = (flow: FakeFlow): string[] =>
     flow.allocatedCapital === null ? 'capitale allocato' : '',
     flow.assets.length === 0 ? 'asset' : '',
   ].filter((part) => part !== '');
+
+/** What the start of the flow waits for, as the API declares it: only a draft lacks its assignment (Bug 560). */
+export const missingBeforeStartOf = (flow: FakeFlow): string[] =>
+  flow.status === DRAFT ? missingOf(flow) : [];
 
 // Bug 244: a stopped flow starts only if its capital fits in what the other flows of its account leave free.
 const requireFreeCapitalFor = (user: FakeUser, flow: FakeFlow): void => {
