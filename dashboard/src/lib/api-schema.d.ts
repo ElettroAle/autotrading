@@ -1438,14 +1438,26 @@ export interface components {
         };
         /**
          * ChannelChoiceRequest
-         * @description The channel of a type of event for all the flows of the user.
+         * @description The channels of a type of event for all the flows of the user, none for no notification.
          */
         ChannelChoiceRequest: {
             event: components["schemas"]["NotificationEvent"];
-            channel: components["schemas"]["ChannelName"];
+            /** Channels */
+            channels: components["schemas"]["ChannelName"][];
         };
         /** @enum {string} */
-        ChannelName: "Telegram" | "email" | "entrambi" | "nessuno";
+        ChannelName: "Telegram" | "email";
+        /**
+         * ChannelStateResponse
+         * @description A channel of the platform, whether the user configured it, and otherwise what it misses (R3.5.5).
+         */
+        ChannelStateResponse: {
+            channel: components["schemas"]["ChannelName"];
+            /** Configured */
+            configured: boolean;
+            /** Warnings */
+            warnings: string[];
+        };
         /**
          * ClosedPositionPageResponse
          * @description A page of the closed positions of a flow that match the filters, from the most recent close, with how many
@@ -1807,12 +1819,13 @@ export interface components {
         };
         /**
          * EventChannelResponse
-         * @description A type of event by the name the user reads, its channel, whether a flow may have an exception for it, and
+         * @description A type of event by the name the user reads, its channels, whether a flow may have an exception for it, and
          *     the warnings of a chosen channel that is not linked (R3.5.3).
          */
         EventChannelResponse: {
             event: components["schemas"]["NotificationEvent"];
-            channel: components["schemas"]["ChannelName"];
+            /** Channels */
+            channels: components["schemas"]["ChannelName"][];
             /** Of Flow */
             of_flow: boolean;
             /** Warnings */
@@ -1840,10 +1853,11 @@ export interface components {
         };
         /**
          * FlowChannelRequest
-         * @description The channel of a flow for the type of event of the path.
+         * @description The channels of a flow for the type of event of the path, none for no notification.
          */
         FlowChannelRequest: {
-            channel: components["schemas"]["ChannelName"];
+            /** Channels */
+            channels: components["schemas"]["ChannelName"][];
         };
         /**
          * FlowChannelsResponse
@@ -2600,13 +2614,16 @@ export interface components {
         };
         /**
          * NotificationChannelsResponse
-         * @description The choices of the user and, whatever they are, the warning of every channel that cannot be reached (R3.5.5).
+         * @description The choices of the user, every channel with its state and, whatever the choices, the warning of every channel
+         *     that cannot be reached (R3.5.5).
          */
         NotificationChannelsResponse: {
             /** Events */
             events: components["schemas"]["EventChannelResponse"][];
             /** Flows */
             flows: components["schemas"]["FlowChannelsResponse"][];
+            /** Channels */
+            channels: components["schemas"]["ChannelStateResponse"][];
             /** Warnings */
             warnings: string[];
         };

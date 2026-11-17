@@ -86,7 +86,7 @@ class Notices:
         # The scenarios read the notification on both channels: the tenant chose both for every event (R3.5.3).
         preferences = ChannelPreferences.of(self.tenant_id)
         for event in NotificationEvent:
-            preferences = preferences.choosing(event, NotificationChannel.BOTH)
+            preferences = preferences.choosing(event, frozenset(NotificationChannel))
         return channel_choices(self.tenant_id, {self.tenant_id: preferences})
 
     @property

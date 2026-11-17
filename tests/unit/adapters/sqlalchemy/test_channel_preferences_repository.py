@@ -27,29 +27,32 @@ def test_the_preferences_of_another_tenant_are_refused_before_the_database() -> 
         repository.save(ChannelPreferences.of(TenantId.new()))
 
 
+TELEGRAM, EMAIL = NotificationChannel.TELEGRAM, NotificationChannel.EMAIL
+CHOICES = [frozenset(), frozenset({TELEGRAM}), frozenset({EMAIL}), frozenset({TELEGRAM, EMAIL})]
+
+
 @pytest.mark.parametrize("event", list(NotificationEvent))
-@pytest.mark.parametrize("channel", list(NotificationChannel))
+@pytest.mark.parametrize("channels", CHOICES)
 def test_a_choice_is_kept_by_the_names_of_its_members_and_read_back(
-    event: NotificationEvent, channel: NotificationChannel
+    event: NotificationEvent, channels: frozenset[NotificationChannel]
 ) -> None:
     tenant = uuid4()
-    row = _row(tenant, event, channel)
+    names = [channel.name.lower() for channel in NotificationChannel if channel in channels]
 
-    assert row == {"tenant_id": tenant, "event": event.name.lower(), "channel": channel.name.lower()}
-    assert _choices_of([(str(row["event"]), str(row["channel"]))]) == {event: channel}
+    row = _row(tenant, event, channels)
+
+    assert row == {"tenant_id": tenant, "event": event.name.lower(), "channels": names}
+    assert _choices_of([(event.name.lower(), names)]) == {event: channels}
 
 
 def test_the_exceptions_are_read_back_by_flow() -> None:
     rows = [
-        (ALFA, "position_opened", "telegram"),
-        (ALFA, "cycle_failed", "none"),
-        (BETA, "position_opened", "both"),
+        (ALFA, "position_opened", ["telegram"]),
+        (ALFA, "cycle_failed", []),
+        (BETA, "position_opened", ["telegram", "email"]),
     ]
 
     assert _exceptions_of(rows) == {
-        ALFA: {
-            NotificationEvent.POSITION_OPENED: NotificationChannel.TELEGRAM,
-            NotificationEvent.CYCLE_FAILED: NotificationChannel.NONE,
-        },
-        BETA: {NotificationEvent.POSITION_OPENED: NotificationChannel.BOTH},
+        ALFA: {NotificationEvent.POSITION_OPENED: frozenset({TELEGRAM}), NotificationEvent.CYCLE_FAILED: frozenset()},
+        BETA: {NotificationEvent.POSITION_OPENED: frozenset({TELEGRAM, EMAIL})},
     }

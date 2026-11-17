@@ -1,61 +1,76 @@
 import pytest
 
-from autotrading.domain.notifications.notification_channel import MissingLink, NotificationChannel
+from autotrading.domain.notifications.notification_channel import (
+    NO_CHANNEL,
+    Channels,
+    MissingLink,
+    NotificationChannel,
+    in_order,
+    missing_links_of,
+)
+
+TELEGRAM, EMAIL = NotificationChannel.TELEGRAM, NotificationChannel.EMAIL
 
 
-def test_each_channel_is_one_of_the_four_choices_of_the_user() -> None:
-    assert [channel.name for channel in NotificationChannel] == ["TELEGRAM", "EMAIL", "BOTH", "NONE"]
+def test_each_member_is_one_channel_never_a_combination_of_them() -> None:
+    assert [channel.name for channel in NotificationChannel] == ["TELEGRAM", "EMAIL"]
+
+
+def test_no_channel_is_the_empty_set() -> None:
+    assert frozenset() == NO_CHANNEL
 
 
 @pytest.mark.parametrize(
-    ("channel", "chat", "email"),
+    ("channels", "ordered"),
     [
-        (NotificationChannel.TELEGRAM, True, False),
-        (NotificationChannel.EMAIL, False, True),
-        (NotificationChannel.BOTH, True, True),
-        (NotificationChannel.NONE, False, False),
+        (frozenset({EMAIL, TELEGRAM}), (TELEGRAM, EMAIL)),
+        (frozenset({EMAIL}), (EMAIL,)),
+        (NO_CHANNEL, ()),
     ],
 )
-def test_a_channel_says_whether_it_reaches_the_chat_and_the_email(
-    channel: NotificationChannel, chat: bool, email: bool
+def test_a_set_of_channels_reads_in_the_order_of_the_channels(
+    channels: Channels, ordered: tuple[NotificationChannel, ...]
 ) -> None:
-    assert channel.reaches_chat is chat
-    assert channel.reaches_email is email
+    assert in_order(channels) == ordered
 
 
 @pytest.mark.parametrize(
-    ("channel", "chat_linked", "email_indicated", "missing"),
+    ("channel", "chat_linked", "email_indicated", "mail_server_configured", "missing"),
     [
-        (NotificationChannel.TELEGRAM, False, True, (MissingLink.CHAT,)),
-        (NotificationChannel.TELEGRAM, True, False, ()),
-        (NotificationChannel.EMAIL, True, False, (MissingLink.EMAIL,)),
-        (NotificationChannel.EMAIL, False, True, ()),
-        (NotificationChannel.BOTH, False, False, (MissingLink.CHAT, MissingLink.EMAIL)),
-        (NotificationChannel.BOTH, True, True, ()),
-        (NotificationChannel.NONE, False, False, ()),
+        (TELEGRAM, False, True, True, (MissingLink.CHAT,)),
+        (TELEGRAM, True, False, False, ()),
+        (EMAIL, False, True, True, ()),
+        (EMAIL, True, False, True, (MissingLink.EMAIL,)),
+        (EMAIL, True, True, False, (MissingLink.MAIL_SERVER,)),
+        (EMAIL, True, False, False, (MissingLink.EMAIL, MissingLink.MAIL_SERVER)),
     ],
 )
-def test_a_chosen_channel_not_linked_is_missing_its_link(
-    channel: NotificationChannel, chat_linked: bool, email_indicated: bool, missing: tuple[MissingLink, ...]
+def test_a_channel_misses_only_its_own_links(
+    channel: NotificationChannel,
+    chat_linked: bool,
+    email_indicated: bool,
+    mail_server_configured: bool,
+    missing: tuple[MissingLink, ...],
 ) -> None:
-    links = channel.missing_links(chat_linked=chat_linked, email_indicated=email_indicated, mail_server_configured=True)
+    links = channel.missing_links(
+        chat_linked=chat_linked, email_indicated=email_indicated, mail_server_configured=mail_server_configured
+    )
 
     assert links == missing
 
 
 @pytest.mark.parametrize(
-    ("channel", "email_indicated", "missing"),
+    ("channels", "missing"),
     [
-        (NotificationChannel.EMAIL, True, (MissingLink.MAIL_SERVER,)),
-        (NotificationChannel.EMAIL, False, (MissingLink.EMAIL, MissingLink.MAIL_SERVER)),
-        (NotificationChannel.BOTH, True, (MissingLink.MAIL_SERVER,)),
-        (NotificationChannel.TELEGRAM, True, ()),
-        (NotificationChannel.NONE, False, ()),
+        (frozenset({EMAIL, TELEGRAM}), (MissingLink.CHAT, MissingLink.EMAIL, MissingLink.MAIL_SERVER)),
+        (frozenset({EMAIL}), (MissingLink.EMAIL, MissingLink.MAIL_SERVER)),
+        (frozenset({TELEGRAM}), (MissingLink.CHAT,)),
+        (NO_CHANNEL, ()),
     ],
 )
-def test_a_channel_reaching_the_email_without_a_mail_server_is_missing_the_server(
-    channel: NotificationChannel, email_indicated: bool, missing: tuple[MissingLink, ...]
+def test_a_set_of_channels_misses_the_links_of_each_of_its_channels_in_order(
+    channels: Channels, missing: tuple[MissingLink, ...]
 ) -> None:
-    links = channel.missing_links(chat_linked=True, email_indicated=email_indicated, mail_server_configured=False)
+    links = missing_links_of(channels, chat_linked=False, email_indicated=False, mail_server_configured=False)
 
     assert links == missing

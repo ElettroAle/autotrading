@@ -1,5 +1,6 @@
-"""R3.5.3: the channel of every type of event, with the exceptions of a flow, on the cycles the worker runs and the use
-cases of the API with the fake adapters (ADR canali-delle-notifiche-per-tipo-di-evento).
+"""R3.5.3: the channels of every type of event, with the exceptions of a flow, on the cycles the worker runs and the use
+cases of the API with the fake adapters (ADR canali-delle-notifiche-per-tipo-di-evento, ADR
+canali-delle-notifiche-come-insieme).
 """
 
 from dataclasses import replace
@@ -8,7 +9,7 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.adapters.inbound.api.notification_channels import CHANNEL_NAMES, warning_of
+from autotrading.adapters.inbound.api.notification_channels import CHANNEL_NAMES, names_of, warning_of
 from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelCommand
 from autotrading.application.notifications.get_notification_channels import EventChannel
 from autotrading.application.notifications.link_chat import LinkChatCommand
@@ -16,7 +17,7 @@ from autotrading.application.notifications.remove_flow_channel_exception import 
 from autotrading.application.notifications.set_flow_channel_exception import SetFlowChannelExceptionCommand
 from autotrading.application.notifications.set_notification_email import SetNotificationEmailCommand
 from autotrading.domain.errors import AutotradingError
-from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_channel import Channels, NotificationChannel
 from autotrading.domain.notifications.notification_event import NotificationEvent
 from tests.fakes.cycles import FakeTransientError
 from tests.support.decision_steps import answer, opening
@@ -31,6 +32,9 @@ MID_PRICE = Decimal(100000)
 OPENING_FEE = Decimal("0.07")
 FAILURE = "modello non raggiungibile"
 FAILED_CYCLE = "ciclo fallito"
+# The words of the scenarios for a set of channels: none, or the names of the interface joined as a sentence.
+NO_CHANNEL_WORD = "nessuno"
+JOINED = " ed "
 # Two flows of the same account open on different assets: an asset belongs to one flow of the account (R1.1.1).
 ASSET_OF = {"alfa": "BTC", "beta": "ETH"}
 
@@ -46,20 +50,26 @@ def outcome() -> dict[str, object]:
     return {}
 
 
-def channel_by_name(name: str) -> NotificationChannel:
-    """The channel by the word the interface shows the user (R3.5.3)."""
-    [channel] = [channel for channel, shown in CHANNEL_NAMES.items() if shown == name]
-    return channel
+def channels_by_words(words: str) -> Channels:
+    """The channels by the words the interface shows the user: "nessuno", or their names joined by "ed" (R3.5.3)."""
+    if words == NO_CHANNEL_WORD:
+        return frozenset()
+    by_name: dict[str, NotificationChannel] = {shown: channel for channel, shown in CHANNEL_NAMES.items()}
+    return frozenset(by_name[name] for name in words.split(JOINED))
+
+
+def words_of(channels: Channels) -> str:
+    return JOINED.join(names_of(channels)) or NO_CHANNEL_WORD
 
 
 def choose(flow_cycles: FlowCycles, user: str, channel: str, event: str) -> None:
-    command = ChooseNotificationChannelCommand(NotificationEvent(event), channel_by_name(channel))
+    command = ChooseNotificationChannelCommand(NotificationEvent(event), channels_by_words(channel))
     flow_cycles.platform.use_cases_of(user).choose_notification_channel.execute(command)
 
 
 def set_exception(flow_cycles: FlowCycles, user: str, flow: str, event: str, channel: str) -> None:
     command = SetFlowChannelExceptionCommand(
-        flow_cycles.flow(flow).id.value, NotificationEvent(event), channel_by_name(channel)
+        flow_cycles.flow(flow).id.value, NotificationEvent(event), channels_by_words(channel)
     )
     flow_cycles.platform.use_cases_of(user).set_flow_channel_exception.execute(command)
 
@@ -207,7 +217,7 @@ def user_chooses(flow_cycles: FlowCycles, user: str, channel: str, event: str) -
 
 @then(quoted('il tipo di evento "{event}" ha il canale "{channel}"'))
 def event_has_channel(outcome: dict[str, object], event: str, channel: str) -> None:
-    assert CHANNEL_NAMES[general_channel(outcome, event).channel] == channel
+    assert words_of(general_channel(outcome, event).channels) == channel
 
 
 @then(parsers.re(r'^la chat "(?P<chat>[^"]+)" (?P<verdict>riceve|non riceve) la notifica$'))

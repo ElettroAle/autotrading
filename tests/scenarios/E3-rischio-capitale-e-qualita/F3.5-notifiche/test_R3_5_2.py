@@ -45,7 +45,7 @@ def indicate(flow_cycles: FlowCycles, user: str, address: str) -> None:
 
 
 def choose_email(flow_cycles: FlowCycles, user: str, event: NotificationEvent) -> None:
-    command = ChooseNotificationChannelCommand(event, NotificationChannel.EMAIL)
+    command = ChooseNotificationChannelCommand(event, frozenset({NotificationChannel.EMAIL}))
     flow_cycles.platform.use_cases_of(user).choose_notification_channel.execute(command)
 
 

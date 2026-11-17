@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from enum import StrEnum
 
 
@@ -11,29 +12,46 @@ class MissingLink(StrEnum):
 
 
 class NotificationChannel(StrEnum):
-    """Where the notifications of a type of event go (R3.5.3, RF-24.04): the linked chat, the address of the
-    notifications by email, both or neither. The words the user chooses them by are those of the interface.
+    """A channel the notifications reach (R3.5.3, RF-24.04): the linked chat or the address of the notifications by
+    email. A type of event goes to a set of them, so a new channel is one member more, never new combinations (ADR
+    canali-delle-notifiche-come-insieme).
     """
 
     TELEGRAM = "chat"
     EMAIL = "email"
-    BOTH = "both"
-    NONE = "none"
-
-    @property
-    def reaches_chat(self) -> bool:
-        return self in {NotificationChannel.TELEGRAM, NotificationChannel.BOTH}
-
-    @property
-    def reaches_email(self) -> bool:
-        return self in {NotificationChannel.EMAIL, NotificationChannel.BOTH}
 
     def missing_links(
         self, *, chat_linked: bool, email_indicated: bool, mail_server_configured: bool
     ) -> tuple[MissingLink, ...]:
-        """What the settings warn beside the event: a chosen channel with nothing linked sends nothing (R3.5.3), and
-        no email leaves without the mail server of the tenant (R3.5.5)."""
-        missing_chat = (MissingLink.CHAT,) if self.reaches_chat and not chat_linked else ()
-        missing_email = (MissingLink.EMAIL,) if self.reaches_email and not email_indicated else ()
-        missing_server = (MissingLink.MAIL_SERVER,) if self.reaches_email and not mail_server_configured else ()
-        return missing_chat + missing_email + missing_server
+        """What the channel misses to reach the tenant: the linked chat (R3.5.3), or the address and the mail server
+        the emails leave from (R3.5.5)."""
+        if self is NotificationChannel.TELEGRAM:
+            return () if chat_linked else (MissingLink.CHAT,)
+        missing_email = () if email_indicated else (MissingLink.EMAIL,)
+        missing_server = () if mail_server_configured else (MissingLink.MAIL_SERVER,)
+        return missing_email + missing_server
+
+
+type Channels = frozenset[NotificationChannel]
+
+NO_CHANNEL: Channels = frozenset()
+
+
+def in_order(channels: Iterable[NotificationChannel]) -> tuple[NotificationChannel, ...]:
+    """The channels of a set in the order of the channels: a set has none of its own."""
+    chosen = frozenset(channels)
+    return tuple(channel for channel in NotificationChannel if channel in chosen)
+
+
+def missing_links_of(
+    channels: Iterable[NotificationChannel], *, chat_linked: bool, email_indicated: bool, mail_server_configured: bool
+) -> tuple[MissingLink, ...]:
+    """What the settings warn beside an event: each chosen channel with what it misses, in the order of the channels;
+    a chosen channel with nothing linked sends nothing (R3.5.3)."""
+    return tuple(
+        missing
+        for channel in in_order(channels)
+        for missing in channel.missing_links(
+            chat_linked=chat_linked, email_indicated=email_indicated, mail_server_configured=mail_server_configured
+        )
+    )

@@ -96,7 +96,7 @@ class Mail:
     def notify_for(self, tenant_id: TenantId, outbox: InMemoryOutboxAdapter | FailingOnEmailOutbox) -> NotifyUseCase:
         chats = InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)
         # The tenant chose both channels for the event: R3.5.3 sends each event only on its channel.
-        both = {tenant_id: ChannelPreferences.of(tenant_id).choosing(PAUSED_EVENT, NotificationChannel.BOTH)}
+        both = {tenant_id: ChannelPreferences.of(tenant_id).choosing(PAUSED_EVENT, frozenset(NotificationChannel))}
         servers = self.servers.repository(tenant_id)
         return NotifyUseCase(chats, self.repository(tenant_id), servers, outbox, channel_choices(tenant_id, both))
 

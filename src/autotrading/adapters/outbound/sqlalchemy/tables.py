@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    ARRAY,
     JSON,
     BigInteger,
     Boolean,
@@ -235,25 +236,25 @@ notification_mail_servers = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
-# The channel the tenant chose for a type of event, for all its flows; an event without a row goes to its default
-# channel (R3.5.3).
+# The channels the tenant chose for a type of event, for all its flows, empty for none; an event without a row goes to
+# its default channels (R3.5.3, ADR canali-delle-notifiche-come-insieme).
 notification_channels = Table(
     "notification_channels",
     metadata,
     Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
     Column("event", Text, primary_key=True),
-    Column("channel", Text, nullable=False),
+    Column("channels", ARRAY(Text), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
-# The channel of a flow other than the general one, for a type of event of the flow (R3.5.3).
+# The channels of a flow other than the general ones, for a type of event of the flow (R3.5.3).
 notification_channel_exceptions = Table(
     "notification_channel_exceptions",
     metadata,
     Column("tenant_id", Uuid, primary_key=True),
     Column("flow_id", Uuid, primary_key=True),
     Column("event", Text, primary_key=True),
-    Column("channel", Text, nullable=False),
+    Column("channels", ARRAY(Text), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     ForeignKeyConstraint(
         ["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"], name="notification_channel_exceptions_flow"

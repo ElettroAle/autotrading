@@ -5,9 +5,10 @@ import { readData, useApiClient } from '@/lib/api-client';
 import type { components } from '@/lib/api-schema';
 import { pageDataQuery } from '@/lib/react-query';
 
-export const CHANNELS = ['Telegram', 'email', 'entrambi', 'nessuno'] as const;
+/** A channel by the name the API gives it: the list comes from the API, so a new channel shows by itself. */
+export type NotificationChannel = components['schemas']['ChannelStateResponse']['channel'];
 
-const channelSchema = z.enum(CHANNELS);
+const channelSchema = z.custom<NotificationChannel>((value) => typeof value === 'string');
 
 /** A type of event by the name the API gives it: the list comes from the API, so a new type shows by itself. */
 export type NotificationEvent = components['schemas']['NotificationEvent'];
@@ -16,8 +17,14 @@ const eventSchema = z.custom<NotificationEvent>((value) => typeof value === 'str
 
 const eventChannelSchema = z.object({
   event: eventSchema,
-  channel: channelSchema,
+  channels: z.array(channelSchema),
   of_flow: z.boolean(),
+  warnings: z.array(z.string()),
+});
+
+const channelStateSchema = z.object({
+  channel: channelSchema,
+  configured: z.boolean(),
   warnings: z.array(z.string()),
 });
 
@@ -30,20 +37,22 @@ const notificationChannelsSchema = z.object({
       exceptions: z.array(eventChannelSchema),
     }),
   ),
+  channels: z.array(channelStateSchema),
   warnings: z.array(z.string()),
 });
 
-export type NotificationChannel = z.infer<typeof channelSchema>;
-
 export type EventChannel = z.infer<typeof eventChannelSchema>;
+
+export type ChannelState = z.infer<typeof channelStateSchema>;
 
 export type NotificationChannels = z.infer<typeof notificationChannelsSchema>;
 
 export const NOTIFICATION_CHANNELS_QUERY_KEY = ['notification-channels'] as const;
 
 /**
- * The channel of every type of event, the exceptions of every flow, the warnings of a channel not linked and those of
- * every channel that cannot be reached, as the API computes them (R3.5.3, R3.5.5).
+ * The channels of every type of event, the exceptions of every flow, every channel of the platform with its state, the
+ * warnings of a chosen channel not linked and those of every channel that cannot be reached, as the API computes them
+ * (R3.5.3, R3.5.5, ADR canali-delle-notifiche-come-insieme).
  */
 export const useNotificationChannels = () => {
   const api = useApiClient();
