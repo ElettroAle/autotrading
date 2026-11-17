@@ -5,9 +5,9 @@ import { ActionLabel } from '@/components/ui/action-label';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
 import { DirectionLabel } from '@/components/ui/direction-label';
 import { ErrorMessage } from '@/components/ui/error-message';
+import { ExpandableText } from '@/components/ui/expandable-text';
 import { paths } from '@/config/paths';
 import { formatInstant } from '@/utils/format-instant';
-import { shortenText } from '@/utils/shorten-text';
 
 import { useLastDecision, type Decision } from '../api/get-last-decision';
 
@@ -27,7 +27,7 @@ const Entry = ({ label, children }: { label: string; children: ReactNode }) => {
   );
 };
 
-// The values are the API's: the panel only shortens the reasoning, the detail of the cycle shows it whole.
+// The values are the API's: the panel shortens the reasoning, which opens whole in place (ADR testo-lungo-espandibile).
 const DecisionEntry = ({ decision }: { decision: Decision }) => (
   <section aria-label={decision.asset}>
     <dl className={DETAILS_GRID}>
@@ -43,7 +43,9 @@ const DecisionEntry = ({ decision }: { decision: Decision }) => (
       <Entry label="Confidenza">
         {decision.confidence === null ? NOT_AVAILABLE : String(decision.confidence)}
       </Entry>
-      <Entry label="Ragionamento">{shortenText(decision.reasoning)}</Entry>
+      <Entry label="Ragionamento">
+        <ExpandableText text={decision.reasoning} />
+      </Entry>
     </dl>
   </section>
 );

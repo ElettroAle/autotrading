@@ -39,3 +39,43 @@ class ModelUsage:
         if prices is None:
             return None
         return (self.input_tokens * prices.input_per_million + self.output_tokens * prices.output_per_million) / MILLION
+
+    def plus(self, other: ModelUsage | None) -> ModelUsage:
+        """This usage and the other together; the reported cost is known only when both report it."""
+        if other is None:
+            return self
+        return ModelUsage(
+            self.input_tokens + other.input_tokens,
+            self.output_tokens + other.output_tokens,
+            _sum(self.reported_cost_usd, other.reported_cost_usd),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ModelSpend:
+    """What the calls of one question to the model consumed together, the retried ones included (R1.4.6, ADR
+    ritentativo-del-modello-nel-ciclo).
+
+    The usage adds up what the provider reported; the cost is not available as soon as one call that went out has none.
+    Nothing is spent until a call goes out.
+    """
+
+    usage: ModelUsage | None = None
+    cost_usd: Decimal | None = None
+    sent: bool = False
+
+    def with_call(self, usage: ModelUsage | None, cost_usd: Decimal | None) -> ModelSpend:
+        """A call that went out, with its usage when the provider reported it and its cost when somebody knows it."""
+        reported = self.usage if usage is None else usage.plus(self.usage)
+        return ModelSpend(reported, self._cost_with(cost_usd), sent=True)
+
+    def _cost_with(self, cost_usd: Decimal | None) -> Decimal | None:
+        if not self.sent:
+            return cost_usd
+        return _sum(self.cost_usd, cost_usd)
+
+
+def _sum(first: Decimal | None, second: Decimal | None) -> Decimal | None:
+    if first is None or second is None:
+        return None
+    return first + second

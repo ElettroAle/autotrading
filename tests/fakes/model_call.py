@@ -25,11 +25,15 @@ class ModelCall:
 
 @dataclass
 class FakeModelCallAdapter:
-    """The provider of the model: it answers what the test says, with the usage it reports, or fails."""
+    """The provider of the model: it answers what the test says, with the usage it reports, or fails.
+
+    The failures of the first calls, one per call, come before the answer or the failure of every other call.
+    """
 
     text: str = '{"decisioni": []}'
     usage: ModelUsage = field(default_factory=lambda: ModelUsage(1000, 200, Decimal("0.001")))
     failure: AutotradingError | None = None
+    first_failures: list[AutotradingError] = field(default_factory=list)
     calls: list[ModelCall] = field(default_factory=list)
     # A test that needs a cycle in progress holds the call open until it releases the gate.
     gate: threading.Event | None = None
@@ -47,6 +51,8 @@ class FakeModelCallAdapter:
         self.entered.set()
         if self.gate is not None:
             self.gate.wait(HELD_SECONDS)
+        if self.first_failures:
+            raise self.first_failures.pop(0)
         if self.failure is not None:
             raise self.failure
         return ModelReply(self.text, self.usage)

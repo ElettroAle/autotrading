@@ -3,7 +3,7 @@ from uuid import UUID
 
 from autotrading.application.notifications.errors import NotifiedFlowNotFoundError
 from autotrading.application.notifications.ports import ChannelPreferencesRepositoryPort, NotifiedFlowsPort
-from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_channel import Channels
 from autotrading.domain.notifications.notification_event import NotificationEvent
 
 
@@ -11,11 +11,11 @@ from autotrading.domain.notifications.notification_event import NotificationEven
 class SetFlowChannelExceptionCommand:
     flow_id: UUID
     event: NotificationEvent
-    channel: NotificationChannel
+    channels: Channels
 
 
 class SetFlowChannelExceptionUseCase:
-    """Gives a flow of the tenant a channel of its own for a type of event of the flow (R3.5.3)."""
+    """Gives a flow of the tenant channels of its own for a type of event of the flow (R3.5.3)."""
 
     def __init__(self, preferences: ChannelPreferencesRepositoryPort, flows: NotifiedFlowsPort) -> None:
         self._preferences = preferences
@@ -23,7 +23,7 @@ class SetFlowChannelExceptionUseCase:
 
     def execute(self, command: SetFlowChannelExceptionCommand) -> None:
         self._ensure_flow_of_tenant(command.flow_id)
-        excepted = self._preferences.get().excepting(command.flow_id, command.event, command.channel)
+        excepted = self._preferences.get().excepting(command.flow_id, command.event, command.channels)
         self._preferences.save(excepted)
 
     def _ensure_flow_of_tenant(self, flow_id: UUID) -> None:

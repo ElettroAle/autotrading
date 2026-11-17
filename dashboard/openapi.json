@@ -5415,26 +5415,54 @@
           "event": {
             "$ref": "#/components/schemas/NotificationEvent"
           },
-          "channel": {
-            "$ref": "#/components/schemas/ChannelName"
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelName"
+            },
+            "type": "array",
+            "title": "Channels"
           }
         },
         "type": "object",
         "required": [
           "event",
-          "channel"
+          "channels"
         ],
         "title": "ChannelChoiceRequest",
-        "description": "The channel of a type of event for all the flows of the user."
+        "description": "The channels of a type of event for all the flows of the user, none for no notification."
       },
       "ChannelName": {
         "type": "string",
         "enum": [
           "Telegram",
-          "email",
-          "entrambi",
-          "nessuno"
+          "email"
         ]
+      },
+      "ChannelStateResponse": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelName"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "configured",
+          "warnings"
+        ],
+        "title": "ChannelStateResponse",
+        "description": "A channel of the platform, whether the user configured it, and otherwise what it misses (R3.5.5)."
       },
       "ClosedPositionPageResponse": {
         "properties": {
@@ -5569,6 +5597,25 @@
         ],
         "title": "ClosedPositionResponse",
         "description": "A closed position of a flow with its result (R1.7.2); amounts as text without trailing zeros (ADR 0018)."
+      },
+      "ClosedPositionTotalsResponse": {
+        "properties": {
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pnl",
+          "fees"
+        ],
+        "title": "ClosedPositionTotalsResponse",
+        "description": "The PnL and the fees of every closed position of the filters, not only of the page (Bug 569)."
       },
       "ConfigurationResponse": {
         "properties": {
@@ -6340,8 +6387,12 @@
           "event": {
             "$ref": "#/components/schemas/NotificationEvent"
           },
-          "channel": {
-            "$ref": "#/components/schemas/ChannelName"
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelName"
+            },
+            "type": "array",
+            "title": "Channels"
           },
           "of_flow": {
             "type": "boolean",
@@ -6358,12 +6409,12 @@
         "type": "object",
         "required": [
           "event",
-          "channel",
+          "channels",
           "of_flow",
           "warnings"
         ],
         "title": "EventChannelResponse",
-        "description": "A type of event by the name the user reads, its channel, whether a flow may have an exception for it, and\nthe warnings of a chosen channel that is not linked (R3.5.3)."
+        "description": "A type of event by the name the user reads, its channels, whether a flow may have an exception for it, and\nthe warnings of a chosen channel that is not linked (R3.5.3)."
       },
       "ExchangeResponse": {
         "properties": {
@@ -6421,16 +6472,20 @@
       },
       "FlowChannelRequest": {
         "properties": {
-          "channel": {
-            "$ref": "#/components/schemas/ChannelName"
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelName"
+            },
+            "type": "array",
+            "title": "Channels"
           }
         },
         "type": "object",
         "required": [
-          "channel"
+          "channels"
         ],
         "title": "FlowChannelRequest",
-        "description": "The channel of a flow for the type of event of the path."
+        "description": "The channels of a flow for the type of event of the path, none for no notification."
       },
       "FlowChannelsResponse": {
         "properties": {
@@ -8091,15 +8146,26 @@
               }
             ],
             "title": "Next"
+          },
+          "totals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClosedPositionTotalsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "positions",
-          "next"
+          "next",
+          "totals"
         ],
         "title": "HistoryClosedPositionsPageResponse",
-        "description": "At most 50 closed positions, newest close first; `next` is the `after` of the following page."
+        "description": "At most 50 closed positions, newest close first; `next` is the `after` of the following page. `totals` comes\nwith the first page only, null on the following ones of the same search."
       },
       "HistoryCycleResponse": {
         "properties": {
@@ -8334,15 +8400,26 @@
               }
             ],
             "title": "Next"
+          },
+          "totals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderTotalsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "orders",
-          "next"
+          "next",
+          "totals"
         ],
         "title": "HistoryOrdersPageResponse",
-        "description": "At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one."
+        "description": "At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one. `totals`\ncomes with the first page only, null on the following ones of the same search."
       },
       "Identity": {
         "properties": {
@@ -8711,6 +8788,13 @@
             "type": "array",
             "title": "Flows"
           },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelStateResponse"
+            },
+            "type": "array",
+            "title": "Channels"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -8723,10 +8807,11 @@
         "required": [
           "events",
           "flows",
+          "channels",
           "warnings"
         ],
         "title": "NotificationChannelsResponse",
-        "description": "The choices of the user and, whatever they are, the warning of every channel that cannot be reached (R3.5.5)."
+        "description": "The choices of the user, every channel with its state and, whatever the choices, the warning of every channel\nthat cannot be reached (R3.5.5)."
       },
       "NotificationEmailRequest": {
         "properties": {
@@ -9168,6 +9253,20 @@
           "message"
         ],
         "title": "OrderResultResponse"
+      },
+      "OrderTotalsResponse": {
+        "properties": {
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fees"
+        ],
+        "title": "OrderTotalsResponse",
+        "description": "The fees of the executions of every order of the filters, not only of the page (Bug 569)."
       },
       "PositionLeftOpenResponse": {
         "properties": {

@@ -21,12 +21,9 @@ export const FlowsList = () => {
     return <p>Non hai ancora flussi.</p>;
   }
   return (
-    <ul
-      aria-label="Flussi"
-      className="divide-y divide-slate-200 rounded border border-slate-200 bg-white"
-    >
+    <ul aria-label="Flussi" className="space-y-3">
       {flows.data.map((flow) => (
-        <li key={flow.id} className="px-4 py-3">
+        <li key={flow.id} className="rounded border border-slate-200 bg-white p-4">
           <FlowOverviewCard flow={flow} />
         </li>
       ))}

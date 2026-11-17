@@ -23,7 +23,14 @@ import {
   statisticsOf,
 } from './flow-statistics';
 import { forecastAccuracyOf } from './forecast-accuracy';
-import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
+import {
+  closedPositionTotals,
+  historyPage,
+  InvalidSearch,
+  orderTotals,
+  type FakeHistoryRow,
+  type FakeRecords,
+} from './history';
 import { lastDecisionOf } from './last-decision';
 import { notificationChannelHandlers } from './notification-channel-handlers';
 import { notificationEmailHandlers } from './notification-email-handlers';
@@ -118,16 +125,25 @@ const refusedOr = (respond: () => Response): Response => {
   }
 };
 
-/** A page of a history of the tenant of the user, under the key the API gives it (R2.5.1, ADR 0138). */
+/**
+ * A page of a history of the tenant of the user, under the key the API gives it (R2.5.1, ADR 0138); a history with
+ * totals gives them with its first page only, those of every row of the search (Bug 569).
+ */
 const historyResponse = <T>(
   request: Request,
   rowsOf: (records: FakeRecords) => readonly FakeHistoryRow<T>[],
   key: string,
+  totalsOf?: (admitted: T[]) => object,
 ) =>
   withUser(request, (user) =>
     refusedOr(() => {
-      const { found, next } = historyPage(rowsOf(user.records), new URL(request.url).searchParams);
-      return HttpResponse.json({ [key]: found, next });
+      const search = new URL(request.url).searchParams;
+      const { found, next, admitted } = historyPage(rowsOf(user.records), search);
+      if (totalsOf === undefined) {
+        return HttpResponse.json({ [key]: found, next });
+      }
+      const totals = search.has('after') ? null : totalsOf(admitted);
+      return HttpResponse.json({ [key]: found, next, totals });
     }),
   );
 
@@ -465,10 +481,15 @@ export const handlers = [
     historyResponse(request, (records) => records.cycles, 'cycles'),
   ),
   http.get('*/history/closed-positions', ({ request }) =>
-    historyResponse(request, (records) => records.closedPositions, 'positions'),
+    historyResponse(
+      request,
+      (records) => records.closedPositions,
+      'positions',
+      closedPositionTotals,
+    ),
   ),
   http.get('*/history/orders', ({ request }) =>
-    historyResponse(request, (records) => records.orders, 'orders'),
+    historyResponse(request, (records) => records.orders, 'orders', orderTotals),
   ),
   http.post('*/flows', ({ request }) => configuring(request, createFlow, 201)),
   http.patch('*/flows/:flowId', ({ request, params }) =>

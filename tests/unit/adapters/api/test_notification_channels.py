@@ -1,5 +1,5 @@
 """The channels of the types of event and the exceptions of the flows from the programmatic interface (R3.5.3, ADR
-canali-delle-notifiche-per-tipo-di-evento).
+canali-delle-notifiche-per-tipo-di-evento, ADR canali-delle-notifiche-come-insieme).
 """
 
 from collections.abc import Callable
@@ -66,14 +66,22 @@ def test_a_user_who_never_chose_reads_every_type_of_event_on_its_default_channel
 
     assert body["events"][0] == {
         "event": OPENING,
-        "channel": "Telegram",
+        "channels": ["Telegram"],
         "of_flow": True,
         "warnings": ["Telegram non collegato"],
     }
     reduced = next(each for each in body["events"] if each["event"] == "decisione ridotta dal rischio")
-    assert reduced == {"event": "decisione ridotta dal rischio", "channel": "nessuno", "of_flow": True, "warnings": []}
+    assert reduced == {"event": "decisione ridotta dal rischio", "channels": [], "of_flow": True, "warnings": []}
     assert body["flows"] == [{"flow_id": str(alfa.id.value), "name": "alfa", "exceptions": []}]
     assert body["warnings"] == ["Telegram non collegato", "email non indicata", "server di posta non configurato"]
+    assert body["channels"] == [
+        {"channel": "Telegram", "configured": False, "warnings": ["Telegram non collegato"]},
+        {
+            "channel": "email",
+            "configured": False,
+            "warnings": ["email non indicata", "server di posta non configurato"],
+        },
+    ]
 
 
 def test_the_channels_warn_of_the_missing_mail_server_whatever_the_choices(
@@ -94,29 +102,44 @@ def test_the_channels_warn_of_the_missing_mail_server_whatever_the_choices(
 def test_a_chosen_channel_reads_back_for_its_tenant_only(client_of: Client) -> None:
     anna = client_of("anna")
 
-    response = anna.put("/notifications/channels", json={"event": "ciclo fallito", "channel": "nessuno"})
+    response = anna.put("/notifications/channels", json={"event": "ciclo fallito", "channels": ["email", "Telegram"]})
 
     assert response.status_code == 204
     chosen = next(
         each for each in anna.get("/notifications/channels").json()["events"] if each["event"] == "ciclo fallito"
     )
-    assert chosen["channel"] == "nessuno"
+    assert chosen["channels"] == ["Telegram", "email"]
     bruno = client_of("bruno").get("/notifications/channels").json()["events"]
-    assert next(each for each in bruno if each["event"] == "ciclo fallito")["channel"] == "Telegram"
+    assert next(each for each in bruno if each["event"] == "ciclo fallito")["channels"] == ["Telegram"]
+
+
+def test_no_channel_chosen_silences_the_event(client_of: Client) -> None:
+    anna = client_of("anna")
+
+    response = anna.put("/notifications/channels", json={"event": "ciclo fallito", "channels": []})
+
+    assert response.status_code == 204
+    events = anna.get("/notifications/channels").json()["events"]
+    assert next(each for each in events if each["event"] == "ciclo fallito")["channels"] == []
 
 
 def test_an_unknown_channel_or_event_is_an_invalid_request(client_of: Client) -> None:
     anna = client_of("anna")
 
-    assert anna.put("/notifications/channels", json={"event": "ciclo fallito", "channel": "sms"}).status_code == 422
-    assert anna.put("/notifications/channels", json={"event": "eclissi", "channel": "email"}).status_code == 422
+    for body in (
+        {"event": "ciclo fallito", "channels": ["sms"]},
+        {"event": "ciclo fallito", "channels": ["entrambi"]},
+        {"event": "ciclo fallito", "channel": "email"},
+        {"event": "eclissi", "channels": ["email"]},
+    ):
+        assert anna.put("/notifications/channels", json=body).status_code == 422, body
 
 
 def test_an_exception_of_a_flow_reads_back_and_is_removed(platform: Platform, client_of: Client) -> None:
     alfa = flow_of(platform, "anna", "alfa")
     anna = client_of("anna")
 
-    put = anna.put(exception_path(alfa, OPENING), json={"channel": "email"})
+    put = anna.put(exception_path(alfa, OPENING), json={"channels": ["email"]})
     excepted = anna.get("/notifications/channels").json()["flows"][0]["exceptions"]
     removed = anna.delete(exception_path(alfa, OPENING))
 
@@ -124,7 +147,7 @@ def test_an_exception_of_a_flow_reads_back_and_is_removed(platform: Platform, cl
     assert excepted == [
         {
             "event": OPENING,
-            "channel": "email",
+            "channels": ["email"],
             "of_flow": True,
             "warnings": ["email non indicata", "server di posta non configurato"],
         }
@@ -136,7 +159,7 @@ def test_an_exception_of_a_flow_reads_back_and_is_removed(platform: Platform, cl
 def test_an_exception_for_an_event_of_the_account_is_refused(platform: Platform, client_of: Client) -> None:
     alfa = flow_of(platform, "anna", "alfa")
 
-    response = client_of("anna").put(exception_path(alfa, ALARM), json={"channel": "email"})
+    response = client_of("anna").put(exception_path(alfa, ALARM), json={"channels": ["email"]})
 
     assert response.status_code == 400
     assert reason_of(response) == {
@@ -148,9 +171,9 @@ def test_an_exception_for_an_event_of_the_account_is_refused(platform: Platform,
 def test_an_exception_for_a_flow_of_another_tenant_is_not_found(platform: Platform, client_of: Client) -> None:
     alfa = flow_of(platform, "anna", "alfa")
 
-    response = client_of("bruno").put(exception_path(alfa, OPENING), json={"channel": "email"})
+    response = client_of("bruno").put(exception_path(alfa, OPENING), json={"channels": ["email"]})
     unknown = client_of("anna").put(
-        f"/notifications/channels/flows/{uuid4()}/{quote(OPENING)}", json={"channel": "email"}
+        f"/notifications/channels/flows/{uuid4()}/{quote(OPENING)}", json={"channels": ["email"]}
     )
 
     assert response.status_code == unknown.status_code == 404

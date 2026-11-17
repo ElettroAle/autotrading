@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { CommandButton } from '@/components/ui/command-button';
+import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { paths } from '@/config/paths';
 
 import type { Account } from '../api/get-accounts';
@@ -21,18 +22,15 @@ export const AccountActions = ({ account }: { readonly account: Account }) => {
     setAction(next);
   };
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
+    <div role="group" aria-label={`Comandi del conto ${account.name}`} className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         <CommandButton tone="secondary" onClick={() => start('replacing')}>
           Sostituisci le credenziali
         </CommandButton>
         <CommandButton tone="destructive" onClick={() => start('removing')}>
           Rimuovi
         </CommandButton>
-        <Link
-          to={paths.accountCapital.getHref(account.id)}
-          className="rounded border border-slate-300 px-3 py-1.5 text-blue-800"
-        >
+        <Link to={paths.accountCapital.getHref(account.id)} className={SECONDARY_COMMAND}>
           Storico del capitale
         </Link>
       </div>

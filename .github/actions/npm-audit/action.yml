@@ -1,9 +1,11 @@
 name: npm-audit
-description: Vulnerabilità note nelle dipendenze della dashboard; qualunque vulnerabilità blocca.
+description: >-
+  Vulnerabilità note nelle dipendenze della dashboard; qualunque vulnerabilità blocca, salvo un'advisory senza correzione
+  accettata in dashboard/.nsprc con motivo e scadenza (ADR eccezioni-delle-vulnerabilita-npm-con-scadenza).
 runs:
   using: composite
   steps:
     - name: Npm audit
       shell: bash
       working-directory: dashboard
-      run: npm audit --audit-level=low
+      run: npx --no-install better-npm-audit audit --level low --require-notes --require-expiry --max-expiry-days 14

@@ -39,9 +39,11 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.history import (
     ClosedPositionHistoryEntry,
+    ClosedPositionHistoryTotals,
     CycleHistoryEntry,
     HistoryQuery,
     OrderHistoryEntry,
+    OrderHistoryTotals,
 )
 from autotrading.domain.flows.ledger import (
     AccountLedger,
@@ -1416,6 +1418,10 @@ class HistoricalClosedPositionsPort(Protocol):
         """
         ...
 
+    def closed_position_totals(self, query: HistoryQuery) -> ClosedPositionHistoryTotals:
+        """The PnL and the fees of every position the filters admit, whatever the cursor (Bug 569)."""
+        ...
+
 
 class HistoricalOrdersPort(Protocol):
     """Bound to the tenant of the request: the orders sent on its accounts, with their executions (R2.5.1)."""
@@ -1426,4 +1432,8 @@ class HistoricalOrdersPort(Protocol):
         Period and versions go by the creation instant; a filter on the flow or the version leaves out the orders of
         no flow.
         """
+        ...
+
+    def order_totals(self, query: HistoryQuery) -> OrderHistoryTotals:
+        """The fees of the executions of every order the filters admit, whatever the cursor (Bug 569)."""
         ...

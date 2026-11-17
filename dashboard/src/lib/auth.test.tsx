@@ -23,6 +23,7 @@ import {
   returnPathOf,
   SessionExpiredError,
   startAutomaticSignIn,
+  useSignedInUserName,
   useSignOut,
 } from './auth';
 
@@ -320,5 +321,36 @@ describe('useSignOut', () => {
 
     await vi.waitFor(() => expect(client.getAllAccounts()).toEqual([]));
     expect(Object.keys(localStorage).filter((key) => key.includes('token'))).toEqual([]);
+  });
+});
+
+// ADR area-utente-in-alto-a-destra: the name comes from the identity token MSAL already holds, never from the API.
+describe('useSignedInUserName', () => {
+  const UserName = () => <p>{useSignedInUserName() ?? 'nessuno'}</p>;
+
+  it('is the name of the signed-in user', async () => {
+    const client = await authClientFor('anna');
+    showWithAuth(client, [{ path: '/', element: <UserName /> }], '/');
+
+    expect(await screen.findByText('anna')).toBeInTheDocument();
+  });
+
+  it('falls back on the username when the token has no name', async () => {
+    const client = await authClientFor('anna');
+    const account = client.getActiveAccount();
+    if (account === null) {
+      throw new Error('anna was expected to be signed in');
+    }
+    vi.spyOn(client, 'getActiveAccount').mockReturnValue({ ...account, name: undefined });
+    showWithAuth(client, [{ path: '/', element: <UserName /> }], '/');
+
+    expect(await screen.findByText('anna@example.test')).toBeInTheDocument();
+  });
+
+  it('is nobody before the sign-in', async () => {
+    const client = await authClientFor();
+    showWithAuth(client, [{ path: '/', element: <UserName /> }], '/');
+
+    expect(await screen.findByText('nessuno')).toBeInTheDocument();
   });
 });

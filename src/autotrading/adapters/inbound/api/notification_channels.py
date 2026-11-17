@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -8,23 +8,23 @@ from pydantic import BaseModel
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelCommand
 from autotrading.application.notifications.get_notification_channels import (
+    ChannelState,
     EventChannel,
     FlowChannels,
     NotificationChannels,
 )
 from autotrading.application.notifications.remove_flow_channel_exception import RemoveFlowChannelExceptionCommand
 from autotrading.application.notifications.set_flow_channel_exception import SetFlowChannelExceptionCommand
-from autotrading.domain.notifications.notification_channel import MissingLink, NotificationChannel
+from autotrading.domain.notifications.notification_channel import Channels, MissingLink, NotificationChannel, in_order
 from autotrading.domain.notifications.notification_event import NotificationEvent
 
 # The words the user chooses the channels by, and those of the warnings, are the interface's: the core names no
-# messaging service (R3.5.3).
-type ChannelName = Literal["Telegram", "email", "entrambi", "nessuno"]
+# messaging service (R3.5.3). A type of event goes to a list of them, empty for none (ADR
+# canali-delle-notifiche-come-insieme).
+type ChannelName = Literal["Telegram", "email"]
 CHANNEL_NAMES: dict[NotificationChannel, ChannelName] = {
     NotificationChannel.TELEGRAM: "Telegram",
     NotificationChannel.EMAIL: "email",
-    NotificationChannel.BOTH: "entrambi",
-    NotificationChannel.NONE: "nessuno",
 }
 _CHANNELS_BY_NAME = {name: channel for channel, name in CHANNEL_NAMES.items()}
 WARNINGS = {
@@ -34,20 +34,28 @@ WARNINGS = {
 }
 
 
-def channel_named(name: ChannelName) -> NotificationChannel:
-    return _CHANNELS_BY_NAME[name]
+def channels_named(names: Iterable[ChannelName]) -> Channels:
+    return frozenset(_CHANNELS_BY_NAME[name] for name in names)
+
+
+def names_of(channels: Channels) -> list[ChannelName]:
+    return [CHANNEL_NAMES[channel] for channel in in_order(channels)]
 
 
 def warning_of(missing: MissingLink) -> str:
     return WARNINGS[missing]
 
 
+def warnings_of(missing_links: Iterable[MissingLink]) -> list[str]:
+    return [warning_of(missing) for missing in missing_links]
+
+
 class EventChannelResponse(BaseModel):
-    """A type of event by the name the user reads, its channel, whether a flow may have an exception for it, and
+    """A type of event by the name the user reads, its channels, whether a flow may have an exception for it, and
     the warnings of a chosen channel that is not linked (R3.5.3)."""
 
     event: NotificationEvent
-    channel: ChannelName
+    channels: list[ChannelName]
     of_flow: bool
     warnings: list[str]
 
@@ -55,9 +63,9 @@ class EventChannelResponse(BaseModel):
     def of(cls, channel: EventChannel) -> EventChannelResponse:
         return cls(
             event=channel.event,
-            channel=CHANNEL_NAMES[channel.channel],
+            channels=names_of(channel.channels),
             of_flow=channel.of_flow,
-            warnings=[warning_of(missing) for missing in channel.missing_links],
+            warnings=warnings_of(channel.missing_links),
         )
 
 
@@ -74,11 +82,27 @@ class FlowChannelsResponse(BaseModel):
         return cls(flow_id=flow.flow_id, name=flow.name, exceptions=exceptions)
 
 
+class ChannelStateResponse(BaseModel):
+    """A channel of the platform, whether the user configured it, and otherwise what it misses (R3.5.5)."""
+
+    channel: ChannelName
+    configured: bool
+    warnings: list[str]
+
+    @classmethod
+    def of(cls, state: ChannelState) -> ChannelStateResponse:
+        return cls(
+            channel=CHANNEL_NAMES[state.channel], configured=state.configured, warnings=warnings_of(state.missing_links)
+        )
+
+
 class NotificationChannelsResponse(BaseModel):
-    """The choices of the user and, whatever they are, the warning of every channel that cannot be reached (R3.5.5)."""
+    """The choices of the user, every channel with its state and, whatever the choices, the warning of every channel
+    that cannot be reached (R3.5.5)."""
 
     events: list[EventChannelResponse]
     flows: list[FlowChannelsResponse]
+    channels: list[ChannelStateResponse]
     warnings: list[str]
 
     @classmethod
@@ -86,21 +110,22 @@ class NotificationChannelsResponse(BaseModel):
         return cls(
             events=[EventChannelResponse.of(channel) for channel in channels.events],
             flows=[FlowChannelsResponse.of(flow) for flow in channels.flows],
-            warnings=[warning_of(missing) for missing in channels.missing_links],
+            channels=[ChannelStateResponse.of(state) for state in channels.channels],
+            warnings=warnings_of(channels.missing_links),
         )
 
 
 class ChannelChoiceRequest(BaseModel):
-    """The channel of a type of event for all the flows of the user."""
+    """The channels of a type of event for all the flows of the user, none for no notification."""
 
     event: NotificationEvent
-    channel: ChannelName
+    channels: list[ChannelName]
 
 
 class FlowChannelRequest(BaseModel):
-    """The channel of a flow for the type of event of the path."""
+    """The channels of a flow for the type of event of the path, none for no notification."""
 
-    channel: ChannelName
+    channels: list[ChannelName]
 
 
 def notification_channels_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
@@ -117,7 +142,7 @@ def notification_channels_router(use_cases_of_request: Callable[..., TenantUseCa
         request: ChannelChoiceRequest, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
     ) -> None:
         use_cases.choose_notification_channel.execute(
-            ChooseNotificationChannelCommand(request.event, channel_named(request.channel))
+            ChooseNotificationChannelCommand(request.event, channels_named(request.channels))
         )
 
     @router.put("/flows/{flow_id}/{event}", status_code=status.HTTP_204_NO_CONTENT)
@@ -127,7 +152,7 @@ def notification_channels_router(use_cases_of_request: Callable[..., TenantUseCa
         request: FlowChannelRequest,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> None:
-        command = SetFlowChannelExceptionCommand(flow_id, event, channel_named(request.channel))
+        command = SetFlowChannelExceptionCommand(flow_id, event, channels_named(request.channels))
         use_cases.set_flow_channel_exception.execute(command)
 
     @router.delete("/flows/{flow_id}/{event}", status_code=status.HTTP_204_NO_CONTENT)

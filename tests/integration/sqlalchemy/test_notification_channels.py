@@ -1,12 +1,13 @@
 """The channels of the types of event and the exceptions of the flows, under row level security, and the flows the
-notifications name (R3.5.3, ADR canali-delle-notifiche-per-tipo-di-evento).
+notifications name (R3.5.3, ADR canali-delle-notifiche-per-tipo-di-evento, ADR canali-delle-notifiche-come-insieme).
 """
 
 from dataclasses import replace
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, insert, select
+from sqlalchemy.exc import IntegrityError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.channel_preferences_repository import (
@@ -23,7 +24,7 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
-from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_channel import NO_CHANNEL, NotificationChannel
 from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -51,10 +52,10 @@ def new_flow(database: Engine, tenant_id: TenantId, name: str) -> Flow:
 def chosen(tenant_id: TenantId, flow_id: UUID) -> ChannelPreferences:
     return (
         ChannelPreferences.of(tenant_id)
-        .choosing(NotificationEvent.CYCLE_FAILED, NotificationChannel.EMAIL)
-        .choosing(NotificationEvent.OPENING_BLOCKED, NotificationChannel.BOTH)
-        .excepting(flow_id, NotificationEvent.POSITION_OPENED, NotificationChannel.TELEGRAM)
-        .excepting(flow_id, NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE)
+        .choosing(NotificationEvent.CYCLE_FAILED, frozenset({NotificationChannel.EMAIL}))
+        .choosing(NotificationEvent.OPENING_BLOCKED, frozenset(NotificationChannel))
+        .excepting(flow_id, NotificationEvent.POSITION_OPENED, frozenset({NotificationChannel.TELEGRAM}))
+        .excepting(flow_id, NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
     )
 
 
@@ -74,7 +75,7 @@ def test_the_preferences_read_back_and_new_ones_replace_them(database: Engine) -
     repository.save(read.without_exception(alfa.id.value, NotificationEvent.POSITION_OPENED))
 
     assert read == chosen(anna, alfa.id.value)
-    assert repository.get().exceptions_of(alfa.id.value) == {NotificationEvent.CYCLE_FAILED: NotificationChannel.NONE}
+    assert repository.get().exceptions_of(alfa.id.value) == {NotificationEvent.CYCLE_FAILED: NO_CHANNEL}
 
 
 def test_a_tenant_never_sees_nor_changes_the_preferences_of_another(database: Engine) -> None:
@@ -123,3 +124,14 @@ def test_the_notified_flows_are_those_of_the_tenant_not_archived_by_name(databas
         NotifiedFlow(alfa.id.value, "alfa"),
         NotifiedFlow(beta.id.value, "beta"),
     )
+
+
+def test_a_channel_the_platform_does_not_know_is_refused_by_the_database(database: Engine) -> None:
+    anna = new_tenant(database)
+
+    unknown = insert(notification_channels).values(tenant_id=anna.value, event="cycle_failed", channels=["sms"])
+
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(anna.value), True)))
+        with pytest.raises(IntegrityError):
+            connection.execute(unknown)
