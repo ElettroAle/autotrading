@@ -56,18 +56,24 @@ class SmtpMailerAdapter:
 
     def _connect(self) -> smtplib.SMTP:
         if self._port == IMPLICIT_TLS_PORT:
-            return smtplib.SMTP_SSL(
-                self._host, self._port, timeout=TIMEOUT_SECONDS, context=ssl.create_default_context()
-            )
+            return smtplib.SMTP_SSL(self._host, self._port, timeout=TIMEOUT_SECONDS, context=_verified_context())
         return smtplib.SMTP(self._host, self._port, timeout=TIMEOUT_SECONDS)
 
     def _secure(self, server: smtplib.SMTP) -> None:
         if self._port != IMPLICIT_TLS_PORT:
-            server.starttls(context=ssl.create_default_context())
+            server.starttls(context=_verified_context())
 
     def _authenticate(self, server: smtplib.SMTP) -> None:
         if self._login is not None:
             server.login(*self._login)
+
+
+def _verified_context() -> ssl.SSLContext:
+    """A TLS context that checks the certificate and the name of the mail service: never a connection to an impostor."""
+    context = ssl.create_default_context()
+    context.check_hostname = True
+    context.verify_mode = ssl.CERT_REQUIRED
+    return context
 
 
 def _message_of(sender: str, address: EmailAddress, subject: str, text: str) -> EmailMessage:

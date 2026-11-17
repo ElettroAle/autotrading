@@ -23,6 +23,10 @@ ANNA = EmailAddress.parse("anna@example.com")
 SENDER = "notifiche@autotrading.example"
 
 
+def verifies(context: ssl.SSLContext) -> bool:
+    return context.check_hostname and context.verify_mode == ssl.CERT_REQUIRED
+
+
 class InMemorySmtpServer:
     """A connection to a mail server: what it was told, and the step at which it refuses, if any."""
 
@@ -32,7 +36,8 @@ class InMemorySmtpServer:
     def __init__(self, host: str, port: int, timeout: float, context: ssl.SSLContext | None = None) -> None:
         self.address = (host, port)
         self.timeout = timeout
-        self.implicit_tls = context is not None
+        # Only a context that checks the certificate and the name of the server secures the connection.
+        self.implicit_tls = context is not None and verifies(context)
         self.secured = False
         self.logins: list[tuple[str, str]] = []
         self.messages: list[EmailMessage] = []
@@ -50,7 +55,7 @@ class InMemorySmtpServer:
 
     def starttls(self, context: ssl.SSLContext) -> None:
         self._refuse("starttls")
-        self.secured = isinstance(context, ssl.SSLContext)
+        self.secured = verifies(context)
 
     def login(self, user: str, password: str) -> None:
         self._refuse("login")

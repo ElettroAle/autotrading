@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from autotrading.domain.notifications.errors import InvalidEmailAddressError
 
 # The form alone, never a delivery: the address counts at once, without a verification (R3.5.2).
-EMAIL_FORM = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+EMAIL_FORM = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
 
 
 @dataclass(frozen=True, slots=True)
