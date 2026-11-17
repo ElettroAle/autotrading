@@ -9,10 +9,12 @@ from autotrading.domain.flows.call_cost import CallCost
 
 @dataclass(frozen=True, slots=True)
 class CycleCost:
-    """The cost of the model call of one cycle, with the planned instant that dates it."""
+    """The cost of the model call of one cycle, with the planned instant that dates it; None when the call went out
+    without a usage anybody knows (R1.4.6).
+    """
 
     planned_at: datetime
-    cost: CallCost
+    cost: CallCost | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +39,7 @@ class FlowCost:
         by_day: defaultdict[date, Decimal] = defaultdict(Decimal)
         unavailable = 0
         for item in costs:
-            if item.cost.cost_usd is None:
+            if item.cost is None or item.cost.cost_usd is None:
                 unavailable += 1
                 continue
             by_day[item.planned_at.astimezone(UTC).date()] += item.cost.cost_usd

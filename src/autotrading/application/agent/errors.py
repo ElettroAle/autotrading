@@ -1,6 +1,8 @@
 from collections.abc import Iterable, Mapping
+from decimal import Decimal
 
 from autotrading.application.errors import ApplicationError
+from autotrading.domain.agent.model_usage import ModelPrices, ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.errors import ErrorScope
 
@@ -73,14 +75,34 @@ class ModelCreditExhaustedError(ApplicationError):
 
 
 class ModelUnavailableError(ApplicationError):
-    """The provider did not answer, or answered with an error that may not repeat: only the cycle fails (R1.2.3)."""
+    """The provider did not answer, or answered with an error that may not repeat: only the cycle fails (R1.2.3).
+
+    A call that went out may have been charged: the error says so, with the usage the provider reported when it did,
+    so the cycle still records the call (R1.4.6, ADR uso-riportato-nell-errore-della-chiamata-al-modello).
+    """
 
     status_code = 503
 
-    def __init__(self, provider: ProviderName, original: str) -> None:
+    def __init__(
+        self,
+        provider: ProviderName,
+        original: str,
+        *,
+        usage: ModelUsage | None = None,
+        sent: bool = False,
+        cost_usd: Decimal | None = None,
+    ) -> None:
         super().__init__(f"fornitore IA non raggiungibile: {provider.value}: {original}")
         self.provider = provider
         self.original = original
+        self.usage = usage
+        self.sent = sent
+        self.cost_usd = cost_usd
+
+    def priced(self, prices: ModelPrices | None) -> ModelUnavailableError:
+        """The same error with the cost of the reported usage, priced as every answered call is (R1.4.6)."""
+        cost = None if self.usage is None else self.usage.cost_usd(prices)
+        return ModelUnavailableError(self.provider, self.original, usage=self.usage, sent=self.sent, cost_usd=cost)
 
 
 class ModelKeyMissingError(ApplicationError):

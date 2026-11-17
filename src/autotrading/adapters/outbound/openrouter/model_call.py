@@ -28,6 +28,9 @@ KEY_REJECTED = frozenset({401, 403})
 CREDIT_EXHAUSTED = 402
 ORIGINAL_LIMIT = 300
 UNEXPECTED_ANSWER = "risposta del fornitore inattesa"
+UNREADABLE = (KeyError, IndexError, TypeError, ValueError, InvalidOperation, InvalidModelUsageError)
+# Failures before the request leaves: OpenRouter never received it, so it cannot have charged it.
+NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 DEFAULT_MAX_TOKENS = 4096
 EFFORTS: Mapping[str, str] = {"basso": "low", "medio": "medium", "alto": "high"}
 # Routed only to the providers that take every parameter: the format of the answer is enforced, never dropped.
@@ -55,10 +58,15 @@ class OpenRouterModelCallAdapter:
         answer: AnswerFormat,
     ) -> ModelReply:
         document = self._complete(key, _request(model, settings, messages, answer))
+        # Whatever the answer looks like, the request went out and OpenRouter may have charged it (R1.4.6).
         try:
-            return _reply_of(document)
-        except (KeyError, IndexError, TypeError, ValueError, InvalidOperation, InvalidModelUsageError) as error:
-            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER) from error
+            usage = _usage_of(document)
+        except UNREADABLE as error:
+            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from error
+        try:
+            return ModelReply(_text_of(document), usage)
+        except UNREADABLE as error:
+            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, usage=usage, sent=True) from error
 
     def _complete(self, key: ProviderKey, request: Mapping[str, object]) -> object:
         try:
@@ -69,16 +77,16 @@ class OpenRouterModelCallAdapter:
                 timeout=TIMEOUT_SECONDS,
             )
         # The errors of httpx carry the request, and with it the key in its header: they never travel as a cause.
-        except httpx.TimeoutException:
-            raise ModelUnavailableError(OPENROUTER, "tempo di risposta scaduto") from None
+        except NOT_SENT as error:
+            raise ModelUnavailableError(OPENROUTER, _reason_of(error)) from None
         except httpx.HTTPError as error:
-            raise ModelUnavailableError(OPENROUTER, type(error).__name__) from None
+            raise ModelUnavailableError(OPENROUTER, _reason_of(error), sent=True) from None
         if response.status_code != httpx.codes.OK:
             raise _refusal(key, response)
         try:
             document: object = response.json()
         except ValueError:
-            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER) from None
+            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from None
         return document
 
 
@@ -115,7 +123,7 @@ def _refusal(key: ProviderKey, response: httpx.Response) -> Exception:
     if status == CREDIT_EXHAUSTED:
         return ModelCreditExhaustedError(OPENROUTER)
     # A provider may echo part of the request in its message: the key is masked before it can travel further.
-    return ModelUnavailableError(OPENROUTER, key.redact(f"{status} {_original_message(response)}"))
+    return ModelUnavailableError(OPENROUTER, key.redact(f"{status} {_original_message(response)}"), sent=True)
 
 
 def _original_message(response: httpx.Response) -> str:
@@ -129,13 +137,27 @@ def _original_message(response: httpx.Response) -> str:
     return " ".join(text.split())[:ORIGINAL_LIMIT]
 
 
-def _reply_of(document: object) -> ModelReply:
+def _reason_of(error: httpx.HTTPError) -> str:
+    if isinstance(error, httpx.TimeoutException):
+        return "tempo di risposta scaduto"
+    return type(error).__name__
+
+
+def _usage_of(document: object) -> ModelUsage:
     if not isinstance(document, Mapping):
         raise InvalidModelUsageError
-    text = document["choices"][0]["message"]["content"]
     usage = document["usage"]
-    if not isinstance(text, str) or not isinstance(usage, Mapping):
+    if not isinstance(usage, Mapping):
         raise InvalidModelUsageError
     cost = usage.get("cost")
     reported = None if cost is None else Decimal(str(cost))
-    return ModelReply(text, ModelUsage(int(usage["prompt_tokens"]), int(usage["completion_tokens"]), reported))
+    return ModelUsage(int(usage["prompt_tokens"]), int(usage["completion_tokens"]), reported)
+
+
+def _text_of(document: object) -> str:
+    if not isinstance(document, Mapping):
+        raise InvalidModelUsageError
+    text = document["choices"][0]["message"]["content"]
+    if not isinstance(text, str):
+        raise InvalidModelUsageError
+    return text

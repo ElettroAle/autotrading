@@ -40,3 +40,11 @@ def test_a_cost_nobody_knows_is_counted_apart_and_never_added() -> None:
 
 def test_a_flow_without_calls_costs_nothing() -> None:
     assert FlowCost.of([]) == FlowCost(Decimal(0), (), 0)
+
+
+# ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: a call that went out without a known usage counts apart.
+def test_a_call_without_a_known_usage_is_counted_apart_and_never_added() -> None:
+    cost = FlowCost.of([CycleCost(DAY, None), a_cost(DAY, "0.01")])
+
+    assert (cost.total_usd, cost.unavailable_calls) == (Decimal("0.01"), 1)
+    assert cost.days == (DailyCost(date(2026, 11, 12), Decimal("0.01")),)

@@ -1,20 +1,24 @@
 from collections.abc import Mapping
 
 from autotrading.adapters.outbound.json.json_document import json_document
+from autotrading.application.agent.errors import ModelUnavailableError
 from autotrading.application.flows.ports import (
     AgentResponsePort,
     CycleContext,
     CycleDecisions,
+    FailedModelCall,
     RiskReview,
     SourceReading,
 )
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_step import CycleStep
 
 
 class JsonCycleJournalAdapter:
-    """Describes for the record what each step produced, as JSON data (R1.7.1, R1.4.6).
+    """Describes for the record what each step produced, as JSON data, and the model call of a failed decision
+    (R1.7.1, R1.4.6).
 
     Only the types of the cycle travel here: none of them carries a credential or a provider key.
     """
@@ -41,6 +45,15 @@ class JsonCycleJournalAdapter:
             return None
         usage = decision.reply.usage
         return CallCost(usage.input_tokens, usage.output_tokens, decision.reply.cost_usd)
+
+    def failed_call(self, error: AutotradingError) -> FailedModelCall | None:
+        """Only a call that went out may have been charged; its usage is known when the provider reported it."""
+        if not isinstance(error, ModelUnavailableError) or not error.sent:
+            return None
+        usage = error.usage
+        if usage is None:
+            return FailedModelCall(None)
+        return FailedModelCall(CallCost(usage.input_tokens, usage.output_tokens, error.cost_usd))
 
     def _flow_of(self, cycle_flow: CycleFlow) -> dict[str, object]:
         configuration = cycle_flow.configuration

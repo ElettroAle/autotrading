@@ -1215,6 +1215,15 @@ class FlowLossGuardPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class FailedModelCall:
+    """A model call that went out in a decision that failed: tokens and cost when the provider reported its usage,
+    None when nobody knows them (R1.4.6).
+    """
+
+    cost: CallCost | None
+
+
 class CycleJournalPort(Protocol):
     """Describes for the record what the steps produced: only the contexts behind the steps know their data."""
 
@@ -1224,6 +1233,12 @@ class CycleJournalPort(Protocol):
 
     def call_cost(self, decision: object) -> CallCost | None:
         """Tokens and cost of the model call behind the decision of the agent (R1.4.6)."""
+        ...
+
+    def failed_call(self, error: AutotradingError) -> FailedModelCall | None:
+        """The model call behind the error that failed the decision of the agent; None when no call went out
+        (R1.4.6, ADR costo-della-decisione-fallita-nel-registro-del-ciclo).
+        """
         ...
 
 

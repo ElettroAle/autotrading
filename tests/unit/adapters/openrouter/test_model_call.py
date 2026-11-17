@@ -170,3 +170,64 @@ def test_a_refused_connection_is_transient_and_never_carries_the_request() -> No
         adapter.call(MODEL, KEY, {}, MESSAGES, FORMAT)
 
     assert raised.value.__cause__ is None
+
+
+# ADR-uso-riportato-nell-errore-della-chiamata-al-modello: a call OpenRouter may have charged says so in its error.
+def test_an_answer_without_text_keeps_the_usage_openrouter_reported() -> None:
+    body = {"choices": [{"message": {"role": "assistant", "content": None}}], "usage": USAGE}
+
+    with pytest.raises(ModelUnavailableError, match="risposta del fornitore inattesa") as raised:
+        call(OpenRouter(200, body))
+
+    assert raised.value.usage == ModelUsage(2000, 500, Decimal("0.0031"))
+    assert raised.value.sent
+
+
+@pytest.mark.parametrize(
+    ("body", "text"),
+    [
+        ({"choices": []}, None),
+        ({"choices": [{"message": {"content": ANSWER}}], "usage": {"prompt_tokens": -1, "completion_tokens": 2}}, None),
+        (None, "<html>"),
+    ],
+    ids=["no-usage", "invalid-usage", "not-json"],
+)
+def test_an_answer_without_a_readable_usage_was_sent_without_usage(body: object, text: str | None) -> None:
+    with pytest.raises(ModelUnavailableError, match="risposta del fornitore inattesa") as raised:
+        call(OpenRouter(200, body, text))
+
+    assert (raised.value.usage, raised.value.sent) == (None, True)
+
+
+def test_a_refusal_after_the_request_went_out_was_sent_without_usage() -> None:
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(OpenRouter(503, {"error": {"code": 503, "message": "busy"}}))
+
+    assert (raised.value.usage, raised.value.sent) == (None, True)
+
+
+def test_a_timeout_after_the_request_went_out_was_sent_without_usage() -> None:
+    def slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout(TIMED_OUT, request=request)
+
+    adapter = OpenRouterModelCallAdapter(httpx.Client(transport=httpx.MockTransport(slow)))
+    with pytest.raises(ModelUnavailableError) as raised:
+        adapter.call(MODEL, KEY, {}, MESSAGES, FORMAT)
+
+    assert (raised.value.usage, raised.value.sent) == (None, True)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout],
+    ids=["refused", "connect-timeout", "pool-timeout"],
+)
+def test_a_request_that_never_went_out_was_not_sent(failure: type[httpx.TransportError]) -> None:
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise failure(REFUSED, request=request)
+
+    adapter = OpenRouterModelCallAdapter(httpx.Client(transport=httpx.MockTransport(unreachable)))
+    with pytest.raises(ModelUnavailableError) as raised:
+        adapter.call(MODEL, KEY, {}, MESSAGES, FORMAT)
+
+    assert not raised.value.sent

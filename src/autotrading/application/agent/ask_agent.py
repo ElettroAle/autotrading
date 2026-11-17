@@ -2,12 +2,18 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from autotrading.application.agent.errors import ModelKeyMissingError
+from autotrading.application.agent.errors import ModelKeyMissingError, ModelUnavailableError
 from autotrading.application.agent.model_gateways import ModelGateways, gateway_of
-from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
+from autotrading.application.agent.ports import (
+    ModelGatewayPort,
+    ModelReply,
+    ProviderKeyOpenerPort,
+    ProviderKeyRepositoryPort,
+)
 from autotrading.domain.agent.agent_context import AgentContext
 from autotrading.domain.agent.agent_response import AgentResponse
 from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
+from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_key import ProviderKey
@@ -45,14 +51,24 @@ class AskAgentUseCase:
     def execute(self, command: AskAgentCommand) -> AgentAnswer:
         definition, gateway = gateway_of(self._gateways, command.model)
         key = self._key_of(definition.provider)
-        reply = gateway.model_call().call(
-            definition.name, key, command.settings, command.context.messages(), DECISIONS_FORMAT
-        )
+        reply = self._reply_of(gateway, definition, key, command)
         return AgentAnswer(
             AgentResponse.read(reply.text, command.context.assets),
             reply.usage,
             reply.usage.cost_usd(definition.prices),
         )
+
+    @staticmethod
+    def _reply_of(
+        gateway: ModelGatewayPort, definition: ModelDefinition, key: ProviderKey, command: AskAgentCommand
+    ) -> ModelReply:
+        """A failed call the provider may have charged still carries its cost, priced as an answered one (R1.4.6)."""
+        try:
+            return gateway.model_call().call(
+                definition.name, key, command.settings, command.context.messages(), DECISIONS_FORMAT
+            )
+        except ModelUnavailableError as error:
+            raise error.priced(definition.prices) from error
 
     def _key_of(self, provider: ProviderName) -> ProviderKey:
         registered = self._keys.get(provider)

@@ -165,6 +165,41 @@ def test_a_failing_call_fails_the_cycle_as_it_is(world: World) -> None:
         world.ask()
 
 
+# ADR-uso-riportato-nell-errore-della-chiamata-al-modello: a paid call without a usable answer keeps usage and cost.
+def test_a_call_without_a_usable_answer_fails_with_the_usage_and_the_cost_of_the_catalog(world: World) -> None:
+    world.register("anthropic", TENANT_KEY)
+    usage = ModelUsage(1000, 1000, None)
+    world.model.failure = ModelUnavailableError(ProviderName("anthropic"), "inattesa", usage=usage, sent=True)
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        world.ask(PRICED)
+
+    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (usage, True, Decimal("0.003"))
+    assert raised.value.__cause__ is world.model.failure
+
+
+def test_a_call_without_a_usable_answer_keeps_the_cost_the_provider_reported(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    usage = ModelUsage(3000, 4000, Decimal("0.002"))
+    world.model.failure = ModelUnavailableError(OPENROUTER, "inattesa", usage=usage, sent=True)
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        world.ask()
+
+    assert raised.value.cost_usd == Decimal("0.002")
+
+
+def test_an_unreadable_answer_keeps_the_usage_and_the_cost_of_the_call(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.text = "non è JSON"
+    world.model.usage = ModelUsage(3000, 4000, Decimal("0.002"))
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert answer.response.decisions == ()
+    assert (answer.usage, answer.cost_usd) == (ModelUsage(3000, 4000, Decimal("0.002")), Decimal("0.002"))
+
+
 @dataclass(frozen=True, slots=True)
 class Question:
     """A question as a cycle of a flow asks it: the model of the flow and the data of the context."""

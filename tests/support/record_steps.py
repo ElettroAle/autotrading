@@ -134,6 +134,27 @@ def catalog_prices(records: Records, price_in: str, price_out: str) -> None:
     )
 
 
+@given(
+    parsers.re(
+        r"^che il fornitore riporta per la chiamata (?P<tokens_in>\d+) token in ingresso, (?P<tokens_out>\d+) in "
+        r"uscita e costo (?P<cost>[\d,]+) USD senza testo di risposta$"
+    )
+)
+def provider_reports_usage_without_text(records: Records, tokens_in: str, tokens_out: str, cost: str) -> None:
+    usage = ModelUsage(int(tokens_in), int(tokens_out), amount(cost))
+    # What the adapters of the providers raise for an answer with its usage and no text (Bug 541).
+    records.flow_cycles.model.failure = ModelUnavailableError(
+        ProviderName("openrouter"), "risposta del fornitore inattesa", usage=usage, sent=True
+    )
+
+
+@given("che il fornitore non risponde entro il tempo massimo")
+def provider_times_out(records: Records) -> None:
+    records.flow_cycles.model.failure = ModelUnavailableError(
+        ProviderName("openrouter"), "tempo di risposta scaduto", sent=True
+    )
+
+
 @given("che né il fornitore né il catalogo riportano il prezzo")
 def no_price(records: Records) -> None:
     records.flow_cycles.model.usage = ModelUsage(1000, 200, None)
@@ -196,6 +217,11 @@ def flow_opens_in_cycle(records: Records, flow: str, asset: str) -> None:
     assert recorded(records).outcome is CycleOutcome.COMPLETED
 
 
+@when(quoted('il ciclo del flusso "{flow}" chiede la decisione all\'agente'))
+def cycle_asks_agent(records: Records, flow: str) -> None:
+    records.flow_cycles.run(flow)
+
+
 @when(quoted('"{user}" consulta i propri flussi'))
 def consult_own_flows(records: Records, user: str) -> None:
     consult(records, lambda: records.use_cases_of(user).list_flow_overviews.execute(ListFlowOverviewsCommand()))
@@ -249,6 +275,22 @@ def failed_at_step(records: Records, step: str) -> None:
     assert record.outcome is CycleOutcome.FAILED
     assert record.failure is not None
     assert record.failure.step.value == step
+
+
+@then("il ciclo fallisce nel passo della decisione dell'agente")
+def fails_in_decision(records: Records) -> None:
+    record = recorded(records)
+    assert record.outcome is CycleOutcome.FAILED
+    assert record.failure is not None
+    assert record.failure.step is CycleStep.AGENT_DECISION
+
+
+@then("il costo del flusso conta una chiamata senza costo noto")
+def flow_cost_counts_unknown_call(records: Records) -> None:
+    flow = recorded(records).flow_id
+    owner = next(user for name, user in records.flow_cycles.users.items() if records.cycles.id_of(name) == flow)
+    flow_cost = records.use_cases_of(owner).read_flow_cost.execute(ReadFlowCostCommand(flow))
+    assert flow_cost.unavailable_calls == 1
 
 
 @then("il ciclo registrato contiene i dati raccolti e il contesto inviato all'agente")
