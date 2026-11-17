@@ -66,6 +66,7 @@ class _CycleRow(TypedDict):
     input_tokens: int | None
     output_tokens: int | None
     cost_usd: Decimal | None
+    model_called: bool
     trigger: str
 
 
@@ -157,14 +158,15 @@ class SqlAlchemyCycleRepositoryAdapter:
         return self.costs_within(flow_id, TimeWindow())
 
     def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
+        """Every call to the model, a call without a known usage too: it counts apart, never as a guess (R1.4.6)."""
         query = (
             select(cycles.c.planned_at, cycles.c.input_tokens, cycles.c.output_tokens, cycles.c.cost_usd)
-            .where(cycles.c.flow_id == flow_id, cycles.c.input_tokens.is_not(None), within(cycles.c.planned_at, window))
+            .where(cycles.c.flow_id == flow_id, cycles.c.model_called, within(cycles.c.planned_at, window))
             .order_by(cycles.c.planned_at)
         )
         with self._transaction() as connection:
             return [
-                CycleCost(row["planned_at"], CallCost(row["input_tokens"], row["output_tokens"], row["cost_usd"]))
+                CycleCost(row["planned_at"], _cost_of(cast("_CycleRow", row)))
                 for row in connection.execute(query).mappings()
             ]
 
@@ -249,6 +251,7 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
         "input_tokens": None if cost is None else cost.input_tokens,
         "output_tokens": None if cost is None else cost.output_tokens,
         "cost_usd": None if cost is None else cost.cost_usd,
+        "model_called": record.model_called,
         "trigger": record.trigger.value,
     }
 
@@ -297,6 +300,7 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
             StepDocument(_step(document["step"]), document["content"]) for document in row["documents"] or ()
         ),
         cost=_cost_of(row),
+        call_without_usage=row["model_called"] and _cost_of(row) is None,
         trigger=CycleTrigger(row["trigger"]),
     )
 

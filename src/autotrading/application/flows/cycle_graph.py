@@ -1,7 +1,7 @@
 import logging
 import operator
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Annotated, TypedDict
 from uuid import UUID
@@ -22,6 +22,7 @@ from autotrading.application.flows.ports import (
     CycleJournalPort,
     CycleRepositoryPort,
     CycleStartPort,
+    FailedModelCall,
     FlowSnapshot,
     OrderPort,
     RiskPort,
@@ -178,7 +179,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
                     if part["type"] == "values":
                         state = part["data"]
             except AutotradingError as error:
-                return FailedCycle(_failed_record(cycle, state, error), error, _last_state(state))
+                return FailedCycle(self._failed_record(cycle, state, error), error, _last_state(state))
         return CompletedCycle(state["record"], state["ended"])
 
     def _graph(self, cycle: PlannedCycle) -> StateGraph[CycleState[S, D, C, A, O, E]]:
@@ -261,6 +262,21 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
     def _done(self, step: CycleStep, result: object) -> CycleState[S, D, C, A, O, E]:
         return {"steps": [step], "documents": [StepDocument(step, self._steps.journal.describe(step, result))]}
 
+    def _failed_record(
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], error: AutotradingError
+    ) -> CycleRecord:
+        """A decision that failed after its call went out keeps the call, which the provider may have charged (R1.4.6,
+        ADR costo-della-decisione-fallita-nel-registro-del-ciclo).
+        """
+        done = state.get("steps", [])
+        # The nodes run in the order of the steps: the failed step is the first one not done.
+        failed = next(step for step in CycleStep if step not in done)
+        failure = CycleFailure(failed, type(error).__name__, str(error))
+        record = _record_of(cycle, state, CycleOutcome.FAILED, done, failure)
+        if failed is not CycleStep.AGENT_DECISION:
+            return record
+        return _with_call(record, self._steps.journal.failed_call(error))
+
 
 def _active_sources[S](state: CycleState[S]) -> list[Send] | str:
     snapshot = state["snapshot"]
@@ -285,14 +301,10 @@ def _last_state[S, D, C, A, O, E](state: CycleState[S, D, C, A, O, E]) -> S | No
     return None
 
 
-def _failed_record[S, D, C, A, O, E](
-    cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], error: AutotradingError
-) -> CycleRecord:
-    done = state.get("steps", [])
-    # The nodes run in the order of the steps: the failed step is the first one not done.
-    failed = next(step for step in CycleStep if step not in done)
-    failure = CycleFailure(failed, type(error).__name__, str(error))
-    return _record_of(cycle, state, CycleOutcome.FAILED, done, failure)
+def _with_call(record: CycleRecord, call: FailedModelCall | None) -> CycleRecord:
+    if call is None:
+        return record
+    return replace(record, cost=call.cost, call_without_usage=call.cost is None)
 
 
 def _record_of[S, D, C, A, O, E](

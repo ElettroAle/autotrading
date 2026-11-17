@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
+from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.errors import UnknownCycleOutcomeError
@@ -65,6 +67,28 @@ def test_an_outcome_nobody_records_is_refused_with_the_outcomes_to_choose_from()
         CycleOutcome.named("failed")
 
     assert raised.value.outcomes == ("concluso", "fallito", "saltato")
+
+
+# ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: the record says whether the cycle called the model.
+def test_a_cycle_without_a_call_did_not_call_the_model() -> None:
+    record = CycleRecord(uuid4(), datetime(2026, 11, 12, tzinfo=UTC), CycleOutcome.FAILED)
+
+    assert not record.model_called
+
+
+def test_a_cycle_with_the_cost_of_its_call_called_the_model() -> None:
+    cost = CallCost(3000, 4000, Decimal("0.002"))
+    record = CycleRecord(uuid4(), datetime(2026, 11, 12, tzinfo=UTC), CycleOutcome.FAILED, cost=cost)
+
+    assert record.model_called
+
+
+def test_a_cycle_whose_call_reported_no_usage_called_the_model_without_a_cost() -> None:
+    planned_at = datetime(2026, 11, 12, tzinfo=UTC)
+    record = CycleRecord(uuid4(), planned_at, CycleOutcome.FAILED, call_without_usage=True)
+
+    assert record.model_called
+    assert record.cost is None
 
 
 def test_a_cycle_keeps_the_decisions_the_agent_took_in_it() -> None:

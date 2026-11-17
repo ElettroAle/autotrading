@@ -297,3 +297,57 @@ def test_an_answer_in_another_shape_is_transient(answer: object) -> None:
         call(Library(answer), "openai/gpt")
 
     assert raised.value.original == "risposta del fornitore inattesa"
+
+
+# ADR-uso-riportato-nell-errore-della-chiamata-al-modello: a call the provider may have charged says so in its error.
+def test_an_answer_without_text_keeps_the_usage_the_provider_reported() -> None:
+    no_text = [{"index": 0, "finish_reason": "length", "message": {"role": "assistant", "content": None}}]
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(Library(response(choices=no_text)), "openai/gpt")
+
+    assert raised.value.usage == ModelUsage(2000, 500, None)
+    assert raised.value.sent
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        litellm.ModelResponse(model="gpt", choices=CHOICES),
+        response(usage={**USAGE, "prompt_tokens": -1}),
+        "not a response",
+    ],
+    ids=["no-usage", "negative-tokens", "not-a-response"],
+)
+def test_an_answer_without_a_readable_usage_was_sent_without_usage(answer: object) -> None:
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(Library(answer), "openai/gpt")
+
+    assert (raised.value.usage, raised.value.sent) == (None, True)
+
+
+def test_a_timeout_was_sent_without_usage() -> None:
+    def slow() -> Exception:
+        return exceptions.Timeout(message="timed out", model="gpt", llm_provider="openai")
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(failing(slow), "openai/gpt")
+
+    assert (raised.value.usage, raised.value.sent) == (None, True)
+
+
+def test_a_refusal_after_the_request_went_out_was_sent_without_usage() -> None:
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(failing(refusal(exceptions.InternalServerError, "Overloaded")), "openai/gpt")
+
+    assert (raised.value.usage, raised.value.sent) == (None, True)
+
+
+def test_an_unreachable_provider_was_not_sent() -> None:
+    def refused() -> Exception:
+        return exceptions.APIConnectionError(message="connection refused", model="gpt", llm_provider="openai")
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(failing(refused), "openai/gpt")
+
+    assert not raised.value.sent

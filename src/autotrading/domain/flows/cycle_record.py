@@ -66,6 +66,8 @@ class CycleRecord:
     failure: CycleFailure | None = None
     documents: tuple[StepDocument, ...] = ()
     cost: CallCost | None = None
+    # A call that went out and failed before the provider reported its usage: nobody knows its cost (R1.4.6).
+    call_without_usage: bool = False
     decisions: tuple[RecordedDecision, ...] = ()
     trigger: CycleTrigger = CycleTrigger.SCHEDULED
 
@@ -73,6 +75,11 @@ class CycleRecord:
     def skipped(cls, flow_id: UUID, planned_at: datetime) -> CycleRecord:
         """A cycle planned while the previous one was still running (R1.2.2)."""
         return cls(flow_id, planned_at, CycleOutcome.SKIPPED)
+
+    @property
+    def model_called(self) -> bool:
+        """The cycle called the model, whether its usage is known or not (R1.4.6)."""
+        return self.cost is not None or self.call_without_usage
 
     def document(self, step: CycleStep) -> Mapping[str, object] | None:
         """What the step produced in this cycle; None when the cycle never got to it."""

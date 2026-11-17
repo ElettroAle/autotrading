@@ -15,6 +15,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 from autotrading.application.flows.ports import (
     CycleJob,
+    FailedModelCall,
     FlowSnapshot,
     RiskReview,
     ScheduledFlow,
@@ -132,7 +133,7 @@ class InMemoryCycleRepositoryAdapter:
         return [
             CycleCost(record.planned_at, record.cost)
             for record in self.records
-            if record.flow_id == flow_id and record.cost is not None
+            if record.flow_id == flow_id and record.model_called
         ]
 
     def costs_within(self, flow_id: UUID, window: TimeWindow) -> list[CycleCost]:
@@ -439,12 +440,19 @@ class FakeCycleJournalAdapter:
 
     def __init__(self) -> None:
         self.cost: CallCost | None = CallCost(1000, 200, Decimal("0.002"))
+        self.failed: FailedModelCall | None = None
+        self.failures: list[AutotradingError] = []
 
     def describe(self, step: CycleStep, result: object) -> dict[str, object]:
         return {"step": step.value, "result": repr(result)}
 
     def call_cost(self, decision: object) -> CallCost | None:  # noqa: ARG002 - the same cost for every call
         return self.cost
+
+    def failed_call(self, error: AutotradingError) -> FailedModelCall | None:
+        """The same failed call for every error, keeping the errors it was asked about."""
+        self.failures.append(error)
+        return self.failed
 
     def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
         """Every asset the fake agent decided is a long opening, with the confidence of the fake."""

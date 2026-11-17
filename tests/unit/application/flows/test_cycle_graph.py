@@ -1,11 +1,13 @@
 import threading
 from collections.abc import Iterator
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 
 from autotrading.application.flows.cycle_graph import CompletedCycle, FailedCycle, PlannedCycle, real_seconds
-from autotrading.application.flows.ports import SourceReading
+from autotrading.application.flows.ports import FailedModelCall, SourceReading
+from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
@@ -176,6 +178,56 @@ def test_a_cycle_failed_reading_the_flow_gives_no_state(cycles: Cycles) -> None:
 
     assert isinstance(outcome, FailedCycle)
     assert outcome.state is None
+
+
+# ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: a cycle failed in the decision records its model call.
+def test_a_cycle_failed_in_the_decision_records_the_tokens_and_cost_of_the_call(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    error = FakeTransientError("risposta del fornitore inattesa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, error)
+    cycles.journal.failed = FailedModelCall(CallCost(3000, 4000, Decimal("0.002")))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert cycles.journal.failures == [error]
+    assert outcome.record.cost == CallCost(3000, 4000, Decimal("0.002"))
+    assert not outcome.record.call_without_usage
+
+
+def test_a_cycle_failed_in_the_decision_without_a_known_usage_records_a_call_without_cost(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakeTransientError("scaduto"))
+    cycles.journal.failed = FailedModelCall(None)
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert (outcome.record.cost, outcome.record.call_without_usage) == (None, True)
+    assert outcome.record.model_called
+
+
+def test_a_cycle_failed_in_the_decision_before_any_call_records_no_call(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakeTransientError("nessuna chiave"))
+    cycles.journal.failed = None
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert not outcome.record.model_called
+
+
+def test_a_cycle_failed_after_the_decision_keeps_the_cost_of_the_answered_call(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+    cycles.journal.failed = FailedModelCall(None)
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert cycles.journal.failures == []
+    assert (outcome.record.cost, outcome.record.call_without_usage) == (cycles.journal.cost, False)
 
 
 # ADR decisioni-del-ciclo-registrate-per-asset: the decide node reads the decisions one by asset through the journal

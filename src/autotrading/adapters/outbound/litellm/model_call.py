@@ -62,10 +62,15 @@ class LiteLlmModelCallAdapter:
         request = _request(model, key, settings, messages)
         request["response_format"] = self._response_format(model, answer)
         reply = self._complete(provider, key, request)
+        # Whatever the answer looks like, the request went out and the provider may have charged it (R1.4.6).
         try:
-            return _reply_of(reply)
+            usage = _usage_of(reply)
+        except InvalidModelUsageError as error:
+            raise ModelUnavailableError(provider, UNEXPECTED_ANSWER, sent=True) from error
+        try:
+            return ModelReply(_text_of(reply), usage)
         except (IndexError, InvalidModelUsageError) as error:
-            raise ModelUnavailableError(provider, UNEXPECTED_ANSWER) from error
+            raise ModelUnavailableError(provider, UNEXPECTED_ANSWER, usage=usage, sent=True) from error
 
     def _response_format(self, model: str, answer: AnswerFormat) -> Mapping[str, object]:
         """Enforced where the library declares the model able to (ADR risposta-del-modello-con-schema-rigido).
@@ -83,7 +88,8 @@ class LiteLlmModelCallAdapter:
             return self._completion(**request, drop_params=True, num_retries=0, timeout=self._timeout_seconds)
         # The errors of the library carry the request, and with it the key: they never travel as a cause.
         except litellm.exceptions.Timeout:
-            raise ModelUnavailableError(provider, "tempo di risposta scaduto") from None
+            raise ModelUnavailableError(provider, "tempo di risposta scaduto", sent=True) from None
+        # The library raises it when the provider could not be reached: the request never got there.
         except litellm.exceptions.APIConnectionError as error:
             raise ModelUnavailableError(provider, type(error).__name__) from None
         except (
@@ -130,22 +136,26 @@ def _refusal(provider: ProviderName, key: ProviderKey, status: int, message: str
     if status == CREDIT_EXHAUSTED:
         return ModelCreditExhaustedError(provider)
     # A provider may echo part of the request in its message: the key is masked before it can travel further.
-    return ModelUnavailableError(provider, key.redact(f"{status} {_compact(message)}"))
+    return ModelUnavailableError(provider, key.redact(f"{status} {_compact(message)}"), sent=True)
 
 
 def _compact(message: str) -> str:
     return " ".join(message.split())[:ORIGINAL_LIMIT]
 
 
-def _reply_of(answer: object) -> ModelReply:
+def _usage_of(answer: object) -> ModelUsage:
     """No reported cost: the providers of the library do not report one, the prices of the catalog apply (R1.4.6)."""
+    usage = getattr(answer, "usage", None) if isinstance(answer, litellm.ModelResponse) else None
+    if not isinstance(usage, litellm.Usage):
+        raise InvalidModelUsageError
+    return ModelUsage(usage.prompt_tokens, usage.completion_tokens, None)
+
+
+def _text_of(answer: object) -> str:
     if not isinstance(answer, litellm.ModelResponse):
         raise InvalidModelUsageError
     choice = answer.choices[0]
-    usage = getattr(answer, "usage", None)
-    if not isinstance(choice, litellm.Choices) or not isinstance(usage, litellm.Usage):
+    text = choice.message.content if isinstance(choice, litellm.Choices) else None
+    if not isinstance(text, str):
         raise InvalidModelUsageError
-    text = choice.message.content
-    if text is None:
-        raise InvalidModelUsageError
-    return ModelReply(text, ModelUsage(usage.prompt_tokens, usage.completion_tokens, None))
+    return text

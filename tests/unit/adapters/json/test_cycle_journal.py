@@ -6,12 +6,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
+from autotrading.application.agent.errors import ModelKeyMissingError, ModelUnavailableError
 from autotrading.application.flows.ports import (
     AgentDecisionPort,
     CycleContext,
     CycleDecisions,
     DecisionExitPlanPort,
     DecisionPlanChangePort,
+    FailedModelCall,
     RiskReview,
     SourceReading,
 )
@@ -19,6 +21,8 @@ from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
 from autotrading.domain.agent.decision import Decision as AgentDecision
 from autotrading.domain.agent.decision import TradeAction, TradeDirection, TradeOpening
 from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
+from autotrading.domain.agent.model_usage import ModelUsage
+from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
@@ -31,6 +35,7 @@ from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
+OPENROUTER = ProviderName("openrouter")
 READ_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 TENANT = TenantId.new()
 FLOW = a_flow(TENANT, configuration=replace(a_configuration(), assets=("BTC",), allocated_capital=Decimal(500)))
@@ -174,6 +179,28 @@ def test_any_other_result_is_recorded_as_it_is() -> None:
 def test_the_cost_of_the_call_comes_from_the_decisions_of_the_agent() -> None:
     assert journal().call_cost(CycleDecisions(CYCLE_FLOW, REPLY)) == CallCost(120, 30, Decimal("0.01"))
     assert journal().call_cost(object()) is None
+
+
+# ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: the failed call comes from the error of the decision.
+def test_a_failed_call_with_a_reported_usage_gives_its_tokens_and_cost() -> None:
+    usage = ModelUsage(3000, 4000, None)
+    error = ModelUnavailableError(OPENROUTER, "inattesa", usage=usage, sent=True, cost_usd=Decimal("0.002"))
+
+    assert journal().failed_call(error) == FailedModelCall(CallCost(3000, 4000, Decimal("0.002")))
+
+
+def test_a_failed_call_without_a_reported_usage_has_no_cost() -> None:
+    error = ModelUnavailableError(OPENROUTER, "tempo di risposta scaduto", sent=True)
+
+    assert journal().failed_call(error) == FailedModelCall(None)
+
+
+def test_a_call_that_never_went_out_is_no_failed_call() -> None:
+    assert journal().failed_call(ModelUnavailableError(OPENROUTER, "ConnectError")) is None
+
+
+def test_an_error_that_is_not_of_the_model_call_is_no_failed_call() -> None:
+    assert journal().failed_call(ModelKeyMissingError(OPENROUTER)) is None
 
 
 # ADR decisioni-del-ciclo-registrate-per-asset: the journal reads the decisions of the agent one by asset.

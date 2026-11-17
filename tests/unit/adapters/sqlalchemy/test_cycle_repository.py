@@ -64,6 +64,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "input_tokens": 2000,
         "output_tokens": 500,
         "cost_usd": Decimal("0.0031"),
+        "model_called": True,
         "trigger": "scheduled",
     }
 
@@ -79,6 +80,7 @@ def test_a_skipped_record_has_no_failure_no_documents_and_no_cost() -> None:
 
     assert (row["outcome"], row["failure"], row["documents"], row["steps"]) == ("skipped", None, [], [])
     assert (row["input_tokens"], row["output_tokens"], row["cost_usd"]) == (None, None, None)
+    assert not row["model_called"]
     assert record_of(row) == skipped
 
 
@@ -98,6 +100,16 @@ def test_a_cost_with_only_part_of_its_tokens_reads_back_as_no_cost() -> None:
     record = CycleRecord(uuid4(), PLANNED, CycleOutcome.COMPLETED, cost=CallCost(10, 5, None))
 
     assert record_of(row_of(record, TENANT) | {"output_tokens": None}).cost is None
+
+
+# ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: a call without a known usage is marked as a call.
+def test_a_call_without_a_known_usage_is_saved_as_a_call_without_tokens_and_reads_back() -> None:
+    record = CycleRecord(uuid4(), PLANNED, CycleOutcome.FAILED, call_without_usage=True)
+
+    row = row_of(record, TENANT)
+
+    assert (row["model_called"], row["input_tokens"], row["output_tokens"], row["cost_usd"]) == (True, None, None, None)
+    assert record_of(row) == record
 
 
 def test_amounts_identifiers_and_instants_become_text_in_a_document() -> None:

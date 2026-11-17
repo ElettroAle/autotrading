@@ -127,6 +127,18 @@ def test_the_costs_are_those_of_the_cycles_that_called_the_model(database: Engin
     ]
 
 
+# ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: a call without a known usage is among the costs.
+def test_a_call_without_a_known_usage_is_among_the_costs_without_a_cost(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    lost = CycleRecord(flow_id, PLANNED, CycleOutcome.FAILED, call_without_usage=True)
+    repository.record(lost)
+    repository.record(CycleRecord(flow_id, PLANNED + timedelta(minutes=15), CycleOutcome.FAILED))
+
+    assert repository.costs(flow_id) == [CycleCost(PLANNED, None)]
+    assert repository.at(flow_id, PLANNED) == lost
+
+
 def test_the_failed_cycles_are_counted_in_the_window(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
     repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
