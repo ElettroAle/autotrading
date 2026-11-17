@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { aCompletedCycle, aFailedCycle, STEPS, withDecisions } from '@/testing/mocks/cycles';
@@ -21,6 +22,16 @@ const decisionOn = async (asset: string) =>
 
 const valueOf = (decision: HTMLElement, label: string) =>
   within(decision).getByLabelText(label, { exact: true });
+
+// The reasoning without the command beside it, which opens and closes it (ADR testo-lungo-espandibile).
+const reasoningOf = (decision: HTMLElement): string => {
+  const value = valueOf(decision, 'Ragionamento');
+  const command = within(value).getByRole('button');
+  return (
+    within(value).getByText((_, element) => element?.id === command.getAttribute('aria-controls'))
+      .textContent ?? ''
+  );
+};
 
 const decided = (plannedAt: Date) =>
   withDecisions(aCompletedCycle(plannedAt), [
@@ -49,10 +60,23 @@ describe('LastDecision', () => {
     expect(valueOf(bitcoin, 'Azione')).toHaveTextContent('apri');
     expect(valueOf(bitcoin, 'Direzione')).toHaveTextContent('long');
     expect(valueOf(bitcoin, 'Confidenza')).toHaveTextContent('72');
-    const reasoning = valueOf(bitcoin, 'Ragionamento').textContent ?? '';
+    const reasoning = reasoningOf(bitcoin);
     expect(reasoning.endsWith('…')).toBe(true);
     expect(reasoning.length).toBeLessThanOrEqual(161);
     expect(LONG_REASONING.startsWith(reasoning.slice(0, -1))).toBe(true);
+  });
+
+  // Bug 576, ADR-testo-lungo-espandibile: the whole reasoning is read in place.
+  it('opens the whole reasoning in place with «Leggi tutto» and closes it with «Riduci»', async () => {
+    fakePlatform.recordCycles('alfa', [decided(TEN)]);
+    await renderInApp(<LastDecision flowId="flow-alfa" />, { account: 'anna' });
+    const bitcoin = await decisionOn('BTC');
+
+    await userEvent.click(within(bitcoin).getByRole('button', { name: 'Leggi tutto' }));
+
+    expect(reasoningOf(bitcoin)).toBe(LONG_REASONING);
+    await userEvent.click(within(bitcoin).getByRole('button', { name: 'Riduci' }));
+    expect(reasoningOf(bitcoin).endsWith('…')).toBe(true);
   });
 
   // R6.5.3: the panel shows action and direction with the shared icons (ADR riquadro-dell-ultima-decisione-nella-panoramica).
