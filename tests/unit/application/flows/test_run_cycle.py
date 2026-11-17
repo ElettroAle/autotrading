@@ -7,11 +7,13 @@ from uuid import UUID
 
 import pytest
 
+from autotrading.application.flows.errors import CycleInProgressError, FlowNotActiveError
 from autotrading.application.flows.ports import RiskReview
 from autotrading.application.flows.run_cycle import RunCycleCommand, RunCycleUseCase
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from tests.fakes.cycles import ACTIVE, PAUSED, FakePermanentError, FakeTransientError
 from tests.support.cycles import Cycles, at
 
@@ -351,3 +353,63 @@ def test_a_skipped_cycle_records_no_equity(cycles: Cycles) -> None:
         run(cycles)
 
     assert cycles.equity.recorded == []
+
+
+def run_on_demand(cycles: Cycles) -> CycleRecord | None:
+    cycles.clock.current = at("10:40:00")
+    command = RunCycleCommand(
+        cycles.id_of("alfa"), cycles.flow("alfa").schedule, at("10:40:00"), CycleTrigger.ON_DEMAND
+    )
+    return cycles.run_cycle().execute(command)
+
+
+def test_a_planned_cycle_is_recorded_as_planned(cycles: Cycles) -> None:
+    record = run(cycles)
+
+    assert record is not None
+    assert record.trigger is CycleTrigger.SCHEDULED
+
+
+def test_a_cycle_asked_for_now_runs_every_step_and_is_recorded_as_asked(cycles: Cycles) -> None:
+    record = run_on_demand(cycles)
+
+    assert record is not None
+    assert (record.planned_at, record.outcome, record.steps) == (
+        at("10:40:00"),
+        CycleOutcome.COMPLETED,
+        tuple(CycleStep),
+    )
+    assert record.trigger is CycleTrigger.ON_DEMAND
+    assert cycles.records.records == [record]
+
+
+@pytest.mark.parametrize("status", [PAUSED, "fermo"])
+def test_a_cycle_asked_for_now_on_a_flow_not_active_is_refused(cycles: Cycles, status: str) -> None:
+    cycles.flow("alfa").status = status
+
+    with pytest.raises(FlowNotActiveError):
+        run_on_demand(cycles)
+
+    assert (cycles.flows.reads, cycles.agent.calls, cycles.records.records) == ([], [], [])
+
+
+def test_a_cycle_asked_for_now_while_another_runs_is_refused_and_not_recorded_as_skipped(cycles: Cycles) -> None:
+    with cycles.lock.hold(cycles.id_of("alfa")), pytest.raises(CycleInProgressError):
+        run_on_demand(cycles)
+
+    assert (cycles.agent.calls, cycles.records.records, cycles.equity.recorded) == ([], [], [])
+
+
+def test_a_permanent_error_of_a_cycle_asked_for_now_pauses_the_flows_and_is_raised(cycles: Cycles) -> None:
+    # Fail fast also for the cycle the user asks for: the only handler records, pauses and raises (context-flows.md).
+    error = FakePermanentError("credito esaurito presso openrouter", provider="openrouter")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, error)
+
+    with pytest.raises(FakePermanentError) as raised:
+        run_on_demand(cycles)
+
+    assert raised.value is error
+    record = cycles.last_record("alfa")
+    assert record.failure == CycleFailure(CycleStep.AGENT_DECISION, "FakePermanentError", str(error))
+    assert record.trigger is CycleTrigger.ON_DEMAND
+    assert (cycles.flow("alfa").status, cycles.flow("alfa").pause_reason) == (PAUSED, str(error))

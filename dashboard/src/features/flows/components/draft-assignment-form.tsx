@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
+import { CommandRefusal } from '@/components/ui/command-refusal';
 import { AssetPicker } from '@/components/ui/form/asset-picker';
 import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { useTradableAssets } from '@/hooks/use-tradable-assets';
@@ -13,8 +14,6 @@ import {
   type AssignmentInput,
 } from '../api/assign-draft-flow';
 import type { Account } from '../api/get-accounts';
-
-import { CommandRefusal } from './command-refusal';
 
 // The names the API gives to the fields of the request, as its invalid requests report them.
 const FIELDS_OF_REQUEST: Record<string, keyof AssignmentInput> = {

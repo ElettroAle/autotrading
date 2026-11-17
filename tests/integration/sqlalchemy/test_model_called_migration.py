@@ -26,7 +26,7 @@ from tests.support.postgres import database_migrated_to
 
 pytestmark = pytest.mark.integration
 
-BEFORE_THE_MODEL_CALL = "0033"
+BEFORE_THE_MODEL_CALL = "0035"
 PLANNED = datetime(2026, 11, 16, 10, 0, tzinfo=UTC)
 
 

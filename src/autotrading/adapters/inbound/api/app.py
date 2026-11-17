@@ -11,6 +11,7 @@ from autotrading.adapters.inbound.api.assets import assets_router
 from autotrading.adapters.inbound.api.capital_changes import capital_changes_router
 from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
 from autotrading.adapters.inbound.api.cycles import cycles_router
+from autotrading.adapters.inbound.api.decisions import decisions_router
 from autotrading.adapters.inbound.api.emergency_closings import emergency_closings_router
 from autotrading.adapters.inbound.api.equity import equity_router
 from autotrading.adapters.inbound.api.errors import AuthenticationNotConfiguredError, install_error_responses
@@ -123,6 +124,7 @@ def create_api(
     protected.include_router(forecast_accuracy_router(use_cases_of_request))
     protected.include_router(operations_router(use_cases_of_request))
     protected.include_router(cycles_router(use_cases_of_request))
+    protected.include_router(decisions_router(use_cases_of_request))
     protected.include_router(equity_router(use_cases_of_request))
     protected.include_router(history_router(use_cases_of_request))
     protected.include_router(flow_ranking_router(use_cases_of_request))

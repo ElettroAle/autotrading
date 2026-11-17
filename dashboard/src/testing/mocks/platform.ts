@@ -345,6 +345,10 @@ export const DEFAULT_RISK_LIMITS: FakeRiskLimits = {
 const DRAFT = 'bozza';
 const STOPPED = 'fermo';
 const ACTIVE = 'attivo';
+const SECOND = 1000;
+// The reasons the API gives when it refuses a cycle asked for now (R6.5.2).
+const FLOW_NOT_ACTIVE = 'il flusso non è attivo';
+const CYCLE_IN_PROGRESS = 'un ciclo del flusso è già in corso';
 const ARCHIVED = 'archiviato';
 const PAUSED = 'in pausa';
 
@@ -400,13 +404,17 @@ const state = {
   linkedChats: new Map<string, FakeChat>(),
   linkCodes: new Map<string, FakeLinkCode>(),
   cycles: new Map<string, FakeCycle[]>(),
+  cyclesInProgress: new Set<string>(),
+  workerClock: undefined as Date | undefined,
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   cashOuts: [] as string[],
   emergencyClosings: [] as FakeEmergencyScope[],
   capitalChanges: [] as FakeCapitalChange[],
   signingIn: undefined as string | undefined,
-  sessionsExpired: false,
+  identityProviderSession: undefined as string | undefined,
+  credentialPagesShown: 0,
+  refreshTokensExpired: false,
   exchangeReachable: true,
   exchangesListed: true,
   exchangeNetwork: 'test' as FakeNetwork,
@@ -574,13 +582,17 @@ export const fakePlatform = {
     state.linkedChats.clear();
     state.linkCodes.clear();
     state.cycles.clear();
+    state.cyclesInProgress.clear();
+    state.workerClock = undefined;
     state.openPositions.clear();
     state.closedPositions.clear();
     state.cashOuts.length = 0;
     state.emergencyClosings.length = 0;
     state.capitalChanges.length = 0;
     state.signingIn = undefined;
-    state.sessionsExpired = false;
+    state.identityProviderSession = undefined;
+    state.credentialPagesShown = 0;
+    state.refreshTokensExpired = false;
     state.exchangeReachable = true;
     state.exchangesListed = true;
     state.exchangeNetwork = 'test';
@@ -811,6 +823,34 @@ export const fakePlatform = {
   concludeCycle(flowName: string, plannedAt: Date): void {
     const flowId = flowIdOf(flowName);
     state.cycles.set(flowId, [...(state.cycles.get(flowId) ?? []), aCompletedCycle(plannedAt)]);
+  },
+
+  /** From now on the worker reads this instant as now: a cycle asked for now is planned at it (R6.5.2). */
+  setWorkerClock(instant: Date): void {
+    state.workerClock = instant;
+  },
+
+  /** A cycle of the flow is under way: a cycle asked for now is refused until it ends (R6.5.2). */
+  holdCycle(flowName: string): void {
+    state.cyclesInProgress.add(flowIdOf(flowName));
+  },
+
+  /**
+   * The worker runs a full cycle of the active flow now, planned at the instant of the request, and records it as asked
+   * for (R6.5.2); a flow not active or with a cycle under way refuses it, as the API does.
+   */
+  runCycleNow(user: FakeUser, flowId: string): FakeCycle {
+    const flow = flowOf(user, flowId);
+    if (flow.status !== ACTIVE) {
+      throw new FakeRefusal(409, FLOW_NOT_ACTIVE);
+    }
+    if (state.cyclesInProgress.has(flow.id)) {
+      throw new FakeRefusal(409, CYCLE_IN_PROGRESS);
+    }
+    const now = state.workerClock ?? new Date(Math.floor(Date.now() / SECOND) * SECOND);
+    const cycle: FakeCycle = { ...aCompletedCycle(now), trigger: 'on_demand' };
+    state.cycles.set(flow.id, [...(state.cycles.get(flow.id) ?? []), cycle]);
+    return cycle;
   },
 
   /** From now on the API does not answer: every request fails on the network (R2.1.2). */
@@ -1136,25 +1176,61 @@ export const fakePlatform = {
       : undefined;
   },
 
-  /** The account the user types on the sign-in page of the identity provider. */
+  /** The account the user types on the page of the credentials of the identity provider, used by the next sending. */
   signIn(account: string): void {
     state.signingIn = account;
   },
 
-  signingInAccount(): string | undefined {
-    return state.signingIn;
+  /** The account the user typed, once: a page of the credentials asked again waits for the user again. */
+  takeSigningInAccount(): string | undefined {
+    const account = state.signingIn;
+    state.signingIn = undefined;
+    return account;
   },
 
-  /** From now on the identity provider refuses to renew the tokens it issued: the user must sign in again. */
+  /** The account whose session the identity provider keeps after a sign-in, until it ends. */
+  startIdentityProviderSession(account: string): void {
+    state.identityProviderSession = account;
+  },
+
+  identityProviderSession(): string | undefined {
+    return state.identityProviderSession;
+  },
+
+  /** The session at the identity provider is over: the next sign-in asks the credentials (R6.5.1). */
+  endIdentityProviderSession(): void {
+    state.identityProviderSession = undefined;
+  },
+
+  countCredentialPage(): void {
+    state.credentialPagesShown += 1;
+  },
+
+  /** How many times the identity provider asked the credentials. */
+  credentialPagesShown(): number {
+    return state.credentialPagesShown;
+  },
+
+  /** From now on the identity provider refuses to renew the tokens it issued, while its session lives on (R6.5.1). */
+  expireRefreshTokens(): void {
+    state.refreshTokensExpired = true;
+  },
+
+  refreshTokensExpired(): boolean {
+    return state.refreshTokensExpired;
+  },
+
+  /** The access expired: the identity provider renews no token and its session is over, the user signs in again. */
   expireSessions(): void {
-    state.sessionsExpired = true;
+    state.refreshTokensExpired = true;
+    state.identityProviderSession = undefined;
   },
 
   restoreSessions(): void {
-    state.sessionsExpired = false;
+    state.refreshTokensExpired = false;
   },
 
   sessionsExpired(): boolean {
-    return state.sessionsExpired;
+    return state.refreshTokensExpired && state.identityProviderSession === undefined;
   },
 };

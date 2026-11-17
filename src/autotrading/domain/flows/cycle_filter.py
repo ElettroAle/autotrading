@@ -1,9 +1,11 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.errors import UnknownCycleDecisionError, UnknownCycleOutcomeError
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 
 # A skipped cycle never ran: the user filters the cycles by how they ended (R6.4.4).
@@ -17,6 +19,24 @@ class CycleDecision(StrEnum):
     CLOSING = "chiusura"
     HOLDING = "mantenimento"
     NONE = "nessuna"
+
+    @property
+    def action(self) -> DecisionAction | None:
+        """The action the agent took on an asset; None for no decision at all."""
+        return _FILTERED_ACTIONS.get(self)
+
+    def taken_in(self, decisions: Sequence[RecordedDecision]) -> bool:
+        """True when the decisions of a cycle match: one of them has the action, or none at all for no decision."""
+        if self.action is None:
+            return not decisions
+        return any(decision.action is self.action for decision in decisions)
+
+
+_FILTERED_ACTIONS = {
+    CycleDecision.OPENING: DecisionAction.OPEN,
+    CycleDecision.CLOSING: DecisionAction.CLOSE,
+    CycleDecision.HOLDING: DecisionAction.HOLD,
+}
 
 
 @dataclass(frozen=True, slots=True)

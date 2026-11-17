@@ -8,6 +8,7 @@ from decimal import Decimal
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
 from autotrading.application.agent.errors import ModelKeyMissingError, ModelUnavailableError
 from autotrading.application.flows.ports import (
+    AgentDecisionPort,
     CycleContext,
     CycleDecisions,
     DecisionExitPlanPort,
@@ -17,7 +18,9 @@ from autotrading.application.flows.ports import (
     SourceReading,
 )
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
-from autotrading.domain.agent.exit_plan import ExitPlan
+from autotrading.domain.agent.decision import Decision as AgentDecision
+from autotrading.domain.agent.decision import TradeAction, TradeDirection, TradeOpening
+from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.flows.call_cost import CallCost
@@ -26,7 +29,9 @@ from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.source_data import SourceData
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
@@ -65,6 +70,8 @@ class Prompt:
 class Decision:
     action: str
     asset: str
+    reasoning: str = "motivo"
+    confidence: int = 60
 
     def intent_with[O, C, H, U](
         self,
@@ -83,7 +90,7 @@ class Decision:
 @dataclass(frozen=True, slots=True)
 class Response:
     raw: str
-    decisions: tuple[Decision, ...]
+    decisions: tuple[AgentDecisionPort, ...]
     discarded: tuple[str, ...]
     missing: tuple[str, ...]
 
@@ -140,7 +147,7 @@ def test_the_context_is_recorded_as_the_messages_the_agent_receives() -> None:
 def test_the_decisions_are_recorded_with_the_raw_answer_the_discarded_and_the_missing() -> None:
     assert journal().describe(CycleStep.AGENT_DECISION, CycleDecisions(CYCLE_FLOW, REPLY)) == {
         "risposta": "{}",
-        "decisioni": [{"tipo": "Decision", "action": "hold", "asset": "BTC"}],
+        "decisioni": [{"tipo": "Decision", "action": "hold", "asset": "BTC", "reasoning": "motivo", "confidence": 60}],
         "scartate": ["x"],
         "mancanti": ["ETH"],
     }
@@ -194,3 +201,37 @@ def test_a_call_that_never_went_out_is_no_failed_call() -> None:
 
 def test_an_error_that_is_not_of_the_model_call_is_no_failed_call() -> None:
     assert journal().failed_call(ModelKeyMissingError(OPENROUTER)) is None
+
+
+# ADR decisioni-del-ciclo-registrate-per-asset: the journal reads the decisions of the agent one by asset.
+def decided(*decisions: AgentDecision) -> CycleDecisions:
+    return CycleDecisions(CYCLE_FLOW, replace(REPLY, response=Response("{}", decisions, (), ())))
+
+
+def test_the_decisions_are_recorded_one_by_asset_with_action_direction_confidence_and_reasoning() -> None:
+    opening = TradeOpening(TradeDirection.SHORT, Decimal("0.1"), 3)
+    decisions = decided(
+        AgentDecision("BTC", TradeAction.OPEN, "debolezza", 72, opening),
+        AgentDecision("ETH", TradeAction.CLOSE, "obiettivo raggiunto", 80),
+        AgentDecision("SOL", TradeAction.HOLD, "attesa", 40),
+        AgentDecision("DOGE", TradeAction.UPDATE, "nuovo stop", 55, plan_change=ExitPlanChange(stop=Decimal(1))),
+    )
+
+    assert journal().recorded_decisions(decisions) == (
+        RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.SHORT, 72, "debolezza"),
+        RecordedDecision("ETH", DecisionAction.CLOSE, None, 80, "obiettivo raggiunto"),
+        RecordedDecision("SOL", DecisionAction.HOLD, None, 40, "attesa"),
+        RecordedDecision("DOGE", DecisionAction.UPDATE, None, 55, "nuovo stop"),
+    )
+
+
+def test_an_opening_without_its_fields_is_recorded_without_direction() -> None:
+    decisions = decided(AgentDecision("BTC", TradeAction.OPEN, "campi mancanti", 30))
+
+    assert journal().recorded_decisions(decisions) == (
+        RecordedDecision("BTC", DecisionAction.OPEN, None, 30, "campi mancanti"),
+    )
+
+
+def test_a_result_other_than_the_decisions_of_the_agent_records_none() -> None:
+    assert journal().recorded_decisions(object()) == ()

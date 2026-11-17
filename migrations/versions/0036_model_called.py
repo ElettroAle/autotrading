@@ -3,15 +3,15 @@
 The cycles recorded before had a call exactly when they kept its tokens. R1.4.6, Bug 541,
 ADR costo-della-decisione-fallita-nel-registro-del-ciclo.
 
-Revision ID: 0034
-Revises: 0033
+Revision ID: 0036
+Revises: 0035
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0034"
-down_revision = "0033"
+revision = "0036"
+down_revision = "0035"
 branch_labels = None
 depends_on = None
 

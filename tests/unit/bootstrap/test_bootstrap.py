@@ -22,6 +22,7 @@ from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.flows.close_flow_positions import ClosingPorts
+from autotrading.application.flows.errors import CycleWorkerUnavailableError
 from autotrading.application.flows.ports import (
     ClosedPositionRepositoryPort,
     ExitPlanRepositoryPort,
@@ -32,6 +33,7 @@ from autotrading.application.flows.ports import (
     RunningCyclePort,
 )
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
+from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleCommand
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
@@ -46,17 +48,21 @@ from autotrading.bootstrap import (
 )
 from autotrading.domain.accounts.errors import UndeclaredEnvironmentError, UnsupportedEnvironmentError
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.accounts import an_account
+from tests.support.flows import a_flow
 from tests.support.installation import (
     WORKER_TOKEN,
+    cycles_of_installation,
     dev_installation_on_testnet,
     installation_configuration,
     worker_configuration,
@@ -322,8 +328,13 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     opener = SodiumCredentialOpenerAdapter({})
+    environment, hyperliquid = dev_installation_on_testnet()
     factory = worker_use_cases(
-        create_engine("sqlite://"), opener, dev_installation_on_testnet(), Slippage.default(), InMemoryOutboxAdapter()
+        create_engine("sqlite://"),
+        opener,
+        (environment, Slippage.default(), hyperliquid),
+        InMemoryOutboxAdapter(),
+        cycles_of_installation(opener),
     )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())
@@ -331,6 +342,36 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     assert first.close_exchange_position is not second.close_exchange_position
     assert first.read_exchange_state is not second.read_exchange_state
     assert first.run_exchange_verification is not second.run_exchange_verification
+    assert first.run_cycle_on_demand is not second.run_cycle_on_demand
+
+
+def test_the_cycle_asked_for_now_is_asked_to_the_worker_for_the_tenant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    flows, tenant_id = FlowStore(), TenantId.new()
+    flow = a_flow(tenant_id, status=FlowStatus.ACTIVE)
+    flows.flows.append(flow)
+    monkeypatch.setattr(
+        bootstrap, "SqlAlchemyFlowRepositoryAdapter", lambda _, tenant: InMemoryFlowRepositoryAdapter(flows, tenant)
+    )
+    asked: list[httpx.Request] = []
+
+    def worker_answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(500, json={"detail": "errore interno"})
+
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
+    factory = tenant_use_cases(
+        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+    )
+
+    with pytest.raises(CycleWorkerUnavailableError):
+        factory(tenant_id).request_on_demand_cycle.execute(RequestOnDemandCycleCommand(flow.id.value))
+
+    assert [request.url.path for request in asked] == [f"/tenants/{tenant_id.value}/flows/{flow.id.value}/cycles"]
+    assert asked[0].headers["Authorization"] == f"Bearer {WORKER_TOKEN}"
 
 
 def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: Path) -> None:

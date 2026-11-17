@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -7,6 +8,8 @@ from sqlalchemy import create_engine
 
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import (
     consecutive_failures_statement,
+    decided_cycle_of,
+    decision_rows_of,
     plain,
     record_of,
     row_of,
@@ -21,6 +24,9 @@ from autotrading.domain.flows.cycle_record import (
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
+from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 PLANNED = datetime(2026, 11, 12, 10, 22, tzinfo=UTC)
@@ -59,6 +65,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "output_tokens": 500,
         "cost_usd": Decimal("0.0031"),
         "model_called": True,
+        "trigger": "scheduled",
     }
 
 
@@ -124,6 +131,61 @@ def test_a_value_that_is_not_json_data_never_reaches_the_record() -> None:
 
     assert raised.value.status_code == 500
     assert str(raised.value) == "documento del ciclo non registrabile: object"
+
+
+OPENING = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 72, "trend rialzista")
+HOLDING = RecordedDecision("ETH", DecisionAction.HOLD, None, None, "attesa")
+
+
+def test_the_decisions_of_a_record_are_saved_one_row_each_in_their_order() -> None:
+    record = CycleRecord(uuid4(), PLANNED, CycleOutcome.COMPLETED, decisions=(OPENING, HOLDING))
+
+    rows = decision_rows_of(record, TENANT)
+
+    common = {"tenant_id": TENANT.value, "flow_id": record.flow_id, "planned_at": PLANNED}
+    assert rows == [
+        common
+        | {
+            "position": 0,
+            "asset": "BTC",
+            "action": "apri",
+            "direction": "long",
+            "confidence": 72,
+            "reasoning": "trend rialzista",
+        },
+        common
+        | {
+            "position": 1,
+            "asset": "ETH",
+            "action": "mantieni",
+            "direction": None,
+            "confidence": None,
+            "reasoning": "attesa",
+        },
+    ]
+
+
+def test_a_record_without_decisions_saves_no_row() -> None:
+    assert decision_rows_of(CycleRecord.skipped(uuid4(), PLANNED), TENANT) == []
+
+
+def test_the_saved_decisions_of_a_cycle_read_back_as_they_were() -> None:
+    record = CycleRecord(uuid4(), PLANNED, CycleOutcome.COMPLETED, decisions=(OPENING, HOLDING))
+
+    assert decided_cycle_of(decision_rows_of(record, TENANT)) == DecidedCycle(PLANNED, (OPENING, HOLDING))
+
+
+def test_no_saved_decision_reads_as_no_decided_cycle() -> None:
+    assert decided_cycle_of([]) is None
+
+
+def test_a_cycle_asked_for_now_is_saved_and_read_back_as_asked() -> None:
+    asked = replace(FAILED, trigger=CycleTrigger.ON_DEMAND)
+
+    row = row_of(asked, TENANT)
+
+    assert row["trigger"] == "on_demand"
+    assert record_of(row) == asked
 
 
 def test_the_consecutive_failures_count_the_failed_cycles_after_the_last_completed_one_since_the_anchor() -> None:

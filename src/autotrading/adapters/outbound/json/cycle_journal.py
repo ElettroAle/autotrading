@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from autotrading.adapters.outbound.json.json_document import json_document
 from autotrading.application.agent.errors import ModelUnavailableError
 from autotrading.application.flows.ports import (
+    AgentDecisionPort,
     AgentResponsePort,
     CycleContext,
     CycleDecisions,
@@ -14,6 +15,7 @@ from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.recorded_decision import RecordedDecision
 
 
 class JsonCycleJournalAdapter:
@@ -55,6 +57,11 @@ class JsonCycleJournalAdapter:
             return FailedModelCall(None)
         return FailedModelCall(CallCost(usage.input_tokens, usage.output_tokens, error.cost_usd))
 
+    def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
+        if not isinstance(decision, CycleDecisions):
+            return ()
+        return tuple(_recorded(each) for each in decision.reply.response.decisions)
+
     def _flow_of(self, cycle_flow: CycleFlow) -> dict[str, object]:
         configuration = cycle_flow.configuration
         return {
@@ -86,3 +93,19 @@ def _decisions_document(response: AgentResponsePort) -> dict[str, object]:
         "scartate": json_document(response.discarded),
         "mancanti": list(response.missing),
     }
+
+
+def _recorded(decision: AgentDecisionPort) -> RecordedDecision:
+    return RecordedDecision.named(
+        decision.asset, decision.action, _direction_of(decision), decision.confidence, decision.reasoning
+    )
+
+
+def _direction_of(decision: AgentDecisionPort) -> str | None:
+    # Only an opening with its fields has a direction: any other decision, or an opening without them, holds.
+    return decision.intent_with(
+        lambda _asset, direction, _margin, _leverage, _plan, _confidence: direction,
+        lambda _asset: None,
+        lambda _asset: None,
+        lambda _asset, _change: None,
+    )

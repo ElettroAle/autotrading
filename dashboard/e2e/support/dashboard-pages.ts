@@ -3,6 +3,7 @@ import { expect, type Locator, type Page, type Request } from '@playwright/test'
 import { accessTokenOf, fakePlatform } from '@/testing/mocks/platform';
 
 const BASE_PATH = '/dashboard';
+const AUTHORIZATION_ENDPOINT = '/oauth2/v2.0/authorize';
 const LOADING = 'Caricamento…';
 // The title of the page of a flow before the page has read it, or when the flow does not exist.
 const UNREAD_FLOW_TITLE = /^Flusso$/;
@@ -15,11 +16,20 @@ export class DashboardPages {
 
   private requestsInFlight = 0;
 
+  private signInRedirects = 0;
+
   constructor(page: Page) {
     this.page = page;
+    page.on('request', (request) => this.countSignInRedirect(request));
     page.on('request', (request) => this.countRequest(request, 1));
     page.on('requestfinished', (request) => this.countRequest(request, -1));
     page.on('requestfailed', (request) => this.countRequest(request, -1));
+  }
+
+  private countSignInRedirect(request: Request): void {
+    if (request.isNavigationRequest() && request.url().includes(AUTHORIZATION_ENDPOINT)) {
+      this.signInRedirects += 1;
+    }
   }
 
   private countRequest(request: Request, change: number): void {
@@ -106,12 +116,31 @@ export class DashboardPages {
     await this.page.getByRole('button', { name: 'Confronta' }).click();
   }
 
-  /** Signs in from the sign-in page: the account is the one typed on the page of the identity provider. */
+  /**
+   * Signs in as the account: from the sign-in page of the dashboard when it waits for the user, then with the
+   * credentials typed on the page of the identity provider, which brings the user back to the page asked for.
+   */
   async signInAs(account: string): Promise<void> {
-    await expect(this.signInButton()).toBeVisible();
+    await expect(this.credentialsPage().or(this.signInButton())).toBeVisible();
+    if (await this.signInButton().isVisible()) {
+      await this.signInButton().click();
+    }
+    await expect(this.credentialsPage()).toBeVisible();
     fakePlatform.signIn(account);
-    await this.signInButton().click();
-    await this.page.waitForURL((url) => !url.pathname.endsWith('/login'));
+    await this.page.getByRole('button', { name: 'Invia le credenziali' }).click();
+    await this.page.waitForURL(
+      (url) => url.pathname.startsWith(`${BASE_PATH}/`) && !url.pathname.endsWith('/login'),
+    );
+  }
+
+  /** The page of the identity provider that asks the credentials. */
+  credentialsPage(): Locator {
+    return this.page.getByRole('heading', { name: 'Inserisci le credenziali' });
+  }
+
+  /** How many times the browser went to the identity provider to sign in, since the page opened. */
+  redirectsToIdentityProvider(): number {
+    return this.signInRedirects;
   }
 
   /** Opens the page of a flow as the account: the sign-in brings the user back to the page asked for. */

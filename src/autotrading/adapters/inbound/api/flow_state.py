@@ -8,8 +8,8 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
-from autotrading.adapters.inbound.api.flows import OpeningsSuspensionResponse
 from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
+from autotrading.adapters.inbound.api.openings_suspension_response import OpeningsSuspensionResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.domain.flows.account_activity import AccountPosition

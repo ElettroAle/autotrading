@@ -230,7 +230,26 @@ cycles = Table(
     Column("cost_usd", Numeric),
     # The cycle called the model, even when the call failed before its usage was known (R1.4.6).
     Column("model_called", Boolean, nullable=False, server_default=text("false")),
+    # What started the cycle: its schedule or the user (R6.5.2); a row taken before the cycle runs is planned.
+    Column("trigger", Text, nullable=False, server_default="scheduled"),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+# The decisions of the agent in a cycle, one row by asset in the order it gave them (ADR
+# decisioni-del-ciclo-registrate-per-asset).
+cycle_decisions = Table(
+    "cycle_decisions",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("planned_at", DateTime(timezone=True), primary_key=True),
+    Column("position", Integer, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("asset", Text, nullable=False),
+    Column("action", Text, nullable=False),
+    Column("direction", Text),
+    Column("confidence", Integer),
+    Column("reasoning", Text, nullable=False),
+    ForeignKeyConstraint(["flow_id", "planned_at"], ["cycles.flow_id", "cycles.planned_at"]),
 )
 
 # The equity of every cycle that read the state of its flow, partitioned by month like a time series (ADR 0120).

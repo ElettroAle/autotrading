@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -9,7 +10,7 @@ from sqlalchemy.exc import IntegrityError, ProgrammingError
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
-from autotrading.adapters.outbound.sqlalchemy.tables import cycles, flows
+from autotrading.adapters.outbound.sqlalchemy.tables import cycle_decisions, cycles, flows
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.call_cost import CallCost
@@ -23,7 +24,9 @@ from autotrading.domain.flows.cycle_record import (
 )
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -246,15 +249,13 @@ def test_the_costs_within_a_window_are_those_of_the_cycles_planned_from_its_star
 
 
 def a_cycle_deciding(flow_id: UUID, minutes: int, *actions: str) -> CycleRecord:
-    decisions = [{"tipo": "Decision", "asset": "BTC", "action": action, "reasoning": "r"} for action in actions]
+    decisions = tuple(RecordedDecision.named("BTC", action, None, 60, "r") for action in actions)
     return CycleRecord(
         flow_id,
         PLANNED + timedelta(minutes=minutes),
         CycleOutcome.COMPLETED,
-        documents=(
-            StepDocument(CycleStep.COMPOSE_CONTEXT, {"messaggi": []}),
-            StepDocument(CycleStep.AGENT_DECISION, {"risposta": "{}", "decisioni": decisions, "scartate": []}),
-        ),
+        documents=(StepDocument(CycleStep.COMPOSE_CONTEXT, {"messaggi": []}),),
+        decisions=decisions,
     )
 
 
@@ -313,3 +314,69 @@ def test_the_filtered_cycles_of_another_tenant_stay_invisible(database: Engine) 
     other = SqlAlchemyCycleRepositoryAdapter(database, other_tenant)
 
     assert (other.matching(flow_id, CycleFilter(), 0, 50), other.count(flow_id, CycleFilter())) == ([], 0)
+
+
+OPENING = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 72, "trend rialzista")
+HOLDING = RecordedDecision("ETH", DecisionAction.HOLD, None, 40, "attesa")
+
+
+def a_completed_cycle(flow_id: UUID, minutes: int, *decisions: RecordedDecision) -> CycleRecord:
+    return CycleRecord(flow_id, PLANNED + timedelta(minutes=minutes), CycleOutcome.COMPLETED, decisions=decisions)
+
+
+# ADR decisioni-del-ciclo-registrate-per-asset: the decisions are written with the cycle, one row by asset.
+def test_the_last_decision_is_that_of_the_most_recent_completed_cycle_with_decisions(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    repository.record(a_completed_cycle(flow_id, 0, HOLDING))
+    repository.record(a_completed_cycle(flow_id, 15, OPENING, HOLDING))
+    repository.record(a_completed_cycle(flow_id, 30))
+    failed_after_deciding = replace(
+        a_completed_cycle(flow_id, 45, HOLDING),
+        outcome=CycleOutcome.FAILED,
+        failure=CycleFailure(CycleStep.RISK_CHECK, "FakeTransientError", "timeout"),
+    )
+    repository.record(failed_after_deciding)
+    repository.record(a_failed_cycle(flow_id, PLANNED + timedelta(minutes=60)))
+
+    assert repository.last_decided(flow_id) == DecidedCycle(PLANNED + timedelta(minutes=15), (OPENING, HOLDING))
+
+
+def test_a_flow_without_completed_cycles_with_decisions_has_no_last_decision(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    repository.record(a_failed_cycle(flow_id))
+
+    assert repository.last_decided(flow_id) is None
+
+
+def test_a_cycle_recorded_again_keeps_its_decisions_once(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    record = a_completed_cycle(flow_id, 0, OPENING)
+
+    repository.record(record)
+    repository.record(record)
+
+    assert repository.last_decided(flow_id) == DecidedCycle(PLANNED, (OPENING,))
+
+
+def test_the_decisions_of_another_tenant_stay_invisible(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    other_tenant, _ = new_flow(database)
+    SqlAlchemyCycleRepositoryAdapter(database, tenant_id).record(a_completed_cycle(flow_id, 0, OPENING))
+
+    assert SqlAlchemyCycleRepositoryAdapter(database, other_tenant).last_decided(flow_id) is None
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(other_tenant.value), True)))
+        assert connection.execute(select(func.count()).select_from(cycle_decisions)).scalar_one() == 0
+
+
+def test_a_recorded_decision_cannot_be_deleted(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    SqlAlchemyCycleRepositoryAdapter(database, tenant_id).record(a_completed_cycle(flow_id, 0, OPENING))
+
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(tenant_id.value), True)))
+        with pytest.raises(ProgrammingError, match="permission denied"):
+            connection.execute(cycle_decisions.delete())

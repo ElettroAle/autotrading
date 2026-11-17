@@ -6,7 +6,9 @@ from uuid import UUID
 
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.errors import UnknownCycleOutcomeError
+from autotrading.domain.flows.recorded_decision import RecordedDecision
 
 
 class CycleOutcome(StrEnum):
@@ -50,7 +52,9 @@ class StepDocument:
 
 @dataclass(frozen=True, slots=True)
 class CycleRecord:
-    """What a cycle produced up to the last step it ran (R1.2.1-R1.2.5, R1.7.1)."""
+    """What a cycle produced up to the last step it ran, and what started it (R1.2.1-R1.2.5, R1.7.1, R6.5.2), with the
+    decisions of the agent one by asset when it got to them (R6.5.4).
+    """
 
     flow_id: UUID
     planned_at: datetime
@@ -64,6 +68,8 @@ class CycleRecord:
     cost: CallCost | None = None
     # A call that went out and failed before the provider reported its usage: nobody knows its cost (R1.4.6).
     call_without_usage: bool = False
+    decisions: tuple[RecordedDecision, ...] = ()
+    trigger: CycleTrigger = CycleTrigger.SCHEDULED
 
     @classmethod
     def skipped(cls, flow_id: UUID, planned_at: datetime) -> CycleRecord:

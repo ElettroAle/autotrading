@@ -23,6 +23,7 @@ import {
 } from './flow-statistics';
 import { forecastAccuracyOf } from './forecast-accuracy';
 import { historyPage, InvalidSearch, type FakeHistoryRow, type FakeRecords } from './history';
+import { lastDecisionOf } from './last-decision';
 import {
   configurationOf,
   FAKE_FLOW_COMMANDS,
@@ -50,7 +51,6 @@ const CYCLES_PER_PAGE = 50;
 const CLOSED_POSITIONS_PER_PAGE = 50;
 const CURRENCY = 'USDC';
 const RECENT_CYCLES = 10;
-const CYCLE_MINUTES = 15;
 const MINUTE = 60_000;
 
 const notFound = (detail: string) => problem(404, 'Not Found', detail);
@@ -249,13 +249,17 @@ const closedPositionPage = (positions: FakeClosedPosition[], request: Request) =
   };
 };
 
-// Only an active flow plans a next cycle, one interval after its last one (R1.7.3).
-const nextCycleOf = (flow: FakeFlow, newest: FakeCycle | undefined): string | null => {
+// Only an active flow plans a next cycle, one interval after its last planned one: a cycle asked for now leaves the
+// schedule as it is (R1.7.3, R6.5.2).
+const nextCycleOf = (flow: FakeFlow): string | null => {
   if (flow.status !== 'attivo') {
     return null;
   }
-  const last = newest === undefined ? Date.now() : Date.parse(newest.planned_at);
-  return apiInstant(new Date(last + CYCLE_MINUTES * MINUTE));
+  const planned = newestFirst(fakePlatform.cyclesOf(flow.id)).find(
+    (cycle) => cycle.trigger === 'scheduled',
+  );
+  const last = planned === undefined ? Date.now() : Date.parse(planned.planned_at);
+  return apiInstant(new Date(last + flow.cycleMinutes * MINUTE));
 };
 
 // The API measures the return in the domain (ADR 0127): the fake answers with the same figure, two decimals.
@@ -284,7 +288,7 @@ const overviewOf = (user: FakeUser, flow: FakeFlow, request: Request) => {
     model: flow.model,
     version: flow.version,
     last_cycle: newest === undefined ? null : outcomeOf(newest),
-    next_cycle_at: nextCycleOf(flow, newest),
+    next_cycle_at: nextCycleOf(flow),
     // A draft has no account yet, so no currency nor capital (ADR 0124).
     ...(flow.status === 'bozza'
       ? { currency: null, initial_capital: null, current_capital: null, summary: null }
@@ -530,6 +534,13 @@ export const handlers = [
       HttpResponse.json(cyclePage(fakePlatform.cyclesOf(flow.id), request)),
     ),
   ),
+  http.post('*/flows/:flowId/cycles', ({ request, params }) =>
+    withUser(request, (user) =>
+      HttpResponse.json(summaryOf(fakePlatform.runCycleNow(user, String(params.flowId))), {
+        status: 201,
+      }),
+    ),
+  ),
   http.get('*/flows/:flowId/versions', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>
       HttpResponse.json(
@@ -556,6 +567,11 @@ export const handlers = [
           HttpResponse.json(differences(first, second)),
         ),
       ),
+    ),
+  ),
+  http.get('*/flows/:flowId/decisions/latest', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json(lastDecisionOf(fakePlatform.cyclesOf(flow.id))),
     ),
   ),
   http.get('*/flows/:flowId/cycles/:plannedAt', ({ request, params }) =>
