@@ -31,6 +31,11 @@ Funzionalità: R2.3.3 Creazione e modifica dei flussi dalla dashboard
     Quando "anna" cambia il peso della fonte "sentiment" a 3
     Allora il flusso "alfa" è alla versione 2 con peso 3 per "sentiment"
 
+  Scenario: Nome modificato nella configurazione
+    Dato che il flusso "alfa" è alla versione 1
+    Quando "anna" rinomina il flusso "alfa" in "gamma"
+    Allora il flusso "gamma" compare nell'elenco nello stato "fermo" alla versione 1
+
   Scenario: Asset già in uso sullo stesso conto
     Dato che il flusso "beta" usa "ETH" sul conto "principale"
     Quando "anna" aggiunge "ETH" al flusso "alfa"

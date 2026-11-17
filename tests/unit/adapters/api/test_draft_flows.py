@@ -58,7 +58,7 @@ def an_original(client: TestClient, platform: Platform, user: str) -> dict[str, 
     return created
 
 
-def test_a_duplicated_flow_answers_as_a_draft_without_account_capital_or_assets(
+def test_a_duplicated_flow_answers_as_a_draft_with_account_and_capital_without_assets(
     client_of: Client, platform: Platform
 ) -> None:
     anna = client_of("anna")
@@ -71,11 +71,11 @@ def test_a_duplicated_flow_answers_as_a_draft_without_account_capital_or_assets(
     assert copy["id"] != original["id"]
     assert {key: copy[key] for key in ("name", "account_id", "status", "version", "assets", "allocated_capital")} == {
         "name": "alfa (copia)",
-        "account_id": None,
+        "account_id": original["account_id"],
         "status": "bozza",
         "version": 1,
         "assets": [],
-        "allocated_capital": None,
+        "allocated_capital": "100",
     }
     assert (copy["model"], copy["sources"], copy["risk_limits"]) == (
         original["model"],
@@ -93,22 +93,22 @@ def test_a_flow_of_another_tenant_is_not_duplicated(client_of: Client, platform:
     assert (response.status_code, reason_of(response)) == (404, {"detail": "flusso non trovato"})
 
 
-def test_an_assigned_draft_answers_with_account_capital_and_assets_and_then_starts(
+def test_a_draft_configured_in_the_editor_answers_with_account_capital_and_assets_and_then_starts(
     client_of: Client, platform: Platform
 ) -> None:
     anna = client_of("anna")
     copy = anna.post(f"/flows/{an_original(anna, platform, 'anna')['id']}/duplicate").json()
     account_id = str(account_id_of(platform, "anna", "secondario"))
 
-    assigned = anna.put(
-        f"/flows/{copy['id']}/assignment",
+    configured = anna.patch(
+        f"/flows/{copy['id']}",
         json={"account_id": account_id, "allocated_capital": "200", "assets": ["btc"]},
     )
     started = anna.post(f"/flows/{copy['id']}/start")
 
-    assert assigned.status_code == 200
+    assert configured.status_code == 200
     assert {
-        key: assigned.json()[key] for key in ("account_id", "status", "version", "assets", "allocated_capital")
+        key: configured.json()[key] for key in ("account_id", "status", "version", "assets", "allocated_capital")
     } == {
         "account_id": account_id,
         "status": "bozza",
@@ -119,40 +119,63 @@ def test_an_assigned_draft_answers_with_account_capital_and_assets_and_then_star
     assert (started.status_code, started.json()["status"]) == (200, "attivo")
 
 
-def test_a_draft_started_without_assignment_answers_with_what_is_missing(client_of: Client, platform: Platform) -> None:
+def test_a_copy_started_without_assets_answers_with_what_is_missing(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     copy = anna.post(f"/flows/{an_original(anna, platform, 'anna')['id']}/duplicate").json()
 
     response = anna.post(f"/flows/{copy['id']}/start")
 
-    assert (response.status_code, reason_of(response)) == (409, {"detail": "conto, capitale allocato e asset mancanti"})
+    assert (response.status_code, reason_of(response)) == (409, {"detail": "asset mancante"})
 
 
-def test_an_assignment_without_assets_answers_with_the_reason(client_of: Client, platform: Platform) -> None:
+def test_the_assignment_has_no_route_of_its_own(client_of: Client, platform: Platform) -> None:
     anna = client_of("anna")
     copy = anna.post(f"/flows/{an_original(anna, platform, 'anna')['id']}/duplicate").json()
 
     response = anna.put(
         f"/flows/{copy['id']}/assignment",
-        json={"account_id": str(account_id_of(platform, "anna")), "allocated_capital": "200"},
+        json={"account_id": copy["account_id"], "allocated_capital": "50", "assets": ["ETH"]},
     )
 
-    assert (response.status_code, reason_of(response)) == (
-        422,
-        {"detail": "almeno un asset è obbligatorio", "field": "assets"},
-    )
+    assert response.status_code == 405
 
 
-def test_a_flow_out_of_draft_is_not_assigned(client_of: Client, platform: Platform) -> None:
+def test_the_capital_of_a_flow_out_of_draft_answers_with_the_command_of_the_capital(
+    client_of: Client, platform: Platform
+) -> None:
     anna = client_of("anna")
     original = an_original(anna, platform, "anna")
 
-    response = anna.put(
-        f"/flows/{original['id']}/assignment",
-        json={"account_id": original["account_id"], "allocated_capital": "50", "assets": ["ETH"]},
+    response = anna.patch(f"/flows/{original['id']}", json={"allocated_capital": "50"})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {
+            "detail": "il capitale allocato di un flusso avviato si cambia con il comando del capitale",
+            "field": "allocated_capital",
+        },
     )
+
+
+def test_a_new_name_answers_with_the_flow_renamed_at_the_same_version(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    original = an_original(anna, platform, "anna")
+
+    response = anna.patch(f"/flows/{original['id']}", json={"name": "beta"})
+
+    assert response.status_code == 200
+    assert (response.json()["name"], response.json()["version"]) == ("beta", 1)
+    assert [flow["name"] for flow in anna.get("/flows").json()] == ["beta"]
+
+
+def test_the_name_of_another_flow_answers_with_the_reason(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    original = an_original(anna, platform, "anna")
+    copy = anna.post(f"/flows/{original['id']}/duplicate").json()
+
+    response = anna.patch(f"/flows/{copy['id']}", json={"name": "alfa"})
 
     assert (response.status_code, reason_of(response)) == (
         409,
-        {"detail": "conto, capitale e asset si assegnano solo a un flusso in bozza"},
+        {"detail": "nome già usato da un altro flusso", "field": "name"},
     )

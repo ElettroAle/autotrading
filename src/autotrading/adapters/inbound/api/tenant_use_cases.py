@@ -28,7 +28,6 @@ from autotrading.application.agent.register_provider_key import ProviderKeyServi
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
-from autotrading.application.flows.assign_draft_flow import AssignDraftFlowUseCase
 from autotrading.application.flows.cash_out_profits import CashOutPorts, CashOutProfitsUseCase
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusUseCase
@@ -282,7 +281,6 @@ class TenantUseCases:
     list_flow_overviews: ListFlowOverviewsUseCase
     read_flow_equity: ReadFlowEquityUseCase
     duplicate_flow: DuplicateFlowUseCase
-    assign_draft_flow: AssignDraftFlowUseCase
     query_cycle_history: QueryCycleHistoryUseCase
     query_closed_position_history: QueryClosedPositionHistoryUseCase
     query_order_history: QueryOrderHistoryUseCase
@@ -424,7 +422,6 @@ class TenantUseCases:
             ),
             read_flow_equity=ReadFlowEquityUseCase(ports.flows, ports.equity_snapshots, ports.clock),
             duplicate_flow=DuplicateFlowUseCase(ports.flows),
-            assign_draft_flow=AssignDraftFlowUseCase(ports.flows, ports.flow_checks),
             query_cycle_history=QueryCycleHistoryUseCase(ports.historical_cycles, ports.clock),
             query_closed_position_history=QueryClosedPositionHistoryUseCase(
                 ports.historical_closed_positions, ports.clock

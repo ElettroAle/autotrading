@@ -13,7 +13,10 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
     document_of,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
@@ -164,8 +167,13 @@ def test_a_version_without_minimum_confidence_reads_back_without_it() -> None:
     assert configuration_of(1, document).minimum_confidence is None
 
 
+def a_draft() -> Flow:
+    """A draft with the strategy alone, as an imported file makes it (R2.5.2)."""
+    return Flow.drafted(TenantId.new(), FlowName("importato"), FlowStrategy.of(CONFIGURATION))
+
+
 def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_back() -> None:
-    draft = a_flow(TenantId.new(), configuration=CONFIGURATION).duplicated()
+    draft = a_draft()
     document = json.loads(json.dumps(document_of(draft.configuration)))
 
     assert (document["assets"], document["allocated_capital"]) == ([], None)
@@ -173,7 +181,7 @@ def test_the_version_of_a_draft_is_saved_without_capital_and_assets_and_reads_ba
 
 
 def test_a_draft_is_saved_without_account() -> None:
-    draft = a_flow(TenantId.new(), configuration=CONFIGURATION).duplicated()
+    draft = a_draft()
 
     assert (_row_of(draft)["account_id"], _row_of(draft)["status"]) == (None, "draft")
 
@@ -183,3 +191,10 @@ def test_an_assignment_of_another_tenant_never_reaches_the_database() -> None:
 
     with pytest.raises(CrossTenantAccessError):
         repository.add_assignment(a_flow(TenantId.new()).duplicated())
+
+
+def test_a_name_of_another_tenant_never_reaches_the_database() -> None:
+    repository = SqlAlchemyFlowRepositoryAdapter(ENGINE, TenantId.new())
+
+    with pytest.raises(CrossTenantAccessError):
+        repository.rename(a_flow(TenantId.new(), name="beta"))

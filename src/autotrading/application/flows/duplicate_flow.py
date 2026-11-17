@@ -17,8 +17,10 @@ class DuplicateFlowCommand:
 class DuplicateFlowUseCase:
     """Saves a draft with the strategy of a flow of the tenant, to try a variant of it (R2.4.1, ADR 0124).
 
-    The copy has its own history from version 1 and no account, capital or assets: the user assigns them before
-    starting it. Cycles and positions of the original stay where they are.
+    The copy has its own history from version 1, the account and the capital of the original and no assets: the user
+    chooses them in its configuration before starting it (ADR bozza-configurata-dall-editor-e-duplica-con-conto). The
+    free capital is not read: a draft takes nothing on its account until it starts. Cycles and positions of the
+    original stay where they are.
     """
 
     def __init__(self, flows: FlowRepositoryPort) -> None:

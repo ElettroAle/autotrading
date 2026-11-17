@@ -5,15 +5,17 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
-from autotrading.application.flows.errors import AssetWithOpenPositionError
+from autotrading.application.flows.errors import AssetWithOpenPositionError, FlowNameInUseError
+from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.cycle_interval import CycleInterval
-from autotrading.domain.flows.errors import AccountNotChangeableError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
@@ -27,11 +29,15 @@ operations = logging.getLogger("autotrading.flows")
 class ModifyFlowCommand:
     """Only what the user changes: a part left None keeps the value of the version in force.
 
-    The allocated capital is not here: it changes on its own, with its history (R1.1.7).
+    The name changes in every status but archived, without a new version (ADR nome-del-flusso-modificabile). Account
+    and allocated capital change only on a draft: out of draft the capital changes on its own, with its history
+    (R1.1.7, ADR bozza-configurata-dall-editor-e-duplica-con-conto).
     """
 
     flow_id: FlowId
+    name: str | None = None
     account_id: UUID | None = None
+    allocated_capital: Decimal | None = None
     assets: tuple[str, ...] | None = None
     model: str | None = None
     model_parameters: Mapping[str, object] | None = None
@@ -76,6 +82,11 @@ class ModifyFlowUseCase:
 
     The rules of the creation hold (R1.1.1), with the conflict on the assets of the account (R1.1.2). An asset with
     an open position is not removed: the flow would leave on the account a position nobody follows.
+
+    A draft takes here account, capital and assets, even one alone: the account is one of the tenant, the assets are
+    traded by its exchange and the capital fits the free capital read now; the conflict on the assets waits for the
+    start, since a draft takes nothing on its account (ADR bozza-configurata-dall-editor-e-duplica-con-conto). A new
+    name alone saves no version (ADR nome-del-flusso-modificabile).
     """
 
     def __init__(self, flows: FlowRepositoryPort, checks: FlowChecks, activity: AccountActivityPort) -> None:
@@ -86,17 +97,60 @@ class ModifyFlowUseCase:
     def execute(self, command: ModifyFlowCommand) -> Flow:
         flow = self._flows.get(command.flow_id)
         flow.require_modifiable()
-        _require_same_account(flow, command.account_id)
-        configuration = self._configuration(flow.configuration, command)
-        if configuration.assets != flow.configuration.assets:
-            self._require_assets_admitted(flow, configuration.assets)
-            self._require_removed_without_position(flow, configuration.assets)
-        modified = flow.reconfigured(configuration)
-        self._flows.add_version(modified)
+        renamed = self._renamed(flow, command.name)
+        changed = renamed.with_assignment(command.account_id, command.allocated_capital)
+        changed = replace(changed, configuration=self._configuration(changed.configuration, command))
+        modified = changed if _renamed_alone(flow, changed) else changed.reconfigured(changed.configuration)
+        self._require_admitted(flow, modified)
+        self._save(flow, modified)
+        return modified
+
+    def _renamed(self, flow: Flow, name: str | None) -> Flow:
+        if name is None:
+            return flow
+        renamed = flow.renamed(FlowName(name))
+        if renamed.name != flow.name and self._flows.name_in_use(renamed.name):
+            raise FlowNameInUseError
+        return renamed
+
+    def _require_admitted(self, flow: Flow, modified: Flow) -> None:
+        if flow.status is FlowStatus.DRAFT:
+            self._require_assignment_admitted(flow, modified)
+            return
+        assets = modified.configuration.assets
+        if assets != flow.configuration.assets:
+            self._require_assets_admitted(flow, assets)
+            self._require_removed_without_position(flow, assets)
+
+    def _require_assignment_admitted(self, draft: Flow, modified: Flow) -> None:
+        if _assignment_of(modified) == _assignment_of(draft):
+            return
+        if modified.account_id is None and not modified.configuration.assets:
+            return
+        account_id = modified.assigned_account_id
+        exchange = self._checks.accounts.directory.exchange_of(account_id)
+        require_tradable(self._checks.markets, exchange, modified.configuration.assets)
+        capital = modified.configuration.allocated_capital
+        if capital is not None:
+            read_free_capital(self._flows, self._checks.accounts, account_id).require_room_for(capital)
+
+    def _save(self, flow: Flow, modified: Flow) -> None:
+        if modified.name != flow.name:
+            self._flows.rename(modified)
+            operations.info("flusso rinominato", extra={"flow_id": str(flow.id.value)})
+        if modified.configuration.version == flow.configuration.version:
+            return
+        self._add_version(flow.status, modified)
         operations.info(
             "flusso modificato", extra={"flow_id": str(flow.id.value), "version": modified.configuration.version}
         )
-        return modified
+
+    def _add_version(self, status: FlowStatus, modified: Flow) -> None:
+        # The account of a draft may change with the version: the two are saved together.
+        if status is FlowStatus.DRAFT:
+            self._flows.add_assignment(modified)
+            return
+        self._flows.add_version(modified)
 
     def _configuration(self, current: FlowConfiguration, command: ModifyFlowCommand) -> FlowConfiguration:
         return replace(
@@ -154,9 +208,14 @@ class ModifyFlowUseCase:
             raise AssetWithOpenPositionError(held)
 
 
-def _require_same_account(flow: Flow, account_id: UUID | None) -> None:
-    if account_id is not None and account_id != flow.account_id:
-        raise AccountNotChangeableError
+def _renamed_alone(flow: Flow, changed: Flow) -> bool:
+    """A new name with nothing else changed: the name is not part of the strategy (ADR nome-del-flusso-modificabile)."""
+    unchanged = changed.account_id == flow.account_id and changed.configuration == flow.configuration
+    return unchanged and changed.name != flow.name
+
+
+def _assignment_of(flow: Flow) -> tuple[UUID | None, Decimal | None, tuple[str, ...]]:
+    return flow.account_id, flow.configuration.allocated_capital, flow.configuration.assets
 
 
 def _system_prompt(current: str | None, command: ModifyFlowCommand) -> str | None:

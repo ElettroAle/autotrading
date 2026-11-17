@@ -4,11 +4,12 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.flows.errors import (
+    AccountNotChangeableError,
     ArchivedFlowNotModifiableError,
     ArchiveOnlyStoppedError,
+    CapitalNotChangeableError,
     FlowAssignmentMissingError,
     FlowCommandNotAllowedError,
-    FlowNotDraftError,
 )
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -31,8 +32,8 @@ ARCHIVABLE = frozenset({FlowStatus.STOPPED, FlowStatus.DRAFT})
 class Flow(TenantOwned):
     """An agent trading on one account of the tenant, with the configuration version in force (R1.1.1).
 
-    A draft has only the strategy; account, allocated capital and assets are required in every status the draft
-    reaches by starting (ADR 0124).
+    A draft may lack account, allocated capital and assets; they are required in every status the draft reaches by
+    starting (ADR 0124, ADR bozza-configurata-dall-editor-e-duplica-con-conto).
     """
 
     id: FlowId
@@ -75,16 +76,36 @@ class Flow(TenantOwned):
         return self.account_id
 
     def duplicated(self) -> Flow:
-        """A new draft with the strategy of the version in force, its own history and no account (R2.4.1)."""
+        """A new draft with the strategy, the account and the capital of the version in force, its own history and no
+        asset: two flows of one account never share an asset (R2.4.1, RF-02.05, ADR
+        bozza-configurata-dall-editor-e-duplica-con-conto)."""
         name = FlowName(self.name.value + COPY_SUFFIX)
-        return Flow.drafted(self.tenant_id, name, FlowStrategy.of(self.configuration))
+        draft = Flow.drafted(self.tenant_id, name, FlowStrategy.of(self.configuration))
+        return draft.with_assignment(self.account_id, self.configuration.allocated_capital)
 
-    def assigned(self, account_id: UUID, capital: Decimal, assets: tuple[str, ...]) -> Flow:
-        """The draft with the account and, as its next version, the capital and the assets to start with (ADR 0124)."""
+    def with_assignment(self, account_id: UUID | None, capital: Decimal | None) -> Flow:
+        """The flow with the account and the capital sent, None keeping its own, in the same version.
+
+        A draft takes any of them, even one alone (ADR bozza-configurata-dall-editor-e-duplica-con-conto); a flow out of
+        draft keeps its account (R1.1.1) and changes its capital only with the command of the capital (R1.1.7).
+        """
+        account = self.account_id if account_id is None else account_id
+        allocated = self.configuration.allocated_capital if capital is None else capital
         if self.status is not FlowStatus.DRAFT:
-            raise FlowNotDraftError
-        configuration = replace(self.configuration, assets=assets, allocated_capital=capital)
-        return replace(self.reconfigured(configuration), account_id=account_id)
+            self._require_assignment_kept(account, allocated)
+            return self
+        return replace(self, account_id=account, configuration=replace(self.configuration, allocated_capital=allocated))
+
+    def renamed(self, name: FlowName) -> Flow:
+        """The flow with another name: the name is not part of the strategy, so the version stays (Bug 558)."""
+        self.require_modifiable()
+        return replace(self, name=name)
+
+    def _require_assignment_kept(self, account_id: UUID | None, capital: Decimal | None) -> None:
+        if account_id != self.account_id:
+            raise AccountNotChangeableError
+        if capital != self.configuration.allocated_capital:
+            raise CapitalNotChangeableError
 
     @property
     def model_provider(self) -> str:

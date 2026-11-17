@@ -20,9 +20,11 @@ from autotrading.application.flows.errors import (
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant import Tenant
@@ -32,6 +34,17 @@ from tests.support.accounts import an_account
 from tests.support.flows import a_configuration, a_flow
 
 pytestmark = pytest.mark.integration
+
+
+def a_draft(tenant_id: TenantId) -> Flow:
+    """A draft with the strategy alone, as an imported file makes it (R2.5.2)."""
+    return Flow.drafted(tenant_id, FlowName("importato"), FlowStrategy.of(a_configuration()))
+
+
+def configured(draft: Flow, account_id: UUID) -> Flow:
+    """The draft with account, capital and assets, as the editor saves it."""
+    with_account = draft.with_assignment(account_id, Decimal(200))
+    return with_account.reconfigured(replace(with_account.configuration, assets=("SOL",)))
 
 
 def new_account(database: Engine) -> tuple[TenantId, UUID]:
@@ -151,6 +164,38 @@ def test_a_name_is_in_use_only_by_a_flow_not_archived(database: Engine) -> None:
     assert repository.name_in_use(FlowName("alfa"))
     assert not repository.name_in_use(FlowName("beta"))
     repository.add(a_flow(tenant_id, name="beta", account_id=account_id))
+
+
+def test_a_new_name_is_saved_without_a_new_version(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    flow = a_flow(tenant_id, name="alfa", account_id=account_id)
+    repository.add(flow)
+
+    repository.rename(flow.renamed(FlowName("beta")))
+
+    assert repository.get(flow.id) == flow.renamed(FlowName("beta"))
+    assert len(rows_of(database, flow_versions, tenant_id)) == 1
+
+
+def test_the_database_refuses_the_name_of_another_flow(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
+    repository.add(a_flow(tenant_id, name="alfa", account_id=account_id))
+    beta = a_flow(tenant_id, name="beta", account_id=account_id)
+    repository.add(beta)
+
+    with pytest.raises(FlowNameInUseError):
+        repository.rename(beta.renamed(FlowName("alfa")))
+
+    assert repository.get(beta.id) == beta
+
+
+def test_a_flow_never_saved_is_not_renamed(database: Engine) -> None:
+    tenant_id, _ = new_account(database)
+
+    with pytest.raises(FlowNotFoundError):
+        SqlAlchemyFlowRepositoryAdapter(database, tenant_id).rename(a_flow(tenant_id))
 
 
 def test_the_database_refuses_a_second_flow_with_the_same_name(database: Engine) -> None:
@@ -281,7 +326,7 @@ def test_the_flow_on_an_asset_of_the_account_is_the_active_or_paused_one_of_the_
     assert SqlAlchemyFlowRepositoryAdapter(database, other_tenant).flow_on(account_id, "BTC") is None
 
 
-def test_a_draft_is_saved_without_account_and_reads_back(database: Engine) -> None:
+def test_a_copy_is_saved_with_account_and_capital_without_assets_and_reads_back(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
     original = a_flow(tenant_id, account_id=account_id)
@@ -297,9 +342,9 @@ def test_a_draft_is_saved_without_account_and_reads_back(database: Engine) -> No
 def test_an_assignment_saves_the_account_of_the_draft_with_its_next_version(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
-    draft = a_flow(tenant_id, account_id=account_id).duplicated()
+    draft = a_draft(tenant_id)
     repository.add(draft)
-    assigned = draft.assigned(account_id, Decimal(200), ("SOL",))
+    assigned = configured(draft, account_id)
 
     repository.add_assignment(assigned)
 
@@ -311,11 +356,11 @@ def test_an_assignment_on_the_account_of_another_tenant_is_refused(database: Eng
     tenant_id, _ = new_account(database)
     _, stranger_account = new_account(database)
     repository = SqlAlchemyFlowRepositoryAdapter(database, tenant_id)
-    draft = a_flow(tenant_id).duplicated()
+    draft = a_draft(tenant_id)
     repository.add(draft)
 
     with pytest.raises(FlowAccountNotFoundError):
-        repository.add_assignment(draft.assigned(stranger_account, Decimal(200), ("SOL",)))
+        repository.add_assignment(configured(draft, stranger_account))
 
     assert repository.get(draft.id) == draft
 

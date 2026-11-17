@@ -110,6 +110,10 @@ class FlowRepositoryPort(Protocol):
         """Saves the status of the flow. Raises FlowNotFoundError."""
         ...
 
+    def rename(self, flow: Flow) -> None:
+        """Saves the name of the flow, its versions untouched. Raises FlowNotFoundError or FlowNameInUseError."""
+        ...
+
     def add_version(self, flow: Flow) -> None:
         """Saves the configuration of the flow as a new version, the others untouched. Raises FlowNotFoundError."""
         ...
@@ -130,7 +134,8 @@ class FlowRepositoryPort(Protocol):
         ...
 
     def add_assignment(self, flow: Flow) -> None:
-        """Saves, together, the account of the draft and the version with its capital and assets (ADR 0124).
+        """Saves, together, the account of the draft and the version with its capital and assets (ADR 0124, ADR
+        bozza-configurata-dall-editor-e-duplica-con-conto).
 
         Raises FlowNotFoundError, or FlowAccountNotFoundError when the account is not of the tenant any more.
         """
