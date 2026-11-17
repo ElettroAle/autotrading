@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.loss_guard import LossReferences
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -14,7 +15,10 @@ class EquitySnapshotStore:
 
 
 class InMemoryEquitySnapshotRepositoryAdapter:
-    """Bound to one tenant, like the real adapter under row level security; a cycle keeps its first equity."""
+    """Bound to one tenant, like the real adapter under row level security; a cycle keeps its first equity.
+
+    It gives the references of the losses as the real adapter does (R3.2.2).
+    """
 
     def __init__(self, store: EquitySnapshotStore, tenant_id: TenantId) -> None:
         self._store = store
@@ -32,3 +36,12 @@ class InMemoryEquitySnapshotRepositoryAdapter:
             ),
             key=lambda snapshot: snapshot.planned_at,
         )
+
+    def loss_references(self, flow_id: UUID, day_start: datetime, peak_since: datetime) -> LossReferences:
+        recorded = self.of_flow(flow_id, TimeWindow(None, None))
+        until_midnight = [snapshot for snapshot in recorded if snapshot.planned_at <= day_start]
+        of_the_day = [snapshot for snapshot in recorded if snapshot.planned_at >= day_start]
+        daily = until_midnight[-1] if until_midnight else next(iter(of_the_day), None)
+        since = [snapshot for snapshot in recorded if snapshot.planned_at >= peak_since]
+        peak = max(reversed(since), key=lambda snapshot: snapshot.equity - snapshot.allocated_capital, default=None)
+        return LossReferences(daily, peak)

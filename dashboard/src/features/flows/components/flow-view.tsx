@@ -10,7 +10,6 @@ import { paths } from '@/config/paths';
 import { useAccounts } from '../api/get-accounts';
 import { DRAFT_STATUS, useFlows, type Flow } from '../api/get-flows';
 
-import { OpeningsSuspendedNotice } from './openings-suspended-notice';
 import { StartFlowButton } from './start-flow-button';
 
 const FlowStatus = ({ flow }: { flow: Flow }) => {
@@ -62,7 +61,6 @@ export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) =>
           {account !== undefined && !realMoney ? (
             <TestNetworkNotice subject="Il flusso" networkName={account.network_name} />
           ) : null}
-          {flow.status === DRAFT_STATUS ? null : <OpeningsSuspendedNotice flowId={flow.id} />}
         </div>
         {flow.status === DRAFT_STATUS ? (
           <div className="mt-3">

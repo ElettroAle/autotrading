@@ -11,9 +11,11 @@ from autotrading.domain.flows.errors import (
     MaxLeverageRequiredError,
     ModelRequiredError,
     SourceWeightOutOfRangeError,
+    TotalExposureOutOfRangeError,
 )
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
+from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
@@ -97,6 +99,39 @@ def test_an_exposure_outside_zero_to_hundred_percent_is_refused(percent: Decimal
         RiskLimits(5, percent)
     with pytest.raises(InvalidRiskLimitError, match=r"^limite di rischio non valido: esposizione massima del valore$"):
         RiskLimits(5, Decimal(10), percent)
+
+
+def test_the_overall_exposure_limits_are_optional() -> None:
+    limits = RiskLimits(5, Decimal(10))
+
+    assert (limits.max_total_margin_exposure_percent, limits.max_total_value_exposure_percent) == (None, None)
+
+
+@pytest.mark.parametrize("percent", [Decimal("0.1"), Decimal(30), Decimal(1000)])
+def test_an_overall_exposure_goes_from_a_tenth_to_a_thousand_percent(percent: Decimal) -> None:
+    limits = RiskLimits(5, Decimal(10), None, percent, percent)
+
+    assert (limits.max_total_margin_exposure_percent, limits.max_total_value_exposure_percent) == (percent, percent)
+
+
+@pytest.mark.parametrize(
+    "percent", [Decimal(0), Decimal("0.09"), Decimal(1001), Decimal(-1), Decimal("NaN"), Decimal("Infinity")]
+)
+def test_an_overall_exposure_out_of_range_is_refused_naming_its_setting(percent: Decimal) -> None:
+    reason = r"^l'esposizione complessiva massima va da 0,1 a 1000$"
+    with pytest.raises(TotalExposureOutOfRangeError, match=reason) as margin:
+        RiskLimits(5, Decimal(10), max_total_margin_exposure_percent=percent)
+    with pytest.raises(TotalExposureOutOfRangeError, match=reason) as value:
+        RiskLimits(5, Decimal(10), max_total_value_exposure_percent=percent)
+
+    assert margin.value.setting is FlowSetting.MAX_TOTAL_MARGIN_EXPOSURE
+    assert value.value.setting is FlowSetting.MAX_TOTAL_VALUE_EXPOSURE
+
+
+def test_the_limits_the_user_configures_carry_the_overall_exposures() -> None:
+    limits = RiskLimits.of(5, Decimal(10), None, Decimal(30), Decimal(100))
+
+    assert limits == RiskLimits(5, Decimal(10), None, Decimal(30), Decimal(100))
 
 
 def test_a_model_selection_needs_a_model() -> None:

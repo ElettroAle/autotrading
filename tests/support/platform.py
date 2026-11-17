@@ -44,6 +44,7 @@ from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.flows.account_activity import AccountActivity
+from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
@@ -60,6 +61,7 @@ from tests.fakes.closed_position_repository import ClosedPositionStore, InMemory
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
+from tests.fakes.emergency_closing_log import InMemoryEmergencyClosingLogAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
@@ -68,7 +70,12 @@ from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
+from tests.fakes.flow_repository import (
+    FlowStore,
+    InMemoryAutomaticPauseAdapter,
+    InMemoryFlowRepositoryAdapter,
+    InMemoryFlowTimingAdapter,
+)
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.link_code_repository import (
@@ -84,6 +91,7 @@ from tests.fakes.linked_chat_repository import (
 from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -163,6 +171,8 @@ class Platform:
         # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
+        # The emergency closings of every tenant, as their record keeps them (R3.2.3).
+        self.emergency_closings: list[EmergencyClosing] = []
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -255,6 +265,7 @@ class Platform:
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
+            openings_suspensions=InMemoryOpeningsSuspensionAdapter(self.flows, tenant_id),
             flow_forecasts=InMemoryFlowForecastsAdapter(self.forecasts_of(tenant_id)),
             historical_cycles=self.history_of(tenant_id),
             historical_closed_positions=self.history_of(tenant_id),
@@ -262,6 +273,8 @@ class Platform:
             reconciliation=self.readings,
             account_thresholds=accounts,
             account_names=accounts,
+            automatic_pause=InMemoryAutomaticPauseAdapter(self.flows, tenant_id),
+            emergency_closings=InMemoryEmergencyClosingLogAdapter(self.emergency_closings, tenant_id),
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )

@@ -49,9 +49,9 @@ segnalati come variazioni non attribuibili, mentre R3.3.1 li vuole spiegati.
      `notifications` ("test-1: allarme di riconciliazione, saldo 980 USDC invece di 1000 USDC") come le altre
      segnalazioni di R1.6.2.
    - Sospensione: `ReadCycleFlowUseCase` legge l'allarme aperto del conto e lo mette nel `CycleFlow`; `RiskState`
-     porta il motivo della sospensione delle aperture e `RiskCheck` blocca ogni apertura con
-     `BlockedDecision(asset, "allarme di riconciliazione sul conto test-1")`, registrata nel ciclo come "apertura ETH
-     non eseguita: …"; chiusure e piano di uscita non passano dal blocco. La riconciliazione di inizio ciclo precede
+     porta il motivo della sospensione delle aperture (una sola sospensione con la perdita massima di R3.2.2, ADR
+     perdita-massima-sui-valori-di-equity-registrati) e `RiskCheck` blocca ogni apertura con
+     `BlockedDecision(asset, "apertura ETH non eseguita: allarme di riconciliazione sul conto test-1")`; chiusure e piano di uscita non passano dal blocco. La riconciliazione di inizio ciclo precede
      la revisione del rischio, quindi l'allarme aperto in un ciclo blocca già le sue aperture.
    - Conferma: `ConfirmReconciliationUseCase` (flows) chiude l'allarme con data e ora e porta il riferimento al saldo
      letto dell'ultima lettura; senza allarme aperto `ReconciliationAlarmNotOpenError` (409) "il conto test-1 non ha

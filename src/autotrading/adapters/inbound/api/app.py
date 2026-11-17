@@ -12,6 +12,7 @@ from autotrading.adapters.inbound.api.capital_changes import capital_changes_rou
 from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
 from autotrading.adapters.inbound.api.cycles import cycles_router
 from autotrading.adapters.inbound.api.decisions import decisions_router
+from autotrading.adapters.inbound.api.emergency_closings import emergency_closings_router
 from autotrading.adapters.inbound.api.equity import equity_router
 from autotrading.adapters.inbound.api.errors import AuthenticationNotConfiguredError, install_error_responses
 from autotrading.adapters.inbound.api.exchanges import exchanges_router
@@ -112,6 +113,8 @@ def create_api(
     protected.include_router(provider_keys_router(use_cases_of_request))
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))
+    # Before the routes of one flow, whose identifier would otherwise take the place of its fixed path (R3.2.3).
+    protected.include_router(emergency_closings_router(use_cases_of_request, current_user))
     protected.include_router(flows_router(use_cases_of_request, current_user))
     protected.include_router(capital_changes_router(use_cases_of_request))
     protected.include_router(assets_router(use_cases_of_request))

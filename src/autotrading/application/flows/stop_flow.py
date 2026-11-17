@@ -35,7 +35,7 @@ class StopFlowUseCase:
     def execute(self, command: StopFlowCommand) -> StopOutcome:
         flow = self._flows.get(command.flow_id).after(FlowAction.STOP)
         self._flows.change_status(flow)
-        left_open = self._closings.execute(CloseFlowPositionsCommand(flow, command.user_id, command.reason))
+        left_open = self._closings.execute(CloseFlowPositionsCommand(flow, command.user_id, command.reason)).left_open
         operations.info(
             "flusso fermato",
             extra={"flow_id": str(flow.id.value), "left_open": [position.asset for position in left_open]},

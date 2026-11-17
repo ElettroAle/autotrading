@@ -54,6 +54,24 @@ class InvalidRiskLimitError(FlowSettingError):
         self.label = label
 
 
+class TotalExposureOutOfRangeError(FlowSettingError):
+    def __init__(self, setting: FlowSetting) -> None:
+        super().__init__("l'esposizione complessiva massima va da 0,1 a 1000", setting)
+
+
+class MaxConsecutiveFailuresOutOfRangeError(FlowSettingError):
+    # The status the ADR of the maximum declares (ADR pausa-dopo-cicli-falliti-consecutivi); the field still names it.
+    status_code = 400
+
+    def __init__(self) -> None:
+        super().__init__("il massimo di cicli falliti consecutivi va da 1 a 100", FlowSetting.MAX_CONSECUTIVE_FAILURES)
+
+
+class MaxLossOutOfRangeError(FlowSettingError):
+    def __init__(self, setting: FlowSetting) -> None:
+        super().__init__("la perdita massima va da 0,1 a 100", setting)
+
+
 class SourceWeightOutOfRangeError(FlowSettingError):
     def __init__(self, source: str) -> None:
         super().__init__(f"peso fuori da 1-10: {source}", FlowSetting.SOURCES)
@@ -129,6 +147,16 @@ class FlowCommandNotAllowedError(DomainError):
         super().__init__(f"comando {command} non ammesso per un flusso {status}")
         self.command = command
         self.status = status
+
+
+class OpeningsNotSuspendedError(DomainError):
+    """A resume of the openings of a flow that are not suspended for maximum loss (R3.2.2)."""
+
+    status_code = 409
+
+    def __init__(self, flow: str) -> None:
+        super().__init__(f"le aperture di {flow} non sono sospese")
+        self.flow = flow
 
 
 class ArchiveOnlyStoppedError(DomainError):
@@ -385,3 +413,12 @@ class MalformedSystemPromptError(FlowSettingError):
         super().__init__(
             "parentesi graffa senza la sua coppia: per scriverla nel testo raddoppiala", FlowSetting.SYSTEM_PROMPT
         )
+
+
+class EmergencyScopeAmbiguousError(DomainError):
+    """An emergency closing covers one flow, one account or every flow: never a flow and an account at once
+    (R3.2.3).
+    """
+
+    def __init__(self) -> None:
+        super().__init__("indicare un flusso o un conto, non entrambi")

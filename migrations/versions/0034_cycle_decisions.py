@@ -4,15 +4,15 @@ The cycles recorded before keep their decisions in the document of the decision 
 their order, with the confidence the agent gave or none when the decision came before it. R6.5.4, ADR
 decisioni-del-ciclo-registrate-per-asset.
 
-Revision ID: 0032
-Revises: 0031
+Revision ID: 0034
+Revises: 0033
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0032"
-down_revision = "0031"
+revision = "0034"
+down_revision = "0033"
 branch_labels = None
 depends_on = None
 

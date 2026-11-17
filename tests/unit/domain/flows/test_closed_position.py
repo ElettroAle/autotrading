@@ -73,6 +73,7 @@ def test_the_reasons_speak_italian() -> None:
         "take profit",
         "stop loss non piazzato",
         "incasso",
+        "chiusura di emergenza",
     ]
 
 

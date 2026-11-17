@@ -19,6 +19,8 @@ const flowOverviewSchema = z.object({
   environment: z.string(),
   status: z.string(),
   pause_reason: z.string().nullable(),
+  // The openings suspended for maximum loss now, or null (R3.2.2).
+  openings_suspension: z.object({ reason: z.string(), suspended_at: z.string() }).nullable(),
   model: z.string(),
   version: z.number(),
   last_cycle: cycleOutcomeSchema.nullable(),

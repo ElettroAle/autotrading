@@ -16,6 +16,7 @@ from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension, OpeningsSuspensionCause
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
@@ -25,6 +26,7 @@ from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnap
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -47,7 +49,9 @@ class Bench:
             ReadFlowStateUseCase(
                 flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
             ),
-            ReadOpeningsSuspensionUseCase(flows, self.readings, self.accounts),
+            ReadOpeningsSuspensionUseCase(
+                flows, InMemoryOpeningsSuspensionAdapter(self.store, TENANT), self.readings, self.accounts, lambda: NOW
+            ),
             InMemoryEquitySnapshotRepositoryAdapter(self.equity, TENANT),
             InMemoryCycleHistoryAdapter(self.cycles, self.store, TENANT),
             lambda: NOW,
@@ -157,10 +161,12 @@ def test_the_results_tell_why_the_openings_are_suspended_by_an_alarm_on_the_acco
 
     results = bench.use_case.execute(ReadFlowResultsCommand(flow.id.value))
 
-    assert results.openings_suspended == "allarme di riconciliazione sul conto test-1"
+    assert results.openings_suspension == OpeningsSuspension(
+        "allarme di riconciliazione sul conto test-1", NOW, OpeningsSuspensionCause.RECONCILIATION
+    )
 
 
 def test_the_openings_of_a_flow_whose_account_has_no_alarm_are_not_suspended(bench: Bench) -> None:
     flow = bench.flow()
 
-    assert bench.use_case.execute(ReadFlowResultsCommand(flow.id.value)).openings_suspended is None
+    assert bench.use_case.execute(ReadFlowResultsCommand(flow.id.value)).openings_suspension is None

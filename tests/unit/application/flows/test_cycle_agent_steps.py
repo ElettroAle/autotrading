@@ -20,6 +20,7 @@ from autotrading.domain.flows.cycle_record import AbsentSource
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_side import TradeSide
@@ -132,6 +133,18 @@ class Agent:
         return Reply(Response((Closing("BTC"),)))
 
 
+class LossGuard:
+    """The guard of the losses of the flow, with the answer the test gives, and the flows it guarded."""
+
+    def __init__(self, *, suspended: bool) -> None:
+        self.suspended = suspended
+        self.guarded: list[CycleFlow] = []
+
+    def execute(self, flow: CycleFlow) -> OpeningsSuspension | None:
+        self.guarded.append(flow)
+        return OpeningsSuspension("perdita giornaliera 6% oltre il 5%", flow.started_at) if self.suspended else None
+
+
 class Actions:
     def execute(self) -> tuple[str, ...]:
         return ("apri", "chiudi")
@@ -181,7 +194,7 @@ def test_the_risk_check_runs_on_the_limits_of_the_exchange_of_the_account() -> N
     decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Opening("BTC"), Opening("ETH")))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
 
-    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
 
     assert [order.flow for order in review.orders] == [CYCLE_FLOW]
     outcomes = review.outcomes
@@ -195,7 +208,7 @@ def test_the_exit_plan_of_the_agent_reaches_the_risk_check() -> None:
     decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Decision("open", "BTC", plan),))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
 
-    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
 
     [order] = review.orders
     assert isinstance(order.outcome, ApprovedOpening)
@@ -212,7 +225,7 @@ def test_the_minimum_confidence_of_the_flow_blocks_a_weak_opening() -> None:
     decisions = CycleDecisions(cycle_flow, Reply(Response((weak, convinced))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC", "ETH"}))})
 
-    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
 
     outcomes = review.outcomes
     assert isinstance(outcomes, tuple)
@@ -225,7 +238,22 @@ def test_the_exchange_of_an_account_without_limits_is_unavailable() -> None:
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter()})
 
     with pytest.raises(FlowExchangeUnavailableError):
-        ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+        ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+
+def test_openings_suspended_by_the_guard_of_the_losses_are_blocked_before_the_exchange() -> None:
+    decisions = CycleDecisions(CYCLE_FLOW, Reply(Response((Opening("BTC"),))))
+    guard = LossGuard(suspended=True)
+
+    review = ReviewCycleRiskUseCase(CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter()}), guard).execute(
+        FLOW.id.value, SNAPSHOT, decisions
+    )
+
+    assert guard.guarded == [CYCLE_FLOW]
+    assert review.orders == ()
+    assert review.outcomes == (
+        BlockedDecision("BTC", "apertura BTC non eseguita: aperture sospese per perdita massima"),
+    )
 
 
 def test_the_change_of_the_plan_of_an_open_position_reaches_the_risk_check() -> None:
@@ -237,7 +265,7 @@ def test_the_change_of_the_plan_of_an_open_position_reaches_the_risk_check() -> 
     decisions = CycleDecisions(cycle_flow, Reply(Response((Decision("update", "BTC", change=change),))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
 
-    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
 
     [order] = review.orders
     assert order.outcome == ApprovedUpdate("BTC", ExitPlanChange(Decimal(99000), Decimal(101500), "sopra 103000"), ())
@@ -251,7 +279,7 @@ def test_a_removal_of_the_target_reaches_the_risk_check() -> None:
     )
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
 
-    review = ReviewCycleRiskUseCase(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+    review = ReviewCycleRiskUseCase(check, LossGuard(suspended=False)).execute(FLOW.id.value, SNAPSHOT, decisions)
 
     [order] = review.orders
     assert order.outcome == ApprovedUpdate("BTC", ExitPlanChange(remove_target=True), ())

@@ -26,7 +26,7 @@ from tests.support.postgres import database_migrated_to
 
 pytestmark = pytest.mark.integration
 
-BEFORE_THE_DECISIONS = "0031"
+BEFORE_THE_DECISIONS = "0033"
 DECIDED_AT = datetime(2026, 11, 16, 10, 0, tzinfo=UTC)
 FAILED_AT = datetime(2026, 11, 16, 11, 0, tzinfo=UTC)
 # The decisions as the journal of the cycle wrote them: an opening with its fields, a hold given before the agent had
