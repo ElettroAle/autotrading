@@ -84,6 +84,15 @@ class EmergencyClosing(TenantOwned):
     closed_at: datetime
     outcomes: tuple[FlowEmergencyOutcome, ...]
 
+    @property
+    def positions_closed(self) -> int:
+        return sum(len(outcome.closed) for outcome in self.outcomes)
+
+    @property
+    def paused_flows(self) -> tuple[str, ...]:
+        """Every flow of the scope is left paused, whatever its closings did (R3.2.3)."""
+        return tuple(outcome.flow_name for outcome in self.outcomes)
+
 
 @dataclass(frozen=True, slots=True)
 class EmergencyClosingPreview:

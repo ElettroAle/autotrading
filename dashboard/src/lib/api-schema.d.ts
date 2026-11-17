@@ -421,6 +421,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Notification Email */
+        get: operations["read_notification_email_notifications_email_get"];
+        /** Set Notification Email */
+        put: operations["set_notification_email_notifications_email_put"];
+        post?: never;
+        /** Remove Notification Email */
+        delete: operations["remove_notification_email_notifications_email_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/email/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Test Email */
+        post: operations["send_test_email_notifications_email_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Notification Channels */
+        get: operations["read_notification_channels_notifications_channels_get"];
+        /** Choose Notification Channel */
+        put: operations["choose_notification_channel_notifications_channels_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/channels/flows/{flow_id}/{event}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Flow Channel Exception */
+        put: operations["set_flow_channel_exception_notifications_channels_flows__flow_id___event__put"];
+        post?: never;
+        /** Remove Flow Channel Exception */
+        delete: operations["remove_flow_channel_exception_notifications_channels_flows__flow_id___event__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows": {
         parameters: {
             query?: never;
@@ -1343,6 +1415,16 @@ export interface components {
             capital?: number | string | null;
         };
         /**
+         * ChannelChoiceRequest
+         * @description The channel of a type of event for all the flows of the user.
+         */
+        ChannelChoiceRequest: {
+            event: components["schemas"]["NotificationEvent"];
+            channel: components["schemas"]["ChannelName"];
+        };
+        /** @enum {string} */
+        ChannelName: "Telegram" | "email" | "entrambi" | "nessuno";
+        /**
          * ClosedPositionPageResponse
          * @description A page of the closed positions of a flow that match the filters, from the most recent close, with how many
          *     match in all (R1.7.2, R2.2.5, R6.4.4).
@@ -1691,6 +1773,19 @@ export interface components {
             /** Change Percent */
             change_percent: string | null;
         };
+        /**
+         * EventChannelResponse
+         * @description A type of event by the name the user reads, its channel, whether a flow may have an exception for it, and
+         *     the warnings of a chosen channel that is not linked (R3.5.3).
+         */
+        EventChannelResponse: {
+            event: components["schemas"]["NotificationEvent"];
+            channel: components["schemas"]["ChannelName"];
+            /** Of Flow */
+            of_flow: boolean;
+            /** Warnings */
+            warnings: string[];
+        };
         /** ExchangeResponse */
         ExchangeResponse: {
             /** Name */
@@ -1710,6 +1805,28 @@ export interface components {
             error_type: string;
             /** Message */
             message: string;
+        };
+        /**
+         * FlowChannelRequest
+         * @description The channel of a flow for the type of event of the path.
+         */
+        FlowChannelRequest: {
+            channel: components["schemas"]["ChannelName"];
+        };
+        /**
+         * FlowChannelsResponse
+         * @description A flow of the tenant with its exceptions; an event without one follows the general choice.
+         */
+        FlowChannelsResponse: {
+            /**
+             * Flow Id
+             * Format: uuid
+             */
+            flow_id: string;
+            /** Name */
+            name: string;
+            /** Exceptions */
+            exceptions: components["schemas"]["EventChannelResponse"][];
         };
         /** FlowCostResponse */
         FlowCostResponse: {
@@ -2401,6 +2518,40 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** NotificationChannelsResponse */
+        NotificationChannelsResponse: {
+            /** Events */
+            events: components["schemas"]["EventChannelResponse"][];
+            /** Flows */
+            flows: components["schemas"]["FlowChannelsResponse"][];
+        };
+        /**
+         * NotificationEmailRequest
+         * @description The address the notifications go to by email; the platform checks its form (R3.5.2).
+         */
+        NotificationEmailRequest: {
+            /** Address */
+            address: string;
+        };
+        /**
+         * NotificationEmailResponse
+         * @description The address of the notifications by email, if any, and the warning that no email leaves when the
+         *     installation has no mail service (R3.5.2).
+         */
+        NotificationEmailResponse: {
+            /** Address */
+            address: string | null;
+            /** Warning */
+            warning: string | null;
+        };
+        /**
+         * NotificationEvent
+         * @description The types of event told to the user, by the name the user chooses their channels by (R1.8.2, R3.5.1, R3.5.3).
+         *
+         *     An event belongs to a flow, or to the account when no single flow explains it.
+         * @enum {string}
+         */
+        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "movimento non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita";
         /**
          * OpeningsResume
          * @description How the openings of a flow suspended for maximum loss resume (R3.2.2).
@@ -3770,6 +3921,210 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EmergencyClosingPreviewResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_notification_email_notifications_email_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationEmailResponse"];
+                };
+            };
+        };
+    };
+    set_notification_email_notifications_email_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_notification_email_notifications_email_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    send_test_email_notifications_email_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    read_notification_channels_notifications_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelsResponse"];
+                };
+            };
+        };
+    };
+    choose_notification_channel_notifications_channels_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelChoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_flow_channel_exception_notifications_channels_flows__flow_id___event__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+                event: components["schemas"]["NotificationEvent"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlowChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_flow_channel_exception_notifications_channels_flows__flow_id___event__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+                event: components["schemas"]["NotificationEvent"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

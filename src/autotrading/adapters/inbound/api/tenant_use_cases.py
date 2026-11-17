@@ -107,17 +107,34 @@ from autotrading.application.flows.remove_account_with_flows import RemoveAccoun
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase
+from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
+from autotrading.application.notifications.get_notification_channels import GetNotificationChannelsUseCase
+from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
+from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
+from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
 from autotrading.application.notifications.ports import (
     BotStartLinkPort,
+    ChannelPreferencesRepositoryPort,
     LinkCodeRepositoryPort,
     LinkedChatRepositoryPort,
+    MailServicePort,
+    NotificationEmailRepositoryPort,
+    NotifiedFlowsPort,
     NotifierPort,
+    OutboxPort,
 )
+from autotrading.application.notifications.remove_flow_channel_exception import (
+    RemoveFlowChannelExceptionUseCase,
+)
+from autotrading.application.notifications.remove_notification_email import RemoveNotificationEmailUseCase
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
 from autotrading.application.notifications.send_linked_chat_test_notification import (
     SendLinkedChatTestNotificationUseCase,
 )
+from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
+from autotrading.application.notifications.set_flow_channel_exception import SetFlowChannelExceptionUseCase
+from autotrading.application.notifications.set_notification_email import SetNotificationEmailUseCase
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import ManualClosingRecorderPort, PositionClosingPort
@@ -162,6 +179,11 @@ class TenantPorts:
     bot_identity: BotStartLinkPort
     linked_chats: LinkedChatRepositoryPort
     notifier: NotifierPort
+    notification_emails: NotificationEmailRepositoryPort
+    mail_service: MailServicePort
+    outbox: OutboxPort
+    channel_preferences: ChannelPreferencesRepositoryPort
+    notified_flows: NotifiedFlowsPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
     exit_plans: ExitPlanRepositoryPort
@@ -214,6 +236,14 @@ class TenantUseCases:
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
     send_test_notification: SendLinkedChatTestNotificationUseCase
+    get_notification_email: GetNotificationEmailUseCase
+    set_notification_email: SetNotificationEmailUseCase
+    remove_notification_email: RemoveNotificationEmailUseCase
+    send_test_email: SendTestEmailUseCase
+    get_notification_channels: GetNotificationChannelsUseCase
+    choose_notification_channel: ChooseNotificationChannelUseCase
+    set_flow_channel_exception: SetFlowChannelExceptionUseCase
+    remove_flow_channel_exception: RemoveFlowChannelExceptionUseCase
     modify_flow: ModifyFlowUseCase
     get_flow_version: GetFlowVersionUseCase
     list_flow_versions: ListFlowVersionsUseCase
@@ -301,6 +331,16 @@ class TenantUseCases:
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
             send_test_notification=SendLinkedChatTestNotificationUseCase(ports.linked_chats, ports.notifier),
+            get_notification_email=GetNotificationEmailUseCase(ports.notification_emails, ports.mail_service),
+            set_notification_email=SetNotificationEmailUseCase(tenant_id, ports.notification_emails),
+            remove_notification_email=RemoveNotificationEmailUseCase(ports.notification_emails),
+            send_test_email=SendTestEmailUseCase(ports.notification_emails, ports.mail_service, ports.outbox),
+            get_notification_channels=GetNotificationChannelsUseCase(
+                ports.channel_preferences, ports.notified_flows, ports.linked_chats, ports.notification_emails
+            ),
+            choose_notification_channel=ChooseNotificationChannelUseCase(ports.channel_preferences),
+            set_flow_channel_exception=SetFlowChannelExceptionUseCase(ports.channel_preferences, ports.notified_flows),
+            remove_flow_channel_exception=RemoveFlowChannelExceptionUseCase(ports.channel_preferences),
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             list_flow_versions=ListFlowVersionsUseCase(ports.flows),
@@ -317,6 +357,7 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.ledger_recording,
                     ports.clock,
+                    NotifyCashOutDoneUseCase(ports.notifier, ports.settlement_currency),
                 ),
             ),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
@@ -389,6 +430,7 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.emergency_closings,
                     ports.clock,
+                    NotifyEmergencyClosingDoneUseCase(ports.notifier),
                 ),
             ),
             preview_emergency_closing=PreviewEmergencyClosingUseCase(

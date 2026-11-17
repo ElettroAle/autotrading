@@ -28,6 +28,7 @@ from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.cash_out_notices import FakeCashOutNoticeAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
@@ -124,7 +125,8 @@ class Bench:
             RecordAccountExecutionsUseCase(self.flows, self.activity, InMemoryPlatformOrdersAdapter(), self.ledger)
         )
         flow_state = ReadFlowStateUseCase(self.flows, self.activity, self.ledger, self.exit_plans)
-        ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW)
+        self.notices = FakeCashOutNoticeAdapter()
+        ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW, self.notices)
         self.cash_out = CashOutProfitsUseCase(self.flows, ports)
 
     def flow(self, *, status: FlowStatus = FlowStatus.ACTIVE, capital: str = "500") -> Flow:
@@ -242,6 +244,7 @@ def test_a_closing_refused_frees_nothing_and_comes_back_with_its_reason(bench: B
     assert outcome.left_open == (PositionLeftOpen("BTC", "Order rejected"),)
     assert tuple(bench.store.capital_changes.get(flow.id, [])) == ()
     assert bench.recording.recorded == []
+    assert bench.notices.told == []
 
 
 def test_profits_gone_with_the_closings_free_nothing(bench: Bench) -> None:
@@ -254,6 +257,7 @@ def test_profits_gone_with_the_closings_free_nothing(bench: Bench) -> None:
 
     assert bench.exchange.closed == ["BTC"]
     assert tuple(bench.store.capital_changes.get(flow.id, [])) == ()
+    assert bench.notices.told == []
 
 
 def test_the_flow_keeps_its_status_and_every_closing_enters_the_history_as_a_cash_out(bench: Bench) -> None:
@@ -272,3 +276,12 @@ def test_a_flow_of_another_tenant_is_not_found(bench: Bench) -> None:
 
     with pytest.raises(FlowNotFoundError):
         bench.cash_out.execute(CashOutProfitsCommand(theirs.id, USER))
+
+
+def test_a_cash_out_is_told_once_recorded_with_the_money_it_freed(bench: Bench) -> None:
+    flow = bench.flow()
+    bench.earned(flow, "118")
+
+    bench.cash_out.execute(CashOutProfitsCommand(flow.id, USER))
+
+    assert bench.notices.told == [(flow.name.value, Decimal(118))]

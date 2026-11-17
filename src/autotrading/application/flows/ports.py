@@ -713,8 +713,24 @@ class ClosedPositionRepositoryPort(Protocol):
 
 
 class PositionClosedNoticePort(Protocol):
-    def execute(self, flow_name: str, asset: str, pnl: Decimal) -> None:
-        """Tells a closing of the flow once, with the PnL its history keeps or the exchange reported (ADR 0070)."""
+    def execute(self, flow_name: str, asset: str, pnl: Decimal, reason: str) -> None:
+        """Tells a closing of the flow once, with the PnL its history keeps or the exchange reported (ADR 0070) and the
+        reason of the closing (R3.5.1).
+        """
+        ...
+
+
+class CashOutNoticePort(Protocol):
+    def execute(self, flow_name: str, freed: Decimal) -> None:
+        """Tells the user the cash-out of the flow, with the money it freed (R3.5.1)."""
+        ...
+
+
+class EmergencyClosingNoticePort(Protocol):
+    def execute(self, positions_closed: int, paused_flows: Sequence[str]) -> None:
+        """Tells the user the emergency closing once, with the positions it closed and the flows it left paused
+        (R3.5.1).
+        """
         ...
 
 
@@ -1233,6 +1249,20 @@ class LossReferencesPort(Protocol):
 class OpeningsSuspendedNoticePort(Protocol):
     def execute(self, flow_name: str, reason: str) -> None:
         """Tells the user the openings of the flow are suspended, with the threshold passed (R3.2.2, R1.8.2)."""
+        ...
+
+
+class OpeningReducedNoticePort(Protocol):
+    def execute(self, flow_name: str, asset: str, requested_margin: Decimal, approved_margin: Decimal) -> None:
+        """Tells the user the risk check reduced an opening of the flow, with the margin asked and the one approved
+        (R3.5.1).
+        """
+        ...
+
+
+class OpeningBlockedNoticePort(Protocol):
+    def execute(self, flow_name: str, asset: str, cause: str) -> None:
+        """Tells the user the risk check blocked an opening of the flow, with its cause (R3.5.1)."""
         ...
 
 

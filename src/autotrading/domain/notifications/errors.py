@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from autotrading.domain.errors import DomainError
 
 
@@ -15,3 +17,22 @@ class InvalidOutboxMessageError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("messaggio in uscita senza chat o testo")
+
+
+class AccountEventWithoutFlowExceptionError(DomainError):
+    """An event of the account belongs to no single flow: it follows the general choice only (R3.5.3)."""
+
+    def __init__(self, event: str) -> None:
+        super().__init__(f"{event} è un evento del conto: segue la scelta generale")
+        self._event = event
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"event": self._event}
+
+
+class InvalidEmailAddressError(DomainError):
+    """An address without the form of an email: the user writes it again."""
+
+    def __init__(self) -> None:
+        super().__init__("indirizzo email non valido")

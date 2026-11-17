@@ -1190,6 +1190,279 @@
         }
       }
     },
+    "/notifications/email": {
+      "get": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Read Notification Email",
+        "operationId": "read_notification_email_notifications_email_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationEmailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Set Notification Email",
+        "operationId": "set_notification_email_notifications_email_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Remove Notification Email",
+        "operationId": "remove_notification_email_notifications_email_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/email/test": {
+      "post": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Send Test Email",
+        "operationId": "send_test_email_notifications_email_test_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/channels": {
+      "get": {
+        "tags": [
+          "canali delle notifiche"
+        ],
+        "summary": "Read Notification Channels",
+        "operationId": "read_notification_channels_notifications_channels_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannelsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "canali delle notifiche"
+        ],
+        "summary": "Choose Notification Channel",
+        "operationId": "choose_notification_channel_notifications_channels_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelChoiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/channels/flows/{flow_id}/{event}": {
+      "put": {
+        "tags": [
+          "canali delle notifiche"
+        ],
+        "summary": "Set Flow Channel Exception",
+        "operationId": "set_flow_channel_exception_notifications_channels_flows__flow_id___event__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "event",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NotificationEvent"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlowChannelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "canali delle notifiche"
+        ],
+        "summary": "Remove Flow Channel Exception",
+        "operationId": "remove_flow_channel_exception_notifications_channels_flows__flow_id___event__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "event",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NotificationEvent"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows": {
       "post": {
         "tags": [
@@ -5111,6 +5384,32 @@
         "title": "CashOutRequest",
         "description": "The capital the flow keeps after the cash-out; without it, the capital allocated now (R3.4.1)."
       },
+      "ChannelChoiceRequest": {
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/NotificationEvent"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/ChannelName"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event",
+          "channel"
+        ],
+        "title": "ChannelChoiceRequest",
+        "description": "The channel of a type of event for all the flows of the user."
+      },
+      "ChannelName": {
+        "type": "string",
+        "enum": [
+          "Telegram",
+          "email",
+          "entrambi",
+          "nessuno"
+        ]
+      },
       "ClosedPositionPageResponse": {
         "properties": {
           "page": {
@@ -6044,6 +6343,36 @@
         "title": "EquityPointResponse",
         "description": "A point of the curve: its equity and how much it moved from the first point of the period, in percent with two\ndecimals, null when the first point has no equity (ADR 0137)."
       },
+      "EventChannelResponse": {
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/NotificationEvent"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/ChannelName"
+          },
+          "of_flow": {
+            "type": "boolean",
+            "title": "Of Flow"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event",
+          "channel",
+          "of_flow",
+          "warnings"
+        ],
+        "title": "EventChannelResponse",
+        "description": "A type of event by the name the user reads, its channel, whether a flow may have an exception for it, and\nthe warnings of a chosen channel that is not linked (R3.5.3)."
+      },
       "ExchangeResponse": {
         "properties": {
           "name": {
@@ -6097,6 +6426,47 @@
           "message"
         ],
         "title": "FailureResponse"
+      },
+      "FlowChannelRequest": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelName"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel"
+        ],
+        "title": "FlowChannelRequest",
+        "description": "The channel of a flow for the type of event of the path."
+      },
+      "FlowChannelsResponse": {
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "exceptions": {
+            "items": {
+              "$ref": "#/components/schemas/EventChannelResponse"
+            },
+            "type": "array",
+            "title": "Exceptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_id",
+          "name",
+          "exceptions"
+        ],
+        "title": "FlowChannelsResponse",
+        "description": "A flow of the tenant with its exceptions; an event without one follows the general choice."
       },
       "FlowCostResponse": {
         "properties": {
@@ -8216,6 +8586,101 @@
           "parameters"
         ],
         "title": "ModelSelectionResponse"
+      },
+      "NotificationChannelsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventChannelResponse"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/FlowChannelsResponse"
+            },
+            "type": "array",
+            "title": "Flows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events",
+          "flows"
+        ],
+        "title": "NotificationChannelsResponse"
+      },
+      "NotificationEmailRequest": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address"
+        ],
+        "title": "NotificationEmailRequest",
+        "description": "The address the notifications go to by email; the platform checks its form (R3.5.2)."
+      },
+      "NotificationEmailResponse": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "warning"
+        ],
+        "title": "NotificationEmailResponse",
+        "description": "The address of the notifications by email, if any, and the warning that no email leaves when the\ninstallation has no mail service (R3.5.2)."
+      },
+      "NotificationEvent": {
+        "type": "string",
+        "enum": [
+          "apertura di una posizione",
+          "chiusura di una posizione",
+          "stop loss attivato",
+          "take profit attivato",
+          "liquidazione di una posizione",
+          "ciclo fallito",
+          "ordine rifiutato",
+          "pausa automatica di un flusso",
+          "perdita massima raggiunta",
+          "decisione ridotta dal rischio",
+          "decisione bloccata dal rischio",
+          "posizione non attribuibile",
+          "esecuzione non attribuibile",
+          "movimento non attribuibile",
+          "allarme di riconciliazione",
+          "incasso eseguito",
+          "chiusura di emergenza eseguita"
+        ],
+        "title": "NotificationEvent",
+        "description": "The types of event told to the user, by the name the user chooses their channels by (R1.8.2, R3.5.1, R3.5.3).\n\nAn event belongs to a flow, or to the account when no single flow explains it."
       },
       "OpeningsResume": {
         "type": "string",

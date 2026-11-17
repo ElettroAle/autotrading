@@ -74,7 +74,17 @@ def test_the_reasons_speak_italian() -> None:
         "stop loss non piazzato",
         "incasso",
         "chiusura di emergenza",
+        "liquidazione",
     ]
+
+
+@pytest.mark.parametrize("reason", [reason for reason in CloseReason if reason is not CloseReason.EMERGENCY])
+def test_a_closing_is_told_on_its_own(reason: CloseReason) -> None:
+    assert reason.told_on_its_own
+
+
+def test_the_closings_of_an_emergency_are_told_by_the_emergency_closing_alone() -> None:
+    assert not CloseReason.EMERGENCY.told_on_its_own
 
 
 @pytest.mark.parametrize(

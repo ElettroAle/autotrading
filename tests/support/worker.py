@@ -30,6 +30,7 @@ from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
+from tests.fakes.channel_preferences_repository import ChannelPreferencesStore
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
 from tests.fakes.cycles import FakeClockAdapter
@@ -37,7 +38,13 @@ from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -46,6 +53,7 @@ from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
+from tests.support.notifications import channel_choices
 from tests.support.platform import HYPERLIQUID, new_credentials
 from tests.support.procedure_orders import procedure_orders
 
@@ -67,9 +75,13 @@ class Worker:
         self.flows = FlowStore()
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.channel_preferences: ChannelPreferencesStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.activity_reader = FakeActivityReaderAdapter()
         self.protection_exchange = FakeProtectionExchangeAdapter()
         self.protections = ProtectionStore()
@@ -102,7 +114,13 @@ class Worker:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox),
+            notify=NotifyUseCase(
+                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+                InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+                self.mail_service,
+                self.outbox,
+                channel_choices(tenant_id, self.channel_preferences, self.flows),
+            ),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             record_account_executions=RecordAccountExecutionsUseCase(

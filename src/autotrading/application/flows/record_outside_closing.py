@@ -18,7 +18,8 @@ operations = logging.getLogger("autotrading.flows")
 
 class RecordOutsideClosingUseCase:
     """A position the reconciliation finds closed outside the platform ends its exit plan and enters the history of its
-    flow, then is told, and the protections left on the exchange are cancelled (R3.1.1, R3.1.2, ADR 0056, ADR 0070).
+    flow, then is told, as a liquidation when the exchange liquidated it, and the protections left on the exchange are
+    cancelled (R3.1.1, R3.1.2, R3.5.1, ADR 0056, ADR 0070).
 
     The opening is the last order of the flow on the asset. A position the flow never opened, or a loss beyond the
     value it held, has no history to enter: the closing is told on its own and stays among the unattributable.
@@ -58,8 +59,8 @@ class RecordOutsideClosingUseCase:
             self._tell_without_history(flow, closing, "esito della chiusura fuori non rappresentabile")
             return
         self._closed_positions.add(closed)
-        self._notice.execute(flow.name.value, closed.asset, closed.pnl)
+        self._notice.execute(flow.name.value, closed.asset, closed.pnl, closing.reason_told.value)
 
     def _tell_without_history(self, flow: Flow, closing: OutsideClosing, reason: str) -> None:
         operations.warning(reason, extra={"flow_id": str(flow.id.value), "asset": closing.asset})
-        self._notice.execute(flow.name.value, closing.asset, closing.realized_pnl)
+        self._notice.execute(flow.name.value, closing.asset, closing.realized_pnl, closing.reason_told.value)

@@ -2,8 +2,12 @@
 
 from decimal import Decimal
 
+from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
+from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
+from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -66,9 +70,50 @@ def test_an_opening_is_told_with_its_value_in_whole_units_of_the_settlement_curr
 def test_a_closing_is_told_with_its_pnl_in_the_settlement_currency() -> None:
     notifier = Notifier()
 
-    NotifyPositionClosedUseCase(notifier, "USDC").execute("alfa", "BTC", Decimal("1.5"))
+    NotifyPositionClosedUseCase(notifier, "USDC").execute("alfa", "BTC", Decimal("1.5"), "decisione dell'agente")
 
     assert [notification.text for notification in notifier.sent] == ["alfa: chiusa BTC, PnL 1,50 USDC"]
+
+
+def test_a_closing_by_a_protection_is_told_once_with_its_reason() -> None:
+    notifier = Notifier()
+
+    NotifyPositionClosedUseCase(notifier, "USDC").execute("alfa", "BTC", Decimal("-5.1"), "stop loss")
+
+    assert notifier.sent == [Notification.position_closed("alfa", "BTC", Amount(Decimal("-5.1"), "USDC"), "stop loss")]
+    assert [notification.text for notification in notifier.sent] == ["alfa: chiusa BTC per stop loss, PnL -5,10 USDC"]
+
+
+def test_an_opening_reduced_by_the_risk_check_is_told_with_both_margins_in_the_settlement_currency() -> None:
+    notifier = Notifier()
+
+    NotifyOpeningReducedUseCase(notifier, "USDC").execute("alfa", "BTC", Decimal(150), Decimal(100))
+
+    assert [notification.text for notification in notifier.sent] == ["alfa: apertura BTC ridotta da 150 a 100 USDC"]
+
+
+def test_an_opening_blocked_by_the_risk_check_is_told_with_its_cause() -> None:
+    notifier = Notifier()
+
+    NotifyOpeningBlockedUseCase(notifier).execute("alfa", "BTC", "confidenza 40 sotto la minima 60")
+
+    assert notifier.sent == [Notification.opening_blocked("alfa", "BTC", "confidenza 40 sotto la minima 60")]
+
+
+def test_a_cash_out_is_told_with_the_money_freed_in_the_settlement_currency() -> None:
+    notifier = Notifier()
+
+    NotifyCashOutDoneUseCase(notifier, "USDC").execute("alfa", Decimal(118))
+
+    assert [notification.text for notification in notifier.sent] == ["alfa: incassati 118 USDC"]
+
+
+def test_an_emergency_closing_is_told_with_the_positions_closed_and_the_flows_paused() -> None:
+    notifier = Notifier()
+
+    NotifyEmergencyClosingDoneUseCase(notifier).execute(1, ["alfa"])
+
+    assert notifier.sent == [Notification.emergency_closing_done(1, ("alfa",))]
 
 
 def test_the_cases_no_flow_explains_are_told_by_the_name_of_the_account() -> None:

@@ -1,10 +1,14 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
+from uuid import UUID
 
+from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.notification_email import NotificationEmail
 from autotrading.domain.notifications.outbox_message import OutboxMessage
 from autotrading.domain.notifications.pending_link import PendingLink
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -54,6 +58,69 @@ class MessengerPort(Protocol):
         ...
 
 
+class NotificationEmailRepositoryPort(Protocol):
+    """Bound to the tenant of the request: the only address its notifications go to by email (R3.5.2)."""
+
+    def get(self) -> NotificationEmail | None: ...
+
+    def set(self, email: NotificationEmail) -> None:
+        """Keeps the address, replacing the one kept before."""
+        ...
+
+    def remove(self) -> None:
+        """Forgets the address; nothing to forget is no error."""
+        ...
+
+
+class MailerPort(Protocol):
+    def send(self, address: EmailAddress, subject: str, text: str) -> None:
+        """Raises MessageNotDeliveredError when the mail service does not take the email."""
+        ...
+
+
+class MailServicePort(Protocol):
+    def is_configured(self) -> bool:
+        """Whether the installation has a mail service: without one no email leaves (R3.5.2)."""
+        ...
+
+
+class ChannelPreferencesRepositoryPort(Protocol):
+    """Bound to the tenant of the request: the channel of every type of event and the exceptions of the flows
+    (R3.5.3).
+    """
+
+    def get(self) -> ChannelPreferences:
+        """The preferences of the tenant; those of a tenant who never chose when nothing is kept."""
+        ...
+
+    def save(self, preferences: ChannelPreferences) -> None:
+        """Keeps the preferences, replacing those kept before; raises NotifiedFlowNotFoundError when an exception
+        names a flow the tenant lacks."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class NotifiedFlow:
+    flow_id: UUID
+    name: str
+
+
+class NotifiedFlowsPort(Protocol):
+    """Bound to the tenant of the request: the flows a notification may name, by the name it names them with."""
+
+    def list(self) -> Sequence[NotifiedFlow]:
+        """The flows of the tenant not archived, whose names are unique among them (R1.1.1), by name."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelChoicePorts:
+    """What tells the channel of a notification: the choices of the tenant and the flows its exceptions name."""
+
+    preferences: ChannelPreferencesRepositoryPort
+    flows: NotifiedFlowsPort
+
+
 @dataclass(frozen=True, slots=True)
 class BotMessage:
     chat_id: ChatId
@@ -76,7 +143,7 @@ class LinkStores:
 
 class NotifierPort(Protocol):
     def execute(self, notification: Notification) -> None:
-        """Delivers the notification to the chats of the tenant; a delivery that fails is recorded, never raised."""
+        """Delivers the notification to the channels of the tenant; a delivery that fails is recorded, never raised."""
         ...
 
 

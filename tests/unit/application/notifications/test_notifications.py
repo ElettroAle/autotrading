@@ -47,8 +47,15 @@ from tests.fakes.linked_chat_repository import (
     InMemoryLinkedChatRepositoryAdapter,
     LinkedChatStore,
 )
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
+from tests.support.notifications import channel_choices
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
@@ -64,9 +71,12 @@ class Telegram:
         self.codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
         self.now = NOW
         self.bot = FakeBotIdentityAdapter("autotrading_bot")
 
@@ -95,7 +105,13 @@ class Telegram:
         return GetLinkedChatUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)).execute()
 
     def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
-        return NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox)
+        return NotifyUseCase(
+            InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            self.mail_service,
+            self.outbox,
+            channel_choices(tenant_id),
+        )
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:
         self.notify_for(tenant_id).execute(notification)

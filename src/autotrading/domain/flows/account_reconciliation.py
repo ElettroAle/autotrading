@@ -40,13 +40,23 @@ class AccountReading:
 
 @dataclass(frozen=True, slots=True)
 class OutsideClosing:
-    """A position of a flow gone from the exchange without an order of the flow, with the outcome read there."""
+    """A position of a flow gone from the exchange without an order of the flow, with the outcome read there and
+    whether the exchange liquidated it.
+    """
 
     flow_id: FlowId
     asset: str
     realized_pnl: Decimal
     fee: Decimal
     closed_at: datetime
+    liquidation: bool = False
+
+    @property
+    def reason_told(self) -> CloseReason:
+        """The reason the closing is told by: a liquidation is an event of its own (R3.5.1), while the history keeps
+        every closing outside the platform, liquidations included, as such (R1.7.2).
+        """
+        return CloseReason.LIQUIDATION if self.liquidation else CloseReason.OUTSIDE_PLATFORM
 
 
 @dataclass(frozen=True, slots=True)
@@ -285,4 +295,5 @@ def _outside_closing(
         realized_pnl=sum((execution.realized_pnl for execution in outside), Decimal(0)),
         fee=sum((execution.fee for execution in outside), Decimal(0)),
         closed_at=max((execution.executed_at for execution in outside), default=activity.read_at),
+        liquidation=any(execution.liquidation for execution in outside),
     )

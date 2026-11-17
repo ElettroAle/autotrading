@@ -43,7 +43,8 @@ class CloseFlowPositionsUseCase:
     (ADR 0055, ADR incasso-dei-profitti, ADR chiusura-di-emergenza-per-ambito).
 
     The cycle under way ends first, so it never opens a position after the closings. Each position closed enters the
-    history with the reason and is told (R1.7.2, ADR 0070); a closing that fails does not stop the others and comes
+    history with the reason and is told, unless an emergency closing tells them all together (R1.7.2, ADR 0070,
+    R3.5.1); a closing that fails does not stop the others and comes
     back with the reason the exchange gave. The outcome names the positions closed too, which the emergency closing
     reports flow by flow (R3.2.3).
     """
@@ -77,7 +78,8 @@ class CloseFlowPositionsUseCase:
             return
         position = opening.closed(flow, asset, fill, reason)
         self._ports.closed_positions.add(position)
-        self._ports.closing_notice.execute(flow.name.value, asset, position.pnl)
+        if reason.told_on_its_own:
+            self._ports.closing_notice.execute(flow.name.value, asset, position.pnl, reason.value)
 
 
 def _closing_of(asset: str, answer: ClosingAnswerPort) -> PositionClosing | None:

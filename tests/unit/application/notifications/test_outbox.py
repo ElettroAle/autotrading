@@ -18,8 +18,15 @@ from autotrading.domain.notifications.outbox_message import CHAT_MESSAGE, Outbox
 from autotrading.domain.notifications.outbox_message_id import OutboxMessageId
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
+from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
+from tests.fakes.notification_email_repository import (
+    InMemoryNotificationEmailRepositoryAdapter,
+    NotificationEmailStore,
+)
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
+from tests.support.notifications import channel_choices
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
@@ -33,12 +40,21 @@ class Outbox:
         self.chats: LinkedChatStore = {ANNA: LinkedChat(ANNA, CHAT), BRUNO: LinkedChat(BRUNO, OTHER_CHAT)}
         self.outbox = InMemoryOutboxAdapter()
         self.messenger = FakeMessengerAdapter()
+        self.emails: NotificationEmailStore = {}
+        self.mail_service = FakeMailServiceAdapter()
+        self.mailer = FakeMailerAdapter()
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:
-        NotifyUseCase(InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id), self.outbox).execute(notification)
+        NotifyUseCase(
+            InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            self.mail_service,
+            self.outbox,
+            channel_choices(tenant_id),
+        ).execute(notification)
 
     def process(self) -> None:
-        ProcessOutboxUseCase(self.outbox, DeliverOutboxMessageUseCase(self.messenger)).execute()
+        ProcessOutboxUseCase(self.outbox, DeliverOutboxMessageUseCase(self.messenger, self.mailer)).execute()
 
 
 @pytest.fixture
@@ -132,7 +148,9 @@ def test_the_delivery_of_a_message_raises_the_transient_error_of_the_messenger()
     messenger.reachable = False
 
     with pytest.raises(MessageNotDeliveredError) as raised:
-        DeliverOutboxMessageUseCase(messenger).execute(OutboxMessage.to_chat(LinkedChat(ANNA, CHAT), "alfa"))
+        DeliverOutboxMessageUseCase(messenger, FakeMailerAdapter()).execute(
+            OutboxMessage.to_chat(LinkedChat(ANNA, CHAT), "alfa")
+        )
 
     assert not raised.value.permanent
 
@@ -141,7 +159,7 @@ def test_a_message_of_an_integration_without_its_port_fails_for_good() -> None:
     message = OutboxMessage(OutboxMessageId.new(), ANNA, "posta", {"to": "anna"})
 
     with pytest.raises(UnknownOutboxIntegrationError, match=r"^integrazione in uscita sconosciuta$") as raised:
-        DeliverOutboxMessageUseCase(FakeMessengerAdapter()).execute(message)
+        DeliverOutboxMessageUseCase(FakeMessengerAdapter(), FakeMailerAdapter()).execute(message)
 
     assert raised.value.permanent
     assert raised.value.details == {"integration": "posta"}
@@ -163,4 +181,4 @@ def test_a_malformed_message_is_a_permanent_error_of_the_delivery() -> None:
     message = OutboxMessage(OutboxMessageId.new(), ANNA, CHAT_MESSAGE, {"chat_id": CHAT.value})
 
     with pytest.raises(InvalidOutboxMessageError):
-        DeliverOutboxMessageUseCase(FakeMessengerAdapter()).execute(message)
+        DeliverOutboxMessageUseCase(FakeMessengerAdapter(), FakeMailerAdapter()).execute(message)

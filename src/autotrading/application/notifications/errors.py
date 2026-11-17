@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from typing import ClassVar
 
 from autotrading.application.errors import ApplicationError
 
@@ -17,12 +18,46 @@ class NoLinkedChatToTestError(ChatNotLinkedError):
 
 
 class MessageNotDeliveredError(ApplicationError):
-    """Telegram did not take the message: the notification is lost and recorded, the caller goes on (R1.8.2)."""
+    """The channel did not take the message: the delivery is recorded and retried, the caller goes on (R1.8.2)."""
 
     status_code = 503
+    reason: ClassVar[str] = "messaggio non consegnato alla chat"
 
     def __init__(self) -> None:
-        super().__init__("messaggio non consegnato alla chat")
+        super().__init__(self.reason)
+
+
+class EmailNotDeliveredError(MessageNotDeliveredError):
+    """The mail service did not take the email: recorded and retried as every notification (R3.5.2)."""
+
+    reason = "email non consegnata"
+
+
+class NoNotificationEmailToTestError(ApplicationError):
+    """A test email has no address to reach: the user must indicate one first (R3.5.2)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("nessun indirizzo email per le notifiche")
+
+
+class MailServiceNotConfiguredError(ApplicationError):
+    """The installation has no mail service: the address is kept, but no email leaves (R3.5.2)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("servizio di posta non configurato")
+
+
+class NotifiedFlowNotFoundError(ApplicationError):
+    """The same answer for a flow that does not exist and for one of another tenant (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("flusso non trovato")
 
 
 class BotUnreachableError(ApplicationError):

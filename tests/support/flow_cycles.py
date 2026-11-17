@@ -40,6 +40,8 @@ from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCa
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
+from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -293,6 +295,8 @@ class FlowCycles:
             openings_suspensions=InMemoryOpeningsSuspensionAdapter(platform.flows, tenant_id),
             loss_references=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
             openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify),
+            opening_reduced_notice=NotifyOpeningReducedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+            opening_blocked_notice=NotifyOpeningBlockedUseCase(notify),
         )
 
     def services(self) -> CycleServices:

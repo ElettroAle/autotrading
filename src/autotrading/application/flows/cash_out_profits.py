@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from autotrading.application.flows.close_flow_positions import CloseFlowPositionsCommand, CloseFlowPositionsUseCase
-from autotrading.application.flows.ports import FlowRepositoryPort, LedgerRecordingPort
+from autotrading.application.flows.ports import CashOutNoticePort, FlowRepositoryPort, LedgerRecordingPort
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.cash_out import CashOutOutcome, cash_out_capital
@@ -33,6 +33,7 @@ class CashOutPorts:
     closings: CloseFlowPositionsUseCase
     ledger: LedgerRecordingPort
     clock: Callable[[], datetime]
+    notice: CashOutNoticePort
 
 
 class CashOutProfitsUseCase:
@@ -42,7 +43,7 @@ class CashOutProfitsUseCase:
     Nothing closes before the checks: a flow without profits, or a capital out of range, is refused as it is. A closing
     that fails frees nothing and comes back with its reason. Otherwise the executions of the closings enter the ledger,
     so the value freed is the real one, fees included; the checks hold on that value too, then the capital, when it
-    changes, and the cash-out are recorded together. The flow keeps its status.
+    changes, and the cash-out are recorded together, then told (R3.5.1). The flow keeps its status.
     """
 
     def __init__(self, flows: FlowRepositoryPort, ports: CashOutPorts) -> None:
@@ -62,6 +63,7 @@ class CashOutProfitsUseCase:
         change = CapitalChange.cashed_out(closed, capital, self._ports.clock(), command.user_id)
         kept = changed if capital != closed.allocated_capital else flow
         self._flows.add_capital_change(kept, change)
+        self._ports.notice.execute(flow.name.value, change.amount)
         operations.info("profitti incassati", extra={"flow_id": str(flow.id.value), "freed": str(change.amount)})
         return CashOutOutcome(kept, change.amount)
 
