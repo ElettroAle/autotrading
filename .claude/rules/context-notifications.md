@@ -25,7 +25,8 @@ Le notifiche all'utente su Telegram e via email (R3.5.2), sui canali scelti per 
   scelto per il suo tipo di evento, o l'eccezione del suo flusso, raggiunge; non contiene mai credenziali (ADR
   canale-email-delle-notifiche-con-smtp, ADR canali-delle-notifiche-per-tipo-di-evento).
 - Un invio che fallisce si registra e non fa fallire il ciclo. Senza un canale collegato e scelto non si invia nulla;
-  l'email parte solo se l'installazione ha un servizio di posta.
+  l'email parte solo dal server di posta che il tenant ha indicato nella dashboard (ADR server-di-posta-per-tenant), con
+  la password aperta solo dal worker.
 - La risposta a un codice scaduto, già usato o inesistente è la stessa e non rivela se il codice è esistito.
 - Il codice si salva solo come digest; il bot trova il tenant dal digest e riscatta il codice con le porte
   legate a quel tenant. Il bot gira nel worker; senza token le notifiche sono disattivate, mai un errore
