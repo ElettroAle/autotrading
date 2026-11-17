@@ -49,7 +49,7 @@ describe('the emergency closing', () => {
   });
 
   it('of a flow asks to confirm with its name and its positions, closing nothing before', async () => {
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/settings' });
 
     await click(FLOW_COMMAND);
 
@@ -61,7 +61,7 @@ describe('the emergency closing', () => {
   });
 
   it('of a flow closes its positions once confirmed and shows the outcome of the flow', async () => {
-    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/settings' });
     await click(FLOW_COMMAND);
     await confirmation();
 
