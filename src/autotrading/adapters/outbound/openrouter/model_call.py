@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 import httpx
 
 from autotrading.application.agent.errors import (
+    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -62,11 +63,11 @@ class OpenRouterModelCallAdapter:
         try:
             usage = _usage_of(document)
         except UNREADABLE as error:
-            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from error
+            raise _unusable(key, document, None) from error
         try:
             return ModelReply(_text_of(document), usage)
         except UNREADABLE as error:
-            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, usage=usage, sent=True) from error
+            raise _unusable(key, document, usage) from error
 
     def _complete(self, key: ProviderKey, request: Mapping[str, object]) -> object:
         try:
@@ -82,11 +83,11 @@ class OpenRouterModelCallAdapter:
         except httpx.HTTPError as error:
             raise ModelUnavailableError(OPENROUTER, _reason_of(error), sent=True) from None
         if response.status_code != httpx.codes.OK:
-            raise _refusal(key, response)
+            raise _refusal(key, response.status_code, _original_message(response))
         try:
             document: object = response.json()
         except ValueError:
-            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from None
+            raise ModelAnswerUnreadableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from None
         return document
 
 
@@ -116,14 +117,27 @@ def _role(message: ModelMessage) -> str:
     return "system" if message.role is MessageRole.SYSTEM else "user"
 
 
-def _refusal(key: ProviderKey, response: httpx.Response) -> Exception:
-    status = response.status_code
+def _refusal(key: ProviderKey, status: int, message: str, usage: ModelUsage | None = None) -> Exception:
     if status in KEY_REJECTED:
         return ModelKeyRejectedError(OPENROUTER)
     if status == CREDIT_EXHAUSTED:
         return ModelCreditExhaustedError(OPENROUTER)
     # A provider may echo part of the request in its message: the key is masked before it can travel further.
-    return ModelUnavailableError(OPENROUTER, key.redact(f"{status} {_original_message(response)}"), sent=True)
+    return ModelUnavailableError(OPENROUTER, key.redact(f"{status} {message}"), usage=usage, sent=True)
+
+
+def _unusable(key: ProviderKey, document: object, usage: ModelUsage | None) -> Exception:
+    """The error OpenRouter puts in an answer when the provider behind it fails, with the code of that failure when it
+    gives one; else an answer that cannot be read (ADR errore-di-openrouter-nella-risposta).
+    """
+    error = _error_of(document)
+    message = error.get("message")
+    if not isinstance(message, str):
+        return ModelAnswerUnreadableError(OPENROUTER, UNEXPECTED_ANSWER, usage=usage, sent=True)
+    code = error.get("code")
+    if isinstance(code, int) and not isinstance(code, bool):
+        return _refusal(key, code, _compact(message), usage)
+    return ModelUnavailableError(OPENROUTER, key.redact(_compact(message)), usage=usage, sent=True)
 
 
 def _original_message(response: httpx.Response) -> str:
@@ -131,9 +145,16 @@ def _original_message(response: httpx.Response) -> str:
         document: object = response.json()
     except ValueError:
         document = None
+    message = _error_of(document).get("message")
+    return _compact(message if isinstance(message, str) else response.text)
+
+
+def _error_of(document: object) -> Mapping[str, object]:
     error = document.get("error") if isinstance(document, Mapping) else None
-    message = error.get("message") if isinstance(error, Mapping) else None
-    text = message if isinstance(message, str) else response.text
+    return error if isinstance(error, Mapping) else {}
+
+
+def _compact(text: str) -> str:
     return " ".join(text.split())[:ORIGINAL_LIMIT]
 
 

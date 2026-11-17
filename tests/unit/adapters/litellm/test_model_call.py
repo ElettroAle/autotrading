@@ -10,6 +10,7 @@ from litellm import exceptions
 
 from autotrading.adapters.outbound.litellm.model_call import LiteLlmModelCallAdapter
 from autotrading.application.agent.errors import (
+    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -292,18 +293,19 @@ def test_an_unreachable_provider_is_transient_and_carries_no_request() -> None:
     ],
     ids=["no-choice", "no-usage", "negative-tokens", "no-text", "not-a-response"],
 )
-def test_an_answer_in_another_shape_is_transient(answer: object) -> None:
-    with pytest.raises(ModelUnavailableError) as raised:
+def test_an_answer_in_another_shape_is_an_unreadable_answer(answer: object) -> None:
+    with pytest.raises(ModelAnswerUnreadableError) as raised:
         call(Library(answer), "openai/gpt")
 
     assert raised.value.original == "risposta del fornitore inattesa"
+    assert not raised.value.permanent
 
 
 # ADR-uso-riportato-nell-errore-della-chiamata-al-modello: a call the provider may have charged says so in its error.
 def test_an_answer_without_text_keeps_the_usage_the_provider_reported() -> None:
     no_text = [{"index": 0, "finish_reason": "length", "message": {"role": "assistant", "content": None}}]
 
-    with pytest.raises(ModelUnavailableError) as raised:
+    with pytest.raises(ModelAnswerUnreadableError) as raised:
         call(Library(response(choices=no_text)), "openai/gpt")
 
     assert raised.value.usage == ModelUsage(2000, 500, None)
@@ -320,7 +322,7 @@ def test_an_answer_without_text_keeps_the_usage_the_provider_reported() -> None:
     ids=["no-usage", "negative-tokens", "not-a-response"],
 )
 def test_an_answer_without_a_readable_usage_was_sent_without_usage(answer: object) -> None:
-    with pytest.raises(ModelUnavailableError) as raised:
+    with pytest.raises(ModelAnswerUnreadableError) as raised:
         call(Library(answer), "openai/gpt")
 
     assert (raised.value.usage, raised.value.sent) == (None, True)

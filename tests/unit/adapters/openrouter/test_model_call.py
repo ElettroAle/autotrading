@@ -8,6 +8,7 @@ import pytest
 
 from autotrading.adapters.outbound.openrouter.model_call import OpenRouterModelCallAdapter
 from autotrading.application.agent.errors import (
+    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -145,9 +146,78 @@ def test_a_refusal_that_echoes_the_key_never_carries_it() -> None:
     ("body", "text"),
     [({"choices": []}, None), ({"choices": [{"message": {"content": None}}], "usage": USAGE}, None), (None, "<html>")],
 )
-def test_an_answer_in_another_shape_is_transient(body: object, text: str | None) -> None:
-    with pytest.raises(ModelUnavailableError, match="risposta del fornitore inattesa"):
+def test_an_answer_in_another_shape_is_an_unreadable_answer(body: object, text: str | None) -> None:
+    with pytest.raises(ModelAnswerUnreadableError, match="risposta del fornitore inattesa") as raised:
         call(OpenRouter(200, body, text))
+
+    assert not raised.value.permanent
+
+
+# ADR-errore-di-openrouter-nella-risposta: the error OpenRouter puts in an answer is the reason, not an unreadable one.
+@pytest.mark.parametrize("code", [429, 500, 502, 503])
+def test_an_error_in_an_answer_with_a_code_is_transient_with_the_message_of_openrouter(code: int) -> None:
+    body = {"error": {"code": code, "message": "Provider   returned\nerror"}}
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(OpenRouter(200, body))
+
+    assert not isinstance(raised.value, ModelAnswerUnreadableError)
+    assert raised.value.original == f"{code} Provider returned error"
+    assert str(raised.value) == f"fornitore IA non raggiungibile: openrouter: {code} Provider returned error"
+    assert (raised.value.sent, raised.value.usage) == (True, None)
+    assert not raised.value.permanent
+
+
+@pytest.mark.parametrize("code", [None, "provider_error", True])
+def test_an_error_in_an_answer_without_a_numeric_code_is_transient_with_its_message(code: object) -> None:
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(OpenRouter(200, {"error": {"code": code, "message": "Upstream model overloaded"}}))
+
+    assert not isinstance(raised.value, ModelAnswerUnreadableError)
+    assert raised.value.original == "Upstream model overloaded"
+    assert raised.value.sent
+
+
+def test_an_error_in_an_answer_keeps_the_usage_openrouter_reported() -> None:
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(OpenRouter(200, {"error": {"code": 502, "message": "Provider returned error"}, "usage": USAGE}))
+
+    assert raised.value.usage == ModelUsage(2000, 500, Decimal("0.0031"))
+    assert raised.value.original == "502 Provider returned error"
+
+
+@pytest.mark.parametrize(
+    ("code", "failure"),
+    [(401, ModelKeyRejectedError), (403, ModelKeyRejectedError), (402, ModelCreditExhaustedError)],
+)
+def test_an_error_in_an_answer_with_a_blocking_code_is_permanent(code: int, failure: type[Exception]) -> None:
+    with pytest.raises(failure) as raised:
+        call(OpenRouter(200, {"error": {"code": code, "message": "denied"}}))
+
+    assert getattr(raised.value, "permanent", False)
+
+
+def test_an_error_in_an_answer_that_echoes_the_key_never_carries_it() -> None:
+    message = f"bad header Bearer {KEY.value('api_key')}"
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(OpenRouter(200, {"error": {"code": 500, "message": message}}))
+
+    assert KEY.value("api_key") not in str(raised.value)
+    assert raised.value.original.startswith("500 bad header Bearer")
+
+
+def test_an_error_in_an_answer_is_limited_like_every_message_of_openrouter() -> None:
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(OpenRouter(200, {"error": {"message": "x" * 1000}}))
+
+    assert raised.value.original == "x" * 300
+
+
+@pytest.mark.parametrize("error", [{"code": 502}, "Provider returned error", {"message": 7}])
+def test_an_error_in_an_answer_without_a_message_is_an_unreadable_answer(error: object) -> None:
+    with pytest.raises(ModelAnswerUnreadableError):
+        call(OpenRouter(200, {"error": error}))
 
 
 def test_a_timeout_is_transient_and_never_carries_the_request() -> None:
@@ -176,7 +246,7 @@ def test_a_refused_connection_is_transient_and_never_carries_the_request() -> No
 def test_an_answer_without_text_keeps_the_usage_openrouter_reported() -> None:
     body = {"choices": [{"message": {"role": "assistant", "content": None}}], "usage": USAGE}
 
-    with pytest.raises(ModelUnavailableError, match="risposta del fornitore inattesa") as raised:
+    with pytest.raises(ModelAnswerUnreadableError, match="risposta del fornitore inattesa") as raised:
         call(OpenRouter(200, body))
 
     assert raised.value.usage == ModelUsage(2000, 500, Decimal("0.0031"))
@@ -193,7 +263,7 @@ def test_an_answer_without_text_keeps_the_usage_openrouter_reported() -> None:
     ids=["no-usage", "invalid-usage", "not-json"],
 )
 def test_an_answer_without_a_readable_usage_was_sent_without_usage(body: object, text: str | None) -> None:
-    with pytest.raises(ModelUnavailableError, match="risposta del fornitore inattesa") as raised:
+    with pytest.raises(ModelAnswerUnreadableError, match="risposta del fornitore inattesa") as raised:
         call(OpenRouter(200, body, text))
 
     assert (raised.value.usage, raised.value.sent) == (None, True)

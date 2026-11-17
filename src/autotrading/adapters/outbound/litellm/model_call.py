@@ -6,6 +6,7 @@ from decimal import Decimal
 lazy import litellm.exceptions
 
 from autotrading.application.agent.errors import (
+    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -66,11 +67,11 @@ class LiteLlmModelCallAdapter:
         try:
             usage = _usage_of(reply)
         except InvalidModelUsageError as error:
-            raise ModelUnavailableError(provider, UNEXPECTED_ANSWER, sent=True) from error
+            raise ModelAnswerUnreadableError(provider, UNEXPECTED_ANSWER, sent=True) from error
         try:
             return ModelReply(_text_of(reply), usage)
         except (IndexError, InvalidModelUsageError) as error:
-            raise ModelUnavailableError(provider, UNEXPECTED_ANSWER, usage=usage, sent=True) from error
+            raise ModelAnswerUnreadableError(provider, UNEXPECTED_ANSWER, usage=usage, sent=True) from error
 
     def _response_format(self, model: str, answer: AnswerFormat) -> Mapping[str, object]:
         """Enforced where the library declares the model able to (ADR risposta-del-modello-con-schema-rigido).
