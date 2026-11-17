@@ -221,16 +221,6 @@ class Notification:
         )
 
     @classmethod
-    def unattributable_movement(cls, account_id: UUID, account: str, amount: Amount) -> Notification:
-        return cls.of_account(
-            NotificationEvent.UNATTRIBUTABLE_MOVEMENT,
-            account_id,
-            account,
-            "movimento non attribuibile",
-            NotificationLine("Importo", str(amount)),
-        )
-
-    @classmethod
     def reconciliation_alarm(cls, account_id: UUID, account: str, read: Amount, expected: Amount) -> Notification:
         return cls.of_account(
             NotificationEvent.RECONCILIATION_ALARM,

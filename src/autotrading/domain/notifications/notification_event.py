@@ -30,7 +30,6 @@ class NotificationEvent(StrEnum):
     OPENING_BLOCKED = "decisione bloccata dal rischio"
     UNATTRIBUTABLE_POSITION = "posizione non attribuibile"
     UNATTRIBUTABLE_FILL = "esecuzione non attribuibile"
-    UNATTRIBUTABLE_MOVEMENT = "movimento non attribuibile"
     RECONCILIATION_ALARM = "allarme di riconciliazione"
     CASH_OUT = "incasso eseguito"
     # The scope of an emergency closing may hold several flows of the account at once (R3.2.3).
@@ -57,7 +56,6 @@ _OF_ACCOUNT = frozenset(
     {
         NotificationEvent.UNATTRIBUTABLE_POSITION,
         NotificationEvent.UNATTRIBUTABLE_FILL,
-        NotificationEvent.UNATTRIBUTABLE_MOVEMENT,
         NotificationEvent.RECONCILIATION_ALARM,
         NotificationEvent.EMERGENCY_CLOSING,
     }
@@ -84,7 +82,6 @@ _ICONS = {
     NotificationEvent.OPENING_BLOCKED: WARNING_ICON,
     NotificationEvent.UNATTRIBUTABLE_POSITION: ALARM_ICON,
     NotificationEvent.UNATTRIBUTABLE_FILL: ALARM_ICON,
-    NotificationEvent.UNATTRIBUTABLE_MOVEMENT: ALARM_ICON,
     NotificationEvent.RECONCILIATION_ALARM: ALARM_ICON,
     NotificationEvent.CASH_OUT: PROFIT_ICON,
     NotificationEvent.EMERGENCY_CLOSING: ALARM_ICON,

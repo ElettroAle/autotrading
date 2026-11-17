@@ -1,17 +1,21 @@
+import base64
+import binascii
 from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.accounts.set_deviation_threshold import SetDeviationThresholdCommand
 from autotrading.application.flows.confirm_reconciliation import ConfirmReconciliationCommand
+from autotrading.application.flows.errors import UnattributableCursorInvalidError
 from autotrading.application.flows.list_reconciliation_alarms import ListReconciliationAlarmsCommand
+from autotrading.application.flows.list_unattributable import ListUnattributableCommand
 from autotrading.application.flows.read_account_reconciliation import (
     AccountReconciliationStatus,
     ReadAccountReconciliationCommand,
@@ -20,6 +24,15 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.flows.unattributable import UnattributableKind
+from autotrading.domain.flows.unattributable_page import (
+    RecordedUnattributable,
+    UnattributableCursor,
+    UnattributableFilter,
+    UnattributablePage,
+)
+
+SEPARATOR = "|"
 
 
 class DeviationThresholdRequest(BaseModel):
@@ -93,6 +106,67 @@ class AccountReconciliationResponse(BaseModel):
         )
 
 
+class UnattributableResponse(BaseModel):
+    """A case no flow explains (R1.6.2): the change of the balance, or the size of a position or an execution, as text
+    without trailing zeros (ADR 0047)."""
+
+    detected_at: datetime
+    kind: UnattributableKind
+    asset: str | None
+    amount: str
+
+    @classmethod
+    def of(cls, case: RecordedUnattributable) -> UnattributableResponse:
+        item = case.item
+        return cls(detected_at=item.detected_at, kind=item.kind, asset=item.asset, amount=amount_text(item.amount))
+
+
+class UnattributablePageResponse(BaseModel):
+    """At most 50 cases, newest first; `next` is the `cursor` of the following page, null on the last one. `count` and
+    `net_change`, the net of the changes of the balance, cover every case of the filter, not only the page."""
+
+    items: list[UnattributableResponse]
+    next: str | None
+    count: int
+    net_change: str
+
+    @classmethod
+    def of(cls, page: UnattributablePage) -> UnattributablePageResponse:
+        return cls(
+            items=[UnattributableResponse.of(case) for case in page.cases],
+            next=None if page.next is None else unattributable_cursor_text(page.next),
+            count=page.count,
+            net_change=amount_text(page.net_change),
+        )
+
+
+def unattributable_cursor_text(cursor: UnattributableCursor) -> str:
+    plain = SEPARATOR.join((cursor.detected_at.isoformat(), str(cursor.item_id)))
+    return base64.urlsafe_b64encode(plain.encode()).decode()
+
+
+def unattributable_cursor_of(text: str) -> UnattributableCursor:
+    try:
+        detected_at, item_id = base64.urlsafe_b64decode(text.encode()).decode().split(SEPARATOR)
+        return UnattributableCursor(datetime.fromisoformat(detected_at), UUID(item_id))
+    except (binascii.Error, UnicodeDecodeError, ValueError) as error:
+        raise UnattributableCursorInvalidError from error
+
+
+def unattributable_filter_of(
+    kind: UnattributableKind | None = None,
+    since: Annotated[datetime | None, Query(description="dall'istante incluso")] = None,
+    until: Annotated[datetime | None, Query(description="all'istante escluso")] = None,
+) -> UnattributableFilter:
+    return UnattributableFilter(kind, since, until)
+
+
+def unattributable_cursor_query(
+    cursor: Annotated[str | None, Query(description="`next` della pagina precedente")] = None,
+) -> UnattributableCursor | None:
+    return None if cursor is None else unattributable_cursor_of(cursor)
+
+
 def reconciliation_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRouter:
     router = APIRouter(prefix="/accounts/{account_id}", tags=["conti"])
 
@@ -119,6 +193,16 @@ def reconciliation_router(use_cases_of_request: Callable[..., TenantUseCases]) -
         command = ListReconciliationAlarmsCommand(account_id)
         alarms = use_cases.list_reconciliation_alarms.execute(command)
         return [ReconciliationAlarmResponse.of(alarm) for alarm in alarms]
+
+    @router.get("/reconciliation/unattributable")
+    def list_unattributable(
+        account_id: UUID,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+        criteria: Annotated[UnattributableFilter, Depends(unattributable_filter_of)],
+        cursor: Annotated[UnattributableCursor | None, Depends(unattributable_cursor_query)],
+    ) -> UnattributablePageResponse:
+        command = ListUnattributableCommand(account_id, criteria, cursor)
+        return UnattributablePageResponse.of(use_cases.list_unattributable.execute(command))
 
     @router.post("/reconciliation/confirmation", status_code=status.HTTP_204_NO_CONTENT)
     def confirm_reconciliation(

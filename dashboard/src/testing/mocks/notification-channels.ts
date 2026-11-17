@@ -41,7 +41,6 @@ export const FAKE_EVENT_TYPES: readonly FakeEventType[] = [
   flowEvent('decisione bloccata dal rischio', SILENT),
   accountEvent('posizione non attribuibile'),
   accountEvent('esecuzione non attribuibile'),
-  accountEvent('movimento non attribuibile'),
   accountEvent('allarme di riconciliazione'),
   flowEvent('incasso eseguito'),
   accountEvent('chiusura di emergenza eseguita'),

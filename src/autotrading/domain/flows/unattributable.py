@@ -10,6 +10,13 @@ class UnattributableKind(StrEnum):
     FILL = "esecuzione"
     BALANCE_CHANGE = "variazione del saldo"
 
+    @property
+    def told(self) -> bool:
+        """Whether the user is told of a new case of the kind: a change of the balance within the threshold of the
+        account is only recorded, beyond it an alarm tells it (R3.3.1, ADR variazioni-sotto-soglia-senza-notifica).
+        """
+        return self is not UnattributableKind.BALANCE_CHANGE
+
 
 @dataclass(frozen=True, slots=True)
 class UnattributableItem:

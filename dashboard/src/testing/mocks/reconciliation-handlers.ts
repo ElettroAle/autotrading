@@ -29,6 +29,18 @@ export const reconciliationHandlers = [
       HttpResponse.json(fakeReconciliation.alarmsOf(account.id)),
     ),
   ),
+  http.get('*/accounts/:accountId/reconciliation/unattributable', ({ request, params }) =>
+    withAccount(request, params.accountId, (account) => {
+      const search = new URL(request.url).searchParams;
+      const query = {
+        kind: search.get('kind'),
+        since: search.get('since'),
+        until: search.get('until'),
+        cursor: search.get('cursor'),
+      };
+      return HttpResponse.json(fakeReconciliation.unattributableOf(account.id, query));
+    }),
+  ),
   http.post('*/accounts/:accountId/reconciliation/confirmation', ({ request, params }) =>
     withAccount(request, params.accountId, (account) =>
       fakeReconciliation.confirm(account.id, new Date())

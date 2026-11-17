@@ -183,9 +183,6 @@ from autotrading.application.notifications.notify_position_closed import NotifyP
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
 from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
-from autotrading.application.notifications.notify_unattributable_movement import (
-    NotifyUnattributableMovementUseCase,
-)
 from autotrading.application.notifications.notify_unattributable_position import (
     NotifyUnattributablePositionUseCase,
 )
@@ -508,7 +505,6 @@ def cycle_of(
                 UnattributableNotices(
                     NotifyUnattributablePositionUseCase(notify),
                     NotifyUnattributableFillUseCase(notify),
-                    NotifyUnattributableMovementUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
                 ),
             ),
         )
