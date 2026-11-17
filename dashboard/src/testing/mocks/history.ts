@@ -222,7 +222,7 @@ export const historyPage = <T>(
   rows: readonly FakeHistoryRow<T>[],
   search: URLSearchParams,
   now = fakeClock.now(),
-): { readonly found: T[]; readonly next: string | null } => {
+): { readonly found: T[]; readonly next: string | null; readonly admitted: T[] } => {
   const flow = search.get('flow_id');
   const account = search.get('account_id');
   const asset = search.get('asset');
@@ -249,5 +249,35 @@ export const historyPage = <T>(
   return {
     found: page.map((row) => row.body),
     next: more && last !== undefined ? cursorOf(last) : null,
+    admitted: sorted.map((row) => row.body),
   };
 };
+
+const decimalsOf = (amount: string): number => amount.split('.')[1]?.length ?? 0;
+
+const scaled = (amount: string, decimals: number): bigint => {
+  const [whole = '0', fraction = ''] = amount.split('.');
+  return BigInt(`${whole}${fraction.padEnd(decimals, '0')}`);
+};
+
+/** The sum of amounts as the API writes them, digit for digit and without trailing zeros (ADR 0018). */
+export const sumOfAmounts = (amounts: readonly string[]): string => {
+  const decimals = Math.max(0, ...amounts.map(decimalsOf));
+  const total = amounts.reduce((sum, amount) => sum + scaled(amount, decimals), 0n);
+  const negative = total < 0n;
+  const digits = (negative ? -total : total).toString().padStart(decimals + 1, '0');
+  const whole = digits.slice(0, digits.length - decimals);
+  const fraction = digits.slice(digits.length - decimals).replace(/0+$/, '');
+  return `${negative ? '-' : ''}${whole}${fraction === '' ? '' : `.${fraction}`}`;
+};
+
+/** The totals the API gives with the first page of the closed positions: PnL and fees of every one (Bug 569). */
+export const closedPositionTotals = (positions: readonly FakeHistoryPosition[]) => ({
+  pnl: sumOfAmounts(positions.map((position) => position.pnl)),
+  fees: sumOfAmounts(positions.map((position) => position.fees)),
+});
+
+/** The totals the API gives with the first page of the orders: the fees of their executions (Bug 569). */
+export const orderTotals = (orders: readonly FakeHistoryOrder[]) => ({
+  fees: sumOfAmounts(orders.flatMap((order) => order.executions.map((execution) => execution.fee))),
+});

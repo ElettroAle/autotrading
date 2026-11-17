@@ -239,6 +239,47 @@ describe('HistoryView', () => {
     expect(screen.queryByRole('button', { name: 'Carica altri' })).not.toBeInTheDocument();
   });
 
+  it('shows the totals of every closed position of the search, not only of the page (Bug 569)', async () => {
+    records().closedPositions.push(
+      ...Array.from({ length: 30 }, (_, index) => index + 1).flatMap((day) =>
+        ['BTC', 'ETH'].map((asset) => aHistoryPosition(ownerAt(day), asset, dayOf(day))),
+      ),
+    );
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/history?tab=closed-positions' });
+
+    expect(await rowsOf('Posizioni chiuse')).toHaveLength(50);
+    const totals = screen.getByLabelText('Totali della ricerca');
+    expect(totals).toHaveTextContent('Totale PnL+600');
+    expect(totals).toHaveTextContent('Totale commissioni25,2');
+    await user.click(screen.getByRole('button', { name: 'Carica altri' }));
+    await waitFor(async () => expect(await rowsOf('Posizioni chiuse')).toHaveLength(60));
+    expect(screen.getByLabelText('Totali della ricerca')).toHaveTextContent('Totale PnL+600');
+
+    await user.selectOptions(screen.getByLabelText('Asset'), 'ETH');
+    await waitFor(async () => expect(await rowsOf('Posizioni chiuse')).toHaveLength(30));
+    expect(screen.getByLabelText('Totali della ricerca')).toHaveTextContent('Totale PnL+300');
+    expect(screen.getByLabelText('Totali della ricerca')).toHaveTextContent('12,6');
+  });
+
+  it('shows the fees of every order of the search', async () => {
+    records().orders.push(
+      ...Array.from({ length: 60 }, (_, index) =>
+        aHistoryOrder(ALFA, 'BTC', new Date(FIRST + index * 3600_000), [
+          anExecution(dayOf(1), '91000.5', '0.015', '0.41'),
+          anExecution(dayOf(1), '91001', '0.005', '0.14'),
+        ]),
+      ),
+    );
+    await renderApp({ account: 'anna', url: '/history?tab=orders' });
+
+    await rowsOf('Ordini');
+    expect(screen.getAllByText('2 esecuzioni')).toHaveLength(50);
+    const totals = screen.getByLabelText('Totali della ricerca');
+    expect(totals).toHaveTextContent('Totale commissioni33');
+    expect(totals).not.toHaveTextContent('Totale PnL');
+  });
+
   it('says why the API refuses a search, a version without its flow', async () => {
     await renderApp({ account: 'anna', url: '/history?version=2' });
 

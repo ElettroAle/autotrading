@@ -15,11 +15,14 @@ from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.history import (
     ClosedPositionHistoryEntry,
+    ClosedPositionHistoryTotals,
     CycleHistoryEntry,
+    HistoryCursor,
     HistoryEntry,
     HistoryFilter,
     OrderExecution,
     OrderHistoryEntry,
+    OrderHistoryTotals,
 )
 from autotrading.domain.flows.statistics_period import StatisticsPeriod, StatisticsPeriodKind
 from autotrading.domain.flows.trade_side import TradeSide
@@ -57,6 +60,8 @@ class History:
     accounts: dict[str, UUID] = field(default_factory=dict)
     first_of_version_two: int = 1
     found: tuple[HistoryEntry, ...] = ()
+    next: HistoryCursor | None = None
+    totals: ClosedPositionHistoryTotals | OrderHistoryTotals | None = None
     refusal: AutotradingError | None = None
 
     def flow(self, user: str, name: str, account: str = "principale") -> OwnedFlow:
@@ -176,13 +181,22 @@ def query_positions_in_range(history: History, user: str, asset: str, first: str
         datetime(YEAR, NOVEMBER, int(last), 23, 59, tzinfo=UTC),
     )
     command = QueryClosedPositionHistoryCommand(HistoryFilter(period=period, asset=asset))
-    history.found = history.platform.use_cases_of(user).query_closed_position_history.execute(command).entries
+    report = history.platform.use_cases_of(user).query_closed_position_history.execute(command)
+    history.found, history.totals = report.page.entries, report.totals
+
+
+@when(quoted('"{user}" interroga le posizioni chiuse del flusso "{flow}"'))
+def query_positions_of_flow(history: History, user: str, flow: str) -> None:
+    command = QueryClosedPositionHistoryCommand(HistoryFilter(flow_id=history.flows[flow].flow_id))
+    report = history.platform.use_cases_of(user).query_closed_position_history.execute(command)
+    history.found, history.next, history.totals = report.page.entries, report.page.next, report.totals
 
 
 @when(quoted('"{user}" interroga gli ordini del conto "{account}"'))
 def query_orders_of_account(history: History, user: str, account: str) -> None:
     command = QueryOrderHistoryCommand(HistoryFilter(account_id=history.accounts[account]))
-    history.found = history.platform.use_cases_of(user).query_order_history.execute(command).entries
+    report = history.platform.use_cases_of(user).query_order_history.execute(command)
+    history.found, history.totals = report.page.entries, report.totals
 
 
 @when(quoted('"{user}" interroga i cicli con la versione {version} senza indicare un flusso'))
@@ -197,7 +211,7 @@ def query_version_without_flow(history: History, user: str, version: str) -> Non
 @when(quoted('"{user}" interroga le posizioni chiuse con asset "{asset}"'))
 def query_positions_of_asset(history: History, user: str, asset: str) -> None:
     command = QueryClosedPositionHistoryCommand(HistoryFilter(asset=asset))
-    history.found = history.platform.use_cases_of(user).query_closed_position_history.execute(command).entries
+    history.found = history.platform.use_cases_of(user).query_closed_position_history.execute(command).page.entries
 
 
 @then(quoted("ottiene solo i cicli dal {day} novembre in poi"))
@@ -241,3 +255,24 @@ def no_position_of(history: History, flow: str) -> None:
     assert positions
     assert all(entry.position.flow_id.value != history.flows[flow].flow_id for entry in positions)
     assert {entry.flow_name for entry in positions} == {"omega"}
+
+
+def amount_of(text: str) -> Decimal:
+    """An amount as the scenario writes it, with the decimal comma."""
+    return Decimal(text.replace(",", "."))
+
+
+@then(quoted("ottiene le prime {count} posizioni"))
+def first_positions(history: History, count: str) -> None:
+    assert len(history.found) == int(count)
+    assert history.next is not None
+
+
+@then(quoted("il totale del PnL è {pnl} e quello delle commissioni {fees}"))
+def position_totals(history: History, pnl: str, fees: str) -> None:
+    assert history.totals == ClosedPositionHistoryTotals(amount_of(pnl), amount_of(fees))
+
+
+@then(quoted("il totale delle commissioni degli ordini è {fees}"))
+def order_totals(history: History, fees: str) -> None:
+    assert history.totals == OrderHistoryTotals(amount_of(fees))

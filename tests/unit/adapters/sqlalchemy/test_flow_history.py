@@ -8,17 +8,28 @@ from sqlalchemy import Select, create_engine
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import row_of as position_row_of
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import row_of as cycle_row_of
 from autotrading.adapters.outbound.sqlalchemy.flow_history import (
+    closed_position_totals_of,
+    closed_position_totals_statement,
     closed_positions_statement,
     cycle_entry_of,
     cycles_statement,
     executions_by_order,
     executions_statement,
     order_entry_of,
+    order_totals_of,
+    order_totals_statement,
     orders_statement,
     position_entry_of,
 )
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
-from autotrading.domain.flows.history import HistoryCursor, HistoryFilter, HistoryQuery, OrderExecution
+from autotrading.domain.flows.history import (
+    ClosedPositionHistoryTotals,
+    HistoryCursor,
+    HistoryFilter,
+    HistoryQuery,
+    OrderExecution,
+    OrderHistoryTotals,
+)
 from autotrading.domain.flows.statistics_period import StatisticsPeriod
 from tests.support.history import ACCOUNT, FLOW, TENANT, a_closed_position
 
@@ -81,7 +92,7 @@ def test_the_closed_positions_read_every_filter_by_their_closing_instant() -> No
     assert "flows.account_id = %(account_id_1)s" in sql
     assert "closed_positions.asset = %(asset_1)s" in sql
     assert "flow_versions.created_at <= closed_positions.closed_at" in sql
-    assert "(closed_positions.closed_at, closed_positions.id) < (%(param_1)s, %(param_2)s)" in sql
+    assert "(closed_positions.closed_at, closed_positions.id) < (%(param_2)s, %(param_3)s)" in sql
     assert "ORDER BY closed_positions.closed_at DESC, closed_positions.id DESC" in sql
 
 
@@ -167,3 +178,43 @@ def test_an_order_row_reads_status_and_origin_in_the_words_of_the_orders_context
     assert (entry.flow_id, entry.flow_name, entry.account_name) == (None, None, "principale")
     assert (entry.asset, entry.direction, entry.leverage) == ("BTC", "short", 5)
     assert entry.executions == (execution,)
+
+
+def where_of(sql: str) -> str:
+    """The filters of a statement, between its WHERE and what follows them, whatever the names of the parameters."""
+    filters = sql.split(" WHERE ", 1)[1].split(" ORDER BY ", 1)[0]
+    return re.sub(r"%\(\w+\)s", "?", filters)
+
+
+# ADR totali-dello-storico-sul-risultato-filtrato: the totals read the same selection as the page, without its cursor.
+def test_the_totals_of_the_closed_positions_sum_the_filters_of_the_page_without_its_cursor() -> None:
+    sql = sql_of(closed_position_totals_statement(NARROW))
+    page = sql_of(closed_positions_statement(NARROW))
+
+    assert sql.startswith(
+        "SELECT coalesce(sum(coalesce(closed_positions.realized_pnl,"
+        " closed_positions.margin * closed_positions.leverage"
+    )
+    assert "coalesce(sum(closed_positions.fees), %(coalesce_" in sql
+    assert "FROM closed_positions JOIN flows ON flows.id = closed_positions.flow_id" in sql
+    assert where_of(page).startswith(where_of(sql) + " AND (closed_positions.closed_at, closed_positions.id) <")
+    assert "ORDER BY" not in sql
+    assert "LIMIT" not in sql
+
+
+def test_the_totals_of_the_orders_sum_the_fees_of_their_executions_with_the_filters_of_the_page() -> None:
+    sql = sql_of(order_totals_statement(NARROW))
+    page = sql_of(orders_statement(NARROW))
+
+    assert sql.startswith("SELECT coalesce(sum(account_fills.fee), %(coalesce_1)s) AS fees")
+    assert "JOIN account_fills ON account_fills.order_id = orders.id" in sql
+    assert where_of(page).startswith(where_of(sql) + " AND (orders.created_at, orders.id) <")
+    assert "LIMIT" not in sql
+
+
+def test_the_totals_rows_become_the_totals_of_the_history() -> None:
+    positions = closed_position_totals_of({"pnl": Decimal("12.5"), "fees": Decimal("0.84")})
+    executions = order_totals_of({"fees": Decimal("1.1")})
+
+    assert positions == ClosedPositionHistoryTotals(Decimal("12.5"), Decimal("0.84"))
+    assert executions == OrderHistoryTotals(Decimal("1.1"))

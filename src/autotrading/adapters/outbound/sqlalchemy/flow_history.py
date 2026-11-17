@@ -10,6 +10,7 @@ from sqlalchemy import (
     ColumnElement,
     Connection,
     Engine,
+    FromClause,
     RowMapping,
     Select,
     func,
@@ -20,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
-from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import position_of
+from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import CLOSED_POSITION_PNL, position_of
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import RECORDED, record_of
 from autotrading.adapters.outbound.sqlalchemy.tables import (
     account_fills,
@@ -34,12 +35,15 @@ from autotrading.adapters.outbound.sqlalchemy.tables import (
 from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.domain.flows.history import (
     ClosedPositionHistoryEntry,
+    ClosedPositionHistoryTotals,
     CycleHistoryEntry,
     HistoryCursor,
     HistoryQuery,
     OrderExecution,
     OrderHistoryEntry,
+    OrderHistoryTotals,
 )
+from autotrading.domain.flows.ledger import ZERO
 from autotrading.domain.orders.order import OrderOrigin, OrderStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -54,6 +58,15 @@ class _CycleEntryRow(TypedDict):
 class _PositionEntryRow(TypedDict):
     id: UUID
     flow_name: str
+
+
+class _PositionTotalsRow(TypedDict):
+    pnl: Decimal
+    fees: Decimal
+
+
+class _OrderTotalsRow(TypedDict):
+    fees: Decimal
 
 
 class _FillRow(TypedDict):
@@ -85,7 +98,8 @@ class SqlAlchemyFlowHistoryAdapter:
 
     The pages go by keyset on instant and key, newest first, as the operations do: a page costs the same however deep
     it is, and the indexes on tenant, flow and instant serve it. A configuration version is in force from the instant
-    it was saved until the next one of its flow.
+    it was saved until the next one of its flow. The totals sum the same selection as the pages, without the cursor
+    (ADR totali-dello-storico-sul-risultato-filtrato).
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
@@ -109,6 +123,16 @@ class SqlAlchemyFlowHistoryAdapter:
             fills = connection.execute(executions_statement(order_ids)).mappings().all() if order_ids else []
         executions = executions_by_order(fills)
         return [order_entry_of(row, executions[row["id"]]) for row in rows]
+
+    def closed_position_totals(self, query: HistoryQuery) -> ClosedPositionHistoryTotals:
+        with self._transaction() as connection:
+            row = connection.execute(closed_position_totals_statement(query)).mappings().one()
+        return closed_position_totals_of(row)
+
+    def order_totals(self, query: HistoryQuery) -> OrderHistoryTotals:
+        with self._transaction() as connection:
+            row = connection.execute(order_totals_statement(query)).mappings().one()
+        return order_totals_of(row)
 
     @contextmanager
     def _transaction(self) -> Iterator[Connection]:
@@ -145,45 +169,47 @@ def cycles_statement(query: HistoryQuery) -> Select[tuple[object, ...]]:
 
 def closed_positions_statement(query: HistoryQuery) -> Select[tuple[object, ...]]:
     """The closed positions of the page: period and version go by the closing instant."""
-    criteria, columns = query.criteria, closed_positions.c
-    filters = [within(columns.closed_at, query.window), *_after(columns.closed_at, columns.id, query)]
-    if criteria.flow_id is not None:
-        filters.append(columns.flow_id == criteria.flow_id)
-    if criteria.account_id is not None:
-        filters.append(flows.c.account_id == criteria.account_id)
-    if criteria.asset is not None:
-        filters.append(columns.asset == criteria.asset)
-    if criteria.version is not None:
-        filters.append(_version_in_force(columns.flow_id, columns.closed_at) == criteria.version)
+    columns = closed_positions.c
     return (
         select(closed_positions, flows.c.name.label("flow_name"))
-        .join(flows, flows.c.id == columns.flow_id)
-        .where(*filters)
+        .select_from(_closed_positions_with_flows())
+        .where(*_closed_position_filters(query), *_after(columns.closed_at, columns.id, query))
         .order_by(columns.closed_at.desc(), columns.id.desc())
         .limit(query.limit + 1)
     )
 
 
+def closed_position_totals_statement(query: HistoryQuery) -> Select[tuple[object, ...]]:
+    """The PnL and the fees of every closed position of the filters, whatever the page."""
+    return (
+        select(
+            func.coalesce(func.sum(CLOSED_POSITION_PNL), ZERO).label("pnl"),
+            func.coalesce(func.sum(closed_positions.c.fees), ZERO).label("fees"),
+        )
+        .select_from(_closed_positions_with_flows())
+        .where(*_closed_position_filters(query))
+    )
+
+
 def orders_statement(query: HistoryQuery) -> Select[tuple[object, ...]]:
     """The orders of the page: period and version go by the creation instant; an order of no flow has no version."""
-    criteria, columns = query.criteria, orders.c
-    filters = [within(columns.created_at, query.window), *_after(columns.created_at, columns.id, query)]
-    if criteria.flow_id is not None:
-        filters.append(columns.flow_id == criteria.flow_id)
-    if criteria.account_id is not None:
-        filters.append(columns.account_id == criteria.account_id)
-    if criteria.asset is not None:
-        filters.append(columns.coin == criteria.asset)
-    if criteria.version is not None:
-        filters.append(_version_in_force(columns.flow_id, columns.created_at) == criteria.version)
+    columns = orders.c
     return (
         select(orders, accounts.c.name.label("account_name"), flows.c.name.label("flow_name"))
-        .select_from(
-            orders.join(accounts, accounts.c.id == columns.account_id).outerjoin(flows, flows.c.id == columns.flow_id)
-        )
-        .where(*filters)
+        .select_from(_orders_with_accounts_and_flows())
+        .where(*_order_filters(query), *_after(columns.created_at, columns.id, query))
         .order_by(columns.created_at.desc(), columns.id.desc())
         .limit(query.limit + 1)
+    )
+
+
+def order_totals_statement(query: HistoryQuery) -> Select[tuple[object, ...]]:
+    """The fees of the executions of every order of the filters, whatever the page."""
+    with_executions = _orders_with_accounts_and_flows().join(account_fills, account_fills.c.order_id == orders.c.id)
+    return (
+        select(func.coalesce(func.sum(account_fills.c.fee), ZERO).label("fees"))
+        .select_from(with_executions)
+        .where(*_order_filters(query))
     )
 
 
@@ -204,6 +230,16 @@ def cycle_entry_of(columns: Row) -> CycleHistoryEntry:
 def position_entry_of(columns: Row) -> ClosedPositionHistoryEntry:
     row = cast("_PositionEntryRow", columns)
     return ClosedPositionHistoryEntry(row["id"], row["flow_name"], position_of(columns))
+
+
+def closed_position_totals_of(columns: Row) -> ClosedPositionHistoryTotals:
+    row = cast("_PositionTotalsRow", columns)
+    return ClosedPositionHistoryTotals(row["pnl"], row["fees"])
+
+
+def order_totals_of(columns: Row) -> OrderHistoryTotals:
+    row = cast("_OrderTotalsRow", columns)
+    return OrderHistoryTotals(row["fees"])
 
 
 def executions_by_order(fills: Iterable[Row]) -> defaultdict[UUID, list[OrderExecution]]:
@@ -232,6 +268,43 @@ def order_entry_of(columns: Row, executions: Sequence[OrderExecution]) -> OrderH
         origin=OrderOrigin[row["origin"]].value,
         executions=tuple(executions),
     )
+
+
+def _closed_positions_with_flows() -> FromClause:
+    return closed_positions.join(flows, flows.c.id == closed_positions.c.flow_id)
+
+
+def _closed_position_filters(query: HistoryQuery) -> list[ColumnElement[bool]]:
+    criteria, columns = query.criteria, closed_positions.c
+    filters = [within(columns.closed_at, query.window)]
+    if criteria.flow_id is not None:
+        filters.append(columns.flow_id == criteria.flow_id)
+    if criteria.account_id is not None:
+        filters.append(flows.c.account_id == criteria.account_id)
+    if criteria.asset is not None:
+        filters.append(columns.asset == criteria.asset)
+    if criteria.version is not None:
+        filters.append(_version_in_force(columns.flow_id, columns.closed_at) == criteria.version)
+    return filters
+
+
+def _orders_with_accounts_and_flows() -> FromClause:
+    columns = orders.c
+    return orders.join(accounts, accounts.c.id == columns.account_id).outerjoin(flows, flows.c.id == columns.flow_id)
+
+
+def _order_filters(query: HistoryQuery) -> list[ColumnElement[bool]]:
+    criteria, columns = query.criteria, orders.c
+    filters = [within(columns.created_at, query.window)]
+    if criteria.flow_id is not None:
+        filters.append(columns.flow_id == criteria.flow_id)
+    if criteria.account_id is not None:
+        filters.append(columns.account_id == criteria.account_id)
+    if criteria.asset is not None:
+        filters.append(columns.coin == criteria.asset)
+    if criteria.version is not None:
+        filters.append(_version_in_force(columns.flow_id, columns.created_at) == criteria.version)
+    return filters
 
 
 def _version_in_force(flow_id: ColumnElement[UUID], instant: ColumnElement[datetime]) -> ColumnElement[int]:
