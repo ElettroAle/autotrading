@@ -4931,7 +4931,7 @@ export interface operations {
                 action?: string | null;
                 /** @description long o short */
                 direction?: string | null;
-                /** @description all, 7d, 30d o range */
+                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;

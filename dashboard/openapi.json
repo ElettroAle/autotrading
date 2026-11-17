@@ -3701,11 +3701,11 @@
             "required": false,
             "schema": {
               "type": "string",
-              "description": "all, 7d, 30d o range",
+              "description": "30m, 1h, 12h, 24h, 7d, 30d, all o range",
               "default": "all",
               "title": "Period"
             },
-            "description": "all, 7d, 30d o range"
+            "description": "30m, 1h, 12h, 24h, 7d, 30d, all o range"
           },
           {
             "name": "from",
