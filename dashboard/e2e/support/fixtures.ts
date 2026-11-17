@@ -3,6 +3,7 @@ import { createBdd, defineParameterType, test as base } from 'playwright-bdd';
 import type { FakeCycle } from '@/testing/mocks/cycles';
 import { fakePlatform, type FakeFlowHistory, type FakeVersion } from '@/testing/mocks/platform';
 
+import { BrowserRestart } from './browser-restart';
 import { DashboardPages } from './dashboard-pages';
 import { routeToFakes } from './fake-network';
 
@@ -48,12 +49,21 @@ export type ScenarioMemory = {
   spilledByPage: Map<string, string[]>;
   /** The widths of the screens the pages are opened on, one after the other (R6.4.4). */
   screenWidths: number[];
+  /** How many times the identity provider had asked the credentials before the step that must not ask them (R6.5.1). */
+  credentialPages: number;
+  /** How many times the browser had gone to the identity provider before the session was renewed (R6.5.1). */
+  signInRedirects: number;
+  /** The headers and the page the dashboard answered when the browser loaded it (R6.5.1). */
+  loadedPage: { readonly headers: Record<string, string>; readonly body: string } | undefined;
+  /** What the browser blocked under the content security policy of the dashboard (R6.5.1). */
+  policyViolations: string[];
 };
 
 type Fixtures = {
   fakes: void;
   dashboard: DashboardPages;
   memory: ScenarioMemory;
+  browserRestart: BrowserRestart;
 };
 
 export const test = base.extend<Fixtures>({
@@ -69,6 +79,11 @@ export const test = base.extend<Fixtures>({
   ],
   dashboard: async ({ page }, use) => {
     await use(new DashboardPages(page));
+  },
+  browserRestart: async ({ page, browser, baseURL, timezoneId }, use) => {
+    const restart = new BrowserRestart(page, browser, { baseURL, timezoneId });
+    await use(restart);
+    await restart.dispose();
   },
   memory: async ({}, use) => {
     await use({
@@ -96,6 +111,10 @@ export const test = base.extend<Fixtures>({
       capitalChangedAt: '',
       spilledByPage: new Map(),
       screenWidths: [],
+      credentialPages: 0,
+      signInRedirects: 0,
+      loadedPage: undefined,
+      policyViolations: [],
     });
   },
 });

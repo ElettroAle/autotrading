@@ -47,6 +47,17 @@ describe('DashboardLayout', () => {
     expect(screen.getByRole('button', { name: 'Aggiorna' })).toBeInTheDocument();
   });
 
+  // ADR accesso-persistente-con-cache-msal-in-localstorage: «Esci» lives in the shared layout, on every page of the data.
+  it('offers the way out in the navigation of the page', () => {
+    renderLayout();
+
+    expect(
+      within(screen.getByRole('navigation', { name: 'Navigazione' })).getByRole('button', {
+        name: 'Esci',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('breaks a title with a long word instead of pushing the page wider', () => {
     renderLayout();
 
