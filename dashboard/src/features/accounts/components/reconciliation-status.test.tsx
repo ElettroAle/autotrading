@@ -12,14 +12,21 @@ const ACCOUNTS_PAGE = '/accounts';
 const ACCOUNT_ID = 'account-test-1';
 const COMPARED_AT = new Date(Date.UTC(2026, 10, 16, 9, 0));
 
-// The account is read first, its reconciliation after: the section waits for both.
+// The account is read first, its reconciliation after: the section has its title at once, its data once read.
 const reconciliation = async (): Promise<HTMLElement> => {
-  await screen.findByRole('table', { name: 'Conti' });
-  return screen.findByRole('region', { name: 'Riconciliazione del conto test-1' });
+  const section = await screen.findByRole('region', { name: 'Riconciliazione del conto test-1' });
+  await within(section).findByRole('button', { name: 'Modifica la soglia' });
+  return section;
 };
 
 const detail = (section: HTMLElement, term: string): HTMLElement =>
   within(section).getByLabelText(term, { selector: 'dd' });
+
+// Whether the account is aligned is said in the header of its box, outside the section (ADR conti-a-riquadri).
+const state = (): Promise<HTMLElement> =>
+  within(screen.getByRole('article', { name: 'test-1' })).findByRole('status', {
+    name: 'Stato della riconciliazione',
+  });
 
 const confirmationDialog = (section: HTMLElement): HTMLElement =>
   within(section).getByRole('alertdialog', { name: 'Verifica del conto test-1' });
@@ -34,7 +41,7 @@ describe('ReconciliationStatus', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
 
     const section = await reconciliation();
-    expect(detail(section, 'Stato')).toHaveTextContent('allineato');
+    expect(await state()).toHaveTextContent('Riconciliazione: allineato');
     expect(detail(section, 'Ultimo confronto')).toHaveTextContent(
       formatInstant(COMPARED_AT.toISOString()),
     );
@@ -60,7 +67,7 @@ describe('ReconciliationStatus', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
 
     const section = await reconciliation();
-    expect(detail(section, 'Stato')).toHaveTextContent('allarme');
+    expect(await state()).toHaveTextContent('Riconciliazione: allarme');
     expect(detail(section, 'Scostamento')).toHaveTextContent('2%');
     expect(within(section).getByRole('button', { name: 'Ho verificato' })).toBeInTheDocument();
   });
@@ -78,7 +85,11 @@ describe('ReconciliationStatus', () => {
       within(confirmationDialog(section)).getByRole('button', { name: 'Conferma la verifica' }),
     );
 
-    expect(await within(section).findByText('allineato')).toBeInTheDocument();
+    expect(
+      await within(screen.getByRole('article', { name: 'test-1' })).findByText(
+        'Riconciliazione: allineato',
+      ),
+    ).toBeInTheDocument();
     expect(within(section).queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(fakeReconciliation.statusOf(ACCOUNT_ID).aligned).toBe(true);
   });
@@ -94,7 +105,7 @@ describe('ReconciliationStatus', () => {
     );
 
     expect(within(section).queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(detail(section, 'Stato')).toHaveTextContent('allarme');
+    expect(await state()).toHaveTextContent('Riconciliazione: allarme');
     expect(fakeReconciliation.statusOf(ACCOUNT_ID).aligned).toBe(false);
   });
 
@@ -148,6 +159,6 @@ describe('ReconciliationStatus', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
 
     expect(await screen.findByText(/errore interno/)).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Conti' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'test-1' })).toBeInTheDocument();
   });
 });

@@ -7,7 +7,6 @@ import { formatInstant } from '@/utils/format-instant';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When } from '../../../support/fixtures';
 
-const RECONCILIATION = 'Riconciliazione';
 const CONFIRM = 'Ho verificato';
 const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
@@ -17,13 +16,18 @@ const READ = 980;
 
 const accountIdOf = (name: string): string => fakePlatform.accountNamed(name).id;
 
-/** The reconciliation of the account on the page of the accounts, in its column. */
-const reconciliationOf = (dashboard: DashboardPages, name: string): Promise<Locator> =>
-  dashboard.accountCell(name, RECONCILIATION);
+/** The section of the reconciliation in the box of the account on the page of the accounts (ADR conti-a-riquadri). */
+const reconciliationOf = (dashboard: DashboardPages, name: string): Locator =>
+  dashboard.accountReconciliation(name);
 
 /** One value of the reconciliation of the account, by the term it shows. */
-const detailOf = async (dashboard: DashboardPages, name: string, term: string) =>
-  (await reconciliationOf(dashboard, name)).getByLabel(term, { exact: true });
+const detailOf = (dashboard: DashboardPages, name: string, term: string): Locator =>
+  reconciliationOf(dashboard, name).getByLabel(term, { exact: true });
+
+/** Whether the account is aligned, said in the header of its box. */
+const expectState = async (dashboard: DashboardPages, name: string, state: string) => {
+  await expect(dashboard.accountReconciliationState(name)).toHaveText(`Riconciliazione: ${state}`);
+};
 
 const openAccountsAs = async (dashboard: DashboardPages, account: string): Promise<void> => {
   await dashboard.openAccounts();
@@ -39,7 +43,7 @@ const chooseConfirmation = async (
   answer: string,
 ): Promise<void> => {
   await openAccountsAs(dashboard, account);
-  const reconciliation = await reconciliationOf(dashboard, name);
+  const reconciliation = reconciliationOf(dashboard, name);
   await reconciliation.getByRole('button', { name: CONFIRM }).click();
   await dashboard
     .confirmation(`Verifica del conto ${name}`)
@@ -109,7 +113,7 @@ When(
   '{string} apre gli allarmi del conto {string}',
   async ({ dashboard }, account: string, name: string) => {
     await openAccountsAs(dashboard, account);
-    await (await reconciliationOf(dashboard, name)).getByRole('link', { name: 'Allarmi' }).click();
+    await reconciliationOf(dashboard, name).getByRole('link', { name: 'Allarmi' }).click();
     await expect(dashboard.pageHeading()).toHaveText(`Allarmi del conto ${name}`);
   },
 );
@@ -118,7 +122,7 @@ When(
   '{string} imposta dalla pagina del conto {string} la soglia di scostamento a {int}%',
   async ({ dashboard }, account: string, name: string, threshold: number) => {
     await openAccountsAs(dashboard, account);
-    const reconciliation = await reconciliationOf(dashboard, name);
+    const reconciliation = reconciliationOf(dashboard, name);
     await reconciliation.getByRole('button', { name: 'Modifica la soglia' }).click();
     await dashboard.field('Soglia di scostamento (%)', reconciliation).fill(String(threshold));
     await reconciliation.getByRole('button', { name: 'Salva la soglia' }).click();
@@ -130,8 +134,8 @@ Then(
   async ({ dashboard }, name: string, state: string) => {
     const comparedAt = fakeReconciliation.statusOf(accountIdOf(name)).last_comparison?.compared_at;
     expect(comparedAt).toBeDefined();
-    await expect(await detailOf(dashboard, name, 'Stato')).toHaveText(state);
-    await expect(await detailOf(dashboard, name, 'Ultimo confronto')).toHaveText(
+    await expectState(dashboard, name, state);
+    await expect(detailOf(dashboard, name, 'Ultimo confronto')).toHaveText(
       formatInstant(comparedAt ?? ''),
     );
   },
@@ -148,11 +152,11 @@ Then(
     deviation: number,
     threshold: number,
   ) => {
-    await expect(await detailOf(dashboard, name, 'Stato')).toHaveText(state);
-    await expect(await detailOf(dashboard, name, 'Saldo atteso')).toHaveText(`${expected} USDC`);
-    await expect(await detailOf(dashboard, name, 'Saldo letto')).toHaveText(`${read} USDC`);
-    await expect(await detailOf(dashboard, name, 'Scostamento')).toHaveText(`${deviation}%`);
-    await expect(await detailOf(dashboard, name, 'Soglia')).toHaveText(`${threshold}%`);
+    await expectState(dashboard, name, state);
+    await expect(detailOf(dashboard, name, 'Saldo atteso')).toHaveText(`${expected} USDC`);
+    await expect(detailOf(dashboard, name, 'Saldo letto')).toHaveText(`${read} USDC`);
+    await expect(detailOf(dashboard, name, 'Scostamento')).toHaveText(`${deviation}%`);
+    await expect(detailOf(dashboard, name, 'Soglia')).toHaveText(`${threshold}%`);
   },
 );
 
@@ -160,7 +164,7 @@ Then(
   'il conto {string} offre il comando {string}',
   async ({ dashboard }, name: string, command: string) => {
     await expect(
-      (await reconciliationOf(dashboard, name)).getByRole('button', { name: command }),
+      reconciliationOf(dashboard, name).getByRole('button', { name: command }),
     ).toBeVisible();
   },
 );
@@ -168,7 +172,7 @@ Then(
 Then(
   'il conto {string} mostra lo stato {string}',
   async ({ dashboard }, name: string, state: string) => {
-    await expect(await detailOf(dashboard, name, 'Stato')).toHaveText(state);
+    await expectState(dashboard, name, state);
     expect(fakeReconciliation.statusOf(accountIdOf(name)).aligned).toBe(state === 'allineato');
   },
 );
@@ -197,7 +201,7 @@ Then(
 Then(
   'il conto {string} mostra la soglia {int}%',
   async ({ dashboard }, name: string, threshold: number) => {
-    await expect(await detailOf(dashboard, name, 'Soglia')).toHaveText(`${threshold}%`);
+    await expect(detailOf(dashboard, name, 'Soglia')).toHaveText(`${threshold}%`);
     expect(fakeReconciliation.thresholdOf(accountIdOf(name))).toBe(String(threshold));
   },
 );

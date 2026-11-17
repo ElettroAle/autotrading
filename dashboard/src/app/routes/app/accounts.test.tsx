@@ -38,9 +38,11 @@ describe('AccountsRoute', () => {
 
     await openAccountsFromTheMenu();
 
-    const table = await screen.findByRole('table');
-    expect(within(table).getByRole('columnheader', { name: 'Capitale allocato' })).toBeVisible();
-    expect(await within(table).findByRole('row', { name: /principale/ })).toBeVisible();
+    const card = await within(await screen.findByRole('region', { name: 'Conti' })).findByRole(
+      'article',
+      { name: 'principale' },
+    );
+    expect(within(card).getByLabelText('Capitale allocato', { selector: 'dd' })).toBeVisible();
   });
 
   it('rereads the accounts of the flow editor after an account is registered', async () => {
@@ -90,8 +92,8 @@ describe('AccountsRoute', () => {
     fakePlatform.addAccount('anna', 'test-1');
     await renderApp({ account: 'anna', url: '/accounts' });
 
-    const table = await screen.findByRole('table', { name: 'Conti' });
-    expect(within(table).queryByRole('button', { name: /Chiusura di emergenza/ })).toBeNull();
+    const list = await screen.findByRole('region', { name: 'Conti' });
+    expect(within(list).queryByRole('button', { name: /Chiusura di emergenza/ })).toBeNull();
   });
 
   it('has no zone without an account', async () => {

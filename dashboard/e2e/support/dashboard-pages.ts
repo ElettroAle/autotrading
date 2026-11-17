@@ -219,21 +219,31 @@ export class DashboardPages {
     return this.pageHeading().filter({ hasNotText: UNREAD_FLOW_TITLE });
   }
 
-  accountRow(name: string): Locator {
+  /** The box of the account on the page of the accounts (ADR conti-a-riquadri). */
+  accountBox(name: string): Locator {
     return this.page
-      .getByRole('table', { name: 'Conti' })
-      .locator('tbody tr')
-      .filter({ has: this.page.getByRole('cell', { name, exact: true }) });
+      .getByRole('region', { name: 'Conti' })
+      .getByRole('article', { name, exact: true });
   }
 
-  /** The cell of the account under the column with the header, as the table shows it on a wide screen. */
-  async accountCell(name: string, header: string): Promise<Locator> {
-    await this.accountRow(name).waitFor();
-    const headers = await this.page
-      .getByRole('table', { name: 'Conti' })
-      .getByRole('columnheader')
-      .allTextContents();
-    return this.accountRow(name).getByRole('cell').nth(headers.indexOf(header));
+  /** One value of the box of the account, by the term it shows: «Saldo», «Capitale allocato», ... */
+  accountDetail(name: string, term: string): Locator {
+    return this.accountBox(name).getByLabel(term, { exact: true });
+  }
+
+  /** The network of the account, in the header of its box, with its kind and the name the exchange gives it. */
+  accountNetwork(name: string): Locator {
+    return this.accountBox(name).getByText(/^(TEST|REALE) · /);
+  }
+
+  /** The section of the reconciliation in the box of the account. */
+  accountReconciliation(name: string): Locator {
+    return this.accountBox(name).getByRole('region', { name: `Riconciliazione del conto ${name}` });
+  }
+
+  /** Whether the account is aligned, in the header of its box, with an icon and a text. */
+  accountReconciliationState(name: string): Locator {
+    return this.accountBox(name).getByRole('status', { name: 'Stato della riconciliazione' });
   }
 
   registerAccount(): Locator {

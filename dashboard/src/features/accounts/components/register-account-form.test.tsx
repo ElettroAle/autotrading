@@ -46,7 +46,7 @@ describe('RegisterAccountForm', () => {
     expect(await within(form()).findByRole('status')).toHaveTextContent(
       'Conto principale registrato',
     );
-    expect(await screen.findByRole('cell', { name: 'principale' })).toBeInTheDocument();
+    expect(await screen.findByRole('article', { name: 'principale' })).toBeInTheDocument();
     expect(within(form()).getByLabelText('Nome')).toHaveValue('');
     expect(within(form()).getByLabelText('Exchange')).toHaveValue('');
     expect(within(form()).queryByLabelText(SECRET_LABEL)).not.toBeInTheDocument();
@@ -85,7 +85,7 @@ describe('RegisterAccountForm', () => {
 
     await fillAndSend();
 
-    await screen.findByRole('cell', { name: 'principale' });
+    await screen.findByRole('article', { name: 'principale' });
     expect(document.body.innerHTML).not.toContain(SECRET_KEY);
     const mutationCache = mutations.mock.contexts[0] as MutationCache;
     await waitFor(() => expect(mutationCache.getAll()).toEqual([]));

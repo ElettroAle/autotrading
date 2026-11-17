@@ -55,12 +55,12 @@ const accountOf = (account: string, name: string) =>
 
 const reopenWithAccount = async (dashboard: DashboardPages, name: string): Promise<void> => {
   await dashboard.openAccounts();
-  await expect(dashboard.accountRow(name)).toBeVisible();
+  await expect(dashboard.accountBox(name)).toBeVisible();
 };
 
 // The removal is asked in a window first; the API decides whether it needs a second confirmation (ADR 0130).
 const requestRemoval = async (dashboard: DashboardPages, name: string): Promise<void> => {
-  await dashboard.accountRow(name).getByRole('button', { name: 'Rimuovi' }).click();
+  await dashboard.accountBox(name).getByRole('button', { name: 'Rimuovi' }).click();
   await dashboard
     .confirmation(`Rimozione del conto ${name}`)
     .getByRole('button', { name: CONFIRM_REMOVAL })
@@ -143,7 +143,7 @@ When(
   async ({ dashboard, memory }, account: string, name: string) => {
     expectSignedIn(memory, account);
     memory.secret = OTHER_SECRET_KEY;
-    const item = dashboard.accountRow(name);
+    const item = dashboard.accountBox(name);
     await item.getByRole('button', { name: 'Sostituisci le credenziali' }).click();
     await dashboard.field("Chiave dell'API wallet", item).fill(OTHER_SECRET_KEY);
     await item.getByRole('button', { name: 'Sostituisci', exact: true }).click();
@@ -156,7 +156,7 @@ When(
     expectSignedIn(memory, account);
     memory.subject = name;
     await dashboard
-      .accountRow(name)
+      .accountBox(name)
       .getByRole('button', { name: 'Sostituisci le credenziali' })
       .click();
   },
@@ -176,7 +176,7 @@ Then(
 Then(
   "il conto {string} mostra l'indirizzo con cui è registrato",
   async ({ dashboard }, name: string) => {
-    const cell = await dashboard.accountCell(name, ON_EXCHANGE);
+    const cell = dashboard.accountDetail(name, ON_EXCHANGE);
     await expect(cell).toContainText(ADDRESS_LABEL);
     await expect(cell).toContainText(VALID_ADDRESS);
   },
@@ -203,7 +203,7 @@ Then(
   "il conto {string} compare nell'elenco con il suo saldo",
   async ({ dashboard }, name: string) => {
     const { balance } = fakePlatform.accountNamed(name);
-    await expect(await dashboard.accountCell(name, 'Saldo')).toContainText(
+    await expect(dashboard.accountDetail(name, 'Saldo')).toContainText(
       `${formatAmount(String(balance))} USDC`,
     );
   },
@@ -211,7 +211,7 @@ Then(
 
 Then("il conto non compare nell'elenco", async ({ dashboard, memory }) => {
   expect(accountOf(memory.account, REJECTED_ACCOUNT)).toBeUndefined();
-  await expect(dashboard.accountRow(REJECTED_ACCOUNT)).toHaveCount(0);
+  await expect(dashboard.accountBox(REJECTED_ACCOUNT)).toHaveCount(0);
 });
 
 Then('la dashboard conferma la sostituzione', async ({ dashboard }) => {
@@ -221,7 +221,7 @@ Then('la dashboard conferma la sostituzione', async ({ dashboard }) => {
 Then(
   "il conto {string} non compare più nell'elenco",
   async ({ dashboard, memory }, name: string) => {
-    await expect(dashboard.accountRow(name)).toHaveCount(0);
+    await expect(dashboard.accountBox(name)).toHaveCount(0);
     expect(accountOf(memory.account, name)).toBeUndefined();
   },
 );

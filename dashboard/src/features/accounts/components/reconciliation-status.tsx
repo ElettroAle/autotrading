@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { CommandButton } from '@/components/ui/command-button';
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
+import { DETAILS_GRID } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { paths } from '@/config/paths';
@@ -18,21 +18,8 @@ import {
 } from '../api/get-account-reconciliation';
 import type { Account } from '../api/get-accounts';
 
+import { Detail } from './detail';
 import { DeviationThresholdForm } from './deviation-threshold-form';
-
-const Detail = ({ term, children }: { readonly term: string; readonly children: ReactNode }) => (
-  <>
-    <dt className="font-medium text-slate-600">{term}</dt>
-    <dd aria-label={term} className={DETAIL_VALUE}>
-      {children}
-    </dd>
-  </>
-);
-
-const STATE_STYLES = {
-  aligned: 'rounded bg-green-100 px-2 py-0.5 font-semibold text-green-900',
-  alarm: 'rounded bg-red-100 px-2 py-0.5 font-semibold text-red-900',
-} as const;
 
 const ReconciliationDetails = ({
   account,
@@ -41,15 +28,10 @@ const ReconciliationDetails = ({
   readonly account: Account;
   readonly reconciliation: AccountReconciliation;
 }) => {
-  const { aligned, last_comparison: comparison, threshold_percent: threshold } = reconciliation;
+  const { last_comparison: comparison, threshold_percent: threshold } = reconciliation;
   const amount = (value: string) => `${formatAmount(value)} ${account.currency}`;
   return (
     <dl className={DETAILS_GRID}>
-      <Detail term="Stato">
-        <span className={aligned ? STATE_STYLES.aligned : STATE_STYLES.alarm}>
-          {aligned ? 'allineato' : 'allarme'}
-        </span>
-      </Detail>
       {comparison === null ? (
         <Detail term="Ultimo confronto">nessun confronto ancora</Detail>
       ) : (
@@ -86,11 +68,20 @@ const ConfirmAlarm = ({ account, onDone }: ConfirmAlarmProps) => {
 
 type Action = 'none' | 'confirming' | 'threshold';
 
-/**
- * Whether the balance of the account is the expected one, as the API says it, with the commands on it: the confirmation
- * of an open alarm, its alarms and the threshold (R3.3.2, ADR stato-della-riconciliazione-nella-dashboard).
- */
-export const ReconciliationStatus = ({ account }: { readonly account: Account }) => {
+type SectionProps = { readonly account: Account; readonly children: ReactNode };
+
+/** The section of the reconciliation in the box of the account, with its title even while it is read (ADR conti-a-riquadri). */
+const ReconciliationSection = ({ account, children }: SectionProps) => (
+  <section
+    aria-label={`Riconciliazione del conto ${account.name}`}
+    className="space-y-2 border-t border-slate-200 pt-3"
+  >
+    <h3 className="font-semibold">Riconciliazione</h3>
+    {children}
+  </section>
+);
+
+const ReconciliationContent = ({ account }: { readonly account: Account }) => {
   const reconciliation = useAccountReconciliation(account.id);
   const [action, setAction] = useState<Action>('none');
   if (reconciliation.isPending) {
@@ -101,7 +92,7 @@ export const ReconciliationStatus = ({ account }: { readonly account: Account })
   }
   const done = () => setAction('none');
   return (
-    <section aria-label={`Riconciliazione del conto ${account.name}`} className="space-y-2">
+    <>
       <ReconciliationDetails account={account} reconciliation={reconciliation.data} />
       <div className="flex flex-wrap gap-2">
         {reconciliation.data.open_alarm !== null && (
@@ -125,6 +116,17 @@ export const ReconciliationStatus = ({ account }: { readonly account: Account })
           onCancel={done}
         />
       )}
-    </section>
+    </>
   );
 };
+
+/**
+ * The data of the reconciliation of the account, as the API says it, with the commands on it: the confirmation of an
+ * open alarm, its alarms and the threshold (R3.3.2, ADR stato-della-riconciliazione-nella-dashboard); whether it is
+ * aligned is said in the header of the box (ADR conti-a-riquadri).
+ */
+export const ReconciliationStatus = ({ account }: { readonly account: Account }) => (
+  <ReconciliationSection account={account}>
+    <ReconciliationContent account={account} />
+  </ReconciliationSection>
+);
