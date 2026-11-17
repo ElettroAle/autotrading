@@ -13,16 +13,11 @@ const SECRET_LABEL = "Chiave dell'API wallet";
 const ADDRESS_LABEL = 'Indirizzo del conto';
 const CONFIRM_REMOVAL = 'Conferma la rimozione';
 
-const accountItem = async (name: string): Promise<HTMLElement> => {
-  const table = await screen.findByRole('table', { name: 'Conti' });
-  const row = within(table)
-    .getAllByRole('row')
-    .find((candidate) => within(candidate).queryByRole('cell', { name }) !== null);
-  if (row === undefined) {
-    throw new Error(`no row for ${name}`);
-  }
-  return row;
-};
+// The commands of the account, at the bottom of its box (ADR conti-a-riquadri).
+const accountItem = async (name: string): Promise<HTMLElement> =>
+  within(await screen.findByRole('article', { name })).getByRole('group', {
+    name: `Comandi del conto ${name}`,
+  });
 
 const accountNames = (account: string) =>
   fakePlatform.user(account).accounts.map(({ name }) => name);
@@ -108,7 +103,8 @@ describe('AccountActions', () => {
     expect(await within(item).findByRole('status')).toHaveTextContent(
       'Credenziali del conto principale sostituite',
     );
-    expect(await within(item).findByText(ADDRESS)).toBeInTheDocument();
+    const card = screen.getByRole('article', { name: 'principale' });
+    expect(await within(card).findByText(ADDRESS)).toBeInTheDocument();
   });
 
   it('tells why the replacement was refused and empties the secret', async () => {

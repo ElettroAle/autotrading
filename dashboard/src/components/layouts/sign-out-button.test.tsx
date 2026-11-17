@@ -24,20 +24,25 @@ const renderSignOut = async () => {
   return { client, queryClient };
 };
 
+// ADR area-utente-in-alto-a-destra: «Esci» is the item of the menu of the user.
 describe('SignOutButton', () => {
   it('forgets the data of the user and signs out at the identity provider', async () => {
     const { client, queryClient } = await renderSignOut();
     const logout = vi.spyOn(client, 'logoutRedirect').mockResolvedValue();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Esci' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Esci' }));
 
     expect(queryClient.getQueryData(['flows'])).toBeUndefined();
     expect(logout).toHaveBeenCalledOnce();
   });
 
-  it('is large enough to be touched on a phone', async () => {
+  it('is large enough to be touched on a phone, as wide as the menu', async () => {
     await renderSignOut();
 
-    expect(screen.getByRole('button', { name: 'Esci' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('menuitem', { name: 'Esci' })).toHaveClass(
+      'min-h-11',
+      'min-w-11',
+      'w-full',
+    );
   });
 });

@@ -97,7 +97,7 @@ from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
-from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters
+from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters, system_clock_pause_adapters
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
@@ -541,7 +541,10 @@ def cycle_of(
                 AskFlowAgentUseCase(
                     ComposeAgentContextUseCase(),
                     AskAgentUseCase(
-                        models, SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id), provider_key_opener
+                        models,
+                        SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id),
+                        provider_key_opener,
+                        system_clock_pause_adapters(),
                     ),
                 )
             ),

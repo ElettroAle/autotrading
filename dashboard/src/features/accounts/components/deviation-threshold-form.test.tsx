@@ -12,10 +12,9 @@ const FIELD = 'Soglia di scostamento (%)';
 
 const openThresholdForm = async (): Promise<HTMLElement> => {
   await renderApp({ account: 'anna', url: '/accounts' });
-  // The account is read first, its reconciliation after: the section waits for both.
-  await screen.findByRole('table', { name: 'Conti' });
+  // The account is read first, its reconciliation after: the section has its title at once, its data once read.
   const section = await screen.findByRole('region', { name: 'Riconciliazione del conto test-1' });
-  await userEvent.click(within(section).getByRole('button', { name: 'Modifica la soglia' }));
+  await userEvent.click(await within(section).findByRole('button', { name: 'Modifica la soglia' }));
   return section;
 };
 

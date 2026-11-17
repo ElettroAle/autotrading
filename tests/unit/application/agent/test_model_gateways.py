@@ -18,6 +18,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,
     FakeProviderKeySealerAdapter,
@@ -59,9 +60,8 @@ class Gateways:
             self.keys.add(RegisteredProviderKey(TENANT, name, sealed))
 
     def ask(self, model: str) -> None:
-        use_case = AskAgentUseCase(
-            {"proxy": self.proxy, "direct": self.direct}, self.keys, FakeProviderKeyOpenerAdapter(self.vault)
-        )
+        gateways = {"proxy": self.proxy, "direct": self.direct}
+        use_case = AskAgentUseCase(gateways, self.keys, FakeProviderKeyOpenerAdapter(self.vault), FakePauseAdapter())
         use_case.execute(AskAgentCommand(model, {}, CONTEXT))
 
     def listing(self) -> list[str]:

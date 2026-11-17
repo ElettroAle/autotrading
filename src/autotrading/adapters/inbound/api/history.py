@@ -19,12 +19,15 @@ from autotrading.application.flows.query_cycle_history import QueryCycleHistoryC
 from autotrading.application.flows.query_order_history import QueryOrderHistoryCommand
 from autotrading.domain.flows.history import (
     ClosedPositionHistoryEntry,
+    ClosedPositionHistoryTotals,
     CycleHistoryEntry,
     HistoryCursor,
     HistoryFilter,
     HistoryPage,
+    HistoryReport,
     OrderExecution,
     OrderHistoryEntry,
+    OrderHistoryTotals,
 )
 from autotrading.domain.flows.statistics_period import StatisticsPeriod
 
@@ -70,16 +73,33 @@ class HistoryClosedPositionResponse(ClosedPositionResponse):
         )
 
 
+class ClosedPositionTotalsResponse(BaseModel):
+    """The PnL and the fees of every closed position of the filters, not only of the page (Bug 569)."""
+
+    pnl: str
+    fees: str
+
+    @classmethod
+    def of(cls, totals: ClosedPositionHistoryTotals) -> ClosedPositionTotalsResponse:
+        return cls(pnl=amount_text(totals.pnl), fees=amount_text(totals.fees))
+
+
 class HistoryClosedPositionsPageResponse(BaseModel):
-    """At most 50 closed positions, newest close first; `next` is the `after` of the following page."""
+    """At most 50 closed positions, newest close first; `next` is the `after` of the following page. `totals` comes
+    with the first page only, null on the following ones of the same search.
+    """
 
     positions: list[HistoryClosedPositionResponse]
     next: str | None
+    totals: ClosedPositionTotalsResponse | None
 
     @classmethod
-    def of(cls, page: HistoryPage[ClosedPositionHistoryEntry]) -> HistoryClosedPositionsPageResponse:
-        positions = [HistoryClosedPositionResponse.of_entry(entry) for entry in page.entries]
-        return cls(positions=positions, next=_next_of(page.next))
+    def of(
+        cls, report: HistoryReport[ClosedPositionHistoryEntry, ClosedPositionHistoryTotals]
+    ) -> HistoryClosedPositionsPageResponse:
+        positions = [HistoryClosedPositionResponse.of_entry(entry) for entry in report.page.entries]
+        totals = None if report.totals is None else ClosedPositionTotalsResponse.of(report.totals)
+        return cls(positions=positions, next=_next_of(report.page.next), totals=totals)
 
 
 class OrderExecutionResponse(BaseModel):
@@ -138,15 +158,30 @@ class HistoryOrderResponse(BaseModel):
         )
 
 
+class OrderTotalsResponse(BaseModel):
+    """The fees of the executions of every order of the filters, not only of the page (Bug 569)."""
+
+    fees: str
+
+    @classmethod
+    def of(cls, totals: OrderHistoryTotals) -> OrderTotalsResponse:
+        return cls(fees=amount_text(totals.fees))
+
+
 class HistoryOrdersPageResponse(BaseModel):
-    """At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one."""
+    """At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one. `totals`
+    comes with the first page only, null on the following ones of the same search.
+    """
 
     orders: list[HistoryOrderResponse]
     next: str | None
+    totals: OrderTotalsResponse | None
 
     @classmethod
-    def of(cls, page: HistoryPage[OrderHistoryEntry]) -> HistoryOrdersPageResponse:
-        return cls(orders=[HistoryOrderResponse.of(entry) for entry in page.entries], next=_next_of(page.next))
+    def of(cls, report: HistoryReport[OrderHistoryEntry, OrderHistoryTotals]) -> HistoryOrdersPageResponse:
+        orders = [HistoryOrderResponse.of(entry) for entry in report.page.entries]
+        totals = None if report.totals is None else OrderTotalsResponse.of(report.totals)
+        return cls(orders=orders, next=_next_of(report.page.next), totals=totals)
 
 
 def cursor_text(cursor: HistoryCursor) -> str:
@@ -205,8 +240,8 @@ def history_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRo
         criteria: Annotated[HistoryFilter, Depends(criteria_of)],
         after: Annotated[HistoryCursor | None, Depends(after_of)],
     ) -> HistoryClosedPositionsPageResponse:
-        page = use_cases.query_closed_position_history.execute(QueryClosedPositionHistoryCommand(criteria, after))
-        return HistoryClosedPositionsPageResponse.of(page)
+        report = use_cases.query_closed_position_history.execute(QueryClosedPositionHistoryCommand(criteria, after))
+        return HistoryClosedPositionsPageResponse.of(report)
 
     @router.get("/orders")
     def query_order_history(
@@ -214,8 +249,8 @@ def history_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRo
         criteria: Annotated[HistoryFilter, Depends(criteria_of)],
         after: Annotated[HistoryCursor | None, Depends(after_of)],
     ) -> HistoryOrdersPageResponse:
-        page = use_cases.query_order_history.execute(QueryOrderHistoryCommand(criteria, after))
-        return HistoryOrdersPageResponse.of(page)
+        report = use_cases.query_order_history.execute(QueryOrderHistoryCommand(criteria, after))
+        return HistoryOrdersPageResponse.of(report)
 
     return router
 

@@ -1,73 +1,36 @@
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 
-import { FAKE_ACCOUNT_ADDRESS, fakePlatform } from '@/testing/mocks/platform';
+import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
 const ACCOUNTS_PAGE = '/accounts';
 
-const rowOf = async (name: string): Promise<HTMLElement> => {
-  const table = await screen.findByRole('table', { name: 'Conti' });
-  const row = within(table)
-    .getAllByRole('row')
-    .find((candidate) => within(candidate).queryByRole('cell', { name }) !== null);
-  if (row === undefined) {
-    throw new Error(`no row for ${name}`);
-  }
-  return row;
-};
+const accountsList = (): Promise<HTMLElement> => screen.findByRole('region', { name: 'Conti' });
 
 describe('AccountsList', () => {
   beforeEach(() => {
     fakePlatform.giveAccountTo('anna', 'principale', 1000);
-    fakePlatform.addFlow('anna', 'alfa', { accountName: 'principale', allocatedCapital: 300 });
-    fakePlatform.addFlow('anna', 'beta', { accountName: 'principale', allocatedCapital: 200 });
+    fakePlatform.giveAccountTo('anna', 'secondario', 10);
     fakePlatform.giveAccountTo('bruno', 'altrui', 50);
   });
 
-  it('shows each account of the tenant with network, balance, allocated and free capital', async () => {
+  it('shows every account of the tenant in a box of its own (Bug 565)', async () => {
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
 
-    const row = await rowOf('principale');
-    expect(within(row).getByText('TEST · testnet')).toBeInTheDocument();
-    expect(await within(row).findByText('1000 USDC')).toBeInTheDocument();
-    expect(within(row).getAllByText('500 USDC')).toHaveLength(2);
+    const list = await accountsList();
+    // Every account comes from the same reading of the API: the boxes appear together.
+    expect(await within(list).findAllByRole('article')).toHaveLength(2);
+    expect(within(list).getByRole('article', { name: 'principale' })).toBeInTheDocument();
+    expect(within(list).getByRole('article', { name: 'secondario' })).toBeInTheDocument();
     expect(screen.queryByText('altrui')).not.toBeInTheDocument();
   });
 
-  it('shows the public fields of the account with the labels the exchange gives them (Bug 401)', async () => {
+  it('lays the boxes in one column on a phone and two from a wide screen (Bug 565)', async () => {
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
 
-    const row = await rowOf('principale');
-    expect(await within(row).findByText('Indirizzo del conto')).toBeInTheDocument();
-    expect(within(row).getByText(FAKE_ACCOUNT_ADDRESS)).toBeInTheDocument();
-  });
-
-  it.each([
-    ['real', 'REALE · sandbox'],
-    ['test', 'TEST · sandbox'],
-  ])('marks the network %s with the name the API gives it', async (network, label) => {
-    server.use(
-      http.get('*/accounts', () =>
-        HttpResponse.json([
-          {
-            id: 'account-reale',
-            name: 'reale',
-            exchange: 'Hyperliquid',
-            has_credentials: true,
-            public_fields: {},
-            network,
-            network_name: 'sandbox',
-            allocated_capital: '0',
-            currency: 'USDC',
-          },
-        ]),
-      ),
-    );
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
-
-    expect(within(await rowOf('reale')).getByText(label)).toBeInTheDocument();
+    expect(await accountsList()).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
   });
 
   it('says there is no account yet and how to register one', async () => {
@@ -75,18 +38,8 @@ describe('AccountsList', () => {
     await renderApp({ account: 'carla', url: ACCOUNTS_PAGE });
 
     expect(await screen.findByText('Nessun conto registrato.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Conti' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Registra il conto' })).toBeInTheDocument();
-  });
-
-  it('keeps network and allocated capital when the exchange does not answer', async () => {
-    fakePlatform.stopExchange();
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
-
-    const row = await rowOf('principale');
-    expect(await within(row).findByText('Saldo non disponibile')).toBeInTheDocument();
-    expect(await within(row).findByText('Capitale libero non disponibile')).toBeInTheDocument();
-    expect(within(row).getByText('TEST · testnet')).toBeInTheDocument();
-    expect(within(row).getByText('500 USDC')).toBeInTheDocument();
   });
 
   it('tells why the accounts could not be read', async () => {

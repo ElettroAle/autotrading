@@ -6,7 +6,6 @@ import { paths } from '@/config/paths';
 import { usePageData } from '@/hooks/use-page-data';
 
 import { AppHeader } from './app-header';
-import { SignOutButton } from './sign-out-button';
 
 type NavigationEntry = {
   readonly name: string;
@@ -35,6 +34,11 @@ const NAVIGATION: readonly NavigationGroup[] = [
   {
     heading: 'Impostazioni',
     entries: [
+      {
+        name: 'Generale',
+        to: paths.generalSettings.getHref(),
+        area: [paths.generalSettings.path],
+      },
       { name: 'Chiavi', to: paths.providerKeys.getHref(), area: [paths.providerKeys.path] },
       { name: 'Notifiche', to: paths.notifications.getHref(), area: [paths.notifications.path] },
     ],
@@ -99,8 +103,8 @@ const NavigationGroupLinks = ({ group }: { group: NavigationGroup }) => {
 /**
  * A page of the data of the user: navigation at the side on a wide screen, folded into a menu under 768 pixels, and
  * the data of the page reread on request or by itself (ADR 0119). The menu gathers the areas in groups and marks the
- * area of the page, its sub-pages included (ADR 0160), and ends with «Esci» (ADR
- * accesso-persistente-con-cache-msal-in-localstorage).
+ * area of the page, its sub-pages included (ADR 0160); «Esci» is in the menu of the user, in the bar on top (ADR
+ * area-utente-in-alto-a-destra).
  */
 export const DashboardLayout = ({ title, children }: { title: string; children: ReactNode }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -128,10 +132,6 @@ export const DashboardLayout = ({ title, children }: { title: string; children: 
           {NAVIGATION.map((group) => (
             <NavigationGroupLinks key={group.heading ?? ''} group={group} />
           ))}
-          {/* In the navigation, folded in the menu on a phone: the bar on top has no room left there. */}
-          <div className="mt-4 border-t border-slate-200 px-1 pt-3">
-            <SignOutButton />
-          </div>
         </nav>
         <main className="mx-auto w-full max-w-4xl min-w-0 p-4 md:p-6">
           <h1 className="mb-4 text-2xl font-semibold wrap-anywhere">{title}</h1>

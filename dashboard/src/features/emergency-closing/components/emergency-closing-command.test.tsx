@@ -89,7 +89,7 @@ describe('the emergency closing', () => {
   });
 
   it('of every flow names them all', async () => {
-    await renderApp({ account: 'anna', url: '/' });
+    await renderApp({ account: 'anna', url: '/settings/general' });
 
     await click(COMMAND);
 
@@ -99,7 +99,7 @@ describe('the emergency closing', () => {
   });
 
   it('closes nothing when the user cancels', async () => {
-    await renderApp({ account: 'anna', url: '/' });
+    await renderApp({ account: 'anna', url: '/settings/general' });
     await click(COMMAND);
     await confirmation();
 
@@ -118,7 +118,7 @@ describe('the emergency closing', () => {
         anOutcome('delta', { remark: 'nessuna posizione da chiudere' }),
       ]),
     );
-    await renderApp({ account: 'anna', url: '/' });
+    await renderApp({ account: 'anna', url: '/settings/general' });
     await click(COMMAND);
     await confirmation();
 
@@ -141,7 +141,7 @@ describe('the emergency closing', () => {
         problem(503, 'Unavailable', 'exchange non raggiungibile'),
       ),
     );
-    await renderApp({ account: 'anna', url: '/' });
+    await renderApp({ account: 'anna', url: '/settings/general' });
     await click(COMMAND);
     await confirmation();
 
@@ -158,7 +158,7 @@ describe('the emergency closing', () => {
         problem(503, 'Unavailable', 'exchange non raggiungibile, riprovare'),
       ),
     );
-    await renderApp({ account: 'anna', url: '/' });
+    await renderApp({ account: 'anna', url: '/settings/general' });
     await click(COMMAND);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

@@ -5656,6 +5656,25 @@
         "title": "ClosedPositionResponse",
         "description": "A closed position of a flow with its result (R1.7.2); amounts as text without trailing zeros (ADR 0018)."
       },
+      "ClosedPositionTotalsResponse": {
+        "properties": {
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pnl",
+          "fees"
+        ],
+        "title": "ClosedPositionTotalsResponse",
+        "description": "The PnL and the fees of every closed position of the filters, not only of the page (Bug 569)."
+      },
       "ConfigurationResponse": {
         "properties": {
           "version": {
@@ -8194,15 +8213,26 @@
               }
             ],
             "title": "Next"
+          },
+          "totals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClosedPositionTotalsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "positions",
-          "next"
+          "next",
+          "totals"
         ],
         "title": "HistoryClosedPositionsPageResponse",
-        "description": "At most 50 closed positions, newest close first; `next` is the `after` of the following page."
+        "description": "At most 50 closed positions, newest close first; `next` is the `after` of the following page. `totals` comes\nwith the first page only, null on the following ones of the same search."
       },
       "HistoryCycleResponse": {
         "properties": {
@@ -8437,15 +8467,26 @@
               }
             ],
             "title": "Next"
+          },
+          "totals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderTotalsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "orders",
-          "next"
+          "next",
+          "totals"
         ],
         "title": "HistoryOrdersPageResponse",
-        "description": "At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one."
+        "description": "At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one. `totals`\ncomes with the first page only, null on the following ones of the same search."
       },
       "Identity": {
         "properties": {
@@ -9279,6 +9320,20 @@
           "message"
         ],
         "title": "OrderResultResponse"
+      },
+      "OrderTotalsResponse": {
+        "properties": {
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fees"
+        ],
+        "title": "OrderTotalsResponse",
+        "description": "The fees of the executions of every order of the filters, not only of the page (Bug 569)."
       },
       "PositionLeftOpenResponse": {
         "properties": {

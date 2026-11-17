@@ -87,6 +87,7 @@ export const preparePagesWithLongWords = (
     editFlow: paths.editFlow.getHref(flow.id),
     notifications: paths.notifications.getHref(),
     history: paths.history.getHref(),
+    generalSettings: paths.generalSettings.getHref(),
     providerKeys: paths.providerKeys.getHref(),
     flowCycles: paths.flowCycles.getHref(flow.id),
     flowDecisions: paths.flowDecisions.getHref(flow.id),

@@ -1,5 +1,5 @@
 // ADR-chiusura-di-emergenza-nella-dashboard (R3.2.3): one feature, emergency-closing, with one command for the three
-// scopes, built on the shared confirmation; the pages of the flow, of the accounts and of the flows compose it, and no
+// scopes, built on the shared confirmation; the pages of the flow, of the accounts and «Generale» compose it, and no
 // other code calls the emergency closing of the API.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -29,8 +29,15 @@ const COMMAND = 'features/emergency-closing/components/emergency-closing-command
 const COMMAND_IMPORT = "from '@/features/emergency-closing/components/emergency-closing-command'";
 const SHARED_CONFIRMATION = "from '@/components/ui/confirmation-dialog'";
 
-/** The pages that offer the emergency closing, one per scope. */
-const PAGES = ['app/routes/app/flow.tsx', 'app/routes/app/accounts.tsx', 'app/routes/app/home.tsx'];
+/**
+ * The pages that offer the emergency closing, one per scope; every flow from «Generale» of the settings (ADR
+ * voce-generale-con-la-zona-pericolosa).
+ */
+const PAGES = [
+  'app/routes/app/flow.tsx',
+  'app/routes/app/accounts.tsx',
+  'app/routes/app/general-settings.tsx',
+];
 
 /** The files that call the emergency closing of the API outside the API of its feature. */
 const callsOutsideTheFeature = (files: readonly SourceFile[]): string[] =>

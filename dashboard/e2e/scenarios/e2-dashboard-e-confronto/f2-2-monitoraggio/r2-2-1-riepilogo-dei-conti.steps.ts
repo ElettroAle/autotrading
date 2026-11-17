@@ -4,9 +4,8 @@ import { fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then } from '../../../support/fixtures';
 
-// The header of each cell stays in the page for narrow screens, hidden on the wide one: the text is what shows.
-const expectShown = async (cell: Promise<Locator>, text: string): Promise<void> => {
-  await expect(await cell).toHaveText(text, { useInnerText: true });
+const expectShown = async (value: Locator, text: string): Promise<void> => {
+  await expect(value).toHaveText(text, { useInnerText: true });
 };
 
 Given(
@@ -44,10 +43,10 @@ Then(
     free: number,
   ) => {
     // The network carries its kind beside the name the exchange gives it (R2.3.10).
-    await expectShown(dashboard.accountCell(name, 'Rete'), `TEST · ${network}`);
-    await expectShown(dashboard.accountCell(name, 'Saldo'), `${balance} USDC`);
-    await expectShown(dashboard.accountCell(name, 'Capitale allocato'), `${allocated} USDC`);
-    await expectShown(dashboard.accountCell(name, 'Capitale libero'), `${free} USDC`);
+    await expectShown(dashboard.accountNetwork(name), `TEST · ${network}`);
+    await expectShown(dashboard.accountDetail(name, 'Saldo'), `${balance} USDC`);
+    await expectShown(dashboard.accountDetail(name, 'Capitale allocato'), `${allocated} USDC`);
+    await expectShown(dashboard.accountDetail(name, 'Capitale libero'), `${free} USDC`);
   },
 );
 
@@ -63,13 +62,13 @@ Then(
   'il conto {string} mostra {string} al posto del saldo',
   async ({ dashboard, memory }, name: string, message: string) => {
     memory.tradingAccount = name;
-    await expectShown(dashboard.accountCell(name, 'Saldo'), message);
+    await expectShown(dashboard.accountDetail(name, 'Saldo'), message);
   },
 );
 
 Then('mostra il capitale allocato {int} USDC', async ({ dashboard, memory }, allocated: number) => {
   await expectShown(
-    dashboard.accountCell(memory.tradingAccount, 'Capitale allocato'),
+    dashboard.accountDetail(memory.tradingAccount, 'Capitale allocato'),
     `${allocated} USDC`,
   );
 });

@@ -14,7 +14,16 @@ import { CycleHistoryTable } from './cycle-history-table';
 import { HistoryFilters } from './history-filters';
 import { HistoryResults } from './history-results';
 import { HistoryTabs } from './history-tabs';
+import { HistoryTotals } from './history-totals';
 import { OrderHistoryTable } from './order-history-table';
+
+type Totals = { readonly pnl?: string; readonly fees: string };
+
+// The API gives the totals of the whole search with its first page: the pages loaded after it do not change them.
+const TotalsOfSearch = ({ totals }: { readonly totals: Totals | null | undefined }) =>
+  totals === null || totals === undefined ? null : (
+    <HistoryTotals pnl={totals.pnl} fees={totals.fees} />
+  );
 
 type ResultsProps = { readonly kind: HistoryKind; readonly query: string; readonly ready: boolean };
 
@@ -34,14 +43,22 @@ const Results = ({ kind, query, ready }: ResultsProps) => {
     return (
       <HistoryResults pages={positions} waiting={!ready}>
         {(pages) => (
-          <ClosedPositionHistoryTable positions={pages.flatMap((page) => page.positions)} />
+          <>
+            <TotalsOfSearch totals={pages[0]?.totals} />
+            <ClosedPositionHistoryTable positions={pages.flatMap((page) => page.positions)} />
+          </>
         )}
       </HistoryResults>
     );
   }
   return (
     <HistoryResults pages={orders} waiting={!ready}>
-      {(pages) => <OrderHistoryTable orders={pages.flatMap((page) => page.orders)} />}
+      {(pages) => (
+        <>
+          <TotalsOfSearch totals={pages[0]?.totals} />
+          <OrderHistoryTable orders={pages.flatMap((page) => page.orders)} />
+        </>
+      )}
     </HistoryResults>
   );
 };

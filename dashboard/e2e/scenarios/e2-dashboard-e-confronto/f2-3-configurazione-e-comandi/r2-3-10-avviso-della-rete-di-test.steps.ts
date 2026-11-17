@@ -78,14 +78,14 @@ When('{string} apre i suoi conti', async ({ dashboard, memory }, account: string
 Then(
   'il conto {string} è segnato come rete di test {string}',
   async ({ dashboard }, name: string, networkName: string) => {
-    await expect(await dashboard.accountCell(name, 'Rete')).toHaveText(`TEST · ${networkName}`, {
+    await expect(dashboard.accountNetwork(name)).toHaveText(`TEST · ${networkName}`, {
       useInnerText: true,
     });
   },
 );
 
 Then('il conto {string} è segnato come rete reale', async ({ dashboard }, name: string) => {
-  await expect(await dashboard.accountCell(name, 'Rete')).toHaveText(/^REALE · /, {
+  await expect(dashboard.accountNetwork(name)).toHaveText(/^REALE · /, {
     useInnerText: true,
   });
 });

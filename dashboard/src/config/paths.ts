@@ -44,6 +44,12 @@ export const paths = {
     path: '/history',
     getHref: () => '/history',
   },
+  // The settings of the platform, not of the user, with the emergency closing of every flow (ADR
+  // voce-generale-con-la-zona-pericolosa).
+  generalSettings: {
+    path: '/settings/general',
+    getHref: () => '/settings/general',
+  },
   providerKeys: {
     path: '/provider-keys',
     getHref: () => '/provider-keys',
