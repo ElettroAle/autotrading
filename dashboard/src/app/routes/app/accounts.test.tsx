@@ -2,7 +2,7 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { FAKE_EXCHANGE, fakePlatform } from '@/testing/mocks/platform';
-import { renderApp } from '@/testing/test-utils';
+import { partsAfter, renderApp } from '@/testing/test-utils';
 
 const openAccountsFromTheMenu = async () =>
   userEvent.click(
@@ -67,5 +67,38 @@ describe('AccountsRoute', () => {
     await act(() => router.navigate('/flows/new'));
 
     expect(await screen.findByRole('option', { name: 'secondario' })).toBeInTheDocument();
+  });
+
+  // ADR zona-di-emergenza-in-fondo-alla-pagina: one command per account, each naming it, in the zone after the form.
+  it('keeps the emergency closing of each account in the zone at the bottom of the page', async () => {
+    fakePlatform.addUser('anna', { hasUserRole: true });
+    fakePlatform.addAccount('anna', 'test-1');
+    fakePlatform.addAccount('anna', 'test-2');
+    await renderApp({ account: 'anna', url: '/accounts' });
+
+    const zone = await screen.findByRole('region', { name: 'Zona di emergenza' });
+    expect(
+      within(zone)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Chiusura di emergenza del conto test-1', 'Chiusura di emergenza del conto test-2']);
+    expect(partsAfter(zone)).toEqual([]);
+  });
+
+  it('keeps the emergency closing out of the commands of the accounts', async () => {
+    fakePlatform.addUser('anna', { hasUserRole: true });
+    fakePlatform.addAccount('anna', 'test-1');
+    await renderApp({ account: 'anna', url: '/accounts' });
+
+    const table = await screen.findByRole('table', { name: 'Conti' });
+    expect(within(table).queryByRole('button', { name: /Chiusura di emergenza/ })).toBeNull();
+  });
+
+  it('has no zone without an account', async () => {
+    fakePlatform.addUser('anna', { hasUserRole: true });
+    await renderApp({ account: 'anna', url: '/accounts' });
+
+    await screen.findByText('Nessun conto registrato.');
+    expect(screen.queryByRole('region', { name: 'Zona di emergenza' })).toBeNull();
   });
 });

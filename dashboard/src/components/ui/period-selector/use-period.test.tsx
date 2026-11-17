@@ -7,6 +7,7 @@ import {
   intervalOfInstants,
   listIntervalOf,
   localInputOf,
+  PERIODS,
   usePeriod,
   usePeriodInterval,
   usePeriodSearch,
@@ -149,6 +150,44 @@ describe('listIntervalOf, ADR periodo-al-minuto', () => {
 
   it('asks from the minute 30 days before now', () => {
     expect(listIntervalOf(period('30d'), NOW)).toEqual({ from: '2026-10-17T09:30Z' });
+  });
+
+  // ADR periodi-brevi-nel-selettore-condiviso: a short period asks from the minute its length before now.
+  it.each([
+    ['30m', '2026-11-16T09:00Z'],
+    ['1h', '2026-11-16T08:30Z'],
+    ['12h', '2026-11-15T21:30Z'],
+    ['24h', '2026-11-15T09:30Z'],
+  ] as const)('asks the period %s from the minute %s', (kind, from) => {
+    expect(listIntervalOf(period(kind), NOW)).toEqual({ from });
+  });
+});
+
+// ADR periodi-brevi-nel-selettore-condiviso: one list of periods, from the shortest, the whole life the default.
+describe('the periods of the menu, ADR periodi-brevi-nel-selettore-condiviso', () => {
+  it('goes from the shortest to the range', () => {
+    expect(PERIODS.map(({ kind, label }) => [kind, label])).toEqual([
+      ['30m', '30 minuti'],
+      ['1h', '1 ora'],
+      ['12h', '12 ore'],
+      ['24h', '24 ore'],
+      ['7d', '7 giorni'],
+      ['30d', '30 giorni'],
+      ['all', 'Tutta la vita'],
+      ['range', 'Intervallo'],
+    ]);
+  });
+
+  it.each(['30m', '1h', '12h', '24h'])('reads the period %s from the address', (kind) => {
+    renderAt(`/flows/alfa?period=${kind}`);
+
+    expect(read('periodo letto')).toEqual({ kind, from: '', to: '' });
+  });
+
+  it('reads the whole life for a period the page does not know', () => {
+    renderAt('/flows/alfa?period=2h');
+
+    expect(read('periodo letto')).toEqual({ kind: 'all', from: '', to: '' });
   });
 });
 

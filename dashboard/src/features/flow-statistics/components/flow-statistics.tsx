@@ -39,8 +39,18 @@ const Statistic = ({ label, children }: { label: string; children: ReactNode }) 
   );
 };
 
-// The values are the API's: the panel formats them and computes nothing (ADR 0123).
+// The values are the API's: the panel formats them and computes nothing (ADR 0123). A short period may hold no
+// operation, and the panel says so before the values (ADR periodi-brevi-nel-selettore-condiviso).
 const StatisticsList = ({ statistics }: { statistics: Statistics }) => (
+  <>
+    {statistics.operations === 0 && (
+      <p className="mb-2 text-slate-600">Nessuna operazione nel periodo</p>
+    )}
+    <StatisticsValues statistics={statistics} />
+  </>
+);
+
+const StatisticsValues = ({ statistics }: { statistics: Statistics }) => (
   <dl>
     <Statistic label="Operazioni vinte">{statistics.won}</Statistic>
     <Statistic label="Operazioni perse">{statistics.lost}</Statistic>

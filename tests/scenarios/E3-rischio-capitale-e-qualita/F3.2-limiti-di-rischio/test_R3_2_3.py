@@ -1,7 +1,9 @@
 """R3.2.3: the emergency closing of a flow, of an account or of every flow, on the use cases of the API with the fake
 adapters (ADR chiusura-di-emergenza-per-ambito). playwright-bdd runs the confirmation of the dashboard on its build
 (ADR chiusura-di-emergenza-nella-dashboard); here the same scenario proves that the API gives the confirmation what it
-shows and closes nothing while the user chooses.
+shows and closes nothing while the user chooses. The page puts the command alone at the bottom of the page (ADR
+zona-di-emergenza-in-fondo-alla-pagina), which playwright-bdd proves; here the scenarios of the zone prove what the zone
+shows comes from the API: one scope per command, the positions it counts, and nothing closed by opening the page.
 """
 
 from dataclasses import dataclass, field, replace
@@ -19,6 +21,7 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.emergency_closing import EmergencyClosing, EmergencyScope, FlowEmergencyOutcome
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.market import Market
@@ -39,6 +42,7 @@ from tests.support.steps import quoted
 scenarios("E3-rischio-capitale-e-qualita/F3.2-limiti-di-rischio/R3.2.3-chiusura-di-emergenza.feature")
 
 STOP_PRICE = Decimal(95000)
+EMERGENCY_COMMAND = "Chiusura di emergenza"
 
 
 @dataclass
@@ -53,6 +57,8 @@ class Emergency:
     error: AutotradingError | None = None
     confirmation: str = ""
     orders_before: int = 0
+    # The commands of the zone of the page opened, each with the positions the API counts for its scope.
+    zone: dict[str, int] = field(default_factory=dict)
 
     def flow(self, name: str) -> Flow:
         owner = self.owners[name]
@@ -90,6 +96,19 @@ class Emergency:
             self.platform.orders_of(flow.tenant_id).add(_opening_order(account_id, flow, asset))
         return flow
 
+    def previewed(self, user: str, scope: EmergencyScope) -> int:
+        command = PreviewEmergencyClosingCommand(scope)
+        return self.platform.use_cases_of(user).preview_emergency_closing.execute(command).positions
+
+    def open_page(self, user: str, zone: dict[str, EmergencyScope]) -> None:
+        self.user = user
+        self.orders_before = len(self.platform.order_exchange.sent)
+        self.zone = {command: self.previewed(user, scope) for command, scope in zone.items()}
+
+    def nothing_run(self) -> bool:
+        statuses = {flow.status for flow in self.platform.flows.flows}
+        return len(self.platform.order_exchange.sent) == self.orders_before and statuses == {FlowStatus.ACTIVE}
+
     def launch(self, user: str, scope: EmergencyScope) -> None:
         self.user = user
         command = CloseInEmergencyCommand(scope, self.platform.user_id_of(user))
@@ -102,6 +121,10 @@ class Emergency:
         assert self.closing is not None, self.error
         (outcome,) = [each for each in self.closing.outcomes if each.flow_name == name]
         return outcome
+
+
+def _positions_text(positions: int) -> str:
+    return "1 posizione" if positions == 1 else f"{positions} posizioni"
 
 
 def _opening_order(account_id: UUID, flow: Flow, asset: str) -> Order:
@@ -209,6 +232,37 @@ def choose_on_account(emergency: Emergency, platform: Platform, user: str, accou
     emergency.confirmation = (
         f"Chiudere {preview.positions} posizioni dei flussi del conto {account} e metterli in pausa?"
     )
+
+
+@when(quoted('"{user}" apre nella dashboard la pagina del flusso "{name}"'))
+def open_flow_page(emergency: Emergency, user: str, name: str) -> None:
+    flow = emergency.flow(name)
+    emergency.open_page(user, {f"{EMERGENCY_COMMAND} del flusso {name}": EmergencyScope(flow_id=flow.id)})
+
+
+@when(quoted('"{user}" apre nella dashboard la pagina dei conti'))
+def open_accounts_page(emergency: Emergency, user: str) -> None:
+    accounts = emergency.platform.use_cases_of(user).list_accounts.execute()
+    emergency.open_page(
+        user,
+        {
+            f"{EMERGENCY_COMMAND} del conto {account.name.value}": EmergencyScope(account_id=account.id.value)
+            for account in accounts
+        },
+    )
+
+
+@when(quoted('"{user}" apre nella dashboard l\'elenco dei flussi'))
+def open_flows_list(emergency: Emergency, user: str) -> None:
+    emergency.open_page(user, {f"{EMERGENCY_COMMAND} di tutti i flussi": EmergencyScope()})
+
+
+@when(quoted('"{user}" sceglie la chiusura di emergenza del flusso "{name}" nel riquadro "{zone}"'))
+def choose_flow_in_zone(emergency: Emergency, user: str, name: str, zone: str) -> None:
+    assert zone == "Zona di emergenza"
+    open_flow_page(emergency, user, name)
+    positions = emergency.zone[f"{EMERGENCY_COMMAND} del flusso {name}"]
+    emergency.confirmation = f"Chiudere {_positions_text(positions)} del flusso {name} e metterlo in pausa?"
 
 
 @then(quoted('la posizione di "{name}" su "{asset}" è chiusa'))
@@ -319,6 +373,51 @@ def nothing_closed(emergency: Emergency, platform: Platform, user: str) -> None:
     assert len(platform.order_exchange.sent) == emergency.orders_before
     assert emergency.flow_position_open("alfa")
     assert emergency.flow_position_open("beta")
+
+
+@then(quoted('la chiusura di emergenza del flusso "{name}" sta nel riquadro "{zone}" in fondo alla pagina'))
+def flow_closing_in_zone(emergency: Emergency, name: str, zone: str) -> None:
+    assert zone == "Zona di emergenza"
+    assert emergency.zone == {f"{EMERGENCY_COMMAND} del flusso {name}": 1}
+
+
+@then(quoted('la chiusura di emergenza di tutti i flussi sta nel riquadro "{zone}" in fondo alla pagina'))
+def all_closing_in_zone(emergency: Emergency, zone: str) -> None:
+    assert zone == "Zona di emergenza"
+    assert emergency.zone == {f"{EMERGENCY_COMMAND} di tutti i flussi": len(emergency.owners)}
+
+
+@then(
+    quoted(
+        'il riquadro "{zone}" in fondo alla pagina contiene la chiusura di emergenza dei conti "{first}" e "{second}"'
+    )
+)
+def accounts_closing_in_zone(emergency: Emergency, zone: str, first: str, second: str) -> None:
+    assert zone == "Zona di emergenza"
+    # alfa and beta on the first account, gamma on the second (background).
+    assert emergency.zone == {f"{EMERGENCY_COMMAND} del conto {first}": 2, f"{EMERGENCY_COMMAND} del conto {second}": 1}
+
+
+@then(quoted('il riquadro "{zone}" non contiene altri comandi'))
+def zone_alone(emergency: Emergency, zone: str) -> None:
+    assert zone == "Zona di emergenza"
+    assert [command for command in emergency.zone if not command.startswith(EMERGENCY_COMMAND)] == []
+    assert len(emergency.zone) == 1
+
+
+@then(quoted('i comandi del flusso "{name}" non contengono la chiusura di emergenza'))
+def flow_commands_without_emergency(emergency: Emergency, name: str) -> None:
+    # The commands of the flow are those its status admits; the emergency closing is none of them.
+    status = emergency.flow(name).status
+    assert [action for action in FlowAction if status in action.starts_from] == [FlowAction.PAUSE, FlowAction.STOP]
+    assert emergency.nothing_run()
+
+
+@then("i comandi dei conti non contengono la chiusura di emergenza")
+def account_commands_without_emergency(emergency: Emergency) -> None:
+    # Opening the page runs no closing: only the command of the zone does, once confirmed.
+    assert emergency.nothing_run()
+    assert all(emergency.flow_position_open(name) for name in emergency.owners)
 
 
 @then("il comando viene rifiutato come flusso inesistente")

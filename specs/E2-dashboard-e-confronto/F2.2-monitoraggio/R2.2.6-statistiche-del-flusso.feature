@@ -5,9 +5,9 @@ Funzionalità: R2.2.6 Statistiche del flusso
   Voglio vedere le statistiche di un flusso
   Perché valuti la qualità della strategia oltre al rendimento
 
-  Per il periodo scelto (tutta la vita predefinita, 7 giorni, 30 giorni, intervallo libero) la dashboard
-  mostra: operazioni vinte e perse, win rate, PnL medio delle vincenti e delle perdenti, commissioni totali,
-  numero di operazioni, costo del modello IA (RF-23.05). Un'operazione è una posizione chiusa nel periodo:
+  Per il periodo scelto (30 minuti, 1 ora, 12 ore, 24 ore, 7 giorni, 30 giorni, tutta la vita predefinita,
+  intervallo libero; R6.4.6) la dashboard mostra: operazioni vinte e perse, win rate, PnL medio delle vincenti
+  e delle perdenti, commissioni totali, numero di operazioni, costo del modello IA (RF-23.05). Un'operazione è una posizione chiusa nel periodo:
   vinta con PnL netto positivo, persa con PnL netto negativo; con PnL netto nullo non è né vinta né persa,
   conta nel numero di operazioni ma non nel win rate, che è vinte su vinte più perse. Disponibile dalla
   dashboard e dall'interfaccia programmatica.

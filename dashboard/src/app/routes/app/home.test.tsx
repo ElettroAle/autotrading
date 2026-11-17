@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { fakePlatform } from '@/testing/mocks/platform';
-import { renderApp } from '@/testing/test-utils';
+import { partsAfter, renderApp } from '@/testing/test-utils';
 
 const OTHER_AREAS = ['/accounts', '/history', '/provider-keys', '/notifications'];
 
@@ -43,5 +43,20 @@ describe('HomeRoute', () => {
       .getAllByRole('link')
       .map((link) => link.getAttribute('href') ?? '');
     expect(hrefs.filter((href) => OTHER_AREAS.some((area) => href.startsWith(area)))).toEqual([]);
+  });
+
+  // ADR zona-di-emergenza-in-fondo-alla-pagina.
+  it('keeps the emergency closing of every flow alone in the zone at the bottom of the page', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    await renderApp({ account: 'anna' });
+
+    const zone = await screen.findByRole('region', { name: 'Zona di emergenza' });
+    expect(
+      within(zone)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Chiusura di emergenza di tutti i flussi']);
+    await screen.findByRole('link', { name: 'alfa' });
+    expect(partsAfter(zone)).toEqual([]);
   });
 });
