@@ -55,7 +55,6 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
-from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -506,7 +505,7 @@ def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
         create_engine("sqlite://"),
         (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({})),
         ("dev", Slippage.default(), dev_installation_on_testnet()[1]),
-        (InMemoryOutboxAdapter(), FakeMailServiceAdapter()),
+        InMemoryOutboxAdapter(),
         ({"models": FakeModelGatewayAdapter(catalog)}, FakePriceForecasterAdapter()),
     )
 

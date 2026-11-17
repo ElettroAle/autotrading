@@ -12,12 +12,13 @@ Funzionalità: R3.5.2 Notifiche via email
   Una notifica destinata all'email (R3.5.3) ha per oggetto il flusso o il conto e l'evento, e per testo lo stesso
   testo della notifica su Telegram.
   Un invio che fallisce si registra, si ritenta come le altre notifiche e non fa fallire il ciclo.
-  Se l'installazione non ha un servizio di posta configurato, il canale email non è disponibile: l'indirizzo si può
-  indicare, la dashboard avvisa che le email non partono, e la prova risponde con lo stesso avviso.
+  Le email partono dal server di posta del tenant (R3.5.5). Se il tenant non ha un server di posta, il canale email non
+  è disponibile: l'indirizzo si può indicare, la dashboard avvisa che le email non partono, e la prova risponde con lo
+  stesso avviso.
   Un'email non contiene mai credenziali.
 
   Contesto:
-    Dato che l'installazione ha un servizio di posta configurato
+    Dato che "anna" ha un server di posta configurato
     E che "anna" ha il flusso "alfa" con il canale email scelto per l'evento "pausa automatica di un flusso"
   Scenario: Indirizzo indicato
     Quando "anna" indica l'indirizzo "anna@example.com" per le notifiche
@@ -48,18 +49,18 @@ Funzionalità: R3.5.2 Notifiche via email
     Quando "anna" toglie l'indirizzo e il flusso "alfa" va in pausa
     Allora "anna@example.com" non riceve l'email
   Scenario: Invio fallito non ferma il ciclo
-    Dato che "anna" ha indicato l'indirizzo "anna@example.com" e il servizio di posta rifiuta gli invii
+    Dato che "anna" ha indicato l'indirizzo "anna@example.com" e il server di posta rifiuta gli invii
     Quando un ciclo di "alfa" produce una notifica destinata all'email
     Allora il ciclo di "alfa" si conclude
     E l'invio fallito è registrato
-  Scenario: Installazione senza servizio di posta
-    Dato che l'installazione non ha un servizio di posta configurato
+  Scenario: Tenant senza server di posta
+    Dato che "anna" non ha un server di posta configurato
     Quando "anna" apre le Impostazioni delle notifiche
-    Allora la pagina avvisa "le email non partono: servizio di posta non configurato"
-  Scenario: Prova senza servizio di posta
-    Dato che l'installazione non ha un servizio di posta configurato
+    Allora la pagina avvisa "le email non partono: server di posta non configurato"
+  Scenario: Prova senza server di posta
+    Dato che "anna" non ha un server di posta configurato
     Quando "anna" chiede un'email di prova
-    Allora la richiesta viene rifiutata con "servizio di posta non configurato"
+    Allora la richiesta viene rifiutata con "server di posta non configurato"
   Scenario: Indirizzi isolati per tenant
     Dato che "bruno" ha indicato l'indirizzo "bruno@example.com"
     Quando il flusso "alfa" di "anna" va in pausa

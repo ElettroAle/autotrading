@@ -37,17 +37,20 @@ def _opening(tmp_path: Path, content: str | None = None, **overrides: str) -> Co
 
 
 def test_the_sealers_of_a_tenant_seal_with_the_declared_key_and_version(tmp_path: Path) -> None:
-    credential_sealer, provider_key_sealer = libsodium_sealing_adapters(_sealing(tmp_path, CREDENTIALS_KEY_VERSION="3"))
+    credential_sealer, provider_key_sealer, mail_password_sealer = libsodium_sealing_adapters(
+        _sealing(tmp_path, CREDENTIALS_KEY_VERSION="3")
+    )
     tenant_id = TenantId.new()
 
     sealed = credential_sealer(tenant_id).seal(AccountId.new(), CREDENTIALS)
 
     assert sealed.key_version == 3
     assert "key_version=3" in repr(provider_key_sealer(tenant_id))
+    assert mail_password_sealer(tenant_id).seal("segreta").key_version == 3
 
 
 def test_the_key_version_is_one_unless_declared(tmp_path: Path) -> None:
-    credential_sealer, _ = libsodium_sealing_adapters(_sealing(tmp_path))
+    credential_sealer, *_ = libsodium_sealing_adapters(_sealing(tmp_path))
 
     assert credential_sealer(TenantId.new()).seal(AccountId.new(), CREDENTIALS).key_version == 1
 
@@ -74,10 +77,24 @@ def test_a_malformed_public_key_is_refused(tmp_path: Path, content: str) -> None
 
 
 def test_the_openers_hold_the_private_key_under_its_version(tmp_path: Path) -> None:
-    opener, provider_key_opener = libsodium_opening_adapters(_opening(tmp_path, CREDENTIALS_KEY_VERSION="2"))
+    opener, provider_key_opener, mail_password_opener = libsodium_opening_adapters(
+        _opening(tmp_path, CREDENTIALS_KEY_VERSION="2")
+    )
+    tenant_id = TenantId.new()
 
     assert repr(opener) == "SodiumCredentialOpenerAdapter(key_versions=[2])"
     assert "2" in repr(provider_key_opener)
+    assert repr(mail_password_opener(tenant_id)) == (
+        f"SodiumMailPasswordOpenerAdapter(tenant_id={tenant_id.value}, key_versions=[2])"
+    )
+
+
+def test_the_mail_password_sealed_by_the_api_is_opened_by_the_worker_for_the_same_tenant(tmp_path: Path) -> None:
+    *_, mail_password_sealer = libsodium_sealing_adapters(_sealing(tmp_path))
+    *_, mail_password_opener = libsodium_opening_adapters(_opening(tmp_path))
+    tenant_id = TenantId.new()
+
+    assert mail_password_opener(tenant_id).open(mail_password_sealer(tenant_id).seal("segreta")) == "segreta"
 
 
 def test_the_private_key_must_be_declared() -> None:

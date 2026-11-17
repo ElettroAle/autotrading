@@ -16,8 +16,8 @@ class NotificationEmailRequest(BaseModel):
 
 
 class NotificationEmailResponse(BaseModel):
-    """The address of the notifications by email, if any, and the warning that no email leaves when the
-    installation has no mail service (R3.5.2)."""
+    """The address of the notifications by email, if any, and the warning that no email leaves when the tenant has
+    no mail server (R3.5.2, R3.5.5)."""
 
     address: str | None
     warning: str | None
@@ -47,8 +47,9 @@ def notification_email_router(use_cases_of_request: Callable[..., TenantUseCases
     def remove_notification_email(use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> None:
         use_cases.remove_notification_email.execute()
 
-    @router.post("/test", status_code=status.HTTP_202_ACCEPTED)
+    @router.post("/test", status_code=status.HTTP_204_NO_CONTENT)
     def send_test_email(use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> None:
-        use_cases.send_test_email.execute()
+        """Sent now from the mail server of the user: the refusal of the server is the answer (R3.5.5)."""
+        use_cases.request_test_email.execute()
 
     return router

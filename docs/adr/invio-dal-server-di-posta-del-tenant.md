@@ -1,6 +1,6 @@
 # ADR invio-dal-server-di-posta-del-tenant — Invio delle email dal server di posta del tenant
 
-- Stato: proposta (17 novembre 2026)
+- Stato: accettata (17 novembre 2026, design approvato dal proprietario)
 - Requisiti: R3.5.5, Task T3.5.5.2; R3.5.2, R3.5.3
 - Collegate: ADR server-di-posta-per-tenant, ADR canale-email-delle-notifiche-con-smtp (sostituita: niente più servizio
   dell'installazione), ADR outbox-delle-integrazioni-esterne-con-procrastinate, ADR permanenza-decisa-dall-errore-base

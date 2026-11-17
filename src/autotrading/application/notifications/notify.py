@@ -5,7 +5,7 @@ from autotrading.application.notifications.errors import OutboxUnavailableError
 from autotrading.application.notifications.ports import (
     ChannelChoicePorts,
     LinkedChatRepositoryPort,
-    MailServicePort,
+    MailServerRepositoryPort,
     NotificationEmailRepositoryPort,
     OutboxPort,
 )
@@ -18,7 +18,7 @@ operations = logging.getLogger("autotrading.notifications")
 
 class NotifyUseCase:
     """Queues a notification for the channels of the tenant, and for nobody else: the linked chat (R1.8.2) and the
-    address of the notifications by email when the installation has a mail service (R3.5.2), each only when the
+    address of the notifications by email when the tenant has a mail server (R3.5.2, R3.5.5), each only when the
     channel chosen for the type of event, or the exception of its flow, reaches it (R3.5.3).
 
     Without a channel nothing is queued; the outbox delivers each message and retries a failed sending (ADR
@@ -30,13 +30,13 @@ class NotifyUseCase:
         self,
         chats: LinkedChatRepositoryPort,
         emails: NotificationEmailRepositoryPort,
-        mail_service: MailServicePort,
+        mail_servers: MailServerRepositoryPort,
         outbox: OutboxPort,
         choices: ChannelChoicePorts,
     ) -> None:
         self._chats = chats
         self._emails = emails
-        self._mail_service = mail_service
+        self._mail_servers = mail_servers
         self._outbox = outbox
         self._choices = choices
 
@@ -63,7 +63,7 @@ class NotifyUseCase:
         if chat is not None:
             messages.append(OutboxMessage.to_chat(chat, notification.text))
         email = self._emails.get() if channel.reaches_email else None
-        if email is not None and self._mail_service.is_configured():
+        if email is not None and self._mail_servers.get() is not None:
             messages.append(OutboxMessage.to_email(email, notification.title, notification.text))
         return messages
 

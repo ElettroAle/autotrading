@@ -5,6 +5,7 @@ from uuid import UUID
 from autotrading.application.notifications.ports import (
     ChannelPreferencesRepositoryPort,
     LinkedChatRepositoryPort,
+    MailServerRepositoryPort,
     NotificationEmailRepositoryPort,
     NotifiedFlowsPort,
 )
@@ -34,8 +35,11 @@ class FlowChannels:
 
 @dataclass(frozen=True, slots=True)
 class NotificationChannels:
+    """The choices of the tenant and what it misses to reach each channel, whatever it chose (R3.5.5)."""
+
     events: tuple[EventChannel, ...]
     flows: tuple[FlowChannels, ...]
+    missing_links: tuple[MissingLink, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +48,7 @@ class _Links:
 
     chat_linked: bool
     email_indicated: bool
+    mail_server_configured: bool
 
     def channels_of(self, choices: Mapping[NotificationEvent, NotificationChannel]) -> tuple[EventChannel, ...]:
         return tuple(
@@ -51,15 +56,22 @@ class _Links:
                 event,
                 channel,
                 event.of_flow,
-                channel.missing_links(chat_linked=self.chat_linked, email_indicated=self.email_indicated),
+                self.missing_for(channel),
             )
             for event, channel in choices.items()
+        )
+
+    def missing_for(self, channel: NotificationChannel) -> tuple[MissingLink, ...]:
+        return channel.missing_links(
+            chat_linked=self.chat_linked,
+            email_indicated=self.email_indicated,
+            mail_server_configured=self.mail_server_configured,
         )
 
 
 class GetNotificationChannelsUseCase:
     """The channel of every type of event and the exceptions of every flow of the tenant, with the warning of a
-    chosen channel that is not linked (R3.5.3).
+    chosen channel that is not linked (R3.5.3), and what the tenant misses to reach each channel (R3.5.5).
     """
 
     def __init__(
@@ -68,17 +80,24 @@ class GetNotificationChannelsUseCase:
         flows: NotifiedFlowsPort,
         chats: LinkedChatRepositoryPort,
         emails: NotificationEmailRepositoryPort,
+        servers: MailServerRepositoryPort,
     ) -> None:
         self._preferences = preferences
         self._flows = flows
         self._chats = chats
         self._emails = emails
+        self._servers = servers
 
     def execute(self) -> NotificationChannels:
         preferences = self._preferences.get()
-        links = _Links(chat_linked=self._chats.get() is not None, email_indicated=self._emails.get() is not None)
+        links = _Links(
+            chat_linked=self._chats.get() is not None,
+            email_indicated=self._emails.get() is not None,
+            mail_server_configured=self._servers.get() is not None,
+        )
         flows = tuple(
             FlowChannels(flow.flow_id, flow.name, links.channels_of(preferences.exceptions_of(flow.flow_id)))
             for flow in self._flows.list()
         )
-        return NotificationChannels(links.channels_of(preferences.general_choices()), flows)
+        missing = links.missing_for(NotificationChannel.BOTH)
+        return NotificationChannels(links.channels_of(preferences.general_choices()), flows, missing)

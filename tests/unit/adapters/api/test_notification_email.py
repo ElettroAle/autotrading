@@ -1,5 +1,5 @@
-"""The address of the notifications by email from the programmatic interface (R3.5.2, ADR
-canale-email-delle-notifiche-con-smtp).
+"""The address of the notifications by email and its test from the programmatic interface (R3.5.2, R3.5.5, ADR
+invio-dal-server-di-posta-del-tenant).
 """
 
 from collections.abc import Callable
@@ -15,7 +15,8 @@ from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
 Client = Callable[[str], TestClient]
-WITHOUT_ADDRESS = {"address": None, "warning": None}
+SERVER_MISSING = "le email non partono: server di posta non configurato"
+WITHOUT_ADDRESS = {"address": None, "warning": SERVER_MISSING}
 
 
 @pytest.fixture
@@ -41,8 +42,18 @@ def client_of(platform: Platform) -> Client:
     return client
 
 
-def test_an_indicated_address_reads_back_for_its_tenant_only(client_of: Client) -> None:
+def configure_server(platform: Platform, user: str) -> None:
+    platform.mail_servers.configure(platform.tenant_of(user), f"{user}@example.com")
+
+
+def ready(platform: Platform, client: TestClient, user: str) -> None:
+    configure_server(platform, user)
+    client.put("/notifications/email", json={"address": f"{user}@example.com"})
+
+
+def test_an_indicated_address_reads_back_for_its_tenant_only(platform: Platform, client_of: Client) -> None:
     anna = client_of("anna")
+    configure_server(platform, "anna")
 
     response = anna.put("/notifications/email", json={"address": " anna@example.com "})
 
@@ -69,39 +80,64 @@ def test_a_removed_address_answers_with_no_content_and_is_no_more(client_of: Cli
     assert anna.get("/notifications/email").json() == WITHOUT_ADDRESS
 
 
-def test_without_a_mail_service_the_settings_carry_the_warning(platform: Platform, client_of: Client) -> None:
-    platform.mail_service.configured = False
-
+def test_without_a_mail_server_the_settings_carry_the_warning(client_of: Client) -> None:
     body = client_of("anna").get("/notifications/email").json()
 
-    assert body == {"address": None, "warning": "le email non partono: servizio di posta non configurato"}
+    assert body == WITHOUT_ADDRESS
 
 
-def test_a_test_email_is_accepted_and_reaches_the_address(platform: Platform, client_of: Client) -> None:
+def test_a_test_email_leaves_at_once_from_the_server_of_the_user(platform: Platform, client_of: Client) -> None:
     anna = client_of("anna")
-    anna.put("/notifications/email", json={"address": "anna@example.com"})
+    ready(platform, anna, "anna")
 
     response = anna.post("/notifications/email/test")
 
-    assert response.status_code == 202
+    assert response.status_code == 204
     [email] = platform.mailer.received_by("anna@example.com")
     assert email.subject == Notification.test().title
+    assert [login.host for login in platform.mailer.sent_from("anna@example.com")] == ["smtp.example.com"]
 
 
-def test_a_test_email_without_an_address_is_a_conflict(client_of: Client) -> None:
-    response = client_of("anna").post("/notifications/email/test")
+def test_a_test_email_without_an_address_is_a_conflict(platform: Platform, client_of: Client) -> None:
+    anna = client_of("anna")
+    configure_server(platform, "anna")
+
+    response = anna.post("/notifications/email/test")
 
     assert response.status_code == 409
     assert reason_of(response) == {"detail": "nessun indirizzo email per le notifiche"}
 
 
-def test_a_test_email_without_a_mail_service_is_a_conflict(platform: Platform, client_of: Client) -> None:
-    platform.mail_service.configured = False
+def test_a_test_email_without_a_mail_server_is_a_conflict(client_of: Client) -> None:
+    anna = client_of("anna")
+    anna.put("/notifications/email", json={"address": "anna@example.com"})
 
-    response = client_of("anna").post("/notifications/email/test")
+    response = anna.post("/notifications/email/test")
 
     assert response.status_code == 409
-    assert reason_of(response) == {"detail": "servizio di posta non configurato"}
+    assert reason_of(response) == {"detail": "server di posta non configurato"}
+
+
+def test_a_login_refused_by_the_server_answers_with_its_reason(platform: Platform, client_of: Client) -> None:
+    anna = client_of("anna")
+    ready(platform, anna, "anna")
+    platform.mailer.refusing_login = True
+
+    response = anna.post("/notifications/email/test")
+
+    assert response.status_code == 400
+    assert reason_of(response) == {"detail": "il server di posta ha rifiutato l'accesso: controlla utente e password"}
+
+
+def test_an_email_the_server_does_not_take_is_unavailable(platform: Platform, client_of: Client) -> None:
+    anna = client_of("anna")
+    ready(platform, anna, "anna")
+    platform.mailer.accepting = False
+
+    response = anna.post("/notifications/email/test")
+
+    assert response.status_code == 503
+    assert reason_of(response) == {"detail": "email non consegnata"}
 
 
 def test_the_email_functions_need_a_login(platform: Platform) -> None:

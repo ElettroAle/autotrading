@@ -1,5 +1,5 @@
-"""The emails of the notifications through the mail service of the installation, against a server in memory that
-answers as smtplib does (ADR canale-email-delle-notifiche-con-smtp).
+"""The emails of the notifications through the mail server of their tenant, against a server in memory that answers as
+smtplib does (ADR invio-dal-server-di-posta-del-tenant).
 """
 
 import smtplib
@@ -11,16 +11,22 @@ from typing import ClassVar
 import pytest
 
 from autotrading.adapters.outbound.smtp import mailer
-from autotrading.adapters.outbound.smtp.mailer import (
-    SmtpDisabledMailerAdapter,
-    SmtpMailerAdapter,
-    SmtpMailServiceAdapter,
-)
-from autotrading.application.notifications.errors import EmailNotDeliveredError, MessageNotDeliveredError
+from autotrading.adapters.outbound.smtp.mailer import SmtpMailerAdapter
+from autotrading.application.notifications.errors import EmailNotDeliveredError, MailServerRefusedLoginError
 from autotrading.domain.notifications.email_address import EmailAddress
+from autotrading.domain.notifications.mail_security import MailSecurity
+from autotrading.domain.notifications.mail_server import MailServer, MailServerAddress
+from autotrading.domain.notifications.sealed_mail_password import SealedMailPassword
+from autotrading.domain.tenancy.tenant_id import TenantId
 
 ANNA = EmailAddress.parse("anna@example.com")
 SENDER = "notifiche@autotrading.example"
+PASSWORD = "PASSWORD-FAKE"  # noqa: S105 - the password of a fake mail server
+
+
+def a_server(port: int = 587, security: MailSecurity = MailSecurity.STARTTLS) -> MailServer:
+    address = MailServerAddress("smtp.example", port, security, "notifiche", SENDER)
+    return MailServer.of(TenantId.new(), address, SealedMailPassword(1, b"sealed"))
 
 
 def verifies(context: ssl.SSLContext) -> bool:
@@ -84,14 +90,14 @@ def server(monkeypatch: pytest.MonkeyPatch) -> type[InMemorySmtpServer]:
     return InMemorySmtpServer
 
 
-def sent_through(port: int, login: tuple[str, str] | None = None) -> InMemorySmtpServer:
-    SmtpMailerAdapter("smtp.example", port, SENDER, login).send(ANNA, "alfa: in pausa", "alfa: in pausa, credito")
+def sent_through(server: MailServer) -> InMemorySmtpServer:
+    SmtpMailerAdapter().send(server, PASSWORD, ANNA, "alfa: in pausa", "alfa: in pausa, credito")
     [connection] = InMemorySmtpServer.opened
     return connection
 
 
 def test_an_email_carries_sender_address_subject_and_text() -> None:
-    connection = sent_through(587)
+    connection = sent_through(a_server())
 
     [message] = connection.messages
     assert (message["From"], message["To"], message["Subject"]) == (SENDER, "anna@example.com", "alfa: in pausa")
@@ -100,11 +106,11 @@ def test_an_email_carries_sender_address_subject_and_text() -> None:
 
 def test_an_email_with_emoji_on_several_lines_keeps_subject_and_text_intact_as_plain_text() -> None:
     """ADR resa-della-notifica-per-telegram-ed-email: text/plain in UTF-8, the subject encoded by EmailMessage."""
-    subject = "\u23f8\ufe0f alfa: in pausa"
+    subject = "⏸️ alfa: in pausa"
     status = "Flusso: 312,40 USDC · PnL +12,40 USDC · nessuna posizione aperta · in pausa"
     text = f"{subject}\n\nMotivo: credito esaurito\n{status}"
 
-    SmtpMailerAdapter("smtp.example", 587, SENDER, None).send(ANNA, subject, text)
+    SmtpMailerAdapter().send(a_server(), PASSWORD, ANNA, subject, text)
 
     [connection] = InMemorySmtpServer.opened
     [message] = connection.messages
@@ -114,52 +120,56 @@ def test_an_email_with_emoji_on_several_lines_keeps_subject_and_text_intact_as_p
     assert message.get_content() == f"{text}\n"
 
 
-def test_on_the_submission_port_the_connection_is_secured_with_starttls_and_then_closed() -> None:
-    connection = sent_through(587)
+@pytest.mark.parametrize("port", [587, 25, 465])
+def test_with_starttls_the_connection_is_secured_after_connecting_whatever_the_port(port: int) -> None:
+    connection = sent_through(a_server(port, MailSecurity.STARTTLS))
 
-    assert connection.address == ("smtp.example", 587)
+    assert connection.address == ("smtp.example", port)
     assert (connection.implicit_tls, connection.secured, connection.closed) == (False, True, True)
     assert connection.timeout == mailer.TIMEOUT_SECONDS
 
 
-def test_on_port_465_the_connection_is_tls_from_the_start() -> None:
-    connection = sent_through(465)
+@pytest.mark.parametrize("port", [465, 2465])
+def test_with_tls_the_connection_is_tls_from_the_start_whatever_the_port(port: int) -> None:
+    connection = sent_through(a_server(port, MailSecurity.TLS))
 
+    assert connection.address == ("smtp.example", port)
     assert (connection.implicit_tls, connection.secured, connection.closed) == (True, False, True)
 
 
-def test_with_a_user_the_adapter_logs_in_before_sending() -> None:
-    connection = sent_through(587, ("notifiche", "PASSWORD-FAKE"))
+def test_the_adapter_logs_in_with_the_user_of_the_server_and_its_password_before_sending() -> None:
+    connection = sent_through(a_server())
 
-    assert connection.logins == [("notifiche", "PASSWORD-FAKE")]
+    assert connection.logins == [("notifiche", PASSWORD)]
     assert len(connection.messages) == 1
 
 
-def test_without_a_user_the_adapter_sends_without_logging_in() -> None:
-    assert sent_through(587).logins == []
+def test_a_login_refused_by_the_server_tells_the_user_to_check_user_and_password() -> None:
+    InMemorySmtpServer.refuse_at = "login"
+
+    with pytest.raises(MailServerRefusedLoginError) as raised:
+        SmtpMailerAdapter().send(a_server(), PASSWORD, ANNA, "s", "t")
+
+    assert str(raised.value) == "il server di posta ha rifiutato l'accesso: controlla utente e password"
+    assert isinstance(raised.value.__cause__, smtplib.SMTPAuthenticationError)
+    assert raised.value.status_code == 400
+    assert not raised.value.permanent
 
 
-@pytest.mark.parametrize("step", ["connect", "starttls", "login", "send"])
+@pytest.mark.parametrize("step", ["connect", "starttls", "send"])
 def test_a_refusal_of_the_server_is_an_email_not_delivered_that_keeps_its_cause_and_is_retried(step: str) -> None:
     InMemorySmtpServer.refuse_at = step
-    adapter = SmtpMailerAdapter("smtp.example", 587, SENDER, ("notifiche", "PASSWORD-FAKE"))
+    adapter = SmtpMailerAdapter()
 
     with pytest.raises(EmailNotDeliveredError) as raised:
-        adapter.send(ANNA, "s", "t")
+        adapter.send(a_server(), PASSWORD, ANNA, "s", "t")
 
+    assert type(raised.value) is EmailNotDeliveredError
     assert isinstance(raised.value.__cause__, (smtplib.SMTPException, OSError))
     assert not raised.value.permanent
-    assert "PASSWORD-FAKE" not in repr(adapter)
+    assert PASSWORD not in str(raised.value)
     assert all(connection.closed for connection in InMemorySmtpServer.opened)
 
 
-def test_the_disabled_mailer_fails_every_email_so_the_failure_is_recorded() -> None:
-    with pytest.raises(MessageNotDeliveredError):
-        SmtpDisabledMailerAdapter().send(ANNA, "s", "t")
-
-    assert InMemorySmtpServer.opened == []
-
-
-@pytest.mark.parametrize("configured", [True, False])
-def test_the_mail_service_tells_whether_the_installation_has_one(configured: bool) -> None:
-    assert SmtpMailServiceAdapter(configured).is_configured() is configured
+def test_the_adapter_holds_no_server_of_its_own() -> None:
+    assert repr(SmtpMailerAdapter()) == "SmtpMailerAdapter()"

@@ -62,14 +62,15 @@ def subjects_received_by(flow_cycles: FlowCycles, address: str) -> list[str]:
 # Given
 
 
-@given("che l'installazione ha un servizio di posta configurato")
-def mail_service_configured(flow_cycles: FlowCycles) -> None:
-    flow_cycles.platform.mail_service.configured = True
+@given(quoted('che "{user}" ha un server di posta configurato'))
+def mail_server_configured(flow_cycles: FlowCycles, user: str) -> None:
+    platform = flow_cycles.platform
+    platform.mail_servers.configure(platform.tenant_of(user), f"{user}@example.com")
 
 
-@given("che l'installazione non ha un servizio di posta configurato")
-def mail_service_missing(flow_cycles: FlowCycles) -> None:
-    flow_cycles.platform.mail_service.configured = False
+@given(quoted('che "{user}" non ha un server di posta configurato'))
+def mail_server_missing(flow_cycles: FlowCycles, user: str) -> None:
+    flow_cycles.platform.use_cases_of(user).remove_mail_server.execute()
 
 
 @given(quoted('che "{user}" ha il flusso "{flow}" con il canale email scelto per l\'evento "{event}"'))
@@ -84,7 +85,7 @@ def address_indicated(flow_cycles: FlowCycles, user: str, address: str) -> None:
     indicate(flow_cycles, user, address)
 
 
-@given(quoted('che "{user}" ha indicato l\'indirizzo "{address}" e il servizio di posta rifiuta gli invii'))
+@given(quoted('che "{user}" ha indicato l\'indirizzo "{address}" e il server di posta rifiuta gli invii'))
 def address_indicated_and_mail_refused(flow_cycles: FlowCycles, user: str, address: str) -> None:
     indicate(flow_cycles, user, address)
     flow_cycles.platform.mailer.accepting = False
@@ -104,7 +105,7 @@ def user_indicates(flow_cycles: FlowCycles, outcome: dict[str, object], user: st
 @when(quoted('"{user}" chiede un\'email di prova'))
 def user_asks_for_test(flow_cycles: FlowCycles, outcome: dict[str, object], user: str) -> None:
     try:
-        flow_cycles.platform.use_cases_of(user).send_test_email.execute()
+        flow_cycles.platform.use_cases_of(user).request_test_email.execute()
     except AutotradingError as error:
         outcome["refusal"] = error
 

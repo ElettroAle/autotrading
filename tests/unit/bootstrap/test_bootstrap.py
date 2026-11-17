@@ -1,5 +1,4 @@
 import base64
-from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from uuid import uuid4
@@ -12,6 +11,9 @@ from sqlalchemy import create_engine
 from autotrading import bootstrap
 from autotrading.adapters.configuration.errors import MissingConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.outbound.libsodium.composition import SealersOfTenant
+from autotrading.adapters.outbound.libsodium.mail_password_opener import SodiumMailPasswordOpenerAdapter
+from autotrading.adapters.outbound.libsodium.mail_password_sealer import SodiumMailPasswordSealerAdapter
 from autotrading.adapters.outbound.libsodium.opener import (
     InvalidPrivateCredentialsKeyError,
     SodiumCredentialOpenerAdapter,
@@ -56,7 +58,7 @@ from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
-from tests.fakes.mail_service import FakeMailServiceAdapter
+from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.accounts import an_account
@@ -86,10 +88,12 @@ def providers_of() -> tuple[dict[str, InMemoryModelCatalogAdapter], dict[str, In
     return {"models": catalog}, {"models": catalog}
 
 
-def _sealers(
-    public_key: bytes,
-) -> tuple[Callable[[TenantId], SodiumCredentialSealerAdapter], Callable[[TenantId], SodiumProviderKeySealerAdapter]]:
-    return partial(SodiumCredentialSealerAdapter, public_key, 1), partial(SodiumProviderKeySealerAdapter, public_key, 1)
+def _sealers(public_key: bytes) -> SealersOfTenant:
+    return (
+        partial(SodiumCredentialSealerAdapter, public_key, 1),
+        partial(SodiumProviderKeySealerAdapter, public_key, 1),
+        partial(SodiumMailPasswordSealerAdapter, public_key, 1),
+    )
 
 
 def test_application_exposes_configured_version_and_environment(tmp_path: Path) -> None:
@@ -203,7 +207,7 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -235,7 +239,7 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -340,9 +344,9 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     environment, hyperliquid = dev_installation_on_testnet()
     factory = worker_use_cases(
         create_engine("sqlite://"),
-        opener,
+        (opener, partial(SodiumMailPasswordOpenerAdapter, {})),
         (environment, Slippage.default(), hyperliquid),
-        (InMemoryOutboxAdapter(), FakeMailServiceAdapter()),
+        (InMemoryOutboxAdapter(), FakeMailerAdapter()),
         cycles_of_installation(opener),
     )
 
@@ -375,7 +379,7 @@ def test_the_cycle_asked_for_now_is_asked_to_the_worker_for_the_tenant(
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -400,7 +404,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -428,7 +432,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )
@@ -481,7 +485,7 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
     factory = tenant_use_cases(
         create_engine("sqlite://"),
         _sealers(public_key),
-        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        dev_installation_on_testnet(),
         worker,
         providers_of(),
     )

@@ -449,9 +449,31 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send Test Email */
+        /**
+         * Send Test Email
+         * @description Sent now from the mail server of the user: the refusal of the server is the answer (R3.5.5).
+         */
         post: operations["send_test_email_notifications_email_test_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/mail-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Mail Server */
+        get: operations["read_mail_server_notifications_mail_server_get"];
+        /** Set Mail Server */
+        put: operations["set_mail_server_notifications_mail_server_put"];
+        post?: never;
+        /** Remove Mail Server */
+        delete: operations["remove_mail_server_notifications_mail_server_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2473,6 +2495,50 @@ export interface components {
             /** Chat Id */
             chat_id: number | null;
         };
+        /**
+         * MailSecurity
+         * @description How the connection to the mail server of the tenant is protected, by the words the user reads (R3.5.5): from the
+         *     first byte, or raised on the plain connection before the login.
+         * @enum {string}
+         */
+        MailSecurity: "STARTTLS" | "TLS";
+        /**
+         * MailServerRequest
+         * @description The mail server the emails of the user leave from; a password left out keeps the saved one (R3.5.5).
+         */
+        MailServerRequest: {
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            security: components["schemas"]["MailSecurity"];
+            /** Username */
+            username: string;
+            /**
+             * Sender
+             * @default
+             */
+            sender: string;
+            /** Password */
+            password?: string | null;
+        };
+        /**
+         * MailServerResponse
+         * @description The mail server of the user: never its password, only that one is saved (ADR server-di-posta-per-tenant).
+         */
+        MailServerResponse: {
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            security: components["schemas"]["MailSecurity"];
+            /** Username */
+            username: string;
+            /** Sender */
+            sender: string;
+            /** Password Saved */
+            password_saved: boolean;
+        };
         /** ModelCatalogResponse */
         ModelCatalogResponse: {
             /** Providers */
@@ -2518,12 +2584,17 @@ export interface components {
                 [key: string]: string;
             };
         };
-        /** NotificationChannelsResponse */
+        /**
+         * NotificationChannelsResponse
+         * @description The choices of the user and, whatever they are, the warning of every channel that cannot be reached (R3.5.5).
+         */
         NotificationChannelsResponse: {
             /** Events */
             events: components["schemas"]["EventChannelResponse"][];
             /** Flows */
             flows: components["schemas"]["FlowChannelsResponse"][];
+            /** Warnings */
+            warnings: string[];
         };
         /**
          * NotificationEmailRequest
@@ -2535,8 +2606,8 @@ export interface components {
         };
         /**
          * NotificationEmailResponse
-         * @description The address of the notifications by email, if any, and the warning that no email leaves when the
-         *     installation has no mail service (R3.5.2).
+         * @description The address of the notifications by email, if any, and the warning that no email leaves when the tenant has
+         *     no mail server (R3.5.2, R3.5.5).
          */
         NotificationEmailResponse: {
             /** Address */
@@ -4012,13 +4083,80 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            202: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_mail_server_notifications_mail_server_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MailServerResponse"] | null;
                 };
+            };
+        };
+    };
+    set_mail_server_notifications_mail_server_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailServerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_mail_server_notifications_mail_server_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

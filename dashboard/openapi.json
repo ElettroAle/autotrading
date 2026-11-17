@@ -1276,15 +1276,99 @@
           "notifiche email"
         ],
         "summary": "Send Test Email",
+        "description": "Sent now from the mail server of the user: the refusal of the server is the answer (R3.5.5).",
         "operationId": "send_test_email_notifications_email_test_post",
         "responses": {
-          "202": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/mail-server": {
+      "get": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Read Mail Server",
+        "operationId": "read_mail_server_notifications_mail_server_get",
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MailServerResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Read Mail Server Notifications Mail Server Get"
+                }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Set Mail Server",
+        "operationId": "set_mail_server_notifications_mail_server_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailServerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "notifiche email"
+        ],
+        "summary": "Remove Mail Server",
+        "operationId": "remove_mail_server_notifications_mail_server_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           }
         },
         "security": [
@@ -8445,6 +8529,97 @@
         "title": "LinkedChatResponse",
         "description": "Whether the tenant has a linked chat, and which one as Telegram numbers it, for the dashboard to show it."
       },
+      "MailSecurity": {
+        "type": "string",
+        "enum": [
+          "STARTTLS",
+          "TLS"
+        ],
+        "title": "MailSecurity",
+        "description": "How the connection to the mail server of the tenant is protected, by the words the user reads (R3.5.5): from the\nfirst byte, or raised on the plain connection before the login."
+      },
+      "MailServerRequest": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "security": {
+            "$ref": "#/components/schemas/MailSecurity"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "sender": {
+            "type": "string",
+            "title": "Sender",
+            "default": ""
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "port",
+          "security",
+          "username"
+        ],
+        "title": "MailServerRequest",
+        "description": "The mail server the emails of the user leave from; a password left out keeps the saved one (R3.5.5)."
+      },
+      "MailServerResponse": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "security": {
+            "$ref": "#/components/schemas/MailSecurity"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "sender": {
+            "type": "string",
+            "title": "Sender"
+          },
+          "password_saved": {
+            "type": "boolean",
+            "title": "Password Saved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "port",
+          "security",
+          "username",
+          "sender",
+          "password_saved"
+        ],
+        "title": "MailServerResponse",
+        "description": "The mail server of the user: never its password, only that one is saved (ADR server-di-posta-per-tenant)."
+      },
       "ModelCatalogResponse": {
         "properties": {
           "providers": {
@@ -8602,14 +8777,23 @@
             },
             "type": "array",
             "title": "Flows"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
           }
         },
         "type": "object",
         "required": [
           "events",
-          "flows"
+          "flows",
+          "warnings"
         ],
-        "title": "NotificationChannelsResponse"
+        "title": "NotificationChannelsResponse",
+        "description": "The choices of the user and, whatever they are, the warning of every channel that cannot be reached (R3.5.5)."
       },
       "NotificationEmailRequest": {
         "properties": {
@@ -8656,7 +8840,7 @@
           "warning"
         ],
         "title": "NotificationEmailResponse",
-        "description": "The address of the notifications by email, if any, and the warning that no email leaves when the\ninstallation has no mail service (R3.5.2)."
+        "description": "The address of the notifications by email, if any, and the warning that no email leaves when the tenant has\nno mail server (R3.5.2, R3.5.5)."
       },
       "NotificationEvent": {
         "type": "string",

@@ -47,7 +47,6 @@ from tests.fakes.linked_chat_repository import (
     InMemoryLinkedChatRepositoryAdapter,
     LinkedChatStore,
 )
-from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.notification_email_repository import (
@@ -55,6 +54,7 @@ from tests.fakes.notification_email_repository import (
     NotificationEmailStore,
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
+from tests.support.mail_servers import MailServers
 from tests.support.notifications import channel_choices
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -72,11 +72,13 @@ class Telegram:
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
         self.emails: NotificationEmailStore = {}
-        self.mail_service = FakeMailServiceAdapter()
+        self.mail_servers = MailServers()
         self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
+        self.outbox.process(
+            DeliverOutboxMessageUseCase(self.messenger, self.mailer, self.mail_servers.access_of).execute
+        )
         self.now = NOW
         self.bot = FakeBotIdentityAdapter("autotrading_bot")
 
@@ -108,7 +110,7 @@ class Telegram:
         return NotifyUseCase(
             InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
-            self.mail_service,
+            self.mail_servers.repository(tenant_id),
             self.outbox,
             channel_choices(tenant_id),
         )

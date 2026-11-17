@@ -57,6 +57,7 @@ def test_the_notification_reaches_the_chat_whole_with_its_icon_its_values_and_th
 
 
 def test_the_test_notification_keeps_the_subject_of_its_email_on_the_way_to_the_worker(worker: Worker) -> None:
+    worker.mail_servers.configure(TENANT, "anna@example.com")
     worker.emails[TENANT] = NotificationEmail(TENANT, EmailAddress.parse("anna@example.com"))
 
     adapter_on(worker).execute(Notification.test())

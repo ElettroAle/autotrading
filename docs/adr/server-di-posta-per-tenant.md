@@ -1,6 +1,6 @@
 # ADR server-di-posta-per-tenant — Server di posta per tenant con password sigillata
 
-- Stato: proposta (17 novembre 2026)
+- Stato: accettata (17 novembre 2026, design approvato dal proprietario)
 - Requisiti: R3.5.5, Task T3.5.5.1; RF-24.01, RF-01.05
 - Collegate: ADR 0007 (credenziali cifrate nel database), ADR 0029 (chiavi dei fornitori IA), ADR
   canale-email-delle-notifiche-con-smtp (sostituita per la sola provenienza del server), ADR

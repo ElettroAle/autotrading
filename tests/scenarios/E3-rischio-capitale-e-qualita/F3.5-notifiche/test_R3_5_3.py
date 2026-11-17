@@ -116,6 +116,8 @@ def chat_and_address(flow_cycles: FlowCycles, user: str, chat: str, address: str
     code = platform.use_cases_of(user).request_link_code.execute().code
     platform.link_chat().execute(LinkChatCommand(chat_named(chat), code))
     platform.use_cases_of(user).set_notification_email.execute(SetNotificationEmailCommand(address))
+    # The emails leave from the mail server of the tenant (R3.5.5): an address without one reaches nobody.
+    platform.mail_servers.configure(platform.tenant_of(user), address)
     # The confirmation of the link is R1.8.1: the scenarios read only what the flows notify.
     platform.messenger.sent.clear()
 
