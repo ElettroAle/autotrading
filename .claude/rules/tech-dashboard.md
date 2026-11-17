@@ -82,6 +82,21 @@ dal client di `src/lib/api-client.ts`.
 - Nel compose: sola lettura, nessun segreto, porta solo su `127.0.0.1:8080`. Tailscale Serve la espone su `/dashboard`
   del nome dell'installazione (`deploy/configure-serve.sh` a ogni rilascio, `cloud-init.yaml` per le macchine nuove).
 
+## Pagine di impostazioni (UX, decisione del proprietario 17/11/2026)
+
+- Prima ciò che si usa spesso: la scelta ricorrente (es. quali eventi e su quale canale) sta nella vista predefinita;
+  il collegamento e la configurazione di un servizio, che si fanno una volta, stanno in una vista separata.
+- Il cosa separato dal come: preferenze e configurazione dei servizi in due schede (`ViewTabs`) della stessa pagina.
+- Rimando nel punto in cui serve: una preferenza che dipende da un servizio non configurato lo dice accanto alla scelta,
+  con un collegamento «Configura» alla scheda del servizio.
+- Dettagli solo quando servono: i campi tecnici di un servizio (server, porte, credenziali) si vedono solo mentre si
+  configura; poi un riassunto di una riga con i comandi Modifica e Rimuovi. Un segreto salvato non torna mai: si mostra
+  «salvata», e una modifica senza segreto conserva quello salvato.
+- Stato visibile: ogni servizio mostra in alto il proprio stato (collegato, da configurare) con icona e testo, mai solo
+  col colore. Una pagina senza nessun servizio collegato si apre sulla scheda della configurazione.
+- Una pagina di impostazioni con più servizi li mostra con la stessa forma: un riquadro per servizio; su desktop
+  affiancati, su telefono uno sotto l'altro.
+
 ## Prove
 
 - Unit test con Vitest + Testing Library accanto al modulo (`<modulo>.test.ts(x)`); l'API e l'identity provider sono i
