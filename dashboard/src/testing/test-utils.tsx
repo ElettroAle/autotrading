@@ -1,5 +1,6 @@
 import {
   loadExternalTokens,
+  PublicClientApplication,
   type INavigationClient,
   type IPublicClientApplication,
 } from '@azure/msal-browser';
@@ -24,6 +25,21 @@ const stayingNavigation: INavigationClient = {
   navigateExternal: () => Promise.resolve(false),
 };
 
+const redirectOfMsal = PublicClientApplication.prototype.acquireTokenRedirect;
+
+// A redirect leaves the page, so in the browser its promise never settles: one that settled in jsdom could do it after
+// the end of the test, on a closed jsdom (ADR redirect-dell-accesso-che-non-torna-nei-test). A test that wants another
+// redirect says so with its own spy, on the client or on every client of MSAL.
+const leavingThePageFor =
+  (client: IPublicClientApplication): IPublicClientApplication['acquireTokenRedirect'] =>
+  (request) => {
+    const redirectOfEveryClient = PublicClientApplication.prototype.acquireTokenRedirect;
+    if (redirectOfEveryClient !== redirectOfMsal) {
+      return redirectOfEveryClient.call(client, request);
+    }
+    return new Promise<void>(() => undefined);
+  };
+
 /** A client of the fake identity provider, with the account already signed in when one is given. */
 export const authClientFor = async (account?: string): Promise<IPublicClientApplication> => {
   if (account !== undefined) {
@@ -36,6 +52,7 @@ export const authClientFor = async (account?: string): Promise<IPublicClientAppl
   }
   const client = createAuthClient(FAKE_IDENTITY_PROVIDER, TEST_REDIRECT_URI);
   client.setNavigationClient(stayingNavigation);
+  client.acquireTokenRedirect = leavingThePageFor(client);
   await completeSignIn(client);
   return client;
 };
