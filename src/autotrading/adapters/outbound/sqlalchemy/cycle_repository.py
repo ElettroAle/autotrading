@@ -23,8 +23,9 @@ from autotrading.domain.flows.cycle_record import (
 )
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
+from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.flow_cost import CycleCost
-from autotrading.domain.flows.recorded_decision import DecidedCycle, RecordedDecision
+from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -186,6 +187,17 @@ class SqlAlchemyCycleRepositoryAdapter:
         with self._transaction() as connection:
             return decided_cycle_of(list(connection.execute(query).mappings()))
 
+    def decisions_matching(
+        self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow, offset: int, limit: int
+    ) -> list[DatedDecision]:
+        query = decisions_statement(flow_id, criteria, window).offset(offset).limit(limit)
+        with self._transaction() as connection:
+            return dated_decisions_of(list(connection.execute(query).mappings()))
+
+    def decisions_count(self, flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> int:
+        with self._transaction() as connection:
+            return connection.execute(decision_count_statement(flow_id, criteria, window)).scalar_one()
+
     @contextmanager
     def _transaction(self) -> Iterator[Connection]:
         with self._engine.begin() as connection:
@@ -209,6 +221,41 @@ def consecutive_failures_statement(flow_id: UUID) -> Select[int]:
         or_(last_completed.is_(None), cycles.c.planned_at > last_completed),
         or_(anchor.is_(None), cycles.c.planned_at >= anchor),
     )
+
+
+def decisions_statement(flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> Select[tuple[object, ...]]:
+    """The decisions of the completed cycles of the flow that match, newest first and then by asset (R6.5.5)."""
+    return (
+        select(cycle_decisions)
+        .join(cycles, _of_the_cycle())
+        .where(_decisions_of(flow_id, criteria, window))
+        .order_by(cycle_decisions.c.planned_at.desc(), cycle_decisions.c.asset, cycle_decisions.c.position)
+    )
+
+
+def decision_count_statement(flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> Select[int]:
+    """How many decisions of the completed cycles of the flow match (R6.5.5)."""
+    return (
+        select(func.count())
+        .select_from(cycle_decisions.join(cycles, _of_the_cycle()))
+        .where(_decisions_of(flow_id, criteria, window))
+    )
+
+
+def _decisions_of(flow_id: UUID, criteria: DecisionFilter, window: TimeWindow) -> ColumnElement[bool]:
+    # Only a completed cycle has decisions the history shows: a cycle failed after deciding did not act on them.
+    condition = (
+        (cycle_decisions.c.flow_id == flow_id)
+        & (cycles.c.outcome == COMPLETED)
+        & within(cycle_decisions.c.planned_at, window)
+    )
+    if criteria.asset is not None:
+        condition = condition & (cycle_decisions.c.asset == criteria.asset)
+    if criteria.action is not None:
+        condition = condition & (cycle_decisions.c.action == criteria.action.value)
+    if criteria.direction is not None:
+        condition = condition & (cycle_decisions.c.direction == criteria.direction.value)
+    return condition
 
 
 def matching(criteria: CycleFilter) -> ColumnElement[bool]:
@@ -279,6 +326,12 @@ def decided_cycle_of(columns: Sequence[RowMapping | Mapping[str, object]]) -> De
     if not rows:
         return None
     return DecidedCycle(rows[0]["planned_at"], tuple(_decision_of(row) for row in rows))
+
+
+def dated_decisions_of(columns: Sequence[RowMapping | Mapping[str, object]]) -> list[DatedDecision]:
+    """The saved decisions in their order, each with the planned instant of its cycle."""
+    rows = [cast("_DecisionRow", row) for row in columns]
+    return [DatedDecision(row["planned_at"], _decision_of(row)) for row in rows]
 
 
 def _decision_of(row: _DecisionRow) -> RecordedDecision:

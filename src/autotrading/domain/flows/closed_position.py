@@ -28,6 +28,16 @@ class CloseReason(StrEnum):
     CASH_OUT = "incasso"
     # Every flow of the scope closes and pauses at once (R3.2.3).
     EMERGENCY = "chiusura di emergenza"
+    # The exchange closed the position for lack of margin, as its execution says: told as such (R3.5.1), while the
+    # history keeps it as a closing outside the platform (R1.7.2).
+    LIQUIDATION = "liquidazione"
+
+    @property
+    def told_on_its_own(self) -> bool:
+        """Whether the closing is told to the user by itself: the closings of an emergency are told all together by the
+        notification of the emergency closing (R3.5.1).
+        """
+        return self is not CloseReason.EMERGENCY
 
 
 @dataclass(frozen=True, slots=True)

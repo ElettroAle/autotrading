@@ -6,7 +6,7 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.application.notifications.link_chat import HOW_TO_LINK, INVALID_CODE, LINKED
 from autotrading.application.notifications.request_link_code import IssuedLinkCode
 from autotrading.domain.notifications.notification import Notification
-from tests.support.notifications import chat_named
+from tests.support.notifications import chat_named, told
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
@@ -165,6 +165,12 @@ def no_more_notifications(platform: Platform, chat: str, user: str) -> None:
     platform.worker_for(platform.tenant_of(user)).notify.execute(Notification.cycle_failed("alfa", "timeout"))
 
     assert len(platform.messenger.received_by(chat_named(chat))) == before
+
+
+@then(quoted('il bot invia alla chat "{chat}" la notifica "{title}" con le righe "{values}"'))
+def bot_sends_notification(platform: Platform, chat: str, title: str, values: str) -> None:
+    [*_, last] = platform.messenger.received_by(chat_named(chat))
+    assert told(last, title, values), last
 
 
 @then(quoted('il bot invia alla chat "{chat}" "{text}"'))

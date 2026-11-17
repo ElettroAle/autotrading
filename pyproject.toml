@@ -184,6 +184,7 @@ modules = [
     "autotrading.adapters.outbound.litellm",
     "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.openrouter",
+    "autotrading.adapters.outbound.smtp",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",
 ]

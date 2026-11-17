@@ -48,6 +48,22 @@ def test_a_message_is_sent_to_the_chat_with_the_bot_token_in_the_path() -> None:
     assert json.loads(request.content) == {"chat_id": 42, "text": "alfa: ciclo fallito, timeout"}
 
 
+def test_a_text_on_several_lines_with_emoji_reaches_telegram_intact_as_plain_text() -> None:
+    """ADR resa-della-notifica-per-telegram-ed-email: no parse_mode, the text of the domain as it is."""
+    requests: list[httpx.Request] = []
+    status = "Flusso: 312,40 USDC · PnL +12,40 USDC · 2 posizioni aperte · attivo"
+    text = f"\U0001f7e2 alfa: posizione aperta\n\nAsset: BTC\n{status}"
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    TelegramMessengerAdapter(client_answering(answer)).send(ChatId(42), text)
+
+    [request] = requests
+    assert json.loads(request.content) == {"chat_id": 42, "text": text}
+
+
 @pytest.mark.parametrize("answer", [refusing, lambda _: httpx.Response(403, json={"ok": False})])
 def test_a_message_telegram_does_not_take_is_not_delivered_and_never_shows_the_token(
     answer: Callable[[httpx.Request], httpx.Response],

@@ -39,7 +39,10 @@ from autotrading.application.flows.record_protection_closing import RecordProtec
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
+from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
@@ -193,8 +196,9 @@ class FlowCycles:
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         exit_plans = InMemoryExitPlanRepositoryAdapter(platform.exit_plans, tenant_id)
         notify = platform.worker_for(tenant_id).notify
+        notify_flow = NotifyFlowEventUseCase(notify, platform.flow_status)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
-        closing_notice = NotifyPositionClosedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        closing_notice = NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         protections = InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
         protection_exchanges = {HYPERLIQUID: platform.protection_exchange}
@@ -256,8 +260,8 @@ class FlowCycles:
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
-                NotifyOrderRejectedUseCase(notify),
-                NotifyPositionOpenedUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                NotifyOrderRejectedUseCase(notify_flow),
+                NotifyPositionOpenedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
                 RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
@@ -283,8 +287,8 @@ class FlowCycles:
             openings=openings,
             closed_positions=closed_positions,
             follow_flow_orders=follow_flow_orders,
-            flow_paused_notice=NotifyFlowPausedUseCase(notify),
-            cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
+            flow_paused_notice=NotifyFlowPausedUseCase(notify_flow),
+            cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify_flow)),
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
             checkpoints=self.checkpoints,
@@ -292,7 +296,9 @@ class FlowCycles:
             consecutive_failures=InMemoryConsecutiveFailuresAdapter(self.records, platform.flows),
             openings_suspensions=InMemoryOpeningsSuspensionAdapter(platform.flows, tenant_id),
             loss_references=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
-            openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify),
+            openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify_flow),
+            opening_reduced_notice=NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
+            opening_blocked_notice=NotifyOpeningBlockedUseCase(notify_flow),
         )
 
     def services(self) -> CycleServices:

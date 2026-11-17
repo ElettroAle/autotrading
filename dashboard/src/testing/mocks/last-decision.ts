@@ -6,14 +6,14 @@ import { STEPS, type FakeCycle, type FakeDecision } from './cycles';
  */
 
 const OPENING = 'apri';
-const COMPLETED = 'concluso';
+export const COMPLETED = 'concluso';
 
-const decisionsOf = (cycle: FakeCycle): FakeDecision[] => {
+export const decisionsOf = (cycle: FakeCycle): FakeDecision[] => {
   const document = cycle.documents.find((each) => each.step === STEPS.agentDecision);
   return (document?.content.decisioni as FakeDecision[] | undefined) ?? [];
 };
 
-const decisionResponse = (decision: FakeDecision) => ({
+export const decisionResponse = (decision: FakeDecision) => ({
   asset: decision.asset,
   action: decision.action,
   direction: decision.action === OPENING ? (decision.opening?.direction ?? null) : null,

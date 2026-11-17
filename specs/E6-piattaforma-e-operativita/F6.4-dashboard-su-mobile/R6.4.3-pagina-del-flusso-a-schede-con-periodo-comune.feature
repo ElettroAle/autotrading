@@ -6,9 +6,10 @@ Funzionalità: R6.4.3 Pagina del flusso a schede con periodo comune
   Perché nessun filtro agisce di nascosto su una parte che non sto guardando
 
   La pagina del flusso ha, in quest'ordine: nome, stato con i comandi di stato (Avvia, Pausa, Riprendi, Stop) e
-  avviso della rete; il periodo; le schede Panoramica, Posizioni chiuse e Cicli; il contenuto della scheda scelta.
-  Il periodo sta sopra le schede e vale per tutte: Panoramica (riepilogo R6.4.2, equity curve, statistiche,
-  posizioni aperte attuali), Posizioni chiuse e Cicli. Le posizioni aperte sono quelle attuali e lo dicono. Il
+  avviso della rete; il periodo; le schede Panoramica, Posizioni chiuse, Cicli e Decisioni; il contenuto della scheda
+  scelta. Il periodo sta sopra le schede e vale per tutte: Panoramica (riepilogo R6.4.2, equity curve, statistiche,
+  posizioni aperte attuali), Posizioni chiuse, Cicli e Decisioni (R6.5.5). Le posizioni aperte sono quelle attuali e
+  lo dicono. Il
   periodo si sceglie dal menu (R2.2.8) oppure trascinando sull'equity curve da un istante a un altro, anche col
   dito, al minuto; un intervallo scelto così compare come etichetta "… – …" con data e ora di inizio e fine e il
   comando per toglierlo. Periodo,

@@ -12,11 +12,12 @@ from sqlalchemy import Engine, create_engine
 from autotrading import bootstrap
 from autotrading.adapters.inbound.api.worker import BotPolling, OutboxProcessing, WorkerLoops, WorkerUseCases
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
+from autotrading.adapters.outbound.smtp.mailer import SmtpMailServiceAdapter
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import SqlAlchemyLinkCodeRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import SqlAlchemyLinkedChatRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.outbox import SqlAlchemyOutboxAdapter
 from autotrading.adapters.outbound.telegram.bot_api import TelegramInboxAdapter, TelegramMessengerAdapter
-from autotrading.application.notifications.ports import BotInboxPort, MessengerPort, OutboxPort
+from autotrading.application.notifications.ports import BotInboxPort, MailServicePort, MessengerPort, OutboxPort
 from autotrading.bootstrap import (
     create_worker_application,
     link_stores_for,
@@ -26,19 +27,27 @@ from autotrading.bootstrap import (
 )
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.installation import cycles_of_installation, dev_installation_on_testnet, worker_configuration
 
 FAKE_BOT = "BOT-FAKE_BOT-FAKE"
 DISABLED = "bot Telegram non configurato: notifiche disattivate"
+MAIL_DISABLED = "servizio di posta non configurato: email disattivate"
+# A mail service in the configuration keeps its warning out of the tests of the bot.
+MAIL_SERVICE = {"SMTP_HOST": "smtp.example", "SMTP_SENDER": "notifiche@autotrading.example"}
 
 
 def factory(engine: Engine, outbox: OutboxPort) -> Callable[[TenantId], WorkerUseCases]:
     opener = SodiumCredentialOpenerAdapter({})
     environment, hyperliquid = dev_installation_on_testnet()
     return worker_use_cases(
-        engine, opener, (environment, Slippage.default(), hyperliquid), outbox, cycles_of_installation(opener)
+        engine,
+        opener,
+        (environment, Slippage.default(), hyperliquid),
+        (outbox, FakeMailServiceAdapter()),
+        cycles_of_installation(opener),
     )
 
 
@@ -57,7 +66,9 @@ def test_without_the_bot_token_the_worker_starts_with_notifications_off(
     settings = {"missing": str(tmp_path / "absent"), "empty": token_file(tmp_path, " \n"), "": ""}
 
     with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
-        create_worker_application(worker_configuration(tmp_path, **{"TELEGRAM_BOT_TOKEN_FILE": settings[location]}))
+        create_worker_application(
+            worker_configuration(tmp_path, **MAIL_SERVICE, **{"TELEGRAM_BOT_TOKEN_FILE": settings[location]})
+        )
 
     assert started == []
     assert [record.getMessage() for record in caplog.records] == [DISABLED]
@@ -66,24 +77,45 @@ def test_without_the_bot_token_the_worker_starts_with_notifications_off(
 def test_with_the_bot_token_the_worker_runs_the_bot_on_the_bot_api(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    started: list[tuple[BotInboxPort, MessengerPort, OutboxPort]] = []
+    started: list[tuple[BotInboxPort, MessengerPort, tuple[OutboxPort, MailServicePort]]] = []
 
-    def start(_engine: object, inbox: BotInboxPort, messenger: MessengerPort, outbox: OutboxPort) -> BotPolling:
-        started.append((inbox, messenger, outbox))
+    def start(
+        _engine: object,
+        inbox: BotInboxPort,
+        messenger: MessengerPort,
+        notifications: tuple[OutboxPort, MailServicePort],
+    ) -> BotPolling:
+        started.append((inbox, messenger, notifications))
         return BotPolling(lambda: None)
 
     monkeypatch.setattr(bootstrap, "telegram_bot", start)
 
     with caplog.at_level(logging.WARNING, logger="autotrading.bootstrap"):
         create_worker_application(
-            worker_configuration(tmp_path, **{"TELEGRAM_BOT_TOKEN_FILE": token_file(tmp_path, FAKE_BOT)})
+            worker_configuration(
+                tmp_path, **MAIL_SERVICE, **{"TELEGRAM_BOT_TOKEN_FILE": token_file(tmp_path, FAKE_BOT)}
+            )
         )
 
-    [(inbox, messenger, outbox)] = started
+    [(inbox, messenger, (outbox, mail_service))] = started
     assert isinstance(inbox, TelegramInboxAdapter)
     assert isinstance(messenger, TelegramMessengerAdapter)
     assert isinstance(outbox, SqlAlchemyOutboxAdapter)
+    assert isinstance(mail_service, SmtpMailServiceAdapter)
     assert caplog.records == []
+
+
+def test_without_a_mail_service_the_worker_starts_with_the_emails_off(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    composed: list[tuple[object, ...]] = []
+    monkeypatch.setattr(bootstrap, "worker_api_adapters", lambda *arguments: composed.append(arguments))
+
+    with caplog.at_level(logging.WARNING, logger="autotrading.notifications"):
+        create_worker_application(worker_configuration(tmp_path))
+
+    assert MAIL_DISABLED in [record.getMessage() for record in caplog.records]
+    assert len(composed) == 1
 
 
 def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
@@ -96,7 +128,9 @@ def test_the_bot_polls_telegram_and_answers_on_the_messenger() -> None:
 
     client = httpx.Client(base_url=f"https://api.telegram.org/bot{FAKE_BOT}", transport=httpx.MockTransport(answer))
     inbox = TelegramInboxAdapter(client)
-    bot = telegram_bot(create_engine("sqlite://"), inbox, FakeMessengerAdapter(), InMemoryOutboxAdapter())
+    bot = telegram_bot(
+        create_engine("sqlite://"), inbox, FakeMessengerAdapter(), (InMemoryOutboxAdapter(), FakeMailServiceAdapter())
+    )
 
     bot.run(polled)
 
@@ -113,7 +147,8 @@ def test_the_link_stores_and_the_notifications_are_bound_to_the_tenant() -> None
     assert isinstance(stores.codes, SqlAlchemyLinkCodeRepositoryAdapter)
     assert isinstance(stores.chats, SqlAlchemyLinkedChatRepositoryAdapter)
     assert worker(tenant).notify is not worker(tenant).notify
-    assert notify_for(engine, outbox, tenant) is not notify_for(engine, outbox, tenant)
+    notifications = (outbox, FakeMailServiceAdapter())
+    assert notify_for(engine, notifications, tenant) is not notify_for(engine, notifications, tenant)
 
 
 def test_the_worker_delivers_the_outbox_in_the_background(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

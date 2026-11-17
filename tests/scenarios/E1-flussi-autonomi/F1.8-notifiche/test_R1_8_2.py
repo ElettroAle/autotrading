@@ -21,7 +21,7 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.cycles import FakeTransientError
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import FlowCycles
-from tests.support.notifications import chat_named
+from tests.support.notifications import chat_named, told_in
 from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 
@@ -194,17 +194,19 @@ def unattributable_position(flow_cycles: FlowCycles, flow: str, asset: str) -> N
 # Then
 
 
-@then(quoted('la chat "{chat}" riceve una notifica che contiene "{text}"'))
-def chat_receives(flow_cycles: FlowCycles, notified: dict[str, str], chat: str, text: str) -> None:
-    notified["text"] = text
+@then(quoted('la chat "{chat}" riceve una notifica "{title}" con le righe "{values}"'))
+def chat_receives(flow_cycles: FlowCycles, notified: dict[str, str], chat: str, title: str, values: str) -> None:
+    notified["title"] = title
     received = flow_cycles.platform.messenger.received_by(chat_named(chat))
-    assert any(text in message for message in received), received
+    assert told_in(received, title, values), received
 
 
-@then(quoted('la chat "{chat}" riceve una sola notifica che contiene "{text}"'))
-def chat_receives_once(flow_cycles: FlowCycles, chat: str, text: str) -> None:
+@then(quoted('la chat "{chat}" riceve una sola notifica "{title}" con le righe "{values}"'))
+def chat_receives_once(flow_cycles: FlowCycles, chat: str, title: str, values: str) -> None:
     received = flow_cycles.platform.messenger.received_by(chat_named(chat))
-    assert [message for message in received if "chiusa" in message] == [text], received
+    closings = [message for message in received if "chiusa" in message.splitlines()[0]]
+    assert len(closings) == 1, received
+    assert told_in(closings, title, values), closings
 
 
 @then(quoted('lo storico del flusso "{flow}" contiene la posizione su "{asset}" con PnL {pnl} USDC'))
@@ -218,7 +220,7 @@ def history_with_pnl(flow_cycles: FlowCycles, flow: str, asset: str, pnl: str) -
 @then(quoted('la chat "{chat}" non riceve la notifica'))
 def chat_does_not_receive(flow_cycles: FlowCycles, notified: dict[str, str], chat: str) -> None:
     received = flow_cycles.platform.messenger.received_by(chat_named(chat))
-    assert not any(notified["text"] in message for message in received)
+    assert not any(notified["title"] in message for message in received)
     assert received == []
 
 

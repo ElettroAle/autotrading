@@ -82,7 +82,7 @@ Funzionalità: R1.8.1 Collegamento di Telegram
   Scenario: Prova dalla chat collegata
     Dato che la chat "chat-anna" è collegata al tenant di "anna"
     Quando la chat "chat-anna" invia "/prova" al bot
-    Allora il bot invia alla chat "chat-anna" "notifica di prova: le notifiche dei tuoi flussi arrivano qui"
+    Allora il bot invia alla chat "chat-anna" la notifica "🔔 AutoTrading: prova delle notifiche" con le righe "Esito: le notifiche dei tuoi flussi arrivano qui"
 
   Scenario: Prova da una chat non collegata
     Quando la chat "chat-x" invia "/prova" al bot

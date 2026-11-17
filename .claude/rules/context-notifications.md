@@ -7,7 +7,7 @@ paths:
 
 # Contesto notifications
 
-Le notifiche all'utente su Telegram.
+Le notifiche all'utente su Telegram e via email (R3.5.2), sui canali scelti per tipo di evento (R3.5.3).
 
 ## Glossario
 
@@ -21,8 +21,11 @@ Le notifiche all'utente su Telegram.
 
 - Un solo bot della piattaforma, in long polling: nessuna porta in ingresso. Il token del bot è un file
   montato in sola lettura, mai una variabile d'ambiente.
-- Una notifica va solo alla chat collegata al tenant e non contiene mai credenziali.
-- Un invio che fallisce si registra e non fa fallire il ciclo. Senza chat collegata non si invia nulla.
+- Una notifica va solo ai canali del tenant (la chat collegata e l'indirizzo email delle notifiche) che il canale
+  scelto per il suo tipo di evento, o l'eccezione del suo flusso, raggiunge; non contiene mai credenziali (ADR
+  canale-email-delle-notifiche-con-smtp, ADR canali-delle-notifiche-per-tipo-di-evento).
+- Un invio che fallisce si registra e non fa fallire il ciclo. Senza un canale collegato e scelto non si invia nulla;
+  l'email parte solo se l'installazione ha un servizio di posta.
 - La risposta a un codice scaduto, già usato o inesistente è la stessa e non rivela se il codice è esistito.
 - Il codice si salva solo come digest; il bot trova il tenant dal digest e riscatta il codice con le porte
   legate a quel tenant. Il bot gira nel worker; senza token le notifiche sono disattivate, mai un errore

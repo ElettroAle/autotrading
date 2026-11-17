@@ -48,6 +48,7 @@ from autotrading.application.flows.list_account_operations import ListAccountOpe
 from autotrading.application.flows.list_capital_changes import ListCapitalChangesUseCase
 from autotrading.application.flows.list_closed_positions import ListClosedPositionsUseCase
 from autotrading.application.flows.list_cycles import ListCyclesUseCase
+from autotrading.application.flows.list_decisions import ListDecisionsUseCase
 from autotrading.application.flows.list_emergency_flows import ListEmergencyFlowsUseCase
 from autotrading.application.flows.list_flow_operations import ListFlowOperationsUseCase
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsUseCase
@@ -64,6 +65,7 @@ from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
+    DecisionHistoryPort,
     EmergencyClosingLogPort,
     EquitySnapshotRepositoryPort,
     ExitPlanRepositoryPort,
@@ -105,17 +107,36 @@ from autotrading.application.flows.remove_account_with_flows import RemoveAccoun
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase
+from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
+from autotrading.application.notifications.get_notification_channels import GetNotificationChannelsUseCase
+from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
+from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
+from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.ports import (
     BotStartLinkPort,
+    ChannelPreferencesRepositoryPort,
+    FlowStatusPort,
     LinkCodeRepositoryPort,
     LinkedChatRepositoryPort,
+    MailServicePort,
+    NotificationEmailRepositoryPort,
+    NotifiedFlowsPort,
     NotifierPort,
+    OutboxPort,
 )
+from autotrading.application.notifications.remove_flow_channel_exception import (
+    RemoveFlowChannelExceptionUseCase,
+)
+from autotrading.application.notifications.remove_notification_email import RemoveNotificationEmailUseCase
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
 from autotrading.application.notifications.send_linked_chat_test_notification import (
     SendLinkedChatTestNotificationUseCase,
 )
+from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
+from autotrading.application.notifications.set_flow_channel_exception import SetFlowChannelExceptionUseCase
+from autotrading.application.notifications.set_notification_email import SetNotificationEmailUseCase
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import ManualClosingRecorderPort, PositionClosingPort
@@ -160,10 +181,17 @@ class TenantPorts:
     bot_identity: BotStartLinkPort
     linked_chats: LinkedChatRepositoryPort
     notifier: NotifierPort
+    flow_status: FlowStatusPort
+    notification_emails: NotificationEmailRepositoryPort
+    mail_service: MailServicePort
+    outbox: OutboxPort
+    channel_preferences: ChannelPreferencesRepositoryPort
+    notified_flows: NotifiedFlowsPort
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
     exit_plans: ExitPlanRepositoryPort
     cycle_history: CycleHistoryPort
+    decision_history: DecisionHistoryPort
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     equity_snapshots: EquitySnapshotRepositoryPort
@@ -211,6 +239,14 @@ class TenantUseCases:
     get_linked_chat: GetLinkedChatUseCase
     unlink_chat: UnlinkChatUseCase
     send_test_notification: SendLinkedChatTestNotificationUseCase
+    get_notification_email: GetNotificationEmailUseCase
+    set_notification_email: SetNotificationEmailUseCase
+    remove_notification_email: RemoveNotificationEmailUseCase
+    send_test_email: SendTestEmailUseCase
+    get_notification_channels: GetNotificationChannelsUseCase
+    choose_notification_channel: ChooseNotificationChannelUseCase
+    set_flow_channel_exception: SetFlowChannelExceptionUseCase
+    remove_flow_channel_exception: RemoveFlowChannelExceptionUseCase
     modify_flow: ModifyFlowUseCase
     get_flow_version: GetFlowVersionUseCase
     list_flow_versions: ListFlowVersionsUseCase
@@ -231,6 +267,7 @@ class TenantUseCases:
     read_cycle: ReadCycleUseCase
     read_last_decision: ReadLastDecisionUseCase
     request_on_demand_cycle: RequestOnDemandCycleUseCase
+    list_decisions: ListDecisionsUseCase
     read_flow_cost: ReadFlowCostUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
     read_forecast_accuracy: ReadForecastAccuracyUseCase
@@ -297,6 +334,16 @@ class TenantUseCases:
             get_linked_chat=GetLinkedChatUseCase(ports.linked_chats),
             unlink_chat=UnlinkChatUseCase(ports.linked_chats),
             send_test_notification=SendLinkedChatTestNotificationUseCase(ports.linked_chats, ports.notifier),
+            get_notification_email=GetNotificationEmailUseCase(ports.notification_emails, ports.mail_service),
+            set_notification_email=SetNotificationEmailUseCase(tenant_id, ports.notification_emails),
+            remove_notification_email=RemoveNotificationEmailUseCase(ports.notification_emails),
+            send_test_email=SendTestEmailUseCase(ports.notification_emails, ports.mail_service, ports.outbox),
+            get_notification_channels=GetNotificationChannelsUseCase(
+                ports.channel_preferences, ports.notified_flows, ports.linked_chats, ports.notification_emails
+            ),
+            choose_notification_channel=ChooseNotificationChannelUseCase(ports.channel_preferences),
+            set_flow_channel_exception=SetFlowChannelExceptionUseCase(ports.channel_preferences, ports.notified_flows),
+            remove_flow_channel_exception=RemoveFlowChannelExceptionUseCase(ports.channel_preferences),
             modify_flow=ModifyFlowUseCase(ports.flows, ports.flow_checks, ports.account_activity),
             get_flow_version=GetFlowVersionUseCase(ports.flows),
             list_flow_versions=ListFlowVersionsUseCase(ports.flows),
@@ -313,6 +360,9 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.ledger_recording,
                     ports.clock,
+                    NotifyCashOutDoneUseCase(
+                        NotifyFlowEventUseCase(ports.notifier, ports.flow_status), ports.settlement_currency
+                    ),
                 ),
             ),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
@@ -334,6 +384,7 @@ class TenantUseCases:
             read_cycle=ReadCycleUseCase(ports.flow_directory, ports.cycle_history),
             read_last_decision=ReadLastDecisionUseCase(ports.flow_directory, ports.cycle_history),
             request_on_demand_cycle=RequestOnDemandCycleUseCase(ports.flows, ports.on_demand_cycles),
+            list_decisions=ListDecisionsUseCase(ports.flow_directory, ports.decision_history, ports.clock),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_statistics=ReadFlowStatisticsUseCase(
                 ports.flows, ports.closed_positions, ports.cycle_history, ports.clock
@@ -384,6 +435,7 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.emergency_closings,
                     ports.clock,
+                    NotifyEmergencyClosingDoneUseCase(ports.notifier),
                 ),
             ),
             preview_emergency_closing=PreviewEmergencyClosingUseCase(

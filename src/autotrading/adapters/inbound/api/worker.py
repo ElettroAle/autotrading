@@ -44,7 +44,9 @@ from autotrading.application.verification.run_exchange_verification import (
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.statistics_period import TimeWindow
-from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.flow_status import FlowStatusLine
+from autotrading.domain.notifications.notification import Notification, NotificationLine
+from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -97,10 +99,28 @@ class VerificationRequest(UserRequest):
     amount: Decimal | None = Field(default=None, gt=0)
 
 
+class NotificationLineRequest(BaseModel):
+    label: str
+    value: str
+
+
 class NotificationRequest(BaseModel):
-    # Built by the API from its own events: the worker only delivers it to the chat of the tenant.
+    """Built by the API from its own events: the worker only delivers it to the channels of the tenant, as it is (ADR
+    notifica-strutturata-con-icona-titolo-e-valori).
+    """
+
     subject: str
-    event: str
+    headline: str
+    icon: str
+    lines: list[NotificationLineRequest] = Field(default_factory=list)
+    flow_status: str | None = None
+    # The type of the event; none for the test notification (R3.5.1).
+    event: NotificationEvent | None = None
+
+    def notification(self) -> Notification:
+        lines = tuple(NotificationLine(line.label, line.value) for line in self.lines)
+        status = None if self.flow_status is None else FlowStatusLine(self.flow_status)
+        return Notification(self.subject, self.headline, lines, self.event, self.icon, status)
 
 
 class BotPolling:
@@ -283,7 +303,7 @@ def create_worker_api(
 
     @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])
     def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:
-        for_tenant(TenantId(tenant_id)).notify.execute(Notification(request.subject, request.event))
+        for_tenant(TenantId(tenant_id)).notify.execute(request.notification())
         return {"status": "ok"}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])

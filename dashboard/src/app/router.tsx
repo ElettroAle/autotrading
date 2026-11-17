@@ -9,6 +9,7 @@ import { ClosedPositionsRoute } from './routes/app/closed-positions';
 import { ComparisonRoute } from './routes/app/comparison';
 import { CycleRoute } from './routes/app/cycle';
 import { CyclesRoute } from './routes/app/cycles';
+import { DecisionsRoute } from './routes/app/decisions';
 import { EditFlowRoute } from './routes/app/edit-flow';
 import { FlowRoute } from './routes/app/flow';
 import { FlowCapitalRoute } from './routes/app/flow-capital';
@@ -47,6 +48,7 @@ export const routes: RouteObject[] = [
           { index: true, element: <FlowOverviewRoute /> },
           { path: paths.flowClosedPositions.path, element: <ClosedPositionsRoute /> },
           { path: paths.flowCycles.path, element: <CyclesRoute /> },
+          { path: paths.flowDecisions.path, element: <DecisionsRoute /> },
           { path: paths.flowCapital.path, element: <FlowCapitalRoute /> },
         ],
       },

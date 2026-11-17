@@ -3,6 +3,7 @@ import { fakeClock } from './clock';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
+import { fakeNotificationChannels } from './notification-channels';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 import { fakeReconciliation } from './reconciliation';
 
@@ -224,6 +225,9 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
 
+/** An email the mail service of the fake platform delivered (R3.5.2). */
+export type FakeEmail = { readonly to: string; readonly subject: string };
+
 /** A Telegram chat: Telegram numbers it, the scenarios name it, and it keeps what it received. */
 export type FakeChat = { readonly name: string; readonly id: number; readonly received: string[] };
 
@@ -403,6 +407,9 @@ const state = {
   users: new Map<string, FakeUser>(),
   chats: new Map<string, FakeChat>(),
   linkedChats: new Map<string, FakeChat>(),
+  notificationEmails: new Map<string, string>(),
+  sentEmails: [] as FakeEmail[],
+  mailServiceConfigured: true,
   linkCodes: new Map<string, FakeLinkCode>(),
   cycles: new Map<string, FakeCycle[]>(),
   cyclesInProgress: new Set<string>(),
@@ -582,6 +589,9 @@ export const fakePlatform = {
     state.users.clear();
     state.chats.clear();
     state.linkedChats.clear();
+    state.notificationEmails.clear();
+    state.sentEmails = [];
+    state.mailServiceConfigured = true;
     state.linkCodes.clear();
     state.cycles.clear();
     state.cyclesInProgress.clear();
@@ -601,6 +611,7 @@ export const fakePlatform = {
     state.exchangeNetworkName = 'testnet';
     state.apiAnswers = true;
     fakeReconciliation.reset();
+    fakeNotificationChannels.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
@@ -923,6 +934,36 @@ export const fakePlatform = {
 
   unlinkChat(account: string): boolean {
     return state.linkedChats.delete(account);
+  },
+
+  /** The address the notifications of the user go to by email, if any (R3.5.2). */
+  notificationEmailOf(account: string): string | undefined {
+    return state.notificationEmails.get(account);
+  },
+
+  setNotificationEmail(account: string, address: string): void {
+    state.notificationEmails.set(account, address);
+  },
+
+  removeNotificationEmail(account: string): void {
+    state.notificationEmails.delete(account);
+  },
+
+  /** Whether the installation has a mail service: without one the address is kept, but no email leaves. */
+  mailServiceConfigured(): boolean {
+    return state.mailServiceConfigured;
+  },
+
+  withoutMailService(): void {
+    state.mailServiceConfigured = false;
+  },
+
+  sendEmail(email: FakeEmail): void {
+    state.sentEmails.push(email);
+  },
+
+  emailsTo(address: string): FakeEmail[] {
+    return state.sentEmails.filter((email) => email.to === address);
   },
 
   issueLinkCode(account: string, now: Date): FakeLinkCode {

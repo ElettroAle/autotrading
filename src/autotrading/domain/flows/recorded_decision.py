@@ -59,6 +59,14 @@ class DecidedCycle:
     decisions: tuple[RecordedDecision, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class DatedDecision:
+    """A decision of the agent on one asset with the planned instant of its cycle, as the history lists it (R6.5.5)."""
+
+    planned_at: datetime
+    decision: RecordedDecision
+
+
 def _action_named(name: str) -> DecisionAction:
     actions = {action.value: action for action in DecisionAction}
     if name not in actions:

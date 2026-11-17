@@ -3,9 +3,17 @@ from uuid import UUID
 import pytest
 
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.errors import InvalidOutboxMessageError
 from autotrading.domain.notifications.linked_chat import LinkedChat
-from autotrading.domain.notifications.outbox_message import CHAT_MESSAGE, ChatMessage, OutboxMessage
+from autotrading.domain.notifications.notification_email import NotificationEmail
+from autotrading.domain.notifications.outbox_message import (
+    CHAT_MESSAGE,
+    EMAIL_MESSAGE,
+    ChatMessage,
+    EmailMessage,
+    OutboxMessage,
+)
 from autotrading.domain.notifications.outbox_message_id import OutboxMessageId
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
@@ -62,3 +70,47 @@ def test_an_identity_is_read_back_from_its_text() -> None:
     identity = OutboxMessageId.new()
 
     assert OutboxMessageId.parse(str(identity.value)) == identity
+
+
+EMAIL = NotificationEmail(TENANT, EmailAddress.parse("anna@example.com"))
+
+
+def test_a_message_to_an_email_keeps_the_address_the_subject_and_the_text_for_its_integration() -> None:
+    message = OutboxMessage.to_email(EMAIL, "alfa: in pausa", "alfa: in pausa, credito esaurito")
+
+    assert message.tenant_id == TENANT
+    assert message.integration == EMAIL_MESSAGE
+    assert message.payload == {
+        "to": "anna@example.com",
+        "subject": "alfa: in pausa",
+        "text": "alfa: in pausa, credito esaurito",
+    }
+
+
+def test_a_message_to_an_email_reads_back_its_address_its_subject_and_its_text() -> None:
+    message = OutboxMessage.to_email(EMAIL, "alfa: in pausa", "alfa: in pausa, credito esaurito")
+
+    assert message.email_message() == EmailMessage(
+        EmailAddress.parse("anna@example.com"), "alfa: in pausa", "alfa: in pausa, credito esaurito"
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"subject": "s", "text": "t"},
+        {"to": "anna@example.com", "text": "t"},
+        {"to": "anna@example.com", "subject": "s"},
+        {"to": 7, "subject": "s", "text": "t"},
+        {"to": "anna", "subject": "s", "text": "t"},
+    ],
+)
+def test_a_payload_without_an_address_a_subject_and_a_text_is_a_defect_that_never_heals(
+    payload: dict[str, str | int],
+) -> None:
+    message = OutboxMessage(OutboxMessageId.new(), TENANT, EMAIL_MESSAGE, payload)
+
+    with pytest.raises(InvalidOutboxMessageError) as raised:
+        message.email_message()
+
+    assert raised.value.permanent
