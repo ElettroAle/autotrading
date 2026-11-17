@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.domain.notifications.notification import Notification
 
@@ -8,5 +10,5 @@ class NotifyOpeningBlockedUseCase:
     def __init__(self, notifier: NotifyFlowEventUseCase) -> None:
         self._notifier = notifier
 
-    def execute(self, flow_name: str, asset: str, cause: str) -> None:
-        self._notifier.execute(Notification.opening_blocked(flow_name, asset, cause))
+    def execute(self, flow_id: UUID, flow_name: str, asset: str, cause: str) -> None:
+        self._notifier.execute(Notification.opening_blocked(flow_id, flow_name, asset, cause))

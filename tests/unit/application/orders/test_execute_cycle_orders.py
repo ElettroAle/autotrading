@@ -149,7 +149,7 @@ def test_the_orders_are_sent_closings_first_and_followed_with_the_name_of_the_fl
     assert bench.orders.orders == sent
     closed, opened = bench.told.events
     assert closed[:4] == (FLOW_ID, PLANNED_AT, "ETH", sent[0].execution)
-    assert opened[:4] == ("Trend BTC", "BTC", "short", 3)
+    assert opened[:5] == (FLOW_ID, "Trend BTC", "BTC", "short", 3)
 
 
 def test_a_cycle_without_orders_sends_and_follows_nothing(bench: Bench) -> None:
@@ -215,7 +215,7 @@ def test_a_closing_after_a_refused_stop_loss_is_followed_as_unprotected(bench: B
     assert isinstance(closing, Order)
     assert note == ProtectionNote("BTC", "posizione BTC chiusa: stop loss non piazzato, Invalid trigger price")
     opened, closed = bench.told.events
-    assert opened[:2] == ("Trend BTC", "BTC")
+    assert opened[:3] == (FLOW_ID, "Trend BTC", "BTC")
     assert closed[:3] == (FLOW_ID, PLANNED_AT, "BTC")
     assert closed[-1] is True
 

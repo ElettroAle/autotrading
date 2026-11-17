@@ -21,11 +21,13 @@ class World:
         self.store = FlowStore()
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         self.told: list[tuple[str, str]] = []
+        self.flows_told: list[UUID] = []
         pause = InMemoryAutomaticPauseAdapter(self.store, TENANT)
         self.use_case = PauseAffectedFlowsUseCase(flows, pause, self)
 
-    def execute(self, flow_name: str, reason: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, reason: str) -> None:
         self.told.append((flow_name, reason))
+        self.flows_told.append(flow_id)
 
     def add(
         self, name: str, status: FlowStatus = FlowStatus.ACTIVE, account_id: UUID = ACCOUNT, model: str = ""
@@ -116,9 +118,10 @@ def test_the_command_takes_the_reason_and_the_scope_the_error_declares() -> None
 def test_every_paused_flow_is_told_with_the_reason() -> None:
     world = World()
     alfa = world.add("alfa")
-    world.add("beta")
+    beta = world.add("beta")
     world.add("gamma", status=FlowStatus.STOPPED)
 
     world.use_case.execute(PauseAffectedFlowsCommand(alfa.id.value, REASON, account_id=ACCOUNT))
 
     assert world.told == [("alfa", REASON), ("beta", REASON)]
+    assert world.flows_told == [alfa.id.value, beta.id.value]

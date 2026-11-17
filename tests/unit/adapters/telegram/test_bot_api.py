@@ -16,6 +16,7 @@ from autotrading.adapters.outbound.telegram.bot_api import (
 from autotrading.application.notifications.errors import BotUnreachableError, MessageNotDeliveredError
 from autotrading.application.notifications.ports import BotMessage
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.notification_link import NotificationLink
 
 FAKE_BOT = "BOT-FAKE_BOT-FAKE"
 BASE = f"https://api.telegram.org/bot{FAKE_BOT}"
@@ -62,6 +63,50 @@ def test_a_text_on_several_lines_with_emoji_reaches_telegram_intact_as_plain_tex
 
     [request] = requests
     assert json.loads(request.content) == {"chat_id": 42, "text": text}
+
+
+def test_the_links_of_a_message_are_buttons_on_one_row_under_it() -> None:
+    """ADR link-nei-messaggi-telegram-ed-email: an inline keyboard of url buttons, the text left as it is."""
+    requests: list[httpx.Request] = []
+    links = (
+        NotificationLink("Apri flusso", "https://example.org/dashboard/flows/1"),
+        NotificationLink("Apri operazione", "https://example.org/dashboard/flows/1/positions?asset=BTC"),
+    )
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    TelegramMessengerAdapter(client_answering(answer)).send(ChatId(42), "alfa: posizione aperta", links)
+
+    [request] = requests
+    assert json.loads(request.content) == {
+        "chat_id": 42,
+        "text": "alfa: posizione aperta",
+        "reply_markup": {
+            "inline_keyboard": [
+                [
+                    {"text": "Apri flusso", "url": "https://example.org/dashboard/flows/1"},
+                    {"text": "Apri operazione", "url": "https://example.org/dashboard/flows/1/positions?asset=BTC"},
+                ]
+            ]
+        },
+    }
+
+
+def test_at_most_three_buttons_go_under_a_message() -> None:
+    requests: list[httpx.Request] = []
+    links = tuple(NotificationLink(f"Apri {index}", f"https://example.org/{index}") for index in range(4))
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    TelegramMessengerAdapter(client_answering(answer)).send(ChatId(42), "testo", links)
+
+    [request] = requests
+    [row] = json.loads(request.content)["reply_markup"]["inline_keyboard"]
+    assert [button["text"] for button in row] == ["Apri 0", "Apri 1", "Apri 2"]
 
 
 @pytest.mark.parametrize("answer", [refusing, lambda _: httpx.Response(403, json={"ok": False})])

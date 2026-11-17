@@ -125,6 +125,7 @@ jobs:
           auth-audience: ${{ vars.AUTH_AUDIENCE }}
           auth-client-id: ${{ vars.AUTH_CLIENT_ID }}
           auth-scope: ${{ vars.AUTH_SCOPE }}
+          dashboard-url: ${{ vars.DASHBOARD_URL }}
           telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       - uses: ./.github/actions/health-check
         with:
@@ -200,6 +201,7 @@ jobs:
           auth-audience: ${{ vars.AUTH_AUDIENCE }}
           auth-client-id: ${{ vars.AUTH_CLIENT_ID }}
           auth-scope: ${{ vars.AUTH_SCOPE }}
+          dashboard-url: ${{ vars.DASHBOARD_URL }}
           telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       - uses: ./.github/actions/health-check
         with:

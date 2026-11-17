@@ -3,6 +3,7 @@ from autotrading.application.notifications.ports import MailerPort, MailServerAc
 from autotrading.domain.notifications.mail_server import MailServer
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.notifications.notification_email import NotificationEmail
+from autotrading.domain.notifications.outbox_message import EmailMessage
 
 
 class SendTestEmailUseCase:
@@ -25,7 +26,7 @@ class SendTestEmailUseCase:
         email = self._address_to_test()
         password = self._mail_servers.opener.open(server.password)
         test = Notification.test()
-        self._mailer.send(server, password, email.address, test.title, test.text)
+        self._mailer.send(server, password, EmailMessage(email.address, test.title, test.text))
 
     def _server(self) -> MailServer:
         server = self._mail_servers.servers.get()

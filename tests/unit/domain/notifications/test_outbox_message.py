@@ -7,6 +7,7 @@ from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.errors import InvalidOutboxMessageError
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification_email import NotificationEmail
+from autotrading.domain.notifications.notification_link import NotificationLink
 from autotrading.domain.notifications.outbox_message import (
     CHAT_MESSAGE,
     EMAIL_MESSAGE,
@@ -114,3 +115,75 @@ def test_a_payload_without_an_address_a_subject_and_a_text_is_a_defect_that_neve
         message.email_message()
 
     assert raised.value.permanent
+
+
+# ADR destinazioni-delle-notifiche-nella-dashboard: the links of a notification travel with its message (R3.5.6).
+
+LINKS = (
+    NotificationLink("Apri flusso", "https://example.org/dashboard/flows/1"),
+    NotificationLink("Apri operazione", "https://example.org/dashboard/flows/1/positions?asset=BTC"),
+)
+LINKS_PAYLOAD = [
+    {"label": "Apri flusso", "url": "https://example.org/dashboard/flows/1"},
+    {"label": "Apri operazione", "url": "https://example.org/dashboard/flows/1/positions?asset=BTC"},
+]
+
+
+def test_a_message_to_a_chat_keeps_its_links_for_its_integration() -> None:
+    message = OutboxMessage.to_chat(CHAT, "alfa: posizione aperta", links=LINKS)
+
+    assert message.payload == {"chat_id": -100123, "text": "alfa: posizione aperta", "links": LINKS_PAYLOAD}
+    assert message.chat_message() == ChatMessage(ChatId(-100123), "alfa: posizione aperta", LINKS)
+
+
+def test_a_message_to_an_email_keeps_its_links_for_its_integration() -> None:
+    message = OutboxMessage.to_email(EMAIL, "alfa: posizione aperta", "alfa: posizione aperta", links=LINKS)
+
+    assert message.payload["links"] == LINKS_PAYLOAD
+    assert message.email_message().links == LINKS
+
+
+def test_a_message_queued_before_the_links_reads_back_without_links() -> None:
+    message = OutboxMessage(OutboxMessageId.new(), TENANT, CHAT_MESSAGE, {"chat_id": -100123, "text": "t"})
+
+    assert message.chat_message().links == ()
+
+
+@pytest.mark.parametrize(
+    "links",
+    [
+        "https://example.org",
+        [{"label": "Apri flusso"}],
+        [{"label": "Apri flusso", "url": 7}],
+        ["Apri flusso"],
+    ],
+)
+def test_links_without_label_and_address_are_a_defect_that_never_heals(links: object) -> None:
+    payload = {"to": "anna@example.com", "subject": "s", "text": "t", "links": links}
+    message = OutboxMessage(OutboxMessageId.new(), TENANT, EMAIL_MESSAGE, payload)  # type: ignore[arg-type]  # a payload read back malformed
+
+    with pytest.raises(InvalidOutboxMessageError) as raised:
+        message.email_message()
+
+    assert raised.value.permanent
+
+
+def test_the_body_of_an_email_ends_with_a_blank_line_and_a_line_for_each_link() -> None:
+    email = EmailMessage(
+        EmailAddress.parse("anna@example.com"), "alfa: posizione aperta", "titolo\n\nAsset: BTC", LINKS
+    )
+
+    assert email.body.splitlines() == [
+        "titolo",
+        "",
+        "Asset: BTC",
+        "",
+        "Apri flusso: https://example.org/dashboard/flows/1",
+        "Apri operazione: https://example.org/dashboard/flows/1/positions?asset=BTC",
+    ]
+
+
+def test_the_body_of_an_email_without_links_is_its_text() -> None:
+    email = EmailMessage(EmailAddress.parse("anna@example.com"), "alfa: in pausa", "alfa: in pausa")
+
+    assert email.body == "alfa: in pausa"

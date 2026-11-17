@@ -79,7 +79,9 @@ class CloseFlowPositionsUseCase:
         position = opening.closed(flow, asset, fill, reason)
         self._ports.closed_positions.add(position)
         if reason.told_on_its_own:
-            self._ports.closing_notice.execute(flow.name.value, asset, position.pnl, reason.value)
+            self._ports.closing_notice.execute(
+                flow.id.value, flow.name.value, asset, position.pnl, reason.value, position.closing.at
+            )
 
 
 def _closing_of(asset: str, answer: ClosingAnswerPort) -> PositionClosing | None:

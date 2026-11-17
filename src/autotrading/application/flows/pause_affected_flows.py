@@ -39,7 +39,7 @@ class PauseAffectedFlowsUseCase:
         affected = [flow for flow in self._flows.list() if _involved(flow, command)]
         self._pause.pause([flow.id for flow in affected], command.reason)
         for flow in affected:
-            self._notices.execute(flow.name.value, command.reason)
+            self._notices.execute(flow.id.value, flow.name.value, command.reason)
         return affected
 
 

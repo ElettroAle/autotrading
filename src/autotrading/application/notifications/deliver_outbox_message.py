@@ -44,7 +44,7 @@ class DeliverOutboxMessageUseCase:
     def _send_to_chat(self, message: OutboxMessage) -> None:
         chat_message = message.chat_message()
         try:
-            self._messenger.send(chat_message.chat_id, chat_message.text)
+            self._messenger.send(chat_message.chat_id, chat_message.text, chat_message.links)
         except MessageNotDeliveredError:
             _record_failure("invio della notifica fallito", message)
             raise
@@ -53,7 +53,7 @@ class DeliverOutboxMessageUseCase:
         email = message.email_message()
         try:
             server, password = self._server_of(message.tenant_id)
-            self._mailer.send(server, password, email.address, email.subject, email.text)
+            self._mailer.send(server, password, email)
         except MessageNotDeliveredError, MailServerNotConfiguredError, MailPasswordNotOpenedError:
             _record_failure("invio dell'email fallito", message)
             raise

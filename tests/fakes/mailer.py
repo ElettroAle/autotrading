@@ -3,10 +3,13 @@ from dataclasses import dataclass
 from autotrading.application.notifications.errors import EmailNotDeliveredError, MailServerRefusedLoginError
 from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.mail_server import MailServer
+from autotrading.domain.notifications.outbox_message import EmailMessage
 
 
 @dataclass(frozen=True, slots=True)
 class SentEmail:
+    """An email as its address reads it: the text ends with its links (ADR link-nei-messaggi-telegram-ed-email)."""
+
     address: EmailAddress
     subject: str
     text: str
@@ -33,13 +36,13 @@ class FakeMailerAdapter:
         self.sent: list[SentEmail] = []
         self.logins: list[MailLogin] = []
 
-    def send(self, server: MailServer, password: str, address: EmailAddress, subject: str, text: str) -> None:
+    def send(self, server: MailServer, password: str, email: EmailMessage) -> None:
         if self.refusing_login:
             raise MailServerRefusedLoginError
         if not self.accepting:
             raise EmailNotDeliveredError
         self.logins.append(MailLogin(server.host, server.port, server.username, password, server.sender.value))
-        self.sent.append(SentEmail(address, subject, text))
+        self.sent.append(SentEmail(email.address, email.subject, email.body))
 
     def received_by(self, address: str) -> list[SentEmail]:
         return [email for email in self.sent if email.address.value == address]

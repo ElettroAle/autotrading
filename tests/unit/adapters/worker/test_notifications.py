@@ -5,8 +5,10 @@ ADR 0070.
 
 import json
 import logging
+from datetime import UTC, datetime
 from decimal import Decimal
 from secrets import token_hex
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -19,6 +21,8 @@ from autotrading.domain.notifications.flow_status import FlowStatusLine
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Amount, Notification
 from autotrading.domain.notifications.notification_email import NotificationEmail
+from autotrading.domain.notifications.notification_link import NotificationLink
+from autotrading.domain.notifications.notification_target import NotificationTarget
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
@@ -26,7 +30,11 @@ from tests.support.worker import TENANT, TOKEN, Worker
 CHAT = ChatId(4242)
 REFUSED = "connection refused"
 STATUS = FlowStatusLine("Flusso: 312,40 USDC · PnL +12,40 USDC · 2 posizioni aperte · attivo")
-CLOSED = Notification.position_closed("alfa", "BTC", Amount(Decimal("4.20"), "USDC"), "stop del flusso")
+FLOW_ID = uuid4()
+CLOSED_AT = datetime(2026, 11, 17, 10, 15, 30, tzinfo=UTC)
+CLOSED = Notification.position_closed(
+    FLOW_ID, "alfa", "BTC", Amount(Decimal("4.20"), "USDC"), "stop del flusso", CLOSED_AT
+)
 
 
 @pytest.fixture
@@ -64,6 +72,29 @@ def test_the_test_notification_keeps_the_subject_of_its_email_on_the_way_to_the_
 
     [email] = worker.mailer.received_by("anna@example.com")
     assert email.subject == Notification.test().title
+
+
+def test_the_notification_keeps_the_pages_it_leads_to_on_the_way_to_the_worker(worker: Worker) -> None:
+    """ADR destinazioni-delle-notifiche-nella-dashboard: the worker composes the links of what the API tells."""
+    worker.links.dashboard = True
+
+    adapter_on(worker).execute(CLOSED)
+
+    targets = (NotificationTarget.flow(FLOW_ID), NotificationTarget.closed_position(FLOW_ID, "BTC", CLOSED_AT))
+    links = tuple(NotificationLink(target.label, worker.links.address_of(target)) for target in targets)
+    assert worker.messenger.links_received_by(CHAT) == [links]
+
+
+def test_an_account_notification_keeps_its_account_on_the_way_to_the_worker(worker: Worker) -> None:
+    worker.links.dashboard = True
+    account_id = uuid4()
+
+    adapter_on(worker).execute(Notification.unattributable_fill(account_id, "principale", "ETH"))
+
+    target = NotificationTarget.account_alarms(account_id)
+    assert worker.messenger.links_received_by(CHAT) == [
+        (NotificationLink(target.label, worker.links.address_of(target)),)
+    ]
 
 
 def test_another_tenant_never_reaches_the_chat(worker: Worker) -> None:
@@ -119,6 +150,10 @@ def test_the_request_names_the_tenant_carries_the_token_and_waits_a_bounded_time
         "lines": [{"label": "Asset", "value": "BTC"}, {"label": "PnL", "value": "4,20 USDC"}],
         "flow_status": None,
         "event": "chiusura di una posizione",
+        "targets": [
+            {"kind": "flow", "owner_id": str(FLOW_ID), "asset": None, "closed_at": None},
+            {"kind": "closed_position", "owner_id": str(FLOW_ID), "asset": "BTC", "closed_at": CLOSED_AT.isoformat()},
+        ],
     }
     assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS
 
@@ -158,7 +193,7 @@ def test_the_worker_refuses_a_type_of_event_it_does_not_know_and_delivers_nothin
 
 
 def test_the_worker_delivers_a_notification_with_its_type_of_event(worker: Worker) -> None:
-    cash_out = Notification.cash_out_done("alfa", Amount(Decimal(118), "USDC"))
+    cash_out = Notification.cash_out_done(FLOW_ID, "alfa", Amount(Decimal(118), "USDC"))
 
     adapter_on(worker).execute(cash_out)
 

@@ -48,6 +48,7 @@ from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.notifications.flow_status import FlowStatusLine
 from autotrading.domain.notifications.notification import Notification, NotificationLine
 from autotrading.domain.notifications.notification_event import NotificationEvent
+from autotrading.domain.notifications.notification_target import NotificationTarget, TargetKind
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.order_outcome import OrderOutcome
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -106,6 +107,20 @@ class NotificationLineRequest(BaseModel):
     value: str
 
 
+class NotificationTargetRequest(BaseModel):
+    """A page of the dashboard the notification leads to, by what finds it (ADR
+    destinazioni-delle-notifiche-nella-dashboard).
+    """
+
+    kind: TargetKind
+    owner_id: UUID
+    asset: str | None = None
+    closed_at: datetime | None = None
+
+    def target(self) -> NotificationTarget:
+        return NotificationTarget(self.kind, self.owner_id, self.asset, self.closed_at)
+
+
 class NotificationRequest(BaseModel):
     """Built by the API from its own events: the worker only delivers it to the channels of the tenant, as it is (ADR
     notifica-strutturata-con-icona-titolo-e-valori).
@@ -118,11 +133,14 @@ class NotificationRequest(BaseModel):
     flow_status: str | None = None
     # The type of the event; none for the test notification (R3.5.1).
     event: NotificationEvent | None = None
+    # The pages it leads to; none from an API that does not send them yet.
+    targets: list[NotificationTargetRequest] = Field(default_factory=list)
 
     def notification(self) -> Notification:
         lines = tuple(NotificationLine(line.label, line.value) for line in self.lines)
         status = None if self.flow_status is None else FlowStatusLine(self.flow_status)
-        return Notification(self.subject, self.headline, lines, self.event, self.icon, status)
+        targets = tuple(target.target() for target in self.targets)
+        return Notification(self.subject, self.headline, lines, self.event, self.icon, status, targets)
 
 
 class BotPolling:

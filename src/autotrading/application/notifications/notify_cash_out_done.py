@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.domain.notifications.notification import Amount, Notification
@@ -11,5 +12,5 @@ class NotifyCashOutDoneUseCase:
         self._notifier = notifier
         self._currency = currency
 
-    def execute(self, flow_name: str, freed: Decimal) -> None:
-        self._notifier.execute(Notification.cash_out_done(flow_name, Amount(freed, self._currency)))
+    def execute(self, flow_id: UUID, flow_name: str, freed: Decimal) -> None:
+        self._notifier.execute(Notification.cash_out_done(flow_id, flow_name, Amount(freed, self._currency)))

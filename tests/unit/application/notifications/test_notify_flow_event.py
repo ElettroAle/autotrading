@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -18,7 +19,7 @@ from tests.fakes.flow_status import FakeFlowStatusAdapter
 ALFA = FlowStatusFigures(
     NotifiedFlowStatus.ACTIVE, 2, "USDC", RecordedEquity(Decimal("312.40"), Decimal(300), Decimal(0))
 )
-OPENED = Notification.position_opened("alfa", "BTC", "long", 3, Amount(Decimal(150), "USDC"))
+OPENED = Notification.position_opened(uuid4(), "alfa", "BTC", "long", 3, Amount(Decimal(150), "USDC"))
 
 
 class Notifier:
@@ -47,7 +48,7 @@ def test_a_notification_of_a_flow_closes_with_the_state_of_the_flow(flow_status:
 
 def test_a_notification_of_the_account_reads_no_state(flow_status: FakeFlowStatusAdapter) -> None:
     notifier = Notifier()
-    alarm = Notification.unattributable_fill("test-1", "SOL")
+    alarm = Notification.unattributable_fill(uuid4(), "test-1", "SOL")
 
     NotifyFlowEventUseCase(notifier, flow_status).execute(alarm)
 
@@ -57,7 +58,7 @@ def test_a_notification_of_the_account_reads_no_state(flow_status: FakeFlowStatu
 
 def test_a_flow_no_longer_found_leaves_its_notification_without_state(flow_status: FakeFlowStatusAdapter) -> None:
     notifier = Notifier()
-    paused = Notification.flow_paused("beta", "credito esaurito")
+    paused = Notification.flow_paused(uuid4(), "beta", "credito esaurito")
 
     NotifyFlowEventUseCase(notifier, flow_status).execute(paused)
 

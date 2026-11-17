@@ -1,21 +1,28 @@
 from decimal import Decimal
+from uuid import UUID
 
 
 class FakeUnattributableAssetNoticeAdapter:
-    """Keeps the positions or the executions a use case tells, instead of sending them to the chat of the tenant."""
+    """Keeps the positions or the executions a use case tells, instead of sending them to the chat of the tenant, and
+    the accounts they lead to (R3.5.6)."""
 
     def __init__(self) -> None:
         self.told: list[tuple[str, str]] = []
+        self.accounts: list[UUID] = []
 
-    def execute(self, account_name: str, asset: str) -> None:
+    def execute(self, account_id: UUID, account_name: str, asset: str) -> None:
         self.told.append((account_name, asset))
+        self.accounts.append(account_id)
 
 
 class FakeUnattributableMovementNoticeAdapter:
-    """Keeps the movements of the balance a use case tells, instead of sending them to the chat of the tenant."""
+    """Keeps the movements of the balance a use case tells, instead of sending them to the chat of the tenant, and the
+    accounts they lead to (R3.5.6)."""
 
     def __init__(self) -> None:
         self.told: list[tuple[str, Decimal]] = []
+        self.accounts: list[UUID] = []
 
-    def execute(self, account_name: str, amount: Decimal) -> None:
+    def execute(self, account_id: UUID, account_name: str, amount: Decimal) -> None:
         self.told.append((account_name, amount))
+        self.accounts.append(account_id)

@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from autotrading.application.flows.guard_flow_loss import GuardFlowLossUseCase
 from autotrading.domain.flows.cycle_account import CycleAccount
@@ -40,10 +41,12 @@ class World:
         self.openings = InMemoryOpeningsSuspensionAdapter(self.store, TENANT)
         self.clock = FakeClockAdapter(NOW)
         self.notices: list[tuple[str, str]] = []
+        self.flows_told: list[UUID] = []
         self.use_case = GuardFlowLossUseCase(self.openings, self.equities, self, self.clock)
 
-    def execute(self, flow_name: str, reason: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, reason: str) -> None:
         self.notices.append((flow_name, reason))
+        self.flows_told.append(flow_id)
 
     def recorded(self, at: datetime, equity: str) -> None:
         realized = Decimal(equity) - CAPITAL
@@ -71,6 +74,7 @@ def test_a_loss_beyond_a_threshold_suspends_the_openings_and_tells_the_user_once
     assert world.guarded("940")
     assert world.status.suspension == OpeningsSuspension("perdita giornaliera 6% oltre il 5%", NOW)
     assert world.notices == [("alfa", "perdita giornaliera 6% oltre il 5%")]
+    assert world.flows_told == [world.flow.id.value]
 
 
 def test_openings_already_suspended_stay_suspended_without_another_notice() -> None:

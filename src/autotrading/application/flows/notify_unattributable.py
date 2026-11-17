@@ -36,9 +36,9 @@ class NotifyUnattributableUseCase:
     def _tell(self, item: UnattributableItem) -> None:
         account = self._accounts.account_name(item.account_id)
         if item.kind is UnattributableKind.POSITION:
-            self._notices.positions.execute(account, item.asset or "")
+            self._notices.positions.execute(item.account_id, account, item.asset or "")
             return
         if item.kind is UnattributableKind.FILL:
-            self._notices.fills.execute(account, item.asset or "")
+            self._notices.fills.execute(item.account_id, account, item.asset or "")
             return
-        self._notices.movements.execute(account, item.amount)
+        self._notices.movements.execute(item.account_id, account, item.amount)
