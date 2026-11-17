@@ -92,7 +92,7 @@ def test_adr_pulsante_esegui_ora_nella_pagina_del_flusso_the_command_lives_with_
     assert f"api.POST('{API_ROUTE}'" in mutation
     assert "invalidateQueries" in mutation
     assert "from '@/components/ui/command-refusal'" in commands
-    assert re.search(r"cycleNow\.mutate\(\)\}\s+disabled=\{busy\}\s+className=\{SECONDARY_COMMAND\}", commands)
+    assert re.search(r"<CommandButton\s+tone=\"secondary\"\s+icon=\"refresh\"\s+onClick=\{\(\) => cycleNow\.mutate\(\)\}", commands)
     assert "Ciclo in corso…" in commands
     assert not (DASHBOARD / "src" / "features" / "flows" / "components" / "command-refusal.tsx").exists()
     for response in (CycleSummaryResponse, CycleDetailResponse):

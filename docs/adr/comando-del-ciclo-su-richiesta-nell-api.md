@@ -30,7 +30,11 @@ ADR 0021). Serve un comando legato al tenant che chieda il ciclo al worker e res
      interna del worker. `TIMEOUT_SECONDS = 300.0`, perché il ciclo comprende l'attesa delle fonti, la chiamata al
      modello (fino a 120 s) e gli ordini.
    - Il 409 del worker torna `CycleInProgressError` o `FlowNotActiveError` secondo il tipo nei Problem Details;
-     l'errore di un ciclo fallito arriva come esito del ciclo, non come errore.
+     un ciclo fallito per un errore temporaneo arriva come esito del ciclo (201). Un errore permanente fallisce in
+     fretta come nel ciclo pianificato (regola «Fail fast» di context-flows.md): il worker registra il ciclo, mette in
+     pausa e rilancia, e il suo handler centrale risponde con lo stato e il motivo dell'errore. L'adapter traduce un
+     4xx con motivo (401 escluso, che è il rifiuto del servizio) in `OnDemandCycleFailedError` (424, «ciclo fallito:
+     <motivo>»), con la risposta del worker come causa.
    - Risposta 201 con il riassunto del ciclo (`CycleSummaryResponse`, che riceve `trigger`).
    - Gli errori stanno in `application/flows/errors.py` o nel domain, con il proprio `status_code`. Nessuna mappa
      nell'handler.

@@ -278,6 +278,17 @@ class CycleInProgressError(ApplicationError):
         super().__init__("un ciclo del flusso è già in corso")
 
 
+class OnDemandCycleFailedError(ApplicationError):
+    """A cycle asked for now stopped by a permanent error: recorded and the flow paused by the worker, which gives its
+    reason back (R6.5.2, R1.2.4). The cycle the request asked for did not complete because of what it depends on."""
+
+    status_code = 424
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"ciclo fallito: {reason}")
+        self.reason = reason
+
+
 class CycleWorkerUnavailableError(ApplicationError):
     """The worker, the only service that runs the cycles, cannot be reached or answers in an unexpected shape."""
 

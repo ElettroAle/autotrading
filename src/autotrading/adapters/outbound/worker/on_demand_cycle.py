@@ -10,6 +10,7 @@ from autotrading.application.flows.errors import (
     CycleWorkerUnavailableError,
     FlowNotActiveError,
     FlowNotFoundError,
+    OnDemandCycleFailedError,
 )
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord, StepDocument
@@ -32,7 +33,8 @@ class WorkerOnDemandCycleAdapter:
     to end (ADR comando-del-ciclo-su-richiesta-nell-api): only the worker runs the cycles.
 
     Bound to the tenant of the request. A flow the worker does not find is not found, its refusals become the errors
-    of the port again; anything else it cannot answer, or answers in an unexpected shape, is a worker not available.
+    of the port again, a cycle stopped by a permanent error fails with its reason; anything else it cannot answer, or
+    answers in an unexpected shape, is a worker not available.
     """
 
     def __init__(self, client: httpx.Client, token: str, tenant_id: TenantId) -> None:
@@ -63,7 +65,21 @@ def _raise_for_refusal(response: httpx.Response) -> None:
         raise FlowNotFoundError
     if status == httpx.codes.CONFLICT:
         raise _conflict_of(_reason_of(response))
+    # A 401 is the worker refusing this service, never the outcome of a cycle.
+    if response.is_client_error and status != httpx.codes.UNAUTHORIZED:
+        _raise_failed_cycle(response)
     raise CycleWorkerUnavailableError
+
+
+def _raise_failed_cycle(response: httpx.Response) -> None:
+    """A cycle stopped by a permanent error comes back with the status and the reason of that error (ADR 0027)."""
+    reason = _reason_of(response)
+    if not isinstance(reason, str):
+        raise CycleWorkerUnavailableError
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        raise OnDemandCycleFailedError(reason) from error
 
 
 def _reason_of(response: httpx.Response) -> object:

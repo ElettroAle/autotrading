@@ -3,7 +3,8 @@
 // breaks it and silent on one that respects it. That the dashboard as a whole breaks none the required lint jobs verify
 // (npm run lint:architecture and npm run lint, which spreads the same rules), not a test bound by the speed of the
 // machine (Bug 397). ADR-0166: the query string changes only through the shared hook of src/hooks/use-search-change.ts,
-// never with a function of the last render.
+// never with a function of the last render. ADR icone-con-lucide-react-e-comandi-condivisi: lucide-react is imported
+// only by the shared icons of src/components/ui/icons.
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
@@ -101,6 +102,36 @@ const VIOLATING: ReadonlyArray<readonly [string, string, string]> = [
       '  return search.toString();\n' +
       '};\n',
   ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: a feature draws an icon with lucide-react itself',
+    'src/features/flow-commands/components/flow-commands.tsx',
+    "import { Pause } from 'lucide-react';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: a shared component draws an icon with lucide-react itself',
+    'src/components/ui/command-button.tsx',
+    "import { Play } from 'lucide-react';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: the app imports an icon of lucide-react by its path',
+    'src/app/routes/app/flows.tsx',
+    "import Square from 'lucide-react/dist/esm/icons/square';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: the shared charts draw an icon with lucide-react',
+    'src/components/charts/equity-chart.tsx',
+    "import { ArrowUp } from 'lucide-react';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: the client of the API draws an icon with lucide-react',
+    'src/lib/api-client.ts',
+    "import { X } from 'lucide-react';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: the shared icons call the API without the client',
+    'src/components/ui/icons/icon.tsx',
+    "import createClient from 'openapi-fetch';\n",
+  ],
   ['a file is not named in kebab-case', 'src/components/ui/EnvironmentLabel.tsx', 'export {};\n'],
   [
     'a folder is not named in kebab-case',
@@ -129,6 +160,16 @@ const CONFORMING: ReadonlyArray<readonly [string, string, string]> = [
     'ADR-0121: a feature draws its data with a shared chart',
     'src/features/flows/components/flow-chart.tsx',
     "import { EquityChart } from '@/components/charts/equity-chart';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: the shared icons draw with lucide-react',
+    'src/components/ui/icons/icon.tsx',
+    "import { Pause } from 'lucide-react';\n",
+  ],
+  [
+    'ADR icone-con-lucide-react-e-comandi-condivisi: a feature names a shared icon',
+    'src/features/flow-commands/components/flow-commands.tsx',
+    "import { Icon } from '@/components/ui/icons/icon';\n",
   ],
   [
     'a test uses the fakes',
@@ -161,7 +202,7 @@ const CONFORMING: ReadonlyArray<readonly [string, string, string]> = [
   ],
 ];
 
-describe('ADR-0116, ADR-0121, ADR-0166: the structure of the dashboard', () => {
+describe('ADR-0116, ADR-0121, ADR-0166, ADR icone-con-lucide-react-e-comandi-condivisi: the structure of the dashboard', () => {
   it.each(VIOLATING)('is red when %s', async (_rule, path, source) => {
     expect(await brokenRules(path, source)).not.toEqual([]);
   });

@@ -1,4 +1,5 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { DirectionLabel } from '@/components/ui/direction-label';
 import { formatPrice, formatRoundedAmount } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
 
@@ -56,7 +57,11 @@ const COLUMNS: DataTableColumn<HistoryOrder>[] = [
   { header: 'Asset', cell: (order) => order.asset },
   {
     header: 'Ordine',
-    cell: (order) => `${order.closing ? 'chiusura' : 'apertura'} ${order.direction}`,
+    cell: (order) => (
+      <>
+        {order.closing ? 'chiusura' : 'apertura'} <DirectionLabel value={order.direction} />
+      </>
+    ),
   },
   { header: 'Stato', cell: (order) => order.status },
   { header: 'Esecuzioni', cell: (order) => <Executions executions={order.executions} /> },

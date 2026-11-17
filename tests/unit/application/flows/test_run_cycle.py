@@ -400,15 +400,16 @@ def test_a_cycle_asked_for_now_while_another_runs_is_refused_and_not_recorded_as
     assert (cycles.agent.calls, cycles.records.records, cycles.equity.recorded) == ([], [], [])
 
 
-def test_a_permanent_error_of_a_cycle_asked_for_now_pauses_the_flows_and_comes_back_as_its_record(
-    cycles: Cycles,
-) -> None:
+def test_a_permanent_error_of_a_cycle_asked_for_now_pauses_the_flows_and_is_raised(cycles: Cycles) -> None:
+    # Fail fast also for the cycle the user asks for: the only handler records, pauses and raises (context-flows.md).
     error = FakePermanentError("credito esaurito presso openrouter", provider="openrouter")
     cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, error)
 
-    record = run_on_demand(cycles)
+    with pytest.raises(FakePermanentError) as raised:
+        run_on_demand(cycles)
 
-    assert record == cycles.last_record("alfa")
+    assert raised.value is error
+    record = cycles.last_record("alfa")
     assert record.failure == CycleFailure(CycleStep.AGENT_DECISION, "FakePermanentError", str(error))
     assert record.trigger is CycleTrigger.ON_DEMAND
     assert (cycles.flow("alfa").status, cycles.flow("alfa").pause_reason) == (PAUSED, str(error))

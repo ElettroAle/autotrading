@@ -56,8 +56,8 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     planner may still hold its job for a few seconds (Bug 373).
 
     A cycle the user asks for now (R6.5.2, ADR ciclo-su-richiesta-nel-worker) answers the user where the planned one
-    would pass in silence: a flow not active and a cycle in progress are refused, and a permanent error comes back as
-    the record of the failed cycle, after the pause, since the user reads it instead of the log of the planner.
+    would pass in silence: a flow not active and a cycle in progress are refused. A permanent error fails fast as for
+    the planned cycle: recorded, the flows paused, then raised, and the user reads its reason in the answer.
     """
 
     def __init__(self, graph: CycleGraph[S, D, C, A, O, E], guards: CycleGuards, equity: CycleEquityPort[S]) -> None:
@@ -93,8 +93,6 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
             self._guards.consecutive_failures.execute(flow_id, failed.error)
             return record
         self._guards.pause.execute(PauseAffectedFlowsCommand.of_error(flow_id, failed.error))
-        if command.trigger is CycleTrigger.ON_DEMAND:
-            return record
         raise failed.error
 
 

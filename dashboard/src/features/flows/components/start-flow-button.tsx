@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
+import { CommandButton } from '@/components/ui/command-button';
 import { CommandRefusal } from '@/components/ui/command-refusal';
-import { PRIMARY_COMMAND } from '@/components/ui/commands';
 import { RealMoneyStartConfirmation } from '@/components/ui/network-notice';
 
 import { useStartFlow } from '../api/start-flow';
@@ -28,14 +28,9 @@ export const StartFlowButton = ({ flowId, realMoney }: StartFlowButtonProps) => 
           onCancel={() => setConfirming(false)}
         />
       ) : (
-        <button
-          type="button"
-          disabled={start.isPending}
-          onClick={request}
-          className={PRIMARY_COMMAND}
-        >
+        <CommandButton tone="go" icon="play" disabled={start.isPending} onClick={request}>
           Avvia
-        </button>
+        </CommandButton>
       )}
       <CommandRefusal refusal="Avvio rifiutato" error={start.error} />
     </div>

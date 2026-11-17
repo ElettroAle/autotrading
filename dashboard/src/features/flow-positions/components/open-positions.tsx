@@ -1,5 +1,6 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
+import { DirectionLabel } from '@/components/ui/direction-label';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { formatAmount, formatPrice } from '@/utils/format-amount';
@@ -14,7 +15,7 @@ const priceOrNone = (price: string | null): string => (price === null ? NONE : f
 
 const columnsIn = (currency: string): DataTableColumn<OpenPosition>[] => [
   { header: 'Asset', cell: (position) => position.asset },
-  { header: 'Direzione', cell: (position) => position.side },
+  { header: 'Direzione', cell: (position) => <DirectionLabel value={position.side} /> },
   { header: 'Dimensione', cell: (position) => formatAmount(position.size) },
   { header: 'Leva', cell: (position) => position.leverage },
   { header: 'Prezzo di ingresso', cell: (position) => formatPrice(position.entry_price) },

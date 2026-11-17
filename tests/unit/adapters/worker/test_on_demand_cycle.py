@@ -16,6 +16,7 @@ from autotrading.application.flows.errors import (
     CycleWorkerUnavailableError,
     FlowNotActiveError,
     FlowNotFoundError,
+    OnDemandCycleFailedError,
 )
 from autotrading.application.flows.run_cycle import RunCycleCommand
 from autotrading.domain.flows.call_cost import CallCost
@@ -25,12 +26,14 @@ from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.cycles import FakePermanentError
 from tests.support.flows import a_flow
 from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import STARTED_AT, TENANT, TOKEN, Worker
 
 ANCHOR = datetime(2026, 11, 10, 11, 0, tzinfo=UTC)
 REFUSED = "connection refused"
+CREDIT_EXHAUSTED = "credito esaurito presso openrouter"
 
 
 @pytest.fixture
@@ -123,6 +126,29 @@ def test_a_failed_cycle_comes_back_as_its_record(worker: Worker) -> None:
         CycleFailure(CycleStep.AGENT_DECISION, "ModelUnavailableError", "fornitore IA non raggiungibile"),
         CallCost(1, 1, None),
     )
+
+
+def stopped_by_a_permanent_error(_command: RunCycleCommand) -> CycleRecord:
+    raise FakePermanentError(CREDIT_EXHAUSTED, provider="openrouter")
+
+
+def test_a_cycle_stopped_by_a_permanent_error_fails_with_its_reason(worker: Worker) -> None:
+    flow = active_flow(worker)
+    worker.cycle_run = stopped_by_a_permanent_error
+
+    with pytest.raises(OnDemandCycleFailedError) as raised:
+        adapter_on(worker).run(flow.id.value)
+
+    assert str(raised.value) == f"ciclo fallito: {CREDIT_EXHAUSTED}"
+
+
+@pytest.mark.parametrize("status", [httpx.codes.PAYMENT_REQUIRED, httpx.codes.FORBIDDEN])
+def test_a_refusal_of_the_worker_with_its_reason_is_a_failed_cycle(status: int) -> None:
+    with pytest.raises(OnDemandCycleFailedError) as raised:
+        answering(status, {"detail": CREDIT_EXHAUSTED}).run(uuid4())
+
+    assert str(raised.value) == f"ciclo fallito: {CREDIT_EXHAUSTED}"
+    assert raised.value.permanent
 
 
 def test_a_cycle_in_progress_is_refused_by_the_worker(worker: Worker) -> None:

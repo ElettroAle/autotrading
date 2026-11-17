@@ -35,6 +35,19 @@ describe('CyclesList', () => {
     expect(first).toHaveTextContent('apri long BTC');
   });
 
+  it('shows the action and the direction of each decision with their icons (R6.5.3)', async () => {
+    fakePlatform.recordCycles('alfa', cyclesBack(1));
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });
+
+    const [first] = await rowsOf();
+    expect(
+      within(within(first as HTMLElement).getByText('apri')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'plus');
+    expect(
+      within(within(first as HTMLElement).getByText('long')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'arrow-up');
+  });
+
   // R6.5.2, ADR pulsante-esegui-ora-nella-pagina-del-flusso.
   it('marks a cycle the user asked for now, and only that one', async () => {
     const asked = { ...aCompletedCycle(LAST), trigger: 'on_demand' as const };
@@ -180,7 +193,7 @@ describe('CyclesList', () => {
     const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa/cycles' });
 
     const [row] = await rowsOf();
-    await user.click(within(row as HTMLElement).getByText('apri long BTC'));
+    await user.click(within(row as HTMLElement).getByText('BTC'));
 
     expect(router.state.location.pathname).toBe('/flows/flow-alfa/cycles/2026-11-14T09%3A07%3A00Z');
   });

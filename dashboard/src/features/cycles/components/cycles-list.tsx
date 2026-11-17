@@ -16,8 +16,10 @@ import { formatInstant } from '@/utils/format-instant';
 import { searchWithPage } from '@/utils/page-number';
 
 import { useCycles, type CycleSummary } from '../api/get-cycles';
-import { decisionLabelsOf } from '../utils/cycle-documents';
+import { decisionsOf as agentDecisionsOf } from '../utils/cycle-documents';
 import { ON_DEMAND_LABEL } from '../utils/cycle-trigger';
+
+import { DecisionLabel } from './decision-label';
 
 const NO_DECISION = '—';
 
@@ -59,8 +61,18 @@ const countOf = (total: number): string => (total === 1 ? '1 ciclo' : `${total} 
 const outcomeOf = (cycle: CycleSummary): string =>
   cycle.failure === null ? cycle.outcome : `${cycle.outcome} nel passo «${cycle.failure.step}»`;
 
-const decisionsOf = (cycle: CycleSummary): string =>
-  decisionLabelsOf(cycle.decisions).join(', ') || NO_DECISION;
+const decisionsOf = (cycle: CycleSummary) => {
+  const decisions = agentDecisionsOf(cycle.decisions)?.decisioni ?? [];
+  if (decisions.length === 0) {
+    return NO_DECISION;
+  }
+  return decisions.map((decision, index) => (
+    <span key={decision.asset}>
+      {index > 0 && ', '}
+      <DecisionLabel decision={decision} />
+    </span>
+  ));
+};
 
 // A cycle the user asked for now says so beside its instant (R6.5.2).
 const instantOf = (cycle: CycleSummary): string =>

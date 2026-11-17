@@ -1,5 +1,5 @@
+import { CommandButton } from '@/components/ui/command-button';
 import { CommandRefusal } from '@/components/ui/command-refusal';
-import { SECONDARY_COMMAND } from '@/components/ui/commands';
 
 import { useExportFlowStrategy } from '../api/export-flow-strategy';
 
@@ -8,14 +8,13 @@ export const ExportStrategyButton = ({ flowId }: { flowId: string }) => {
   const exportStrategy = useExportFlowStrategy();
   return (
     <div>
-      <button
-        type="button"
+      <CommandButton
+        tone="secondary"
         disabled={exportStrategy.isPending}
         onClick={() => exportStrategy.mutate(flowId)}
-        className={SECONDARY_COMMAND}
       >
         Esporta
-      </button>
+      </CommandButton>
       <CommandRefusal refusal="Esportazione rifiutata" error={exportStrategy.error} />
     </div>
   );

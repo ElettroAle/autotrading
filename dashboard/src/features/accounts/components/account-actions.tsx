@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 
+import { CommandButton } from '@/components/ui/command-button';
 import { paths } from '@/config/paths';
 
 import type { Account } from '../api/get-accounts';
@@ -22,20 +23,12 @@ export const AccountActions = ({ account }: { readonly account: Account }) => {
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => start('replacing')}
-          className="rounded border border-slate-300 px-3 py-1.5"
-        >
+        <CommandButton tone="secondary" onClick={() => start('replacing')}>
           Sostituisci le credenziali
-        </button>
-        <button
-          type="button"
-          onClick={() => start('removing')}
-          className="rounded border border-red-300 px-3 py-1.5 text-red-800"
-        >
+        </CommandButton>
+        <CommandButton tone="destructive" onClick={() => start('removing')}>
           Rimuovi
-        </button>
+        </CommandButton>
         <Link
           to={paths.accountCapital.getHref(account.id)}
           className="rounded border border-slate-300 px-3 py-1.5 text-blue-800"

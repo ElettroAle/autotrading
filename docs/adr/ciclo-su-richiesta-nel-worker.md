@@ -10,7 +10,7 @@
 Il ciclo parte solo dal pianificatore APScheduler, agli istanti del suo piano, con `RunCycleUseCase`. Questo caso d'uso:
 - tiene il ciclo unico (`claim`) e da solo (`FlowLockPort.hold`);
 - esegue il grafo e registra il ciclo;
-- registra l'equity, avvisa del fallimento e mette in pausa per errore permanente.
+- registra l'equity, avvisa del fallimento e, per errore permanente, mette in pausa e rilancia l'errore come per il ciclo pianificato (fail fast).
 
 Se il lock è occupato registra un ciclo saltato; se il flusso non è attivo non fa nulla. R6.5.2 chiede un ciclo
 completo subito, rifiutato con un motivo se è già in corso o se il flusso non è attivo. Il prossimo ciclo pianificato
