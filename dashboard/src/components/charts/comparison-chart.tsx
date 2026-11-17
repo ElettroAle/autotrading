@@ -3,11 +3,11 @@ import {
   Line,
   LineChart,
   ReferenceLine,
-  Tooltip,
-  XAxis,
   YAxis,
   type DotItemDotProps,
 } from 'recharts';
+
+import { ChartFrame, ChartTooltip, dotRadius, TimeAxis, useChartWidth } from './chart-frame';
 
 /** A point of a compared curve: the change of the equity from the first point of the period, null if not defined. */
 export type ChangePoint = { readonly plannedAt: string; readonly changePercent: number | null };
@@ -21,9 +21,6 @@ export type ComparedSeries = {
 /** One colour per compared flow, at most five, told apart also with the common forms of colour blindness. */
 export const COMPARISON_COLORS = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#D55E00'] as const;
 
-const WIDTH = 720;
-const HEIGHT = 320;
-
 const percentFormat = new Intl.NumberFormat('it-IT', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -36,7 +33,6 @@ const instantFormat = new Intl.DateTimeFormat('it-IT', {
   hour: '2-digit',
   minute: '2-digit',
 });
-const dayFormat = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit' });
 
 export const percentText = (percent: number): string => `${percentFormat.format(percent)}%`;
 const instantText = (instant: number): string => instantFormat.format(new Date(instant));
@@ -71,7 +67,8 @@ const ChangeDot = ({
   payload,
   name,
   color,
-}: DotItemDotProps & { name: string; color: string }) => {
+  radius,
+}: DotItemDotProps & { name: string; color: string; radius: number }) => {
   const point = payload as PlottedPoint;
   if (point.changePercent === null) {
     return null;
@@ -80,7 +77,7 @@ const ChangeDot = ({
     <circle
       cx={cx}
       cy={cy}
-      r={3}
+      r={radius}
       fill={color}
       role="img"
       aria-label={`${name} ${percentText(point.changePercent)} del ${instantText(point.instant)}`}
@@ -103,26 +100,31 @@ const Legend = ({ series }: { series: readonly ColoredSeries[] }) => (
   </ul>
 );
 
+// The points of the longest curve decide how crowded the chart is.
+const mostPoints = (series: readonly ComparedSeries[]): number =>
+  Math.max(0, ...series.map((flow) => flow.points.length));
+
 /**
  * The equity curves of up to five flows on the same time axis, each as the change in percent from its first point
- * of the period, so flows with different capitals compare (R2.4.3, ADR 0121, ADR 0137).
+ * of the period, so flows with different capitals compare (R2.4.3, ADR 0121, ADR 0137). The chart is as wide as its
+ * room, never wider, with fewer dates and smaller points as they crowd, in the frame every chart shares (ADR
+ * grafici-condivisi-larghi-come-lo-schermo).
  */
 export const ComparisonChart = ({ series }: { series: readonly ComparedSeries[] }) => {
   const curves = colored(series);
+  const [width, setWidth] = useChartWidth();
+  const radius = dotRadius(mostPoints(curves), width);
   return (
-    <figure aria-label="Equity curve sovrapposte" className="overflow-x-auto">
-      <LineChart width={WIDTH} height={HEIGHT} accessibilityLayer>
+    <ChartFrame
+      label="Equity curve sovrapposte"
+      onResize={setWidth}
+      footer={<Legend series={curves} />}
+    >
+      <LineChart accessibilityLayer>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          type="number"
-          dataKey="instant"
-          domain={['dataMin', 'dataMax']}
-          scale="time"
-          allowDuplicatedCategory={false}
-          tickFormatter={(instant: number) => dayFormat.format(new Date(instant))}
-        />
+        <TimeAxis dataKey="instant" domain={['dataMin', 'dataMax']} />
         <YAxis domain={['auto', 'auto']} tickFormatter={percentText} width={72} />
-        <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValue} />
+        <ChartTooltip labelFormatter={tooltipLabel} formatter={tooltipValue} />
         <ReferenceLine y={0} stroke="#475569" strokeDasharray="4 4" />
         {curves.map((flow) => (
           <Line
@@ -134,13 +136,18 @@ export const ComparisonChart = ({ series }: { series: readonly ComparedSeries[] 
             stroke={flow.color}
             strokeWidth={2}
             dot={(props: DotItemDotProps) => (
-              <ChangeDot key={props.index} {...props} name={flow.name} color={flow.color} />
+              <ChangeDot
+                key={props.index}
+                {...props}
+                name={flow.name}
+                color={flow.color}
+                radius={radius}
+              />
             )}
             isAnimationActive={false}
           />
         ))}
       </LineChart>
-      <Legend series={curves} />
-    </figure>
+    </ChartFrame>
   );
 };

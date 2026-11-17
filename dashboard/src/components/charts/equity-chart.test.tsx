@@ -1,17 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
+import { MIN_DOT_RADIUS } from './chart-frame';
 import {
   ABOVE_COLOR,
   BELOW_COLOR,
   CHANGE_COLOR,
   chosenRange,
-  dotRadius,
   equityAt,
   EquityChart,
   selectionMoved,
   selectionStarted,
-  MIN_DOT_RADIUS,
   splitOffset,
   timeDomainOf,
   tooltipLabel,
@@ -367,24 +366,6 @@ describe('the width of the chart, ADR equity-curve-larga-come-lo-schermo', () =>
     await waitFor(() => {
       expect(screen.getAllByRole('img', { name: /^Equity / })[0]).toHaveAttribute('r', '4');
     });
-  });
-});
-
-describe('dotRadius, ADR equity-curve-larga-come-lo-schermo', () => {
-  it('keeps the full size when the points have room', () => {
-    expect(dotRadius(3, 720)).toBe(4);
-  });
-
-  it('shrinks the points as they crowd', () => {
-    expect(dotRadius(90, 720)).toBe(2);
-  });
-
-  it('never draws a point smaller than the least size', () => {
-    expect(dotRadius(1000, 360)).toBe(MIN_DOT_RADIUS);
-  });
-
-  it('keeps the full size without points', () => {
-    expect(dotRadius(0, 720)).toBe(4);
   });
 });
 
