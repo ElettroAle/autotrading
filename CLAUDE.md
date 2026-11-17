@@ -237,8 +237,9 @@ nomi di [bulletproof-react](https://github.com/alan2207/bulletproof-react): `src
 ──> codice condiviso, mai il contrario, nessun import tra funzionalità, nessun barrel file, import assoluti `@/`. Le
 cartelle `utils` e simili sono ammesse solo dentro `dashboard/`: la regola sulle cartelle generiche resta per il Python.
 Container `dashboard` servito sul percorso `/dashboard` dello stesso nome HTTPS di `api` (ADR 0117); accesso Entra come
-SPA con PKCE tramite MSAL, token in `sessionStorage`, autorizzazione solo sull'API (ADR 0118). Controlli come passi dei
-job obbligatori esistenti. Dettagli in `.claude/rules/tech-dashboard.md`.
+SPA con PKCE tramite MSAL, cache MSAL in `localStorage` con CSP rigida, autorizzazione solo sull'API (ADR 0118, ADR
+accesso-persistente-con-cache-msal-in-localstorage). Controlli come passi dei job obbligatori esistenti.
+Dettagli in `.claude/rules/tech-dashboard.md`.
 
 ## Multi-tenancy
 
