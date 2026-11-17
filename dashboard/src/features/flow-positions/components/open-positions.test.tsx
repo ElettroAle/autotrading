@@ -46,6 +46,19 @@ describe('OpenPositions', () => {
     ]);
   });
 
+  it.each([
+    ['long', 'arrow-up'],
+    ['short', 'arrow-down'],
+  ])('shows the direction %s with its icon (R6.5.3)', async (side, icon) => {
+    fakePlatform.holdPositions('alfa', [anOpenPosition({ side })]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const [, direction] = await cellsOfFirstRow();
+    expect(
+      within(within(direction as HTMLElement).getByText(side)).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', icon);
+  });
+
   // ADR piano-di-uscita-nella-dashboard: the plan grows the shared table, its invalidation is a detail of the row.
   it('shows the exit plan in force: target and stop as prices, the invalidation under the position', async () => {
     fakePlatform.holdPositions('alfa', [

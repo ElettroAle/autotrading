@@ -4,7 +4,6 @@ import { formatPrice } from '@/utils/format-amount';
 import type { StepDocument } from '../api/get-cycle';
 import {
   contextOf,
-  decisionLabelOf,
   decisionsOf,
   exitPlanOf,
   sourcesOf,
@@ -15,6 +14,7 @@ import {
 } from '../utils/cycle-documents';
 
 import { CycleSection } from './cycle-section';
+import { DecisionLabel } from './decision-label';
 import { RecordedText, RecordedValue } from './recorded-text';
 
 // The steps by the names the API gives them (R1.2.1).
@@ -103,7 +103,9 @@ const DecisionSections = ({ decision }: { decision: AgentDecision }) => (
       {decision.decisioni.length === 0 && <p>Nessuna decisione valida.</p>}
       {decision.decisioni.map((each) => (
         <div key={each.asset}>
-          <h3 className="font-medium">{decisionLabelOf(each)}</h3>
+          <h3 className="font-medium">
+            <DecisionLabel decision={each} />
+          </h3>
           <DecisionDetailsOf decision={each} />
           <RecordedText text={each.reasoning} />
         </div>
