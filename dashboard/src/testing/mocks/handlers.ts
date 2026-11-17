@@ -4,6 +4,7 @@ import { accountHandlers } from './account-handlers';
 import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
+import { decisionPageOf, InvalidDecisionFilter } from './decisions';
 import { emergencyClosingHandlers } from './emergency-closings';
 import {
   changeAllocatedCapital,
@@ -104,7 +105,11 @@ const refusedOr = (respond: () => Response): Response => {
   try {
     return respond();
   } catch (error) {
-    if (error instanceof InvalidPeriod || error instanceof InvalidSearch) {
+    if (
+      error instanceof InvalidPeriod ||
+      error instanceof InvalidSearch ||
+      error instanceof InvalidDecisionFilter
+    ) {
       return problem(400, 'Bad Request', error.message);
     }
     throw error;
@@ -565,6 +570,15 @@ export const handlers = [
       withConfiguration(flow, params.first, (first) =>
         withConfiguration(flow, params.second, (second) =>
           HttpResponse.json(differences(first, second)),
+        ),
+      ),
+    ),
+  ),
+  http.get('*/flows/:flowId/decisions', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      refusedOr(() =>
+        HttpResponse.json(
+          decisionPageOf(fakePlatform.cyclesOf(flow.id), new URL(request.url).searchParams),
         ),
       ),
     ),

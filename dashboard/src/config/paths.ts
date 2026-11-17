@@ -63,6 +63,11 @@ export const paths = {
       return `/flows/${encodeURIComponent(flowId)}/cycles${query === '' ? '' : `?${query}`}`;
     },
   },
+  flowDecisions: {
+    path: '/flows/:flowId/decisions',
+    getHref: (flowId: string, page = 1) =>
+      `/flows/${encodeURIComponent(flowId)}/decisions${page === 1 ? '' : `?page=${page}`}`,
+  },
   flowCapital: {
     path: '/flows/:flowId/capital',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/capital`,
