@@ -30,7 +30,7 @@ Funzionalità: R3.5.1 Eventi notificabili completi
       | evento                                                                                   | testo                                                              |
       | l'exchange esegue lo stop loss di "alfa" su "BTC" con PnL -5,10 USDC                       | alfa: chiusa BTC per stop loss, PnL -5,10 USDC                     |
       | l'exchange esegue il take profit di "alfa" su "BTC" con PnL 4,90 USDC                      | alfa: chiusa BTC per take profit, PnL 4,90 USDC                    |
-      | l'exchange liquida la posizione di "alfa" su "BTC" con PnL -48,00 USDC                     | alfa: liquidata BTC, PnL -48,00 USDC                               |
+      | l'exchange liquida la posizione di "alfa" su "BTC" con PnL -48,25 USDC                     | alfa: liquidata BTC, PnL -48,25 USDC                               |
       | il rischio riduce l'apertura di "alfa" su "BTC" da 150 a 100 USDC di margine               | alfa: apertura BTC ridotta da 150 a 100 USDC                       |
       | il rischio blocca l'apertura di "alfa" su "BTC" per confidenza 40 sotto la minima 60       | alfa: apertura BTC non eseguita, confidenza 40 sotto la minima 60  |
       | le aperture di "alfa" si sospendono per perdita giornaliera 6% oltre il 5%                 | alfa: aperture sospese, perdita giornaliera 6% oltre il 5%         |
