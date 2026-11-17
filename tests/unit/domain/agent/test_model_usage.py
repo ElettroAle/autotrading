@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.domain.agent.errors import InvalidModelUsageError
-from autotrading.domain.agent.model_usage import ModelPrices, ModelUsage
+from autotrading.domain.agent.model_usage import ModelPrices, ModelSpend, ModelUsage
 
 PRICES = ModelPrices(Decimal(1), Decimal(2))
 
@@ -47,3 +47,50 @@ def test_negative_prices_are_a_defect(input_price: Decimal, output_price: Decima
 
 def test_free_prices_are_allowed() -> None:
     assert ModelUsage(5, 5, None).cost_usd(ModelPrices(Decimal(0), Decimal(0))) == Decimal(0)
+
+
+def test_two_usages_add_their_tokens_and_reported_costs() -> None:
+    total = ModelUsage(100, 0, Decimal("0.0001")).plus(ModelUsage(2000, 500, Decimal("0.0031")))
+
+    assert total == ModelUsage(2100, 500, Decimal("0.0032"))
+
+
+def test_a_usage_without_a_reported_cost_leaves_the_reported_cost_unknown() -> None:
+    assert ModelUsage(100, 0, None).plus(ModelUsage(2000, 500, Decimal("0.0031"))).reported_cost_usd is None
+    assert ModelUsage(100, 0, Decimal("0.0001")).plus(ModelUsage(2000, 500, None)).reported_cost_usd is None
+
+
+def test_a_usage_plus_nothing_reported_is_itself() -> None:
+    usage = ModelUsage(100, 0, Decimal("0.0001"))
+
+    assert usage.plus(None) is usage
+
+
+def test_nothing_is_spent_before_a_call_goes_out() -> None:
+    assert ModelSpend() == ModelSpend(usage=None, cost_usd=None, sent=False)
+
+
+def test_the_calls_that_went_out_add_their_usage_and_their_cost() -> None:
+    first = ModelUsage(100, 0, None)
+    second = ModelUsage(2000, 500, None)
+
+    spend = ModelSpend().with_call(first, Decimal("0.0001")).with_call(second, Decimal("0.0031"))
+
+    assert spend == ModelSpend(ModelUsage(2100, 500, None), Decimal("0.0032"), sent=True)
+
+
+def test_a_call_that_went_out_without_a_known_cost_makes_the_cost_not_available() -> None:
+    known = ModelUsage(100, 0, Decimal("0.0001"))
+
+    after_unknown = ModelSpend().with_call(None, None).with_call(known, Decimal("0.0001"))
+    before_unknown = ModelSpend().with_call(known, Decimal("0.0001")).with_call(None, None)
+
+    assert after_unknown == ModelSpend(known, None, sent=True)
+    assert before_unknown == ModelSpend(known, None, sent=True)
+
+
+def test_a_reported_usage_whose_cost_nobody_knows_makes_the_cost_not_available() -> None:
+    spend = ModelSpend().with_call(ModelUsage(100, 0, None), Decimal("0.0001")).with_call(ModelUsage(1, 1, None), None)
+
+    assert spend.cost_usd is None
+    assert spend.usage == ModelUsage(101, 1, None)

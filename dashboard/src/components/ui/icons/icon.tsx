@@ -1,8 +1,10 @@
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
   CircleAlert,
   CircleCheck,
+  CircleUser,
   Pause,
   Play,
   Plus,
@@ -24,6 +26,8 @@ const DRAWINGS = {
   refresh: RefreshCw,
   'circle-check': CircleCheck,
   'circle-alert': CircleAlert,
+  user: CircleUser,
+  'chevron-down': ChevronDown,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;

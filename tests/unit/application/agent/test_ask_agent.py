@@ -8,7 +8,13 @@ import pytest
 from autotrading.application.agent.ask_agent import AskAgentCommand, AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
-from autotrading.application.agent.errors import ModelKeyMissingError, ModelUnavailableError, ProviderKeyNotOpenedError
+from autotrading.application.agent.errors import (
+    ModelCreditExhaustedError,
+    ModelKeyMissingError,
+    ModelKeyRejectedError,
+    ModelUnavailableError,
+    ProviderKeyNotOpenedError,
+)
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, SourceData
 from autotrading.domain.agent.decision import TradeAction
 from autotrading.domain.agent.errors import ModelNotAvailableError
@@ -18,10 +24,12 @@ from autotrading.domain.agent.model_usage import ModelPrices, ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.provider_keys import (
     FakeProviderKeyOpenerAdapter,
     FakeProviderKeySealerAdapter,
@@ -64,8 +72,10 @@ class World:
         self.store = ProviderKeyStore()
         self.keys = InMemoryProviderKeyRepositoryAdapter(self.store, TENANT)
         self.model = FakeModelCallAdapter(text=ANSWER)
+        self.pause = FakePauseAdapter()
         gateway = FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(CATALOG), self.model)
-        self.use_case = AskAgentUseCase({"models": gateway}, self.keys, FakeProviderKeyOpenerAdapter(self.vault))
+        opener = FakeProviderKeyOpenerAdapter(self.vault)
+        self.use_case = AskAgentUseCase({"models": gateway}, self.keys, opener, self.pause)
 
     def register(self, provider: str, secret: str) -> None:
         name = ProviderName(provider)
@@ -157,12 +167,146 @@ def test_a_model_no_longer_in_the_catalog_is_not_called(world: World) -> None:
     assert world.model.calls == []
 
 
-def test_a_failing_call_fails_the_cycle_as_it_is(world: World) -> None:
+def test_a_call_failing_at_every_attempt_fails_with_the_last_error(world: World) -> None:
     world.register("openrouter", TENANT_KEY)
-    world.model.failure = ModelUnavailableError(OPENROUTER, "503")
+    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "503"), ModelUnavailableError(OPENROUTER, "429")]
+    world.model.failure = ModelUnavailableError(OPENROUTER, "502 Provider returned error")
+
+    with pytest.raises(ModelUnavailableError, match="502 Provider returned error") as raised:
+        world.ask()
+
+    assert raised.value.__cause__ is world.model.failure
+    assert len(world.model.calls) == 3
+
+
+# ADR-ritentativo-del-modello-nel-ciclo: a temporary error is asked again in the same cycle, after 5 and 15 seconds.
+def test_a_temporary_error_is_asked_again_after_a_growing_pause(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.failure = ModelUnavailableError(OPENROUTER, "tempo di risposta scaduto", sent=True)
 
     with pytest.raises(ModelUnavailableError):
         world.ask()
+
+    assert world.pause.pauses == [5.0, 15.0]
+    assert [call.messages for call in world.model.calls] == [CONTEXT.messages()] * 3
+
+
+def test_a_temporary_error_then_an_answer_gives_the_answer_with_the_cost_of_both_calls(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    failed = ModelUsage(100, 0, Decimal("0.0001"))
+    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "502", usage=failed, sent=True)]
+    world.model.usage = ModelUsage(2000, 500, Decimal("0.0031"))
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert [decision.asset for decision in answer.response.decisions] == ["BTC"]
+    assert (answer.usage, answer.cost_usd) == (ModelUsage(2100, 500, Decimal("0.0032")), Decimal("0.0032"))
+    assert world.pause.pauses == [5.0]
+
+
+def test_a_failed_call_priced_by_the_catalog_adds_its_cost_to_the_answer(world: World) -> None:
+    world.register("anthropic", TENANT_KEY)
+    failed = ModelUsage(1000, 0, None)
+    world.model.first_failures = [ModelUnavailableError(ProviderName("anthropic"), "500", usage=failed, sent=True)]
+    world.model.usage = ModelUsage(1000, 1000, None)
+
+    answer = world.use_case.execute(AskAgentCommand(PRICED, {}, CONTEXT))
+
+    assert answer.cost_usd == Decimal("0.004")
+
+
+def test_a_failed_call_that_went_out_without_a_known_cost_leaves_the_cost_not_available(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "tempo di risposta scaduto", sent=True)]
+    world.model.usage = ModelUsage(2000, 500, Decimal("0.0031"))
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert (answer.usage, answer.cost_usd) == (ModelUsage(2000, 500, Decimal("0.0031")), None)
+
+
+def test_a_failed_call_that_never_went_out_costs_nothing(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "ConnectError")]
+    world.model.usage = ModelUsage(2000, 500, Decimal("0.0031"))
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert answer.cost_usd == Decimal("0.0031")
+
+
+def test_the_last_error_carries_the_usage_and_the_cost_of_every_attempt(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    usage = ModelUsage(100, 0, Decimal("0.0001"))
+    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "ConnectError")]
+    world.model.failure = ModelUnavailableError(OPENROUTER, "502", usage=usage, sent=True)
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        world.ask()
+
+    assert (raised.value.usage, raised.value.sent) == (ModelUsage(200, 0, Decimal("0.0002")), True)
+    assert raised.value.cost_usd == Decimal("0.0002")
+
+
+def test_attempts_that_never_went_out_fail_without_a_cost(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.failure = ModelUnavailableError(OPENROUTER, "ConnectError")
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        world.ask()
+
+    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (None, False, None)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [ModelKeyRejectedError(OPENROUTER), ModelCreditExhaustedError(OPENROUTER)],
+    ids=["key rejected", "credit exhausted"],
+)
+def test_a_permanent_error_of_the_provider_is_never_asked_again(world: World, failure: AutotradingError) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.failure = failure
+
+    with pytest.raises(type(failure)):
+        world.ask()
+
+    assert (len(world.model.calls), world.pause.pauses) == (1, [])
+
+
+def test_an_unavailable_provider_made_permanent_by_its_cause_is_never_asked_again(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.failure = _caused_by_code(ModelUnavailableError(OPENROUTER, "401"), 401)
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        world.ask()
+
+    assert raised.value.__cause__ is world.model.failure
+    assert (len(world.model.calls), world.pause.pauses) == (1, [])
+
+
+# Owner decision (17/11/2026, "Riprova sempre"): an answer that arrived but cannot be read is asked again too.
+def test_an_answer_that_arrived_unreadable_is_asked_again(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    usage = ModelUsage(3000, 4000, Decimal("0.002"))
+    world.model.first_failures = [
+        ModelUnavailableError(OPENROUTER, "risposta del fornitore inattesa", usage=usage, sent=True)
+    ]
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert (len(world.model.calls), world.pause.pauses) == (2, [5.0])
+    assert answer.cost_usd == Decimal("0.002") + Decimal("0.001")
+
+
+class ExternalRefusal(Exception):  # noqa: N818 - the error a library of the provider raises, not a project error
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"status {status_code}")
+        self.status_code = status_code
+
+
+def _caused_by_code(error: ModelUnavailableError, code: int) -> ModelUnavailableError:
+    error.__cause__ = ExternalRefusal(code)
+    return error
 
 
 # ADR-uso-riportato-nell-errore-della-chiamata-al-modello: a paid call without a usable answer keeps usage and cost.
@@ -174,7 +318,8 @@ def test_a_call_without_a_usable_answer_fails_with_the_usage_and_the_cost_of_the
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask(PRICED)
 
-    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (usage, True, Decimal("0.003"))
+    every_attempt = ModelUsage(3000, 3000, None)
+    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (every_attempt, True, Decimal("0.009"))
     assert raised.value.__cause__ is world.model.failure
 
 
@@ -186,7 +331,7 @@ def test_a_call_without_a_usable_answer_keeps_the_cost_the_provider_reported(wor
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask()
 
-    assert raised.value.cost_usd == Decimal("0.002")
+    assert raised.value.cost_usd == Decimal("0.006")
 
 
 def test_an_unreadable_answer_keeps_the_usage_and_the_cost_of_the_call(world: World) -> None:

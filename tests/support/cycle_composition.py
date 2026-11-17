@@ -13,7 +13,7 @@ from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
 from autotrading.application.agent.list_agent_actions import ListAgentActionsUseCase
 from autotrading.application.agent.model_gateways import ModelGateways
-from autotrading.application.agent.ports import ProviderKeyOpenerPort, ProviderKeyRepositoryPort
+from autotrading.application.agent.ports import PausePort, ProviderKeyOpenerPort, ProviderKeyRepositoryPort
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.compose_cycle_context import ComposeCycleContextUseCase
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps, GraphCheckpoints
@@ -107,6 +107,7 @@ class CycleServices:
     clock: ClockPort
     model_gateways: ModelGateways
     provider_key_opener: ProviderKeyOpenerPort
+    pause: PausePort
     sentiments: Mapping[str, SentimentPort]
     news: NewsPort
     prices: PriceHistoryPort
@@ -150,7 +151,9 @@ def run_cycle_for(
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
                 ComposeAgentContextUseCase(),
-                AskAgentUseCase(services.model_gateways, ports.provider_keys, services.provider_key_opener),
+                AskAgentUseCase(
+                    services.model_gateways, ports.provider_keys, services.provider_key_opener, services.pause
+                ),
             )
         ),
         risk=ReviewCycleRiskUseCase(

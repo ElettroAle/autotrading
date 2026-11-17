@@ -252,8 +252,8 @@ def open_accounts_page(emergency: Emergency, user: str) -> None:
     )
 
 
-@when(quoted('"{user}" apre nella dashboard l\'elenco dei flussi'))
-def open_flows_list(emergency: Emergency, user: str) -> None:
+@when(quoted('"{user}" apre nella dashboard le impostazioni generali'))
+def open_general_settings(emergency: Emergency, user: str) -> None:
     emergency.open_page(user, {f"{EMERGENCY_COMMAND} di tutti i flussi": EmergencyScope()})
 
 
@@ -411,6 +411,13 @@ def flow_commands_without_emergency(emergency: Emergency, name: str) -> None:
     status = emergency.flow(name).status
     assert [action for action in FlowAction if status in action.starts_from] == [FlowAction.PAUSE, FlowAction.STOP]
     assert emergency.nothing_run()
+
+
+@then("l'elenco dei flussi non contiene la chiusura di emergenza")
+def flows_list_without_emergency(emergency: Emergency) -> None:
+    # The list of the flows reads only the flows: no closing and no count of the positions to close starts from it.
+    assert emergency.nothing_run()
+    assert all(emergency.flow_position_open(name) for name in emergency.owners)
 
 
 @then("i comandi dei conti non contengono la chiusura di emergenza")

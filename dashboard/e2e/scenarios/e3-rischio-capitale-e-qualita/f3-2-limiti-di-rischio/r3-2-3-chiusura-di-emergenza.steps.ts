@@ -103,10 +103,12 @@ When(
 );
 
 When(
-  "{string} apre nella dashboard l'elenco dei flussi",
+  '{string} apre nella dashboard le impostazioni generali',
   async ({ dashboard }, account: string) => {
     await dashboard.openAndSignInAs(account);
     await expect(dashboard.flows()).toBeVisible();
+    await dashboard.menuEntry('Generale').click();
+    await expect(dashboard.page.getByRole('heading', { level: 1 })).toHaveText('Generale');
     await dashboard.waitUntilRead();
   },
 );
@@ -172,6 +174,15 @@ Then(
     await expect(head.getByRole('button', { name: EMERGENCY })).toHaveCount(0);
   },
 );
+
+// ADR voce-generale-con-la-zona-pericolosa: the page of every day offers no emergency closing.
+Then("l'elenco dei flussi non contiene la chiusura di emergenza", async ({ dashboard }) => {
+  await dashboard.menuEntry('Flussi').click();
+  await expect(dashboard.flows().getByRole('link').first()).toBeVisible();
+  await dashboard.waitUntilRead();
+  await expect(dashboard.content().getByRole('button', { name: EMERGENCY })).toHaveCount(0);
+  await expect(zoneNamed(dashboard, 'Zona di emergenza')).toHaveCount(0);
+});
 
 Then('i comandi dei conti non contengono la chiusura di emergenza', async ({ dashboard }) => {
   const accounts = dashboard.page.getByRole('table', { name: 'Conti' });

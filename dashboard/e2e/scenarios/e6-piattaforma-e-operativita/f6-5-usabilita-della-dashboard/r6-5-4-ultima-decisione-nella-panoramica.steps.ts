@@ -20,6 +20,7 @@ import { Given, Then, When } from '../../../support/fixtures';
 // The user who owns the flows of the scenarios and opens their Panoramica.
 const OWNER = 'anna';
 const SHORTENED_LENGTH = 160;
+const READ_ALL = /\s*Leggi tutto$/;
 const REASONING =
   'Il prezzo ha rotto la resistenza con volumi in aumento e il sentiment resta positivo: apro una posizione long ' +
   'con leva contenuta e uno stop sotto il minimo della giornata, pronto a chiuderla se il volume cala.';
@@ -119,7 +120,11 @@ Then(
     await expect(valueOf(decision, 'Azione')).toHaveText(action);
     await expect(valueOf(decision, 'Direzione')).toHaveText(direction);
     await expect(valueOf(decision, 'Confidenza')).toHaveText(String(confidence));
-    const reasoning = (await valueOf(decision, 'Ragionamento').textContent()) ?? '';
+    // The command «Leggi tutto» beside the shortened text opens it whole (ADR testo-lungo-espandibile).
+    const reasoning = ((await valueOf(decision, 'Ragionamento').textContent()) ?? '').replace(
+      READ_ALL,
+      '',
+    );
     expect(reasoning.endsWith('…')).toBe(true);
     expect(reasoning.length).toBeLessThanOrEqual(SHORTENED_LENGTH + 1);
     expect(REASONING.startsWith(reasoning.slice(0, -1))).toBe(true);

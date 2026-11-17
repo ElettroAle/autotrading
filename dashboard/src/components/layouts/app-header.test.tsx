@@ -1,9 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Link, RouterProvider } from 'react-router';
 
 import { RuntimeConfigProvider } from '@/config/runtime-config';
-import { TEST_CONFIG } from '@/testing/test-utils';
+import { AuthProvider } from '@/lib/auth';
+import { FAKE_IDENTITY_PROVIDER } from '@/testing/mocks/identity-provider';
+import { authClientFor, TEST_CONFIG } from '@/testing/test-utils';
 
 import { AppHeader } from './app-header';
 
@@ -85,5 +88,35 @@ describe('AppHeader', () => {
     expect(screen.getByText('AutoTrading')).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(backCommand()).not.toBeInTheDocument();
+  });
+
+  // ADR area-utente-in-alto-a-destra.
+  it('shows the area of the signed-in user on the right of the bar, after the environment', async () => {
+    const client = await authClientFor('anna');
+    render(
+      <AuthProvider client={client} scope={FAKE_IDENTITY_PROVIDER.scope}>
+        <QueryClientProvider client={new QueryClient()}>
+          <RuntimeConfigProvider config={TEST_CONFIG}>
+            <AppHeader />
+          </RuntimeConfigProvider>
+        </QueryClientProvider>
+      </AuthProvider>,
+    );
+
+    const user = within(screen.getByRole('banner')).getByRole('button', { name: 'anna' });
+    const environment = screen.getByLabelText("Ambiente dell'installazione");
+    expect(environment.compareDocumentPosition(user) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(
+      0,
+    );
+  });
+
+  it('shows no area of the user before the sign-in', () => {
+    render(
+      <RuntimeConfigProvider config={TEST_CONFIG}>
+        <AppHeader />
+      </RuntimeConfigProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'anna' })).not.toBeInTheDocument();
   });
 });

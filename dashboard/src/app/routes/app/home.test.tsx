@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { fakePlatform } from '@/testing/mocks/platform';
-import { partsAfter, renderApp } from '@/testing/test-utils';
+import { renderApp } from '@/testing/test-utils';
 
 const OTHER_AREAS = ['/accounts', '/history', '/provider-keys', '/notifications'];
 
@@ -45,18 +45,13 @@ describe('HomeRoute', () => {
     expect(hrefs.filter((href) => OTHER_AREAS.some((area) => href.startsWith(area)))).toEqual([]);
   });
 
-  // ADR zona-di-emergenza-in-fondo-alla-pagina.
-  it('keeps the emergency closing of every flow alone in the zone at the bottom of the page', async () => {
+  // ADR voce-generale-con-la-zona-pericolosa: the emergency closing of every flow lives in the general settings.
+  it('offers no emergency closing in the page of every day', async () => {
     fakePlatform.addFlow('anna', 'alfa');
     await renderApp({ account: 'anna' });
 
-    const zone = await screen.findByRole('region', { name: 'Zona di emergenza' });
-    expect(
-      within(zone)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual(['Chiusura di emergenza di tutti i flussi']);
     await screen.findByRole('link', { name: 'alfa' });
-    expect(partsAfter(zone)).toEqual([]);
+    expect(screen.queryByRole('region', { name: 'Zona di emergenza' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Chiusura di emergenza/ })).toBeNull();
   });
 });
