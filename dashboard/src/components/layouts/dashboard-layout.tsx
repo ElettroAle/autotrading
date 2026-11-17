@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
 
+import { Icon } from '@/components/ui/icons/icon';
 import { RefreshBar } from '@/components/ui/refresh-bar';
 import { paths } from '@/config/paths';
 import { usePageData } from '@/hooks/use-page-data';
@@ -117,10 +118,11 @@ export const DashboardLayout = ({ title, children }: { title: string; children: 
           type="button"
           aria-expanded={menuOpen}
           aria-controls={navigationId}
+          aria-label="Menu"
           onClick={() => setMenuOpen((open) => !open)}
-          className="rounded border border-slate-300 px-2 py-1 text-sm md:hidden"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded border border-slate-300 md:hidden"
         >
-          Menu
+          <Icon name="menu" />
         </button>
       </AppHeader>
       <div className="md:flex">

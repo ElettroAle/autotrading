@@ -24,6 +24,14 @@ describe('BackButton', () => {
     expect(router.state.location.pathname).toBe('/flows/alfa');
   });
 
+  // ADR intestazione-su-una-riga.
+  it('shows only the arrow under 768 pixels, keeping «Indietro» for screen readers', () => {
+    openDashboardWith(['/flows/alfa']);
+
+    expect(screen.getByText('Indietro')).toHaveClass('max-md:sr-only');
+    expect(screen.getByRole('button', { name: 'Indietro' })).toHaveClass('min-h-11', 'min-w-11');
+  });
+
   it('leads to the main page from the page the dashboard was opened on', async () => {
     const router = openDashboardWith(['/flows/alfa']);
 
