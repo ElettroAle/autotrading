@@ -21,8 +21,8 @@ mostra `DraftAssignmentForm` con conto, capitale e asset.
 
 - `flow-form.tsx`, per una bozza: «Conto» selezionabile e preselezionato col conto del flusso (quello copiato da
   Duplica), «Capitale allocato» modificabile, asset modificabili; tutto salvato con `PATCH /flows/{flow_id}`
-  (`allocated_capital` nello schema rigenerato). Fuori dalla bozza conto e capitale sono in sola lettura, con un
-  rimando al comando del capitale.
+  (`allocated_capital` nello schema rigenerato). Fuori dalla bozza il conto è in sola lettura e il capitale
+  resta modificabile come oggi, salvato con `PUT /flows/{flow_id}/allocated-capital` (R1.1.7, R2.3.3).
 - Panoramica di una bozza: al posto di `DraftAssignmentForm` un avviso con ciò che manca all'avvio e il collegamento
   «Configura» all'editor. Spariscono `draft-assignment-form.tsx`, `api/assign-draft-flow` e i loro test.
 - Prove: unit test del form (bozza con conto preselezionato, salvataggio con conto/capitale/asset, sola lettura
