@@ -12,22 +12,30 @@ import { problem, withUser } from './responses';
 const ARCHIVED = 'archiviato';
 const TELEGRAM_NOT_LINKED = 'Telegram non collegato';
 const EMAIL_NOT_INDICATED = 'email non indicata';
+const MAIL_SERVER_MISSING = 'server di posta non configurato';
 
 const isChannel = (value: unknown): value is FakeChannel =>
   FAKE_CHANNELS.some((channel) => channel === value);
 
 const typeOf = (event: unknown) => FAKE_EVENT_TYPES.find((type) => type.event === event);
 
-// The same warnings the API computes: a chosen channel with nothing linked sends nothing (R3.5.3).
-const warningsOf = (account: string, channel: FakeChannel): string[] => [
-  ...(['Telegram', 'entrambi'].includes(channel) && fakePlatform.linkedChatOf(account) === undefined
-    ? [TELEGRAM_NOT_LINKED]
-    : []),
-  ...(['email', 'entrambi'].includes(channel) &&
-  fakePlatform.notificationEmailOf(account) === undefined
-    ? [EMAIL_NOT_INDICATED]
-    : []),
-];
+// The same warnings the API computes: a chosen channel with nothing linked sends nothing (R3.5.3), and no email
+// leaves without the mail server of the user (R3.5.5).
+const warningsOf = (account: string, channel: FakeChannel): string[] => {
+  const reachesChat = ['Telegram', 'entrambi'].includes(channel);
+  const reachesEmail = ['email', 'entrambi'].includes(channel);
+  return [
+    ...(reachesChat && fakePlatform.linkedChatOf(account) === undefined
+      ? [TELEGRAM_NOT_LINKED]
+      : []),
+    ...(reachesEmail && fakePlatform.notificationEmailOf(account) === undefined
+      ? [EMAIL_NOT_INDICATED]
+      : []),
+    ...(reachesEmail && fakePlatform.mailServerOf(account) === undefined
+      ? [MAIL_SERVER_MISSING]
+      : []),
+  ];
+};
 
 const eventChannel = (account: string, event: string, channel: FakeChannel) => ({
   event,
@@ -52,6 +60,7 @@ const channelsOf = (account: string) => ({
         ([event, channel]) => eventChannel(account, event, channel),
       ),
     })),
+  warnings: warningsOf(account, 'entrambi'),
 });
 
 const invalid = () =>

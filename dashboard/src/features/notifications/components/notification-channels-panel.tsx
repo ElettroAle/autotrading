@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
@@ -16,6 +17,7 @@ import {
 } from '../api/get-notification-channels';
 import { useRemoveFlowChannelException } from '../api/remove-flow-channel-exception';
 import { useSetFlowChannelException } from '../api/set-flow-channel-exception';
+import { searchOfTab } from '../utils/notification-tabs';
 
 const COMMAND_FAILED = 'Operazione non riuscita';
 // The choice that takes the exception away: the flow follows the general choice again.
@@ -49,6 +51,21 @@ const ChannelCell = ({ event, value, onChoose, withGeneral = false }: ChannelCel
 
 const Warnings = ({ warnings }: { readonly warnings: readonly string[] }) =>
   warnings.length === 0 ? null : <span className="text-amber-800">{warnings.join(', ')}</span>;
+
+// The reminder where the choice is made: a channel that cannot be reached is configured in the tab of the channels
+// (tech-dashboard.md, §Pagine di impostazioni).
+const ChannelsToConfigure = ({ warnings }: { readonly warnings: readonly string[] }) =>
+  warnings.length === 0 ? null : (
+    <p role="status" aria-label="Canali da configurare" className="text-amber-800">
+      Canali da configurare: {warnings.join(', ')}.{' '}
+      <Link
+        to={{ search: searchOfTab('channels') }}
+        className="font-medium text-blue-700 underline"
+      >
+        Configura
+      </Link>
+    </p>
+  );
 
 const isChannel = (value: string): value is NotificationChannel =>
   CHANNELS.some((channel) => channel === value);
@@ -171,6 +188,7 @@ export const NotificationChannelsPanel = () => {
       {channels.isError && <ErrorMessage error={channels.error} />}
       {channels.isSuccess && (
         <>
+          <ChannelsToConfigure warnings={channels.data.warnings} />
           <GeneralChannels events={channels.data.events} />
           <Exceptions channels={channels.data} />
         </>

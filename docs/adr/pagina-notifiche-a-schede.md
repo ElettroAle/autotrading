@@ -1,6 +1,6 @@
 # ADR pagina-notifiche-a-schede — Pagina Notifiche a schede e pannello del server di posta
 
-- Stato: proposta (17 novembre 2026)
+- Stato: accettata (17 novembre 2026, design approvato dal proprietario)
 - Requisiti: R3.5.5, Task T3.5.5.3; R1.8.1, R3.5.2, R3.5.3
 - Collegate: ADR schede-con-aspetto-e-ruolo-di-schede, ADR indirizzo-email-nelle-impostazioni-delle-notifiche, ADR
   scelta-dei-canali-nella-dashboard, ADR icone-con-lucide-react-e-comandi-condivisi, ADR
