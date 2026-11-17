@@ -7,6 +7,7 @@ import { Given, Then, When } from '../../../support/fixtures';
 const USER = 'anna';
 const CYCLE = 15 * 60 * 1000;
 const DAY = 24 * 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
 const GREEN = '#16a34a';
 const RED = '#dc2626';
 
@@ -76,7 +77,9 @@ Then("il punto a {int} USDC è nell'area rossa", async ({ dashboard }, equity: n
 Then(
   'la curva mostra solo i punti degli ultimi {int} giorni',
   async ({ dashboard, memory }, days: number) => {
-    const since = Date.now() - days * DAY;
+    // The window of a period starts at a whole minute (ADR periodi-brevi-come-durata-nel-dominio).
+    const exact = Date.now() - days * DAY;
+    const since = exact - (exact % MINUTE);
     const expected = fakePlatform
       .flowNamed(memory.flow)
       .equity.filter((point) => point.plannedAt.getTime() >= since).length;
