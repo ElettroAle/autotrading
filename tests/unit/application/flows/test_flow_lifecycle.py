@@ -36,6 +36,9 @@ from autotrading.domain.flows.errors import (
     InvalidDefaultStopLossError,
     InvalidDefaultTakeProfitError,
     InvalidMinimumConfidenceError,
+    MaxConsecutiveFailuresOutOfRangeError,
+    MaxLossOutOfRangeError,
+    TotalExposureOutOfRangeError,
     UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
@@ -43,6 +46,7 @@ from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
@@ -147,7 +151,13 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         max_leverage=2,
         max_margin_exposure_percent=Decimal(20),
         max_value_exposure_percent=Decimal(30),
+        max_total_margin_exposure_percent=Decimal(40),
+        max_total_value_exposure_percent=Decimal(200),
         bring_to_minimum=True,
+        max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
     configuration = flows.modify.execute(command).configuration
@@ -159,8 +169,12 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         sources=(SourceSelection("notizie", 7, {"numero_notizie": 3}),),
         instructions="prudente",
         cycle_interval=CycleInterval(60),
-        risk_limits=RiskLimits(2, Decimal(20), Decimal(30)),
+        risk_limits=RiskLimits(2, Decimal(20), Decimal(30), Decimal(40), Decimal(200)),
         bring_to_minimum=True,
+        max_consecutive_failures=3,
+        max_daily_loss_percent=Decimal(5),
+        max_drawdown_percent=Decimal(10),
+        openings_resume=OpeningsResume.NEXT_DAY,
     )
 
 
@@ -197,6 +211,63 @@ def test_an_exposure_left_out_keeps_the_one_in_force(flows: Flows) -> None:
     assert modified.configuration.risk_limits == RiskLimits(5, Decimal(10), Decimal(5))
 
 
+def test_a_change_without_maximum_of_consecutive_failures_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_consecutive_failures=3))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro"))
+
+    assert modified.configuration.max_consecutive_failures == 3
+
+
+def test_a_change_without_maximum_losses_nor_resume_keeps_the_ones_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(
+        ModifyFlowCommand(
+            flow.id,
+            max_daily_loss_percent=Decimal(5),
+            max_drawdown_percent=Decimal(10),
+            openings_resume=OpeningsResume.NEXT_DAY,
+        )
+    )
+
+    configuration = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="altro")).configuration
+
+    assert (
+        configuration.max_daily_loss_percent,
+        configuration.max_drawdown_percent,
+        configuration.openings_resume,
+    ) == (Decimal(5), Decimal(10), OpeningsResume.NEXT_DAY)
+
+
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum losses.
+def test_maximum_losses_removed_on_purpose_leave_the_next_version_without_them(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(
+        ModifyFlowCommand(flow.id, max_daily_loss_percent=Decimal(5), max_drawdown_percent=Decimal(10))
+    )
+
+    daily_removed = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_daily_loss=True)).configuration
+    both_removed = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_drawdown=True)).configuration
+
+    assert (daily_removed.max_daily_loss_percent, daily_removed.max_drawdown_percent) == (None, Decimal(10))
+    assert (both_removed.version, both_removed.max_daily_loss_percent, both_removed.max_drawdown_percent) == (
+        4,
+        None,
+        None,
+    )
+
+
+# ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta, applied to the maximum of consecutive failures.
+def test_a_maximum_of_consecutive_failures_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_consecutive_failures=3))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_consecutive_failures=True))
+
+    assert (modified.configuration.version, modified.configuration.max_consecutive_failures) == (3, None)
+
+
 # ADR limite-di-esposizione-tolto-con-un-null-inviato-apposta:
 # the flag removes the limit, the domain refuses a version without any.
 def test_an_exposure_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
@@ -225,6 +296,39 @@ def test_an_exposure_is_replaced_while_the_other_is_removed(flows: Flows) -> Non
     )
 
     assert modified.configuration.risk_limits == RiskLimits(5, None, Decimal(30))
+
+
+def test_an_overall_exposure_left_out_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, max_total_margin_exposure_percent=Decimal(30)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, max_total_value_exposure_percent=Decimal(90)))
+
+    assert modified.configuration.risk_limits == RiskLimits(5, Decimal(10), None, Decimal(30), Decimal(90))
+
+
+def test_an_overall_exposure_removed_on_purpose_leaves_the_next_version_without_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(
+        ModifyFlowCommand(
+            flow.id, max_total_margin_exposure_percent=Decimal(30), max_total_value_exposure_percent=Decimal(90)
+        )
+    )
+
+    without_margin = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_total_margin_exposure=True))
+    without_any = flows.modify.execute(ModifyFlowCommand(flow.id, remove_max_total_value_exposure=True))
+
+    assert without_margin.configuration.risk_limits == RiskLimits(5, Decimal(10), None, None, Decimal(90))
+    assert without_any.configuration.risk_limits == RiskLimits(5, Decimal(10))
+
+
+def test_an_overall_exposure_out_of_range_is_refused_and_the_version_in_force_stays(flows: Flows) -> None:
+    flow = flows.saved()
+
+    with pytest.raises(TotalExposureOutOfRangeError, match=r"^l'esposizione complessiva massima va da 0,1 a 1000$"):
+        flows.modify.execute(ModifyFlowCommand(flow.id, max_total_margin_exposure_percent=Decimal(1001)))
+
+    assert flows.current(flow) == flow
 
 
 def test_removing_both_exposures_is_refused_and_the_version_in_force_stays(flows: Flows) -> None:
@@ -330,6 +434,13 @@ def test_the_minimum_confidence_removed_on_purpose_leaves_the_next_version_witho
         ({"assets": ("BTC", "XYZ")}, AssetNotTradableError, "asset non negoziabile sull'exchange: XYZ"),
         ({"account_id": uuid4()}, AccountNotChangeableError, "il conto di un flusso non si cambia"),
         ({"system_prompt": "Leva {leverage}"}, UnknownPromptPlaceholderError, 'il segnaposto "leverage" non esiste'),
+        ({"max_daily_loss_percent": Decimal(0)}, MaxLossOutOfRangeError, "la perdita massima va da 0,1 a 100"),
+        ({"max_drawdown_percent": Decimal(101)}, MaxLossOutOfRangeError, "la perdita massima va da 0,1 a 100"),
+        (
+            {"max_consecutive_failures": 101},
+            MaxConsecutiveFailuresOutOfRangeError,
+            "il massimo di cicli falliti consecutivi va da 1 a 100",
+        ),
         (
             {"default_stop_loss_percent": Decimal(51)},
             InvalidDefaultStopLossError,

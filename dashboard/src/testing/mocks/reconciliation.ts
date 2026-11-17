@@ -141,10 +141,19 @@ export const fakeReconciliation = {
     );
   },
 
-  /** Why the openings of the flows of the account are suspended, with the words of the API; null when they are not. */
-  openingsSuspendedOf(accountId: string, accountName: string): string | null {
-    return openAlarmOf(accountId) === undefined
+  /**
+   * The suspension of the openings of the flows of the account while an alarm is open, as the API answers it; null when
+   * none is open. Only the confirmation of the account ends it (R3.3.1).
+   */
+  openingsSuspensionOf(accountId: string, accountName: string) {
+    const alarm = openAlarmOf(accountId);
+    return alarm === undefined
       ? null
-      : `allarme di riconciliazione sul conto ${accountName}`;
+      : {
+          reason: `allarme di riconciliazione sul conto ${accountName}`,
+          suspended_at: alarm.opened_at,
+          cause: 'riconciliazione' as const,
+          resumable: false,
+        };
   },
 };

@@ -231,7 +231,7 @@ describe('FlowView', () => {
 
     expect(
       await screen.findByText('aperture sospese: allarme di riconciliazione sul conto principale'),
-    ).toHaveAttribute('role', 'note');
+    ).toHaveAttribute('role', 'status');
   });
 
   it('says nothing of the openings of a flow whose account has no alarm', async () => {

@@ -6,10 +6,10 @@ from decimal import Decimal
 from typing import TypedDict, cast
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, func, select
+from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, Select, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
-from autotrading.adapters.outbound.sqlalchemy.tables import cycles
+from autotrading.adapters.outbound.sqlalchemy.tables import cycles, flows
 from autotrading.adapters.outbound.sqlalchemy.time_window import within
 from autotrading.application.flows.errors import UnrecordableDocumentError
 from autotrading.domain.flows.call_cost import CallCost
@@ -126,6 +126,15 @@ class SqlAlchemyCycleRepositoryAdapter:
         with self._transaction() as connection:
             return connection.execute(query).scalar_one()
 
+    def consecutive_failures(self, flow_id: UUID) -> int:
+        """The failed cycles after the last completed one and since the flow last became active (R3.2.4).
+
+        The anchor moves at every change into "active", so a resume starts the count again without any write; a
+        skipped cycle is neither failed nor completed and leaves the series as it is.
+        """
+        with self._transaction() as connection:
+            return connection.execute(consecutive_failures_statement(flow_id)).scalar_one()
+
     def costs(self, flow_id: UUID) -> list[CycleCost]:
         return self.costs_within(flow_id, TimeWindow())
 
@@ -147,6 +156,23 @@ class SqlAlchemyCycleRepositoryAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             yield connection
+
+
+def consecutive_failures_statement(flow_id: UUID) -> Select[int]:
+    """The count of the failed cycles of the flow after its last completed one and since its anchor (R3.2.4)."""
+    completed = cycles.alias("completed")
+    last_completed = (
+        select(func.max(completed.c.planned_at))
+        .where(completed.c.flow_id == flow_id, completed.c.outcome == CycleOutcome.COMPLETED.name.lower())
+        .scalar_subquery()
+    )
+    anchor = select(flows.c.cycle_anchor).where(flows.c.id == flow_id).scalar_subquery()
+    return select(func.count()).where(
+        cycles.c.flow_id == flow_id,
+        cycles.c.outcome == CycleOutcome.FAILED.name.lower(),
+        or_(last_completed.is_(None), cycles.c.planned_at > last_completed),
+        or_(anchor.is_(None), cycles.c.planned_at >= anchor),
+    )
 
 
 def matching(criteria: CycleFilter) -> ColumnElement[bool]:

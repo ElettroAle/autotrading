@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -14,6 +15,26 @@ class PositionLeftOpen:
 
     asset: str
     reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class FlowClosings:
+    """What closing every position of a flow gave: the assets closed and the positions the exchange left open
+    (ADR 0055, ADR chiusura-di-emergenza-per-ambito)."""
+
+    closed: tuple[str, ...] = ()
+    left_open: tuple[PositionLeftOpen, ...] = ()
+
+    @classmethod
+    def of(cls, closings: Iterable[PositionClosing]) -> FlowClosings:
+        """A closing with its fill closed the position; one without was refused, with the reason of the exchange."""
+        done = tuple(closings)
+        return cls(
+            closed=tuple(closing.asset for closing in done if closing.fill is not None),
+            left_open=tuple(
+                PositionLeftOpen(closing.asset, closing.refusal or "") for closing in done if closing.fill is None
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)

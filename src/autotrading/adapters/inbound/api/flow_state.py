@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
+from autotrading.adapters.inbound.api.flows import OpeningsSuspensionResponse
 from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
@@ -72,7 +73,7 @@ class FlowStateResponse(BaseModel):
     return_percent: str | None
     positions: list[FlowPositionResponse]
     summary: FlowResultsResponse
-    openings_suspended: str | None
+    openings_suspension: OpeningsSuspensionResponse | None
 
     @classmethod
     def of(cls, results: FlowResults) -> FlowStateResponse:
@@ -92,7 +93,7 @@ class FlowStateResponse(BaseModel):
                 FlowPositionResponse.of(position, state.exit_plan_of(position.asset)) for position in state.positions
             ],
             summary=FlowResultsResponse.of(results),
-            openings_suspended=results.openings_suspended,
+            openings_suspension=OpeningsSuspensionResponse.of(results.openings_suspension),
         )
 
 

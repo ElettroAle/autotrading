@@ -1,27 +1,44 @@
 """The alarm on the balance of an account the cycles cannot explain (R3.3.1), on the cycles as the worker runs them."""
 
-import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.accounts.set_deviation_threshold import SetDeviationThresholdCommand
 from autotrading.application.flows.confirm_reconciliation import ConfirmReconciliationCommand
+from autotrading.application.flows.ports import ReconciliationAlarmPorts
+from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.unattributable import UnattributableKind
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.trading_access import TradingAccess
-from tests.support.activity import READ_AT, a_movement, an_activity
-from tests.support.flow_cycles import FlowCycles
+from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
+from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
+from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
+from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
+from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.support.activity import READ_AT, a_fill, a_movement, a_payment, a_position, an_activity
+from tests.support.decision_steps import answer, opening
+from tests.support.flow_cycles import FlowCycles, at
+from tests.support.flows import a_configuration, a_flow
 from tests.support.notifications import chat_named
 from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
@@ -33,11 +50,66 @@ ALARM_TEXT = "allarme di riconciliazione"
 ACCOUNT_OF_FLOWS = "test-1"
 MOVEMENTS = {"deposito": Decimal(1), "prelievo": Decimal(-1)}
 SOL = Market("SOL", max_leverage=20, size_decimals=2, mid_price=Decimal(150), min_order_value=Decimal(10))
+LATE_ASSET = "BTC"
+
+
+class LateRows:
+    """The reconciliation of one account on the fake adapters, with rows the exchange publishes after a reading of
+    the balance that already held them (Bug 506)."""
+
+    def __init__(self) -> None:
+        self.tenant_id = TenantId(uuid4())
+        self.account_id = uuid4()
+        self.store = FlowStore()
+        self.exchange = FakeAccountActivityAdapter()
+        self.orders = InMemoryPlatformOrdersAdapter()
+        self.ledger = InMemoryFlowLedgerAdapter()
+        self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.reconciled_at: datetime | None = None
+        flows = InMemoryFlowRepositoryAdapter(self.store, self.tenant_id)
+        accounts = FakeAccountThresholdsAdapter({self.account_id: "principale"})
+        record = RecordAccountExecutionsUseCase(flows, self.exchange, self.orders, self.ledger)
+        alarms = ReconciliationAlarmPorts(accounts, accounts, FakeReconciliationAlarmNoticeAdapter())
+        self.reconcile = ReconcileAccountUseCase(
+            flows,
+            self.exchange,
+            self.readings,
+            InMemoryClosedPositionsAdapter(),
+            record,
+            InMemoryProtectionClosingsAdapter(),
+            alarms,
+        )
+
+    def flow(self, name: str) -> Flow:
+        """The flow of the account, holding a position on its asset since before the previous reading."""
+        known = next((flow for flow in self.store.flows if flow.name.value == name), None)
+        if known is not None:
+            return known
+        configuration = a_configuration(assets=(LATE_ASSET,))
+        flow = a_flow(
+            self.tenant_id, name=name, account_id=self.account_id, status=FlowStatus.ACTIVE, configuration=configuration
+        )
+        self.store.flows.append(flow)
+        self.ledger.totals[flow.id] = FlowTotals(flow.id, positions=frozendict({LATE_ASSET: Decimal(1)}))
+        return flow
+
+    def publish_at(self, clock: str) -> None:
+        previous = self.readings.last_reading(self.account_id)
+        assert previous is not None
+        self.reconciled_at = at(clock)
+        assert self.reconciled_at > previous.read_at
+        # The ledger was read up to the previous reading: what comes late falls in the hour it reads again (ADR 0076).
+        self.ledger.cursors[self.account_id] = previous.read_at
 
 
 @pytest.fixture(name="flow_cycles")
 def flow_cycles_of_the_worker() -> FlowCycles:
     return FlowCycles()
+
+
+@pytest.fixture
+def late_rows() -> LateRows:
+    return LateRows()
 
 
 @pytest.fixture
@@ -71,25 +143,6 @@ def exchange_shows(flow_cycles: FlowCycles, account: str, balance: Decimal, decl
     flow_cycles.platform.activity_reader.activities[address_of(flow_cycles, account)] = activity
 
 
-def answer(flow_cycles: FlowCycles, *decisions: dict[str, object]) -> None:
-    flow_cycles.model.text = json.dumps({"decisioni": list(decisions)})
-
-
-def opening(asset: str) -> dict[str, object]:
-    return {
-        "asset": asset,
-        "azione": "apri",
-        "direzione": "long",
-        "quota": 0.1,
-        "leva": 3,
-        "obiettivo": None,
-        "stop": None,
-        "invalidazione": None,
-        "confidenza": 70,
-        "ragionamento": "r",
-    }
-
-
 def next_cycle(flow_cycles: FlowCycles, flow: str) -> None:
     flow_cycles.clock.current += CYCLE
     flow_cycles.run(flow)
@@ -118,7 +171,7 @@ def openings_suspended(flow_cycles: FlowCycles, flow: str) -> bool:
     sent_before = len(flow_cycles.platform.order_exchange.sent)
     answer(flow_cycles, opening(asset))
     next_cycle(flow_cycles, flow)
-    reason = f"{ALARM_TEXT} sul conto {ACCOUNT_OF_FLOWS}"
+    reason = f"apertura {asset} non eseguita: {ALARM_TEXT} sul conto {ACCOUNT_OF_FLOWS}"
     suspended = blocked_reasons(flow_cycles, flow).get(asset) == reason
     assert suspended is (len(flow_cycles.platform.order_exchange.sent) == sent_before)
     return suspended
@@ -321,7 +374,7 @@ def not_opened(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
 
 @then(quoted('il ciclo di "{flow}" registra "apertura {asset} non eseguita: {reason}"'))
 def cycle_records_blocked(flow_cycles: FlowCycles, flow: str, asset: str, reason: str) -> None:
-    assert blocked_reasons(flow_cycles, flow) == {asset: reason}
+    assert blocked_reasons(flow_cycles, flow) == {asset: f"apertura {asset} non eseguita: {reason}"}
 
 
 @then(quoted('"{flow}" chiude la posizione su "{asset}"'))
@@ -356,3 +409,72 @@ def expected_balance_is(flow_cycles: FlowCycles, account: str, balance: str) -> 
 @then(quoted('la modifica viene rifiutata con "{reason}"'))
 def command_refused(refused: list[AutotradingError], reason: str) -> None:
     assert [str(error) for error in refused] == [reason]
+
+
+# ADR saldo-atteso-con-le-sole-righe-successive-alla-lettura-precedente: the scenarios of Bug 506, on the
+# reconciliation of an account of their own.
+
+
+@given(quoted('che il conto "{account}" ha una lettura precedente alle {clock} con saldo di riferimento {balance}'))
+def previous_reading(late_rows: LateRows, account: str, clock: str, balance: str) -> None:
+    assert account == "principale"
+    late_rows.readings.save_reading(AccountReading(late_rows.account_id, at(clock), {}, amount(balance)))
+
+
+@given(
+    quoted(
+        'che alle {clock} il registro scrive un pagamento di funding di {value} del flusso "{flow}" '
+        "avvenuto alle {paid}"
+    )
+)
+def late_funding(late_rows: LateRows, clock: str, value: str, flow: str, paid: str) -> None:
+    late_rows.flow(flow)
+    late_rows.publish_at(clock)
+    payment = a_payment(LATE_ASSET, amount(value), paid_at=at(paid))
+    late_rows.exchange.funding.setdefault(late_rows.account_id, []).append(payment)
+
+
+@given(
+    quoted(
+        'che alle {clock} il registro scrive un\'esecuzione del flusso "{flow}" delle {executed} '
+        "con PnL realizzato {pnl} e commissione {fee}"
+    )
+)
+def late_execution(late_rows: LateRows, clock: str, flow: str, *, executed: str, pnl: str, fee: str) -> None:
+    order_id = uuid4()
+    late_rows.orders.add(order_id, late_rows.account_id, late_rows.flow(flow).id)
+    late_rows.publish_at(clock)
+    fill = a_fill(LATE_ASSET, order_id, realized_pnl=amount(pnl), fee=amount(fee), executed_at=at(executed))
+    late_rows.exchange.executions.setdefault(late_rows.account_id, []).append(fill)
+
+
+@given(quoted("che il saldo letto alle {clock} è {balance}"))
+def balance_read(late_rows: LateRows, clock: str, balance: str) -> None:
+    assert at(clock) == late_rows.reconciled_at
+    late_rows.exchange.activities[late_rows.account_id] = an_activity(
+        balance=amount(balance), positions=(a_position(LATE_ASSET),), read_at=at(clock)
+    )
+
+
+@when("il conto si riconcilia")
+def account_reconciled(late_rows: LateRows) -> None:
+    [flow] = late_rows.store.flows
+    late_rows.reconcile.execute(ReconcileAccountCommand(flow.id))
+    account = late_rows.account_id
+    written = [entry.flow_id for entry in late_rows.ledger.entries.get(account, [])]
+    written += [entry.flow_id for entry in late_rows.ledger.funding.get(account, [])]
+    # The late row enters the ledger of its flow: only the comparison of the balance leaves it out.
+    assert written == [flow.id]
+
+
+@then(quoted("il saldo atteso è {balance}"))
+def expected_balance_of_the_comparison(late_rows: LateRows, balance: str) -> None:
+    reading = late_rows.readings.last_reading(late_rows.account_id)
+    assert reading is not None
+    assert reading.comparison is not None
+    assert reading.comparison.expected == amount(balance)
+
+
+@then("nessuna variazione del saldo non spiegata si registra")
+def no_unexplained_change(late_rows: LateRows) -> None:
+    assert UnattributableKind.BALANCE_CHANGE not in [item.kind for item in late_rows.readings.items]

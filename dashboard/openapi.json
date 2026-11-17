@@ -1072,6 +1072,124 @@
         ]
       }
     },
+    "/flows/emergency-closings": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Close In Emergency",
+        "operationId": "close_in_emergency_flows_emergency_closings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyClosingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyClosingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/flows/emergency-closings/preview": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Preview Emergency Closing",
+        "operationId": "preview_emergency_closing_flows_emergency_closings_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flow Id"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmergencyClosingPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows": {
       "post": {
         "tags": [
@@ -1850,6 +1968,48 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{flow_id}/openings/resume": {
+      "post": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Resume Flow Openings",
+        "description": "The user resumes the openings suspended for maximum loss (R3.2.2); the suspension in force, of any cause,\nreads in the state of the flow.",
+        "operationId": "resume_flow_openings_flows__flow_id__openings_resume_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -4882,6 +5042,42 @@
             "type": "array",
             "title": "System Prompt Placeholders"
           },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume"
+          },
           "default_stop_loss_percent": {
             "type": "string",
             "title": "Default Stop Loss Percent"
@@ -4923,6 +5119,10 @@
           "system_prompt",
           "system_prompt_is_default",
           "system_prompt_placeholders",
+          "max_consecutive_failures",
+          "max_daily_loss_percent",
+          "max_drawdown_percent",
+          "openings_resume",
           "default_stop_loss_percent",
           "default_take_profit_percent",
           "minimum_confidence"
@@ -5278,6 +5478,129 @@
         "title": "DraftAssignmentRequest",
         "description": "Account, capital and assets of a draft; missing assets arrive empty, so the domain answers with the reason."
       },
+      "EmergencyClosingPreviewResponse": {
+        "properties": {
+          "flows": {
+            "type": "integer",
+            "title": "Flows"
+          },
+          "positions": {
+            "type": "integer",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flows",
+          "positions"
+        ],
+        "title": "EmergencyClosingPreviewResponse",
+        "description": "The flows of the scope and the positions they hold now, for the confirmation (ADR chiusura-di-emergenza-nella-\ndashboard)."
+      },
+      "EmergencyClosingRequest": {
+        "properties": {
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "title": "EmergencyClosingRequest",
+        "description": "A flow, an account, or neither for every flow of the user (R3.2.3)."
+      },
+      "EmergencyClosingResponse": {
+        "properties": {
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closed At"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EmergencyScopeResponse"
+          },
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/FlowEmergencyOutcomeResponse"
+            },
+            "type": "array",
+            "title": "Flows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "closed_at",
+          "scope",
+          "flows"
+        ],
+        "title": "EmergencyClosingResponse"
+      },
+      "EmergencyScopeKind": {
+        "type": "string",
+        "enum": [
+          "flow",
+          "account",
+          "all"
+        ],
+        "title": "EmergencyScopeKind"
+      },
+      "EmergencyScopeResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/EmergencyScopeKind"
+          },
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "flow_id",
+          "account_id"
+        ],
+        "title": "EmergencyScopeResponse"
+      },
       "EquityPointResponse": {
         "properties": {
           "planned_at": {
@@ -5490,6 +5813,34 @@
             ],
             "title": "Max Value Exposure Percent"
           },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
+          },
           "allocated_capital": {
             "anyOf": [
               {
@@ -5516,6 +5867,49 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume",
+            "default": "manual"
           },
           "default_stop_loss_percent": {
             "anyOf": [
@@ -5564,6 +5958,66 @@
         ],
         "title": "FlowCreationRequest",
         "description": "A missing name, model, asset or risk limit arrives empty, so the domain answers with the reason (R1.1.1)."
+      },
+      "FlowEmergencyOutcomeResponse": {
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "closed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Closed"
+          },
+          "left_open": {
+            "items": {
+              "$ref": "#/components/schemas/PositionLeftOpenResponse"
+            },
+            "type": "array",
+            "title": "Left Open"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "remark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_id",
+          "flow_name",
+          "closed",
+          "left_open",
+          "failure",
+          "remark"
+        ],
+        "title": "FlowEmergencyOutcomeResponse",
+        "description": "What the closing did to one flow: the assets closed, the positions left open with the reason of the exchange,\nthe reason the whole flow failed, or the remark that it had nothing to close (R3.2.3)."
       },
       "FlowEquityResponse": {
         "properties": {
@@ -5746,6 +6200,34 @@
             ],
             "title": "Max Value Exposure Percent"
           },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
+          },
           "bring_to_minimum": {
             "anyOf": [
               {
@@ -5767,6 +6249,55 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpeningsResume"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "default_stop_loss_percent": {
             "anyOf": [
@@ -5845,6 +6376,16 @@
               }
             ],
             "title": "Pause Reason"
+          },
+          "openings_suspension": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpeningsSuspensionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "model": {
             "type": "string",
@@ -5946,6 +6487,7 @@
           "environment",
           "status",
           "pause_reason",
+          "openings_suspension",
           "model",
           "version",
           "last_cycle",
@@ -6219,6 +6761,42 @@
             "type": "array",
             "title": "System Prompt Placeholders"
           },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume"
+          },
           "default_stop_loss_percent": {
             "type": "string",
             "title": "Default Stop Loss Percent"
@@ -6264,6 +6842,10 @@
           "system_prompt",
           "system_prompt_is_default",
           "system_prompt_placeholders",
+          "max_consecutive_failures",
+          "max_daily_loss_percent",
+          "max_drawdown_percent",
+          "openings_resume",
           "default_stop_loss_percent",
           "default_take_profit_percent",
           "minimum_confidence"
@@ -6384,16 +6966,15 @@
           "summary": {
             "$ref": "#/components/schemas/FlowResultsResponse"
           },
-          "openings_suspended": {
+          "openings_suspension": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/OpeningsSuspensionResponse"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Openings Suspended"
+            ]
           }
         },
         "type": "object",
@@ -6410,7 +6991,7 @@
           "return_percent",
           "positions",
           "summary",
-          "openings_suspended"
+          "openings_suspension"
         ],
         "title": "FlowStateResponse",
         "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018)."
@@ -7197,6 +7778,53 @@
         ],
         "title": "ModelSelectionResponse"
       },
+      "OpeningsResume": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "next_day"
+        ],
+        "title": "OpeningsResume",
+        "description": "How the openings of a flow suspended for maximum loss resume (R3.2.2).\n\nBy hand unless the user chooses otherwise: the openings resume when the user confirms. The next day they resume on\ntheir own at 00:00 UTC of the day after the suspension, and the user may still confirm before."
+      },
+      "OpeningsSuspensionCause": {
+        "type": "string",
+        "enum": [
+          "perdita_massima",
+          "riconciliazione"
+        ],
+        "title": "OpeningsSuspensionCause",
+        "description": "Why the openings of a flow are suspended: a maximum loss passed (R3.2.2) or an alarm of reconciliation open on\nits account (R3.3.1). Only the first one the user resumes from the flow; the second ends with the confirmation of\nthe account."
+      },
+      "OpeningsSuspensionResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "suspended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Suspended At"
+          },
+          "cause": {
+            "$ref": "#/components/schemas/OpeningsSuspensionCause"
+          },
+          "resumable": {
+            "type": "boolean",
+            "title": "Resumable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "suspended_at",
+          "cause",
+          "resumable"
+        ],
+        "title": "OpeningsSuspensionResponse",
+        "description": "The openings of a flow suspended: the reason, since when, the cause and whether the user resumes them from the\nflow, true only after a maximum loss (R3.2.2, R3.3.1)."
+      },
       "OperationResponse": {
         "properties": {
           "occurred_at": {
@@ -7816,13 +8444,37 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",
         "required": [
           "max_leverage",
           "max_margin_exposure_percent",
-          "max_value_exposure_percent"
+          "max_value_exposure_percent",
+          "max_total_margin_exposure_percent",
+          "max_total_value_exposure_percent"
         ],
         "title": "RiskLimitsResponse"
       },
@@ -8093,6 +8745,49 @@
             ],
             "title": "System Prompt"
           },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume",
+            "default": "manual"
+          },
           "default_stop_loss_percent": {
             "anyOf": [
               {
@@ -8190,6 +8885,43 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "max_consecutive_failures": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Failures"
+          },
+          "max_daily_loss_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Daily Loss Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "openings_resume": {
+            "$ref": "#/components/schemas/OpeningsResume",
+            "default": "manual"
           },
           "default_stop_loss_percent": {
             "anyOf": [
@@ -8358,6 +9090,34 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",
@@ -8397,6 +9157,28 @@
               }
             ],
             "title": "Max Value Exposure Percent"
+          },
+          "max_total_margin_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Margin Exposure Percent"
+          },
+          "max_total_value_exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Value Exposure Percent"
           }
         },
         "type": "object",

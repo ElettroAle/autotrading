@@ -110,6 +110,7 @@ class Removal:
             self.notices,
             InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
         )
+
         self.use_case = RemoveAccountWithFlowsUseCase(
             repository,
             AccountRemovalPorts(self.positions, account_repository),

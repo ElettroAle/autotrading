@@ -19,12 +19,15 @@ from autotrading.application.flows.compose_cycle_context import ComposeCycleCont
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps, GraphCheckpoints
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
+from autotrading.application.flows.guard_flow_loss import GuardFlowLossUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.pause_after_consecutive_failures import PauseAfterConsecutiveFailuresUseCase
 from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ClockPort,
     ClosedPositionRepositoryPort,
+    ConsecutiveFailuresPort,
     CycleContext,
     CycleDecisions,
     CycleRepositoryPort,
@@ -32,6 +35,8 @@ from autotrading.application.flows.ports import (
     FlowLockPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
+    LossReferencesPort,
+    OpeningsSuspensionPort,
     PlannedFlowsPort,
 )
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
@@ -43,6 +48,7 @@ from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCa
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
 from autotrading.application.sources.ports import (
@@ -84,6 +90,10 @@ class TenantCyclePorts:
     settlement_currency: str
     checkpoints: GraphCheckpoints
     equity: RecordCycleEquityUseCase
+    consecutive_failures: ConsecutiveFailuresPort
+    openings_suspensions: OpeningsSuspensionPort
+    loss_references: LossReferencesPort
+    openings_suspended_notice: NotifyOpeningsSuspendedUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,19 +149,26 @@ def run_cycle_for(
                 AskAgentUseCase(services.model_gateways, ports.provider_keys, services.provider_key_opener),
             )
         ),
-        risk=ReviewCycleRiskUseCase(CheckRiskUseCase(services.exchange_limits)),
+        risk=ReviewCycleRiskUseCase(
+            CheckRiskUseCase(services.exchange_limits),
+            GuardFlowLossUseCase(
+                ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock
+            ),
+        ),
         orders=ports.send_orders,
         end=ports.end_cycle,
         journal=JsonCycleJournalAdapter(services.environment),
     )
     cycles = cycles_of(tenant_id)
+    pause = PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice)
     guards = CycleGuards(
         cycles=cycles,
         lock=lock,
-        pause=PauseAffectedFlowsUseCase(ports.flows, ports.pause, ports.flow_paused_notice),
+        pause=pause,
         clock=services.clock,
         failures=ports.cycle_failure,
         activity=ReadFlowActivityUseCase(ports.flows),
+        consecutive_failures=PauseAfterConsecutiveFailuresUseCase(ports.flows, ports.consecutive_failures, pause),
     )
     return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
 
