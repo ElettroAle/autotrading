@@ -86,14 +86,18 @@ def emails_to(flow_cycles: FlowCycles, address: str) -> list[str]:
 
 
 def opening_of(flow: str) -> str:
-    return f"{flow}: aperta"
+    return f"{flow}: posizione aperta"
 
 
 def notices(outcome: dict[str, object], messages: list[str]) -> list[str]:
-    """The messages that tell the event of the scenario, by the start of their text."""
+    """The messages that tell the event of the scenario, by the title on their first line (R3.5.4)."""
     notice = outcome["notice"]
     assert isinstance(notice, str)
-    return [message for message in messages if message.startswith(notice)]
+    return [message for message in messages if titled(message, notice)]
+
+
+def titled(message: str, title: str) -> bool:
+    return title in message.splitlines()[0]
 
 
 def general_channel(outcome: dict[str, object], event: str) -> EventChannel:
@@ -218,13 +222,13 @@ def email_verdict(flow_cycles: FlowCycles, outcome: dict[str, object], address: 
 
 @then(quoted('la chat "{chat}" riceve la notifica dell\'apertura di "{flow}"'))
 def chat_receives_opening(flow_cycles: FlowCycles, chat: str, flow: str) -> None:
-    openings = [message for message in chat_messages(flow_cycles, chat) if message.startswith(opening_of(flow))]
+    openings = [message for message in chat_messages(flow_cycles, chat) if titled(message, opening_of(flow))]
     assert len(openings) == 1, chat_messages(flow_cycles, chat)
 
 
 @then(quoted('la chat "{chat}" non riceve la notifica dell\'apertura di "{flow}"'))
 def chat_does_not_receive_opening(flow_cycles: FlowCycles, chat: str, flow: str) -> None:
-    assert not [message for message in chat_messages(flow_cycles, chat) if message.startswith(opening_of(flow))]
+    assert not [message for message in chat_messages(flow_cycles, chat) if titled(message, opening_of(flow))]
 
 
 @then(quoted('la richiesta viene rifiutata con "{reason}"'))
