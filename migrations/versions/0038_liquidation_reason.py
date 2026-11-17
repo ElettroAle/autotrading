@@ -2,14 +2,14 @@
 
 R3.5.1, ADR eventi-notificabili-di-rischio-e-capitale.
 
-Revision ID: 0035
-Revises: 0034
+Revision ID: 0038
+Revises: 0037
 """
 
 from alembic import op
 
-revision = "0035"
-down_revision = "0034"
+revision = "0038"
+down_revision = "0037"
 branch_labels = None
 depends_on = None
 

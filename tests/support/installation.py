@@ -17,6 +17,7 @@ from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumPr
 from autotrading.bootstrap import WorkerCycle, cycle_of
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 
@@ -75,6 +76,6 @@ def cycles_of_installation(opener: SodiumCredentialOpenerAdapter) -> Callable[[T
         create_engine("sqlite://"),
         (opener, SodiumProviderKeyOpenerAdapter({})),
         (environment, Slippage.default(), hyperliquid),
-        InMemoryOutboxAdapter(),
+        (InMemoryOutboxAdapter(), FakeMailServiceAdapter()),
         ({}, FakePriceForecasterAdapter()),
     )

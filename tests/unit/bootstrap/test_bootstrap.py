@@ -373,7 +373,11 @@ def test_the_cycle_asked_for_now_is_asked_to_the_worker_for_the_tenant(
     public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
     worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
     factory = tenant_use_cases(
-        create_engine("sqlite://"), _sealers(public_key), dev_installation_on_testnet(), worker, providers_of()
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        (*dev_installation_on_testnet(), FakeMailServiceAdapter()),
+        worker,
+        providers_of(),
     )
 
     with pytest.raises(CycleWorkerUnavailableError):

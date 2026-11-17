@@ -32,7 +32,7 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
     Quando un ciclo di "alfa" legge dall'exchange il saldo 980 USDC
     Allora sul conto "test-1" c'è un allarme di riconciliazione con saldo atteso 1000 USDC, saldo letto 980 USDC e scostamento 2%
     E le aperture di "alfa" e "beta" sono sospese
-    E "anna" riceve la notifica "test-1: allarme di riconciliazione, saldo 980 USDC invece di 1000 USDC"
+    E "anna" riceve la notifica "🚨 test-1: allarme di riconciliazione" con le righe "Saldo letto: 980 USDC; Saldo atteso: 1000 USDC"
 
   Scenario: Scostamento entro la soglia
     Quando un ciclo di "alfa" legge dall'exchange il saldo 995 USDC

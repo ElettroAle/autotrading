@@ -6,6 +6,7 @@ from uuid import UUID
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.email_address import EmailAddress
+from autotrading.domain.notifications.flow_status import FlowStatusFigures
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.notifications.notification_email import NotificationEmail
@@ -144,6 +145,16 @@ class LinkStores:
 class NotifierPort(Protocol):
     def execute(self, notification: Notification) -> None:
         """Delivers the notification to the channels of the tenant; a delivery that fails is recorded, never raised."""
+        ...
+
+
+class FlowStatusPort(Protocol):
+    """Bound to the tenant of the request: the state of a flow as its last cycle recorded it (ADR
+    stato-del-flusso-in-ogni-notifica).
+    """
+
+    def status_of(self, flow_name: str) -> FlowStatusFigures | None:
+        """The figures of the flow not archived with that name, none without one; raises FlowStatusUnavailableError."""
         ...
 
 

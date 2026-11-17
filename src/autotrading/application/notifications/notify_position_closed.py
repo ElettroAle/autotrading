@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from autotrading.application.notifications.ports import NotifierPort
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.domain.notifications.notification import Amount, Notification
 
 
@@ -9,7 +9,7 @@ class NotifyPositionClosedUseCase:
     for a closing by a protection or a liquidation, its reason, in the one notification of the closing (R3.5.1).
     """
 
-    def __init__(self, notifier: NotifierPort, currency: str) -> None:
+    def __init__(self, notifier: NotifyFlowEventUseCase, currency: str) -> None:
         self._notifier = notifier
         self._currency = currency
 

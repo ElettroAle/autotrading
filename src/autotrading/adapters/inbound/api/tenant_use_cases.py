@@ -113,9 +113,11 @@ from autotrading.application.notifications.get_notification_channels import GetN
 from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
 from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
 from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.ports import (
     BotStartLinkPort,
     ChannelPreferencesRepositoryPort,
+    FlowStatusPort,
     LinkCodeRepositoryPort,
     LinkedChatRepositoryPort,
     MailServicePort,
@@ -179,6 +181,7 @@ class TenantPorts:
     bot_identity: BotStartLinkPort
     linked_chats: LinkedChatRepositoryPort
     notifier: NotifierPort
+    flow_status: FlowStatusPort
     notification_emails: NotificationEmailRepositoryPort
     mail_service: MailServicePort
     outbox: OutboxPort
@@ -357,7 +360,9 @@ class TenantUseCases:
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.ledger_recording,
                     ports.clock,
-                    NotifyCashOutDoneUseCase(ports.notifier, ports.settlement_currency),
+                    NotifyCashOutDoneUseCase(
+                        NotifyFlowEventUseCase(ports.notifier, ports.flow_status), ports.settlement_currency
+                    ),
                 ),
             ),
             change_allocated_capital=ChangeAllocatedCapitalUseCase(

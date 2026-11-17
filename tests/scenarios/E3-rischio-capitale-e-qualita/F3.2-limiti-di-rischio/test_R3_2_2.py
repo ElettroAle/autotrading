@@ -36,7 +36,7 @@ from tests.support.activity import a_position, an_activity
 from tests.support.decision_steps import answer, decision, opening
 from tests.support.flow_cycle_steps import position
 from tests.support.flow_cycles import DAY, FlowCycles
-from tests.support.notifications import chat_named
+from tests.support.notifications import chat_named, told_in
 from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 
@@ -330,10 +330,10 @@ def suspended_with_reason(loss: MaximumLoss, reason: str) -> None:
     assert suspension.reason == reason
 
 
-@then(quoted('"{user}" riceve la notifica "{text}"'))
-def notified(loss: MaximumLoss, user: str, text: str) -> None:
+@then(quoted('"{user}" riceve la notifica "{title}" con le righe "{values}"'))
+def notified(loss: MaximumLoss, user: str, title: str, values: str) -> None:
     received = loss.flow_cycles.platform.messenger.received_by(chat_named(user))
-    assert text in received, received
+    assert told_in(received, title, values), received
 
 
 @then('le aperture di "alfa" non sono sospese')

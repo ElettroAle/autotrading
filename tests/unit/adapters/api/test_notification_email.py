@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.notifications.notification import Notification
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
@@ -84,7 +85,7 @@ def test_a_test_email_is_accepted_and_reaches_the_address(platform: Platform, cl
 
     assert response.status_code == 202
     [email] = platform.mailer.received_by("anna@example.com")
-    assert email.subject == "AutoTrading: prova delle notifiche"
+    assert email.subject == Notification.test().title
 
 
 def test_a_test_email_without_an_address_is_a_conflict(client_of: Client) -> None:

@@ -27,6 +27,7 @@ from autotrading.application.notifications.answer_bot_messages import AnswerBotM
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
@@ -82,6 +83,7 @@ from tests.fakes.flow_repository import (
     InMemoryFlowRepositoryAdapter,
     InMemoryFlowTimingAdapter,
 )
+from tests.fakes.flow_status import FakeFlowStatusAdapter
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.link_code_repository import (
@@ -171,6 +173,8 @@ class Platform:
         self.channel_preferences: ChannelPreferencesStore = {}
         self.mail_service = FakeMailServiceAdapter()
         self.mailer = FakeMailerAdapter()
+        # The state of the flows the notifications close with: none unless a test sets it (R3.5.4).
+        self.flow_status = FakeFlowStatusAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
         self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
@@ -242,7 +246,9 @@ class Platform:
         closed_positions = InMemoryClosedPositionRepositoryAdapter(self.closed_positions, tenant_id)
         flow_openings = InMemoryFlowOpeningsAdapter(self.orders_of(tenant_id))
         # The API hands its notifications to the worker, which holds the bot (ADR 0070).
-        closing_notice = NotifyPositionClosedUseCase(self.worker_for(tenant_id).notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        closing_notice = NotifyPositionClosedUseCase(
+            NotifyFlowEventUseCase(self.worker_for(tenant_id).notify, self.flow_status), HYPERLIQUID_SETTLEMENT_CURRENCY
+        )
         exit_plans = InMemoryExitPlanRepositoryAdapter(self.exit_plans, tenant_id)
         closing_ports = ClosingPorts(
             self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
@@ -290,6 +296,7 @@ class Platform:
             bot_identity=FakeBotIdentityAdapter(self.bot_username),
             linked_chats=InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             notifier=self.worker_for(tenant_id).notify,
+            flow_status=self.flow_status,
             notification_emails=InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             mail_service=self.mail_service,
             outbox=self.outbox,

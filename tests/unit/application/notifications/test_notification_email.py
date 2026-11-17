@@ -161,8 +161,8 @@ def test_the_test_email_reaches_the_address_of_the_tenant_by_the_outbox(mail: Ma
     assert mail.mailer.sent == [
         SentEmail(
             ANNA_ADDRESS,
-            "AutoTrading: prova delle notifiche",
-            "notifica di prova: le notifiche dei tuoi flussi arrivano qui",
+            Notification.test().title,
+            Notification.test().text,
         )
     ]
 
@@ -198,7 +198,7 @@ def test_a_notification_goes_by_email_with_the_event_as_subject_and_the_text_of_
 
     mail.notify(ANNA)
 
-    assert mail.mailer.sent == [SentEmail(ANNA_ADDRESS, "alfa: in pausa", "alfa: in pausa, credito esaurito")]
+    assert mail.mailer.sent == [SentEmail(ANNA_ADDRESS, PAUSED.title, PAUSED.text)]
 
 
 def test_a_notification_goes_to_the_chat_and_to_the_address_of_its_tenant_only(mail: Mail) -> None:
@@ -209,7 +209,7 @@ def test_a_notification_goes_to_the_chat_and_to_the_address_of_its_tenant_only(m
     mail.notify(ANNA)
 
     assert [message.integration for message in mail.outbox.messages] == [CHAT_MESSAGE, EMAIL_MESSAGE]
-    assert mail.messenger.sent == [(ChatId(1001), "alfa: in pausa, credito esaurito")]
+    assert mail.messenger.sent == [(ChatId(1001), PAUSED.text)]
     assert mail.mailer.received_by("bruno@example.com") == []
 
 
@@ -234,7 +234,7 @@ def test_an_email_the_outbox_does_not_take_is_recorded_and_the_chat_still_gets_i
     [record] = caplog.records
     assert record.getMessage() == "notifica non accodata"
     assert (record.__dict__["tenant_id"], record.__dict__["subject"]) == (str(ANNA.value), "alfa")
-    assert mail.messenger.sent == [(ChatId(1001), "alfa: in pausa, credito esaurito")]
+    assert mail.messenger.sent == [(ChatId(1001), PAUSED.text)]
 
 
 def test_an_email_the_mail_service_refuses_is_recorded_and_left_to_the_retries(

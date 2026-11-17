@@ -23,6 +23,7 @@ from autotrading.application.flows.record_flow_closing import RecordFlowClosingU
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.run_cycle import RunCycleUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
+from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
@@ -43,6 +44,7 @@ from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
+from autotrading.domain.notifications.notification import Amount, Notification
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.market_order import MarketOrder
@@ -108,10 +110,14 @@ class World:
         assert tenant_id == self.tenant_id
         ports = self.cycles.ports_of(self.tenant_id)
         followers = FlowOrderFollowers(
-            NotifyOrderRejectedUseCase(ports.notify),
-            NotifyPositionOpenedUseCase(ports.notify, "USDC"),
+            NotifyOrderRejectedUseCase(self.of_flow(ports.notify)),
+            NotifyPositionOpenedUseCase(self.of_flow(ports.notify), "USDC"),
             RecordFlowClosingUseCase(
-                self.flows, self.openings, self.history, self.closing_notice(ports.notify), self.exit_plans
+                self.flows,
+                self.openings,
+                self.history,
+                self.closing_notice(self.of_flow(ports.notify)),
+                self.exit_plans,
             ),
         )
         return replace(
@@ -129,8 +135,11 @@ class World:
     def history(self) -> InMemoryClosedPositionRepositoryAdapter:
         return InMemoryClosedPositionRepositoryAdapter(self.closed, self.tenant_id)
 
+    def of_flow(self, notify: NotifyUseCase) -> NotifyFlowEventUseCase:
+        return NotifyFlowEventUseCase(notify, self.cycles.platform.flow_status)
+
     @staticmethod
-    def closing_notice(notify: NotifyUseCase) -> NotifyPositionClosedUseCase:
+    def closing_notice(notify: NotifyFlowEventUseCase) -> NotifyPositionClosedUseCase:
         return NotifyPositionClosedUseCase(notify, "USDC")
 
     @property
@@ -165,6 +174,15 @@ def an_execution(*, price: str = "100.4", pnl: str = "4.20") -> Execution:
     return Execution(Decimal("0.5"), Decimal(price), Decimal("0.3"), Decimal(pnl), CLOSED_AT)
 
 
+def usdc(value: str) -> Amount:
+    return Amount(Decimal(value), "USDC")
+
+
+def closed_with(pnl: str) -> str:
+    """The notification of a closing of BTC by alfa that is no event of its own."""
+    return Notification.position_closed("alfa", "BTC", usdc(pnl), "agente").text
+
+
 # FollowFlowOrdersUseCase
 
 
@@ -176,7 +194,7 @@ def follow(world: World, order: Order) -> None:
 def test_an_executed_opening_is_notified_with_its_value_in_whole_units(world: World) -> None:
     follow(world, an_order(reduce_only=False, execution=an_execution()))
 
-    assert world.received == ["alfa: aperta long BTC, leva 3, 50 USDC"]
+    assert world.received == [Notification.position_opened("alfa", "BTC", "long", 3, usdc("50")).text]
     assert world.closed.positions == []
 
 
@@ -185,7 +203,7 @@ def test_a_rejected_order_is_notified_with_the_message_of_the_exchange(world: Wo
 
     follow(world, an_order(reduce_only=True, rejection=rejection))
 
-    assert world.received == ["alfa: ordine rifiutato, Insufficient margin to place order."]
+    assert world.received == [Notification.order_rejected("alfa", "Insufficient margin to place order.").text]
     assert world.closed.positions == []
 
 
@@ -206,7 +224,7 @@ def test_an_executed_closing_enters_the_history_with_its_cycle_and_is_notified(w
     assert closed.fees == Decimal("1.3")
     assert closed.pnl == Decimal("4.20")
     assert world.openings.asked == [(world.flow.id, "BTC")]
-    assert world.received == ["alfa: chiusa BTC, PnL 4,20 USDC"]
+    assert world.received == [closed_with("4.20")]
 
 
 def test_a_closing_without_an_opening_of_the_flow_is_notified_but_has_no_history(world: World) -> None:
@@ -215,7 +233,7 @@ def test_a_closing_without_an_opening_of_the_flow_is_notified_but_has_no_history
     follow(world, an_order(reduce_only=True, execution=an_execution()))
 
     assert world.closed.positions == []
-    assert world.received == ["alfa: chiusa BTC, PnL 4,20 USDC"]
+    assert world.received == [closed_with("4.20")]
 
 
 # RecordOutsideClosingUseCase
@@ -226,7 +244,7 @@ def outside(world: World, pnl: str) -> OutsideClosing:
 
 
 def closed_positions(world: World) -> RecordOutsideClosingUseCase:
-    notice = World.closing_notice(world.ports.notify)
+    notice = World.closing_notice(world.of_flow(world.ports.notify))
     return RecordOutsideClosingUseCase(
         world.flows, world.openings, world.history, notice, world.exit_plans, FakeProtectionCancellationAdapter()
     )
@@ -245,7 +263,7 @@ def test_a_position_closed_outside_enters_the_history_from_the_opening_of_the_fl
     assert closed.closing == PositionEnd(Decimal(90), CLOSED_AT, None)
     assert closed.pnl == Decimal(-10)
     assert world.openings.asked == [(world.flow.id, "BTC")]
-    assert world.received == ["alfa: chiusa BTC, PnL -10 USDC"]
+    assert world.received == [closed_with("-10")]
 
 
 def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: pytest.LogCaptureFixture) -> None:
@@ -257,7 +275,7 @@ def test_a_position_the_flow_never_opened_has_no_history(world: World, caplog: p
     assert world.closed.positions == []
     assert [record.getMessage() for record in caplog.records] == ["posizione chiusa fuori senza apertura del flusso"]
     assert caplog.records[0].__dict__["asset"] == "BTC"
-    assert world.received == ["alfa: chiusa BTC, PnL -10 USDC"]
+    assert world.received == [closed_with("-10")]
 
 
 def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
@@ -268,7 +286,7 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
 
     assert world.closed.positions == []
     assert [record.getMessage() for record in caplog.records] == ["esito della chiusura fuori non rappresentabile"]
-    assert world.received == ["alfa: chiusa BTC, PnL -100 USDC"]
+    assert world.received == [closed_with("-100")]
 
 
 # NotifyCycleFailureUseCase
@@ -277,7 +295,7 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
 def test_a_failed_cycle_is_told_with_the_name_of_its_flow_and_its_message(world: World) -> None:
     world.ports_of(world.tenant_id).cycle_failure.execute(world.flow.id.value, "timeout")
 
-    assert world.received == ["alfa: ciclo fallito, timeout"]
+    assert world.received == [Notification.cycle_failed("alfa", "timeout").text]
 
 
 # PauseAffectedFlowsUseCase
@@ -293,7 +311,9 @@ def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None
         "alfa": FlowStatus.PAUSED,
         "beta": FlowStatus.PAUSED,
     }
-    assert sorted(world.received) == sorted(f"{flow.name.value}: in pausa, {error}" for flow in (world.flow, other))
+    assert sorted(world.received) == sorted(
+        Notification.flow_paused(name, str(error)).text for name in (world.flow.name.value, other.name.value)
+    )
 
 
 def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: World) -> None:
@@ -301,7 +321,7 @@ def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: Wor
 
     world.pause(error)
 
-    assert world.received == [f"alfa: in pausa, {error}"]
+    assert world.received == [Notification.flow_paused("alfa", str(error)).text]
 
 
 def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(world: World) -> None:
@@ -316,7 +336,7 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
         "alfa": FlowStatus.PAUSED,
         "beta": FlowStatus.ACTIVE,
     }
-    assert world.received == ["alfa: in pausa, registro delle esecuzioni incompleto"]
+    assert world.received == [Notification.flow_paused("alfa", "registro delle esecuzioni incompleto").text]
 
 
 # StartCycleFlowUseCase: the beginning of the flow
@@ -436,9 +456,9 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: W
 
     assert sorted(world.received) == sorted(
         [
-            "test-1: posizione non attribuibile su SOL",
-            "test-1: esecuzione non attribuibile su ETH",
-            "test-1: movimento non attribuibile di 5 USDC",
+            Notification.unattributable_position("test-1", "SOL").text,
+            Notification.unattributable_fill("test-1", "ETH").text,
+            Notification.unattributable_movement("test-1", usdc("5")).text,
         ]
     )
 
@@ -452,7 +472,7 @@ def test_a_position_of_the_flow_closed_outside_is_notified_with_its_pnl(world: W
 
     update(world)
 
-    assert world.received == ["alfa: chiusa BTC, PnL -10 USDC", "test-1: esecuzione non attribuibile su BTC"]
+    assert world.received == [closed_with("-10"), Notification.unattributable_fill("test-1", "BTC").text]
 
 
 def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the_next_cycle(

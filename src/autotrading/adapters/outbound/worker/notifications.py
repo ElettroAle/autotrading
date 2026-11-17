@@ -46,11 +46,14 @@ class WorkerNotificationAdapter:
         )
 
 
-def _body_of(notification: Notification) -> dict[str, str | None]:
-    kind = notification.kind
+def _body_of(notification: Notification) -> dict[str, object]:
+    event = notification.event
+    status = notification.flow_status
     return {
         "subject": notification.subject,
-        "event": notification.event,
         "headline": notification.headline,
-        "kind": None if kind is None else kind.value,
+        "icon": notification.icon,
+        "lines": [{"label": line.label, "value": line.value} for line in notification.lines],
+        "flow_status": None if status is None else status.text,
+        "event": None if event is None else event.value,
     }

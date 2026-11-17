@@ -47,9 +47,9 @@ class NotifyUseCase:
 
     def _channel_of(self, notification: Notification) -> NotificationChannel:
         # The test notification is no event: it reaches every channel the tenant linked.
-        if notification.kind is None:
+        if notification.event is None:
             return NotificationChannel.BOTH
-        return self._choices.preferences.get().channel_for(notification.kind, self._flow_id_of(notification))
+        return self._choices.preferences.get().channel_for(notification.event, self._flow_id_of(notification))
 
     def _flow_id_of(self, notification: Notification) -> UUID | None:
         """The flow the notification names, by its name among the flows not archived; none for the account."""
@@ -64,7 +64,7 @@ class NotifyUseCase:
             messages.append(OutboxMessage.to_chat(chat, notification.text))
         email = self._emails.get() if channel.reaches_email else None
         if email is not None and self._mail_service.is_configured():
-            messages.append(OutboxMessage.to_email(email, notification.email_subject, notification.text))
+            messages.append(OutboxMessage.to_email(email, notification.title, notification.text))
         return messages
 
     def _enqueue(self, message: OutboxMessage, notification: Notification) -> None:
