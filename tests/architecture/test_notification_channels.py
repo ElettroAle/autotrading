@@ -36,17 +36,17 @@ class NotifyUseCase:
 CHOSEN_CHANNEL = """
 class NotifyUseCase:
     def execute(self, notification):
-        channel = self._choices.preferences.get().channel_for(notification.kind, None)
-        chat = self._chats.get() if channel.reaches_chat else None
+        channels = self._choices.preferences.get().channels_for(notification.kind, None)
+        chat = self._chats.get() if NotificationChannel.TELEGRAM in channels else None
         self._outbox.enqueue(OutboxMessage.to_chat(chat, notification.text))
 """
 
 
 def queues_without_the_chosen_channel(source: str) -> bool:
-    """Whether the module queues a message for a channel without asking the domain for the channel of the event."""
+    """Whether the module queues a message for a channel without asking the domain for the channels of the event."""
     calls = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)]
     called = {node.func.attr for node in calls if isinstance(node.func, ast.Attribute)}
-    return bool(called & {"to_chat", "to_email"}) and "channel_for" not in called
+    return bool(called & {"to_chat", "to_email"}) and "channels_for" not in called
 
 
 def test_adr_canali_delle_notifiche_a_notification_is_queued_only_on_the_chosen_channel() -> None:

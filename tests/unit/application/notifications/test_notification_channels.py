@@ -1,5 +1,5 @@
-"""The channel of every type of event with the exceptions of a flow, and the notifications queued only on it (R3.5.3,
-ADR canali-delle-notifiche-per-tipo-di-evento).
+"""The channels of every type of event with the exceptions of a flow, and the notifications queued only on them
+(R3.5.3, ADR canali-delle-notifiche-per-tipo-di-evento, ADR canali-delle-notifiche-come-insieme).
 """
 
 from decimal import Decimal
@@ -14,6 +14,7 @@ from autotrading.application.notifications.choose_notification_channel import (
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.errors import NotifiedFlowNotFoundError
 from autotrading.application.notifications.get_notification_channels import (
+    ChannelState,
     EventChannel,
     FlowChannels,
     GetNotificationChannelsUseCase,
@@ -35,7 +36,8 @@ from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.errors import AccountEventWithoutFlowExceptionError
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Amount, Notification
-from autotrading.domain.notifications.notification_channel import MissingLink, NotificationChannel
+from autotrading.domain.notifications.notification_channel import NO_CHANNEL, MissingLink, NotificationChannel
+from autotrading.domain.notifications.notification_channel import Channels as ChannelSet
 from autotrading.domain.notifications.notification_email import NotificationEmail
 from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -60,6 +62,9 @@ ADDRESS = EmailAddress.parse("anna@example.com")
 FAILED_ALFA = Notification.cycle_failed("alfa", "modello non raggiungibile")
 FAILED_BETA = Notification.cycle_failed("beta", "modello non raggiungibile")
 ALARM = Notification.reconciliation_alarm("test-1", Amount(Decimal(980), "USDC"), Amount(Decimal(1000), "USDC"))
+TELEGRAM = frozenset({NotificationChannel.TELEGRAM})
+EMAIL = frozenset({NotificationChannel.EMAIL})
+BOTH = frozenset(NotificationChannel)
 
 
 class FixedNotifiedFlowsAdapter:
@@ -88,12 +93,12 @@ class Channels:
     def repository(self, tenant_id: TenantId = ANNA) -> InMemoryChannelPreferencesRepositoryAdapter:
         return InMemoryChannelPreferencesRepositoryAdapter(self.preferences, tenant_id)
 
-    def choose(self, event: NotificationEvent, channel: NotificationChannel, tenant_id: TenantId = ANNA) -> None:
-        command = ChooseNotificationChannelCommand(event, channel)
+    def choose(self, event: NotificationEvent, chosen: ChannelSet, tenant_id: TenantId = ANNA) -> None:
+        command = ChooseNotificationChannelCommand(event, chosen)
         ChooseNotificationChannelUseCase(self.repository(tenant_id)).execute(command)
 
-    def except_flow(self, flow: NotifiedFlow, event: NotificationEvent, channel: NotificationChannel) -> None:
-        command = SetFlowChannelExceptionCommand(flow.flow_id, event, channel)
+    def except_flow(self, flow: NotifiedFlow, event: NotificationEvent, chosen: ChannelSet) -> None:
+        command = SetFlowChannelExceptionCommand(flow.flow_id, event, chosen)
         SetFlowChannelExceptionUseCase(self.repository(), self.flows).execute(command)
 
     def remove_exception(self, flow: NotifiedFlow, event: NotificationEvent) -> None:
@@ -133,42 +138,59 @@ def channels() -> Channels:
 def test_a_tenant_who_never_chose_reads_the_default_channels_and_the_flows(channels: Channels) -> None:
     read = channels.read()
 
-    assert read.events[0] == EventChannel(NotificationEvent.POSITION_OPENED, NotificationChannel.TELEGRAM, True, ())
+    assert read.events[0] == EventChannel(NotificationEvent.POSITION_OPENED, TELEGRAM, True, ())
     assert [each.event for each in read.events] == list(NotificationEvent)
     reduced = next(each for each in read.events if each.event is NotificationEvent.OPENING_REDUCED)
-    assert reduced.channel is NotificationChannel.NONE
+    assert reduced.channels == NO_CHANNEL
     alarm = next(each for each in read.events if each.event is NotificationEvent.RECONCILIATION_ALARM)
     assert alarm.of_flow is False
     assert read.flows == (FlowChannels(ALFA.flow_id, "alfa", ()), FlowChannels(BETA.flow_id, "beta", ()))
 
 
 def test_a_chosen_channel_is_read_back_and_counts_for_that_tenant_only(channels: Channels) -> None:
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.BOTH)
+    channels.choose(NotificationEvent.CYCLE_FAILED, BOTH)
 
     failed = next(each for each in channels.read().events if each.event is NotificationEvent.CYCLE_FAILED)
-    assert failed.channel is NotificationChannel.BOTH
+    assert failed.channels == BOTH
     bruno = next(each for each in channels.read(BRUNO).events if each.event is NotificationEvent.CYCLE_FAILED)
-    assert bruno.channel is NotificationChannel.TELEGRAM
+    assert bruno.channels == TELEGRAM
 
 
 def test_a_channel_without_its_link_is_warned_beside_the_event(channels: Channels) -> None:
     channels.chats.clear()
     channels.emails.clear()
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.BOTH)
-    channels.except_flow(ALFA, NotificationEvent.POSITION_OPENED, NotificationChannel.EMAIL)
+    channels.choose(NotificationEvent.CYCLE_FAILED, BOTH)
+    channels.except_flow(ALFA, NotificationEvent.POSITION_OPENED, EMAIL)
 
     read = channels.read()
 
     failed = next(each for each in read.events if each.event is NotificationEvent.CYCLE_FAILED)
     assert failed.missing_links == (MissingLink.CHAT, MissingLink.EMAIL)
     [alfa, _] = read.flows
-    assert alfa.exceptions == (
-        EventChannel(NotificationEvent.POSITION_OPENED, NotificationChannel.EMAIL, True, (MissingLink.EMAIL,)),
-    )
+    assert alfa.exceptions == (EventChannel(NotificationEvent.POSITION_OPENED, EMAIL, True, (MissingLink.EMAIL,)),)
 
 
 def test_a_tenant_with_every_channel_linked_misses_nothing(channels: Channels) -> None:
-    assert channels.read().missing_links == ()
+    read = channels.read()
+
+    assert read.missing_links == ()
+    assert read.channels == (
+        ChannelState(NotificationChannel.TELEGRAM, ()),
+        ChannelState(NotificationChannel.EMAIL, ()),
+    )
+    assert all(state.configured for state in read.channels)
+
+
+def test_each_channel_tells_whether_it_is_configured_and_what_it_misses(channels: Channels) -> None:
+    channels.chats.clear()
+    channels.servers.store.clear()
+
+    telegram, email = channels.read().channels
+
+    assert telegram == ChannelState(NotificationChannel.TELEGRAM, (MissingLink.CHAT,))
+    assert email == ChannelState(NotificationChannel.EMAIL, (MissingLink.MAIL_SERVER,))
+    assert not telegram.configured
+    assert not email.configured
 
 
 def test_the_channels_tell_what_the_tenant_misses_whatever_the_choices(channels: Channels) -> None:
@@ -180,7 +202,7 @@ def test_the_channels_tell_what_the_tenant_misses_whatever_the_choices(channels:
 
 def test_an_email_chosen_without_a_mail_server_is_warned_beside_the_event(channels: Channels) -> None:
     channels.servers.store.clear()
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.EMAIL)
+    channels.choose(NotificationEvent.CYCLE_FAILED, EMAIL)
 
     failed = next(each for each in channels.read().events if each.event is NotificationEvent.CYCLE_FAILED)
 
@@ -189,7 +211,7 @@ def test_an_email_chosen_without_a_mail_server_is_warned_beside_the_event(channe
 
 def test_without_a_mail_server_no_notification_goes_by_email(channels: Channels) -> None:
     channels.servers.store.clear()
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.BOTH)
+    channels.choose(NotificationEvent.CYCLE_FAILED, BOTH)
 
     channels.notify(FAILED_ALFA)
 
@@ -198,30 +220,30 @@ def test_without_a_mail_server_no_notification_goes_by_email(channels: Channels)
 
 
 def test_the_exception_of_a_flow_is_read_with_the_flow(channels: Channels) -> None:
-    channels.except_flow(BETA, NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE)
+    channels.except_flow(BETA, NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
 
     [alfa, beta] = channels.read().flows
 
     assert alfa.exceptions == ()
-    assert beta.exceptions == (EventChannel(NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE, True, ()),)
+    assert beta.exceptions == (EventChannel(NotificationEvent.CYCLE_FAILED, NO_CHANNEL, True, ()),)
 
 
 def test_an_exception_for_a_flow_the_tenant_lacks_is_refused(channels: Channels) -> None:
     with pytest.raises(NotifiedFlowNotFoundError):
-        channels.except_flow(NotifiedFlow(uuid4(), "gamma"), NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE)
+        channels.except_flow(NotifiedFlow(uuid4(), "gamma"), NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
 
     assert channels.preferences == {}
 
 
 def test_an_exception_for_an_event_of_the_account_is_refused(channels: Channels) -> None:
     with pytest.raises(AccountEventWithoutFlowExceptionError):
-        channels.except_flow(ALFA, NotificationEvent.RECONCILIATION_ALARM, NotificationChannel.NONE)
+        channels.except_flow(ALFA, NotificationEvent.RECONCILIATION_ALARM, NO_CHANNEL)
 
     assert channels.preferences == {}
 
 
 def test_a_removed_exception_leaves_the_flow_to_the_general_choice(channels: Channels) -> None:
-    channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE)
+    channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
 
     channels.remove_exception(ALFA, NotificationEvent.CYCLE_FAILED)
 
@@ -229,18 +251,18 @@ def test_a_removed_exception_leaves_the_flow_to_the_general_choice(channels: Cha
 
 
 @pytest.mark.parametrize(
-    ("channel", "chat", "email"),
+    ("chosen", "chat", "email"),
     [
-        (NotificationChannel.TELEGRAM, 1, 0),
-        (NotificationChannel.EMAIL, 0, 1),
-        (NotificationChannel.BOTH, 1, 1),
-        (NotificationChannel.NONE, 0, 0),
+        (TELEGRAM, 1, 0),
+        (EMAIL, 0, 1),
+        (BOTH, 1, 1),
+        (NO_CHANNEL, 0, 0),
     ],
 )
-def test_a_notification_is_queued_only_on_the_chosen_channel(
-    channels: Channels, channel: NotificationChannel, chat: int, email: int
+def test_a_notification_is_queued_once_on_each_chosen_channel(
+    channels: Channels, chosen: ChannelSet, chat: int, email: int
 ) -> None:
-    channels.choose(NotificationEvent.CYCLE_FAILED, channel)
+    channels.choose(NotificationEvent.CYCLE_FAILED, chosen)
 
     channels.notify(FAILED_ALFA)
 
@@ -249,8 +271,8 @@ def test_a_notification_is_queued_only_on_the_chosen_channel(
 
 
 def test_the_exception_of_the_flow_of_the_event_wins_over_the_general_choice(channels: Channels) -> None:
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE)
-    channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, NotificationChannel.TELEGRAM)
+    channels.choose(NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
+    channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, TELEGRAM)
 
     channels.notify(FAILED_ALFA)
     channels.notify(FAILED_BETA)
@@ -259,7 +281,7 @@ def test_the_exception_of_the_flow_of_the_event_wins_over_the_general_choice(cha
 
 
 def test_an_event_of_a_flow_no_more_listed_follows_the_general_choice(channels: Channels) -> None:
-    channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE)
+    channels.except_flow(ALFA, NotificationEvent.CYCLE_FAILED, NO_CHANNEL)
     channels.flows.flows = (BETA,)
 
     channels.notify(FAILED_ALFA)
@@ -268,7 +290,7 @@ def test_an_event_of_a_flow_no_more_listed_follows_the_general_choice(channels: 
 
 
 def test_an_event_of_the_account_follows_the_general_choice(channels: Channels) -> None:
-    channels.choose(NotificationEvent.RECONCILIATION_ALARM, NotificationChannel.EMAIL)
+    channels.choose(NotificationEvent.RECONCILIATION_ALARM, EMAIL)
 
     channels.notify(ALARM)
 
@@ -285,7 +307,7 @@ def test_the_risk_decisions_are_silent_until_the_user_chooses(channels: Channels
 
 def test_the_test_notification_is_no_event_and_reaches_every_linked_channel(channels: Channels) -> None:
     for event in NotificationEvent:
-        channels.choose(event, NotificationChannel.NONE)
+        channels.choose(event, NO_CHANNEL)
 
     channels.notify(Notification.test())
 
@@ -295,7 +317,7 @@ def test_the_test_notification_is_no_event_and_reaches_every_linked_channel(chan
 
 def test_a_chosen_channel_not_linked_sends_nothing_on_it(channels: Channels) -> None:
     channels.chats.clear()
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.BOTH)
+    channels.choose(NotificationEvent.CYCLE_FAILED, BOTH)
 
     channels.notify(FAILED_ALFA)
 
@@ -304,7 +326,7 @@ def test_a_chosen_channel_not_linked_sends_nothing_on_it(channels: Channels) -> 
 
 
 def test_the_choices_of_another_tenant_never_change_the_channels_of_a_tenant(channels: Channels) -> None:
-    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.NONE, BRUNO)
+    channels.choose(NotificationEvent.CYCLE_FAILED, NO_CHANNEL, BRUNO)
 
     channels.notify(FAILED_ALFA)
 

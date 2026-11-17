@@ -6,14 +6,14 @@ Funzionalità: R3.5.3 Scelta dei canali delle notifiche
   Perché ricevo gli avvisi importanti dove li vedo e non sono sommerso dagli altri
 
   Nelle Impostazioni delle notifiche, e dall'interfaccia programmatica, l'utente sceglie per ogni tipo di evento
-  (R1.8.2, R3.5.1) il canale: "Telegram", "email", "entrambi", "nessuno" (RF-24.04). La scelta vale per tutti i suoi
-  flussi.
+  (R1.8.2, R3.5.1) i canali, attivando o disattivando ciascuno: "Telegram", "email", tutti e due o "nessuno"
+  (RF-24.04). La scelta vale per tutti i suoi flussi.
   Finché l'utente non sceglie, valgono i predefiniti: "nessuno" per decisione ridotta dal rischio e decisione bloccata
   dal rischio, "Telegram" per tutti gli altri tipi.
-  Ogni flusso può avere eccezioni: per un tipo di evento, un canale diverso da quello generale. Senza eccezione il
+  Ogni flusso può avere eccezioni: per un tipo di evento, canali diversi da quelli generali. Senza eccezione il
   flusso segue la scelta generale. Un'eccezione si può togliere. Gli eventi del conto (posizione o movimento non
   attribuibile, allarme di riconciliazione) seguono solo la scelta generale.
-  Se il canale scelto non è collegato (nessuna chat Telegram, nessun indirizzo email), la notifica non parte su quel
+  Se un canale scelto non è collegato (nessuna chat Telegram, nessun indirizzo email), la notifica non parte su quel
   canale e le Impostazioni lo avvisano accanto al tipo di evento.
   La scelta dei canali non riguarda il campanello della dashboard, che riceve ogni notifica (R6.2.1).
 
@@ -38,11 +38,11 @@ Funzionalità: R3.5.3 Scelta dei canali delle notifiche
     Allora la chat "chat-anna" <telegram> la notifica
     E "anna@example.com" <email> la notifica
     Esempi:
-      | canale   | telegram    | email       |
-      | Telegram | riceve      | non riceve  |
-      | email    | non riceve  | riceve      |
-      | entrambi | riceve      | riceve      |
-      | nessuno  | non riceve  | non riceve  |
+      | canale            | telegram   | email      |
+      | Telegram          | riceve     | non riceve |
+      | email             | non riceve | riceve     |
+      | Telegram ed email | riceve     | riceve     |
+      | nessuno           | non riceve | non riceve |
   Scenario: La scelta generale vale per tutti i flussi
     Dato che "anna" sceglie il canale "email" per "ciclo fallito"
     Quando un ciclo di "beta" fallisce

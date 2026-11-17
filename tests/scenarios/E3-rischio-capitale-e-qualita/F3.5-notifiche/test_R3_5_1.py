@@ -75,7 +75,7 @@ class Events:
         these scenarios receives every event."""
         choose = self.flow_cycles.platform.use_cases_of(user).choose_notification_channel
         for event in events:
-            choose.execute(ChooseNotificationChannelCommand(event, NotificationChannel.TELEGRAM))
+            choose.execute(ChooseNotificationChannelCommand(event, frozenset({NotificationChannel.TELEGRAM})))
 
     def answer(self, *decisions: dict[str, object]) -> None:
         self.flow_cycles.model.text = json.dumps({"decisioni": list(decisions)})

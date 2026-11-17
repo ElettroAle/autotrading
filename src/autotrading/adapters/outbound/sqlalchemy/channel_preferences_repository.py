@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from uuid import UUID
 
@@ -9,7 +9,7 @@ from autotrading.adapters.outbound.sqlalchemy.tables import notification_channel
 from autotrading.application.notifications.errors import NotifiedFlowNotFoundError
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences, Choices
-from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_channel import Channels, NotificationChannel, in_order
 from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -20,7 +20,8 @@ class SqlAlchemyChannelPreferencesRepositoryAdapter:
     """Bound to the tenant of the request: every transaction declares it, and row level security does the rest.
 
     Events and channels are kept by the name of their member, not by the words the user reads: a word can change
-    without migrating the rows.
+    without migrating the rows. The channels of an event are an array of those names, empty when it reaches nobody (ADR
+    canali-delle-notifiche-come-insieme).
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
@@ -29,12 +30,12 @@ class SqlAlchemyChannelPreferencesRepositoryAdapter:
 
     def get(self) -> ChannelPreferences:
         with self._transaction() as connection:
-            general = connection.execute(select(notification_channels.c.event, notification_channels.c.channel)).all()
+            general = connection.execute(select(notification_channels.c.event, notification_channels.c.channels)).all()
             excepted = connection.execute(
                 select(
                     notification_channel_exceptions.c.flow_id,
                     notification_channel_exceptions.c.event,
-                    notification_channel_exceptions.c.channel,
+                    notification_channel_exceptions.c.channels,
                 ).order_by(notification_channel_exceptions.c.flow_id)
             ).all()
         return ChannelPreferences(self._tenant_id, _choices_of(general), _exceptions_of(excepted))
@@ -43,11 +44,11 @@ class SqlAlchemyChannelPreferencesRepositoryAdapter:
         if preferences.tenant_id != self._tenant_id:
             raise CrossTenantAccessError
         tenant = self._tenant_id.value
-        general = [_row(tenant, event, channel) for event, channel in preferences.choices.items()]
+        general = [_row(tenant, event, channels) for event, channels in preferences.choices.items()]
         excepted = [
-            {**_row(tenant, event, channel), "flow_id": flow_id}
+            {**_row(tenant, event, channels), "flow_id": flow_id}
             for flow_id, choices in preferences.exceptions.items()
-            for event, channel in choices.items()
+            for event, channels in choices.items()
         ]
         # The preferences are replaced as a whole, in one transaction: a reader never sees half of them.
         try:
@@ -72,21 +73,25 @@ class SqlAlchemyChannelPreferencesRepositoryAdapter:
             yield connection
 
 
-def _row(tenant: UUID, event: NotificationEvent, channel: NotificationChannel) -> dict[str, object]:
-    return {"tenant_id": tenant, "event": event.name.lower(), "channel": channel.name.lower()}
+def _row(tenant: UUID, event: NotificationEvent, channels: Channels) -> dict[str, object]:
+    return {
+        "tenant_id": tenant,
+        "event": event.name.lower(),
+        "channels": [each.name.lower() for each in in_order(channels)],
+    }
 
 
-def _choice_of(event: str, channel: str) -> tuple[NotificationEvent, NotificationChannel]:
-    return NotificationEvent[event.upper()], NotificationChannel[channel.upper()]
+def _choice_of(event: str, channels: Iterable[str]) -> tuple[NotificationEvent, Channels]:
+    return NotificationEvent[event.upper()], frozenset(NotificationChannel[name.upper()] for name in channels)
 
 
-def _choices_of(rows: Iterable[tuple[str, str]]) -> Choices:
-    return dict(_choice_of(event, channel) for event, channel in rows)
+def _choices_of(rows: Iterable[tuple[str, Sequence[str]]]) -> Choices:
+    return dict(_choice_of(event, channels) for event, channels in rows)
 
 
-def _exceptions_of(rows: Iterable[tuple[UUID, str, str]]) -> Mapping[UUID, Choices]:
-    exceptions: dict[UUID, dict[NotificationEvent, NotificationChannel]] = {}
-    for flow_id, event, channel in rows:
-        chosen_event, chosen_channel = _choice_of(event, channel)
-        exceptions.setdefault(flow_id, {})[chosen_event] = chosen_channel
+def _exceptions_of(rows: Iterable[tuple[UUID, str, Sequence[str]]]) -> Mapping[UUID, Choices]:
+    exceptions: dict[UUID, dict[NotificationEvent, Channels]] = {}
+    for flow_id, event, channels in rows:
+        chosen_event, chosen_channels = _choice_of(event, channels)
+        exceptions.setdefault(flow_id, {})[chosen_event] = chosen_channels
     return exceptions
