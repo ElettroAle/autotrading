@@ -4,7 +4,6 @@ from decimal import Decimal, InvalidOperation
 import httpx
 
 from autotrading.application.agent.errors import (
-    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -87,7 +86,7 @@ class OpenRouterModelCallAdapter:
         try:
             document: object = response.json()
         except ValueError:
-            raise ModelAnswerUnreadableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from None
+            raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, sent=True) from None
         return document
 
 
@@ -133,7 +132,7 @@ def _unusable(key: ProviderKey, document: object, usage: ModelUsage | None) -> E
     error = _error_of(document)
     message = error.get("message")
     if not isinstance(message, str):
-        return ModelAnswerUnreadableError(OPENROUTER, UNEXPECTED_ANSWER, usage=usage, sent=True)
+        return ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER, usage=usage, sent=True)
     code = error.get("code")
     if isinstance(code, int) and not isinstance(code, bool):
         return _refusal(key, code, _compact(message), usage)

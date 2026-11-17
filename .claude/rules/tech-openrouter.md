@@ -28,8 +28,8 @@ paths:
 - **Errori** (R1.2.3, R1.2.4): 401 e 403 chiave rifiutata, 402 credito esaurito (permanenti); tempo scaduto, rete e
   altri stati transitori. L'errore che OpenRouter mette nel corpo di una risposta 200 (`error` con `message`) è il motivo:
   con un `code` numerico passa dalla stessa traduzione degli stati HTTP, altrimenti è transitorio col suo messaggio; il
-  costo, se `usage` c'è, resta (ADR errore-di-openrouter-nella-risposta). Una risposta che non si legge è
-  `ModelAnswerUnreadableError`. L'adapter non ritenta: gli errori transitori li ritenta nel ciclo il caso d'uso (ADR
+  costo, se `usage` c'è, resta (ADR errore-di-openrouter-nella-risposta). Una risposta che non si legge è transitoria.
+  L'adapter non ritenta: gli errori transitori li ritenta nel ciclo il caso d'uso (ADR
   ritentativo-del-modello-nel-ciclo).
 - `composition.py` espone `openrouter_adapters()`; `configuration.py` la dataclass privata `_OpenRouterSettings` (solo
   il tempo di attesa: nessun indirizzo né chiave della piattaforma).

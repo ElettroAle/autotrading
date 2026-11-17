@@ -102,7 +102,7 @@ class ModelUnavailableError(ApplicationError):
     def priced(self, prices: ModelPrices | None) -> ModelUnavailableError:
         """The same error with the cost of the reported usage, priced as every answered call is (R1.4.6)."""
         cost = None if self.usage is None else self.usage.cost_usd(prices)
-        return type(self)(self.provider, self.original, usage=self.usage, sent=self.sent, cost_usd=cost)
+        return ModelUnavailableError(self.provider, self.original, usage=self.usage, sent=self.sent, cost_usd=cost)
 
     def spent_after(self, spend: ModelSpend) -> ModelSpend:
         """What the calls before this one spent, with this call when it went out (R1.4.6)."""
@@ -114,13 +114,9 @@ class ModelUnavailableError(ApplicationError):
         """The same error carrying what every call of the question consumed, the retried ones included (R1.4.6, ADR
         ritentativo-del-modello-nel-ciclo).
         """
-        return type(self)(self.provider, self.original, usage=spend.usage, sent=spend.sent, cost_usd=spend.cost_usd)
-
-
-class ModelAnswerUnreadableError(ModelUnavailableError):
-    """The provider answered, and may have charged, a call whose answer cannot be read: the answer arrived, so it is not
-    asked again in the same cycle (R1.4.5, ADR ritentativo-del-modello-nel-ciclo).
-    """
+        return ModelUnavailableError(
+            self.provider, self.original, usage=spend.usage, sent=spend.sent, cost_usd=spend.cost_usd
+        )
 
 
 class ModelKeyMissingError(ApplicationError):

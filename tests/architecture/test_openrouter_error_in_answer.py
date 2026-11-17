@@ -54,7 +54,7 @@ def test_adr_errore_di_openrouter_nella_risposta_a_generic_reason_from_the_readi
         "    def call(self, document):\n"
         "        raise ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER)\n"
         "def _unusable(key, document, usage):\n"
-        "    return ModelAnswerUnreadableError(OPENROUTER, UNEXPECTED_ANSWER)\n",
+        "    return ModelUnavailableError(OPENROUTER, UNEXPECTED_ANSWER)\n",
     )
 
     assert generic_reasons(hiding) == ["call"]

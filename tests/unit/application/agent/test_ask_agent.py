@@ -9,7 +9,6 @@ from autotrading.application.agent.ask_agent import AskAgentCommand, AskAgentUse
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
 from autotrading.application.agent.compose_agent_context import ComposeAgentContextUseCase
 from autotrading.application.agent.errors import (
-    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyMissingError,
     ModelKeyRejectedError,
@@ -285,14 +284,18 @@ def test_an_unavailable_provider_made_permanent_by_its_cause_is_never_asked_agai
     assert (len(world.model.calls), world.pause.pauses) == (1, [])
 
 
-def test_an_answer_that_arrived_unreadable_is_never_asked_again(world: World) -> None:
+# Owner decision (17/11/2026, "Riprova sempre"): an answer that arrived but cannot be read is asked again too.
+def test_an_answer_that_arrived_unreadable_is_asked_again(world: World) -> None:
     world.register("openrouter", TENANT_KEY)
-    world.model.failure = ModelAnswerUnreadableError(OPENROUTER, "risposta del fornitore inattesa", sent=True)
+    usage = ModelUsage(3000, 4000, Decimal("0.002"))
+    world.model.first_failures = [
+        ModelUnavailableError(OPENROUTER, "risposta del fornitore inattesa", usage=usage, sent=True)
+    ]
 
-    with pytest.raises(ModelAnswerUnreadableError):
-        world.ask()
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
 
-    assert (len(world.model.calls), world.pause.pauses) == (1, [])
+    assert (len(world.model.calls), world.pause.pauses) == (2, [5.0])
+    assert answer.cost_usd == Decimal("0.002") + Decimal("0.001")
 
 
 class ExternalRefusal(Exception):  # noqa: N818 - the error a library of the provider raises, not a project error
@@ -310,24 +313,25 @@ def _caused_by_code(error: ModelUnavailableError, code: int) -> ModelUnavailable
 def test_a_call_without_a_usable_answer_fails_with_the_usage_and_the_cost_of_the_catalog(world: World) -> None:
     world.register("anthropic", TENANT_KEY)
     usage = ModelUsage(1000, 1000, None)
-    world.model.failure = ModelAnswerUnreadableError(ProviderName("anthropic"), "inattesa", usage=usage, sent=True)
+    world.model.failure = ModelUnavailableError(ProviderName("anthropic"), "inattesa", usage=usage, sent=True)
 
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask(PRICED)
 
-    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (usage, True, Decimal("0.003"))
+    every_attempt = ModelUsage(3000, 3000, None)
+    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (every_attempt, True, Decimal("0.009"))
     assert raised.value.__cause__ is world.model.failure
 
 
 def test_a_call_without_a_usable_answer_keeps_the_cost_the_provider_reported(world: World) -> None:
     world.register("openrouter", TENANT_KEY)
     usage = ModelUsage(3000, 4000, Decimal("0.002"))
-    world.model.failure = ModelAnswerUnreadableError(OPENROUTER, "inattesa", usage=usage, sent=True)
+    world.model.failure = ModelUnavailableError(OPENROUTER, "inattesa", usage=usage, sent=True)
 
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask()
 
-    assert raised.value.cost_usd == Decimal("0.002")
+    assert raised.value.cost_usd == Decimal("0.006")
 
 
 def test_an_unreadable_answer_keeps_the_usage_and_the_cost_of_the_call(world: World) -> None:

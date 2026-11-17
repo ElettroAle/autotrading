@@ -31,8 +31,8 @@ paths:
   fornitore che accetta meno rifiuta la chiamata col suo motivo.
 - **Errori** (R1.2.3, R1.2.4): chiave rifiutata (401, 403) e credito esaurito (402) sono permanenti, come calcola l'errore
   base dal codice della causa (ADR permanenza-decisa-dall-errore-base); un 429 non lo è mai; tempo scaduto, rete, ogni altro rifiuto (stato e messaggio originale) e risposta
-  inattesa sono transitori; una risposta che non si legge è `ModelAnswerUnreadableError`. Mai un tentativo della
-  libreria: gli errori transitori li ritenta nel ciclo il caso d'uso (ADR ritentativo-del-modello-nel-ciclo).
+  inattesa sono transitori. Mai un tentativo della libreria: gli errori transitori li ritenta nel ciclo il caso d'uso
+  (ADR ritentativo-del-modello-nel-ciclo).
 - **Catalogo dalla mappa dei modelli della libreria, mai scritto a mano**: i modelli di chat dei fornitori abilitati,
   col nome `<fornitore>/<modello>` (un modello che la mappa nomina con e senza fornitore si offre una volta),
   temperatura se la libreria la dichiara supportata, lunghezza massima della risposta, livello di ragionamento se

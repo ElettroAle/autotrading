@@ -2,11 +2,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from autotrading.application.agent.errors import (
-    ModelAnswerUnreadableError,
-    ModelKeyMissingError,
-    ModelUnavailableError,
-)
+from autotrading.application.agent.errors import ModelKeyMissingError, ModelUnavailableError
 from autotrading.application.agent.model_gateways import ModelGateways, gateway_of
 from autotrading.application.agent.ports import (
     ModelReply,
@@ -46,10 +42,10 @@ class AgentAnswer:
 class AskAgentUseCase:
     """Asks the model of the flow with the key of the tenant, in the worker, and reads its answer (R1.4.3-R1.4.6).
 
-    A temporary failure of the provider is asked again in the same cycle, up to twice and after a longer pause each
-    time, even if the provider may have charged it; a permanent failure or an answer that arrived unreadable is not (ADR
-    ritentativo-del-modello-nel-ciclo, R1.4.5). The gateway that calls is the one whose catalog holds the model of the
-    flow (ADR 0109).
+    A failure of the provider that is not permanent, an answer that arrived unreadable included, is asked again in the
+    same cycle, up to twice and after a longer pause each time, even if the provider may have charged it (ADR
+    ritentativo-del-modello-nel-ciclo). An answer read but not conforming is not a failure and is not asked again
+    (R1.4.5). The gateway that calls is the one whose catalog holds the model of the flow (ADR 0109).
     """
 
     def __init__(
@@ -89,7 +85,7 @@ class AskAgentUseCase:
             except ModelUnavailableError as error:
                 failed = error.priced(prices)
                 spend = failed.spent_after(spend)
-                if not _temporary(error):
+                if error.permanent:
                     raise failed.with_spend(spend) from error
             self._pause.pause(pause)
         try:
@@ -103,8 +99,3 @@ class AskAgentUseCase:
         if registered is None:
             raise ModelKeyMissingError(provider)
         return self._opener.open(registered)
-
-
-def _temporary(error: ModelUnavailableError) -> bool:
-    """An answer that arrived unreadable is not a failure of availability: asking again would not change it (R1.4.5)."""
-    return not error.permanent and not isinstance(error, ModelAnswerUnreadableError)

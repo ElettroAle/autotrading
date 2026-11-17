@@ -10,7 +10,6 @@ import pytest
 from pytest_bdd import given, parsers, then, when
 
 from autotrading.application.agent.errors import (
-    ModelAnswerUnreadableError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -148,7 +147,7 @@ def catalog_prices(records: Records, price_in: str, price_out: str) -> None:
 def provider_reports_usage_without_text(records: Records, tokens_in: str, tokens_out: str, cost: str) -> None:
     usage = ModelUsage(int(tokens_in), int(tokens_out), amount(cost))
     # What the adapters of the providers raise for an answer with its usage and no text (Bug 541).
-    records.flow_cycles.model.failure = ModelAnswerUnreadableError(
+    records.flow_cycles.model.failure = ModelUnavailableError(
         ProviderName("openrouter"), "risposta del fornitore inattesa", usage=usage, sent=True
     )
 

@@ -12,7 +12,7 @@ Funzionalità: R1.4.6 Costo delle chiamate al modello
   Anche una chiamata che il ciclo non può usare registra l'uso riportato dal fornitore; una chiamata partita di cui
   nessuno conosce il costo conta tra le chiamate senza costo noto (Bug 541).
   Un errore temporaneo del fornitore (non raggiungibile, tempo scaduto, troppe richieste, errore del fornitore o del
-  modello che gli sta dietro) si ritenta nello stesso ciclo fino a 2 volte, con attese di 5 e 15 secondi, anche se la
+  modello che gli sta dietro, risposta arrivata ma illeggibile) si ritenta nello stesso ciclo fino a 2 volte, con attese di 5 e 15 secondi, anche se la
   chiamata può essere stata addebitata: il ciclo registra il costo di tutti i tentativi e, se nessuno riesce, il
   motivo dell'ultimo. Una chiave rifiutata o un credito esaurito non si ritentano (Bug 583).
 
@@ -47,7 +47,8 @@ Funzionalità: R1.4.6 Costo delle chiamate al modello
     Dato che il fornitore riporta per la chiamata 3000 token in ingresso, 4000 in uscita e costo 0,002 USD senza testo di risposta
     Quando il ciclo del flusso "alfa" chiede la decisione all'agente
     Allora il ciclo fallisce nel passo della decisione dell'agente
-    E il ciclo registra 3000 token in ingresso, 4000 in uscita e costo 0,002 USD
+    E il fornitore riceve 3 chiamate con attese di 5 e 15 secondi
+    E il ciclo registra 9000 token in ingresso, 12000 in uscita e costo 0,006 USD
 
   Scenario: Chiamata senza risposta dal fornitore
     Dato che il fornitore non risponde entro il tempo massimo

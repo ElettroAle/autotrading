@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from autotrading.application.agent.errors import ModelAnswerUnreadableError, ModelUnavailableError
+from autotrading.application.agent.errors import ModelUnavailableError
 from autotrading.domain.agent.model_usage import ModelPrices, ModelSpend, ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
 
@@ -50,16 +50,6 @@ def test_without_usage_the_priced_error_has_no_cost() -> None:
     assert (priced.usage, priced.sent, priced.cost_usd) == (None, True, None)
 
 
-def test_an_unreadable_answer_is_an_unavailable_provider_that_stays_unreadable_once_priced() -> None:
-    error = ModelAnswerUnreadableError(OPENROUTER, "inattesa", usage=ModelUsage(1000, 1000, None), sent=True)
-
-    priced = error.priced(PRICES)
-
-    assert isinstance(priced, ModelAnswerUnreadableError)
-    assert str(priced) == "fornitore IA non raggiungibile: openrouter: inattesa"
-    assert not priced.permanent
-
-
 def test_a_call_that_went_out_adds_its_usage_and_cost_to_what_was_spent() -> None:
     error = ModelUnavailableError(OPENROUTER, "502", usage=ModelUsage(100, 0, None), sent=True).priced(PRICES)
 
@@ -74,12 +64,11 @@ def test_a_call_that_never_went_out_spends_nothing() -> None:
     assert ModelUnavailableError(OPENROUTER, "ConnectError").spent_after(before) is before
 
 
-def test_the_error_with_the_spend_carries_what_every_call_consumed_and_keeps_its_kind() -> None:
+def test_the_error_with_the_spend_carries_what_every_call_consumed() -> None:
     spend = ModelSpend(ModelUsage(300, 0, None), Decimal("0.0003"), sent=True)
-    error = ModelAnswerUnreadableError(OPENROUTER, "inattesa")
+    error = ModelUnavailableError(OPENROUTER, "inattesa")
 
     spent = error.with_spend(spend)
 
-    assert isinstance(spent, ModelAnswerUnreadableError)
     assert (spent.provider, spent.original) == (OPENROUTER, "inattesa")
     assert (spent.usage, spent.cost_usd, spent.sent) == (ModelUsage(300, 0, None), Decimal("0.0003"), True)
