@@ -97,7 +97,7 @@ When(
   async ({ dashboard }, account: string) => {
     await dashboard.openAccounts();
     await dashboard.signInAs(account);
-    await expect(dashboard.page.getByRole('table', { name: 'Conti' })).toBeVisible();
+    await expect(dashboard.page.getByRole('region', { name: 'Conti' })).toBeVisible();
     await dashboard.waitUntilRead();
   },
 );
@@ -185,7 +185,7 @@ Then("l'elenco dei flussi non contiene la chiusura di emergenza", async ({ dashb
 });
 
 Then('i comandi dei conti non contengono la chiusura di emergenza', async ({ dashboard }) => {
-  const accounts = dashboard.page.getByRole('table', { name: 'Conti' });
+  const accounts = dashboard.page.getByRole('region', { name: 'Conti' });
   await expect(accounts.getByRole('button').first()).toBeVisible();
   await expect(accounts.getByRole('button', { name: EMERGENCY })).toHaveCount(0);
 });
