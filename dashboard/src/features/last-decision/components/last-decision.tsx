@@ -1,7 +1,9 @@
 import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { ActionLabel } from '@/components/ui/action-label';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
+import { DirectionLabel } from '@/components/ui/direction-label';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { paths } from '@/config/paths';
 import { formatInstant } from '@/utils/format-instant';
@@ -30,8 +32,14 @@ const DecisionEntry = ({ decision }: { decision: Decision }) => (
   <section aria-label={decision.asset}>
     <dl className={DETAILS_GRID}>
       <Entry label="Asset">{decision.asset}</Entry>
-      <Entry label="Azione">{decision.action}</Entry>
-      {decision.direction === null ? null : <Entry label="Direzione">{decision.direction}</Entry>}
+      <Entry label="Azione">
+        <ActionLabel value={decision.action} />
+      </Entry>
+      {decision.direction === null ? null : (
+        <Entry label="Direzione">
+          <DirectionLabel value={decision.direction} />
+        </Entry>
+      )}
       <Entry label="Confidenza">
         {decision.confidence === null ? NOT_AVAILABLE : String(decision.confidence)}
       </Entry>

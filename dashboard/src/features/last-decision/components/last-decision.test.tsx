@@ -55,6 +55,21 @@ describe('LastDecision', () => {
     expect(LONG_REASONING.startsWith(reasoning.slice(0, -1))).toBe(true);
   });
 
+  // R6.5.3: the panel shows action and direction with the shared icons (ADR riquadro-dell-ultima-decisione-nella-panoramica).
+  it('shows the action and the direction with their icons', async () => {
+    fakePlatform.recordCycles('alfa', [decided(TEN)]);
+    await renderInApp(<LastDecision flowId="flow-alfa" />, { account: 'anna' });
+
+    const bitcoin = await decisionOn('BTC');
+    expect(within(valueOf(bitcoin, 'Azione')).getByRole('img', { hidden: true })).toHaveAttribute(
+      'data-icon',
+      'plus',
+    );
+    expect(
+      within(valueOf(bitcoin, 'Direzione')).getByRole('img', { hidden: true }),
+    ).toHaveAttribute('data-icon', 'arrow-up');
+  });
+
   it('shows no direction for a decision other than an opening, and a confidence the agent never gave as not available', async () => {
     fakePlatform.recordCycles('alfa', [decided(TEN)]);
     await renderInApp(<LastDecision flowId="flow-alfa" />, { account: 'anna' });

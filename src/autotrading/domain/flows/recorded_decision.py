@@ -41,7 +41,7 @@ class RecordedDecision:
         if self.direction is not None and self.action is not DecisionAction.OPEN:
             raise DirectionWithoutOpeningError(self.direction, self.action)
         if self.confidence is not None and not LOWEST_CONFIDENCE <= self.confidence <= HIGHEST_CONFIDENCE:
-            raise DecisionConfidenceOutOfRangeError
+            raise DecisionConfidenceOutOfRangeError(self.confidence, LOWEST_CONFIDENCE, HIGHEST_CONFIDENCE)
 
     @classmethod
     def named(
