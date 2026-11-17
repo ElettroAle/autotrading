@@ -70,6 +70,7 @@ def test_gives_the_cycles_of_a_version_of_a_flow_with_flow_and_version(platform:
         "outcome": "concluso",
         "failure": None,
         "decisions": None,
+        "trigger": "scheduled",
     }
     assert body["cycles"][-1]["planned_at"] == "2026-11-15T12:00:00Z"
     assert body["next"] is None

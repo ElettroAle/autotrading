@@ -77,6 +77,7 @@ class Decision:
     plan: Plan = Plan()
     change: Change = Change()
     confidence: int = 70
+    reasoning: str = "motivo"
 
     def intent_with[O, C, H, U](
         self,

@@ -9,8 +9,8 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
-from autotrading.adapters.inbound.api.flows import OpeningsSuspensionResponse
 from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
+from autotrading.adapters.inbound.api.openings_suspension_response import OpeningsSuspensionResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.application.flows.list_flow_overviews import FlowOverview, ListFlowOverviewsCommand
@@ -50,13 +50,16 @@ class CallCostResponse(BaseModel):
 
 
 class CycleSummaryResponse(BaseModel):
-    """A cycle in the list: its instants, its outcome and the decisions of the agent (R1.7.3)."""
+    """A cycle in the list: its instants, its outcome, the decisions of the agent and what started it (R1.7.3,
+    R6.5.2)."""
 
     planned_at: datetime
     started_at: datetime | None
     outcome: str
     failure: FailureResponse | None
     decisions: dict[str, object] | None
+    # scheduled or on_demand: what started the cycle (R6.5.2).
+    trigger: str
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleSummaryResponse:
@@ -67,6 +70,7 @@ class CycleSummaryResponse(BaseModel):
             outcome=record.outcome.value,
             failure=FailureResponse.of(record.failure),
             decisions=None if decisions is None else dict(decisions),
+            trigger=record.trigger.value,
         )
 
 
@@ -99,7 +103,7 @@ class AbsentSourceResponse(BaseModel):
 
 
 class CycleDetailResponse(BaseModel):
-    """A cycle with everything recorded about it (R1.7.1)."""
+    """A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2)."""
 
     planned_at: datetime
     started_at: datetime | None
@@ -110,6 +114,8 @@ class CycleDetailResponse(BaseModel):
     absent_sources: list[AbsentSourceResponse]
     documents: list[StepDocumentResponse]
     cost: CallCostResponse | None
+    # scheduled or on_demand: what started the cycle (R6.5.2).
+    trigger: str
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleDetailResponse:
@@ -128,6 +134,7 @@ class CycleDetailResponse(BaseModel):
                 for document in record.documents
             ],
             cost=CallCostResponse.of(record.cost),
+            trigger=record.trigger.value,
         )
 
 

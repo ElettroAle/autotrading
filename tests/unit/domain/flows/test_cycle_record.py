@@ -6,6 +6,8 @@ import pytest
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord, StepDocument
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.errors import UnknownCycleOutcomeError
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
+from autotrading.domain.flows.trade_side import TradeSide
 
 
 def test_a_skipped_cycle_keeps_only_its_planned_instant() -> None:
@@ -63,3 +65,16 @@ def test_an_outcome_nobody_records_is_refused_with_the_outcomes_to_choose_from()
         CycleOutcome.named("failed")
 
     assert raised.value.outcomes == ("concluso", "fallito", "saltato")
+
+
+def test_a_cycle_keeps_the_decisions_the_agent_took_in_it() -> None:
+    decision = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 72, "trend")
+    record = CycleRecord(
+        uuid4(), datetime(2026, 11, 16, 10, 0, tzinfo=UTC), CycleOutcome.COMPLETED, decisions=(decision,)
+    )
+
+    assert record.decisions == (decision,)
+
+
+def test_a_cycle_that_never_got_to_the_agent_has_no_decision() -> None:
+    assert CycleRecord.skipped(uuid4(), datetime(2026, 11, 16, 10, 0, tzinfo=UTC)).decisions == ()

@@ -258,3 +258,41 @@ class ReconciliationAlarmNotOpenError(ApplicationError):
     def __init__(self, account_name: str) -> None:
         super().__init__(f"il conto {account_name} non ha un allarme di riconciliazione aperto")
         self.account_name = account_name
+
+
+class FlowNotActiveError(ApplicationError):
+    """A cycle asked for now on a flow that runs no cycles: paused, stopped or a draft (R6.5.2)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("il flusso non è attivo")
+
+
+class CycleInProgressError(ApplicationError):
+    """A cycle asked for now while another cycle of the flow runs: two never overlap (R1.2.2, R6.5.2)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("un ciclo del flusso è già in corso")
+
+
+class OnDemandCycleFailedError(ApplicationError):
+    """A cycle asked for now stopped by a permanent error: recorded and the flow paused by the worker, which gives its
+    reason back (R6.5.2, R1.2.4). The cycle the request asked for did not complete because of what it depends on."""
+
+    status_code = 424
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"ciclo fallito: {reason}")
+        self.reason = reason
+
+
+class CycleWorkerUnavailableError(ApplicationError):
+    """The worker, the only service that runs the cycles, cannot be reached or answers in an unexpected shape."""
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("servizio di esecuzione non raggiungibile, riprovare")

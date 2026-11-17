@@ -2,6 +2,7 @@ import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { formatInstant } from '@/utils/format-instant';
 
 import type { Cycle } from '../api/get-cycle';
+import { ON_DEMAND_LABEL } from '../utils/cycle-trigger';
 
 const startOf = (cycle: Cycle): string => {
   if (cycle.started_at === null) {
@@ -28,7 +29,10 @@ const Term = ({ term, children }: { term: string; children: string }) => (
   </div>
 );
 
-/** When the cycle was planned and started, how it ended, what the model cost and the steps it ran (R1.7.1). */
+/**
+ * When the cycle was planned and started, whether the user asked for it now, how it ended, what the model cost and the
+ * steps it ran (R1.7.1, R6.5.2).
+ */
 export const CycleSummaryView = ({ cycle }: { cycle: Cycle }) => (
   <section
     aria-labelledby="cycle-summary"
@@ -40,6 +44,7 @@ export const CycleSummaryView = ({ cycle }: { cycle: Cycle }) => (
     <dl className="space-y-1 text-sm">
       <Term term="Pianificato">{formatInstant(cycle.planned_at)}</Term>
       <Term term="Avviato">{startOf(cycle)}</Term>
+      {cycle.trigger === 'on_demand' && <Term term="Avvio">{ON_DEMAND_LABEL}</Term>}
       <Term term="Esito">{cycle.outcome}</Term>
       <Term term="Costo del modello">{costOf(cycle)}</Term>
     </dl>

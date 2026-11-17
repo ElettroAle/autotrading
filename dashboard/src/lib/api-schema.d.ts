@@ -612,6 +612,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cycles */
+        get: operations["list_cycles_flows__flow_id__cycles_get"];
+        put?: never;
+        /**
+         * Run Cycle Now
+         * @description A cycle of the flow now, run by the worker and answered when it ends (R6.5.2): a failed cycle is the
+         *     cycle created, a flow not active or a cycle in progress a refusal.
+         */
+        post: operations["run_cycle_now_flows__flow_id__cycles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/duplicate": {
         parameters: {
             query?: never;
@@ -928,23 +950,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/flows/{flow_id}/cycles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Cycles */
-        get: operations["list_cycles_flows__flow_id__cycles_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/flows/{flow_id}/cycles/{planned_at}": {
         parameters: {
             query?: never;
@@ -971,6 +976,26 @@ export interface paths {
         };
         /** Read Flow Cost */
         get: operations["read_flow_cost_flows__flow_id__cost_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/decisions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Last Decision
+         * @description The last decision of the flow, whatever the period; null before its first completed cycle with one.
+         */
+        get: operations["read_last_decision_flows__flow_id__decisions_latest_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1413,7 +1438,7 @@ export interface components {
         };
         /**
          * CycleDetailResponse
-         * @description A cycle with everything recorded about it (R1.7.1).
+         * @description A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2).
          */
         CycleDetailResponse: {
             /**
@@ -1435,6 +1460,8 @@ export interface components {
             /** Documents */
             documents: components["schemas"]["StepDocumentResponse"][];
             cost: components["schemas"]["CallCostResponse"] | null;
+            /** Trigger */
+            trigger: string;
         };
         /**
          * CyclePageResponse
@@ -1452,7 +1479,8 @@ export interface components {
         };
         /**
          * CycleSummaryResponse
-         * @description A cycle in the list: its instants, its outcome and the decisions of the agent (R1.7.3).
+         * @description A cycle in the list: its instants, its outcome, the decisions of the agent and what started it (R1.7.3,
+         *     R6.5.2).
          */
         CycleSummaryResponse: {
             /**
@@ -1469,6 +1497,8 @@ export interface components {
             decisions: {
                 [key: string]: unknown;
             } | null;
+            /** Trigger */
+            trigger: string;
         };
         /** DailyCostResponse */
         DailyCostResponse: {
@@ -1479,6 +1509,23 @@ export interface components {
             day: string;
             /** Cost Usd */
             cost_usd: string;
+        };
+        /**
+         * DecisionResponse
+         * @description A decision of the agent on one asset: the direction only for an opening, the confidence null when the agent
+         *     gave none (R6.5.4).
+         */
+        DecisionResponse: {
+            /** Asset */
+            asset: string;
+            /** Action */
+            action: string;
+            /** Direction */
+            direction: string | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Reasoning */
+            reasoning: string;
         };
         /**
          * DefaultSystemPromptResponse
@@ -2121,6 +2168,8 @@ export interface components {
             decisions: {
                 [key: string]: unknown;
             } | null;
+            /** Trigger */
+            trigger: string;
             /**
              * Flow Id
              * Format: uuid
@@ -2210,6 +2259,20 @@ export interface components {
             planned_at: string;
             /** Outcome */
             outcome: string;
+        };
+        /**
+         * LastDecisionResponse
+         * @description The last decision of the agent in the flow: the planned instant of its cycle and its decisions, one by asset
+         *     (ADR decisioni-del-ciclo-registrate-per-asset).
+         */
+        LastDecisionResponse: {
+            /**
+             * Planned At
+             * Format: date-time
+             */
+            planned_at: string;
+            /** Decisions */
+            decisions: components["schemas"]["DecisionResponse"][];
         };
         /**
          * LinkCodeResponse
@@ -4045,6 +4108,78 @@ export interface operations {
             };
         };
     };
+    list_cycles_flows__flow_id__cycles_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description concluso o fallito */
+                outcome?: string | null;
+                /** @description apertura, chiusura, mantenimento o nessuna */
+                decision?: string | null;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CyclePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_cycle_now_flows__flow_id__cycles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleSummaryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     duplicate_flow_flows__flow_id__duplicate_post: {
         parameters: {
             query?: never;
@@ -4667,47 +4802,6 @@ export interface operations {
             };
         };
     };
-    list_cycles_flows__flow_id__cycles_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                /** @description concluso o fallito */
-                outcome?: string | null;
-                /** @description apertura, chiusura, mantenimento o nessuna */
-                decision?: string | null;
-                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                from?: string | null;
-                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                to?: string | null;
-            };
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CyclePageResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_cycle_flows__flow_id__cycles__planned_at__get: {
         parameters: {
             query?: never;
@@ -4758,6 +4852,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowCostResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_last_decision_flows__flow_id__decisions_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastDecisionResponse"] | null;
                 };
             };
             /** @description Validation Error */

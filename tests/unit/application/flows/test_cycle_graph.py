@@ -8,6 +8,8 @@ from autotrading.application.flows.cycle_graph import CompletedCycle, FailedCycl
 from autotrading.application.flows.ports import SourceReading
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.cycles import FakeTransientError
 from tests.support.cycles import Cycles, at
 
@@ -174,3 +176,57 @@ def test_a_cycle_failed_reading_the_flow_gives_no_state(cycles: Cycles) -> None:
 
     assert isinstance(outcome, FailedCycle)
     assert outcome.state is None
+
+
+# ADR decisioni-del-ciclo-registrate-per-asset: the decide node reads the decisions one by asset through the journal
+# and the record of the cycle keeps them, also when the cycle fails after deciding or resumes from a checkpoint.
+def opening_of(asset: str) -> RecordedDecision:
+    return RecordedDecision(asset, DecisionAction.OPEN, TradeSide.LONG, 70, f"apertura di {asset}")
+
+
+def test_a_completed_cycle_records_the_decisions_the_journal_reads_one_by_asset(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC", "ETH"]
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert record.decisions == (opening_of("BTC"), opening_of("ETH"))
+    assert cycles.records.records[-1].decisions == record.decisions
+
+
+def test_a_cycle_failed_after_the_decision_keeps_its_decisions(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    cycles.agent.decisions[flow_id] = ["BTC"]
+    cycles.failures.fail_once(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.record.decisions == (opening_of("BTC"),)
+
+
+def test_a_cycle_failed_before_the_decision_has_none(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    cycles.agent.decisions[flow_id] = ["BTC"]
+    cycles.failures.fail_once(flow_id, CycleStep.AGENT_DECISION, FakeTransientError("timeout del modello"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.record.decisions == ()
+
+
+def test_a_resumed_cycle_records_the_decisions_taken_before_it_stopped(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    cycles.agent.decisions[flow_id] = ["BTC"]
+    cycles.failures.fail_once(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+    graph = cycles.graph()
+    graph.run(planned(cycles), at("10:00:00"))
+    cycles.agent.decisions[flow_id] = []
+
+    record = completed(graph.run(planned(cycles), at("10:05:00")))
+
+    assert record.decisions == (opening_of("BTC"),)
