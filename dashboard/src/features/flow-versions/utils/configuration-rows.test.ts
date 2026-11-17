@@ -18,6 +18,8 @@ const CONFIGURATION: Configuration = {
     max_leverage: 5,
     max_margin_exposure_percent: '10',
     max_value_exposure_percent: null,
+    max_total_margin_exposure_percent: '30',
+    max_total_value_exposure_percent: null,
   },
   default_stop_loss_percent: '5',
   default_take_profit_percent: '10',
@@ -26,6 +28,10 @@ const CONFIGURATION: Configuration = {
   bring_to_minimum: true,
   system_prompt: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
   system_prompt_is_default: false,
+  max_consecutive_failures: 3,
+  max_daily_loss_percent: '5',
+  max_drawdown_percent: '12.5',
+  openings_resume: 'next_day',
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -41,6 +47,8 @@ const PARTS_OF_FIELD = {
     'leva massima',
     'esposizione massima del margine',
     'esposizione massima del valore',
+    'esposizione complessiva massima del margine',
+    'esposizione complessiva massima del valore',
   ],
   default_stop_loss_percent: ['stop loss predefinito'],
   default_take_profit_percent: ['take profit predefinito'],
@@ -50,6 +58,10 @@ const PARTS_OF_FIELD = {
   system_prompt: ['system prompt'],
   system_prompt_is_default: [],
   system_prompt_placeholders: [],
+  max_consecutive_failures: ['cicli falliti consecutivi massimi'],
+  max_daily_loss_percent: ['perdita giornaliera massima'],
+  max_drawdown_percent: ['perdita massima dal picco'],
+  openings_resume: ['ripresa delle aperture'],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
   readonly string[]
@@ -67,6 +79,8 @@ describe('configurationRows', () => {
       { part: 'leva massima', value: '5' },
       { part: 'esposizione massima del margine', value: '10%' },
       { part: 'esposizione massima del valore', value: 'nessuno' },
+      { part: 'esposizione complessiva massima del margine', value: '30%' },
+      { part: 'esposizione complessiva massima del valore', value: 'nessuno' },
       { part: 'stop loss predefinito', value: '5%' },
       { part: 'take profit predefinito', value: '10%' },
       { part: 'confidenza minima', value: '60' },
@@ -76,6 +90,10 @@ describe('configurationRows', () => {
         part: 'system prompt',
         value: '{instructions}\nRegole operative:\n- leva da 1 a {max_leverage}',
       },
+      { part: 'cicli falliti consecutivi massimi', value: '3' },
+      { part: 'perdita giornaliera massima', value: '5%' },
+      { part: 'perdita massima dal picco', value: '12.5%' },
+      { part: 'ripresa delle aperture', value: 'il giorno dopo' },
     ]);
   });
 
@@ -100,10 +118,16 @@ describe('configurationRows', () => {
         max_leverage: null,
         max_margin_exposure_percent: null,
         max_value_exposure_percent: '12.5',
+        max_total_margin_exposure_percent: null,
+        max_total_value_exposure_percent: null,
       },
       default_take_profit_percent: null,
       minimum_confidence: null,
       bring_to_minimum: false,
+      max_consecutive_failures: null,
+      max_daily_loss_percent: null,
+      max_drawdown_percent: null,
+      openings_resume: 'manual',
     });
 
     expect(Object.fromEntries(rows.map((row) => [row.part, row.value]))).toMatchObject({
@@ -112,9 +136,15 @@ describe('configurationRows', () => {
       'leva massima': 'nessuno',
       'esposizione massima del margine': 'nessuno',
       'esposizione massima del valore': '12.5%',
+      'esposizione complessiva massima del margine': 'nessuno',
+      'esposizione complessiva massima del valore': 'nessuno',
       'take profit predefinito': 'nessuno',
       'confidenza minima': 'nessuna',
       'porta al minimo': 'no',
+      'cicli falliti consecutivi massimi': 'nessuno',
+      'perdita giornaliera massima': 'nessuno',
+      'perdita massima dal picco': 'nessuno',
+      'ripresa delle aperture': 'manuale',
     });
   });
 });

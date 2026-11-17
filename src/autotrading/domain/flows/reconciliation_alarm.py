@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.flows.balance_comparison import BalanceComparison
+from autotrading.domain.flows.openings_suspension import OpeningsSuspension, OpeningsSuspensionCause
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +33,7 @@ class ReconciliationAlarm:
     def confirmed(self, at: datetime) -> ReconciliationAlarm:
         return replace(self, confirmed_at=at)
 
-    def suspension_reason(self, account_name: str) -> str:
-        """Why an opening of a flow of the account is not executed while the alarm is open."""
-        return f"allarme di riconciliazione sul conto {account_name}"
+    def suspension(self, account_name: str) -> OpeningsSuspension:
+        """The openings of every flow of the account, suspended while the alarm is open."""
+        reason = f"allarme di riconciliazione sul conto {account_name}"
+        return OpeningsSuspension(reason, self.opened_at, OpeningsSuspensionCause.RECONCILIATION)

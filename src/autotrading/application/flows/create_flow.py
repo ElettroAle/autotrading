@@ -20,6 +20,7 @@ from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
@@ -45,6 +46,9 @@ class CreateFlowCommand:
     max_leverage: int | None
     max_margin_exposure_percent: Decimal | None = None
     max_value_exposure_percent: Decimal | None = None
+    # None: no overall limit on the sum of the open positions (R3.2.1).
+    max_total_margin_exposure_percent: Decimal | None = None
+    max_total_value_exposure_percent: Decimal | None = None
     model_parameters: Mapping[str, object] = field(default_factory=dict)
     sources: tuple[SourceRequest, ...] = ()
     instructions: str = ""
@@ -52,6 +56,12 @@ class CreateFlowCommand:
     bring_to_minimum: bool = False
     # None keeps the default of the platform (R1.4.8).
     system_prompt: str | None = None
+    # None: no maximum, the flow keeps trying at every cycle (R3.2.4).
+    max_consecutive_failures: int | None = None
+    # None: no maximum loss; the suspended openings resume by hand unless the user chooses the next day (R3.2.2).
+    max_daily_loss_percent: Decimal | None = None
+    max_drawdown_percent: Decimal | None = None
+    openings_resume: OpeningsResume = OpeningsResume.MANUAL
     # None for the stop loss of the platform; no take profit unless given (R3.1.2).
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
@@ -104,11 +114,19 @@ class CreateFlowUseCase:
             sources=tuple(self._source(request) for request in command.sources),
             instructions=command.instructions.strip(),
             risk_limits=RiskLimits.of(
-                command.max_leverage, command.max_margin_exposure_percent, command.max_value_exposure_percent
+                command.max_leverage,
+                command.max_margin_exposure_percent,
+                command.max_value_exposure_percent,
+                command.max_total_margin_exposure_percent,
+                command.max_total_value_exposure_percent,
             ),
             allocated_capital=command.allocated_capital,
             bring_to_minimum=command.bring_to_minimum,
             system_prompt=command.system_prompt,
+            max_consecutive_failures=command.max_consecutive_failures,
+            max_daily_loss_percent=command.max_daily_loss_percent,
+            max_drawdown_percent=command.max_drawdown_percent,
+            openings_resume=command.openings_resume,
             protection_defaults=ProtectionDefaults.of(
                 command.default_stop_loss_percent, command.default_take_profit_percent
             ),

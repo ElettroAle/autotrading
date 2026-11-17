@@ -27,6 +27,8 @@ export const flowSchema = z.object({
     max_leverage: z.number().nullable(),
     max_margin_exposure_percent: z.string().nullable(),
     max_value_exposure_percent: z.string().nullable(),
+    max_total_margin_exposure_percent: z.string().nullable(),
+    max_total_value_exposure_percent: z.string().nullable(),
   }),
   default_stop_loss_percent: z.string(),
   default_take_profit_percent: z.string().nullable(),
@@ -36,6 +38,10 @@ export const flowSchema = z.object({
   system_prompt: z.string(),
   system_prompt_is_default: z.boolean(),
   system_prompt_placeholders: z.array(promptPlaceholderSchema),
+  max_consecutive_failures: z.number().nullable(),
+  max_daily_loss_percent: z.string().nullable(),
+  max_drawdown_percent: z.string().nullable(),
+  openings_resume: z.enum(['manual', 'next_day']),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

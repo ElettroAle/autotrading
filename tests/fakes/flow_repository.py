@@ -19,6 +19,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
+from autotrading.domain.flows.openings_suspension import OpeningsStatus
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -34,6 +35,8 @@ class FlowStore:
         self.first_starts: dict[FlowId, datetime] = {}
         self.versions: dict[FlowId, list[FlowConfiguration]] = {}
         self.capital_changes: dict[FlowId, list[CapitalChange]] = {}
+        # Beside the flow as in its row: the suspension of its openings for maximum loss and their last resume (R3.2.2).
+        self.openings: dict[FlowId, OpeningsStatus] = {}
         # As the default of the database: a version is stamped with the time it is saved, here the one the test sets.
         self.now = datetime(2026, 1, 1, tzinfo=UTC)
         self.created_at: dict[tuple[FlowId, int], datetime] = {}
@@ -157,7 +160,7 @@ class InMemoryAutomaticPauseAdapter:
 
 
 class InMemoryFlowTimingAdapter:
-    """Bound to one tenant: the anchor and the pause reason the store keeps beside its flows."""
+    """Bound to one tenant: the anchor, the pause reason and the first start the store keeps beside its flows."""
 
     def __init__(self, store: FlowStore, tenant_id: TenantId) -> None:
         self._store = store

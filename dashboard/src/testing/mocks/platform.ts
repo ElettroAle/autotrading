@@ -29,6 +29,12 @@ export type FakeFlowHistory = {
 
 export type FakeEquityPoint = { readonly plannedAt: Date; readonly equity: number };
 
+/** How suspended openings resume: by the user, or on their own at the next midnight UTC (R3.2.2). */
+export type FakeOpeningsResume = 'manual' | 'next_day';
+
+/** The openings of a flow suspended for maximum loss, as the API says it (R3.2.2). */
+export type FakeOpeningsSuspension = { readonly reason: string; readonly suspendedAt: string };
+
 /**
  * A price forecast the flow recorded (R1.3.5): asset, horizon, the instant it expires, the price it forecast and the
  * actual price at that instant, null when never read.
@@ -49,6 +55,10 @@ export type FakeConfiguration = {
   readonly maxLeverage: number;
   readonly allocatedCapital: string;
   readonly systemPrompt: string | null;
+  readonly maxConsecutiveFailures: number | null;
+  readonly maxDailyLossPercent: string | null;
+  readonly maxDrawdownPercent: string | null;
+  readonly openingsResume: FakeOpeningsResume;
   readonly defaultStopLossPercent: string;
   readonly defaultTakeProfitPercent: string | null;
   readonly minimumConfidence: number | null;
@@ -71,6 +81,9 @@ export type FakeRiskLimits = {
   readonly maxLeverage: number;
   readonly maxMarginExposurePercent: string | null;
   readonly maxValueExposurePercent: string | null;
+  /** The overall limits on the sum of the open positions; null for none (R3.2.1). */
+  readonly maxTotalMarginExposurePercent: string | null;
+  readonly maxTotalValueExposurePercent: string | null;
 };
 
 export type FakeFlow = {
@@ -95,6 +108,14 @@ export type FakeFlow = {
   bringToMinimum: boolean;
   /** The system prompt the user wrote; null follows the default of the platform (R1.4.8). */
   systemPrompt: string | null;
+  /** The failed cycles in a row after which the flow pauses; null keeps it trying (R3.2.4). */
+  maxConsecutiveFailures: number | null;
+  /** The maximum losses, null for none, and how the openings they suspend resume (R3.2.2). */
+  maxDailyLossPercent: string | null;
+  maxDrawdownPercent: string | null;
+  openingsResume: FakeOpeningsResume;
+  /** The suspension of the openings in force, null when the flow may open (R3.2.2). */
+  openingsSuspension: FakeOpeningsSuspension | null;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
   cycles: number;
   /** Why the flow paused, as the API says it (R1.2.4). */
@@ -153,6 +174,8 @@ export type FakeFlowConfiguration = {
     max_leverage: number;
     max_margin_exposure_percent: string | null;
     max_value_exposure_percent: string | null;
+    max_total_margin_exposure_percent: string | null;
+    max_total_value_exposure_percent: string | null;
   };
   default_stop_loss_percent: string;
   default_take_profit_percent: string | null;
@@ -162,6 +185,10 @@ export type FakeFlowConfiguration = {
   system_prompt: string;
   system_prompt_is_default: boolean;
   system_prompt_placeholders: { name: string; description: string }[];
+  max_consecutive_failures: number | null;
+  max_daily_loss_percent: string | null;
+  max_drawdown_percent: string | null;
+  openings_resume: FakeOpeningsResume;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -177,6 +204,8 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
     max_leverage: flow.riskLimits.maxLeverage,
     max_margin_exposure_percent: flow.riskLimits.maxMarginExposurePercent,
     max_value_exposure_percent: flow.riskLimits.maxValueExposurePercent,
+    max_total_margin_exposure_percent: flow.riskLimits.maxTotalMarginExposurePercent,
+    max_total_value_exposure_percent: flow.riskLimits.maxTotalValueExposurePercent,
   },
   default_stop_loss_percent: flow.defaultStopLossPercent,
   default_take_profit_percent: flow.defaultTakeProfitPercent,
@@ -186,6 +215,10 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   system_prompt: flow.systemPrompt ?? FAKE_SYSTEM_PROMPT.system_prompt,
   system_prompt_is_default: flow.systemPrompt === null,
   system_prompt_placeholders: FAKE_SYSTEM_PROMPT.system_prompt_placeholders,
+  max_consecutive_failures: flow.maxConsecutiveFailures,
+  max_daily_loss_percent: flow.maxDailyLossPercent,
+  max_drawdown_percent: flow.maxDrawdownPercent,
+  openings_resume: flow.openingsResume,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -306,6 +339,8 @@ export const DEFAULT_RISK_LIMITS: FakeRiskLimits = {
   maxLeverage: 3,
   maxMarginExposurePercent: '10',
   maxValueExposurePercent: null,
+  maxTotalMarginExposurePercent: null,
+  maxTotalValueExposurePercent: null,
 };
 const DRAFT = 'bozza';
 const STOPPED = 'fermo';
@@ -333,6 +368,10 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   maxLeverage: 3,
   allocatedCapital: '100',
   systemPrompt: null,
+  maxConsecutiveFailures: null,
+  maxDailyLossPercent: null,
+  maxDrawdownPercent: null,
+  openingsResume: 'manual',
   defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
   defaultTakeProfitPercent: null,
   minimumConfidence: null,
@@ -364,6 +403,7 @@ const state = {
   openPositions: new Map<string, FakeOpenPosition[]>(),
   closedPositions: new Map<string, ClosedPositionAnswer[]>(),
   cashOuts: [] as string[],
+  emergencyClosings: [] as FakeEmergencyScope[],
   capitalChanges: [] as FakeCapitalChange[],
   signingIn: undefined as string | undefined,
   identityProviderSession: undefined as string | undefined,
@@ -377,6 +417,17 @@ const state = {
 };
 
 export const flowIdOf = (name: string): string => `flow-${name}`;
+
+/** What an emergency closing covers: one flow, the flows of one account, or every flow (R3.2.3). */
+export type FakeEmergencyScope = { readonly flowId?: string; readonly accountId?: string };
+
+/** What the emergency closing did to one flow, as the API answers it (R3.2.3). */
+export type FakeEmergencyOutcome = {
+  readonly flow: FakeFlow;
+  readonly closed: string[];
+};
+
+export const EMERGENCY_REASON = 'chiusura di emergenza';
 
 const userNamed = (account: string): FakeUser => {
   const user = state.users.get(account);
@@ -434,6 +485,11 @@ const draftOf = (
   minimumConfidence: null,
   bringToMinimum: strategy.bringToMinimum ?? false,
   systemPrompt: null,
+  maxConsecutiveFailures: null,
+  maxDailyLossPercent: null,
+  maxDrawdownPercent: null,
+  openingsResume: 'manual',
+  openingsSuspension: null,
   cycles: 0,
   pauseReason: null,
   currentCapital: 0,
@@ -523,6 +579,7 @@ export const fakePlatform = {
     state.openPositions.clear();
     state.closedPositions.clear();
     state.cashOuts.length = 0;
+    state.emergencyClosings.length = 0;
     state.capitalChanges.length = 0;
     state.signingIn = undefined;
     state.identityProviderSession = undefined;
@@ -599,6 +656,11 @@ export const fakePlatform = {
       minimumConfidence: null,
       bringToMinimum: false,
       systemPrompt: null,
+      maxConsecutiveFailures: null,
+      maxDailyLossPercent: null,
+      maxDrawdownPercent: null,
+      openingsResume: 'manual',
+      openingsSuspension: null,
       cycles: 0,
       pauseReason: null,
       currentCapital: 100,
@@ -706,6 +768,8 @@ export const fakePlatform = {
               maxLeverage: limits.max_leverage,
               maxMarginExposurePercent: limits.max_margin_exposure_percent,
               maxValueExposurePercent: limits.max_value_exposure_percent,
+              maxTotalMarginExposurePercent: limits.max_total_margin_exposure_percent,
+              maxTotalValueExposurePercent: limits.max_total_value_exposure_percent,
             },
           }),
       ...(configuration.allocated_capital == null
@@ -995,6 +1059,51 @@ export const fakePlatform = {
     flow.currentCapital = kept;
     state.cashOuts.push(flow.id);
     return { flow, freed };
+  },
+
+  /**
+   * The flows an emergency closing covers, refused as the API refuses a flow or an account the user lacks: active or
+   * paused, of the flow, of the account or of every account (R3.2.3).
+   */
+  emergencyFlowsOf(user: FakeUser, scope: FakeEmergencyScope): FakeFlow[] {
+    if (scope.flowId !== undefined && scope.accountId !== undefined) {
+      throw new FakeRefusal(400, 'indicare un flusso o un conto, non entrambi');
+    }
+    if (scope.flowId !== undefined) {
+      flowOf(user, scope.flowId);
+    }
+    if (
+      scope.accountId !== undefined &&
+      !user.accounts.some((each) => each.id === scope.accountId)
+    ) {
+      throw new FakeRefusal(404, 'conto non trovato');
+    }
+    return user.flows.filter(
+      (flow) =>
+        (flow.status === ACTIVE || flow.status === PAUSED) &&
+        (scope.flowId === undefined || flow.id === scope.flowId) &&
+        (scope.accountId === undefined || flow.accountId === scope.accountId),
+    );
+  },
+
+  /** The emergency closing: every position of the flows of the scope closes, the active flows pause (R3.2.3). */
+  closeInEmergency(user: FakeUser, scope: FakeEmergencyScope): FakeEmergencyOutcome[] {
+    const outcomes = fakePlatform.emergencyFlowsOf(user, scope).map((flow) => {
+      const closed = fakePlatform.openPositionsOf(flow.id).map((position) => position.asset);
+      state.openPositions.delete(flow.id);
+      if (flow.status === ACTIVE) {
+        flow.status = PAUSED;
+        flow.pauseReason = EMERGENCY_REASON;
+      }
+      return { flow, closed };
+    });
+    state.emergencyClosings.push(scope);
+    return outcomes;
+  },
+
+  /** How many emergency closings the fake API ran. */
+  emergencyClosings(): number {
+    return state.emergencyClosings.length;
   },
 
   /** A row of the history of the capital, in any order: the fake API serves them from the most recent (R3.4.2). */

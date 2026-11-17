@@ -125,13 +125,6 @@ When(
   },
 );
 
-When(
-  '{string} apre il flusso {string} nella dashboard',
-  async ({ dashboard }, account: string, flow: string) => {
-    await dashboard.openFlowAs(account, flow);
-  },
-);
-
 Then(
   "il conto {string} mostra lo stato {string} con data e ora dell'ultimo confronto",
   async ({ dashboard }, name: string, state: string) => {
