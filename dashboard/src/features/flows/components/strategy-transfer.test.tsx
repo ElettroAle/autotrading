@@ -90,7 +90,7 @@ describe('Strategy export and import', () => {
     expect(saved).toEqual([]);
   });
 
-  it('imports the file as a draft and opens it, ready for the assignment', async () => {
+  it('imports the file as a draft and opens it, leading to its configuration', async () => {
     const { router } = await renderApp({ account: 'anna' });
 
     await importAs('alfa bis', fileOf(JSON.stringify(exportedFromAlfa())));
@@ -98,7 +98,9 @@ describe('Strategy export and import', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/flows/flow-alfa%20bis'));
     expect(await screen.findByRole('heading', { level: 1, name: 'alfa bis' })).toBeVisible();
     expect(screen.getByText('Bozza')).toBeInTheDocument();
-    expect(screen.getByRole('form', { name: 'Assegnazione della bozza' })).toBeInTheDocument();
+    expect(screen.getByRole('note', { name: 'Da configurare' })).toHaveTextContent(
+      "Prima dell'avvio mancano: conto, capitale allocato e asset",
+    );
     expect(fakePlatform.flowNamed('alfa bis').sources).toEqual([{ name: 'indicatori', weight: 2 }]);
   });
 

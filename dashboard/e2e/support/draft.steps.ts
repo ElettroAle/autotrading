@@ -6,7 +6,8 @@ import { Then, When } from './fixtures';
 import { onFlowPage } from './flow-page';
 
 // Shared by the requirements that make a draft, from a copy or from a file (R2.4.1, R2.5.2; ADR 0124): what the
-// draft lacks, its assignment and its start.
+// draft lacks, its assignment in its configuration (ADR assegnazione-della-bozza-nel-form-di-configurazione) and its
+// start.
 
 const NOT_ASSIGNED = 'da assegnare';
 
@@ -28,7 +29,12 @@ When(
     asset: string,
   ) => {
     await onFlowPage(dashboard, memory, account, flow);
-    await dashboard.assign(accountName, String(capital), asset);
+    await dashboard.configureDraft({
+      account: accountName,
+      capital: String(capital),
+      assets: asset,
+    });
+    await onFlowPage(dashboard, memory, account, flow);
     await dashboard.openConfiguration();
     await expect(dashboard.detail('Conto')).toHaveText(accountName);
   },

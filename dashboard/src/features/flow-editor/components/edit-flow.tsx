@@ -3,27 +3,31 @@ import { useMemo, useState } from 'react';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 
-import { useFlow, type Flow } from '../api/get-flow';
+import { isDraft, useFlow, type Flow } from '../api/get-flow';
 import { useModifyFlow } from '../api/save-flow';
 import { changesOf, formValuesOf, type FlowFormValues } from '../utils/flow-form';
 
 import { FlowForm } from './flow-form';
 import { WithCatalogs } from './with-catalogs';
 
+const savedMessageOf = (flow: Flow, modified: Flow): string => {
+  if (modified.version !== flow.version) {
+    return `Modifiche salvate: versione ${modified.version}`;
+  }
+  return modified.name === flow.name ? 'Nessuna modifica da salvare' : 'Modifiche salvate';
+};
+
 const FlowEditor = ({ flow }: { flow: Flow }) => {
   const modifyFlow = useModifyFlow(flow);
   const [saved, setSaved] = useState<string>();
   const values = useMemo(() => formValuesOf(flow), [flow]);
 
-  // Every change is a new version, in force from the next cycle (R1.1.3).
+  // Every change is a new version, in force from the next cycle (R1.1.3); a new name alone is not (ADR
+  // nome-del-flusso-modificabile).
   const save = async (submitted: FlowFormValues) => {
     setSaved(undefined);
     const modified = await modifyFlow.mutateAsync(changesOf(flow, submitted));
-    setSaved(
-      modified.version === flow.version
-        ? 'Nessuna modifica da salvare'
-        : `Modifiche salvate: versione ${modified.version}`,
-    );
+    setSaved(savedMessageOf(flow, modified));
   };
 
   return (
@@ -38,7 +42,7 @@ const FlowEditor = ({ flow }: { flow: Flow }) => {
           <FlowForm
             {...catalogs}
             values={values}
-            nameFixed
+            accountChosen={isDraft(flow)}
             submitLabel="Salva le modifiche"
             onSave={save}
           />

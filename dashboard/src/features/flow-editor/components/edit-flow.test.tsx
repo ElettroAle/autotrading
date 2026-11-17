@@ -49,8 +49,10 @@ describe('EditFlow', () => {
     expect(router.state.location.pathname).toBe(EDIT_ALFA);
     expect(await screen.findByText('Versione in vigore: 1')).toBeInTheDocument();
     expect(await screen.findByLabelText('Nome')).toHaveValue('alfa');
-    expect(field('Nome')).toHaveAttribute('readonly');
-    expect(field('Conto')).toHaveValue('account-principale');
+    expect(field('Nome')).not.toHaveAttribute('readonly');
+    // Out of draft the account never changes: it reads, it is not chosen (ADR assegnazione-della-bozza).
+    expect(field('Conto')).toHaveValue('principale');
+    expect(field('Conto')).toHaveAttribute('readonly');
     expect(
       within(screen.getByRole('list', { name: 'Asset scelti' })).getByRole('listitem'),
     ).toHaveTextContent('BTC');
@@ -59,6 +61,14 @@ describe('EditFlow', () => {
     expect(await screen.findByLabelText('lunghezza serie di indicatori')).toHaveValue(10);
     expect(field('temperatura')).toHaveValue('1');
     expect(field('Capitale allocato')).toHaveValue('300');
+  });
+
+  it('names by its identifier the account of a flow that the accounts no longer list', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', {});
+    fakePlatform.changeFlow('alfa', { accountId: 'account-rimosso' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    expect(await screen.findByLabelText('Conto')).toHaveValue('account-rimosso');
   });
 
   it('keeps the model of the flow chosen when its provider has no key, as the current choice', async () => {
@@ -301,6 +311,110 @@ describe('EditFlow', () => {
       max_total_margin_exposure_percent: null,
       max_total_value_exposure_percent: '150.5',
     });
+  });
+
+  it('renames the flow without a new version (ADR nome-del-flusso-modificabile)', async () => {
+    giveAlfa();
+    const sent: unknown[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'PATCH') {
+        void request
+          .clone()
+          .json()
+          .then((body) => sent.push(body));
+      }
+    });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const name = await screen.findByLabelText('Nome');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'gamma');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate'));
+    expect(await screen.findByRole('heading', { level: 2, name: 'gamma' })).toBeInTheDocument();
+    expect(screen.getByText('Versione in vigore: 1')).toBeInTheDocument();
+    expect(sent).toEqual([{ name: 'gamma' }]);
+    server.events.removeAllListeners();
+  });
+
+  it('shows beside the name that another flow has it', async () => {
+    giveAlfa();
+    fakePlatform.addConfiguredFlow('anna', 'beta', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const name = await screen.findByLabelText('Nome');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'beta');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Nome')).toHaveAccessibleDescription('nome già usato da un altro flusso'),
+    );
+  });
+
+  it('preselects the account of a copy and saves account, capital and assets of the draft with the configuration', async () => {
+    giveAlfa();
+    fakePlatform.giveAccountTo('anna', 'secondario', 1000);
+    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
+    const sent: { method: string; body: unknown }[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'PATCH' || request.method === 'PUT') {
+        void request
+          .clone()
+          .json()
+          .then((body) => sent.push({ method: request.method, body }));
+      }
+    });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)/edit' });
+
+    const account = await screen.findByLabelText('Conto');
+    expect(account).toHaveValue('account-principale');
+    expect(account).not.toHaveAttribute('readonly');
+    await userEvent.selectOptions(account, 'secondario');
+    const capital = field('Capitale allocato');
+    await userEvent.clear(capital);
+    await userEvent.type(capital, '200');
+    await userEvent.type(field('Asset'), 'ETH');
+    await userEvent.click(
+      within(screen.getByRole('list', { name: 'Asset negoziabili' })).getByRole('button', {
+        name: 'ETH',
+      }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(sent).toEqual([
+      {
+        method: 'PATCH',
+        body: { account_id: 'account-secondario', assets: ['ETH'], allocated_capital: '200' },
+      },
+    ]);
+    expect(fakePlatform.flowNamed('alfa (copia)')).toMatchObject({
+      accountId: 'account-secondario',
+      allocatedCapital: 200,
+      assets: ['ETH'],
+    });
+    server.events.removeAllListeners();
+  });
+
+  it('shows beside the capital of a draft that it exceeds the free capital', async () => {
+    giveAlfa();
+    fakePlatform.duplicate(fakePlatform.user('anna'), 'flow-alfa');
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa%20(copia)/edit' });
+
+    const capital = await screen.findByLabelText('Capitale allocato');
+    await userEvent.clear(capital);
+    await userEvent.type(capital, '900');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Capitale allocato')).toHaveAccessibleDescription(
+        'capitale allocato oltre il capitale libero: 200 USDC',
+      ),
+    );
   });
 
   it('says there is nothing to save when nothing changed', async () => {
