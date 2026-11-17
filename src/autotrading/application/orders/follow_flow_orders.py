@@ -45,7 +45,7 @@ class FollowFlowOrdersUseCase:
 
     def _follow(self, command: FollowFlowOrdersCommand, order: Order) -> None:
         if order.rejection is not None:
-            self._followers.rejections.execute(command.flow_name, order.rejection.exchange_message)
+            self._followers.rejections.execute(command.flow_id, command.flow_name, order.rejection.exchange_message)
             return
         execution = order.execution
         if execution is None:
@@ -61,5 +61,10 @@ class FollowFlowOrdersUseCase:
             )
             return
         self._followers.openings.execute(
-            command.flow_name, market_order.coin, market_order.direction.value, order.request.leverage, execution.value
+            command.flow_id,
+            command.flow_name,
+            market_order.coin,
+            market_order.direction.value,
+            order.request.leverage,
+            execution.value,
         )

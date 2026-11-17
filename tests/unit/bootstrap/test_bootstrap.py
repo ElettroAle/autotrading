@@ -60,6 +60,7 @@ from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
+from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.accounts import an_account
 from tests.support.flows import a_flow
@@ -346,7 +347,7 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
         create_engine("sqlite://"),
         (opener, partial(SodiumMailPasswordOpenerAdapter, {})),
         (environment, Slippage.default(), hyperliquid),
-        (InMemoryOutboxAdapter(), FakeMailerAdapter()),
+        (InMemoryOutboxAdapter(), FakeMailerAdapter(), FakeNotificationLinkAdapter()),
         cycles_of_installation(opener),
     )
 

@@ -4,7 +4,9 @@ stato-del-flusso-in-ogni-notifica, ADR resa-della-notifica-per-telegram-ed-email
 """
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import UUID, uuid4
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -16,7 +18,7 @@ from autotrading.application.notifications.notify_flow_event import NotifyFlowEv
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
-from autotrading.application.notifications.ports import ChannelChoicePorts
+from autotrading.application.notifications.ports import NotificationRoutes
 from autotrading.application.notifications.send_linked_chat_test_notification import (
     SendLinkedChatTestNotificationUseCase,
 )
@@ -38,7 +40,7 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import channel_choices, chat_named
+from tests.support.notifications import chat_named, notification_routes
 from tests.support.steps import quoted
 
 scenarios(
@@ -47,6 +49,7 @@ scenarios(
 
 CURRENCY = "USDC"
 ADDRESS = "anna@example.com"
+CLOSED_AT = datetime(2026, 11, 17, 10, 15, tzinfo=UTC)
 STATUS_OF = {"attivo": NotifiedFlowStatus.ACTIVE, "in pausa": NotifiedFlowStatus.PAUSED}
 
 
@@ -70,6 +73,7 @@ class Notices:
             DeliverOutboxMessageUseCase(self.messenger, self.mailer, self.mail_servers.access_of).execute
         )
         self.user = ""
+        self.flow_ids: dict[str, UUID] = {}
 
     @property
     def linked_chats(self) -> InMemoryLinkedChatRepositoryAdapter:
@@ -82,22 +86,27 @@ class Notices:
         return NotifyUseCase(self.linked_chats, emails, servers, self.outbox, self.every_channel)
 
     @property
-    def every_channel(self) -> ChannelChoicePorts:
+    def every_channel(self) -> NotificationRoutes:
         # The scenarios read the notification on both channels: the tenant chose both for every event (R3.5.3).
         preferences = ChannelPreferences.of(self.tenant_id)
         for event in NotificationEvent:
             preferences = preferences.choosing(event, frozenset(NotificationChannel))
-        return channel_choices(self.tenant_id, {self.tenant_id: preferences})
+        return notification_routes(self.tenant_id, {self.tenant_id: preferences})
 
     @property
     def notify_flow(self) -> NotifyFlowEventUseCase:
         return NotifyFlowEventUseCase(self.notify, self.flow_status)
 
+    def flow_id(self, flow: str) -> UUID:
+        return self.flow_ids.setdefault(flow, uuid4())
+
     def open_position(self, flow: str, direction: str = "long", asset: str = "BTC") -> None:
-        NotifyPositionOpenedUseCase(self.notify_flow, CURRENCY).execute(flow, asset, direction, 3, Decimal(150))
+        use_case = NotifyPositionOpenedUseCase(self.notify_flow, CURRENCY)
+        use_case.execute(self.flow_id(flow), flow, asset, direction, 3, Decimal(150))
 
     def close_position(self, flow: str, pnl: str, reason: str) -> None:
-        NotifyPositionClosedUseCase(self.notify_flow, CURRENCY).execute(flow, "BTC", amount(pnl), reason)
+        use_case = NotifyPositionClosedUseCase(self.notify_flow, CURRENCY)
+        use_case.execute(self.flow_id(flow), flow, "BTC", amount(pnl), reason, CLOSED_AT)
 
     def received(self) -> list[str]:
         return self.messenger.received_by(chat_named(self.user))
@@ -112,9 +121,11 @@ EVENTS: dict[str, Callable[[Notices, str], None]] = {
     "chiusura in perdita": lambda notices, flow: notices.close_position(flow, "-3,10", "decisione dell'agente"),
     "chiusura per stop loss": lambda notices, flow: notices.close_position(flow, "-5,10", "stop loss"),
     "chiusura per take profit": lambda notices, flow: notices.close_position(flow, "4,90", "take profit"),
-    "ciclo fallito": lambda notices, flow: NotifyCycleFailedUseCase(notices.notify_flow).execute(flow, "timeout"),
+    "ciclo fallito": lambda notices, flow: NotifyCycleFailedUseCase(notices.notify_flow).execute(
+        notices.flow_id(flow), flow, "timeout"
+    ),
     "pausa per errore permanente": lambda notices, flow: NotifyFlowPausedUseCase(notices.notify_flow).execute(
-        flow, "credito esaurito presso openrouter"
+        notices.flow_id(flow), flow, "credito esaurito presso openrouter"
     ),
 }
 

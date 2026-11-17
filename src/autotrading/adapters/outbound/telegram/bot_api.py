@@ -6,6 +6,7 @@ import httpx
 from autotrading.application.notifications.errors import BotUnreachableError, MessageNotDeliveredError
 from autotrading.application.notifications.ports import BotMessage
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.notification_link import NotificationLink
 
 TELEGRAM_URL = "https://api.telegram.org"
 # Telegram opens the chat with the bot and sends it the start command followed by this parameter.
@@ -15,6 +16,8 @@ SEND_TIMEOUT_SECONDS = 10.0
 POLL_SECONDS = 30
 POLL_TIMEOUT_SECONDS = POLL_SECONDS + 10.0
 REDACTED = "bot***"
+# One row of buttons under the message (ADR link-nei-messaggi-telegram-ed-email): more would crowd a phone.
+MAXIMUM_BUTTONS = 3
 
 
 class _TokenFilter(logging.Filter):
@@ -41,20 +44,22 @@ class TelegramDisabledMessengerAdapter:
     failure, and the flows go on (ADR 0035).
     """
 
-    def send(self, chat_id: ChatId, text: str) -> None:  # noqa: ARG002 - the signature of the port
+    def send(self, chat_id: ChatId, text: str, links: Sequence[NotificationLink] = ()) -> None:  # noqa: ARG002 - the port
         raise MessageNotDeliveredError
 
 
 class TelegramMessengerAdapter:
-    """Sends the messages of the platform bot (R1.8.2); the client already carries the token (ADR 0035)."""
+    """Sends the messages of the platform bot (R1.8.2), with a button under the message for each link (ADR
+    link-nei-messaggi-telegram-ed-email); the client already carries the token (ADR 0035).
+    """
 
     def __init__(self, client: httpx.Client) -> None:
         self._client = client
 
-    def send(self, chat_id: ChatId, text: str) -> None:
+    def send(self, chat_id: ChatId, text: str, links: Sequence[NotificationLink] = ()) -> None:
         try:
             response = self._client.post(
-                "/sendMessage", json={"chat_id": chat_id.value, "text": text}, timeout=SEND_TIMEOUT_SECONDS
+                "/sendMessage", json=_message_body(chat_id, text, links), timeout=SEND_TIMEOUT_SECONDS
             )
             response.raise_for_status()
         except httpx.HTTPError:
@@ -136,6 +141,15 @@ class TelegramInboxAdapter:
         if not isinstance(document, Mapping):
             raise BotUnreachableError
         return _update_of(document)
+
+
+def _message_body(chat_id: ChatId, text: str, links: Sequence[NotificationLink]) -> dict[str, object]:
+    """The message as the Bot API takes it; without links, the body it always had."""
+    body: dict[str, object] = {"chat_id": chat_id.value, "text": text}
+    if not links:
+        return body
+    buttons = [{"text": link.label, "url": link.url} for link in links[:MAXIMUM_BUTTONS]]
+    return {**body, "reply_markup": {"inline_keyboard": [buttons]}}
 
 
 def _update_of(document: Mapping[object, object]) -> Mapping[str, object]:

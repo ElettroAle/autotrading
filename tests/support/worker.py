@@ -45,6 +45,7 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
@@ -54,7 +55,7 @@ from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapte
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import channel_choices
+from tests.support.notifications import notification_routes
 from tests.support.platform import HYPERLIQUID, new_credentials
 from tests.support.procedure_orders import procedure_orders
 
@@ -80,6 +81,8 @@ class Worker:
         self.channel_preferences: ChannelPreferencesStore = {}
         self.mail_servers = MailServers()
         self.mailer = FakeMailerAdapter()
+        # No dashboard to lead to unless a test names one (ADR destinazioni-delle-notifiche-nella-dashboard).
+        self.links = FakeNotificationLinkAdapter(dashboard=False)
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
         self.outbox = InMemoryOutboxAdapter()
         self.outbox.process(
@@ -122,7 +125,7 @@ class Worker:
                 InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
                 self.mail_servers.repository(tenant_id),
                 self.outbox,
-                channel_choices(tenant_id, self.channel_preferences, self.flows),
+                notification_routes(tenant_id, self.channel_preferences, self.links),
             ),
             send_test_email=SendTestEmailUseCase(
                 InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),

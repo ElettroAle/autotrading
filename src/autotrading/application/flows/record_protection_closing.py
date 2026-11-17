@@ -58,8 +58,17 @@ class RecordProtectionClosingUseCase:
             self._tell_without_history(flow, closing, "esito della chiusura per protezione non rappresentabile")
             return
         self._closed_positions.add(closed)
-        self._notice.execute(flow.name.value, closed.asset, closed.pnl, closed.reason.value)
+        self._notice.execute(
+            flow.id.value, flow.name.value, closed.asset, closed.pnl, closed.reason.value, closed.closing.at
+        )
 
     def _tell_without_history(self, flow: Flow, closing: ProtectionClosing, reason: str) -> None:
         operations.warning(reason, extra={"flow_id": str(flow.id.value), "asset": closing.asset})
-        self._notice.execute(flow.name.value, closing.asset, closing.realized_pnl, closing.reason.value)
+        self._notice.execute(
+            flow.id.value,
+            flow.name.value,
+            closing.asset,
+            closing.realized_pnl,
+            closing.reason.value,
+            closing.closed_at,
+        )

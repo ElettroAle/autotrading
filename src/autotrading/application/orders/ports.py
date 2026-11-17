@@ -168,13 +168,15 @@ class OrderRepositoryPort(Protocol):
 
 
 class OrderRejectedNoticePort(Protocol):
-    def execute(self, flow_name: str, message: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, message: str) -> None:
         """Tells the user the exchange refused an order of the flow, with its message (R1.8.2)."""
         ...
 
 
 class PositionOpenedNoticePort(Protocol):
-    def execute(self, flow_name: str, asset: str, direction: str, leverage: int, value: Decimal) -> None:
+    def execute(  # noqa: PLR0913, PLR0917 - the flow, by its id and name, and the position it opened
+        self, flow_id: UUID, flow_name: str, asset: str, direction: str, leverage: int, value: Decimal
+    ) -> None:
         """Tells the user the flow opened a position, with the value the exchange executed (R1.8.2)."""
         ...
 

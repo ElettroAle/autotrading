@@ -45,6 +45,8 @@ from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Amount, Notification
+from autotrading.domain.notifications.notification_link import NotificationLink
+from autotrading.domain.notifications.notification_target import NotificationTarget
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.market_order import MarketOrder
@@ -57,6 +59,7 @@ from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
+from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.protection_cancellation import FakeProtectionCancellationAdapter
@@ -71,6 +74,8 @@ CHAT = ChatId(4242)
 PLANNED_AT = at("10:15")
 OPENED_AT = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
 CLOSED_AT = datetime(2026, 11, 12, 10, 5, tzinfo=UTC)
+# The text of a notification names no flow or account by its id: these tests read only the text.
+TEXT_ONLY_ID = uuid4()
 ANCHOR = at("10:00")
 OPENING = PositionOpening(TradeSide.LONG, 2, Decimal(50), PositionEnd(Decimal(100), OPENED_AT, at("09:00")), Decimal(1))
 
@@ -179,7 +184,7 @@ def usdc(value: str) -> Amount:
 
 def closed_with(pnl: str) -> str:
     """The notification of a closing of BTC by alfa that is no event of its own."""
-    return Notification.position_closed("alfa", "BTC", usdc(pnl), "agente").text
+    return Notification.position_closed(TEXT_ONLY_ID, "alfa", "BTC", usdc(pnl), "agente", CLOSED_AT).text
 
 
 # FollowFlowOrdersUseCase
@@ -193,7 +198,7 @@ def follow(world: World, order: Order) -> None:
 def test_an_executed_opening_is_notified_with_its_value_in_whole_units(world: World) -> None:
     follow(world, an_order(reduce_only=False, execution=an_execution()))
 
-    assert world.received == [Notification.position_opened("alfa", "BTC", "long", 3, usdc("50")).text]
+    assert world.received == [Notification.position_opened(TEXT_ONLY_ID, "alfa", "BTC", "long", 3, usdc("50")).text]
     assert world.closed.positions == []
 
 
@@ -202,7 +207,9 @@ def test_a_rejected_order_is_notified_with_the_message_of_the_exchange(world: Wo
 
     follow(world, an_order(reduce_only=True, rejection=rejection))
 
-    assert world.received == [Notification.order_rejected("alfa", "Insufficient margin to place order.").text]
+    assert world.received == [
+        Notification.order_rejected(TEXT_ONLY_ID, "alfa", "Insufficient margin to place order.").text
+    ]
     assert world.closed.positions == []
 
 
@@ -233,6 +240,44 @@ def test_a_closing_without_an_opening_of_the_flow_is_notified_but_has_no_history
 
     assert world.closed.positions == []
     assert world.received == [closed_with("4.20")]
+
+
+def links_to(world: World, *targets: NotificationTarget) -> tuple[NotificationLink, ...]:
+    links = world.cycles.platform.links
+    return tuple(NotificationLink(target.label, links.address_of(target)) for target in targets)
+
+
+def test_an_executed_opening_leads_to_its_flow_and_to_the_open_position(world: World) -> None:
+    """ADR destinazioni-delle-notifiche-nella-dashboard: the cycle tells the opening by the id of its flow."""
+    world.cycles.platform.links.dashboard = True
+    flow_id = world.flow.id.value
+
+    follow(world, an_order(reduce_only=False, execution=an_execution()))
+
+    assert world.cycles.platform.messenger.links_received_by(CHAT) == [
+        links_to(world, NotificationTarget.flow(flow_id), NotificationTarget.open_position(flow_id, "BTC"))
+    ]
+
+
+def test_an_executed_closing_leads_to_the_closed_position_by_the_instant_it_closed(world: World) -> None:
+    world.cycles.platform.links.dashboard = True
+    flow_id = world.flow.id.value
+
+    follow(world, an_order(reduce_only=True, execution=an_execution()))
+
+    assert world.cycles.platform.messenger.links_received_by(CHAT) == [
+        links_to(world, NotificationTarget.flow(flow_id), NotificationTarget.closed_position(flow_id, "BTC", CLOSED_AT))
+    ]
+
+
+def test_a_failed_cycle_leads_to_its_flow(world: World) -> None:
+    world.cycles.platform.links.dashboard = True
+
+    world.ports_of(world.tenant_id).cycle_failure.execute(world.flow.id.value, "timeout")
+
+    assert world.cycles.platform.messenger.links_received_by(CHAT) == [
+        links_to(world, NotificationTarget.flow(world.flow.id.value))
+    ]
 
 
 # RecordOutsideClosingUseCase
@@ -294,7 +339,7 @@ def test_a_loss_beyond_the_value_of_the_position_implies_no_price(
 def test_a_failed_cycle_is_told_with_the_name_of_its_flow_and_its_message(world: World) -> None:
     world.ports_of(world.tenant_id).cycle_failure.execute(world.flow.id.value, "timeout")
 
-    assert world.received == [Notification.cycle_failed("alfa", "timeout").text]
+    assert world.received == [Notification.cycle_failed(TEXT_ONLY_ID, "alfa", "timeout").text]
 
 
 # PauseAffectedFlowsUseCase
@@ -311,7 +356,8 @@ def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None
         "beta": FlowStatus.PAUSED,
     }
     assert sorted(world.received) == sorted(
-        Notification.flow_paused(name, str(error)).text for name in (world.flow.name.value, other.name.value)
+        Notification.flow_paused(TEXT_ONLY_ID, name, str(error)).text
+        for name in (world.flow.name.value, other.name.value)
     )
 
 
@@ -320,7 +366,7 @@ def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: Wor
 
     world.pause(error)
 
-    assert world.received == [Notification.flow_paused("alfa", str(error)).text]
+    assert world.received == [Notification.flow_paused(TEXT_ONLY_ID, "alfa", str(error)).text]
 
 
 def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(world: World) -> None:
@@ -335,7 +381,9 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
         "alfa": FlowStatus.PAUSED,
         "beta": FlowStatus.ACTIVE,
     }
-    assert world.received == [Notification.flow_paused("alfa", "registro delle esecuzioni incompleto").text]
+    assert world.received == [
+        Notification.flow_paused(TEXT_ONLY_ID, "alfa", "registro delle esecuzioni incompleto").text
+    ]
 
 
 # StartCycleFlowUseCase: the beginning of the flow
@@ -455,9 +503,9 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: W
 
     assert sorted(world.received) == sorted(
         [
-            Notification.unattributable_position("test-1", "SOL").text,
-            Notification.unattributable_fill("test-1", "ETH").text,
-            Notification.unattributable_movement("test-1", usdc("5")).text,
+            Notification.unattributable_position(TEXT_ONLY_ID, "test-1", "SOL").text,
+            Notification.unattributable_fill(TEXT_ONLY_ID, "test-1", "ETH").text,
+            Notification.unattributable_movement(TEXT_ONLY_ID, "test-1", usdc("5")).text,
         ]
     )
 
@@ -471,7 +519,20 @@ def test_a_position_of_the_flow_closed_outside_is_notified_with_its_pnl(world: W
 
     update(world)
 
-    assert world.received == [closed_with("-10"), Notification.unattributable_fill("test-1", "BTC").text]
+    assert world.received == [closed_with("-10"), Notification.unattributable_fill(TEXT_ONLY_ID, "test-1", "BTC").text]
+
+
+def test_a_case_no_flow_explains_leads_to_the_alarms_of_its_account(world: World) -> None:
+    world.cycles.platform.links.dashboard = True
+    reader = world.cycles.platform.activity_reader
+    update(world)
+    reader.executions[world.address] = [a_fill("ETH", None, executed_at=CLOSED_AT)]
+    reader.activities[world.address] = an_activity(read_at=CLOSED_AT + timedelta(minutes=1))
+
+    update(world)
+
+    alarms = links_to(world, NotificationTarget.account_alarms(world.flow.assigned_account_id))
+    assert world.cycles.platform.messenger.links_received_by(CHAT) == [alarms]
 
 
 def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the_next_cycle(
@@ -505,7 +566,7 @@ def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
         create_engine("sqlite://"),
         (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({})),
         ("dev", Slippage.default(), dev_installation_on_testnet()[1]),
-        InMemoryOutboxAdapter(),
+        (InMemoryOutboxAdapter(), FakeNotificationLinkAdapter()),
         ({"models": FakeModelGatewayAdapter(catalog)}, FakePriceForecasterAdapter()),
     )
 

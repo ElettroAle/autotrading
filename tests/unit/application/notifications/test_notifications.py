@@ -1,5 +1,6 @@
 import logging
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 
@@ -55,12 +56,12 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import channel_choices
+from tests.support.notifications import notification_routes
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
-FAILED = Notification.cycle_failed("alfa", "timeout")
+FAILED = Notification.cycle_failed(uuid4(), "alfa", "timeout")
 TEST_TEXT = Notification.test().text
 
 
@@ -112,7 +113,7 @@ class Telegram:
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             self.mail_servers.repository(tenant_id),
             self.outbox,
-            channel_choices(tenant_id),
+            notification_routes(tenant_id),
         )
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:

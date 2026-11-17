@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, time
+from uuid import uuid4
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -162,7 +163,7 @@ def answered_how_to_link(platform: Platform, chat: str) -> None:
 def no_more_notifications(platform: Platform, chat: str, user: str) -> None:
     before = len(platform.messenger.received_by(chat_named(chat)))
 
-    platform.worker_for(platform.tenant_of(user)).notify.execute(Notification.cycle_failed("alfa", "timeout"))
+    platform.worker_for(platform.tenant_of(user)).notify.execute(Notification.cycle_failed(uuid4(), "alfa", "timeout"))
 
     assert len(platform.messenger.received_by(chat_named(chat))) == before
 

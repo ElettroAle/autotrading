@@ -439,13 +439,13 @@ class TransfersReaderPort(Protocol):
 
 
 class FlowPausedNoticePort(Protocol):
-    def execute(self, flow_name: str, reason: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, reason: str) -> None:
         """Tells the user the flow paused on its own, with the reason (R1.2.4, R1.8.2)."""
         ...
 
 
 class CycleFailedNoticePort(Protocol):
-    def execute(self, flow_name: str, reason: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, reason: str) -> None:
         """Tells the user a cycle of the flow failed, with the message of its error (R1.8.2)."""
         ...
 
@@ -481,7 +481,7 @@ class AccountDeviationThresholdPort(Protocol):
 class ReconciliationAlarmNoticePort(Protocol):
     """In the worker: NotifyReconciliationAlarmUseCase (R3.3.1)."""
 
-    def execute(self, account_name: str, read_balance: Decimal, expected_balance: Decimal) -> None:
+    def execute(self, account_id: UUID, account_name: str, read_balance: Decimal, expected_balance: Decimal) -> None:
         """Tells the user the balance of the account is not the expected one, once for each alarm."""
         ...
 
@@ -498,19 +498,19 @@ class ReconciliationAlarmPorts:
 
 
 class UnattributablePositionNoticePort(Protocol):
-    def execute(self, account_name: str, asset: str) -> None:
+    def execute(self, account_id: UUID, account_name: str, asset: str) -> None:
         """Tells the user the account holds a position no flow opened (R1.6.2)."""
         ...
 
 
 class UnattributableFillNoticePort(Protocol):
-    def execute(self, account_name: str, asset: str) -> None:
+    def execute(self, account_id: UUID, account_name: str, asset: str) -> None:
         """Tells the user the account shows an execution no flow ordered (R1.6.2)."""
         ...
 
 
 class UnattributableMovementNoticePort(Protocol):
-    def execute(self, account_name: str, amount: Decimal) -> None:
+    def execute(self, account_id: UUID, account_name: str, amount: Decimal) -> None:
         """Tells the user the balance of the account changed with no flow behind it (R1.6.2)."""
         ...
 
@@ -720,15 +720,17 @@ class ClosedPositionRepositoryPort(Protocol):
 
 
 class PositionClosedNoticePort(Protocol):
-    def execute(self, flow_name: str, asset: str, pnl: Decimal, reason: str) -> None:
+    def execute(  # noqa: PLR0913, PLR0917 - the flow, by its id and name, and the closing of the position
+        self, flow_id: UUID, flow_name: str, asset: str, pnl: Decimal, reason: str, closed_at: datetime
+    ) -> None:
         """Tells a closing of the flow once, with the PnL its history keeps or the exchange reported (ADR 0070) and the
-        reason of the closing (R3.5.1).
+        reason of the closing (R3.5.1), leading to the position by its asset and the instant it closed (R3.5.6).
         """
         ...
 
 
 class CashOutNoticePort(Protocol):
-    def execute(self, flow_name: str, freed: Decimal) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, freed: Decimal) -> None:
         """Tells the user the cash-out of the flow, with the money it freed (R3.5.1)."""
         ...
 
@@ -1254,13 +1256,15 @@ class LossReferencesPort(Protocol):
 
 
 class OpeningsSuspendedNoticePort(Protocol):
-    def execute(self, flow_name: str, reason: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, reason: str) -> None:
         """Tells the user the openings of the flow are suspended, with the threshold passed (R3.2.2, R1.8.2)."""
         ...
 
 
 class OpeningReducedNoticePort(Protocol):
-    def execute(self, flow_name: str, asset: str, requested_margin: Decimal, approved_margin: Decimal) -> None:
+    def execute(
+        self, flow_id: UUID, flow_name: str, asset: str, requested_margin: Decimal, approved_margin: Decimal
+    ) -> None:
         """Tells the user the risk check reduced an opening of the flow, with the margin asked and the one approved
         (R3.5.1).
         """
@@ -1268,7 +1272,7 @@ class OpeningReducedNoticePort(Protocol):
 
 
 class OpeningBlockedNoticePort(Protocol):
-    def execute(self, flow_name: str, asset: str, cause: str) -> None:
+    def execute(self, flow_id: UUID, flow_name: str, asset: str, cause: str) -> None:
         """Tells the user the risk check blocked an opening of the flow, with its cause (R3.5.1)."""
         ...
 

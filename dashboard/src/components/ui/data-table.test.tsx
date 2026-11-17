@@ -292,4 +292,74 @@ describe('DataTable', () => {
       expect(screen.getByText('Nessun frutto.')).toBeInTheDocument();
     });
   });
+  // ADR posizione-evidenziata-dall-indirizzo: the row an address points at stands out by colour and by text.
+  it('marks the highlighted row as current, with a text besides the colour, and brings it into focus', () => {
+    render(
+      <DataTable
+        label="Frutti"
+        columns={COLUMNS}
+        rows={FRUITS}
+        rowKey={(fruit) => fruit.name}
+        highlightedRow={(fruit) => fruit.name === 'banana'}
+      />,
+    );
+
+    const [, apple, banana] = screen.getAllByRole('row');
+    expect(banana).toHaveAttribute('aria-current', 'true');
+    expect(banana).toHaveClass('bg-amber-50');
+    expect(within(banana as HTMLElement).getByText('Dalla notifica')).toBeInTheDocument();
+    expect(banana).toHaveFocus();
+    expect(apple).not.toHaveAttribute('aria-current');
+    expect(within(apple as HTMLElement).queryByText('Dalla notifica')).not.toBeInTheDocument();
+  });
+
+  it('scrolls the highlighted row into view', () => {
+    const scrolled: Element[] = [];
+    // jsdom lays nothing out and has no scrollIntoView: the test lends one that records the element.
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+
+    render(
+      <DataTable
+        label="Frutti"
+        columns={COLUMNS}
+        rows={FRUITS}
+        rowKey={(fruit) => fruit.name}
+        highlightedRow={(fruit) => fruit.name === 'mela'}
+      />,
+    );
+
+    Element.prototype.scrollIntoView = original;
+    expect(scrolled).toEqual([screen.getAllByRole('row')[1]]);
+  });
+
+  it('highlights a row that leads to a detail too', () => {
+    inRouter(
+      <DataTable
+        label="Frutti"
+        columns={COLUMNS}
+        rows={FRUITS}
+        rowKey={(fruit) => fruit.name}
+        rowHref={(fruit) => `/frutti/${fruit.name}`}
+        highlightedRow={(fruit) => fruit.name === 'mela'}
+      />,
+    );
+
+    const [, apple] = screen.getAllByRole('row');
+    expect(apple).toHaveAttribute('aria-current', 'true');
+    expect(apple).toHaveFocus();
+  });
+
+  it('highlights no row without the prop', () => {
+    render(
+      <DataTable label="Frutti" columns={COLUMNS} rows={FRUITS} rowKey={(fruit) => fruit.name} />,
+    );
+
+    expect(screen.getAllByRole('row').filter((row) => row.hasAttribute('aria-current'))).toEqual(
+      [],
+    );
+    expect(screen.queryByText('Dalla notifica')).not.toBeInTheDocument();
+  });
 });

@@ -45,9 +45,11 @@ class RecordFlowClosingUseCase:
         reason = CloseReason.PROTECTION_MISSING if unprotected else CloseReason.AGENT
         opening = self._openings.last_opening(flow.id, asset)
         if opening is None:
-            self._notice.execute(flow.name.value, asset, fill.realized_pnl, reason.value)
+            self._notice.execute(
+                flow.id.value, flow.name.value, asset, fill.realized_pnl, reason.value, fill.executed_at
+            )
             return
         closing = ClosingFill(fill.average_price, fill.executed_at, fill.fee, fill.realized_pnl)
         position = opening.closed(flow, asset, closing, reason, cycle=cycle)
         self._closed_positions.add(position)
-        self._notice.execute(flow.name.value, asset, position.pnl, reason.value)
+        self._notice.execute(flow.id.value, flow.name.value, asset, position.pnl, reason.value, position.closing.at)

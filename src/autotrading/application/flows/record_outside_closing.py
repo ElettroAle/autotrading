@@ -59,8 +59,17 @@ class RecordOutsideClosingUseCase:
             self._tell_without_history(flow, closing, "esito della chiusura fuori non rappresentabile")
             return
         self._closed_positions.add(closed)
-        self._notice.execute(flow.name.value, closed.asset, closed.pnl, closing.reason_told.value)
+        self._notice.execute(
+            flow.id.value, flow.name.value, closed.asset, closed.pnl, closing.reason_told.value, closed.closing.at
+        )
 
     def _tell_without_history(self, flow: Flow, closing: OutsideClosing, reason: str) -> None:
         operations.warning(reason, extra={"flow_id": str(flow.id.value), "asset": closing.asset})
-        self._notice.execute(flow.name.value, closing.asset, closing.realized_pnl, closing.reason_told.value)
+        self._notice.execute(
+            flow.id.value,
+            flow.name.value,
+            closing.asset,
+            closing.realized_pnl,
+            closing.reason_told.value,
+            closing.closed_at,
+        )

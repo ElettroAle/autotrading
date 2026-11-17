@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 from autotrading.application.notifications.ports import NotifierPort
 from autotrading.domain.notifications.notification import Amount, Notification
@@ -13,6 +14,6 @@ class NotifyReconciliationAlarmUseCase:
         self._notifier = notifier
         self._currency = currency
 
-    def execute(self, account_name: str, read_balance: Decimal, expected_balance: Decimal) -> None:
+    def execute(self, account_id: UUID, account_name: str, read_balance: Decimal, expected_balance: Decimal) -> None:
         read, expected = Amount(read_balance, self._currency), Amount(expected_balance, self._currency)
-        self._notifier.execute(Notification.reconciliation_alarm(account_name, read, expected))
+        self._notifier.execute(Notification.reconciliation_alarm(account_id, account_name, read, expected))

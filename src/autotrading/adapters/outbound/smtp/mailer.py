@@ -6,20 +6,22 @@ from autotrading.application.notifications.errors import EmailNotDeliveredError,
 from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.mail_security import MailSecurity
 from autotrading.domain.notifications.mail_server import MailServer
+from autotrading.domain.notifications.outbox_message import EmailMessage as NotificationEmail
 
 TIMEOUT_SECONDS = 10.0
 
 
 class SmtpMailerAdapter:
     """Sends the emails of the notifications through the mail server of their tenant, one connection per email, logged
-    in with its user and the password the worker opened (ADR invio-dal-server-di-posta-del-tenant).
+    in with its user and the password the worker opened (ADR invio-dal-server-di-posta-del-tenant); the links of the
+    notification end its plain text (ADR link-nei-messaggi-telegram-ed-email).
     """
 
     def __repr__(self) -> str:
         return "SmtpMailerAdapter()"
 
-    def send(self, server: MailServer, password: str, address: EmailAddress, subject: str, text: str) -> None:
-        message = _message_of(server.sender, address, subject, text)
+    def send(self, server: MailServer, password: str, email: NotificationEmail) -> None:
+        message = _message_of(server.sender, email)
         try:
             with _connect(server) as connection:
                 _secure(server, connection)
@@ -51,10 +53,10 @@ def _verified_context() -> ssl.SSLContext:
     return context
 
 
-def _message_of(sender: EmailAddress, address: EmailAddress, subject: str, text: str) -> EmailMessage:
+def _message_of(sender: EmailAddress, email: NotificationEmail) -> EmailMessage:
     message = EmailMessage()
     message["From"] = sender.value
-    message["To"] = address.value
-    message["Subject"] = subject
-    message.set_content(text)
+    message["To"] = email.address.value
+    message["Subject"] = email.subject
+    message.set_content(email.body)
     return message

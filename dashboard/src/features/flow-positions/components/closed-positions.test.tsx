@@ -238,4 +238,55 @@ describe('ClosedPositions', () => {
       ).toBeInTheDocument();
     });
   });
+
+  // ADR posizione-evidenziata-dall-indirizzo: the link of a notification points at the closing by asset and instant.
+  describe('the position of the address', () => {
+    const CLOSED_AT = encodeURIComponent('2026-11-14T09:07:00+00:00');
+
+    it('highlights the row of the asset closed at the instant of the address', async () => {
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: LAST, asset: 'BTC' }),
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - HOUR), asset: 'ETH' }),
+        aClosedPosition({ closedAt: LAST, asset: 'ETH' }),
+      ]);
+      await renderApp({ account: 'anna', url: `${URL}?asset=ETH&closed_at=${CLOSED_AT}` });
+
+      const table = await screen.findByRole('table', { name: 'Posizioni chiuse' });
+      const highlighted = within(table).getAllByRole('row', { current: true });
+      expect(highlighted).toHaveLength(1);
+      expect(
+        within(highlighted[0] as HTMLElement).getByText('14/11/2026, 10:07:00'),
+      ).toBeInTheDocument();
+      expect(within(highlighted[0] as HTMLElement).getByText('Dalla notifica')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Cercala nello Storico' })).not.toBeInTheDocument();
+    });
+
+    it('leads to the history of the flow and the asset when the row is not on the page', async () => {
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: new Date(LAST.getTime() - HOUR), asset: 'ETH' }),
+      ]);
+      await renderApp({ account: 'anna', url: `${URL}?asset=ETH&closed_at=${CLOSED_AT}` });
+
+      const table = await screen.findByRole('table', { name: 'Posizioni chiuse' });
+      expect(within(table).queryByRole('row', { current: true })).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        "L'operazione della notifica non è in questa pagina.",
+      );
+      expect(screen.getByRole('link', { name: 'Cercala nello Storico' })).toHaveAttribute(
+        'href',
+        '/history?tab=closed-positions&flow=flow-alfa&asset=ETH',
+      );
+    });
+
+    it('says nothing of a notification without the instant of a closing', async () => {
+      fakePlatform.recordClosedPositions('alfa', [
+        aClosedPosition({ closedAt: LAST, asset: 'ETH' }),
+      ]);
+      await renderApp({ account: 'anna', url: `${URL}?asset=ETH` });
+
+      const table = await screen.findByRole('table', { name: 'Posizioni chiuse' });
+      expect(within(table).queryByRole('row', { current: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Cercala nello Storico' })).not.toBeInTheDocument();
+    });
+  });
 });
