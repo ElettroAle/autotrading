@@ -71,9 +71,9 @@ class AccountReconciliation:
     The executions are those the ledger has just recorded (ADR 0063). Without a previous reading, past executions and
     movements are the starting point, not something to report.
     The expected balance is the reference of the previous reading plus the executions, fees and funding of the flows
-    and the deposits and withdrawals the exchange declares since then. A deviation within the threshold is a change of
-    the balance no flow explains, and the balance read becomes the reference; beyond it, an alarm, and the expected
-    balance stays the reference until the user confirms.
+    and the deposits and withdrawals the exchange declares since then, each counted once. A deviation within the
+    threshold is a change of the balance no flow explains, and the balance read becomes the reference; beyond it, an
+    alarm, and the expected balance stays the reference until the user confirms.
     """
 
     items: tuple[UnattributableItem, ...]
@@ -164,12 +164,27 @@ def _comparison(
 
 
 def _explained(recorded: AccountLedger, activity: AccountActivity, since: datetime) -> Decimal:
-    """What moved the balance since the last reading with a reason: the flows, and what the exchange declares."""
+    """What moved the balance since the last reading with a reason: the flows, and what the exchange declares.
+
+    A row not after the last reading was already in the balance read then, the reference now, even when the exchange
+    published it later (ADR saldo-atteso-con-le-sole-righe-successive-alla-lettura-precedente).
+    """
     executions = sum(
-        (entry.execution.realized_pnl - entry.execution.fee for entry in recorded.entries if entry.flow_id is not None),
+        (
+            entry.execution.realized_pnl - entry.execution.fee
+            for entry in recorded.entries
+            if entry.flow_id is not None and entry.execution.executed_at > since
+        ),
         ZERO,
     )
-    funding = sum((entry.payment.amount for entry in recorded.funding if entry.flow_id is not None), ZERO)
+    funding = sum(
+        (
+            entry.payment.amount
+            for entry in recorded.funding
+            if entry.flow_id is not None and entry.payment.paid_at > since
+        ),
+        ZERO,
+    )
     movements = sum((movement.amount for movement in activity.movements if movement.moved_at > since), ZERO)
     return executions + funding + movements
 

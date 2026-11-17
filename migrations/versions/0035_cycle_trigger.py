@@ -3,15 +3,15 @@
 The cycles recorded before were all planned, and so is a row taken before its cycle runs until the cycle records
 what started it. R6.5.2, ADR ciclo-su-richiesta-nel-worker.
 
-Revision ID: 0032
-Revises: 0031
+Revision ID: 0035
+Revises: 0033
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0032"
-down_revision = "0031"
+revision = "0035"
+down_revision = "0033"
 branch_labels = None
 depends_on = None
 

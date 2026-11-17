@@ -19,3 +19,13 @@ When(
     await expect(dashboard.flowName()).toHaveText(flow);
   },
 );
+
+// Shared by the suspension of the openings for maximum loss (R3.2.2) and for an alarm of reconciliation (R3.3.2): the
+// page of the flow shows both with the same notice.
+When(
+  '{string} apre il flusso {string} nella dashboard',
+  async ({ dashboard }, account: string, flow: string) => {
+    await dashboard.openFlowAs(account, flow);
+    await expect(dashboard.flowName()).toHaveText(flow);
+  },
+);

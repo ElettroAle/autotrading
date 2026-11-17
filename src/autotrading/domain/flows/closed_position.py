@@ -26,6 +26,8 @@ class CloseReason(StrEnum):
     TAKE_PROFIT = "take profit"
     PROTECTION_MISSING = "stop loss non piazzato"
     CASH_OUT = "incasso"
+    # Every flow of the scope closes and pauses at once (R3.2.3).
+    EMERGENCY = "chiusura di emergenza"
 
 
 @dataclass(frozen=True, slots=True)

@@ -6,6 +6,21 @@ import type { Flow } from '../api/get-flow';
 const NUMBER = /^\s*(\d+([.,]\d+)?)?\s*$/;
 const numberText = z.string().regex(NUMBER, 'Inserisci un numero');
 
+// The same interval and reason as the API, so the refusal reads alike before and after sending (R3.2.2, ADR
+// perdita-massima-nella-dashboard).
+const MAX_LOSS_RANGE = 'la perdita massima va da 0,1 a 100';
+const withinMaxLoss = (text: string): boolean => {
+  if (text.trim() === '') {
+    return true;
+  }
+  const percent = Number(text.trim().replace(',', '.'));
+  return percent >= 0.1 && percent <= 100;
+};
+const maxLossText = numberText.refine(withinMaxLoss, MAX_LOSS_RANGE);
+
+export const OPENINGS_RESUMES = ['manual', 'next_day'] as const;
+export type OpeningsResume = (typeof OPENINGS_RESUMES)[number];
+
 // A source never activated has only its choice: weight and parameters show once it is active.
 const sourceValuesSchema = z.object({
   active: z.boolean(),
@@ -25,6 +40,8 @@ export const flowFormSchema = z.object({
   max_leverage: numberText,
   max_margin_exposure_percent: numberText,
   max_value_exposure_percent: numberText,
+  max_total_margin_exposure_percent: numberText,
+  max_total_value_exposure_percent: numberText,
   default_stop_loss_percent: numberText,
   default_take_profit_percent: numberText,
   minimum_confidence: numberText,
@@ -33,6 +50,10 @@ export const flowFormSchema = z.object({
   // The text the user wrote, kept apart from whether the flow follows the default of the platform (R1.4.8).
   system_prompt: z.string(),
   system_prompt_default: z.boolean(),
+  max_consecutive_failures: numberText,
+  max_daily_loss_percent: maxLossText,
+  max_drawdown_percent: maxLossText,
+  openings_resume: z.enum(OPENINGS_RESUMES, 'Scegli la ripresa delle aperture'),
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
@@ -56,6 +77,9 @@ type SettingsRequest = {
   max_leverage: number | null;
   max_margin_exposure_percent: string | null;
   max_value_exposure_percent: string | null;
+  // Null: no overall limit on the sum of the open positions (R3.2.1).
+  max_total_margin_exposure_percent: string | null;
+  max_total_value_exposure_percent: string | null;
   // Blank at creation takes the default stop loss of the platform; the take profit may stay absent (R3.1.2).
   default_stop_loss_percent: string | null;
   default_take_profit_percent: string | null;
@@ -64,6 +88,12 @@ type SettingsRequest = {
   bring_to_minimum: boolean;
   // Null follows the default of the platform (R1.4.8).
   system_prompt: string | null;
+  // Null: no maximum, the flow keeps trying at every cycle (R3.2.4).
+  max_consecutive_failures: number | null;
+  // Null: no suspension of the openings for that loss (R3.2.2).
+  max_daily_loss_percent: string | null;
+  max_drawdown_percent: string | null;
+  openings_resume: OpeningsResume;
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -83,6 +113,8 @@ export const emptyFormValues = (): FlowFormValues => ({
   max_leverage: '',
   max_margin_exposure_percent: '',
   max_value_exposure_percent: '',
+  max_total_margin_exposure_percent: '',
+  max_total_value_exposure_percent: '',
   default_stop_loss_percent: '',
   default_take_profit_percent: '',
   minimum_confidence: '',
@@ -90,6 +122,10 @@ export const emptyFormValues = (): FlowFormValues => ({
   bring_to_minimum: false,
   system_prompt: '',
   system_prompt_default: true,
+  max_consecutive_failures: '',
+  max_daily_loss_percent: '',
+  max_drawdown_percent: '',
+  openings_resume: 'manual',
 });
 
 const decimalOf = (text: string): string => text.trim().replace(',', '.');
@@ -134,11 +170,17 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   max_leverage: numberOrNull(values.max_leverage),
   max_margin_exposure_percent: decimalOrNull(values.max_margin_exposure_percent),
   max_value_exposure_percent: decimalOrNull(values.max_value_exposure_percent),
+  max_total_margin_exposure_percent: decimalOrNull(values.max_total_margin_exposure_percent),
+  max_total_value_exposure_percent: decimalOrNull(values.max_total_value_exposure_percent),
   default_stop_loss_percent: decimalOrNull(values.default_stop_loss_percent),
   default_take_profit_percent: decimalOrNull(values.default_take_profit_percent),
   minimum_confidence: numberOrNull(values.minimum_confidence),
   bring_to_minimum: values.bring_to_minimum,
   system_prompt: values.system_prompt_default ? null : values.system_prompt,
+  max_consecutive_failures: numberOrNull(values.max_consecutive_failures),
+  max_daily_loss_percent: decimalOrNull(values.max_daily_loss_percent),
+  max_drawdown_percent: decimalOrNull(values.max_drawdown_percent),
+  openings_resume: values.openings_resume,
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -177,6 +219,8 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   max_leverage: textOf(flow.risk_limits.max_leverage),
   max_margin_exposure_percent: textOf(flow.risk_limits.max_margin_exposure_percent),
   max_value_exposure_percent: textOf(flow.risk_limits.max_value_exposure_percent),
+  max_total_margin_exposure_percent: textOf(flow.risk_limits.max_total_margin_exposure_percent),
+  max_total_value_exposure_percent: textOf(flow.risk_limits.max_total_value_exposure_percent),
   default_stop_loss_percent: flow.default_stop_loss_percent,
   default_take_profit_percent: textOf(flow.default_take_profit_percent),
   minimum_confidence: textOf(flow.minimum_confidence),
@@ -184,6 +228,10 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   bring_to_minimum: flow.bring_to_minimum,
   system_prompt: flow.system_prompt_is_default ? '' : flow.system_prompt,
   system_prompt_default: flow.system_prompt_is_default,
+  max_consecutive_failures: textOf(flow.max_consecutive_failures),
+  max_daily_loss_percent: textOf(flow.max_daily_loss_percent),
+  max_drawdown_percent: textOf(flow.max_drawdown_percent),
+  openings_resume: flow.openings_resume,
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>
@@ -191,12 +239,18 @@ const sameValue = (one: unknown, other: unknown): boolean =>
 
 const MODEL: keyof SettingsRequest = 'model';
 const MODEL_PARAMETERS: keyof SettingsRequest = 'model_parameters';
-// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3), the
-// default take profit removed (R3.1.2), the minimum confidence removed (R3.1.4).
+// Their null is a value: back to the default of the platform (R1.4.8), an exposure limit removed (R1.1.3, R3.2.1),
+// the maximum of consecutive failed cycles removed (R3.2.4), a maximum loss removed (R3.2.2), the default take profit
+// removed (R3.1.2), the minimum confidence removed (R3.1.4).
 const NULL_IS_A_VALUE = new Set<keyof SettingsRequest>([
   'system_prompt',
   'max_margin_exposure_percent',
   'max_value_exposure_percent',
+  'max_total_margin_exposure_percent',
+  'max_total_value_exposure_percent',
+  'max_consecutive_failures',
+  'max_daily_loss_percent',
+  'max_drawdown_percent',
   'default_take_profit_percent',
   'minimum_confidence',
 ]);

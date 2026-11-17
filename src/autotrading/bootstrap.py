@@ -45,6 +45,7 @@ from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import 
 from autotrading.adapters.outbound.sqlalchemy.composition import SqlAlchemyEngine, sqlalchemy_adapters
 from autotrading.adapters.outbound.sqlalchemy.cycle_checkpoints import SqlAlchemyCycleCheckpointsAdapter
 from autotrading.adapters.outbound.sqlalchemy.cycle_repository import SqlAlchemyCycleRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.emergency_closing_log import SqlAlchemyEmergencyClosingLogAdapter
 from autotrading.adapters.outbound.sqlalchemy.equity_snapshot_repository import (
     SqlAlchemyEquitySnapshotRepositoryAdapter,
 )
@@ -65,6 +66,7 @@ from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import (
     SqlAlchemyLinkedChatLookupAdapter,
     SqlAlchemyLinkedChatRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.openings_suspension import SqlAlchemyOpeningsSuspensionAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.outbox import SqlAlchemyOutboxAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
@@ -106,6 +108,7 @@ from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
+from autotrading.application.flows.guard_flow_loss import GuardFlowLossUseCase
 from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.notify_unattributable import (
@@ -113,6 +116,7 @@ from autotrading.application.flows.notify_unattributable import (
     UnattributableNotices,
 )
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.pause_after_consecutive_failures import PauseAfterConsecutiveFailuresUseCase
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
@@ -156,6 +160,7 @@ from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
+from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.notifications.notify_order_rejected import NotifyOrderRejectedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
@@ -312,6 +317,7 @@ def tenant_use_cases(
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
+            openings_suspensions=SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
             flow_forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
             historical_cycles=history,
             historical_closed_positions=history,
@@ -319,6 +325,8 @@ def tenant_use_cases(
             reconciliation=SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id),
             account_thresholds=accounts,
             account_names=accounts,
+            automatic_pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
+            emergency_closings=SqlAlchemyEmergencyClosingLogAdapter(engine, tenant_id),
             environment=environment,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -498,7 +506,15 @@ def cycle_of(
                     ),
                 )
             ),
-            risk=ReviewCycleRiskUseCase(CheckRiskUseCase(markets)),
+            risk=ReviewCycleRiskUseCase(
+                CheckRiskUseCase(markets),
+                GuardFlowLossUseCase(
+                    SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
+                    SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
+                    NotifyOpeningsSuspendedUseCase(notify),
+                    clock,
+                ),
+            ),
             orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(
                     ExecuteFlowOrdersUseCase(
@@ -526,15 +542,17 @@ def cycle_of(
             journal=JsonCycleJournalAdapter(environment),
         )
         cycles = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
+        pause = PauseAffectedFlowsUseCase(
+            flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify)
+        )
         guards = CycleGuards(
             cycles=cycles,
             lock=lock,
-            pause=PauseAffectedFlowsUseCase(
-                flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify)
-            ),
+            pause=pause,
             clock=clock,
             failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify)),
             activity=ReadFlowActivityUseCase(flows),
+            consecutive_failures=PauseAfterConsecutiveFailuresUseCase(flows, cycles, pause),
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
         equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))

@@ -25,7 +25,7 @@ from tests.support.postgres import database_migrated_to
 
 pytestmark = pytest.mark.integration
 
-BEFORE_THE_TRIGGER = "0031"
+BEFORE_THE_TRIGGER = "0033"
 PLANNED = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
 ASKED = datetime(2026, 11, 12, 10, 20, tzinfo=UTC)
 # A cycle as the platform recorded it before the trigger, without its column.

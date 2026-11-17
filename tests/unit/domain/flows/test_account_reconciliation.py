@@ -1,6 +1,8 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
+
+import pytest
 
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reconciliation import (
@@ -260,6 +262,45 @@ def test_the_executions_fees_and_funding_of_the_flows_explain_the_balance() -> N
     )
 
     assert result.comparison == BalanceComparison(Decimal(1025), Decimal(1025), READ_AT)
+
+
+# ADR saldo-atteso-con-le-sole-righe-successive-alla-lettura-precedente: a row published late was in the balance read
+# by the previous reading, which became the reference (Bug 506).
+@pytest.mark.parametrize(
+    ("executed_at", "expected"),
+    [(BEFORE - timedelta(minutes=1), Decimal(1000)), (BEFORE, Decimal(1000)), (READ_AT, Decimal(1028))],
+)
+def test_an_execution_of_a_flow_explains_the_balance_only_after_the_previous_reading(
+    executed_at: datetime, expected: Decimal
+) -> None:
+    flow = flow_on("BTC")
+    fill = a_fill("BTC", uuid4(), realized_pnl=Decimal(30), fee=Decimal(2), executed_at=executed_at)
+
+    result = reconcile(
+        [flow],
+        an_activity(balance=expected),
+        recorded=(of_platform(fill, flow),),
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(expected, expected, READ_AT)
+    assert result.items == ()
+
+
+@pytest.mark.parametrize(
+    ("paid_at", "expected"),
+    [(BEFORE - timedelta(minutes=1), Decimal(1000)), (BEFORE, Decimal(1000)), (READ_AT, Decimal("1000.05"))],
+)
+def test_a_funding_payment_of_a_flow_explains_the_balance_only_after_the_previous_reading(
+    paid_at: datetime, expected: Decimal
+) -> None:
+    flow = flow_on("BTC")
+    funding = (FundingEntry(a_payment("BTC", Decimal("0.05"), paid_at=paid_at), flow.id),)
+
+    result = reconcile([flow], an_activity(balance=expected), funding=funding, last=previous(reference=Decimal(1000)))
+
+    assert result.comparison == BalanceComparison(expected, expected, READ_AT)
+    assert result.items == ()
 
 
 def test_the_executions_and_funding_of_no_flow_do_not_explain_the_balance() -> None:

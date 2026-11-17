@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from autotrading.adapters.outbound.sqlalchemy.tables import equity_snapshots
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
+from autotrading.domain.flows.loss_guard import LossReferences
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -30,7 +31,9 @@ class _EquityRow(TypedDict):
 
 
 class SqlAlchemyEquitySnapshotRepositoryAdapter:
-    """The equity of the cycles of the flows of one tenant, recorded and read under row level security (ADR 0120)."""
+    """The equity of the cycles of the flows of one tenant, recorded and read under row level security (ADR 0120), and
+    the references the losses of a flow are measured from (R3.2.2).
+    """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
         self._engine = engine
@@ -54,6 +57,13 @@ class SqlAlchemyEquitySnapshotRepositoryAdapter:
         with self._transaction() as connection:
             return [snapshot_of(row) for row in connection.execute(of_flow_query(flow_id, window)).mappings()]
 
+    def loss_references(self, flow_id: UUID, day_start: datetime, peak_since: datetime) -> LossReferences:
+        with self._transaction() as connection:
+            daily = _first(connection, daily_until_query(flow_id, day_start)) or _first(
+                connection, daily_from_query(flow_id, day_start)
+            )
+            return LossReferences(daily, _first(connection, peak_query(flow_id, peak_since)))
+
     @contextmanager
     def _transaction(self) -> Iterator[Connection]:
         with self._engine.begin() as connection:
@@ -69,6 +79,46 @@ def of_flow_query(flow_id: UUID, window: TimeWindow) -> Select[tuple[object, ...
     if window.until is not None:
         query = query.where(equity_snapshots.c.planned_at < window.until)
     return query.order_by(equity_snapshots.c.planned_at)
+
+
+def daily_until_query(flow_id: UUID, day_start: datetime) -> Select[tuple[object, ...]]:
+    """The last equity of the flow recorded at the start of the day or before (R3.2.2)."""
+    return (
+        select(equity_snapshots)
+        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at <= day_start)
+        .order_by(equity_snapshots.c.planned_at.desc())
+        .limit(1)
+    )
+
+
+def daily_from_query(flow_id: UUID, day_start: datetime) -> Select[tuple[object, ...]]:
+    """The first equity of the day, for a flow without equity before it (R3.2.2)."""
+    return (
+        select(equity_snapshots)
+        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at >= day_start)
+        .order_by(equity_snapshots.c.planned_at)
+        .limit(1)
+    )
+
+
+def peak_query(flow_id: UUID, since: datetime) -> Select[tuple[object, ...]]:
+    """The equity highest once brought to the capital of now since the instant: the highest gain on its capital, so a
+    change of capital moves no reference (R3.2.2).
+    """
+    return (
+        select(equity_snapshots)
+        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at >= since)
+        .order_by(
+            (equity_snapshots.c.equity - equity_snapshots.c.allocated_capital).desc(),
+            equity_snapshots.c.planned_at.desc(),
+        )
+        .limit(1)
+    )
+
+
+def _first(connection: Connection, query: Select[tuple[object, ...]]) -> EquitySnapshot | None:
+    row = connection.execute(query).mappings().first()
+    return None if row is None else snapshot_of(row)
 
 
 def row_of(snapshot: EquitySnapshot, tenant_id: TenantId) -> dict[str, object]:

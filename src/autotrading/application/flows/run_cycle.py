@@ -7,6 +7,7 @@ from autotrading.application.flows.errors import CycleInProgressError, FlowNotAc
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
 from autotrading.application.flows.ports import (
     ClockPort,
+    ConsecutiveFailuresPausePort,
     CycleEquityPort,
     CycleFailureNoticePort,
     CycleFlowActivityPort,
@@ -31,7 +32,8 @@ class RunCycleCommand:
 @dataclass(frozen=True, slots=True)
 class CycleGuards:
     """What keeps a planned cycle unique and alone and only for an active flow, what pauses the flows on a permanent
-    error and tells the user of a failed cycle: everything but the lock bound to the tenant of the flow.
+    error or after too many failed cycles in a row and tells the user of a failed cycle: everything but the lock bound
+    to the tenant of the flow.
     """
 
     cycles: CycleRepositoryPort
@@ -40,13 +42,15 @@ class CycleGuards:
     clock: ClockPort
     failures: CycleFailureNoticePort
     activity: CycleFlowActivityPort
+    consecutive_failures: ConsecutiveFailuresPausePort
 
 
 class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:
     """Runs one planned cycle of a flow on its graph, stopping at the first failure (R1.2.1-R1.2.5, ADR 0104).
 
     Fail fast: no retry and no node after the failing one. The only handler of the errors of the cycle records the
-    failed cycle and, for a permanent error, pauses the flows involved and raises the error anyway (R1.2.4).
+    failed cycle and, for a permanent error, pauses the flows involved and raises the error anyway (R1.2.4); any other
+    error counts towards the maximum of failed cycles in a row of the flow (R3.2.4).
     Every cycle that read the state of its flow, completed or failed, records the equity of the last state it read
     (R2.2.3, ADR 0120). A cycle whose flow is no longer active when it starts runs nothing and leaves no trace: the
     planner may still hold its job for a few seconds (Bug 373).
@@ -86,6 +90,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
             self._equity.execute(flow_id, command.planned_at, failed.state)
         self._guards.failures.execute(flow_id, str(failed.error))
         if not failed.error.permanent:
+            self._guards.consecutive_failures.execute(flow_id, failed.error)
             return record
         self._guards.pause.execute(PauseAffectedFlowsCommand.of_error(flow_id, failed.error))
         if command.trigger is CycleTrigger.ON_DEMAND:

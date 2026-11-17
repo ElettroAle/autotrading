@@ -24,9 +24,10 @@ R3.3.1 espone nell'API l'ultimo confronto, la soglia, gli allarmi e la conferma 
 1. Nella funzionalità `accounts`: un componente `ReconciliationStatus` per ogni conto della pagina Conti (lista
    etichetta-valore di `details-list`), il comando "Ho verificato" con `ConfirmationDialog`, il form della soglia con
    i campi di `components/ui/form`; una rotta `/accounts/:accountId/alarms` con l'elenco degli allarmi su
-   `DataTable`. Lo stato del flusso nell'API porta il motivo delle aperture sospese (`openings_suspended`), che la
-   pagina del flusso mostra nell'intestazione del layout accanto agli altri avvisi: "aperture sospese: allarme di
-   riconciliazione sul conto test-1".
+   `DataTable`. Lo stato del flusso nell'API porta la sospensione delle aperture (`openings_suspension`, un solo
+   campo per ogni causa, ADR perdita-massima-nella-dashboard), che la pagina del flusso mostra con il componente
+   condiviso dell'avviso: "aperture sospese: allarme di riconciliazione sul conto test-1", senza il comando di
+   ripresa.
 2. Una pagina separata della riconciliazione per tutti i conti: scartata, lo stato serve accanto al conto e ai suoi
    comandi.
 

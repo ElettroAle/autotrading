@@ -283,6 +283,33 @@ def test_a_completed_cycle_is_not_told(cycles: Cycles) -> None:
     assert cycles.failure_notices.told == []
 
 
+def test_a_transient_error_asks_for_the_pause_after_consecutive_failures_once_told(cycles: Cycles) -> None:
+    flow_id = cycles.id_of("alfa")
+    error = FakeTransientError("timeout")
+    cycles.failures.fail_once(flow_id, CycleStep.AGENT_DECISION, error)
+
+    run(cycles)
+
+    assert cycles.consecutive_failures.asked == [(flow_id, error)]
+    assert cycles.consecutive_failures.told_before == [[(flow_id, "timeout")]]
+
+
+def test_a_permanent_error_does_not_count_towards_the_consecutive_failures(cycles: Cycles) -> None:
+    error = FakePermanentError("credito esaurito presso openrouter", provider="openrouter")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, error)
+
+    with pytest.raises(FakePermanentError):
+        run(cycles)
+
+    assert cycles.consecutive_failures.asked == []
+
+
+def test_a_completed_cycle_does_not_ask_for_the_pause_after_consecutive_failures(cycles: Cycles) -> None:
+    run(cycles)
+
+    assert cycles.consecutive_failures.asked == []
+
+
 def test_a_completed_cycle_records_the_equity_of_the_state_at_its_end(cycles: Cycles) -> None:
     run(cycles)
 

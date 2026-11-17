@@ -39,7 +39,7 @@ def state_of(capital: str, *, realized_pnl: str = "0", unrealized_pnl: str = "0"
         cashed_profit=Decimal(cashed),
     )
     changes = (cash_out,) if Decimal(cashed) else ()
-    return FlowState.attributed(flow, activity, FlowTotals(flow.id, Decimal(realized_pnl)), changes)
+    return FlowState.attributed(flow, activity, FlowTotals(flow.id, Decimal(realized_pnl)), capital_changes=changes)
 
 
 def test_the_free_capital_takes_off_the_balance_the_total_value_of_every_flow() -> None:
