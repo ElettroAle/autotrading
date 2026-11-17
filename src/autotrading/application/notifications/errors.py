@@ -51,6 +51,15 @@ class MailServiceNotConfiguredError(ApplicationError):
         super().__init__("servizio di posta non configurato")
 
 
+class NotifiedFlowNotFoundError(ApplicationError):
+    """The same answer for a flow that does not exist and for one of another tenant (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("flusso non trovato")
+
+
 class BotUnreachableError(ApplicationError):
     """Telegram did not answer the bot: the next poll tries again."""
 

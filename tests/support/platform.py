@@ -57,6 +57,10 @@ from tests.fakes.account_transfers import FakeAccountTransfersAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
 from tests.fakes.bot_inbox import FakeBotInboxAdapter
+from tests.fakes.channel_preferences_repository import (
+    ChannelPreferencesStore,
+    InMemoryChannelPreferencesRepositoryAdapter,
+)
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter, SealedVault
@@ -97,6 +101,7 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.notified_flows import InMemoryNotifiedFlowsAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
@@ -121,6 +126,7 @@ from tests.support.activity import an_activity
 from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.model_catalog import PLATFORM_MODELS
+from tests.support.notifications import channel_choices
 from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
@@ -154,6 +160,7 @@ class Platform:
         self.chats: LinkedChatStore = {}
         self.messenger = FakeMessengerAdapter()
         self.emails: NotificationEmailStore = {}
+        self.channel_preferences: ChannelPreferencesStore = {}
         self.mail_service = FakeMailServiceAdapter()
         self.mailer = FakeMailerAdapter()
         # The worker of the outbox is up: a notification is delivered as soon as it is queued.
@@ -270,6 +277,8 @@ class Platform:
             notification_emails=InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             mail_service=self.mail_service,
             outbox=self.outbox,
+            channel_preferences=InMemoryChannelPreferencesRepositoryAdapter(self.channel_preferences, tenant_id),
+            notified_flows=InMemoryNotifiedFlowsAdapter(self.flows, tenant_id),
             clock=lambda: self.now,
             closed_positions=closed_positions,
             exit_plans=exit_plans,
@@ -335,12 +344,7 @@ class Platform:
                 "dev",
                 lambda: STARTED_AT,
             ),
-            notify=NotifyUseCase(
-                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
-                InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
-                self.mail_service,
-                self.outbox,
-            ),
+            notify=self.notify_for(tenant_id),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
             record_account_executions=RecordAccountExecutionsUseCase(
@@ -349,6 +353,16 @@ class Platform:
                 self.platform_orders,
                 self.ledger,
             ),
+        )
+
+    def notify_for(self, tenant_id: TenantId) -> NotifyUseCase:
+        """What the worker composes to queue the notifications of a tenant on the channels it chose (R3.5.3)."""
+        return NotifyUseCase(
+            InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
+            InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            self.mail_service,
+            self.outbox,
+            channel_choices(tenant_id, self.channel_preferences, self.flows),
         )
 
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
@@ -377,12 +391,7 @@ class Platform:
         inbox.waiting = [BotMessage(chat_id, text)]
         test_notification = SendTestNotificationUseCase(
             InMemoryLinkedChatLookupAdapter(self.chats),
-            lambda tenant_id: NotifyUseCase(
-                InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
-                InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
-                self.mail_service,
-                self.outbox,
-            ),
+            self.notify_for,
             self.messenger,
         )
         AnswerBotMessagesUseCase(inbox, self.link_chat(), test_notification).execute()

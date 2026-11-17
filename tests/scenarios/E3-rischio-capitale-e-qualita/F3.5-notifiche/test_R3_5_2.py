@@ -5,10 +5,13 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelCommand
 from autotrading.application.notifications.get_notification_email import NotificationEmailSettings
 from autotrading.application.notifications.set_notification_email import SetNotificationEmailCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.notifications.outbox_message import EMAIL_MESSAGE
 from tests.fakes.cycles import FakePermanentError
 from tests.fakes.outbox import OutboxState
@@ -40,6 +43,11 @@ def indicate(flow_cycles: FlowCycles, user: str, address: str) -> None:
     flow_cycles.platform.use_cases_of(user).set_notification_email.execute(SetNotificationEmailCommand(address))
 
 
+def choose_email(flow_cycles: FlowCycles, user: str, event: NotificationEvent) -> None:
+    command = ChooseNotificationChannelCommand(event, NotificationChannel.EMAIL)
+    flow_cycles.platform.use_cases_of(user).choose_notification_channel.execute(command)
+
+
 def pause(flow_cycles: FlowCycles, flow: str, outcome: dict[str, object], reason: str = PAUSE_REASON) -> None:
     flow_cycles.model.failure = FakePermanentError(reason)
     flow_cycles.run(flow)
@@ -65,10 +73,9 @@ def mail_service_missing(flow_cycles: FlowCycles) -> None:
 
 @given(quoted('che "{user}" ha il flusso "{flow}" con il canale email scelto per l\'evento "{event}"'))
 def flow_with_email_channel(flow_cycles: FlowCycles, user: str, flow: str, event: str) -> None:
-    # The choice of the channels per event is R3.5.3: until then every notification goes to every channel.
-    assert event == "pausa automatica di un flusso"
     flow_cycles.add_flow(user, flow)
     flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, allocated_capital=CAPITAL))
+    choose_email(flow_cycles, user, NotificationEvent(event))
 
 
 @given(quoted('che "{user}" ha indicato l\'indirizzo "{address}"'))
@@ -128,6 +135,8 @@ def flow_of_user_paused(flow_cycles: FlowCycles, outcome: dict[str, object], flo
 
 @when(quoted('un ciclo di "{flow}" produce una notifica destinata all\'email'))
 def cycle_notifies(flow_cycles: FlowCycles, flow: str) -> None:
+    # The opening is the notification of the cycle: its channel is the email (R3.5.3).
+    choose_email(flow_cycles, flow_cycles.users[flow], NotificationEvent.POSITION_OPENED)
     flow_cycles.platform.order_exchange.fill_at = (MID_PRICE, OPENING_FEE)
     answer(flow_cycles, opening("BTC", quota=0.05, reasoning="r"))
     flow_cycles.run(flow)

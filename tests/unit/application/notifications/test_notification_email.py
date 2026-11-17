@@ -26,12 +26,15 @@ from autotrading.application.notifications.set_notification_email import (
     SetNotificationEmailCommand,
     SetNotificationEmailUseCase,
 )
+from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.errors import InvalidEmailAddressError
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.notification_channel import NotificationChannel
 from autotrading.domain.notifications.notification_email import NotificationEmail
+from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.notifications.outbox_message import CHAT_MESSAGE, EMAIL_MESSAGE, OutboxMessage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
@@ -43,10 +46,12 @@ from tests.fakes.notification_email_repository import (
     NotificationEmailStore,
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
+from tests.support.notifications import channel_choices
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 ANNA_ADDRESS = EmailAddress.parse("anna@example.com")
 PAUSED = Notification.flow_paused("alfa", "credito esaurito")
+PAUSED_EVENT = NotificationEvent.FLOW_PAUSED
 FAILED_EMAIL = "invio dell'email fallito"
 
 
@@ -91,7 +96,9 @@ class Mail:
 
     def notify_for(self, tenant_id: TenantId, outbox: InMemoryOutboxAdapter | FailingOnEmailOutbox) -> NotifyUseCase:
         chats = InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id)
-        return NotifyUseCase(chats, self.repository(tenant_id), self.service, outbox)
+        # The tenant chose both channels for the event: R3.5.3 sends each event only on its channel.
+        both = {tenant_id: ChannelPreferences.of(tenant_id).choosing(PAUSED_EVENT, NotificationChannel.BOTH)}
+        return NotifyUseCase(chats, self.repository(tenant_id), self.service, outbox, channel_choices(tenant_id, both))
 
     def notify(self, tenant_id: TenantId, notification: Notification = PAUSED) -> None:
         self.notify_for(tenant_id, self.outbox).execute(notification)

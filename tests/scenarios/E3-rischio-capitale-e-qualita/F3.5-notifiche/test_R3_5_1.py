@@ -12,6 +12,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.close_in_emergency import CloseInEmergencyCommand
+from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelCommand
 from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.cycle_record import CycleOutcome
@@ -20,6 +21,8 @@ from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_limits import RiskLimits
+from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.orders.protection_kind import ProtectionKind
 from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.activity import READ_AT, a_fill, a_position, an_activity
@@ -66,6 +69,13 @@ class Events:
 
     def address(self, flow: str) -> str:
         return self.flow_cycles.credentials_of(flow).value("account_address")
+
+    def receive_on_telegram(self, user: str, *events: NotificationEvent) -> None:
+        """The decisions of the risk check are silent until the user chooses their channel (R3.5.3): the user of
+        these scenarios receives every event."""
+        choose = self.flow_cycles.platform.use_cases_of(user).choose_notification_channel
+        for event in events:
+            choose.execute(ChooseNotificationChannelCommand(event, NotificationChannel.TELEGRAM))
 
     def answer(self, *decisions: dict[str, object]) -> None:
         self.flow_cycles.model.text = json.dumps({"decisioni": list(decisions)})
@@ -169,6 +179,7 @@ def notified() -> dict[str, str]:
 @given(quoted('che "{user}" ha la chat "{chat}" collegata, il conto "{account}" e il flusso "{flow}"'))
 def chat_account_and_flow(events: Events, user: str, chat: str, account: str, flow: str) -> None:
     events.link(user, chat)
+    events.receive_on_telegram(user, NotificationEvent.OPENING_REDUCED, NotificationEvent.OPENING_BLOCKED)
     events.flow_cycles.add_flow(user, flow, assets=("BTC",), account=account)
     events.flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, allocated_capital=CAPITAL))
 

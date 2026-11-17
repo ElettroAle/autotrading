@@ -55,6 +55,7 @@ from tests.fakes.notification_email_repository import (
     NotificationEmailStore,
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
+from tests.support.notifications import channel_choices
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
@@ -109,6 +110,7 @@ class Telegram:
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
             self.mail_service,
             self.outbox,
+            channel_choices(tenant_id),
         )
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:

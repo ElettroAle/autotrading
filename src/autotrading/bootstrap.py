@@ -40,6 +40,9 @@ from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.smtp.composition import smtp_adapters, smtp_service_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
+from autotrading.adapters.outbound.sqlalchemy.channel_preferences_repository import (
+    SqlAlchemyChannelPreferencesRepositoryAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.closed_position_repository import (
     SqlAlchemyClosedPositionRepositoryAdapter,
 )
@@ -70,6 +73,7 @@ from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import (
 from autotrading.adapters.outbound.sqlalchemy.notification_email_repository import (
     SqlAlchemyNotificationEmailRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.notified_flows import SqlAlchemyNotifiedFlowsAdapter
 from autotrading.adapters.outbound.sqlalchemy.openings_suspension import SqlAlchemyOpeningsSuspensionAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.outbox import SqlAlchemyOutboxAdapter
@@ -179,6 +183,7 @@ from autotrading.application.notifications.notify_unattributable_position import
 )
 from autotrading.application.notifications.ports import (
     BotInboxPort,
+    ChannelChoicePorts,
     LinkStores,
     MailServicePort,
     MessengerPort,
@@ -312,6 +317,8 @@ def tenant_use_cases(
             notification_emails=SqlAlchemyNotificationEmailRepositoryAdapter(engine, tenant_id),
             mail_service=mail_service,
             outbox=outbox,
+            channel_preferences=SqlAlchemyChannelPreferencesRepositoryAdapter(engine, tenant_id),
+            notified_flows=SqlAlchemyNotifiedFlowsAdapter(engine, tenant_id),
             clock=system_clock_adapters().now,
             closed_positions=closed_positions,
             exit_plans=exit_plans,
@@ -565,6 +572,10 @@ def notify_for(
         SqlAlchemyNotificationEmailRepositoryAdapter(engine, tenant_id),
         mail_service,
         outbox,
+        ChannelChoicePorts(
+            SqlAlchemyChannelPreferencesRepositoryAdapter(engine, tenant_id),
+            SqlAlchemyNotifiedFlowsAdapter(engine, tenant_id),
+        ),
     )
 
 
