@@ -13,8 +13,10 @@ const missingOf = (flow: Flow): string[] =>
     flow.assets.length === 0 ? 'asset' : '',
   ].filter((part) => part !== '');
 
-const listed = (parts: string[]): string =>
-  parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
+const listed = (parts: string[]): string => {
+  const last = parts.at(-1) ?? '';
+  return parts.length === 1 ? last : `${parts.slice(0, -1).join(', ')} e ${last}`;
+};
 
 const readinessOf = (missing: string[]): string => {
   if (missing.length === 0) {
