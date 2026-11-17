@@ -30,6 +30,7 @@ const notificationChannelsSchema = z.object({
       exceptions: z.array(eventChannelSchema),
     }),
   ),
+  warnings: z.array(z.string()),
 });
 
 export type NotificationChannel = z.infer<typeof channelSchema>;
@@ -41,8 +42,8 @@ export type NotificationChannels = z.infer<typeof notificationChannelsSchema>;
 export const NOTIFICATION_CHANNELS_QUERY_KEY = ['notification-channels'] as const;
 
 /**
- * The channel of every type of event, the exceptions of every flow and the warnings of a channel not linked, as the
- * API computes them (R3.5.3).
+ * The channel of every type of event, the exceptions of every flow, the warnings of a channel not linked and those of
+ * every channel that cannot be reached, as the API computes them (R3.5.3, R3.5.5).
  */
 export const useNotificationChannels = () => {
   const api = useApiClient();

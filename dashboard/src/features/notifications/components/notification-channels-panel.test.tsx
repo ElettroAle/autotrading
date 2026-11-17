@@ -7,7 +7,7 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
-const NOTIFICATIONS = '/notifications';
+const NOTIFICATIONS = '/notifications?tab=preferences';
 const GENERAL = 'Canali per tipo di evento';
 const FAILED_CYCLE = 'ciclo fallito';
 const OPENING = 'apertura di una posizione';

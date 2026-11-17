@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from autotrading.application.notifications.ports import MailServicePort, NotificationEmailRepositoryPort
+from autotrading.application.notifications.ports import MailServerRepositoryPort, NotificationEmailRepositoryPort
 from autotrading.domain.notifications.email_address import EmailAddress
 
-MAIL_SERVICE_MISSING = "le email non partono: servizio di posta non configurato"
+MAIL_SERVER_MISSING = "le email non partono: server di posta non configurato"
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,16 +15,16 @@ class NotificationEmailSettings:
 
 
 class GetNotificationEmailUseCase:
-    """The address of the notifications by email of the tenant; without a mail service it can still be indicated,
-    and the settings warn that no email leaves (R3.5.2).
+    """The address of the notifications by email of the tenant; without a mail server it can still be indicated, and
+    the settings warn that no email leaves (R3.5.2, R3.5.5).
     """
 
-    def __init__(self, emails: NotificationEmailRepositoryPort, mail_service: MailServicePort) -> None:
+    def __init__(self, emails: NotificationEmailRepositoryPort, servers: MailServerRepositoryPort) -> None:
         self._emails = emails
-        self._mail_service = mail_service
+        self._servers = servers
 
     def execute(self) -> NotificationEmailSettings:
         email = self._emails.get()
         address = None if email is None else email.address
-        warning = None if self._mail_service.is_configured() else MAIL_SERVICE_MISSING
+        warning = None if self._servers.get() is not None else MAIL_SERVER_MISSING
         return NotificationEmailSettings(address, warning)

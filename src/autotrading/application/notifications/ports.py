@@ -8,10 +8,12 @@ from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.email_address import EmailAddress
 from autotrading.domain.notifications.flow_status import FlowStatusFigures
 from autotrading.domain.notifications.linked_chat import LinkedChat
+from autotrading.domain.notifications.mail_server import MailServer
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.notifications.notification_email import NotificationEmail
 from autotrading.domain.notifications.outbox_message import OutboxMessage
 from autotrading.domain.notifications.pending_link import PendingLink
+from autotrading.domain.notifications.sealed_mail_password import SealedMailPassword
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -74,14 +76,63 @@ class NotificationEmailRepositoryPort(Protocol):
 
 
 class MailerPort(Protocol):
-    def send(self, address: EmailAddress, subject: str, text: str) -> None:
-        """Raises MessageNotDeliveredError when the mail service does not take the email."""
+    def send(self, server: MailServer, password: str, address: EmailAddress, subject: str, text: str) -> None:
+        """Sends the email from the mail server of the tenant, logged in with its opened password (ADR
+        invio-dal-server-di-posta-del-tenant).
+
+        Raises MailServerRefusedLoginError when the server refuses user and password, EmailNotDeliveredError when it
+        does not take the email for any other reason.
+        """
         ...
 
 
-class MailServicePort(Protocol):
-    def is_configured(self) -> bool:
-        """Whether the installation has a mail service: without one no email leaves (R3.5.2)."""
+class MailServerRepositoryPort(Protocol):
+    """Bound to the tenant of the request: the only mail server its emails leave from (R3.5.5)."""
+
+    def get(self) -> MailServer | None: ...
+
+    def save(self, server: MailServer) -> None:
+        """Keeps the server, replacing the one kept before."""
+        ...
+
+    def remove(self) -> None:
+        """Forgets the server; nothing to forget is no error."""
+        ...
+
+
+class MailPasswordSealerPort(Protocol):
+    """Bound to the tenant of the request: seals the password of its mail server, which only the worker opens (ADR
+    server-di-posta-per-tenant)."""
+
+    def seal(self, password: str) -> SealedMailPassword: ...
+
+
+class MailPasswordOpenerPort(Protocol):
+    """Bound to the tenant of the request, only in the worker: opens the password of its mail server to send."""
+
+    def open(self, sealed: SealedMailPassword) -> str:
+        """Raises MailPasswordNotOpenedError when the sealed text is not a password sealed for this tenant."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class MailServerAccess:
+    """What sends from the mail server of one tenant: the server it saved and the opener of its password."""
+
+    servers: MailServerRepositoryPort
+    opener: MailPasswordOpenerPort
+
+
+class EmailTestPort(Protocol):
+    """Bound to the tenant of the request: sends the test email now, from the mail server of the tenant (ADR
+    invio-dal-server-di-posta-del-tenant).
+
+    Only the worker opens the password: in the API it is the client that asks the worker to run SendTestEmailUseCase.
+    """
+
+    def send_test(self) -> None:
+        """Raises MailServerNotConfiguredError, NoNotificationEmailToTestError, MailServerRefusedLoginError,
+        MailPasswordNotOpenedError, or EmailNotDeliveredError."""
         ...
 
 

@@ -225,8 +225,18 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
 
-/** An email the mail service of the fake platform delivered (R3.5.2). */
-export type FakeEmail = { readonly to: string; readonly subject: string };
+/** An email the mail server of a user delivered (R3.5.2, R3.5.5): the host it left from, too. */
+export type FakeEmail = { readonly to: string; readonly subject: string; readonly host: string };
+
+/** The mail server of a user, as the platform keeps it: the password stays on the platform (R3.5.5). */
+export type FakeMailServer = {
+  readonly host: string;
+  readonly port: number;
+  readonly security: 'STARTTLS' | 'TLS';
+  readonly username: string;
+  readonly sender: string;
+  readonly password: string;
+};
 
 /** A Telegram chat: Telegram numbers it, the scenarios name it, and it keeps what it received. */
 export type FakeChat = { readonly name: string; readonly id: number; readonly received: string[] };
@@ -409,7 +419,8 @@ const state = {
   linkedChats: new Map<string, FakeChat>(),
   notificationEmails: new Map<string, string>(),
   sentEmails: [] as FakeEmail[],
-  mailServiceConfigured: true,
+  mailServers: new Map<string, FakeMailServer>(),
+  mailLoginRefused: false,
   linkCodes: new Map<string, FakeLinkCode>(),
   cycles: new Map<string, FakeCycle[]>(),
   cyclesInProgress: new Set<string>(),
@@ -591,7 +602,8 @@ export const fakePlatform = {
     state.linkedChats.clear();
     state.notificationEmails.clear();
     state.sentEmails = [];
-    state.mailServiceConfigured = true;
+    state.mailServers.clear();
+    state.mailLoginRefused = false;
     state.linkCodes.clear();
     state.cycles.clear();
     state.cyclesInProgress.clear();
@@ -949,13 +961,26 @@ export const fakePlatform = {
     state.notificationEmails.delete(account);
   },
 
-  /** Whether the installation has a mail service: without one the address is kept, but no email leaves. */
-  mailServiceConfigured(): boolean {
-    return state.mailServiceConfigured;
+  /** The mail server of the user, if any: without one the address is kept, but no email leaves (R3.5.5). */
+  mailServerOf(account: string): FakeMailServer | undefined {
+    return state.mailServers.get(account);
   },
 
-  withoutMailService(): void {
-    state.mailServiceConfigured = false;
+  saveMailServer(account: string, server: FakeMailServer): void {
+    state.mailServers.set(account, server);
+  },
+
+  removeMailServer(account: string): void {
+    state.mailServers.delete(account);
+  },
+
+  /** Whether the mail servers refuse the login of the user, as for a wrong password. */
+  mailLoginRefused(): boolean {
+    return state.mailLoginRefused;
+  },
+
+  refuseMailLogin(): void {
+    state.mailLoginRefused = true;
   },
 
   sendEmail(email: FakeEmail): void {

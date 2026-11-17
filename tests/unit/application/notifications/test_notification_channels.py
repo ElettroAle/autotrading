@@ -44,7 +44,6 @@ from tests.fakes.channel_preferences_repository import (
     InMemoryChannelPreferencesRepositoryAdapter,
 )
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
-from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.notification_email_repository import (
@@ -52,6 +51,7 @@ from tests.fakes.notification_email_repository import (
     NotificationEmailStore,
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter
+from tests.support.mail_servers import MailServers
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 ALFA, BETA = NotifiedFlow(uuid4(), "alfa"), NotifiedFlow(uuid4(), "beta")
@@ -78,11 +78,12 @@ class Channels:
         self.chats: LinkedChatStore = {ANNA: LinkedChat(ANNA, CHAT)}
         self.emails: NotificationEmailStore = {ANNA: NotificationEmail(ANNA, ADDRESS)}
         self.flows = FixedNotifiedFlowsAdapter(ALFA, BETA)
-        self.service = FakeMailServiceAdapter()
+        self.servers = MailServers()
+        self.servers.configure(ANNA, ADDRESS.value)
         self.messenger = FakeMessengerAdapter()
         self.mailer = FakeMailerAdapter()
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
+        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer, self.servers.access_of).execute)
 
     def repository(self, tenant_id: TenantId = ANNA) -> InMemoryChannelPreferencesRepositoryAdapter:
         return InMemoryChannelPreferencesRepositoryAdapter(self.preferences, tenant_id)
@@ -105,13 +106,14 @@ class Channels:
             self.flows,
             InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
+            self.servers.repository(tenant_id),
         ).execute()
 
     def notify(self, notification: Notification, tenant_id: TenantId = ANNA) -> None:
         NotifyUseCase(
             InMemoryLinkedChatRepositoryAdapter(self.chats, tenant_id),
             InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),
-            self.service,
+            self.servers.repository(tenant_id),
             self.outbox,
             ChannelChoicePorts(self.repository(tenant_id), self.flows),
         ).execute(notification)
@@ -163,6 +165,36 @@ def test_a_channel_without_its_link_is_warned_beside_the_event(channels: Channel
     assert alfa.exceptions == (
         EventChannel(NotificationEvent.POSITION_OPENED, NotificationChannel.EMAIL, True, (MissingLink.EMAIL,)),
     )
+
+
+def test_a_tenant_with_every_channel_linked_misses_nothing(channels: Channels) -> None:
+    assert channels.read().missing_links == ()
+
+
+def test_the_channels_tell_what_the_tenant_misses_whatever_the_choices(channels: Channels) -> None:
+    channels.chats.clear()
+    channels.servers.store.clear()
+
+    assert channels.read().missing_links == (MissingLink.CHAT, MissingLink.MAIL_SERVER)
+
+
+def test_an_email_chosen_without_a_mail_server_is_warned_beside_the_event(channels: Channels) -> None:
+    channels.servers.store.clear()
+    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.EMAIL)
+
+    failed = next(each for each in channels.read().events if each.event is NotificationEvent.CYCLE_FAILED)
+
+    assert failed.missing_links == (MissingLink.MAIL_SERVER,)
+
+
+def test_without_a_mail_server_no_notification_goes_by_email(channels: Channels) -> None:
+    channels.servers.store.clear()
+    channels.choose(NotificationEvent.CYCLE_FAILED, NotificationChannel.BOTH)
+
+    channels.notify(FAILED_ALFA)
+
+    assert channels.email_texts() == []
+    assert channels.chat_texts() == [FAILED_ALFA.text]
 
 
 def test_the_exception_of_a_flow_is_read_with_the_flow(channels: Channels) -> None:

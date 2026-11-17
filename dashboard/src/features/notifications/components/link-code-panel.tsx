@@ -41,9 +41,9 @@ export const LinkCodePanel = () => {
       aria-labelledby="link-code-title"
       className="rounded border border-slate-200 bg-white p-4"
     >
-      <h2 id="link-code-title" className="text-xl font-semibold">
+      <h3 id="link-code-title" className="text-lg font-semibold">
         Collegamento
-      </h2>
+      </h3>
       <button
         type="button"
         onClick={() => linkCode.mutate()}

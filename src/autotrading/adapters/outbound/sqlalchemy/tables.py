@@ -219,6 +219,22 @@ notification_emails = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
+# The mail server the emails of a tenant leave from, one per tenant, with its password sealed for the worker (ADR
+# server-di-posta-per-tenant).
+notification_mail_servers = Table(
+    "notification_mail_servers",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("host", Text, nullable=False),
+    Column("port", Integer, nullable=False),
+    Column("security", Text, nullable=False),
+    Column("username", Text, nullable=False),
+    Column("sender", Text, nullable=False),
+    Column("sealed_password", LargeBinary, nullable=False),
+    Column("key_version", Integer, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
 # The channel the tenant chose for a type of event, for all its flows; an event without a row goes to its default
 # channel (R3.5.3).
 notification_channels = Table(

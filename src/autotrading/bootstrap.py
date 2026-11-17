@@ -25,19 +25,22 @@ from autotrading.adapters.outbound.hyperliquid.composition import (
 )
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
-from autotrading.adapters.outbound.libsodium.composition import libsodium_opening_adapters, libsodium_sealing_adapters
+from autotrading.adapters.outbound.libsodium.composition import (
+    SealersOfTenant,
+    libsodium_opening_adapters,
+    libsodium_sealing_adapters,
+)
+from autotrading.adapters.outbound.libsodium.mail_password_opener import SodiumMailPasswordOpenerAdapter
 from autotrading.adapters.outbound.libsodium.opener import (
     SodiumCredentialOpenerAdapter,
 )
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
-from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
-from autotrading.adapters.outbound.libsodium.sealer import SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
 from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterModelCatalogAdapter
 from autotrading.adapters.outbound.rss.composition import rss_adapters
-from autotrading.adapters.outbound.smtp.composition import smtp_adapters, smtp_service_adapters
+from autotrading.adapters.outbound.smtp.composition import smtp_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
 from autotrading.adapters.outbound.sqlalchemy.channel_preferences_repository import (
@@ -71,6 +74,7 @@ from autotrading.adapters.outbound.sqlalchemy.linked_chat_repository import (
     SqlAlchemyLinkedChatLookupAdapter,
     SqlAlchemyLinkedChatRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.mail_server_repository import SqlAlchemyMailServerRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.notification_email_repository import (
     SqlAlchemyNotificationEmailRepositoryAdapter,
 )
@@ -188,11 +192,13 @@ from autotrading.application.notifications.ports import (
     BotInboxPort,
     ChannelChoicePorts,
     LinkStores,
-    MailServicePort,
+    MailerPort,
+    MailServerAccess,
     MessengerPort,
     OutboxPort,
 )
 from autotrading.application.notifications.process_outbox import ProcessOutboxUseCase
+from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.close_exchange_position import (
@@ -241,18 +247,15 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 
 def tenant_use_cases(
     engine: SqlAlchemyEngine,
-    sealers: tuple[
-        Callable[[TenantId], SodiumCredentialSealerAdapter], Callable[[TenantId], SodiumProviderKeySealerAdapter]
-    ],
-    installation: tuple[str, HyperliquidAdaptersOfInstallation, MailServicePort],
+    sealers: SealersOfTenant,
+    installation: tuple[str, HyperliquidAdaptersOfInstallation],
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
     models: tuple[ModelCatalogs, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     model_catalogs, flow_models = models
-    credential_sealer, provider_key_sealer = sealers
-    environment, hyperliquid, mail_service = installation
-    outbox = SqlAlchemyOutboxAdapter(engine)
+    credential_sealer, provider_key_sealer, mail_password_sealer = sealers
+    environment, hyperliquid = installation
     exchanges, markets, *_ = hyperliquid
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
@@ -267,6 +270,7 @@ def tenant_use_cases(
             notifier,
             ledger_recording,
             on_demand_cycles,
+            email_tests,
         ) = worker_of(tenant_id)
         flow_ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
@@ -329,8 +333,9 @@ def tenant_use_cases(
             notifier=notifier,
             flow_status=flow_status,
             notification_emails=SqlAlchemyNotificationEmailRepositoryAdapter(engine, tenant_id),
-            mail_service=mail_service,
-            outbox=outbox,
+            mail_servers=SqlAlchemyMailServerRepositoryAdapter(engine, tenant_id),
+            mail_password_sealer=mail_password_sealer(tenant_id),
+            email_tests=email_tests,
             channel_preferences=SqlAlchemyChannelPreferencesRepositoryAdapter(engine, tenant_id),
             notified_flows=SqlAlchemyNotifiedFlowsAdapter(engine, tenant_id),
             clock=system_clock_adapters().now,
@@ -361,9 +366,9 @@ def tenant_use_cases(
 
 def worker_use_cases(
     engine: SqlAlchemyEngine,
-    opener: SodiumCredentialOpenerAdapter,
+    openers: tuple[SodiumCredentialOpenerAdapter, Callable[[TenantId], SodiumMailPasswordOpenerAdapter]],
     trading: tuple[str, Slippage, HyperliquidAdaptersOfInstallation],
-    notifications: tuple[OutboxPort, MailServicePort],
+    notifications: tuple[OutboxPort, MailerPort],
     cycle_for: Callable[[TenantId], WorkerCycle],
 ) -> Callable[[TenantId], WorkerUseCases]:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names.
@@ -372,6 +377,8 @@ def worker_use_cases(
     """
     environment, slippage, hyperliquid = trading
     exchanges, _, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
+    opener, mail_password_opener = openers
+    outbox, mailer = notifications
 
     verification_failures = FailureNames(VerificationAccountNotFoundError, VerificationStepError)
 
@@ -404,7 +411,12 @@ def worker_use_cases(
                 environment,
                 system_clock_adapters().now,
             ),
-            notify=notify_for(engine, notifications, tenant_id),
+            notify=notify_for(engine, outbox, tenant_id),
+            send_test_email=SendTestEmailUseCase(
+                SqlAlchemyNotificationEmailRepositoryAdapter(engine, tenant_id),
+                mail_server_access_for(engine, mail_password_opener, tenant_id),
+                mailer,
+            ),
             read_account_activity=ReadAccountActivityUseCase(accounts, opener, activity_readers),
             read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, activity_readers),
             record_account_executions=RecordAccountExecutionsUseCase(
@@ -428,7 +440,7 @@ def cycle_of(
     engine: SqlAlchemyEngine,
     openers: tuple[SodiumCredentialOpenerAdapter, SodiumProviderKeyOpenerAdapter],
     trading: tuple[str, Slippage, HyperliquidAdaptersOfInstallation],
-    notifications: tuple[OutboxPort, MailServicePort],
+    outbox: OutboxPort,
     predictors: tuple[ModelGateways, PriceForecasterPort],
 ) -> Callable[[TenantId], WorkerCycle]:
     """Builds, for each cycle, its graph on the adapters bound to the tenant of its flow (ADR 0042, ADR 0104).
@@ -455,7 +467,7 @@ def cycle_of(
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
         openings = SqlAlchemyFlowOpeningsAdapter(engine, tenant_id)
         exit_plans = SqlAlchemyExitPlanRepositoryAdapter(engine, tenant_id)
-        notify = notify_for(engine, notifications, tenant_id)
+        notify = notify_for(engine, outbox, tenant_id)
         notify_flow = NotifyFlowEventUseCase(
             notify, SqlAlchemyFlowStatusAdapter(engine, tenant_id, HYPERLIQUID_SETTLEMENT_CURRENCY)
         )
@@ -590,20 +602,27 @@ def cycle_of(
     return cycle_for
 
 
-def notify_for(
-    engine: SqlAlchemyEngine, notifications: tuple[OutboxPort, MailServicePort], tenant_id: TenantId
-) -> NotifyUseCase:
-    outbox, mail_service = notifications
+def notify_for(engine: SqlAlchemyEngine, outbox: OutboxPort, tenant_id: TenantId) -> NotifyUseCase:
     return NotifyUseCase(
         SqlAlchemyLinkedChatRepositoryAdapter(engine, tenant_id),
         SqlAlchemyNotificationEmailRepositoryAdapter(engine, tenant_id),
-        mail_service,
+        SqlAlchemyMailServerRepositoryAdapter(engine, tenant_id),
         outbox,
         ChannelChoicePorts(
             SqlAlchemyChannelPreferencesRepositoryAdapter(engine, tenant_id),
             SqlAlchemyNotifiedFlowsAdapter(engine, tenant_id),
         ),
     )
+
+
+def mail_server_access_for(
+    engine: SqlAlchemyEngine,
+    opener_of: Callable[[TenantId], SodiumMailPasswordOpenerAdapter],
+    tenant_id: TenantId,
+) -> MailServerAccess:
+    """The mail server of the tenant of an email and the opener of its password, in the worker alone (ADR
+    invio-dal-server-di-posta-del-tenant)."""
+    return MailServerAccess(SqlAlchemyMailServerRepositoryAdapter(engine, tenant_id), opener_of(tenant_id))
 
 
 def link_stores_for(engine: SqlAlchemyEngine, tenant_id: TenantId) -> LinkStores:
@@ -625,7 +644,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
-        (source.environment(), hyperliquid_adapters(), smtp_service_adapters(source)),
+        (source.environment(), hyperliquid_adapters()),
         worker_adapters(source),
         (catalogs, catalogs),
     )
@@ -636,27 +655,31 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
     source = ConfigurationSource(configuration)
     environment = source.environment()
-    opener, provider_key_opener = libsodium_opening_adapters(source)
+    opener, provider_key_opener, mail_password_opener = libsodium_opening_adapters(source)
     slippage = hyperliquid_slippage_adapters(source)
     hyperliquid = hyperliquid_adapters()
     engine = sqlalchemy_adapters(source)
     messenger, inbox, start_link = telegram_adapters(source)
-    mailer, mail_service = smtp_adapters(source)
+    mailer = smtp_adapters()
     outbox = SqlAlchemyOutboxAdapter(engine)
-    notifications = (outbox, mail_service)
-    bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger, notifications))
+    bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger, outbox))
     library_gateways = litellm_adapters()
     models: ModelGateways = {**library_gateways, **openrouter_adapters()}
     predictors = (models, forecaster_adapters(source))
     cycle_for = cycle_of(
-        engine, (opener, provider_key_opener), (environment, slippage, hyperliquid), notifications, predictors
+        engine, (opener, provider_key_opener), (environment, slippage, hyperliquid), outbox, predictors
     )
-    for_tenant = worker_use_cases(engine, opener, (environment, slippage, hyperliquid), notifications, cycle_for)
+    for_tenant = worker_use_cases(
+        engine, (opener, mail_password_opener), (environment, slippage, hyperliquid), (outbox, mailer), cycle_for
+    )
     cycles = worker_cycles(engine, cycle_for, hyperliquid)
     library_catalog = ReadModelCatalogUseCase(
         {name: gateway.model_catalog() for name, gateway in library_gateways.items()}
     )
-    delivery = OutboxProcessing(ProcessOutboxUseCase(outbox, DeliverOutboxMessageUseCase(messenger, mailer)).execute)
+    deliver = DeliverOutboxMessageUseCase(
+        messenger, mailer, partial(mail_server_access_for, engine, mail_password_opener)
+    )
+    delivery = OutboxProcessing(ProcessOutboxUseCase(outbox, deliver).execute)
     loops = WorkerLoops(bot, cycles, delivery)
     return worker_api_adapters(source, for_tenant, loops, WorkerAnswers(start_link, library_catalog))
 
@@ -665,7 +688,7 @@ def telegram_bot(
     engine: SqlAlchemyEngine,
     inbox: BotInboxPort,
     messenger: MessengerPort,
-    notifications: tuple[OutboxPort, MailServicePort],
+    outbox: OutboxPort,
 ) -> BotPolling:
     """The only bot of the platform, in long polling inside the worker: no inbound port (ADR 0035).
 
@@ -678,7 +701,7 @@ def telegram_bot(
         system_clock_adapters().now,
     )
     test_notification = SendTestNotificationUseCase(
-        SqlAlchemyLinkedChatLookupAdapter(engine), partial(notify_for, engine, notifications), messenger
+        SqlAlchemyLinkedChatLookupAdapter(engine), partial(notify_for, engine, outbox), messenger
     )
     return BotPolling(AnswerBotMessagesUseCase(inbox, link_chat, test_notification).execute)
 

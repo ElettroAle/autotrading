@@ -30,7 +30,6 @@ from autotrading.domain.notifications.notification_event import NotificationEven
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_status import FakeFlowStatusAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
-from tests.fakes.mail_service import FakeMailServiceAdapter
 from tests.fakes.mailer import FakeMailerAdapter, SentEmail
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.notification_email_repository import (
@@ -38,6 +37,7 @@ from tests.fakes.notification_email_repository import (
     NotificationEmailStore,
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter
+from tests.support.mail_servers import MailServers
 from tests.support.notifications import channel_choices, chat_named
 from tests.support.steps import quoted
 
@@ -63,10 +63,12 @@ class Notices:
         self.emails: NotificationEmailStore = {}
         self.messenger = FakeMessengerAdapter()
         self.mailer = FakeMailerAdapter()
-        self.mail_service = FakeMailServiceAdapter()
+        self.mail_servers = MailServers()
         self.flow_status = FakeFlowStatusAdapter()
         self.outbox = InMemoryOutboxAdapter()
-        self.outbox.process(DeliverOutboxMessageUseCase(self.messenger, self.mailer).execute)
+        self.outbox.process(
+            DeliverOutboxMessageUseCase(self.messenger, self.mailer, self.mail_servers.access_of).execute
+        )
         self.user = ""
 
     @property
@@ -76,7 +78,8 @@ class Notices:
     @property
     def notify(self) -> NotifyUseCase:
         emails = InMemoryNotificationEmailRepositoryAdapter(self.emails, self.tenant_id)
-        return NotifyUseCase(self.linked_chats, emails, self.mail_service, self.outbox, self.every_channel)
+        servers = self.mail_servers.repository(self.tenant_id)
+        return NotifyUseCase(self.linked_chats, emails, servers, self.outbox, self.every_channel)
 
     @property
     def every_channel(self) -> ChannelChoicePorts:
@@ -145,7 +148,7 @@ def flow_state(notices: Notices, *, flow: str, value: str, pnl: str, positions: 
 @given(quoted('che "{user}" riceve le notifiche anche per email'))
 def email_too(notices: Notices, user: str) -> None:
     assert user == notices.user
-    notices.mail_service.configured = True
+    notices.mail_servers.configure(notices.tenant_id, ADDRESS)
     notices.emails[notices.tenant_id] = NotificationEmail(notices.tenant_id, EmailAddress.parse(ADDRESS))
 
 

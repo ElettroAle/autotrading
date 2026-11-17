@@ -32,6 +32,7 @@ from autotrading.application.flows.record_account_executions import (
 from autotrading.application.flows.run_cycle_on_demand import RunCycleOnDemandCommand, RunCycleOnDemandUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.ports import BotInboxPort, BotStartLinkPort
+from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
 from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
@@ -71,6 +72,7 @@ class WorkerUseCases:
     close_exchange_position: CloseExchangePositionUseCase
     run_exchange_verification: RunExchangeVerificationUseCase
     notify: NotifyUseCase
+    send_test_email: SendTestEmailUseCase
     read_account_activity: ReadAccountActivityUseCase
     read_account_transfers: ReadAccountTransfersUseCase
     record_account_executions: RecordAccountExecutionsUseCase
@@ -305,6 +307,12 @@ def create_worker_api(
     def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:
         for_tenant(TenantId(tenant_id)).notify.execute(request.notification())
         return {"status": "ok"}
+
+    @api.post("/tenants/{tenant_id}/notifications/email/test", dependencies=[Depends(require_api)], status_code=204)
+    def send_test_email(tenant_id: UUID) -> None:
+        """The test email now, from the mail server of the tenant, whose password only the worker opens (ADR
+        invio-dal-server-di-posta-del-tenant): a refusal of the server is a Problem Details."""
+        for_tenant(TenantId(tenant_id)).send_test_email.execute()
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/verifications", dependencies=[Depends(require_api)])
     def run_verification(tenant_id: UUID, account_id: UUID, request: VerificationRequest) -> VerificationRunResponse:

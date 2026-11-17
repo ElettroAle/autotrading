@@ -42,13 +42,37 @@ class NoNotificationEmailToTestError(ApplicationError):
         super().__init__("nessun indirizzo email per le notifiche")
 
 
-class MailServiceNotConfiguredError(ApplicationError):
-    """The installation has no mail service: the address is kept, but no email leaves (R3.5.2)."""
+class MailServerRefusedLoginError(EmailNotDeliveredError):
+    """The mail server of the tenant refused its user and password: only the user can correct them (R3.5.5)."""
+
+    status_code = 400
+    reason = "il server di posta ha rifiutato l'accesso: controlla utente e password"
+
+
+class MailServerNotConfiguredError(ApplicationError):
+    """The tenant has no mail server: the address is kept, but no email leaves (R3.5.5)."""
 
     status_code = 409
 
     def __init__(self) -> None:
-        super().__init__("servizio di posta non configurato")
+        super().__init__("server di posta non configurato")
+
+
+class MailPasswordRequiredError(ApplicationError):
+    """A mail server saved for the first time has no password to keep: a change without one keeps the saved one."""
+
+    def __init__(self) -> None:
+        super().__init__("password del server di posta mancante")
+
+
+class MailPasswordNotOpenedError(ApplicationError):
+    """The sealed password is not one sealed for this tenant, or the key that sealed it is gone: the user saves it
+    again (ADR server-di-posta-per-tenant)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("password del server di posta non leggibile: salvala di nuovo")
 
 
 class NotifiedFlowNotFoundError(ApplicationError):

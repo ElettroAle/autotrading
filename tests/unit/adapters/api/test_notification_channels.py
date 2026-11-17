@@ -73,6 +73,22 @@ def test_a_user_who_never_chose_reads_every_type_of_event_on_its_default_channel
     reduced = next(each for each in body["events"] if each["event"] == "decisione ridotta dal rischio")
     assert reduced == {"event": "decisione ridotta dal rischio", "channel": "nessuno", "of_flow": True, "warnings": []}
     assert body["flows"] == [{"flow_id": str(alfa.id.value), "name": "alfa", "exceptions": []}]
+    assert body["warnings"] == ["Telegram non collegato", "email non indicata", "server di posta non configurato"]
+
+
+def test_the_channels_warn_of_the_missing_mail_server_whatever_the_choices(
+    platform: Platform, client_of: Client
+) -> None:
+    anna = client_of("anna")
+    platform.mail_servers.configure(platform.tenant_of("anna"), "anna@example.com")
+    anna.put("/notifications/email", json={"address": "anna@example.com"})
+    before = anna.get("/notifications/channels").json()["warnings"]
+    platform.mail_servers.store.clear()
+
+    after = anna.get("/notifications/channels").json()["warnings"]
+
+    assert before == ["Telegram non collegato"]
+    assert after == ["Telegram non collegato", "server di posta non configurato"]
 
 
 def test_a_chosen_channel_reads_back_for_its_tenant_only(client_of: Client) -> None:
@@ -105,7 +121,14 @@ def test_an_exception_of_a_flow_reads_back_and_is_removed(platform: Platform, cl
     removed = anna.delete(exception_path(alfa, OPENING))
 
     assert put.status_code == 204
-    assert excepted == [{"event": OPENING, "channel": "email", "of_flow": True, "warnings": ["email non indicata"]}]
+    assert excepted == [
+        {
+            "event": OPENING,
+            "channel": "email",
+            "of_flow": True,
+            "warnings": ["email non indicata", "server di posta non configurato"],
+        }
+    ]
     assert removed.status_code == 204
     assert anna.get("/notifications/channels").json()["flows"][0]["exceptions"] == []
 

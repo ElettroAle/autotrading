@@ -51,8 +51,9 @@ export class DashboardPages {
     await this.page.goto(`${BASE_PATH}${path}`);
   }
 
+  /** The tab of the channels of the notifications, where Telegram and the email are linked (ADR pagina-notifiche-a-schede). */
   async openNotifications(): Promise<void> {
-    await this.open('/notifications');
+    await this.open('/notifications?tab=channels');
   }
 
   async openAccounts(): Promise<void> {

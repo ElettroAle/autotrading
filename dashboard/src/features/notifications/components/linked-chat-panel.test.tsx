@@ -7,7 +7,7 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
-const NOTIFICATIONS = '/notifications';
+const NOTIFICATIONS = '/notifications?tab=channels';
 const SEND_TEST = 'Invia notifica di prova';
 const UNLINK = 'Scollega la chat';
 const CONFIRM_UNLINK = 'Conferma lo scollegamento';

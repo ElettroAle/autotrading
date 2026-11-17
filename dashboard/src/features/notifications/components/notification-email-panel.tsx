@@ -18,6 +18,7 @@ import {
 
 const COMMAND_FAILED = 'Operazione non riuscita';
 
+// The outcome beside the command, the reason of a refusal of the mail server among them (R3.5.5).
 const TestEmail = () => {
   const test = useSendTestEmail();
   return (
@@ -30,7 +31,7 @@ const TestEmail = () => {
           Email di prova inviata
         </p>
       )}
-      {test.isError && <ErrorMessage error={test.error} prefix={COMMAND_FAILED} />}
+      {test.isError && <ErrorMessage error={test.error} prefix="Email di prova non inviata" />}
     </div>
   );
 };
@@ -48,8 +49,15 @@ const RemoveAddress = () => {
 };
 
 // The field is the only one of the form: every refusal of the API concerns it (ADR
-// indirizzo-email-nelle-impostazioni-delle-notifiche).
-const AddressForm = ({ address }: { readonly address: string | null }) => {
+// indirizzo-email-nelle-impostazioni-delle-notifiche). Without a mail server the step waits for the first one (ADR
+// pagina-notifiche-a-schede).
+const AddressForm = ({
+  address,
+  disabled,
+}: {
+  readonly address: string | null;
+  readonly disabled: boolean;
+}) => {
   const save = useSetNotificationEmail();
   const {
     register,
@@ -73,39 +81,46 @@ const AddressForm = ({ address }: { readonly address: string | null }) => {
 
   return (
     <form onSubmit={(event) => void onSubmit(event)} noValidate className="space-y-3">
-      {/* The email keyboard on a phone; the form itself is judged by the API. */}
-      <InputField
-        label="Indirizzo email"
-        type="email"
-        autoComplete="email"
-        error={errors.address}
-        {...register('address')}
-      />
-      <CommandButton tone="primary" type="submit" disabled={save.isPending}>
-        Salva
-      </CommandButton>
+      <fieldset disabled={disabled} className="space-y-3">
+        {/* The email keyboard on a phone; the form itself is judged by the API. */}
+        <InputField
+          label="Indirizzo email"
+          type="email"
+          autoComplete="email"
+          error={errors.address}
+          {...register('address')}
+        />
+        <CommandButton tone="primary" type="submit" disabled={save.isPending}>
+          Salva
+        </CommandButton>
+      </fieldset>
     </form>
   );
 };
 
-/** The address of the notifications by email: indicated, changed and removed, with a test email (R3.5.2). */
-export const NotificationEmailPanel = () => {
+type NotificationEmailPanelProps = {
+  /** Whether the user saved a mail server: without one no email leaves (R3.5.5). */
+  readonly serverConfigured: boolean;
+};
+
+/**
+ * The address of the notifications by email, the second step of the channel: indicated, changed and removed, with a
+ * test email from the mail server of the user (R3.5.2, R3.5.5).
+ */
+export const NotificationEmailPanel = ({ serverConfigured }: NotificationEmailPanelProps) => {
   const email = useNotificationEmail();
   return (
-    <section
-      aria-labelledby="notification-email-title"
-      className="rounded border border-slate-200 bg-white p-4"
-    >
-      <h2 id="notification-email-title" className="mb-2 text-xl font-semibold">
-        Email
-      </h2>
+    <section aria-labelledby="notification-email-title" className="space-y-3">
+      <h3 id="notification-email-title" className="text-lg font-semibold">
+        2. Indirizzo delle notifiche
+      </h3>
       {email.isPending && <Loading />}
       {email.isError && <ErrorMessage error={email.error} />}
       {email.isSuccess && (
         <div className="space-y-3">
-          {email.data.warning !== null && (
+          {!serverConfigured && (
             <p role="status" className="text-amber-800">
-              {email.data.warning}
+              Configura prima il server di posta
             </p>
           )}
           {email.data.address === null ? (
@@ -115,10 +130,14 @@ export const NotificationEmailPanel = () => {
               Le notifiche arrivano anche a {email.data.address}
             </p>
           )}
-          <AddressForm key={email.data.address ?? ''} address={email.data.address} />
+          <AddressForm
+            key={email.data.address ?? ''}
+            address={email.data.address}
+            disabled={!serverConfigured}
+          />
           {email.data.address !== null && (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <TestEmail />
+              {serverConfigured && <TestEmail />}
               <RemoveAddress />
             </div>
           )}

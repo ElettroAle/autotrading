@@ -27,7 +27,11 @@ CHANNEL_NAMES: dict[NotificationChannel, ChannelName] = {
     NotificationChannel.NONE: "nessuno",
 }
 _CHANNELS_BY_NAME = {name: channel for channel, name in CHANNEL_NAMES.items()}
-WARNINGS = {MissingLink.CHAT: "Telegram non collegato", MissingLink.EMAIL: "email non indicata"}
+WARNINGS = {
+    MissingLink.CHAT: "Telegram non collegato",
+    MissingLink.EMAIL: "email non indicata",
+    MissingLink.MAIL_SERVER: "server di posta non configurato",
+}
 
 
 def channel_named(name: ChannelName) -> NotificationChannel:
@@ -71,14 +75,18 @@ class FlowChannelsResponse(BaseModel):
 
 
 class NotificationChannelsResponse(BaseModel):
+    """The choices of the user and, whatever they are, the warning of every channel that cannot be reached (R3.5.5)."""
+
     events: list[EventChannelResponse]
     flows: list[FlowChannelsResponse]
+    warnings: list[str]
 
     @classmethod
     def of(cls, channels: NotificationChannels) -> NotificationChannelsResponse:
         return cls(
             events=[EventChannelResponse.of(channel) for channel in channels.events],
             flows=[FlowChannelsResponse.of(flow) for flow in channels.flows],
+            warnings=[warning_of(missing) for missing in channels.missing_links],
         )
 
 

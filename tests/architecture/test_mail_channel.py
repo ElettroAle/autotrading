@@ -1,6 +1,6 @@
-"""ADR-canale-email-delle-notifiche-con-smtp: the mail service is a technology of its own, reached with the standard
-library from its folder alone; the API learns only whether the service exists, and never composes the mailer that
-holds the password.
+"""ADR-canale-email-delle-notifiche-con-smtp, ADR-invio-dal-server-di-posta-del-tenant: the mail server is a technology
+of its own, reached with the standard library from its folder alone; only the worker composes the mailer, which logs in
+with the password it alone opens.
 """
 
 import ast
@@ -13,7 +13,6 @@ from tests.support.architecture import SOURCE_ROOT, TECHNOLOGY_LIBRARIES, Source
 LIBRARIES = frozenset({"smtplib"})
 FOLDER = "adapters/outbound/smtp"
 MAILER_COMPOSITION = "smtp_adapters"
-SERVICE_COMPOSITION = "smtp_service_adapters"
 API_FACTORY = "create_application"
 WORKER_FACTORY = "create_worker_application"
 BOOTSTRAP = Path(SOURCE_ROOT) / "bootstrap.py"
@@ -71,10 +70,9 @@ def test_adr_canale_email_a_module_without_the_library_is_not_found() -> None:
     assert modules_reaching_the_mail_service([module]) == []
 
 
-def test_adr_canale_email_the_api_composes_the_service_and_only_the_worker_the_mailer() -> None:
+def test_adr_invio_dal_server_di_posta_only_the_worker_composes_the_mailer() -> None:
     compositions = compositions_of(BOOTSTRAP.read_text(encoding="utf-8"))
 
-    assert SERVICE_COMPOSITION in compositions[API_FACTORY]
     assert MAILER_COMPOSITION not in compositions[API_FACTORY]
     assert MAILER_COMPOSITION in compositions[WORKER_FACTORY]
 
@@ -82,8 +80,8 @@ def test_adr_canale_email_the_api_composes_the_service_and_only_the_worker_the_m
 @pytest.mark.parametrize(
     ("source", "composed"),
     [
-        (f"def {API_FACTORY}(source):\n    mailer, service = {MAILER_COMPOSITION}(source)\n", True),
-        (f"def {API_FACTORY}(source):\n    return api({SERVICE_COMPOSITION}(source))\n", False),
+        (f"def {API_FACTORY}(source):\n    mailer = {MAILER_COMPOSITION}()\n", True),
+        (f"def {API_FACTORY}(source):\n    return api(source)\n", False),
     ],
 )
 def test_adr_canale_email_the_mailer_composed_in_the_api_is_found(source: str, composed: bool) -> None:

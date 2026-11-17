@@ -6,7 +6,7 @@ import { fakePlatform, FAKE_BOT_LINK, FAKE_LINK_CODE } from '@/testing/mocks/pla
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
-const NOTIFICATIONS = '/notifications';
+const NOTIFICATIONS = '/notifications?tab=channels';
 const REQUEST_CODE = 'Chiedi il codice di collegamento';
 
 describe('LinkCodePanel', () => {

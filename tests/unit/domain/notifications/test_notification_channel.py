@@ -38,4 +38,24 @@ def test_a_channel_says_whether_it_reaches_the_chat_and_the_email(
 def test_a_chosen_channel_not_linked_is_missing_its_link(
     channel: NotificationChannel, chat_linked: bool, email_indicated: bool, missing: tuple[MissingLink, ...]
 ) -> None:
-    assert channel.missing_links(chat_linked=chat_linked, email_indicated=email_indicated) == missing
+    links = channel.missing_links(chat_linked=chat_linked, email_indicated=email_indicated, mail_server_configured=True)
+
+    assert links == missing
+
+
+@pytest.mark.parametrize(
+    ("channel", "email_indicated", "missing"),
+    [
+        (NotificationChannel.EMAIL, True, (MissingLink.MAIL_SERVER,)),
+        (NotificationChannel.EMAIL, False, (MissingLink.EMAIL, MissingLink.MAIL_SERVER)),
+        (NotificationChannel.BOTH, True, (MissingLink.MAIL_SERVER,)),
+        (NotificationChannel.TELEGRAM, True, ()),
+        (NotificationChannel.NONE, False, ()),
+    ],
+)
+def test_a_channel_reaching_the_email_without_a_mail_server_is_missing_the_server(
+    channel: NotificationChannel, email_indicated: bool, missing: tuple[MissingLink, ...]
+) -> None:
+    links = channel.missing_links(chat_linked=True, email_indicated=email_indicated, mail_server_configured=False)
+
+    assert links == missing

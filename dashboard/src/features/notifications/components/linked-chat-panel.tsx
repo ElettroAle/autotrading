@@ -91,9 +91,9 @@ export const LinkedChatPanel = () => {
       aria-labelledby="linked-chat-title"
       className="rounded border border-slate-200 bg-white p-4"
     >
-      <h2 id="linked-chat-title" className="mb-2 text-xl font-semibold">
+      <h3 id="linked-chat-title" className="mb-2 text-lg font-semibold">
         Chat
-      </h2>
+      </h3>
       {chat.isPending && <Loading />}
       {chat.isError && <ErrorMessage error={chat.error} />}
       {chat.isSuccess && chat.data.chat_id === null && (

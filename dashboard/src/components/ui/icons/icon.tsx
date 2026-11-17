@@ -1,4 +1,15 @@
-import { ArrowDown, ArrowUp, Pause, Play, Plus, RefreshCw, Square, X } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  CircleAlert,
+  CircleCheck,
+  Pause,
+  Play,
+  Plus,
+  RefreshCw,
+  Square,
+  X,
+} from 'lucide-react';
 
 // The only module that imports lucide-react: features and shared components name an icon, never draw one (ADR
 // icone-con-lucide-react-e-comandi-condivisi).
@@ -11,6 +22,8 @@ const DRAWINGS = {
   plus: Plus,
   x: X,
   refresh: RefreshCw,
+  'circle-check': CircleCheck,
+  'circle-alert': CircleAlert,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;
