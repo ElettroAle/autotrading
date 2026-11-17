@@ -112,7 +112,12 @@ Then('Entra le chiede le credenziali', async ({ memory }) => {
 
 When('{string} sceglie «Esci»', async ({ dashboard }, account: string) => {
   expect(fakePlatform.identityProviderSession()).toBe(account);
-  await dashboard.button('Esci').click();
+  // «Esci» is in the menu of the user, on top of the page (ADR area-utente-in-alto-a-destra).
+  await dashboard.page
+    .getByRole('banner')
+    .getByRole('button', { name: account, exact: true })
+    .click();
+  await dashboard.page.getByRole('menuitem', { name: 'Esci' }).click();
   await expect(dashboard.signInHeading()).toBeVisible();
 });
 
