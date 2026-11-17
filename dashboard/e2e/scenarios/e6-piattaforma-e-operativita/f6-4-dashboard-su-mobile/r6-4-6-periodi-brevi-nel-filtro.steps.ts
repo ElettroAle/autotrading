@@ -9,8 +9,9 @@ import { formatPercent } from '@/utils/format-amount';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When } from '../../../support/fixtures';
 
-// R6.4.6, ADR periodi-brevi-come-durata-nel-dominio and periodi-brevi-nel-selettore-condiviso. The fake API reads the
-// periods on a clock the background fixes, so the last minutes are the same minutes for every step.
+// R6.4.6 and R6.4.7, ADR periodi-brevi-come-durata-nel-dominio, periodi-brevi-nel-selettore-condiviso and
+// periodo-di-6-ore-e-dall-inizio: the two requirements share these steps. The fake API reads the periods on a clock the
+// background fixes, so the last minutes are the same minutes for every step.
 const MINUTE = 60_000;
 const QUARTER = 15 * MINUTE;
 const HOUR = 60 * MINUTE;
@@ -168,9 +169,9 @@ Then(
 );
 
 Then(
-  'il rendimento di ogni flusso è calcolato sulle ultime 24 ore',
-  async ({ dashboard, memory }) => {
-    const since = minuteOf(fakeClock.now()) - DAY;
+  'il rendimento di ogni flusso è calcolato sulle ultime {int} ore',
+  async ({ dashboard, memory }, hours: number) => {
+    const since = minuteOf(fakeClock.now()) - hours * HOUR;
     const flow = fakePlatform.flowNamed(memory.flow);
     const curve = flow.equity
       .filter(

@@ -8,8 +8,8 @@ Funzionalità: R2.2.3 Equity curve del flusso
   A ogni ciclo, concluso o fallito dopo la lettura dello stato, si registra l'equity del flusso: capitale
   allocato più PnL realizzato e non realizzato, meno le commissioni (R1.6.1). L'equity curve ha un punto per
   ciclo, con linea e area verdi sopra il capitale iniziale e rosse sotto (RF-23.01). L'utente sceglie il
-  periodo: 30 minuti, 1 ora, 12 ore, 24 ore, 7 giorni, 30 giorni, tutta la vita del flusso (predefinito) o un
-  intervallo libero (R6.4.6).
+  periodo: 30 minuti, 1 ora, 6 ore, 12 ore, 24 ore, 7 giorni, 30 giorni, dall'inizio del flusso (predefinito) o un
+  intervallo libero (R6.4.6, R6.4.7).
 
   Fuori ambito: le curve sovrapposte di più flussi (R2.4.3); la ricostruzione dell'equity dei cicli precedenti a questa funzionalità.
 

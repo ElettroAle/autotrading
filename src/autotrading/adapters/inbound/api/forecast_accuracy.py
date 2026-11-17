@@ -52,7 +52,7 @@ def forecast_accuracy_router(use_cases_of_request: Callable[..., TenantUseCases]
     def read_forecast_accuracy(
         flow_id: UUID,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
-        period: Annotated[str, Query(description="30m, 1h, 12h, 24h, 7d, 30d, all o range")] = "all",
+        period: Annotated[str, Query(description="30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range")] = "all",
         since: IntervalStart = None,
         until: IntervalEnd = None,
     ) -> FlowForecastAccuracyResponse:
