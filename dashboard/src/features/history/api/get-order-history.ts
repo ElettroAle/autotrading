@@ -23,9 +23,11 @@ const historyOrderSchema = z.object({
   executions: z.array(executionSchema),
 });
 
+// The fees of every order of the search come with the first page only (Bug 569).
 const ordersPageSchema = z.object({
   orders: z.array(historyOrderSchema),
   next: z.string().nullable(),
+  totals: z.object({ fees: z.string() }).nullable(),
 });
 
 export type HistoryOrder = z.infer<typeof historyOrderSchema>;

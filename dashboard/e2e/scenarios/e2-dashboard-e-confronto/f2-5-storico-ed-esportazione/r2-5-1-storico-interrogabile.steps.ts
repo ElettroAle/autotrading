@@ -151,6 +151,34 @@ When(
   },
 );
 
+When(
+  '{string} interroga le posizioni chiuse del flusso {string}',
+  async ({ dashboard }, account: string, flow: string) => {
+    await openHistoryAs(dashboard, account);
+    await dashboard.openHistoryTab('Posizioni chiuse');
+    await dashboard.chooseFilter('Flusso', flow);
+  },
+);
+
+Then('ottiene le prime {int} posizioni', async ({ dashboard }, count: number) => {
+  await expect(dashboard.historyRows('Posizioni chiuse')).toHaveCount(count);
+  await expect(dashboard.page.getByRole('button', { name: 'Carica altri' })).toBeVisible();
+});
+
+// The amounts are written as the page shows them: the PnL with its sign, the decimal comma.
+Then(
+  /^il totale del PnL è (\S+) e quello delle commissioni (\S+)$/,
+  async ({ dashboard }, pnl: string, fees: string) => {
+    await expect(dashboard.historyTotal('Totale PnL')).toHaveText(pnl);
+    await expect(dashboard.historyTotal('Totale commissioni')).toHaveText(fees);
+  },
+);
+
+Then(/^il totale delle commissioni degli ordini è (\S+)$/, async ({ dashboard }, fees: string) => {
+  await expect(dashboard.historyTotal('Totale commissioni')).toHaveText(fees);
+  await expect(dashboard.historyTotal('Totale PnL')).toHaveCount(0);
+});
+
 Then('ottiene solo i cicli dal {int} novembre in poi', async ({ dashboard }, since: number) => {
   const rows = dashboard.historyRows('Cicli');
   await expect(rows).toHaveCount(DAYS_OF_NOVEMBER - since + 1);

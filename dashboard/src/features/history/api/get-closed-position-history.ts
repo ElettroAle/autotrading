@@ -19,9 +19,11 @@ const historyPositionSchema = z.object({
   reason: z.string(),
 });
 
+// The totals of every position of the search come with the first page only (Bug 569).
 const positionsPageSchema = z.object({
   positions: z.array(historyPositionSchema),
   next: z.string().nullable(),
+  totals: z.object({ pnl: z.string(), fees: z.string() }).nullable(),
 });
 
 export type HistoryPosition = z.infer<typeof historyPositionSchema>;

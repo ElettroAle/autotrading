@@ -1504,6 +1504,16 @@ export interface components {
             closing_cycle: string | null;
         };
         /**
+         * ClosedPositionTotalsResponse
+         * @description The PnL and the fees of every closed position of the filters, not only of the page (Bug 569).
+         */
+        ClosedPositionTotalsResponse: {
+            /** Pnl */
+            pnl: string;
+            /** Fees */
+            fees: string;
+        };
+        /**
          * ConfigurationResponse
          * @description One configuration version of a flow.
          */
@@ -2336,13 +2346,15 @@ export interface components {
         };
         /**
          * HistoryClosedPositionsPageResponse
-         * @description At most 50 closed positions, newest close first; `next` is the `after` of the following page.
+         * @description At most 50 closed positions, newest close first; `next` is the `after` of the following page. `totals` comes
+         *     with the first page only, null on the following ones of the same search.
          */
         HistoryClosedPositionsPageResponse: {
             /** Positions */
             positions: components["schemas"]["HistoryClosedPositionResponse"][];
             /** Next */
             next: string | null;
+            totals: components["schemas"]["ClosedPositionTotalsResponse"] | null;
         };
         /**
          * HistoryCycleResponse
@@ -2430,13 +2442,15 @@ export interface components {
         };
         /**
          * HistoryOrdersPageResponse
-         * @description At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one.
+         * @description At most 50 orders, newest first; `next` is the `after` of the following page, null on the last one. `totals`
+         *     comes with the first page only, null on the following ones of the same search.
          */
         HistoryOrdersPageResponse: {
             /** Orders */
             orders: components["schemas"]["HistoryOrderResponse"][];
             /** Next */
             next: string | null;
+            totals: components["schemas"]["OrderTotalsResponse"] | null;
         };
         /** Identity */
         Identity: {
@@ -2767,6 +2781,14 @@ export interface components {
             realized_pnl: string;
             /** Message */
             message: string | null;
+        };
+        /**
+         * OrderTotalsResponse
+         * @description The fees of the executions of every order of the filters, not only of the page (Bug 569).
+         */
+        OrderTotalsResponse: {
+            /** Fees */
+            fees: string;
         };
         /** PositionLeftOpenResponse */
         PositionLeftOpenResponse: {

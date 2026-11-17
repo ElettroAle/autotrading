@@ -50,6 +50,10 @@ class HistoryQuery:
     def of(cls, criteria: HistoryFilter, now: datetime, after: HistoryCursor | None) -> HistoryQuery:
         return cls(criteria, criteria.period.window(now), after)
 
+    @property
+    def first_page(self) -> bool:
+        return self.after is None
+
 
 @dataclass(frozen=True, slots=True)
 class CycleHistoryEntry:
@@ -115,6 +119,21 @@ type HistoryEntry = CycleHistoryEntry | ClosedPositionHistoryEntry | OrderHistor
 
 
 @dataclass(frozen=True, slots=True)
+class ClosedPositionHistoryTotals:
+    """The PnL and the fees of every closed position the filter admits, whatever the page (Bug 569)."""
+
+    pnl: Decimal
+    fees: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class OrderHistoryTotals:
+    """The fees of the executions of every order the filter admits, whatever the page (Bug 569)."""
+
+    fees: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class HistoryPage[T: HistoryEntry]:
     """One page of a history, newest first, and where the next page starts if there is one."""
 
@@ -127,3 +146,13 @@ class HistoryPage[T: HistoryEntry]:
         page = tuple(newest_first[:limit])
         more = len(newest_first) > limit
         return cls(page, page[-1].cursor if more and page else None)
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryReport[T: HistoryEntry, S: ClosedPositionHistoryTotals | OrderHistoryTotals]:
+    """A page of a history and the totals of the whole filter, given with the first page only: the following pages of
+    the same search would only repeat them (ADR totali-dello-storico-sul-risultato-filtrato).
+    """
+
+    page: HistoryPage[T]
+    totals: S | None

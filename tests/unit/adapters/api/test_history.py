@@ -185,6 +185,7 @@ def test_the_next_page_starts_after_the_last_order_of_the_previous(platform: Pla
 
     assert len(first["orders"]) == 50
     assert len(second["orders"]) == 5
+    assert (first["totals"], second["totals"]) == ({"fees": "30.25"}, None)
     assert second["next"] is None
     assert second["orders"][0]["created_at"] == "2026-11-01T12:04:00Z"
 
@@ -205,7 +206,7 @@ def test_a_user_reads_only_the_history_of_their_tenant(platform: Platform, clien
 
     response = client_of("bruno").get("/history/closed-positions", params={"asset": "BTC"})
 
-    assert response.json() == {"positions": [], "next": None}
+    assert response.json() == {"positions": [], "next": None, "totals": {"pnl": "0", "fees": "0"}}
 
 
 def test_a_cursor_survives_its_text() -> None:
@@ -218,3 +219,18 @@ def test_a_cursor_survives_its_text() -> None:
 def test_rejects_a_cursor_the_platform_did_not_write(text: str) -> None:
     with pytest.raises(HistoryCursorInvalidError):
         cursor_of(text)
+
+
+def test_the_first_page_of_closed_positions_gives_the_totals_of_the_whole_filter(
+    platform: Platform, client_of: Client
+) -> None:
+    history_of(platform, "anna").closed_positions.extend(
+        a_position_row(FIRST + timedelta(hours=hour), asset=asset) for hour in range(60) for asset in ("BTC", "ETH")
+    )
+    client = client_of("anna")
+
+    first = client.get("/history/closed-positions", params={"asset": "ETH", "period": "all"}).json()
+    second = client.get("/history/closed-positions", params={"asset": "ETH", "after": first["next"]}).json()
+
+    assert (len(first["positions"]), first["totals"]) == (50, {"pnl": "600", "fees": "25.2"})
+    assert (len(second["positions"]), second["totals"]) == (10, None)

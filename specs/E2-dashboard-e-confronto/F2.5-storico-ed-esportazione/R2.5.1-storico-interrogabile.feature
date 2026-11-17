@@ -10,6 +10,8 @@ Funzionalità: R2.5.1 Storico interrogabile
   filtro per versione vale per un solo flusso. I risultati sono dal più recente, a pagine di 50. Ogni
   interrogazione riguarda solo i dati dell'utente. Disponibile dalla dashboard e dall'interfaccia
   programmatica.
+  Le posizioni chiuse mostrano il totale del PnL e delle commissioni, gli ordini il totale delle commissioni: i
+  totali sono di tutto ciò che rispetta i filtri, non della sola pagina visibile (Bug 569).
 
   Fuori ambito: la ricerca nel testo del ragionamento dell'agente.
 
@@ -37,3 +39,16 @@ Funzionalità: R2.5.1 Storico interrogabile
   Scenario: Solo i dati dell'utente
     Quando "bruno" interroga le posizioni chiuse con asset "BTC"
     Allora non ottiene alcuna posizione del flusso "alfa"
+
+  Scenario: Totali delle posizioni chiuse di tutte le pagine
+    Quando "anna" interroga le posizioni chiuse del flusso "alfa"
+    Allora ottiene le prime 50 posizioni
+    E il totale del PnL è +600 e quello delle commissioni 25,2
+
+  Scenario: Totali delle posizioni chiuse filtrate
+    Quando "anna" interroga le posizioni chiuse con asset "ETH" dal 10 al 20 novembre
+    Allora il totale del PnL è +110 e quello delle commissioni 4,62
+
+  Scenario: Totale delle commissioni degli ordini
+    Quando "anna" interroga gli ordini del conto "principale"
+    Allora il totale delle commissioni degli ordini è 33

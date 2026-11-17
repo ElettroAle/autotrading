@@ -1,8 +1,9 @@
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 from autotrading.application.flows.query_order_history import QueryOrderHistoryCommand, QueryOrderHistoryUseCase
-from autotrading.domain.flows.history import HistoryFilter
+from autotrading.domain.flows.history import HistoryFilter, OrderHistoryTotals
 from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.support.history import ACCOUNT, an_order_row
 
@@ -15,7 +16,7 @@ def test_gives_the_orders_of_an_account_with_their_executions() -> None:
     rows.append(an_order_row(FIRST, account_id=uuid4()))
     use_case = QueryOrderHistoryUseCase(InMemoryFlowHistoryAdapter(HistoryStore(orders=rows)), lambda: NOW)
 
-    page = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(account_id=ACCOUNT), None))
+    page = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(account_id=ACCOUNT), None)).page
 
     assert [entry.created_at for entry in page.entries] == [FIRST + timedelta(days=day) for day in (2, 1, 0)]
     assert {entry.account_id for entry in page.entries} == {ACCOUNT}
@@ -27,8 +28,31 @@ def test_gives_pages_of_50_and_where_the_next_starts() -> None:
     rows = [an_order_row(FIRST + timedelta(minutes=minute)) for minute in range(60)]
     use_case = QueryOrderHistoryUseCase(InMemoryFlowHistoryAdapter(HistoryStore(orders=rows)), lambda: NOW)
 
-    first = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(), None))
-    last = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(), first.next))
+    first = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(), None)).page
+    last = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(), first.next)).page
 
     assert (len(first.entries), first.next) == (50, first.entries[-1].cursor)
     assert (len(last.entries), last.next) == (10, None)
+
+
+def test_the_first_page_comes_with_the_fees_of_every_order_of_the_filter() -> None:
+    rows = [an_order_row(FIRST + timedelta(minutes=minute)) for minute in range(60)]
+    rows.append(an_order_row(FIRST, account_id=uuid4()))
+    use_case = QueryOrderHistoryUseCase(InMemoryFlowHistoryAdapter(HistoryStore(orders=rows)), lambda: NOW)
+
+    report = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(account_id=ACCOUNT), None))
+
+    assert len(report.page.entries) == 50
+    assert report.totals == OrderHistoryTotals(fees=Decimal(33))
+
+
+def test_the_following_pages_of_orders_come_without_totals() -> None:
+    rows = [an_order_row(FIRST + timedelta(minutes=minute)) for minute in range(60)]
+    history = InMemoryFlowHistoryAdapter(HistoryStore(orders=rows))
+    use_case = QueryOrderHistoryUseCase(history, lambda: NOW)
+    first = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(), None))
+
+    last = use_case.execute(QueryOrderHistoryCommand(HistoryFilter(), first.page.next))
+
+    assert (last.totals, len(last.page.entries)) == (None, 10)
+    assert history.totals_queries == [history.queries[0]]
