@@ -1,8 +1,10 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.errors import (
     AccountNotChangeableError,
     ArchivedFlowNotModifiableError,
@@ -116,6 +118,13 @@ class Flow(TenantOwned):
             raise AccountNotChangeableError
         if capital != self.configuration.allocated_capital:
             raise CapitalNotChangeableError
+
+    def planned_schedule(self, anchor: datetime | None) -> CycleSchedule | None:
+        """The cycles of the flow from its last start or resume, one every interval of its configuration; only an active
+        flow stamped with its anchor plans any (R1.2.1, R1.7.3).
+        """
+        interval = timedelta(minutes=self.configuration.cycle_interval.minutes)
+        return CycleSchedule.planned(self.status.runs_cycles, anchor, interval)
 
     @property
     def model_provider(self) -> str:

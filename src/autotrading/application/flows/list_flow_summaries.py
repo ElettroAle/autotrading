@@ -1,10 +1,8 @@
 from collections.abc import Mapping
-from datetime import timedelta
 from uuid import UUID
 
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.ports import FlowAccountNamesPort, FlowRepositoryPort, FlowSummary, FlowTimingPort
-from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_timing import UNSTAMPED, FlowTiming
 
@@ -38,7 +36,6 @@ def _account_name(names: Mapping[UUID, str], flow: Flow) -> str:
 
 def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
     configuration = flow.configuration
-    interval = timedelta(minutes=configuration.cycle_interval.minutes)
     return FlowSummary(
         flow_id=flow.id.value,
         name=flow.name.value,
@@ -46,6 +43,6 @@ def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
         status=flow.status.value,
         pause_reason=timing.pause_reason,
         model=configuration.model.name,
-        schedule=CycleSchedule.planned(flow.status.runs_cycles, timing.anchor, interval),
+        schedule=flow.planned_schedule(timing.anchor),
         version=configuration.version,
     )
