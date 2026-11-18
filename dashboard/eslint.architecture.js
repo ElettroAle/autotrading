@@ -3,7 +3,9 @@
 // never import each other. One chart library, Recharts, used only by the shared charts of src/components/charts
 // (ADR 0121). One icon library, lucide-react, used only by the shared icons of src/components/ui/icons (ADR
 // icone-con-lucide-react-e-comandi-condivisi). The query string changes through the shared hook of src/hooks/use-search-change.ts, never with a function
-// of the last render (ADR 0166). Every rule is proved red on a violating example in architecture/structure.test.ts.
+// of the last render (ADR 0166). A test creates the client of TanStack Query with the configuration of the platform (ADR
+// test-della-dashboard-deterministici). Every rule is proved red on a violating example in architecture/structure.test.ts,
+// the last in architecture/query-client-in-tests.test.ts.
 import { readdirSync } from 'node:fs';
 
 import checkFile from 'eslint-plugin-check-file';
@@ -53,6 +55,15 @@ const APPLICATION_ZONES = [
     message: "l'applicazione non importa il server né le prove degli scenari",
   },
 ];
+
+// A test gives TanStack Query the configuration of the platform, without retries and their exponential wait, so its
+// result never depends on the speed of the machine (ADR test-della-dashboard-deterministici).
+const BARE_QUERY_CLIENT_IN_TESTS = {
+  selector:
+    "NewExpression[callee.name='QueryClient']:not(:has(Property[key.name='defaultOptions'][value.name='queryConfig']))",
+  message:
+    'nei test il QueryClient ha la configurazione della piattaforma: new QueryClient({ defaultOptions: queryConfig }) o renderApp/renderInApp di src/testing/test-utils.tsx',
+};
 
 // The API is called only through the client generated from its OpenAPI document (ADR 0119).
 const API_CLIENT = 'src/lib/api-client.ts';
@@ -263,7 +274,10 @@ export default tseslint.config(
   },
   {
     files: TEST_FILES,
-    rules: { 'import/no-restricted-paths': ['error', { zones: APPLICATION_ZONES }] },
+    rules: {
+      'import/no-restricted-paths': ['error', { zones: APPLICATION_ZONES }],
+      'no-restricted-syntax': ['error', BARE_QUERY_CLIENT_IN_TESTS],
+    },
   },
   {
     files: ['server/**/*.ts'],

@@ -73,6 +73,7 @@
     "check:api-client": "openapi-typescript openapi.json --output src/lib/api-schema.d.ts --check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:stability": "node -e \"const os=require('node:os');const {spawnSync}=require('node:child_process');const workers=String(2*os.availableParallelism());for(let run=1;run<=10;run++){console.log('Esecuzione '+run+' di 10, ordine casuale, '+workers+' worker');const {status}=spawnSync('npx vitest run --project browser --sequence.shuffle --maxWorkers '+workers,{stdio:'inherit',shell:true});if(status!==0){process.exit(status??1)}}\"",
     "test:scenarios": "bddgen && playwright test"
   },
   "engines": {

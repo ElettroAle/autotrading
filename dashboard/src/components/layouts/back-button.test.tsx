@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
@@ -16,8 +16,10 @@ const openDashboardWith = (initialEntries: string[]) => {
 describe('BackButton', () => {
   it('goes back one page in the history of the dashboard', async () => {
     const router = openDashboardWith(['/']);
-    await router.navigate('/flows/alfa');
-    await router.navigate('/flows/alfa/versions');
+    // The router renders a navigation in a transition: inside act the button reads the page it leads to, not the one
+    // before (Bug 610).
+    await act(() => router.navigate('/flows/alfa'));
+    await act(() => router.navigate('/flows/alfa/versions'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Indietro' }));
 

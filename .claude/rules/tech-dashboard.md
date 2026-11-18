@@ -121,6 +121,14 @@ dal client di `src/lib/api-client.ts`.
   prove-dell-accesso-che-dura).
 - Ogni prova si vede rossa prima di diventare verde. Copertura di righe e rami oltre il 90% (`vitest --coverage`),
   scenari al 100% (`tools/scenario_coverage.py` legge `dashboard/reports/cucumber.json`).
+- Ogni test dà lo stesso esito a ogni esecuzione, in qualunque ordine e con qualunque carico (ADR
+  test-della-dashboard-deterministici): un test che usa TanStack Query passa da `src/testing/test-utils.tsx` o crea il
+  client con `queryConfig`, mai un `new QueryClient()` nudo (regola `no-restricted-syntax` di `eslint.architecture.js`);
+  una navigazione del router fatta dal test sta dentro `act`; un test instabile si corregge alla radice, senza nuovi
+  tentativi, prove disattivate né timeout più alti, salvo un costo fisso misurato e non riducibile, col motivo in un
+  commento. Prova di stabilità: `npm run test:stability` esegue 10 volte di fila la suite del progetto `browser` in
+  ordine casuale (`--sequence.shuffle`) con `--maxWorkers` pari al doppio dei processori; la esegue lo sviluppatore che
+  tocca le prove o la loro configurazione, non i job obbligatori.
 
 ## Controlli
 

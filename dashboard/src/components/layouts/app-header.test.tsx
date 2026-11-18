@@ -5,6 +5,7 @@ import { createMemoryRouter, Link, RouterProvider } from 'react-router';
 
 import { RuntimeConfigProvider } from '@/config/runtime-config';
 import { AuthProvider } from '@/lib/auth';
+import { queryConfig } from '@/lib/react-query';
 import { FAKE_IDENTITY_PROVIDER } from '@/testing/mocks/identity-provider';
 import { authClientFor, TEST_CONFIG } from '@/testing/test-utils';
 
@@ -110,7 +111,7 @@ describe('AppHeader', () => {
     const client = await authClientFor('anna');
     render(
       <AuthProvider client={client} scope={FAKE_IDENTITY_PROVIDER.scope}>
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: queryConfig })}>
           <RuntimeConfigProvider config={TEST_CONFIG}>
             <AppHeader />
           </RuntimeConfigProvider>
