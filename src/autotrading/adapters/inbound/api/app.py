@@ -7,6 +7,7 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.accounts import accounts_router
+from autotrading.adapters.inbound.api.alerts import alerts_router
 from autotrading.adapters.inbound.api.assets import assets_router
 from autotrading.adapters.inbound.api.capital_changes import capital_changes_router
 from autotrading.adapters.inbound.api.closed_positions import closed_positions_router
@@ -109,6 +110,7 @@ def create_api(
 
     protected.include_router(accounts_router(use_cases_of_request, current_user))
     protected.include_router(reconciliation_router(use_cases_of_request))
+    protected.include_router(alerts_router(use_cases_of_request))
     protected.include_router(exchanges_router(use_cases_of_request))
     protected.include_router(orders_router(use_cases_of_request, current_user))
     protected.include_router(verifications_router(use_cases_of_request, current_user))

@@ -7,12 +7,12 @@ from autotrading.domain.notifications.errors import InvalidNotificationTargetErr
 
 
 class TargetKind(StrEnum):
-    """What a notification leads to: a flow, one of its positions, open or closed, or the alarms of an account."""
+    """What a notification leads to: a flow, one of its positions, open or closed, or the alert it opened."""
 
     FLOW = "flow"
     OPEN_POSITION = "open_position"
     CLOSED_POSITION = "closed_position"
-    ACCOUNT_ALARMS = "account_alarms"
+    ALERT = "alert"
 
 
 # An open and a closed position are both the operation the notification tells (R3.5.6).
@@ -20,15 +20,15 @@ _LABELS = {
     TargetKind.FLOW: "Apri flusso",
     TargetKind.OPEN_POSITION: "Apri operazione",
     TargetKind.CLOSED_POSITION: "Apri operazione",
-    TargetKind.ACCOUNT_ALARMS: "Apri allarmi",
+    TargetKind.ALERT: "Apri avviso",
 }
 
 
 @dataclass(frozen=True, slots=True)
 class NotificationTarget:
-    """The page a notification leads to, by the identities that find it: the flow, or the account of its alarms; a
-    position by its asset and, once closed, by the instant it closed, as the rows of the positions have no id
-    (ADR destinazioni-delle-notifiche-nella-dashboard).
+    """The page a notification leads to, by the identities that find it: the flow, or the alert it opened (ADR
+    api-degli-avvisi-e-link-nelle-notifiche); a position by its asset and, once closed, by the instant it closed, as the
+    rows of the positions have no id (ADR destinazioni-delle-notifiche-nella-dashboard).
     """
 
     kind: TargetKind
@@ -59,5 +59,5 @@ class NotificationTarget:
         return cls(TargetKind.CLOSED_POSITION, flow_id, asset, closed_at)
 
     @classmethod
-    def account_alarms(cls, account_id: UUID) -> NotificationTarget:
-        return cls(TargetKind.ACCOUNT_ALARMS, account_id)
+    def alert(cls, alert_id: UUID) -> NotificationTarget:
+        return cls(TargetKind.ALERT, alert_id)

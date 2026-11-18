@@ -1,15 +1,12 @@
-import { useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 
-import { DashboardLayout } from '@/components/layouts/dashboard-layout';
-import { ReconciliationAlarms } from '@/features/accounts/components/reconciliation-alarms';
-import { useAccountTitle } from '@/features/accounts/hooks/use-account-title';
+import { paths } from '@/config/paths';
 
+/**
+ * The alarms of an account are its alerts now: the address of before leads to the alerts of the account, in every
+ * state, so a link kept from before still works (R6.2.3, ADR pagina-avvisi-nella-dashboard).
+ */
 export const AccountAlarmsRoute = () => {
   const { accountId = '' } = useParams();
-  const title = useAccountTitle(accountId, 'Allarmi');
-  return (
-    <DashboardLayout title={title}>
-      <ReconciliationAlarms accountId={accountId} />
-    </DashboardLayout>
-  );
+  return <Navigate replace to={paths.alerts.getHref({ resource_id: accountId, state: 'all' })} />;
 };

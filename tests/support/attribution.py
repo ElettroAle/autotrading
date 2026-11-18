@@ -29,6 +29,7 @@ from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
@@ -79,8 +80,16 @@ class AttributionBench:
         self.thresholds = FakeAccountThresholdsAdapter({})
         self.alarm_notices = FakeReconciliationAlarmNoticeAdapter()
         alarms = ReconciliationAlarmPorts(self.thresholds, self.thresholds, self.alarm_notices)
+        self.alerts = InMemoryAlertRepositoryAdapter({}, TENANT)
         self.reconcile = ReconcileAccountUseCase(
-            flows, self.exchange, self.readings, self.closed, self.record, self.closed_by_protection, alarms
+            flows,
+            self.exchange,
+            self.readings,
+            self.closed,
+            self.record,
+            self.closed_by_protection,
+            alarms,
+            self.alerts,
         )
         self.position_notices = FakeUnattributableAssetNoticeAdapter()
         self.fill_notices = FakeUnattributableAssetNoticeAdapter()

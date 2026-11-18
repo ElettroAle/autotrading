@@ -19,7 +19,7 @@ CLOSED_AT = datetime(2026, 11, 17, 10, 15, tzinfo=UTC)
         (NotificationTarget.flow(FLOW_ID), TargetKind.FLOW, "Apri flusso"),
         (NotificationTarget.open_position(FLOW_ID, "BTC"), TargetKind.OPEN_POSITION, "Apri operazione"),
         (NotificationTarget.closed_position(FLOW_ID, "BTC", CLOSED_AT), TargetKind.CLOSED_POSITION, "Apri operazione"),
-        (NotificationTarget.account_alarms(FLOW_ID), TargetKind.ACCOUNT_ALARMS, "Apri allarmi"),
+        (NotificationTarget.alert(FLOW_ID), TargetKind.ALERT, "Apri avviso"),
     ],
 )
 def test_each_target_is_of_its_kind_with_the_label_of_its_link(

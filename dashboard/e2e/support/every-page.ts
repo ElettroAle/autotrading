@@ -82,6 +82,8 @@ export const preparePagesWithLongWords = (
     accounts: paths.accounts.getHref(),
     accountCapital: paths.accountCapital.getHref(accountId),
     accountAlarms: paths.accountAlarms.getHref(accountId),
+    alerts: paths.alerts.getHref({ state: 'all' }),
+    alert: paths.alert.getHref(`alarm-${accountId}-${new Date(DAY).toISOString()}`),
     newFlow: paths.newFlow.getHref(),
     flow: paths.flow.getHref(flow.id),
     editFlow: paths.editFlow.getHref(flow.id),

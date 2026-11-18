@@ -154,7 +154,7 @@ describe('ReconciliationStatus', () => {
     const section = await reconciliation();
     expect(within(section).getByRole('link', { name: 'Allarmi' })).toHaveAttribute(
       'href',
-      '/accounts/account-test-1/alarms',
+      '/alerts?resource_id=account-test-1&state=all',
     );
   });
 

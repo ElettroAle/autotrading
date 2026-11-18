@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.notifications.alert import Alert, AlertCause, AlertId
+from autotrading.domain.notifications.alert_page import AlertCursor, AlertFilter, AlertPage
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.flow_status import FlowStatusFigures
@@ -245,3 +247,28 @@ class OutboxPort(Protocol):
         marks the message failed at once; raises OutboxUnavailableError when the queue cannot be served.
         """
         ...
+
+
+class AlertRepositoryPort(Protocol):
+    """Bound to the tenant of the request: the alerts of its accounts, flows and keys, open and resolved (R6.2.3, ADR
+    avvisi-nel-contesto-delle-notifiche).
+    """
+
+    def open(self, cause: AlertCause) -> AlertId:
+        """Opens the alert of the cause, unless one with the same key is open, and gives the id of the open one; forgets
+        the alerts of the tenant resolved more than RESOLVED_ALERT_RETENTION ago."""
+        ...
+
+    def get(self, alert_id: AlertId) -> Alert:
+        """Raises AlertNotFoundError for an alert that does not exist and for one of another tenant."""
+        ...
+
+    def resolve(self, alert_id: AlertId) -> None:
+        """Resolves the alert now; a resolved alert keeps the instant it was resolved."""
+        ...
+
+    def list(self, criteria: AlertFilter, cursor: AlertCursor | None) -> AlertPage:
+        """The alerts the filter admits, newest first, from the cursor, with how many it admits in all (ADR 0074)."""
+        ...
+
+    def open_count(self) -> int: ...

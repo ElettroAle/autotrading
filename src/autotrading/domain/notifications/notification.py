@@ -43,8 +43,8 @@ class Notification:
     per line and, for a flow, the state of the flow at the bottom (R1.8.2, R3.5.1, R3.5.4); never a credential.
 
     The same text goes to every channel (ADR notifica-strutturata-con-icona-titolo-e-valori); the test notification is
-    no event. The targets are the pages of the dashboard it leads to: its flow and the position it tells, or the alarms
-    of its account (ADR destinazioni-delle-notifiche-nella-dashboard).
+    no event. The targets are the pages of the dashboard it leads to: its flow and the position it tells, or the alert
+    the event opened (ADR destinazioni-delle-notifiche-nella-dashboard, ADR api-degli-avvisi-e-link-nelle-notifiche).
     """
 
     subject: str
@@ -167,8 +167,11 @@ class Notification:
         )
 
     @classmethod
-    def flow_paused(cls, flow_id: UUID, flow: str, reason: str) -> Notification:
-        return cls.of_flow(NotificationEvent.FLOW_PAUSED, flow_id, flow, "in pausa", NotificationLine("Motivo", reason))
+    def flow_paused(cls, flow_id: UUID, flow: str, reason: str, alert_id: UUID) -> Notification:
+        """A pause on its own opens an alert: the notification leads to it first, then to the flow (R6.2.3)."""
+        targets = (NotificationTarget.alert(alert_id), NotificationTarget.flow(flow_id))
+        line = NotificationLine("Motivo", reason)
+        return cls.told(NotificationEvent.FLOW_PAUSED, flow, "in pausa", line, targets=targets)
 
     @classmethod
     def openings_suspended(cls, flow_id: UUID, flow: str, reason: str) -> Notification:
@@ -201,30 +204,30 @@ class Notification:
         )
 
     @classmethod
-    def unattributable_position(cls, account_id: UUID, account: str, asset: str) -> Notification:
+    def unattributable_position(cls, alert_id: UUID, account: str, asset: str) -> Notification:
         return cls.of_account(
             NotificationEvent.UNATTRIBUTABLE_POSITION,
-            account_id,
+            alert_id,
             account,
             "posizione non attribuibile",
             NotificationLine("Asset", asset),
         )
 
     @classmethod
-    def unattributable_fill(cls, account_id: UUID, account: str, asset: str) -> Notification:
+    def unattributable_fill(cls, alert_id: UUID, account: str, asset: str) -> Notification:
         return cls.of_account(
             NotificationEvent.UNATTRIBUTABLE_FILL,
-            account_id,
+            alert_id,
             account,
             "esecuzione non attribuibile",
             NotificationLine("Asset", asset),
         )
 
     @classmethod
-    def reconciliation_alarm(cls, account_id: UUID, account: str, read: Amount, expected: Amount) -> Notification:
+    def reconciliation_alarm(cls, alert_id: UUID, account: str, read: Amount, expected: Amount) -> Notification:
         return cls.of_account(
             NotificationEvent.RECONCILIATION_ALARM,
-            account_id,
+            alert_id,
             account,
             "allarme di riconciliazione",
             NotificationLine("Saldo letto", str(read)),
@@ -246,10 +249,10 @@ class Notification:
 
     @classmethod
     def of_account(
-        cls, event: NotificationEvent, account_id: UUID, account: str, headline: str, *lines: NotificationLine
+        cls, event: NotificationEvent, alert_id: UUID, account: str, headline: str, *lines: NotificationLine
     ) -> Notification:
-        """An event of an account, which leads to the alarms of the account (R3.5.6)."""
-        return cls.told(event, account, headline, *lines, targets=(NotificationTarget.account_alarms(account_id),))
+        """An event of an account opens an alert, and leads to it (R3.5.6, R6.2.3)."""
+        return cls.told(event, account, headline, *lines, targets=(NotificationTarget.alert(alert_id),))
 
     @classmethod
     def emergency_closing_done(cls, positions_closed: int, paused_flows: Sequence[str]) -> Notification:

@@ -28,6 +28,7 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -78,6 +79,7 @@ class LateRows:
             record,
             InMemoryProtectionClosingsAdapter(),
             alarms,
+            InMemoryAlertRepositoryAdapter({}, self.tenant_id),
         )
 
     def flow(self, name: str) -> Flow:

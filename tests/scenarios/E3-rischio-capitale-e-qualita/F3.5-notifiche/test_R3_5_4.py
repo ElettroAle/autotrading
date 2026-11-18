@@ -30,6 +30,7 @@ from autotrading.domain.notifications.notification_channel import NotificationCh
 from autotrading.domain.notifications.notification_email import NotificationEmail
 from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.flow_status import FakeFlowStatusAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.mailer import FakeMailerAdapter, SentEmail
@@ -62,6 +63,7 @@ class Notices:
 
     def __init__(self) -> None:
         self.tenant_id = TenantId.new()
+        self.alerts = InMemoryAlertRepositoryAdapter({}, self.tenant_id)
         self.chats: LinkedChatStore = {}
         self.emails: NotificationEmailStore = {}
         self.messenger = FakeMessengerAdapter()
@@ -124,9 +126,9 @@ EVENTS: dict[str, Callable[[Notices, str], None]] = {
     "ciclo fallito": lambda notices, flow: NotifyCycleFailedUseCase(notices.notify_flow).execute(
         notices.flow_id(flow), flow, "timeout"
     ),
-    "pausa per errore permanente": lambda notices, flow: NotifyFlowPausedUseCase(notices.notify_flow).execute(
-        notices.flow_id(flow), flow, "credito esaurito presso openrouter"
-    ),
+    "pausa per errore permanente": lambda notices, flow: NotifyFlowPausedUseCase(
+        notices.notify_flow, notices.alerts
+    ).execute(notices.flow_id(flow), flow, "credito esaurito presso openrouter"),
 }
 
 

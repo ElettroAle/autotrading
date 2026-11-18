@@ -208,6 +208,7 @@ class FlowCycles:
             platform.platform_orders,
             platform.ledger,
         )
+        alerts = platform.alerts_of(tenant_id)
         reconcile_account = ReconcileAccountUseCase(
             flows,
             activity,
@@ -220,16 +221,17 @@ class FlowCycles:
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),
             ReconciliationAlarmPorts(
-                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, alerts, HYPERLIQUID_SETTLEMENT_CURRENCY)
             ),
+            alerts,
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
             reconcile_account,
             NotifyUnattributableUseCase(
                 accounts,
                 UnattributableNotices(
-                    NotifyUnattributablePositionUseCase(notify),
-                    NotifyUnattributableFillUseCase(notify),
+                    NotifyUnattributablePositionUseCase(notify, alerts),
+                    NotifyUnattributableFillUseCase(notify, alerts),
                 ),
             ),
         )
@@ -285,7 +287,7 @@ class FlowCycles:
             openings=openings,
             closed_positions=closed_positions,
             follow_flow_orders=follow_flow_orders,
-            flow_paused_notice=NotifyFlowPausedUseCase(notify_flow),
+            flow_paused_notice=NotifyFlowPausedUseCase(notify_flow, alerts),
             cycle_failure=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify_flow)),
             notify=notify,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,

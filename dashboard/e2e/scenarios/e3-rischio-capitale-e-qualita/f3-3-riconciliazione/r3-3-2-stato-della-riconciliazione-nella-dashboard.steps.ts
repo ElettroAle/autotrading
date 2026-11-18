@@ -114,7 +114,8 @@ When(
   async ({ dashboard }, account: string, name: string) => {
     await openAccountsAs(dashboard, account);
     await reconciliationOf(dashboard, name).getByRole('link', { name: 'Allarmi' }).click();
-    await expect(dashboard.pageHeading()).toHaveText(`Allarmi del conto ${name}`);
+    // The alarms of the account are its alerts, in every state (R6.2.3).
+    await expect(dashboard.pageHeading()).toHaveText('Avvisi');
   },
 );
 
@@ -180,20 +181,18 @@ Then(
 Then(
   "l'elenco mostra prima l'allarme di oggi, aperto, poi quello di ieri con data e ora della conferma",
   async ({ dashboard, memory }) => {
-    const rows = dashboard.page
-      .getByRole('table', { name: 'Allarmi di riconciliazione' })
-      .locator('tbody tr');
+    const rows = dashboard.page.getByRole('table', { name: 'Avvisi' }).locator('tbody tr');
     const [today, yesterday] = fakeReconciliation.alarmsOf(accountIdOf(memory.tradingAccount));
     await expect(rows).toHaveCount(2);
     await expect(dashboard.cell(rows.nth(0), 'Aperto il')).toContainText(
       formatInstant(today?.opened_at ?? ''),
     );
-    await expect(dashboard.cell(rows.nth(0), 'Stato')).toContainText('aperto');
+    await expect(dashboard.cell(rows.nth(0), 'Stato')).toContainText('Aperto');
     await expect(dashboard.cell(rows.nth(1), 'Aperto il')).toContainText(
       formatInstant(yesterday?.opened_at ?? ''),
     );
-    await expect(dashboard.cell(rows.nth(1), 'Confermato il')).toContainText(
-      formatInstant(yesterday?.confirmed_at ?? ''),
+    await expect(dashboard.cell(rows.nth(1), 'Stato')).toContainText(
+      `Risolto il ${formatInstant(yesterday?.confirmed_at ?? '')}`,
     );
   },
 );

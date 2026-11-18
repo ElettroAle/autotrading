@@ -30,3 +30,16 @@ describe('paths.accountAlarms', () => {
     expect(paths.accountAlarms.getHref('account-test-1')).toBe('/accounts/account-test-1/alarms');
   });
 });
+
+describe('paths.alerts', () => {
+  it('leads to the alerts, filtered by the parameters of the API when given', () => {
+    expect(paths.alerts.getHref()).toBe('/alerts');
+    expect(paths.alerts.getHref({ resource_id: 'account-test-1', state: 'all' })).toBe(
+      '/alerts?resource_id=account-test-1&state=all',
+    );
+  });
+
+  it('leads to the detail of an alert', () => {
+    expect(paths.alert.getHref('alert 1')).toBe('/alerts/alert%201');
+  });
+});

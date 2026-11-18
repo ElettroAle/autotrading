@@ -85,13 +85,13 @@ def test_the_notification_keeps_the_pages_it_leads_to_on_the_way_to_the_worker(w
     assert worker.messenger.links_received_by(CHAT) == [links]
 
 
-def test_an_account_notification_keeps_its_account_on_the_way_to_the_worker(worker: Worker) -> None:
+def test_an_account_notification_keeps_its_alert_on_the_way_to_the_worker(worker: Worker) -> None:
     worker.links.dashboard = True
-    account_id = uuid4()
+    alert_id = uuid4()
 
-    adapter_on(worker).execute(Notification.unattributable_fill(account_id, "principale", "ETH"))
+    adapter_on(worker).execute(Notification.unattributable_fill(alert_id, "principale", "ETH"))
 
-    target = NotificationTarget.account_alarms(account_id)
+    target = NotificationTarget.alert(alert_id)
     assert worker.messenger.links_received_by(CHAT) == [
         (NotificationLink(target.label, worker.links.address_of(target)),)
     ]

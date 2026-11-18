@@ -22,6 +22,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.exit_plan_repository import InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
@@ -151,6 +152,7 @@ class History:
             record,
             InMemoryProtectionClosingsAdapter(),
             alarms,
+            InMemoryAlertRepositoryAdapter(self.platform.alerts, operating.tenant_id),
         )
         reconciliation.execute(ReconcileAccountCommand(operating.id))
 

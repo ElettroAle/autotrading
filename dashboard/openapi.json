@@ -646,6 +646,273 @@
         }
       }
     },
+    "/alerts": {
+      "get": {
+        "tags": [
+          "avvisi"
+        ],
+        "summary": "List Alerts",
+        "operationId": "list_alerts_alerts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AlertStateQuery",
+              "default": "open"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertSeverity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "resource_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertResourceKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Kind"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "aperti dall'istante incluso",
+              "title": "Since"
+            },
+            "description": "aperti dall'istante incluso"
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "aperti fino all'istante escluso",
+              "title": "Until"
+            },
+            "description": "aperti fino all'istante escluso"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next` della pagina precedente",
+              "title": "Cursor"
+            },
+            "description": "`next` della pagina precedente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/summary": {
+      "get": {
+        "tags": [
+          "avvisi"
+        ],
+        "summary": "Read Alerts Summary",
+        "operationId": "read_alerts_summary_alerts_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertsSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/alerts/{alert_id}": {
+      "get": {
+        "tags": [
+          "avvisi"
+        ],
+        "summary": "Get Alert",
+        "operationId": "get_alert_alerts__alert_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/{alert_id}/resolution": {
+      "post": {
+        "tags": [
+          "avvisi"
+        ],
+        "summary": "Resolve Alert",
+        "operationId": "resolve_alert_alerts__alert_id__resolution_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/exchanges": {
       "get": {
         "tags": [
@@ -5236,6 +5503,277 @@
         ],
         "title": "AccountSummaryResponse",
         "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state."
+      },
+      "AlertDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AlertKind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/AlertSeverity"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AlertState"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/AlertResourceResponse"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/AlertValueResponse"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/AlertRemedy"
+            },
+            "type": "array",
+            "title": "Commands"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "severity",
+          "state",
+          "resource",
+          "opened_at",
+          "resolved_at",
+          "values",
+          "commands"
+        ],
+        "title": "AlertDetailResponse",
+        "description": "The alert with the values read when it opened and the commands that resolve it now; none once resolved."
+      },
+      "AlertKind": {
+        "type": "string",
+        "enum": [
+          "reconciliation_alarm",
+          "flow_paused",
+          "unattributable_position",
+          "unattributable_fill"
+        ],
+        "title": "AlertKind",
+        "description": "A fact that asks the user to act, with its severity and how it resolves (R6.2.3, ADR\navvisi-nel-contesto-delle-notifiche): only a kind without a resolution of its own is resolved by hand."
+      },
+      "AlertPageResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next",
+          "count"
+        ],
+        "title": "AlertPageResponse",
+        "description": "At most 50 alerts, newest first; `next` is the `cursor` of the following page, null on the last one. `count`\ncovers every alert of the filter, not only the page."
+      },
+      "AlertRemedy": {
+        "type": "string",
+        "enum": [
+          "confirm_reconciliation",
+          "resume_flow",
+          "resolve"
+        ],
+        "title": "AlertRemedy",
+        "description": "What removes the cause of an open alert, or resolves it when nothing else does (R6.2.3)."
+      },
+      "AlertResourceKind": {
+        "type": "string",
+        "enum": [
+          "account",
+          "flow",
+          "key"
+        ],
+        "title": "AlertResourceKind",
+        "description": "What an alert is about: an account, a flow or a key (R6.2.3)."
+      },
+      "AlertResourceResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AlertResourceKind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "title": "AlertResourceResponse"
+      },
+      "AlertResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AlertKind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/AlertSeverity"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AlertState"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/AlertResourceResponse"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "severity",
+          "state",
+          "resource",
+          "opened_at",
+          "resolved_at"
+        ],
+        "title": "AlertResponse",
+        "description": "An alert of the tenant: what asks to act, how serious it is, on which resource, and whether it is resolved."
+      },
+      "AlertSeverity": {
+        "type": "string",
+        "enum": [
+          "critical",
+          "warning"
+        ],
+        "title": "AlertSeverity"
+      },
+      "AlertState": {
+        "type": "string",
+        "enum": [
+          "open",
+          "resolved"
+        ],
+        "title": "AlertState"
+      },
+      "AlertStateQuery": {
+        "type": "string",
+        "enum": [
+          "open",
+          "resolved",
+          "all"
+        ],
+        "title": "AlertStateQuery",
+        "description": "The state the list asks for: `all` does not narrow."
+      },
+      "AlertValueResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "AlertValueResponse"
+      },
+      "AlertsSummaryResponse": {
+        "properties": {
+          "open_count": {
+            "type": "integer",
+            "title": "Open Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "open_count"
+        ],
+        "title": "AlertsSummaryResponse"
       },
       "AmountResponse": {
         "properties": {

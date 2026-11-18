@@ -34,9 +34,11 @@ from autotrading.domain.flows.stop_outcome import (
     StopOutcome,
 )
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.notifications.alert import AlertCause, AlertState
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
@@ -107,6 +109,7 @@ class Flows:
         self.closed = ClosedPositionStore()
         self.notices = FakePositionClosedNoticeAdapter()
         self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), self.tenant_id)
+        self.alerts = InMemoryAlertRepositoryAdapter({}, self.tenant_id)
         self.stop = StopFlowUseCase(
             self.repository,
             CloseFlowPositionsUseCase(
@@ -119,6 +122,7 @@ class Flows:
                     self.exit_plans,
                 )
             ),
+            self.alerts,
         )
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
@@ -172,6 +176,15 @@ def test_a_stop_saves_the_flow_stopped_waits_for_its_cycle_then_closes_each_asse
         f"close BTC {flows.account_id} oid-anna",
         f"close ETH {flows.account_id} oid-anna",
     ]
+
+
+def test_a_stop_resolves_the_alert_of_the_pause(flows: Flows) -> None:
+    flow = flows.saved(status=FlowStatus.PAUSED)
+    alert_id = flows.alerts.open(AlertCause.flow_paused(flow.id.value, "alfa", "credito esaurito"))
+
+    flows.stop.execute(StopFlowCommand(flow.id, USER))
+
+    assert flows.alerts.get(alert_id).state is AlertState.RESOLVED
 
 
 def test_a_closing_refused_leaves_the_flow_stopped_with_the_position_in_the_outcome(flows: Flows) -> None:

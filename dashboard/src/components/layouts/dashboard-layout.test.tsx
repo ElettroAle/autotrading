@@ -75,6 +75,10 @@ describe('DashboardLayout', () => {
       'href',
       '/history',
     );
+    expect(within(navigation).getByRole('link', { name: 'Avvisi' })).toHaveAttribute(
+      'href',
+      '/alerts',
+    );
     expect(within(navigation).getByRole('link', { name: 'Generale' })).toHaveAttribute(
       'href',
       '/settings/general',
@@ -111,6 +115,8 @@ describe('DashboardLayout', () => {
     ['/comparison?flow=flow-alfa', 'Flussi'],
     ['/accounts', 'Conti'],
     ['/history?tab=orders', 'Storico'],
+    ['/alerts?state=all', 'Avvisi'],
+    ['/alerts/alert-1', 'Avvisi'],
     ['/settings/general', 'Generale'],
     ['/provider-keys', 'Chiavi'],
     ['/notifications', 'Notifiche'],

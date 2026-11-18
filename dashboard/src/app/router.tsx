@@ -5,6 +5,7 @@ import { paths } from '@/config/paths';
 import { AccountAlarmsRoute } from './routes/app/account-alarms';
 import { AccountCapitalRoute } from './routes/app/account-capital';
 import { AccountsRoute } from './routes/app/accounts';
+import { AlertRoute, AlertsRoute } from './routes/app/alerts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
 import { ComparisonRoute } from './routes/app/comparison';
 import { CycleRoute } from './routes/app/cycle';
@@ -55,6 +56,8 @@ export const routes: RouteObject[] = [
       },
       { path: paths.editFlow.path, element: <EditFlowRoute /> },
       { path: paths.notifications.path, element: <NotificationsRoute /> },
+      { path: paths.alerts.path, element: <AlertsRoute /> },
+      { path: paths.alert.path, element: <AlertRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
       { path: paths.generalSettings.path, element: <GeneralSettingsRoute /> },
       { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },

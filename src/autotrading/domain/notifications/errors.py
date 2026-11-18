@@ -94,3 +94,25 @@ class InvalidMailSenderError(DomainError):
     @property
     def details(self) -> Mapping[str, object]:
         return {"sender": self.sender}
+
+
+class InvalidAlertError(DomainError):
+    """An alert on a resource without a name, or of a kind that belongs to another resource: a defect of the caller,
+    never of the user (R6.2.3)."""
+
+    def __init__(self) -> None:
+        super().__init__("avviso senza la sua risorsa")
+
+
+class AlertNotResolvableByHandError(DomainError):
+    """The alert resolves on its own when its cause goes: the user removes the cause, never the alert (R6.2.3)."""
+
+    status_code = 409
+
+    def __init__(self, kind: str) -> None:
+        super().__init__("l'avviso si risolve da solo quando la sua causa sparisce")
+        self._kind = kind
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"kind": self._kind}
