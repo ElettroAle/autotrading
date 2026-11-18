@@ -7,7 +7,8 @@ import { pageDataQuery } from '@/lib/react-query';
 
 /**
  * How a flow is doing at a glance in a period, as the API measures it (R6.4.2, ADR riepilogo-dei-risultati-nell-api):
- * gains as text in the currency of the account (ADR 0018), percents of the initial capital, null when not measurable.
+ * gains as text in the currency of the account (ADR 0018), percents of the initial capital, null when not measurable;
+ * the next planned cycle, whatever the period, null unless the flow is active (R6.4.8).
  */
 export const resultsSummarySchema = z.object({
   total_gain: z.string(),
@@ -16,6 +17,7 @@ export const resultsSummarySchema = z.object({
   period_gain_percent: z.string().nullable(),
   open_positions: z.number(),
   failed_cycles: z.number(),
+  next_cycle_at: z.string().nullable(),
 });
 
 export type ResultsSummary = z.infer<typeof resultsSummarySchema>;

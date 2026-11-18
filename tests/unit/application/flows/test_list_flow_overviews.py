@@ -7,8 +7,9 @@ import pytest
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsCommand, ListFlowOverviewsUseCase
 from autotrading.application.flows.ports import FlowSummary
-from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
+from autotrading.application.flows.read_flow_results import FlowPeriodPorts, ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_next_cycle import ReadNextCycleUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
@@ -24,7 +25,7 @@ from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
@@ -65,8 +66,8 @@ class Bench:
                 flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
             ),
             suspension,
-            self.equity,
-            self.history,
+            ReadNextCycleUseCase(flows, InMemoryFlowTimingAdapter(self.store, TENANT), lambda: NOW),
+            FlowPeriodPorts(self.equity, self.history),
             lambda: NOW,
         )
         self.use_case = ListFlowOverviewsUseCase(self.summaries, self.history, results, "dev", lambda: NOW)

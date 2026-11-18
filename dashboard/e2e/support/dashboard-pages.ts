@@ -237,7 +237,7 @@ export class DashboardPages {
     return within.getByRole('region', { name: 'Riepilogo dei risultati' });
   }
 
-  /** One value of a summary of the results, by the term it shows: «Guadagno totale», «Cicli falliti», ... */
+  /** One value of a summary of the results, by the term it shows: «Guadagno attuale», «Cicli falliti», ... */
   result(term: string, within?: Locator): Locator {
     return this.results(within).getByLabel(term, { exact: true });
   }

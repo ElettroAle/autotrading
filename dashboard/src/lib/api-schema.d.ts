@@ -2192,7 +2192,7 @@ export interface components {
          * FlowResultsResponse
          * @description How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains
          *     in the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without
-         *     initial capital.
+         *     initial capital; the next planned cycle, whatever the period, null unless the flow is active (R6.4.8).
          */
         FlowResultsResponse: {
             /** Total Gain */
@@ -2207,6 +2207,8 @@ export interface components {
             open_positions: number;
             /** Failed Cycles */
             failed_cycles: number;
+            /** Next Cycle At */
+            next_cycle_at: string | null;
         };
         /**
          * FlowStateResponse

@@ -344,6 +344,7 @@ def tenant_use_cases(
             decision_history=cycle_history,
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
+            flow_timing=SqlAlchemyFlowTimingAdapter(engine, tenant_id),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
             openings_suspensions=SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
             flow_forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),

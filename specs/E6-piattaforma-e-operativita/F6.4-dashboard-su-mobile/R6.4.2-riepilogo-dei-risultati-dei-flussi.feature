@@ -5,7 +5,7 @@ Funzionalità: R6.4.2 Riepilogo dei risultati dei flussi
   Voglio vedere subito come sta andando ogni flusso
   Perché capisco in un colpo d'occhio guadagno, esposizione ed errori senza leggere tabelle
 
-  In cima alla pagina del flusso e in ogni scheda dell'elenco dei flussi un riepilogo mostra: guadagno totale e
+  In cima alla pagina del flusso e in ogni scheda dell'elenco dei flussi un riepilogo mostra: guadagno attuale e
   guadagno nel periodo scelto, ciascuno come importo nella valuta di regolamento del conto e come percentuale sul
   capitale iniziale, verde se positivo e rosso se negativo; numero di posizioni aperte, che porta alle posizioni
   aperte del flusso; numero di cicli falliti nel periodo, evidenziato solo se maggiore di zero, che porta ai cicli
@@ -21,13 +21,13 @@ Funzionalità: R6.4.2 Riepilogo dei risultati dei flussi
     Dato che il flusso "alfa" ha guadagnato 2,5 USDC in tutto e 0,4 USDC nell'ultima settimana
     E ha 1 posizione aperta e 2 cicli falliti nell'ultima settimana
     Quando "anna" apre la pagina del flusso "alfa" con il periodo "ultima settimana"
-    Allora il riepilogo mostra guadagno totale "+2,50 USDC · +2,50%" e nel periodo "+0,40 USDC · +0,40%"
+    Allora il riepilogo mostra guadagno attuale "+2,50 USDC · +2,50%" e nel periodo "+0,40 USDC · +0,40%"
     E mostra 1 posizione aperta e 2 cicli falliti
 
   Scenario: Perdita in rosso
     Dato che il flusso "alfa" ha perso 1,2 USDC in tutto
     Quando "anna" apre la pagina del flusso "alfa"
-    Allora il guadagno totale "-1,20 USDC · -1,20%" è in rosso
+    Allora il guadagno attuale "-1,20 USDC · -1,20%" è in rosso
 
   Scenario: Nessun errore nel periodo
     Dato che il flusso "alfa" non ha cicli falliti nel periodo
