@@ -3,7 +3,8 @@
 - Stato: proposta (16 novembre 2026)
 - Requisiti: R3.3.2 (463), Task T3.3.2.1 (486)
 - Collegate: ADR allarme-di-riconciliazione-sul-saldo-del-conto, ADR tabella-condivisa-senza-sforamento-e-con-filtri,
-  ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune
+  ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune; superata in parte da ADR pagina-avvisi-nella-dashboard
+  (elenco degli allarmi) e da ADR elenco-dei-conti-e-pagina-del-conto (posizione dello stato)
 
 ## Contesto e problema
 
@@ -40,3 +41,6 @@ Verifica: prova (scenari Playwright di R3.3.2, unit test dei componenti, test de
 ### Conseguenze
 
 - L'utente vede e sblocca un allarme senza usare l'interfaccia programmatica.
+- Dopo R6.2.3 (ADR pagina-avvisi-nella-dashboard) gli allarmi di un conto si elencano nella pagina Avvisi, non più
+  nella rotta `/accounts/:accountId/alarms`; dopo il Bug 616 (ADR elenco-dei-conti-e-pagina-del-conto) stato, conferma
+  e soglia stanno nella scheda Riconciliazione della pagina del conto.

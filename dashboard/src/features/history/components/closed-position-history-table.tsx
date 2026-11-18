@@ -7,11 +7,9 @@ import {
   formatRoundedResult,
 } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
+import { gainTone } from '@/utils/gain-tone';
 
 import type { HistoryPosition } from '../api/get-closed-position-history';
-
-const resultClass = (text: string): string =>
-  text.startsWith('-') ? 'text-red-700' : 'text-green-700';
 
 const COLUMNS: DataTableColumn<HistoryPosition>[] = [
   { header: 'Chiusura', cell: (position) => formatInstant(position.closed_at) },
@@ -30,7 +28,7 @@ const COLUMNS: DataTableColumn<HistoryPosition>[] = [
   {
     header: 'PnL',
     cell: (position) => (
-      <span className={resultClass(position.pnl)}>
+      <span className={gainTone(position.pnl)}>
         {formatRoundedResult(position.pnl)} ({formatRate(position.pnl_percent_of_margin)})
       </span>
     ),
