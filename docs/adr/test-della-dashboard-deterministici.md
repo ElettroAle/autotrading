@@ -28,8 +28,10 @@ stato condiviso tra test (cronologia del router, fakePlatform, timer).
 - Ogni causa trovata riproducendo l'errore (stato condiviso, timer reali, cronologia del router in `back-button`) si
   corregge alla radice; il resoconto nomina causa e correzione per ogni test.
 - Prova di stabilità: la suite del progetto `browser` passa 10 volte di fila con ordine casuale (`--sequence.shuffle`)
-  e con `--maxWorkers` pari al doppio dei processori; il comando è uno script `npm run test:stability` documentato in
-  tech-dashboard.md, eseguito dallo sviluppatore, non nei job obbligatori.
+  e con il numero di worker predefinito, quello della pipeline; la configurazione di Vitest non supera i processori
+  disponibili. Il comando è uno script `npm run test:stability` documentato in tech-dashboard.md, eseguito dallo
+  sviluppatore, non nei job obbligatori. Più worker dei processori misurano una contesa della CPU che né la pipeline né
+  lo sviluppo hanno (blocchi del ciclo degli eventi fino a 1,6 s per render sincroni), non un difetto dei test.
 - Un timeout più alto è ammesso solo dove la causa è un costo fisso misurato e non riducibile, col motivo in un commento.
 
 ## Alternative scartate
