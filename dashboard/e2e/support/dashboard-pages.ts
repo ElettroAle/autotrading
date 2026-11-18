@@ -237,7 +237,7 @@ export class DashboardPages {
     return within.getByRole('region', { name: 'Riepilogo dei risultati' });
   }
 
-  /** One value of a summary of the results, by the term it shows: «Guadagno totale», «Cicli falliti», ... */
+  /** One value of a summary of the results, by the term it shows: «Guadagno attuale», «Cicli falliti», ... */
   result(term: string, within?: Locator): Locator {
     return this.results(within).getByLabel(term, { exact: true });
   }
@@ -254,7 +254,7 @@ export class DashboardPages {
       .getByRole('article', { name, exact: true });
   }
 
-  /** One value of the box of the account, by the term it shows: «Saldo», «Capitale allocato», ... */
+  /** One value of the box of the account, by the term it shows: «Valore dei flussi», «capitale allocato», ... */
   accountDetail(name: string, term: string): Locator {
     return this.accountBox(name).getByLabel(term, { exact: true });
   }

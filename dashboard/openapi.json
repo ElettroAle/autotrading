@@ -8411,6 +8411,18 @@
           "failed_cycles": {
             "type": "integer",
             "title": "Failed Cycles"
+          },
+          "next_cycle_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cycle At"
           }
         },
         "type": "object",
@@ -8420,10 +8432,11 @@
           "period_gain",
           "period_gain_percent",
           "open_positions",
-          "failed_cycles"
+          "failed_cycles",
+          "next_cycle_at"
         ],
         "title": "FlowResultsResponse",
-        "description": "How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains\nin the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without\ninitial capital."
+        "description": "How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains\nin the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without\ninitial capital; the next planned cycle, whatever the period, null unless the flow is active (R6.4.8)."
       },
       "FlowStateResponse": {
         "properties": {
@@ -8652,14 +8665,25 @@
           "currency": {
             "type": "string",
             "title": "Currency"
+          },
+          "flows_value": {
+            "type": "string",
+            "title": "Flows Value"
+          },
+          "flows_result": {
+            "type": "string",
+            "title": "Flows Result"
           }
         },
         "type": "object",
         "required": [
           "amount",
-          "currency"
+          "currency",
+          "flows_value",
+          "flows_result"
         ],
-        "title": "FreeCapitalResponse"
+        "title": "FreeCapitalResponse",
+        "description": "The free capital of the account with the value and the result of its flows: the balance is the value of the flows\nplus the free capital (ADR scomposizione-del-saldo-nel-riquadro-del-conto)."
       },
       "HTTPValidationError": {
         "properties": {

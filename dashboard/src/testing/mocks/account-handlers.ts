@@ -44,8 +44,12 @@ const accountStateResponse = (account: FakeAccount) => ({
   read_at: '2026-11-14T09:00:00+00:00',
 });
 
-const freeCapitalResponse = (user: FakeUser, account: FakeAccount) =>
-  amountOf(String(fakePlatform.freeCapitalOfAccount(user, account)));
+// The flows of the fake platform earn nothing: their value is the capital allocated to them (Bug 601).
+const freeCapitalResponse = (user: FakeUser, account: FakeAccount) => ({
+  ...amountOf(String(fakePlatform.freeCapitalOfAccount(user, account))),
+  flows_value: String(fakePlatform.allocatedCapitalOf(user, account)),
+  flows_result: '0',
+});
 
 // An account of another tenant does not exist for the user; what comes from the exchange fails when it does not answer.
 const withAccountOnExchange = (

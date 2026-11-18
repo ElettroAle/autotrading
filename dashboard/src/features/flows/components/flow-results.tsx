@@ -20,11 +20,13 @@ const Results = ({ flowId, period }: { flowId: string; period: Period }) => {
       flowId={flowId}
       currency={results.data.currency}
       summary={results.data.summary}
+      nextCycleAt={results.data.summary.next_cycle_at}
     />
   );
 };
 
-/** The summary of the results at the top of the page of the flow, in the period of the page (R6.4.2). */
+/** The summary of the results at the top of the page of the flow, in the period of the page, with the next cycle (R6.4.2,
+ * R6.4.8). */
 export const FlowResults = ({ flowId }: { flowId: string }) => {
   const [period] = usePeriod();
   if (!isComplete(period)) {

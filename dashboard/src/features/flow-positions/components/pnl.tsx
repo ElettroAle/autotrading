@@ -1,16 +1,9 @@
 import { formatPercent, formatSignedAmount } from '@/utils/format-amount';
-
-const toneOf = (amount: string): string => {
-  const value = Number(amount);
-  if (value > 0) {
-    return 'text-green-700';
-  }
-  return value < 0 ? 'text-red-700' : 'text-slate-700';
-};
+import { gainTone } from '@/utils/gain-tone';
 
 /** A result in value, with its sign and, when given, its unit: green for a gain, red for a loss. */
 export const PnlAmount = ({ amount, unit }: { amount: string; unit?: string }) => (
-  <span className={toneOf(amount)}>
+  <span className={gainTone(amount)}>
     {unit === undefined ? formatSignedAmount(amount) : `${formatSignedAmount(amount)} ${unit}`}
   </span>
 );
@@ -20,5 +13,5 @@ export const PnlPercent = ({ percent }: { percent: string | null }) =>
   percent === null ? (
     <span>—</span>
   ) : (
-    <span className={toneOf(percent)}>{formatPercent(percent)}</span>
+    <span className={gainTone(percent)}>{formatPercent(percent)}</span>
   );

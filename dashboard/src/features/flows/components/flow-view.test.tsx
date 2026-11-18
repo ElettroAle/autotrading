@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { aCompletedCycle } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 import { server } from '@/testing/mocks/server';
@@ -172,7 +173,7 @@ describe('FlowView', () => {
     await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
 
     const results = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
-    expect(await within(results).findByLabelText('Guadagno totale')).toHaveTextContent(
+    expect(await within(results).findByLabelText('Guadagno attuale')).toHaveTextContent(
       '+2,50 USDC · +2,50%',
     );
     expect(within(results).getByLabelText('Guadagno nel periodo')).toHaveTextContent(
@@ -182,6 +183,29 @@ describe('FlowView', () => {
     const curve = screen.getByRole('heading', { name: 'Equity curve' });
     expect(views.compareDocumentPosition(results)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(results.compareDocumentPosition(curve)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  // R6.4.8: the overview says when the next cycle falls, the same instant as the card of the list (R2.2.2).
+  it('shows in the summary when the next cycle of an active flow falls', async () => {
+    fakePlatform.changeFlow('alfa', { status: 'attivo' });
+    fakePlatform.recordCycles('alfa', [aCompletedCycle(new Date('2026-11-18T10:00:00+01:00'))]);
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
+
+    const results = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
+    expect(await within(results).findByLabelText('Prossima esecuzione prevista')).toHaveTextContent(
+      '18/11/2026, 10:15:00',
+    );
+  });
+
+  it('shows no next cycle in the summary of a paused flow', async () => {
+    fakePlatform.changeFlow('alfa', { status: 'in pausa' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    const results = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
+    expect(await within(results).findByLabelText('Guadagno attuale')).toBeInTheDocument();
+    expect(
+      within(results).queryByLabelText('Prossima esecuzione prevista'),
+    ).not.toBeInTheDocument();
   });
 
   it('waits for both days of a range before reading the summary', async () => {

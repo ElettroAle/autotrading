@@ -1,14 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { formatRoundedAmount, formatRoundedResult } from '@/utils/format-amount';
-
-const toneOf = (amount: string): string => {
-  const value = Number(amount);
-  if (value > 0) {
-    return 'text-green-700';
-  }
-  return value < 0 ? 'text-red-700' : 'text-slate-700';
-};
+import { gainTone } from '@/utils/gain-tone';
 
 const Total = ({ label, children }: { readonly label: string; readonly children: ReactNode }) => (
   <div className="flex gap-2">
@@ -27,7 +20,7 @@ export const HistoryTotals = ({ pnl, fees }: HistoryTotalsProps) => (
   <dl aria-label="Totali della ricerca" className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
     {pnl === undefined ? null : (
       <Total label="Totale PnL">
-        <span className={toneOf(pnl)}>{formatRoundedResult(pnl)}</span>
+        <span className={gainTone(pnl)}>{formatRoundedResult(pnl)}</span>
       </Total>
     )}
     <Total label="Totale commissioni">{formatRoundedAmount(fees)}</Total>

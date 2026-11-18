@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -9,7 +10,7 @@ from autotrading.domain.flows.flow_results import FlowResults
 class FlowResultsResponse(BaseModel):
     """How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains
     in the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without
-    initial capital.
+    initial capital; the next planned cycle, whatever the period, null unless the flow is active (R6.4.8).
     """
 
     total_gain: str
@@ -18,6 +19,7 @@ class FlowResultsResponse(BaseModel):
     period_gain_percent: str | None
     open_positions: int
     failed_cycles: int
+    next_cycle_at: datetime | None
 
     @classmethod
     def of(cls, results: FlowResults) -> FlowResultsResponse:
@@ -28,6 +30,7 @@ class FlowResultsResponse(BaseModel):
             period_gain_percent=_percent_text(results.period_gain_percent),
             open_positions=results.open_positions,
             failed_cycles=results.failed_cycles,
+            next_cycle_at=results.next_cycle_at,
         )
 
 

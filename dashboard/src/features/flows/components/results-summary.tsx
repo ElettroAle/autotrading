@@ -4,17 +4,12 @@ import { Link } from 'react-router';
 import { usePeriodSearch } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { formatGain, formatPercent } from '@/utils/format-amount';
+import { formatInstant } from '@/utils/format-instant';
+import { gainTone } from '@/utils/gain-tone';
 
 import type { ResultsSummary as Summary } from '../api/get-flow-results';
-import { returnTone, type ReturnTone } from '../utils/flow-figures';
 
 const FAILED_OUTCOME = 'fallito';
-
-const STYLE_BY_TONE: Readonly<Record<ReturnTone, string>> = {
-  positive: 'text-green-700',
-  negative: 'text-red-700',
-  neutral: 'text-slate-700',
-};
 
 const LINK = 'underline-offset-2 hover:underline';
 
@@ -61,7 +56,7 @@ const Gain = ({
   percent: string | null;
   currency: string;
 }) => (
-  <Value term={term} className={STYLE_BY_TONE[returnTone(amount)]}>
+  <Value term={term} className={gainTone(amount)}>
     {gainText(amount, percent, currency)}
   </Value>
 );
@@ -89,19 +84,23 @@ type ResultsSummaryProps = {
   readonly flowId: string;
   readonly currency: string;
   readonly summary: Summary;
+  // Only the page of the flow gives it: the card of the list says it among its details (R2.2.2).
+  readonly nextCycleAt?: string | null;
 };
 
 /**
- * How the flow is doing at a glance: gains in all and in the period, open positions and failed cycles, two columns on a
- * phone and four on a wide screen (R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard).
+ * How the flow is doing at a glance: the gain read now and the one of the period, open positions and failed cycles, two
+ * columns on a phone and four on a wide screen (R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard, ADR
+ * nomi-e-istanti-dei-guadagni), then when the next cycle falls, if the flow plans one (R6.4.8, ADR
+ * prossima-esecuzione-nel-riepilogo-del-flusso).
  */
-export const ResultsSummary = ({ flowId, currency, summary }: ResultsSummaryProps) => {
+export const ResultsSummary = ({ flowId, currency, summary, nextCycleAt }: ResultsSummaryProps) => {
   const periodSearch = usePeriodSearch();
   return (
     <section aria-label="Riepilogo dei risultati">
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Gain
-          term="Guadagno totale"
+          term="Guadagno attuale"
           amount={summary.total_gain}
           percent={summary.total_gain_percent}
           currency={currency}
@@ -118,6 +117,11 @@ export const ResultsSummary = ({ flowId, currency, summary }: ResultsSummaryProp
           </Link>
         </Value>
         <FailedCycles flowId={flowId} count={summary.failed_cycles} />
+        {nextCycleAt !== undefined && nextCycleAt !== null && (
+          <Value term="Prossima esecuzione prevista" className="text-slate-900">
+            {formatInstant(nextCycleAt)}
+          </Value>
+        )}
       </dl>
     </section>
   );

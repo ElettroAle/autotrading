@@ -77,6 +77,9 @@ const ReconciliationSection = ({ account, children }: SectionProps) => (
     className="space-y-2 border-t border-slate-200 pt-3"
   >
     <h3 className="font-semibold">Riconciliazione</h3>
+    <p className="text-sm text-slate-600">
+      Confronta il saldo senza il risultato delle posizioni aperte
+    </p>
     {children}
   </section>
 );

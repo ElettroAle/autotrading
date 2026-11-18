@@ -6,8 +6,13 @@ from decimal import Decimal
 import pytest
 
 from autotrading.application.flows.errors import FlowNotFoundError
-from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand, ReadFlowResultsUseCase
+from autotrading.application.flows.read_flow_results import (
+    FlowPeriodPorts,
+    ReadFlowResultsCommand,
+    ReadFlowResultsUseCase,
+)
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_next_cycle import ReadNextCycleUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
@@ -15,6 +20,7 @@ from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension, OpeningsSuspensionCause
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
@@ -25,7 +31,7 @@ from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleReposit
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
+from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
@@ -52,14 +58,20 @@ class Bench:
             ReadOpeningsSuspensionUseCase(
                 flows, InMemoryOpeningsSuspensionAdapter(self.store, TENANT), self.readings, self.accounts, lambda: NOW
             ),
-            InMemoryEquitySnapshotRepositoryAdapter(self.equity, TENANT),
-            InMemoryCycleHistoryAdapter(self.cycles, self.store, TENANT),
+            ReadNextCycleUseCase(flows, InMemoryFlowTimingAdapter(self.store, TENANT), lambda: NOW),
+            FlowPeriodPorts(
+                InMemoryEquitySnapshotRepositoryAdapter(self.equity, TENANT),
+                InMemoryCycleHistoryAdapter(self.cycles, self.store, TENANT),
+            ),
             lambda: NOW,
         )
 
-    def flow(self) -> Flow:
-        flow = a_flow(TENANT, configuration=a_configuration(assets=("BTC",), allocated_capital=Decimal(100)))
+    def flow(self, status: FlowStatus = FlowStatus.STOPPED) -> Flow:
+        flow = a_flow(
+            TENANT, status=status, configuration=a_configuration(assets=("BTC",), allocated_capital=Decimal(100))
+        )
         self.store.flows.append(flow)
+        self.store.anchors[flow.id] = NOW - timedelta(minutes=5)
         self.activity.activities[flow.assigned_account_id] = an_activity()
         self.accounts.names[flow.assigned_account_id] = "test-1"
         return flow
@@ -170,3 +182,26 @@ def test_the_openings_of_a_flow_whose_account_has_no_alarm_are_not_suspended(ben
     flow = bench.flow()
 
     assert bench.use_case.execute(ReadFlowResultsCommand(flow.id.value)).openings_suspension is None
+
+
+def test_the_results_of_an_active_flow_tell_when_its_next_cycle_falls(bench: Bench) -> None:
+    flow = bench.flow(FlowStatus.ACTIVE)
+
+    results = bench.use_case.execute(ReadFlowResultsCommand(flow.id.value))
+
+    assert results.next_cycle_at == NOW + timedelta(minutes=10)
+
+
+@pytest.mark.parametrize("status", [FlowStatus.PAUSED, FlowStatus.STOPPED])
+def test_the_results_of_a_flow_that_is_not_active_have_no_next_cycle(bench: Bench, status: FlowStatus) -> None:
+    flow = bench.flow(status)
+
+    assert bench.use_case.execute(ReadFlowResultsCommand(flow.id.value)).next_cycle_at is None
+
+
+def test_the_next_cycle_does_not_depend_on_the_period(bench: Bench) -> None:
+    flow = bench.flow(FlowStatus.ACTIVE)
+
+    results = bench.use_case.execute(ReadFlowResultsCommand(flow.id.value, "7d"))
+
+    assert results.next_cycle_at == NOW + timedelta(minutes=10)

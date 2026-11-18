@@ -1,4 +1,4 @@
-import { formatReturn, returnTone } from './flow-figures';
+import { formatReturn } from './flow-figures';
 
 describe('formatReturn', () => {
   it('shows a positive return with its sign', () => {
@@ -15,17 +15,5 @@ describe('formatReturn', () => {
 
   it('says the return is not available without initial capital', () => {
     expect(formatReturn(null)).toBe('non disponibile');
-  });
-});
-
-describe('returnTone', () => {
-  it.each([
-    ['10.00', 'positive'],
-    ['0.01', 'positive'],
-    ['-0.01', 'negative'],
-    ['0.00', 'neutral'],
-    [null, 'neutral'],
-  ] as const)('the return %s is %s', (percent, tone) => {
-    expect(returnTone(percent)).toBe(tone);
   });
 });

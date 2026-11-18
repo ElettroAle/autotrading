@@ -208,13 +208,16 @@ const openingsSuspensionOf = (user: FakeUser, flow: FakeFlow) =>
         resumable: true,
       };
 
-const resultsSummaryOf = (flow: FakeFlow, request: Request) =>
-  resultsOf(
+// The next cycle does not depend on the period: the summary gives the same instant as the overview (R6.4.8).
+const resultsSummaryOf = (flow: FakeFlow, request: Request) => ({
+  ...resultsOf(
     flow,
     fakePlatform.cyclesOf(flow.id),
     fakePlatform.openPositionsOf(flow.id).length,
     new URL(request.url).searchParams,
-  );
+  ),
+  next_cycle_at: nextCycleOf(flow),
+});
 
 const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
   flow_id: flow.id,
