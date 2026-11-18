@@ -1,9 +1,13 @@
 import json
+from dataclasses import replace
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from autotrading.application.flows.create_flow import SourceRequest
+from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
+from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
+from tests.support.flow_cycles import FlowCycles
 from tests.support.flows import scenario_catalog
 from tests.support.lifecycle_steps import Lifecycle, add_flow, modify
 from tests.support.platform import Platform
@@ -16,6 +20,12 @@ scenarios("E1-flussi-autonomi/F1.3-fonti-dati/R1.3.2-selezione-pesi-e-parametri-
 @pytest.fixture
 def cycle() -> SourceCycle:
     return SourceCycle()
+
+
+@pytest.fixture
+def flow_cycles() -> FlowCycles:
+    """The same flow run as the worker composes its cycle, for what the agent is told beyond the sources."""
+    return FlowCycles()
 
 
 @pytest.fixture
@@ -34,6 +44,14 @@ def names(text: str) -> list[str]:
     return [name.strip() for name in text.split(",")]
 
 
+def select(cycle: SourceCycle, flow_cycles: FlowCycles, flow: str, source: str, weight: int = DEFAULT_WEIGHT) -> None:
+    cycle.activate(source, weight)
+    selection = SourceSelection(source, weight, SOURCE_CATALOG.find(source).settings({}))
+    flow_cycles.reconfigure(
+        flow, lambda configuration: replace(configuration, sources=(*configuration.sources, selection))
+    )
+
+
 def weights_in_context(cycle: SourceCycle) -> dict[str, set[int]]:
     document = json.loads(cycle.agent_context().messages()[1].content)
     weights: dict[str, set[int]] = {}
@@ -43,21 +61,22 @@ def weights_in_context(cycle: SourceCycle) -> dict[str, set[int]]:
 
 
 @given(quoted('che "{user}" ha il flusso "{flow}" con asset "{assets}"'))
-def flow_with_assets(cycle: SourceCycle, assets: str) -> None:
+def flow_with_assets(cycle: SourceCycle, flow_cycles: FlowCycles, user: str, flow: str, assets: str) -> None:
     cycle.assets = tuple(names(assets))
+    flow_cycles.add_flow(user, flow, assets=cycle.assets)
 
 
 @given(quoted('che il flusso "{flow}" ha attiva la fonte "{source}"'))
 @given(quoted('che il flusso "{flow}" ha attiva la fonte "{source}" senza parametri'))
-def one_active_source(cycle: SourceCycle, source: str) -> None:
-    cycle.activate(source)
+def one_active_source(cycle: SourceCycle, flow_cycles: FlowCycles, flow: str, source: str) -> None:
+    select(cycle, flow_cycles, flow, source)
 
 
 @given(quoted('che il flusso "{flow}" ha attive le fonti "{active}" e non "{inactive}"'))
 @given(quoted('che il flusso "{flow}" ha attive le fonti "{active}" senza pesi'))
-def active_sources(cycle: SourceCycle, active: str) -> None:
+def active_sources(cycle: SourceCycle, flow_cycles: FlowCycles, flow: str, active: str) -> None:
     for source in names(active):
-        cycle.activate(source)
+        select(cycle, flow_cycles, flow, source)
 
 
 @given(
@@ -66,9 +85,27 @@ def active_sources(cycle: SourceCycle, active: str) -> None:
         r'e "(?P<second>[^"]+)" con peso (?P<second_weight>\d+)$'
     )
 )
-def weighted_sources(cycle: SourceCycle, first: str, first_weight: str, second: str, second_weight: str) -> None:
-    cycle.activate(first, int(first_weight))
-    cycle.activate(second, int(second_weight))
+def weighted_sources(  # noqa: PLR0917 - one argument per value of the step
+    cycle: SourceCycle,
+    flow_cycles: FlowCycles,
+    flow: str,
+    first: str,
+    first_weight: str,
+    second: str,
+    second_weight: str,
+) -> None:
+    select(cycle, flow_cycles, flow, first, int(first_weight))
+    select(cycle, flow_cycles, flow, second, int(second_weight))
+
+
+@given(quoted('che il flusso "{flow}" segue il system prompt predefinito'))
+def default_prompt(flow_cycles: FlowCycles, flow: str) -> None:
+    assert flow_cycles.flow(flow).configuration.system_prompt is None
+
+
+@given(quoted('che il flusso "{flow}" ha un system prompt personalizzato "{prompt}"'))
+def own_prompt(flow_cycles: FlowCycles, flow: str, prompt: str) -> None:
+    flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, system_prompt=prompt))
 
 
 @when(
@@ -99,8 +136,9 @@ def modify_source(
 
 
 @when(quoted('il flusso "{flow}" esegue un ciclo'))
-def run_cycle(cycle: SourceCycle) -> None:
+def run_cycle(cycle: SourceCycle, flow_cycles: FlowCycles, flow: str) -> None:
     cycle.run()
+    flow_cycles.run(flow)
 
 
 @then(quoted('la fonte "{source}" è interrogata per "{first}" e per "{second}"'))
@@ -154,3 +192,68 @@ def asked_with_defaults(cycle: SourceCycle, source: str, count: str, hours: str)
 @then(quoted('la modifica è rifiutata con il motivo "{reason}"'))
 def modification_refused(lifecycle: Lifecycle, reason: str) -> None:
     assert str(lifecycle.error) == reason
+
+
+WEIGHT_RULE = (
+    "- quando le fonti sono in disaccordo prevale quella col peso più alto, non il numero dei segnali;",
+    "- più valori della stessa fonte (per esempio medie, MACD e RSI degli indicatori) contano come una fonte sola, col"
+    " suo peso;",
+    "- le istruzioni del flusso prevalgono sui pesi quando li contraddicono;",
+    "- nel ragionamento di un'apertura nomina la fonte che ha deciso la direzione quando le fonti erano in disaccordo;",
+)
+
+
+def weight_meaning(minimum: str, maximum: str, default: str) -> str:
+    return (
+        f"- il peso di una fonte è un intero da {minimum} a {maximum}, predefinito {default}: l'importanza relativa"
+        " che l'utente dà a ogni fonte;"
+    )
+
+
+def weights_line(weights: str) -> str:
+    return f"- pesi delle fonti attive del flusso: {weights};"
+
+
+@then(
+    parsers.re(
+        r"^il system prompt inviato all'agente dice che il peso è un intero da (?P<minimum>\d+) a (?P<maximum>\d+), "
+        r"predefinito (?P<default>\d+), importanza relativa data dall'utente a ogni fonte$"
+    )
+)
+def weight_explained(flow_cycles: FlowCycles, minimum: str, maximum: str, default: str) -> None:
+    assert weight_meaning(minimum, maximum, default) in flow_cycles.system_text()
+
+
+@then("dice che quando le fonti sono in disaccordo prevale quella col peso più alto, non il numero dei segnali")
+def heaviest_source_prevails(flow_cycles: FlowCycles) -> None:
+    assert WEIGHT_RULE[0] in flow_cycles.system_text()
+
+
+@then("dice che più valori della stessa fonte contano come una fonte sola, col suo peso")
+def values_of_a_source_count_once(flow_cycles: FlowCycles) -> None:
+    assert WEIGHT_RULE[1] in flow_cycles.system_text()
+
+
+@then("dice che le istruzioni del flusso prevalgono sui pesi")
+def instructions_prevail(flow_cycles: FlowCycles) -> None:
+    assert WEIGHT_RULE[2] in flow_cycles.system_text()
+
+
+@then(
+    "chiede di nominare nel ragionamento di un'apertura la fonte che ha deciso la direzione quando le fonti erano in "
+    "disaccordo"
+)
+def deciding_source_named(flow_cycles: FlowCycles) -> None:
+    assert WEIGHT_RULE[3] in flow_cycles.system_text()
+
+
+@then(quoted('riporta i pesi "{weights}"'))
+def weights_reported(flow_cycles: FlowCycles, weights: str) -> None:
+    assert weights_line(weights) in flow_cycles.system_text()
+
+
+@then(quoted('il system prompt inviato all\'agente contiene la regola del peso e i pesi "{weights}"'))
+def rule_in_own_prompt(flow_cycles: FlowCycles, weights: str) -> None:
+    assert flow_cycles.system_text() == "\n".join(
+        ("Decidi con prudenza. " + weight_meaning("1", "10", "5"), *WEIGHT_RULE, weights_line(weights))
+    )
