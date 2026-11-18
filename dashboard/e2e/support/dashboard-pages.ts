@@ -254,7 +254,7 @@ export class DashboardPages {
       .getByRole('article', { name, exact: true });
   }
 
-  /** One value of the box of the account, by the term it shows: «Saldo», «Capitale allocato», ... */
+  /** One value of the box of the account, by the term it shows: «Valore dei flussi», «capitale allocato», ... */
   accountDetail(name: string, term: string): Locator {
     return this.accountBox(name).getByLabel(term, { exact: true });
   }

@@ -2286,12 +2286,20 @@ export interface components {
             /** Unevaluable */
             unevaluable: number;
         };
-        /** FreeCapitalResponse */
+        /**
+         * FreeCapitalResponse
+         * @description The free capital of the account with the value and the result of its flows: the balance is the value of the flows
+         *     plus the free capital (ADR scomposizione-del-saldo-nel-riquadro-del-conto).
+         */
         FreeCapitalResponse: {
             /** Amount */
             amount: string;
             /** Currency */
             currency: string;
+            /** Flows Value */
+            flows_value: string;
+            /** Flows Result */
+            flows_result: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
