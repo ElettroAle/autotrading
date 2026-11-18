@@ -250,10 +250,15 @@ const SignInRequired = ({ returnTo }: { returnTo: string }) => {
   return null;
 };
 
+// MSAL empties its cache before it leaves for the identity provider to sign out: no account then means a page that is
+// being left, not a visitor, and a sign-in started now would race the sign-out (Bug 610).
+const isPageBeingSetUpOrLeft = (inProgress: InteractionStatus): boolean =>
+  inProgress === InteractionStatus.Startup || inProgress === InteractionStatus.Logout;
+
 export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { accounts, inProgress } = useMsal();
   const location = useLocation();
-  if (inProgress === InteractionStatus.Startup) {
+  if (isPageBeingSetUpOrLeft(inProgress)) {
     return null;
   }
   if (accounts.length === 0) {
