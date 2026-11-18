@@ -7,12 +7,13 @@ const DAY_MS = 24 * HOUR_MS;
 const LAST_DURATIONS_MS: Record<string, number> = {
   '30m': 30 * MINUTE_MS,
   '1h': HOUR_MS,
+  '6h': 6 * HOUR_MS,
   '12h': 12 * HOUR_MS,
   '24h': 24 * HOUR_MS,
   '7d': 7 * DAY_MS,
   '30d': 30 * DAY_MS,
 };
-const PERIOD_NAMES = ['30m', '1h', '12h', '24h', '7d', '30d', 'all', 'range'];
+const PERIOD_NAMES = ['30m', '1h', '6h', '12h', '24h', '7d', '30d', 'all', 'range'];
 
 export type Window = { readonly since?: number; readonly until?: number };
 

@@ -202,7 +202,7 @@ def test_the_history_answers_the_page_asked_for(client_of: Client, platform: Pla
     [
         ({"action": "apertura"}, "azione non valida: scegliere tra apri, chiudi, mantieni, aggiorna"),
         ({"direction": "rialzo"}, "direzione non valida: scegliere tra long, short"),
-        ({"period": "1d"}, "scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"),
+        ({"period": "1d"}, "scegliere tra 30m, 1h, 6h, 12h, 24h, 7d, 30d, all, range"),
         ({"from": "2026-11-06T10:00Z"}, "inizio e fine valgono solo per un intervallo"),
     ],
 )

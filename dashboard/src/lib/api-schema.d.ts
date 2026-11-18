@@ -5003,7 +5003,7 @@ export interface operations {
     read_flow_state_flows__flow_id__state_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5083,7 +5083,7 @@ export interface operations {
     read_flow_statistics_flows__flow_id__statistics_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5121,7 +5121,7 @@ export interface operations {
     read_forecast_accuracy_flows__flow_id__forecast_accuracy_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5299,7 +5299,7 @@ export interface operations {
     list_flow_overviews_flows_overview_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5405,7 +5405,7 @@ export interface operations {
                 action?: string | null;
                 /** @description long o short */
                 direction?: string | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5474,7 +5474,7 @@ export interface operations {
     read_flow_equity_flows__flow_id__equity_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5517,7 +5517,7 @@ export interface operations {
                 asset?: string | null;
                 /** @description versione della configurazione di un flusso */
                 version?: number | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5560,7 +5560,7 @@ export interface operations {
                 asset?: string | null;
                 /** @description versione della configurazione di un flusso */
                 version?: number | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5603,7 +5603,7 @@ export interface operations {
                 asset?: string | null;
                 /** @description versione della configurazione di un flusso */
                 version?: number | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5641,7 +5641,7 @@ export interface operations {
     rank_flows_flows_ranking_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;

@@ -34,7 +34,7 @@ describe('PeriodSelector', () => {
   it('starts from the whole life', () => {
     renderAt('/flows/alfa');
 
-    expect(screen.getByLabelText('Periodo')).toHaveDisplayValue('Tutta la vita');
+    expect(screen.getByLabelText('Periodo')).toHaveDisplayValue("Dall'inizio");
     expect(periodRead()).toEqual({ kind: 'all', from: '', to: '' });
   });
 
@@ -63,13 +63,32 @@ describe('PeriodSelector', () => {
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
       '30 minuti',
       '1 ora',
+      '6 ore',
       '12 ore',
       '24 ore',
       '7 giorni',
       '30 giorni',
-      'Tutta la vita',
+      "Dall'inizio",
       'Intervallo',
     ]);
+  });
+
+  // ADR periodo-di-6-ore-e-dall-inizio: the last 6 hours ride in the address as 6h.
+  it('keeps the last 6 hours in the query string of the page as 6h', async () => {
+    renderAt('/flows/alfa');
+
+    await userEvent.selectOptions(screen.getByLabelText('Periodo'), '6 ore');
+
+    expect(searchShown()).toBe('?period=6h');
+    expect(periodRead()).toEqual({ kind: '6h', from: '', to: '' });
+  });
+
+  // ADR periodo-di-6-ore-e-dall-inizio: an address saved with the whole life still opens on it, now named so.
+  it('opens an address saved with the whole life on the period named from the start', () => {
+    renderAt('/flows/alfa?period=all');
+
+    expect(screen.getByLabelText('Periodo')).toHaveDisplayValue("Dall'inizio");
+    expect(periodRead()).toEqual({ kind: 'all', from: '', to: '' });
   });
 
   it('reads the period the page opens with', () => {
@@ -113,7 +132,7 @@ describe('PeriodSelector', () => {
   it('forgets the days when a period other than a range is chosen', async () => {
     renderAt('/flows/alfa?period=range&from=2026-11-01&to=2026-11-03');
 
-    await userEvent.selectOptions(screen.getByLabelText('Periodo'), 'Tutta la vita');
+    await userEvent.selectOptions(screen.getByLabelText('Periodo'), "Dall'inizio");
 
     expect(searchShown()).toBe('');
     expect(screen.queryByLabelText('Dal')).not.toBeInTheDocument();

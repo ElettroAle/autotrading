@@ -5,10 +5,10 @@ Funzionalità: R6.4.6 Periodi brevi nel filtro
   Voglio scegliere anche periodi brevi, dagli ultimi 30 minuti alle ultime 24 ore
   Perché seguo da vicino cosa fa un flusso nelle ultime ore
 
-  Il menu del periodo offre, in ordine: 30 minuti, 1 ora, 12 ore, 24 ore, 7 giorni, 30 giorni, Tutta la vita,
-  Intervallo. Il predefinito resta Tutta la vita. Un periodo breve vale fino a ora, al minuto (ADR
+  Il menu del periodo offre, in ordine: 30 minuti, 1 ora, 6 ore, 12 ore, 24 ore, 7 giorni, 30 giorni, Dall'inizio,
+  Intervallo (R6.4.7). Il predefinito resta Dall'inizio. Un periodo breve vale fino a ora, al minuto (ADR
   periodo-al-minuto), per tutto ciò che il periodo filtra: panoramica, equity curve, statistiche, posizioni chiuse,
-  cicli (R6.4.3), classifica (R2.4.2), storico (R2.5.1). Nell'indirizzo il periodo è 30m, 1h, 12h o 24h. Con pochi
+  cicli (R6.4.3), classifica (R2.4.2), storico (R2.5.1). Nell'indirizzo il periodo è 30m, 1h, 6h, 12h o 24h. Con pochi
   cicli nel periodo il grafico mostra il solo punto presente o «nessun ciclo nel periodo».
   Aggiorna i testi di R2.2.6 e R2.4.2, che elencano i periodi.
 
@@ -17,8 +17,8 @@ Funzionalità: R6.4.6 Periodi brevi nel filtro
 
   Scenario: Periodi del menu
     Quando "anna" apre il menu del periodo nella pagina del flusso "alfa"
-    Allora vede in ordine "30 minuti", "1 ora", "12 ore", "24 ore", "7 giorni", "30 giorni", "Tutta la vita", "Intervallo"
-    E il periodo scelto è "Tutta la vita"
+    Allora vede in ordine "30 minuti", "1 ora", "6 ore", "12 ore", "24 ore", "7 giorni", "30 giorni", "Dall'inizio", "Intervallo"
+    E il periodo scelto è "Dall'inizio"
 
   Scenario: Ultima ora
     Dato che sono le 10:15
