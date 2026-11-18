@@ -19,7 +19,6 @@ from autotrading.application.notifications.notify_position_closed import NotifyP
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
 from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
-from autotrading.application.notifications.notify_unattributable_movement import NotifyUnattributableMovementUseCase
 from autotrading.application.notifications.notify_unattributable_position import NotifyUnattributablePositionUseCase
 from autotrading.domain.notifications.flow_status import (
     FlowStatusFigures,
@@ -173,12 +172,10 @@ def test_the_cases_no_flow_explains_are_told_by_the_name_of_the_account() -> Non
 
     NotifyUnattributablePositionUseCase(notifier).execute(ACCOUNT_ID, "principale", "BTC")
     NotifyUnattributableFillUseCase(notifier).execute(ACCOUNT_ID, "principale", "ETH")
-    NotifyUnattributableMovementUseCase(notifier, "USDC").execute(ACCOUNT_ID, "principale", Decimal(-15))
 
     assert notifier.sent == [
         Notification.unattributable_position(ACCOUNT_ID, "principale", "BTC"),
         Notification.unattributable_fill(ACCOUNT_ID, "principale", "ETH"),
-        Notification.unattributable_movement(ACCOUNT_ID, "principale", Amount(Decimal(-15), "USDC")),
     ]
 
 

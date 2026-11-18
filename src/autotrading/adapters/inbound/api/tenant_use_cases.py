@@ -55,6 +55,7 @@ from autotrading.application.flows.list_flow_versions import ListFlowVersionsUse
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.list_reconciliation_alarms import ListReconciliationAlarmsUseCase
 from autotrading.application.flows.list_tradable_assets import ListTradableAssetsUseCase
+from autotrading.application.flows.list_unattributable import ListUnattributableUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
@@ -291,6 +292,7 @@ class TenantUseCases:
     set_deviation_threshold: SetDeviationThresholdUseCase
     read_account_reconciliation: ReadAccountReconciliationUseCase
     list_reconciliation_alarms: ListReconciliationAlarmsUseCase
+    list_unattributable: ListUnattributableUseCase
     confirm_reconciliation: ConfirmReconciliationUseCase
     close_in_emergency: CloseInEmergencyUseCase
     preview_emergency_closing: PreviewEmergencyClosingUseCase
@@ -440,6 +442,7 @@ class TenantUseCases:
                 ports.reconciliation, ports.account_thresholds
             ),
             list_reconciliation_alarms=ListReconciliationAlarmsUseCase(ports.reconciliation, ports.account_names),
+            list_unattributable=ListUnattributableUseCase(ports.reconciliation, ports.account_names),
             confirm_reconciliation=ConfirmReconciliationUseCase(ports.reconciliation, ports.account_names, ports.clock),
             close_in_emergency=CloseInEmergencyUseCase(
                 tenant_id,

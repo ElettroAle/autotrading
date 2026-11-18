@@ -485,6 +485,126 @@
         }
       }
     },
+    "/accounts/{account_id}/reconciliation/unattributable": {
+      "get": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "List Unattributable",
+        "operationId": "list_unattributable_accounts__account_id__reconciliation_unattributable_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UnattributableKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "dall'istante incluso",
+              "title": "Since"
+            },
+            "description": "dall'istante incluso"
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "all'istante escluso",
+              "title": "Until"
+            },
+            "description": "all'istante escluso"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next` della pagina precedente",
+              "title": "Cursor"
+            },
+            "description": "`next` della pagina precedente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnattributablePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/accounts/{account_id}/reconciliation/confirmation": {
       "post": {
         "tags": [
@@ -8884,7 +9004,6 @@
           "decisione bloccata dal rischio",
           "posizione non attribuibile",
           "esecuzione non attribuibile",
-          "movimento non attribuibile",
           "allarme di riconciliazione",
           "incasso eseguito",
           "chiusura di emergenza eseguita"
@@ -10342,6 +10461,90 @@
           "name"
         ],
         "title": "StrategySource"
+      },
+      "UnattributableKind": {
+        "type": "string",
+        "enum": [
+          "posizione",
+          "esecuzione",
+          "variazione del saldo"
+        ],
+        "title": "UnattributableKind"
+      },
+      "UnattributablePageResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnattributableResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "net_change": {
+            "type": "string",
+            "title": "Net Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next",
+          "count",
+          "net_change"
+        ],
+        "title": "UnattributablePageResponse",
+        "description": "At most 50 cases, newest first; `next` is the `cursor` of the following page, null on the last one. `count` and\n`net_change`, the net of the changes of the balance, cover every case of the filter, not only the page."
+      },
+      "UnattributableResponse": {
+        "properties": {
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/UnattributableKind"
+          },
+          "asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detected_at",
+          "kind",
+          "asset",
+          "amount"
+        ],
+        "title": "UnattributableResponse",
+        "description": "A case no flow explains (R1.6.2): the change of the balance, or the size of a position or an execution, as text\nwithout trailing zeros (ADR 0047)."
       },
       "ValidationError": {
         "properties": {

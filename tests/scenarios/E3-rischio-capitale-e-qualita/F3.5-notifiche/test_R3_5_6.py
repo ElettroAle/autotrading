@@ -16,8 +16,8 @@ from autotrading.application.notifications.notify_cycle_failed import NotifyCycl
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
-from autotrading.application.notifications.notify_unattributable_movement import (
-    NotifyUnattributableMovementUseCase,
+from autotrading.application.notifications.notify_unattributable_position import (
+    NotifyUnattributablePositionUseCase,
 )
 from autotrading.application.notifications.ports import NotificationRoutes
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
@@ -147,10 +147,10 @@ def flow_with_position_event(notices: Notices, flow: str, event: str) -> None:
     notices.pending = lambda: notices.close_position(flow, pnl, reason)
 
 
-@given(quoted('un movimento non attribuibile sul conto "{account}"'))
-def unattributable_movement(notices: Notices, account: str) -> None:
-    use_case = NotifyUnattributableMovementUseCase(notices.notify, CURRENCY)
-    notices.pending = lambda: use_case.execute(notices.account_id, account, Decimal(25))
+@given(quoted('una posizione non attribuibile sul conto "{account}"'))
+def unattributable_position(notices: Notices, account: str) -> None:
+    use_case = NotifyUnattributablePositionUseCase(notices.notify)
+    notices.pending = lambda: use_case.execute(notices.account_id, account, "SOL")
 
 
 @given("una notifica con i link al flusso e all'operazione")

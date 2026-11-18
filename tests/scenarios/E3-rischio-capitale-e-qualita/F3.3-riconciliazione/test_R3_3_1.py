@@ -332,6 +332,13 @@ def user_notified(flow_cycles: FlowCycles, user: str, title: str, values: str) -
     assert told_in(received, title, values), received
 
 
+@then(quoted('"{user}" non riceve alcuna notifica'))
+def nothing_told(flow_cycles: FlowCycles, user: str) -> None:
+    # The chat of the user is linked from the start: a change within the threshold reaches it with no message at all.
+    assert flow_cycles.platform.tenant_of(user) in flow_cycles.platform.chats
+    assert flow_cycles.platform.messenger.received_by(chat_named(user)) == []
+
+
 @then(quoted('"{user}" non riceve un\'altra notifica di allarme'))
 def no_other_alarm_notice(flow_cycles: FlowCycles, user: str) -> None:
     assert user == "anna"

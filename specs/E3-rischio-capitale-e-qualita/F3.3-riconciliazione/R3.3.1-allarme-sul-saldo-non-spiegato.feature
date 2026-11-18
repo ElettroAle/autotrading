@@ -15,7 +15,8 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
   saldo letto e scostamento, l'utente viene avvisato, e le aperture di tutti i flussi del conto sono sospese finché
   l'utente non conferma di aver verificato. Chiusure e aggiornamenti del piano di uscita si eseguono; i cicli
   continuano.
-  Uno scostamento entro la soglia si registra come variazione del saldo non spiegata (R1.6.2), senza allarme.
+  Uno scostamento entro la soglia si registra come variazione del saldo non spiegata (R1.6.2), senza allarme e senza
+  notifica.
   Un deposito o un prelievo dichiarato dall'exchange è spiegato: non apre l'allarme e non è una variazione non
   spiegata.
   Con un allarme aperto non se ne apre un secondo sullo stesso conto.
@@ -38,6 +39,7 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
     Quando un ciclo di "alfa" legge dall'exchange il saldo 995 USDC
     Allora sul conto "test-1" non c'è alcun allarme di riconciliazione
     E sul conto "test-1" è registrata una variazione del saldo non spiegata di -5 USDC
+    E "anna" non riceve alcuna notifica
 
   Schema dello scenario: Deposito o prelievo dichiarato dall'exchange
     Dato che l'exchange dichiara sul conto "test-1" un <movimento> di <importo> USDC

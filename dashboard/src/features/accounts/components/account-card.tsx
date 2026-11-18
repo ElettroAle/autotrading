@@ -15,6 +15,7 @@ import { ExchangeAmount } from './exchange-amount';
 import { PublicFields } from './public-fields';
 import { ReconciliationState } from './reconciliation-state';
 import { ReconciliationStatus } from './reconciliation-status';
+import { UnattributableMovements } from './unattributable-movements';
 
 const Balance = ({ account }: { readonly account: Account }) => (
   <ExchangeAmount reading={useAccountBalance(account.id)} unavailable="Saldo non disponibile" />
@@ -39,7 +40,8 @@ const hasPublicFields = (account: Account): boolean =>
 
 /**
  * An account in a box of its own: its name, network and state of the reconciliation at the top, its data, the section
- * of the reconciliation, then the commands on the account (Bug 565, ADR conti-a-riquadri).
+ * of the reconciliation, the movements no flow explains, then the commands on the account (Bug 565, ADR conti-a-riquadri,
+ * ADR movimenti-non-spiegati-nel-riquadro-del-conto).
  */
 export const AccountCard = ({ account }: { readonly account: Account }) => {
   const titleId = useId();
@@ -72,6 +74,7 @@ export const AccountCard = ({ account }: { readonly account: Account }) => {
         </Detail>
       </dl>
       <ReconciliationStatus account={account} />
+      <UnattributableMovements account={account} />
       <AccountActions account={account} />
     </article>
   );

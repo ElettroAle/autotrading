@@ -10,8 +10,9 @@ Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
   - una posizione di un flusso che la piattaforma considera aperta e che sull'exchange non c'è più;
   - un'esecuzione senza identificativo della piattaforma;
   - una variazione del saldo del conto che le esecuzioni dei flussi non spiegano (deposito, prelievo).
-  Ogni caso si registra una sola volta con il conto, il tipo e i valori letti dall'exchange, e si notifica
-  (R1.8.2). La piattaforma non tocca posizioni che non attribuisce. I flussi continuano a operare, tranne quello
+  Ogni caso si registra una sola volta con il conto, il tipo e i valori letti dall'exchange. Posizioni ed esecuzioni
+  si notificano (R1.8.2); una variazione del saldo entro la soglia del conto si registra senza notifica (R3.3.1) e si
+  consulta nel conto. La piattaforma non tocca posizioni che non attribuisce. I flussi continuano a operare, tranne quello
   la cui posizione sull'exchange è diversa da quella attesa.
   Ogni flusso conosce la posizione che si aspetta su ogni suo asset dal registro delle operazioni (R1.6.1). Se
   all'inizio del ciclo, dopo la riconciliazione, la posizione del conto su un asset del flusso è diversa da quella
@@ -45,6 +46,7 @@ Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
     Dato che il saldo del conto "test-1" è aumentato di 200 USDC senza esecuzioni dei flussi
     Quando il flusso "alfa" esegue un ciclo
     Allora è registrata per il conto "test-1" una variazione del saldo non attribuibile di 200 USDC
+    E "anna" non riceve alcuna notifica
 
   Scenario: Registrato una sola volta
     Dato che per il conto "test-1" è già registrata una posizione non attribuibile su "SOL"

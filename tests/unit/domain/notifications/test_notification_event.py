@@ -7,7 +7,6 @@ OF_ACCOUNT = frozenset(
     {
         NotificationEvent.UNATTRIBUTABLE_POSITION,
         NotificationEvent.UNATTRIBUTABLE_FILL,
-        NotificationEvent.UNATTRIBUTABLE_MOVEMENT,
         NotificationEvent.RECONCILIATION_ALARM,
         NotificationEvent.EMERGENCY_CLOSING,
     }
@@ -30,7 +29,6 @@ def test_each_type_of_event_has_the_name_the_user_chooses_its_channels_by() -> N
         "decisione bloccata dal rischio",
         "posizione non attribuibile",
         "esecuzione non attribuibile",
-        "movimento non attribuibile",
         "allarme di riconciliazione",
         "incasso eseguito",
         "chiusura di emergenza eseguita",
@@ -82,7 +80,6 @@ def test_every_other_closing_is_the_closing_of_a_position(reason: CloseReason) -
         (NotificationEvent.OPENING_BLOCKED, "\u26a0\ufe0f"),
         (NotificationEvent.UNATTRIBUTABLE_POSITION, "\U0001f6a8"),
         (NotificationEvent.UNATTRIBUTABLE_FILL, "\U0001f6a8"),
-        (NotificationEvent.UNATTRIBUTABLE_MOVEMENT, "\U0001f6a8"),
         (NotificationEvent.RECONCILIATION_ALARM, "\U0001f6a8"),
         (NotificationEvent.CASH_OUT, "\u2705"),
         (NotificationEvent.EMERGENCY_CLOSING, "\U0001f6a8"),

@@ -131,11 +131,6 @@ def usdc(value: str | int) -> Amount:
             ("Asset: ETH",),
         ),
         (
-            Notification.unattributable_movement(ACCOUNT_ID, "conto-1", usdc("12.5")),
-            f"{ALARM} conto-1: movimento non attribuibile",
-            ("Importo: 12,50 USDC",),
-        ),
-        (
             Notification.reconciliation_alarm(ACCOUNT_ID, "test-1", usdc(980), usdc(1000)),
             f"{ALARM} test-1: allarme di riconciliazione",
             ("Saldo letto: 980 USDC", "Saldo atteso: 1000 USDC"),
@@ -250,7 +245,6 @@ def test_the_subject_of_an_email_is_the_title(notification: Notification, subjec
         (Notification.opening_blocked(FLOW_ID, "alfa", "BTC", "motivo"), "OPENING_BLOCKED"),
         (Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"), "UNATTRIBUTABLE_POSITION"),
         (Notification.unattributable_fill(ACCOUNT_ID, "conto-1", "SOL"), "UNATTRIBUTABLE_FILL"),
-        (Notification.unattributable_movement(ACCOUNT_ID, "conto-1", usdc(1)), "UNATTRIBUTABLE_MOVEMENT"),
         (Notification.reconciliation_alarm(ACCOUNT_ID, "test-1", usdc(1), usdc(2)), "RECONCILIATION_ALARM"),
         (Notification.cash_out_done(FLOW_ID, "alfa", usdc(1)), "CASH_OUT"),
         (Notification.emergency_closing_done(1, ("alfa",)), "EMERGENCY_CLOSING"),
@@ -321,10 +315,6 @@ FLOW = NotificationTarget.flow(FLOW_ID)
             (NotificationTarget.account_alarms(ACCOUNT_ID),),
         ),
         (
-            Notification.unattributable_movement(ACCOUNT_ID, "conto-1", usdc(5)),
-            (NotificationTarget.account_alarms(ACCOUNT_ID),),
-        ),
-        (
             Notification.reconciliation_alarm(ACCOUNT_ID, "conto-1", usdc(980), usdc(1000)),
             (NotificationTarget.account_alarms(ACCOUNT_ID),),
         ),
@@ -345,7 +335,7 @@ def test_the_flow_of_a_notification_is_found_by_its_id() -> None:
 @pytest.mark.parametrize(
     "notification",
     [
-        Notification.unattributable_movement(ACCOUNT_ID, "conto-1", usdc(5)),
+        Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"),
         Notification.emergency_closing_done(2, ["alfa"]),
         Notification.test(),
     ],

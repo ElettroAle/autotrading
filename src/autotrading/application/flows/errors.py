@@ -167,6 +167,16 @@ class OperationsCursorInvalidError(ApplicationError):
         super().__init__("pagina delle operazioni non valida")
 
 
+class UnattributableCursorInvalidError(ApplicationError):
+    """The `cursor` of a page of the record of what no flow explains is not one the platform gave (ADR
+    movimenti-non-spiegati-nel-riquadro-del-conto)."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("pagina dei movimenti non spiegati non valida")
+
+
 class FlowPositionMismatchError(ApplicationError):
     """The position of the account on an asset of the flow is not the one the ledger of the flow expects: someone
     else traded it, so the flow sends no order and pauses until the user looks at it (Bug 155, ADR 0064).
