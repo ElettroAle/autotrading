@@ -7,8 +7,8 @@ Funzionalità: R2.4.2 Classifica dei flussi
 
   La classifica confronta i flussi dell'utente (RF-01.06) su: rendimento in percentuale, PnL, commissioni,
   win rate, numero di operazioni, drawdown massimo e costo del modello IA (RF-03.06). Il periodo è a scelta:
-  30 minuti, 1 ora, 12 ore, 24 ore, 7 giorni, 30 giorni, tutta la vita del flusso (predefinito) o un intervallo
-  libero (R6.4.6). Il rendimento del periodo si calcola sull'equity curve (R2.2.3) tra il primo e l'ultimo punto
+  30 minuti, 1 ora, 6 ore, 12 ore, 24 ore, 7 giorni, 30 giorni, dall'inizio del flusso (predefinito) o un intervallo
+  libero (R6.4.6, R6.4.7). Il rendimento del periodo si calcola sull'equity curve (R2.2.3) tra il primo e l'ultimo punto
   del periodo; il drawdown massimo è la più grande discesa percentuale dell'equity da un massimo precedente, nel
   periodo. PnL, commissioni, win rate e operazioni seguono le statistiche (R2.2.6). L'utente ordina la classifica
   per qualsiasi colonna; il predefinito è il rendimento decrescente. Compaiono i flussi non archiviati con almeno

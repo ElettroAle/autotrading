@@ -6,7 +6,8 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
   Perché mi accorga di ciò che succede senza consultare la piattaforma
 
   Si notificano: apertura e chiusura di una posizione, ciclo fallito, ordine rifiutato dall'exchange, pausa
-  automatica di un flusso, posizione o movimento non attribuibile su un conto.
+  automatica di un flusso, posizione o esecuzione non attribuibile su un conto. Una variazione del saldo entro la soglia
+  del conto non si notifica: si registra e si consulta nel conto (R1.6.2, R3.3.1).
   Ogni notifica nomina il flusso (o il conto) e l'evento, con i valori essenziali uno per riga (R3.5.4): per
   un'apertura asset, direzione, leva e valore; per una chiusura asset e PnL; per un errore il messaggio originale.
   Una notifica non contiene mai credenziali. Le notifiche vanno solo alla chat collegata al tenant (R1.8.1).

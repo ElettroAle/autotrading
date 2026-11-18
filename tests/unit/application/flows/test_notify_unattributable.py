@@ -1,4 +1,6 @@
-"""Each new case no flow explains reaches the user with the name of the account (R1.6.2, ADR 0088, ADR 0092)."""
+"""Each new position or execution no flow explains reaches the user with the name of the account; a change of the
+balance within the threshold is only recorded (R1.6.2, ADR 0088, ADR 0092, ADR variazioni-sotto-soglia-senza-notifica).
+"""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -11,10 +13,7 @@ from autotrading.application.flows.notify_unattributable import NotifyUnattribut
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
-from tests.fakes.unattributable_notices import (
-    FakeUnattributableAssetNoticeAdapter,
-    FakeUnattributableMovementNoticeAdapter,
-)
+from tests.fakes.unattributable_notices import FakeUnattributableAssetNoticeAdapter
 from tests.support.worker import TENANT, Worker
 
 DETECTED_AT = datetime(2026, 11, 13, tzinfo=UTC)
@@ -28,14 +27,13 @@ class Notices:
     def __init__(self, worker: Worker) -> None:
         self.positions = FakeUnattributableAssetNoticeAdapter()
         self.fills = FakeUnattributableAssetNoticeAdapter()
-        self.movements = FakeUnattributableMovementNoticeAdapter()
         self.use_case = NotifyUnattributableUseCase(
             InMemoryAccountRepositoryAdapter(worker.store, TENANT),
-            UnattributableNotices(self.positions, self.fills, self.movements),
+            UnattributableNotices(self.positions, self.fills),
         )
 
 
-def test_each_case_is_told_by_its_kind_with_the_name_of_the_account() -> None:
+def test_each_position_and_execution_is_told_by_its_kind_with_the_name_of_the_account() -> None:
     worker = Worker()
     account = worker.saved_account()
     notices, name, account_id = Notices(worker), account.name.value, account.id.value
@@ -44,15 +42,25 @@ def test_each_case_is_told_by_its_kind_with_the_name_of_the_account() -> None:
         [
             an_item(account_id, UnattributableKind.POSITION, "BTC", "0.1"),
             an_item(account_id, UnattributableKind.FILL, "ETH", "2"),
-            an_item(account_id, UnattributableKind.BALANCE_CHANGE, None, "-15"),
         ]
     )
 
-    assert (notices.positions.told, notices.fills.told, notices.movements.told) == (
-        [(name, "BTC")],
-        [(name, "ETH")],
-        [(name, Decimal(-15))],
+    assert (notices.positions.told, notices.fills.told) == ([(name, "BTC")], [(name, "ETH")])
+
+
+def test_a_change_of_the_balance_is_not_told() -> None:
+    worker = Worker()
+    account_id = worker.saved_account().id.value
+    notices = Notices(worker)
+
+    notices.use_case.execute(
+        [
+            an_item(account_id, UnattributableKind.BALANCE_CHANGE, None, "-0.03"),
+            an_item(account_id, UnattributableKind.BALANCE_CHANGE, None, "0.02"),
+        ]
     )
+
+    assert (notices.positions.told, notices.fills.told) == ([], [])
 
 
 def test_no_case_tells_nothing() -> None:
@@ -60,7 +68,7 @@ def test_no_case_tells_nothing() -> None:
 
     notices.use_case.execute([])
 
-    assert (notices.positions.told, notices.fills.told, notices.movements.told) == ([], [], [])
+    assert (notices.positions.told, notices.fills.told) == ([], [])
 
 
 def test_an_account_of_another_tenant_is_not_found() -> None:

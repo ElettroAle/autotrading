@@ -156,6 +156,7 @@ describe('listIntervalOf, ADR periodo-al-minuto', () => {
   it.each([
     ['30m', '2026-11-16T09:00Z'],
     ['1h', '2026-11-16T08:30Z'],
+    ['6h', '2026-11-16T03:30Z'],
     ['12h', '2026-11-15T21:30Z'],
     ['24h', '2026-11-15T09:30Z'],
   ] as const)('asks the period %s from the minute %s', (kind, from) => {
@@ -163,22 +164,24 @@ describe('listIntervalOf, ADR periodo-al-minuto', () => {
   });
 });
 
-// ADR periodi-brevi-nel-selettore-condiviso: one list of periods, from the shortest, the whole life the default.
+// ADR periodi-brevi-nel-selettore-condiviso, ADR periodo-di-6-ore-e-dall-inizio: one list of periods, from the shortest,
+// the whole life, named «Dall'inizio», the default.
 describe('the periods of the menu, ADR periodi-brevi-nel-selettore-condiviso', () => {
   it('goes from the shortest to the range', () => {
     expect(PERIODS.map(({ kind, label }) => [kind, label])).toEqual([
       ['30m', '30 minuti'],
       ['1h', '1 ora'],
+      ['6h', '6 ore'],
       ['12h', '12 ore'],
       ['24h', '24 ore'],
       ['7d', '7 giorni'],
       ['30d', '30 giorni'],
-      ['all', 'Tutta la vita'],
+      ['all', "Dall'inizio"],
       ['range', 'Intervallo'],
     ]);
   });
 
-  it.each(['30m', '1h', '12h', '24h'])('reads the period %s from the address', (kind) => {
+  it.each(['30m', '1h', '6h', '12h', '24h'])('reads the period %s from the address', (kind) => {
     renderAt(`/flows/alfa?period=${kind}`);
 
     expect(read('periodo letto')).toEqual({ kind, from: '', to: '' });

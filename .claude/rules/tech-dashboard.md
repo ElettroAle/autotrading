@@ -54,7 +54,10 @@ dashboard/
 React Router, TanStack Query per i dati dell'API, React Hook Form + Zod per i form (Zod anche per validare le
 risposte), Tailwind per lo stile, MSAL (`@azure/msal-browser`, `@azure/msal-react`) per l'accesso. Grafici: Recharts,
 unica libreria (ADR 0121), importata solo dai grafici condivisi di `src/components/charts`; le funzionalità passano i
-dati (`eslint.architecture.js`). Icone: lucide-react, unica libreria, importata solo da `src/components/ui/icons`;
+dati (`eslint.architecture.js`). Ogni grafico di `src/components/charts` si disegna dentro `ChartFrame` con `TimeAxis` e
+`ChartTooltip` di `chart-frame.tsx`: largo quanto lo spazio disponibile, nessuna larghezza fissa né scorrimento
+orizzontale, tooltip dentro il grafico (ADR grafici-condivisi-larghi-come-lo-schermo, verificata da
+`architecture/charts-in-the-shared-frame.test.ts`). Icone: lucide-react, unica libreria, importata solo da `src/components/ui/icons`;
 comandi, azioni dell'agente e direzioni usano i componenti condivisi `CommandButton`, `ActionLabel` e `DirectionLabel`
 di `src/components/ui`, l'icona accanto al testo e nascosta ai lettori di schermo (ADR
 icone-con-lucide-react-e-comandi-condivisi, ADR icone-condivise-di-azioni-e-direzioni). Chiamate HTTP con `fetch`,

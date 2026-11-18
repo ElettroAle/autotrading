@@ -163,7 +163,7 @@ def test_the_state_of_a_flow_refuses_a_period_the_user_cannot_have_meant(client_
 
     assert (response.status_code, reason_of(response)) == (
         400,
-        {"detail": "periodo non valido: scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"},
+        {"detail": "periodo non valido: scegliere tra 30m, 1h, 6h, 12h, 24h, 7d, 30d, all, range"},
     )
 
 

@@ -217,6 +217,13 @@ def balance_change_recorded(bench: AttributionBench, account: str, a: str) -> No
     assert [item.amount for item in recorded(bench, account, UnattributableKind.BALANCE_CHANGE)] == [amount(a)]
 
 
+@then(quoted('"anna" non riceve alcuna notifica'))
+def nothing_told(bench: AttributionBench) -> None:
+    # The cycle found the change for the first time: no notice means it was not told, not that nothing was found.
+    assert [item.kind for item in bench.new_items] == [UnattributableKind.BALANCE_CHANGE]
+    assert (bench.position_notices.told, bench.fill_notices.told) == ([], [])
+
+
 @then(step(r'per il conto "{account}" c\'è una sola registrazione della posizione non attribuibile su "{asset}"'))
 def recorded_once(bench: AttributionBench, account: str, asset: str) -> None:
     items = recorded(bench, account, UnattributableKind.POSITION)

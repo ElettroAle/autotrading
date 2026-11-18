@@ -23,6 +23,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import PlatformOrder
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
+from autotrading.domain.flows.unattributable_page import UnattributableFilter
 from autotrading.domain.orders.order import Order
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -246,3 +247,91 @@ def test_an_alarm_on_an_account_of_another_tenant_cannot_be_written(database: En
 
     with pytest.raises(IntegrityError, match="reconciliation_alarms_account_of_tenant"):
         SqlAlchemyReconciliationRepositoryAdapter(database, bruno).open(an_alarm(account_id))
+
+
+# The record of the account (ADR movimenti-non-spiegati-nel-riquadro-del-conto)
+
+
+def a_change(account_id: UUID, minutes: int, amount: str) -> UnattributableItem:
+    return UnattributableItem(
+        account_id,
+        UnattributableKind.BALANCE_CHANGE,
+        f"change-{minutes}",
+        None,
+        Decimal(amount),
+        READ_AT + timedelta(minutes=minutes),
+    )
+
+
+def references(cases: object) -> list[str]:
+    assert isinstance(cases, tuple)
+    return [case.item.reference for case in cases]
+
+
+def test_the_record_of_the_account_comes_from_the_most_recent_with_the_net_of_its_changes(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    _, other_account = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    for item in (a_change(account_id, -1, "-0.03"), a_position(account_id), a_change(account_id, 5, "0.05")):
+        repository.record(item)
+
+    page = repository.unattributable_of(account_id, UnattributableFilter(), None)
+
+    assert references(page.cases) == ["change-5", "SOL", "change--1"]
+    assert page.cases[0].item == a_change(account_id, 5, "0.05")
+    assert (page.count, page.net_change, page.next) == (3, Decimal("0.02"), None)
+    assert repository.unattributable_of(other_account, UnattributableFilter(), None).count == 0
+
+
+def test_a_resolved_position_stays_in_the_record(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    repository.record(a_position(account_id))
+    repository.resolve_positions(account_id, frozenset())
+
+    page = repository.unattributable_of(account_id, UnattributableFilter(), None)
+
+    assert references(page.cases) == ["SOL"]
+
+
+def test_the_record_is_read_by_pages_of_keyset_with_the_totals_of_the_whole_filter(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    for minutes in range(3):
+        repository.record(a_change(account_id, minutes, "1"))
+    criteria = UnattributableFilter(limit=2)
+
+    first = repository.unattributable_of(account_id, criteria, None)
+    second = repository.unattributable_of(account_id, criteria, first.next)
+
+    assert references(first.cases) == ["change-2", "change-1"]
+    assert first.next == first.cases[-1].cursor
+    assert references(second.cases) == ["change-0"]
+    assert (second.count, second.net_change, second.next) == (3, Decimal(3), None)
+
+
+def test_the_record_is_narrowed_by_kind_and_by_period(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    repository = SqlAlchemyReconciliationRepositoryAdapter(database, tenant_id)
+    for item in (a_change(account_id, -10, "4"), a_position(account_id), a_change(account_id, 10, "-1")):
+        repository.record(item)
+
+    positions = repository.unattributable_of(account_id, UnattributableFilter(kind=UnattributableKind.POSITION), None)
+    in_period = repository.unattributable_of(
+        account_id, UnattributableFilter(since=READ_AT, until=READ_AT + timedelta(minutes=10)), None
+    )
+
+    assert (references(positions.cases), positions.net_change) == (["SOL"], Decimal(0))
+    assert (references(in_period.cases), in_period.count) == (["SOL"], 1)
+
+
+def test_the_record_of_a_tenant_is_invisible_to_another(database: Engine) -> None:
+    anna, account_id = new_account(database)
+    bruno, _ = new_account(database)
+    SqlAlchemyReconciliationRepositoryAdapter(database, anna).record(a_change(account_id, 0, "1"))
+
+    page = SqlAlchemyReconciliationRepositoryAdapter(database, bruno).unattributable_of(
+        account_id, UnattributableFilter(), None
+    )
+
+    assert (page.cases, page.count, page.net_change) == ((), 0, Decimal(0))

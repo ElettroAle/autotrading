@@ -58,7 +58,7 @@ def anna(platform: Platform) -> TestClient:
 
 
 @pytest.mark.parametrize("reading", READINGS)
-@pytest.mark.parametrize("period", ["30m", "1h", "12h", "24h"])
+@pytest.mark.parametrize("period", ["30m", "1h", "6h", "12h", "24h"])
 def test_every_reading_with_a_period_takes_the_short_periods(
     anna: TestClient, path_of: Callable[[str], str], reading: str, period: str
 ) -> None:
@@ -75,5 +75,5 @@ def test_every_reading_with_a_period_refuses_an_unknown_one_with_the_valid_perio
 
     assert (response.status_code, reason_of(response)) == (
         400,
-        {"detail": "periodo non valido: scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"},
+        {"detail": "periodo non valido: scegliere tra 30m, 1h, 6h, 12h, 24h, 7d, 30d, all, range"},
     )

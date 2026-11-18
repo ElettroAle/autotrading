@@ -159,6 +159,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/reconciliation/unattributable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Unattributable */
+        get: operations["list_unattributable_accounts__account_id__reconciliation_unattributable_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{account_id}/reconciliation/confirmation": {
         parameters: {
             query?: never;
@@ -2632,7 +2649,7 @@ export interface components {
          *     An event belongs to a flow, or to the account when no single flow explains it.
          * @enum {string}
          */
-        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "movimento non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita";
+        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita";
         /**
          * OpeningsResume
          * @description How the openings of a flow suspended for maximum loss resume (R3.2.2).
@@ -3150,6 +3167,43 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /**
+         * UnattributableKind
+         * @enum {string}
+         */
+        UnattributableKind: "posizione" | "esecuzione" | "variazione del saldo";
+        /**
+         * UnattributablePageResponse
+         * @description At most 50 cases, newest first; `next` is the `cursor` of the following page, null on the last one. `count` and
+         *     `net_change`, the net of the changes of the balance, cover every case of the filter, not only the page.
+         */
+        UnattributablePageResponse: {
+            /** Items */
+            items: components["schemas"]["UnattributableResponse"][];
+            /** Next */
+            next: string | null;
+            /** Count */
+            count: number;
+            /** Net Change */
+            net_change: string;
+        };
+        /**
+         * UnattributableResponse
+         * @description A case no flow explains (R1.6.2): the change of the balance, or the size of a position or an execution, as text
+         *     without trailing zeros (ADR 0047).
+         */
+        UnattributableResponse: {
+            /**
+             * Detected At
+             * Format: date-time
+             */
+            detected_at: string;
+            kind: components["schemas"]["UnattributableKind"];
+            /** Asset */
+            asset: string | null;
+            /** Amount */
+            amount: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -3523,6 +3577,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationAlarmResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_unattributable_accounts__account_id__reconciliation_unattributable_get: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["UnattributableKind"] | null;
+                /** @description dall'istante incluso */
+                since?: string | null;
+                /** @description all'istante escluso */
+                until?: string | null;
+                /** @description `next` della pagina precedente */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnattributablePageResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5005,7 +5098,7 @@ export interface operations {
     read_flow_state_flows__flow_id__state_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5085,7 +5178,7 @@ export interface operations {
     read_flow_statistics_flows__flow_id__statistics_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5123,7 +5216,7 @@ export interface operations {
     read_forecast_accuracy_flows__flow_id__forecast_accuracy_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5301,7 +5394,7 @@ export interface operations {
     list_flow_overviews_flows_overview_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5407,7 +5500,7 @@ export interface operations {
                 action?: string | null;
                 /** @description long o short */
                 direction?: string | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5476,7 +5569,7 @@ export interface operations {
     read_flow_equity_flows__flow_id__equity_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5519,7 +5612,7 @@ export interface operations {
                 asset?: string | null;
                 /** @description versione della configurazione di un flusso */
                 version?: number | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5562,7 +5655,7 @@ export interface operations {
                 asset?: string | null;
                 /** @description versione della configurazione di un flusso */
                 version?: number | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5605,7 +5698,7 @@ export interface operations {
                 asset?: string | null;
                 /** @description versione della configurazione di un flusso */
                 version?: number | null;
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;
@@ -5643,7 +5736,7 @@ export interface operations {
     rank_flows_flows_ranking_get: {
         parameters: {
             query?: {
-                /** @description 30m, 1h, 12h, 24h, 7d, 30d, all o range */
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
                 period?: string;
                 /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
                 from?: string | null;

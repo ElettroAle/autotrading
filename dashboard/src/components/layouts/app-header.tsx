@@ -16,7 +16,7 @@ const Navigation = () => {
   return (
     <>
       {pathname === paths.home.path ? null : <BackButton />}
-      <Link to={paths.home.getHref()} className="font-semibold">
+      <Link to={paths.home.getHref()} className="min-w-0 truncate font-semibold">
         {PLATFORM_NAME}
       </Link>
     </>
@@ -26,19 +26,25 @@ const Navigation = () => {
 /**
  * The bar on top of every page: the name of the platform and the environment of the installation (R0.1.4), with the
  * way back on the pages of the dashboard (ADR 0145), and on the right the area of the signed-in user (ADR
- * area-utente-in-alto-a-destra). Outside the router, before the dashboard opens, the name links nowhere.
+ * area-utente-in-alto-a-destra). Outside the router, before the dashboard opens, the name links nowhere. On one line
+ * at every width (ADR intestazione-su-una-riga).
  */
 export const AppHeader = ({ children }: { children?: ReactNode }) => {
   const { environment } = useRuntimeConfig();
   const inDashboard = useInRouterContext();
   return (
-    // On a narrow phone the area of the user goes on a line of its own rather than pushing the page wider.
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 md:px-6">
-      <div className="flex items-center gap-3">
+    // The bar never wraps, or it would grow over the page: where the room ends, the name of the platform gives way
+    // (ADR intestazione-su-una-riga).
+    <header className="flex flex-nowrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 md:px-6">
+      <div className="flex min-w-0 items-center gap-3">
         {children}
-        {inDashboard ? <Navigation /> : <span className="font-semibold">{PLATFORM_NAME}</span>}
+        {inDashboard ? (
+          <Navigation />
+        ) : (
+          <span className="min-w-0 truncate font-semibold">{PLATFORM_NAME}</span>
+        )}
       </div>
-      <div className="ml-auto flex min-w-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <EnvironmentBadge environment={environment} />
         <UserMenu />
       </div>

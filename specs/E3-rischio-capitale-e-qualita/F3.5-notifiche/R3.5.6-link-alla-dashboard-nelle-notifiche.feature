@@ -29,7 +29,7 @@ Funzionalità: R3.5.6 Link alla dashboard nelle notifiche
       | liquidazione di una posizione | Posizioni chiuse |
 
   Scenario: Notifica di un conto
-    Dato un movimento non attribuibile sul conto "Hyperliquid testnet"
+    Dato una posizione non attribuibile sul conto "Hyperliquid testnet"
     Quando ricevo la notifica
     Allora la notifica porta alla pagina Allarmi del conto
 

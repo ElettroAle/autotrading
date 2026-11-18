@@ -19,6 +19,7 @@ def test_the_whole_life_has_no_bounds() -> None:
     [
         ("30m", timedelta(minutes=30)),
         ("1h", timedelta(hours=1)),
+        ("6h", timedelta(hours=6)),
         ("12h", timedelta(hours=12)),
         ("24h", timedelta(hours=24)),
         ("7d", timedelta(days=7)),
@@ -39,8 +40,27 @@ def test_the_last_hour_at_10_15_holds_from_9_15_included_to_the_current_minute()
     assert not window.contains(datetime(2026, 11, 16, 9, 14, 59, tzinfo=UTC))
 
 
+# ADR periodo-di-6-ore-e-dall-inizio: the last 6 hours at 10:15 hold from 4:15 included to the current minute.
+def test_the_last_6_hours_at_10_15_hold_from_4_15_included_to_the_current_minute() -> None:
+    window = StatisticsPeriod.named("6h").window(datetime(2026, 11, 16, 10, 15, 42, tzinfo=UTC))
+
+    assert window == TimeWindow(
+        since=datetime(2026, 11, 16, 4, 15, tzinfo=UTC), until=datetime(2026, 11, 16, 10, 16, tzinfo=UTC)
+    )
+
+
 def test_the_periods_go_from_the_shortest_to_the_range() -> None:
-    assert [kind.value for kind in StatisticsPeriodKind] == ["30m", "1h", "12h", "24h", "7d", "30d", "all", "range"]
+    assert [kind.value for kind in StatisticsPeriodKind] == [
+        "30m",
+        "1h",
+        "6h",
+        "12h",
+        "24h",
+        "7d",
+        "30d",
+        "all",
+        "range",
+    ]
 
 
 # ADR periodo-al-minuto: a range and its window hold the minutes from the start to the end, both whole, in UTC.
@@ -70,7 +90,7 @@ def test_an_unknown_period_is_rejected() -> None:
         StatisticsPeriod.named("2h")
 
     assert raised.value.status_code == 400
-    assert str(raised.value) == "periodo non valido: scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"
+    assert str(raised.value) == "periodo non valido: scegliere tra 30m, 1h, 6h, 12h, 24h, 7d, 30d, all, range"
 
 
 @pytest.mark.parametrize(("since", "until"), [(None, NOW), (NOW, None)])
@@ -88,7 +108,7 @@ def test_a_range_cannot_end_before_it_starts() -> None:
     assert str(raised.value) == "periodo non valido: l'inizio è successivo alla fine"
 
 
-@pytest.mark.parametrize("name", ["30m", "1h", "12h", "24h", "7d", "30d", "all"])
+@pytest.mark.parametrize("name", ["30m", "1h", "6h", "12h", "24h", "7d", "30d", "all"])
 def test_only_a_range_takes_a_start_and_an_end(name: str) -> None:
     with pytest.raises(InvalidStatisticsPeriodError) as raised:
         StatisticsPeriod.named(name, NOW, None)

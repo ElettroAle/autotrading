@@ -246,7 +246,7 @@ When("toglie l'etichetta dell'intervallo", async ({ dashboard }) => {
 Then('la pagina torna al periodo del menu', async ({ dashboard, memory }) => {
   await expect(intervalLabel(dashboard)).toHaveCount(0);
   await expect(dashboard.page).not.toHaveURL(/from=|to=/);
-  await expect(dashboard.period().locator('option:checked')).toHaveText('Tutta la vita');
+  await expect(dashboard.period().locator('option:checked')).toHaveText("Dall'inizio");
   await expect(dashboard.equityPoints()).toHaveCount(memory.cycles.length);
 });
 
