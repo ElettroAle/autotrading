@@ -137,7 +137,9 @@ describe('ResultsSummary', () => {
   it('calls the gain read now the current gain', async () => {
     const summary = await show(GAINING);
 
-    const terms = Array.from(summary.querySelectorAll('dt'), (term) => term.textContent);
+    const terms = within(summary)
+      .getAllByRole('term')
+      .map((term) => term.textContent);
     expect(terms).toEqual([
       'Guadagno attuale',
       'Guadagno nel periodo',
