@@ -139,4 +139,6 @@ def test_only_an_alert_without_an_automatic_resolution_is_resolved_by_hand() -> 
 
 
 def test_an_alert_id_is_new_every_time() -> None:
-    assert AlertId.new() != AlertId.new()
+    first, second = AlertId.new(), AlertId.new()
+
+    assert first != second
