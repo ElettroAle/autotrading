@@ -5,16 +5,18 @@ import { useSearchChange } from '@/hooks/use-search-change';
 
 /**
  * The periods the API accepts, with the words the page shows (ADR 0122), from the shortest (ADR
- * periodi-brevi-nel-selettore-condiviso).
+ * periodi-brevi-nel-selettore-condiviso); the whole life keeps `all` in the address, so the addresses saved before it
+ * was named «Dall'inizio» still open (ADR periodo-di-6-ore-e-dall-inizio).
  */
 export const PERIODS = [
   { kind: '30m', label: '30 minuti' },
   { kind: '1h', label: '1 ora' },
+  { kind: '6h', label: '6 ore' },
   { kind: '12h', label: '12 ore' },
   { kind: '24h', label: '24 ore' },
   { kind: '7d', label: '7 giorni' },
   { kind: '30d', label: '30 giorni' },
-  { kind: 'all', label: 'Tutta la vita' },
+  { kind: 'all', label: "Dall'inizio" },
   { kind: 'range', label: 'Intervallo' },
 ] as const;
 
@@ -44,6 +46,7 @@ const DAY_MS = 24 * HOUR_MS;
 const LAST_DURATIONS_MS: Partial<Record<PeriodKind, number>> = {
   '30m': 30 * MINUTE_MS,
   '1h': HOUR_MS,
+  '6h': 6 * HOUR_MS,
   '12h': 12 * HOUR_MS,
   '24h': 24 * HOUR_MS,
   '7d': 7 * DAY_MS,

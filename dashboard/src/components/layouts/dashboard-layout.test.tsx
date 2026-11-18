@@ -142,6 +142,17 @@ describe('DashboardLayout', () => {
     expect(screen.getByRole('button', { name: 'Menu' })).toHaveClass('md:hidden');
   });
 
+  // ADR intestazione-su-una-riga.
+  it('shows the menu as an icon named «Menu», large enough to be touched on a phone', () => {
+    renderLayout();
+
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    expect(menu).toHaveAttribute('aria-label', 'Menu');
+    expect(within(menu).getByRole('img', { hidden: true })).toHaveAttribute('data-icon', 'menu');
+    expect(menu).not.toHaveTextContent('Menu');
+    expect(menu).toHaveClass('min-h-11', 'min-w-11', 'shrink-0');
+  });
+
   it('opens and closes the menu on a narrow screen', async () => {
     renderLayout();
     const menu = screen.getByRole('button', { name: 'Menu' });
