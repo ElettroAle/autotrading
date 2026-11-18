@@ -55,13 +55,18 @@ describe('AccountCapitalChanges', () => {
     expect(cellsOf(increase)[1]).toBe('Flussoalfa');
   });
 
-  it('is titled with the name of the account, under the period', async () => {
+  // ADR elenco-dei-conti-e-pagina-del-conto: the history is the tab Capitale of the page of the account.
+  it('is the tab Capitale of the page of the account, titled with its name', async () => {
     const accountId = fakePlatform.giveFlowTo('anna', 'alfa').accountId ?? '';
     await renderApp({ account: 'anna', url: `/accounts/${accountId}/capital` });
 
     expect(
-      await screen.findByRole('heading', { name: 'Storico del capitale di principale' }),
+      await screen.findByRole('heading', { level: 1, name: 'principale' }),
     ).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Capitale' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   it('shows only the changes of the minutes of the period', async () => {
@@ -110,7 +115,9 @@ describe('AccountCapitalChanges', () => {
     fakePlatform.giveFlowTo('anna', 'alfa');
     await renderApp({ account: 'anna', url: '/accounts/account-of-bruno/capital' });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('non trovato');
-    expect(screen.getByRole('heading', { name: 'Storico del capitale' })).toBeInTheDocument();
+    // The page of the account reads the account first: an account of someone else is not found (ADR
+    // elenco-dei-conti-e-pagina-del-conto).
+    expect(await screen.findByText('Conto non trovato.')).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Variazioni di capitale' })).not.toBeInTheDocument();
   });
 });

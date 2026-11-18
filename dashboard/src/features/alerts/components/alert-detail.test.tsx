@@ -53,7 +53,7 @@ describe('AlertDetailView', () => {
     expect(within(article).getByText('Critica')).toBeInTheDocument();
     expect(within(article).getByRole('link', { name: 'Conto test-1' })).toHaveAttribute(
       'href',
-      '/accounts',
+      `/accounts/${ACCOUNT_ID}`,
     );
     const happened = within(article).getByRole('region', { name: 'Che cosa è successo' });
     expect(happened).toHaveTextContent(`Aperto il${formatInstant(OPENED_AT.toISOString())}`);

@@ -13,11 +13,13 @@ const SECRET_LABEL = "Chiave dell'API wallet";
 const ADDRESS_LABEL = 'Indirizzo del conto';
 const CONFIRM_REMOVAL = 'Conferma la rimozione';
 
-// The commands of the account, at the bottom of its box (ADR conti-a-riquadri).
-const accountItem = async (name: string): Promise<HTMLElement> =>
-  within(await screen.findByRole('article', { name })).getByRole('group', {
-    name: `Comandi del conto ${name}`,
-  });
+// The element of the account in the list, with its menu «Azioni» (ADR elenco-dei-conti-e-pagina-del-conto).
+const accountItem = (name: string): Promise<HTMLElement> => screen.findByRole('article', { name });
+
+const chooseAction = async (item: HTMLElement, name: string, action: string) => {
+  await userEvent.click(within(item).getByRole('button', { name: `Azioni del conto ${name}` }));
+  await userEvent.click(within(item).getByRole('menuitem', { name: action }));
+};
 
 const accountNames = (account: string) =>
   fakePlatform.user(account).accounts.map(({ name }) => name);
@@ -26,7 +28,7 @@ const NO_ACCOUNT = 'Nessun conto registrato.';
 
 const replaceCredentials = async (name: string, secretKey: string) => {
   const item = await accountItem(name);
-  await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
+  await chooseAction(item, name, 'Sostituisci le credenziali');
   await userEvent.type(within(item).getByLabelText(SECRET_LABEL), secretKey);
   await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
   return item;
@@ -34,7 +36,7 @@ const replaceCredentials = async (name: string, secretKey: string) => {
 
 const askRemoval = async (name: string) => {
   const item = await accountItem(name);
-  await userEvent.click(within(item).getByRole('button', { name: 'Rimuovi' }));
+  await chooseAction(item, name, 'Rimuovi');
   const dialog = within(item).getByRole('alertdialog', { name: `Rimozione del conto ${name}` });
   await userEvent.click(within(dialog).getByRole('button', { name: CONFIRM_REMOVAL }));
   return item;
@@ -47,31 +49,15 @@ describe('AccountActions', () => {
     fakePlatform.addAccount('bruno', 'altrui');
   });
 
-  it('leads from each account to the history of its capital (R3.4.2)', async () => {
-    const account = fakePlatform.addAccount('anna', 'principale');
-    const user = userEvent.setup();
-    await renderApp({ account: 'anna', url: ACCOUNTS });
-
-    const link = within(await accountItem('principale')).getByRole('link', {
-      name: 'Storico del capitale',
-    });
-    expect(link).toHaveAttribute('href', `/accounts/${account.id}/capital`);
-    await user.click(link);
-
-    expect(
-      await screen.findByRole('heading', { name: 'Storico del capitale di principale' }),
-    ).toBeInTheDocument();
-  });
-
   it('replaces the credentials and confirms it, with the secret emptied', async () => {
     fakePlatform.addAccount('anna', 'principale');
     await renderApp({ account: 'anna', url: ACCOUNTS });
 
     const item = await replaceCredentials('principale', SECRET_KEY);
 
-    expect(await within(item).findByRole('status')).toHaveTextContent(
-      'Credenziali del conto principale sostituite',
-    );
+    expect(
+      await within(item).findByText('Credenziali del conto principale sostituite'),
+    ).toHaveAttribute('role', 'status');
     expect(within(item).queryByLabelText(SECRET_LABEL)).not.toBeInTheDocument();
     expect(document.body.innerHTML).not.toContain(SECRET_KEY);
   });
@@ -81,7 +67,7 @@ describe('AccountActions', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const item = await accountItem('principale');
 
-    await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
+    await chooseAction(item, 'principale', 'Sostituisci le credenziali');
 
     const form = within(item).getByRole('form', { name: 'Nuove credenziali del conto principale' });
     expect(within(form).queryByLabelText(ADDRESS_LABEL)).not.toBeInTheDocument();
@@ -95,16 +81,17 @@ describe('AccountActions', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const item = await accountItem('principale');
 
-    await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
+    await chooseAction(item, 'principale', 'Sostituisci le credenziali');
     await userEvent.type(within(item).getByLabelText(ADDRESS_LABEL), ADDRESS);
     await userEvent.type(within(item).getByLabelText(SECRET_LABEL), SECRET_KEY);
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
-    expect(await within(item).findByRole('status')).toHaveTextContent(
-      'Credenziali del conto principale sostituite',
+    expect(
+      await within(item).findByText('Credenziali del conto principale sostituite'),
+    ).toHaveAttribute('role', 'status');
+    expect(fakePlatform.accountNamed('principale').publicFields).toEqual(
+      expect.objectContaining({ account_address: ADDRESS }),
     );
-    const card = screen.getByRole('article', { name: 'principale' });
-    expect(await within(card).findByText(ADDRESS)).toBeInTheDocument();
   });
 
   it('tells why the replacement was refused and empties the secret', async () => {
@@ -124,7 +111,7 @@ describe('AccountActions', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const item = await accountItem('principale');
 
-    await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci le credenziali' }));
+    await chooseAction(item, 'principale', 'Sostituisci le credenziali');
     await userEvent.click(within(item).getByRole('button', { name: 'Sostituisci' }));
 
     await waitFor(() =>
@@ -186,7 +173,7 @@ describe('AccountActions', () => {
     await renderApp({ account: 'anna', url: ACCOUNTS });
     const item = await accountItem('principale');
 
-    await userEvent.click(within(item).getByRole('button', { name: 'Rimuovi' }));
+    await chooseAction(item, 'principale', 'Rimuovi');
     await userEvent.click(within(item).getByRole('button', { name: 'Annulla' }));
 
     expect(within(item).queryByRole('alertdialog')).not.toBeInTheDocument();

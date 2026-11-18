@@ -8,7 +8,8 @@ import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 import { formatInstant } from '@/utils/format-instant';
 
-const ACCOUNTS_PAGE = '/accounts';
+// The reconciliation is a tab of the page of the account (ADR elenco-dei-conti-e-pagina-del-conto).
+const RECONCILIATION_TAB = '/accounts/account-test-1/reconciliation';
 const ACCOUNT_ID = 'account-test-1';
 const COMPARED_AT = new Date(Date.UTC(2026, 10, 16, 9, 0));
 
@@ -22,9 +23,10 @@ const reconciliation = async (): Promise<HTMLElement> => {
 const detail = (section: HTMLElement, term: string): HTMLElement =>
   within(section).getByLabelText(term, { selector: 'dd' });
 
-// Whether the account is aligned is said in the header of its box, outside the section (ADR conti-a-riquadri).
+// Whether the account is aligned is said in the head of its page, outside the section (ADR
+// elenco-dei-conti-e-pagina-del-conto).
 const state = (): Promise<HTMLElement> =>
-  within(screen.getByRole('article', { name: 'test-1' })).findByRole('status', {
+  within(screen.getByRole('region', { name: 'test-1' })).findByRole('status', {
     name: 'Stato della riconciliazione',
   });
 
@@ -37,7 +39,7 @@ describe('ReconciliationStatus', () => {
   });
 
   it('says under its title that it compares the balance without the result of the open positions', async () => {
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await screen.findByRole('region', { name: 'Riconciliazione del conto test-1' });
     const title = within(section).getByRole('heading', { name: 'Riconciliazione' });
@@ -49,7 +51,7 @@ describe('ReconciliationStatus', () => {
 
   it('shows an aligned account with its last comparison and threshold, without the confirmation', async () => {
     fakeReconciliation.compare(ACCOUNT_ID, 1000, 1000.5, COMPARED_AT);
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     expect(await state()).toHaveTextContent('Riconciliazione: allineato');
@@ -66,7 +68,7 @@ describe('ReconciliationStatus', () => {
   });
 
   it('says when the balance of the account was never compared', async () => {
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     expect(detail(section, 'Ultimo confronto')).toHaveTextContent('nessun confronto ancora');
@@ -75,7 +77,7 @@ describe('ReconciliationStatus', () => {
 
   it('shows an alarm with its balances and offers the confirmation', async () => {
     fakeReconciliation.openAlarm(ACCOUNT_ID, 1000, 980, COMPARED_AT);
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     expect(await state()).toHaveTextContent('Riconciliazione: allarme');
@@ -85,7 +87,7 @@ describe('ReconciliationStatus', () => {
 
   it('closes the alarm once the user confirms having checked the account', async () => {
     fakeReconciliation.openAlarm(ACCOUNT_ID, 1000, 980, COMPARED_AT);
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     await userEvent.click(within(section).getByRole('button', { name: 'Ho verificato' }));
@@ -97,7 +99,7 @@ describe('ReconciliationStatus', () => {
     );
 
     expect(
-      await within(screen.getByRole('article', { name: 'test-1' })).findByText(
+      await within(screen.getByRole('region', { name: 'test-1' })).findByText(
         'Riconciliazione: allineato',
       ),
     ).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe('ReconciliationStatus', () => {
 
   it('keeps the alarm open when the user cancels the confirmation', async () => {
     fakeReconciliation.openAlarm(ACCOUNT_ID, 1000, 980, COMPARED_AT);
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     await userEvent.click(within(section).getByRole('button', { name: 'Ho verificato' }));
@@ -135,7 +137,7 @@ describe('ReconciliationStatus', () => {
         ),
       ),
     );
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     await userEvent.click(within(section).getByRole('button', { name: 'Ho verificato' }));
@@ -149,7 +151,7 @@ describe('ReconciliationStatus', () => {
   });
 
   it('leads to the alarms of the account', async () => {
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await reconciliation();
     expect(within(section).getByRole('link', { name: 'Allarmi' })).toHaveAttribute(
@@ -167,9 +169,9 @@ describe('ReconciliationStatus', () => {
         ),
       ),
     );
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     expect(await screen.findByText(/errore interno/)).toBeInTheDocument();
-    expect(screen.getByRole('article', { name: 'test-1' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'test-1' })).toBeInTheDocument();
   });
 });

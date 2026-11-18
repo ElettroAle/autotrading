@@ -1,6 +1,7 @@
 """ADR-movimenti-non-spiegati-nel-riquadro-del-conto: the record of what no flow explains belongs to the account. The
-box of the account shows it right under its reconciliation, with the shared table and its shared filters, never a
-table or filters of its own; the record is read from the port of the reconciliations, one page at a time.
+account shows it right under its reconciliation, in the tab Riconciliazione of the page of the account since
+ADR-elenco-dei-conti-e-pagina-del-conto, with the shared table and its shared filters, never a table or filters of its
+own; the record is read from the port of the reconciliations, one page at a time.
 """
 
 import inspect
@@ -11,7 +12,7 @@ from autotrading.application.flows.ports import ReconciliationRepositoryPort
 
 DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard" / "src"
 COMPONENTS = DASHBOARD / "features" / "accounts" / "components"
-CARD = COMPONENTS / "account-card.tsx"
+RECONCILIATION_TAB = COMPONENTS / "account-reconciliation.tsx"
 MOVEMENTS = COMPONENTS / "unattributable-movements.tsx"
 SECTIONS = re.compile(r"<(ReconciliationStatus|UnattributableMovements|AccountActions) ")
 
@@ -48,7 +49,7 @@ def section_violations(section: str) -> list[str]:
 
 
 def test_adr_movimenti_non_spiegati_nel_riquadro_del_conto_the_box_shows_the_record_under_the_reconciliation() -> None:
-    assert card_violations(CARD.read_text(encoding="utf-8")) == []
+    assert card_violations(RECONCILIATION_TAB.read_text(encoding="utf-8")) == []
     assert section_violations(MOVEMENTS.read_text(encoding="utf-8")) == []
 
 

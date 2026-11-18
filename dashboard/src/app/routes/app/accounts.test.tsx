@@ -38,11 +38,14 @@ describe('AccountsRoute', () => {
 
     await openAccountsFromTheMenu();
 
-    const card = await within(await screen.findByRole('region', { name: 'Conti' })).findByRole(
+    const item = await within(await screen.findByRole('region', { name: 'Conti' })).findByRole(
       'article',
       { name: 'principale' },
     );
-    expect(within(card).getByLabelText('capitale allocato', { selector: 'dd' })).toBeVisible();
+    // The capital allocated is on the overview of the page of the account (ADR elenco-dei-conti-e-pagina-del-conto).
+    await userEvent.click(within(item).getByRole('link', { name: 'principale' }));
+    const overview = await screen.findByRole('region', { name: 'Panoramica del conto principale' });
+    expect(within(overview).getByLabelText('capitale allocato', { selector: 'dd' })).toBeVisible();
   });
 
   it('rereads the accounts of the flow editor after an account is registered', async () => {

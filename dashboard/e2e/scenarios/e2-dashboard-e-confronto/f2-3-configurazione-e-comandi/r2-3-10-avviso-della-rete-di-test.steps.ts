@@ -81,6 +81,11 @@ Then(
     await expect(dashboard.accountNetwork(name)).toHaveText(`TEST · ${networkName}`, {
       useInnerText: true,
     });
+    // In the detail too: the head of the page of the account (ADR elenco-dei-conti-e-pagina-del-conto).
+    await dashboard.openAccount(name);
+    await expect(dashboard.accountNetwork(name)).toHaveText(`TEST · ${networkName}`, {
+      useInnerText: true,
+    });
   },
 );
 

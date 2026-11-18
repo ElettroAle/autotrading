@@ -2,8 +2,12 @@ import type { RouteObject } from 'react-router';
 
 import { paths } from '@/config/paths';
 
+import { AccountRoute } from './routes/app/account';
 import { AccountAlarmsRoute } from './routes/app/account-alarms';
 import { AccountCapitalRoute } from './routes/app/account-capital';
+import { AccountOverviewRoute } from './routes/app/account-overview';
+import { AccountReconciliationRoute } from './routes/app/account-reconciliation';
+import { AccountSettingsRoute } from './routes/app/account-settings';
 import { AccountsRoute } from './routes/app/accounts';
 import { AlertRoute, AlertsRoute } from './routes/app/alerts';
 import { ClosedPositionsRoute } from './routes/app/closed-positions';
@@ -39,7 +43,18 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <HomeRoute /> },
       { path: paths.accounts.path, element: <AccountsRoute /> },
-      { path: paths.accountCapital.path, element: <AccountCapitalRoute /> },
+      // The tabs of the page of the account live under its head, as those of the flow (ADR
+      // elenco-dei-conti-e-pagina-del-conto); the address of its alarms of before leads to its alerts.
+      {
+        path: paths.account.path,
+        element: <AccountRoute />,
+        children: [
+          { index: true, element: <AccountOverviewRoute /> },
+          { path: paths.accountReconciliation.path, element: <AccountReconciliationRoute /> },
+          { path: paths.accountCapital.path, element: <AccountCapitalRoute /> },
+          { path: paths.accountSettings.path, element: <AccountSettingsRoute /> },
+        ],
+      },
       { path: paths.accountAlarms.path, element: <AccountAlarmsRoute /> },
       { path: paths.newFlow.path, element: <NewFlowRoute /> },
       // The tabs of the page of the flow live under its head and its period (R6.4.3).

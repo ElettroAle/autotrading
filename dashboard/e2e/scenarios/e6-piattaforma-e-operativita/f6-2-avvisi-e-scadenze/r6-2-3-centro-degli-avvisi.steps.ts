@@ -156,6 +156,8 @@ When(
   async ({ dashboard }, account: string, name: string) => {
     await dashboard.openAccounts();
     await dashboard.signInAs(account);
+    // The reconciliation of the account is a tab of its page (ADR elenco-dei-conti-e-pagina-del-conto).
+    await dashboard.openAccount(name, 'Riconciliazione');
     await dashboard.accountReconciliation(name).getByRole('link', { name: 'Allarmi' }).click();
     await expect(dashboard.pageHeading()).toHaveText('Avvisi');
   },

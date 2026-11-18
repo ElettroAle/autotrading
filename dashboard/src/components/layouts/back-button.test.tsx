@@ -4,8 +4,8 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { BackButton } from './back-button';
 
-const openDashboardWith = (initialEntries: string[]) => {
-  const router = createMemoryRouter([{ path: '*', element: <BackButton /> }], {
+const openDashboardWith = (initialEntries: string[], fallback?: string) => {
+  const router = createMemoryRouter([{ path: '*', element: <BackButton fallback={fallback} /> }], {
     initialEntries,
     initialIndex: initialEntries.length - 1,
   });
@@ -40,5 +40,14 @@ describe('BackButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Indietro' }));
 
     expect(router.state.location.pathname).toBe('/');
+  });
+
+  // ADR elenco-dei-conti-e-pagina-del-conto: from the page of an account opened first, back to the accounts.
+  it('leads to the page the page names from the page the dashboard was opened on', async () => {
+    const router = openDashboardWith(['/accounts/account-principale'], '/accounts');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+
+    expect(router.state.location.pathname).toBe('/accounts');
   });
 });

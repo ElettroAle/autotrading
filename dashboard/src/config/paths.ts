@@ -14,10 +14,24 @@ export const paths = {
     path: '/accounts',
     getHref: () => '/accounts',
   },
-  // The history of the capital of an account, reached from the page of the accounts (R3.4.2).
+  // The page of an account, with its tabs as the page of a flow: the overview first (ADR
+  // elenco-dei-conti-e-pagina-del-conto).
+  account: {
+    path: '/accounts/:accountId',
+    getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}`,
+  },
+  accountReconciliation: {
+    path: '/accounts/:accountId/reconciliation',
+    getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/reconciliation`,
+  },
+  // The history of the capital of an account, the tab Capitale of its page (R3.4.2).
   accountCapital: {
     path: '/accounts/:accountId/capital',
     getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/capital`,
+  },
+  accountSettings: {
+    path: '/accounts/:accountId/settings',
+    getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/settings`,
   },
   // The alarms of an account of before the alerts: the address leads to the alerts of the account (R6.2.3).
   accountAlarms: {

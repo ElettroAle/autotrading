@@ -38,7 +38,8 @@ const RESOURCE_KINDS: Readonly<Record<Alert['resource']['kind'], string>> = {
 
 export const RESOURCE_KIND_LABELS = RESOURCE_KINDS;
 
-// The page where the user acts on the resource: the box of the account, the page of the flow, the keys.
+// The page where the user acts on the resource: the page of the account (ADR elenco-dei-conti-e-pagina-del-conto), the
+// page of the flow, the keys.
 const resourceHrefOf = (resource: Alert['resource']): string => {
   if (resource.kind === 'flow') {
     return paths.flow.getHref(resource.id);
@@ -46,7 +47,7 @@ const resourceHrefOf = (resource: Alert['resource']): string => {
   if (resource.kind === 'key') {
     return paths.providerKeys.getHref();
   }
-  return paths.accounts.getHref();
+  return paths.account.getHref(resource.id);
 };
 
 /** The resource the alert is about, with the link to where the user acts on it. */

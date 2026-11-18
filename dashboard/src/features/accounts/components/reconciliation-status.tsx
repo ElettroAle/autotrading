@@ -70,12 +70,12 @@ type Action = 'none' | 'confirming' | 'threshold';
 
 type SectionProps = { readonly account: Account; readonly children: ReactNode };
 
-/** The section of the reconciliation in the box of the account, with its title even while it is read (ADR conti-a-riquadri). */
+/**
+ * The section of the reconciliation at the top of its tab, with its title even while it is read (ADR
+ * elenco-dei-conti-e-pagina-del-conto).
+ */
 const ReconciliationSection = ({ account, children }: SectionProps) => (
-  <section
-    aria-label={`Riconciliazione del conto ${account.name}`}
-    className="space-y-2 border-t border-slate-200 pt-3"
-  >
+  <section aria-label={`Riconciliazione del conto ${account.name}`} className="space-y-2">
     <h3 className="font-semibold">Riconciliazione</h3>
     <p className="text-sm text-slate-600">
       Confronta il saldo senza il risultato delle posizioni aperte
@@ -129,7 +129,8 @@ const ReconciliationContent = ({ account }: { readonly account: Account }) => {
 /**
  * The data of the reconciliation of the account, as the API says it, with the commands on it: the confirmation of an
  * open alarm, its alarms and the threshold (R3.3.2, ADR stato-della-riconciliazione-nella-dashboard); whether it is
- * aligned is said in the header of the box (ADR conti-a-riquadri).
+ * aligned is said beside the name of the account, in the list and in the head of its page (ADR
+ * elenco-dei-conti-e-pagina-del-conto).
  */
 export const ReconciliationStatus = ({ account }: { readonly account: Account }) => (
   <ReconciliationSection account={account}>

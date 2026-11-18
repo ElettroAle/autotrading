@@ -135,13 +135,22 @@ const NavigationGroupLinks = ({ group }: { group: NavigationGroup }) => {
  * area of the page, its sub-pages included (ADR 0160); «Esci» is in the menu of the user, in the bar on top (ADR
  * area-utente-in-alto-a-destra).
  */
-export const DashboardLayout = ({ title, children }: { title: string; children: ReactNode }) => {
+export const DashboardLayout = ({
+  title,
+  backTo,
+  children,
+}: {
+  title: string;
+  /** Where «Indietro» leads from the page the dashboard was opened on, the main page when not given (ADR 0145). */
+  backTo?: string;
+  children: ReactNode;
+}) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigationId = useId();
   const pageData = usePageData();
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <AppHeader>
+      <AppHeader backTo={backTo}>
         <button
           type="button"
           aria-expanded={menuOpen}

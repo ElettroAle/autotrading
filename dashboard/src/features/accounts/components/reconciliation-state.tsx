@@ -5,7 +5,8 @@ import type { Account } from '../api/get-accounts';
 
 /**
  * Whether the balance of the account is the expected one, as the API says it, with an icon and a text, never the
- * colour alone; while it is not read, or cannot be, the section of the reconciliation says so (ADR conti-a-riquadri).
+ * colour alone; while it is not read, or cannot be, the section of the reconciliation says so (ADR conti-a-riquadri,
+ * ADR elenco-dei-conti-e-pagina-del-conto).
  */
 export const ReconciliationState = ({ account }: { readonly account: Account }) => {
   const reconciliation = useAccountReconciliation(account.id);

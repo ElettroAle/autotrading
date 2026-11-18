@@ -131,7 +131,8 @@ const MovementsContent = ({ account }: { readonly account: Account }) => {
 };
 
 /**
- * The record of what no flow explains on the account, under its reconciliation, as a portal shows the activity of a
+ * The record of what no flow explains on the account, under its reconciliation in the tab Riconciliazione of the page of
+ * the account (ADR elenco-dei-conti-e-pagina-del-conto), as a portal shows the activity of a
  * resource: the changes of the balance within the threshold and the other cases, newest first, with the net of the
  * changes of the period, the shared filters and the next page on request (R1.6.2, ADR
  * movimenti-non-spiegati-nel-riquadro-del-conto).
