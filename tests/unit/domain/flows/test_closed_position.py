@@ -65,6 +65,7 @@ def test_the_ends_keep_the_cycles_that_produced_them() -> None:
 def test_the_reasons_speak_italian() -> None:
     assert [reason.value for reason in CloseReason] == [
         "decisione dell'agente",
+        "inversione",
         "comando manuale",
         "stop del flusso",
         "rimozione del conto",

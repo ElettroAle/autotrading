@@ -3,8 +3,10 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
 
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
 
 
@@ -51,7 +53,7 @@ class ApprovedOpening:
     def order_with[T](
         self,
         opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],
-        closing: Callable[[str], T],  # noqa: ARG002 - each outcome builds one of the orders
+        closing: Callable[[str, bool], T],  # noqa: ARG002 - each outcome builds one of the orders
         updating: Callable[[str, Decimal | None, Decimal | None, bool], T],  # noqa: ARG002 - each outcome builds one of the orders
     ) -> T:
         """The order that executes the opening, built by whoever sends it: asset, side, value, leverage, and the stop
@@ -63,16 +65,28 @@ class ApprovedOpening:
 
 @dataclass(frozen=True, slots=True)
 class ApprovedClose:
+    """A close the risk check lets through, always total (R1.4.4). The close of a reversal carries the opening on the
+    opposite side, which waits for the close to be executed and is checked on the state after it (R1.4.10).
+    """
+
     asset: str
+    reopening: OpenIntent | None = None
+
+    @property
+    def reason(self) -> CloseReason:
+        """Why the position closes, as its history keeps it (R1.7.2)."""
+        return CloseReason.AGENT if self.reopening is None else CloseReason.REVERSAL
 
     def order_with[T](
         self,
         opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],  # noqa: ARG002 - one of the orders
-        closing: Callable[[str], T],
+        closing: Callable[[str, bool], T],
         updating: Callable[[str, Decimal | None, Decimal | None, bool], T],  # noqa: ARG002 - one of the orders
     ) -> T:
-        """The order that executes the close, built by whoever sends it: a close is always total (R1.4.4)."""
-        return closing(self.asset)
+        """The order that executes the close, built by whoever sends it: the asset, and whether it reverses the
+        position.
+        """
+        return closing(self.asset, self.reopening is not None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +102,7 @@ class ApprovedUpdate:
     def order_with[T](
         self,
         opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],  # noqa: ARG002 - one of the orders
-        closing: Callable[[str], T],  # noqa: ARG002 - one of the orders
+        closing: Callable[[str, bool], T],  # noqa: ARG002 - one of the orders
         updating: Callable[[str, Decimal | None, Decimal | None, bool], T],
     ) -> T:
         """The order that replaces the protection of the position, built by whoever sends it: asset, new stop, new
@@ -113,6 +127,16 @@ class BlockedDecision:
     def cause(self) -> str:
         """Why the decision is blocked, without naming the opening the reason may begin with (R3.5.1)."""
         return self.reason.removeprefix(_opening_not_executed(self.asset))
+
+    @classmethod
+    def without_reversible_position(cls, asset: str) -> BlockedDecision:
+        """A reversal needs the position of the flow it turns (R1.4.10, R1.5.3)."""
+        return cls(asset, "nessuna posizione da invertire")
+
+    @classmethod
+    def closing_not_executed(cls, asset: str) -> BlockedDecision:
+        """The opening of a reversal is never sent while the position it follows is still open (R1.4.10)."""
+        return cls.opening(asset, "chiusura non eseguita")
 
     @classmethod
     def untradable(cls, asset: str) -> BlockedDecision:

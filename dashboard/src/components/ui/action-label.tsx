@@ -6,6 +6,7 @@ const ICONS: ReadonlyMap<string, IconName> = new Map([
   ['chiudi', 'x'],
   ['mantieni', 'pause'],
   ['aggiorna', 'refresh'],
+  ['inverti', 'arrow-left-right'],
 ]);
 
 /** An action of the agent, with its icon; an action it does not know shows as the API wrote it. */

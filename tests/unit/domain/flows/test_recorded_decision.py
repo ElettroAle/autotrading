@@ -19,11 +19,13 @@ def test_an_opening_keeps_asset_action_direction_confidence_and_reasoning() -> N
     assert (decision.confidence, decision.reasoning) == (72, "trend rialzista")
 
 
-def test_the_actions_are_the_four_words_of_the_agent() -> None:
-    assert [action.value for action in DecisionAction] == ["apri", "chiudi", "mantieni", "aggiorna"]
+def test_the_actions_are_the_five_words_of_the_agent() -> None:
+    assert [action.value for action in DecisionAction] == ["apri", "chiudi", "mantieni", "aggiorna", "inverti"]
 
 
-@pytest.mark.parametrize("action", [DecisionAction.CLOSE, DecisionAction.HOLD, DecisionAction.UPDATE])
+@pytest.mark.parametrize(
+    "action", [DecisionAction.CLOSE, DecisionAction.HOLD, DecisionAction.UPDATE, DecisionAction.REVERSE]
+)
 def test_a_decision_other_than_an_opening_has_no_direction(action: DecisionAction) -> None:
     assert RecordedDecision("BTC", action, None, 40, "attesa").direction is None
 
@@ -32,7 +34,9 @@ def test_an_opening_without_its_fields_has_no_direction() -> None:
     assert RecordedDecision("BTC", DecisionAction.OPEN, None, 40, "campi mancanti").direction is None
 
 
-@pytest.mark.parametrize("action", [DecisionAction.CLOSE, DecisionAction.HOLD, DecisionAction.UPDATE])
+@pytest.mark.parametrize(
+    "action", [DecisionAction.CLOSE, DecisionAction.HOLD, DecisionAction.UPDATE, DecisionAction.REVERSE]
+)
 def test_refuses_a_direction_on_a_decision_other_than_an_opening(action: DecisionAction) -> None:
     with pytest.raises(DirectionWithoutOpeningError, match=r"^decisione registrata non valida: direzione ") as raised:
         RecordedDecision("BTC", action, TradeSide.SHORT, 40, "attesa")

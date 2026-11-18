@@ -43,8 +43,11 @@ class ExecuteCycleOrdersUseCase:
         sent = self._execute.execute(
             ExecuteFlowOrdersCommand(cycle.account_id, cycle.flow_id, cycle.planned_at, orders)
         )
+        reversals = frozenset(order.asset for order in orders if isinstance(order, FlowClosing) and order.reversing)
         self._follow.execute(
-            FollowFlowOrdersCommand(cycle.flow_id, cycle.flow_name, cycle.planned_at, sent.orders, sent.unprotected)
+            FollowFlowOrdersCommand(
+                cycle.flow_id, cycle.flow_name, cycle.planned_at, sent.orders, sent.unprotected, reversals
+            )
         )
         return (*sent.orders, *protected, *sent.notes)
 

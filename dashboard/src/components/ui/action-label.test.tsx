@@ -8,6 +8,7 @@ describe('ActionLabel', () => {
     ['chiudi', 'x'],
     ['mantieni', 'pause'],
     ['aggiorna', 'refresh'],
+    ['inverti', 'arrow-left-right'],
   ])('shows %s with its icon next to the text', (value, icon) => {
     render(<ActionLabel value={value} />);
 

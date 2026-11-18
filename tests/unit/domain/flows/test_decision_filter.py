@@ -31,6 +31,7 @@ def test_a_filter_without_values_does_not_narrow() -> None:
         ("chiudi", DecisionAction.CLOSE),
         ("mantieni", DecisionAction.HOLD),
         ("aggiorna", DecisionAction.UPDATE),
+        ("inverti", DecisionAction.REVERSE),
     ],
 )
 def test_the_action_is_named_as_the_cycle_records_it(name: str, action: DecisionAction) -> None:
@@ -50,8 +51,8 @@ def test_an_unknown_action_is_refused_with_the_choices() -> None:
     with pytest.raises(UnknownFilteredActionError) as raised:
         DecisionFilter.named(action="apertura")
 
-    assert str(raised.value) == "azione non valida: scegliere tra apri, chiudi, mantieni, aggiorna"
-    assert raised.value.actions == ("apri", "chiudi", "mantieni", "aggiorna")
+    assert str(raised.value) == "azione non valida: scegliere tra apri, chiudi, mantieni, aggiorna, inverti"
+    assert raised.value.actions == ("apri", "chiudi", "mantieni", "aggiorna", "inverti")
     assert raised.value.status_code == 400
 
 

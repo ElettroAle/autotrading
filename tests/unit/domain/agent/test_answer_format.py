@@ -47,7 +47,7 @@ def test_every_field_of_a_decision_is_required_and_no_other_is_allowed() -> None
 def test_the_fields_only_an_opening_needs_may_be_null() -> None:
     properties = json.loads(json.dumps(decision_schema()))["properties"]
 
-    assert properties["azione"] == {"type": "string", "enum": ["apri", "chiudi", "mantieni", "aggiorna"]}
+    assert properties["azione"] == {"type": "string", "enum": ["apri", "chiudi", "mantieni", "aggiorna", "inverti"]}
     assert properties["direzione"] == {"type": ["string", "null"], "enum": ["long", "short", None]}
     assert properties["quota"] == {"type": ["number", "null"]}
     assert properties["leva"] == {"type": ["integer", "null"]}

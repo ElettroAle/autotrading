@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK
@@ -16,7 +17,7 @@ from autotrading.domain.flows.risk_outcome import (
     BlockedDecision,
     HeldPosition,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, UpdateIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, ReverseIntent, UpdateIntent
 from autotrading.domain.flows.trade_side import TradeSide
 
 EXCHANGE = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(60000))
@@ -30,6 +31,7 @@ def check(
     liquidity: str = "1000",
     funds: str = "1000",
     open_assets: frozenset[str] = frozenset(),
+    open_sides: dict[str, TradeSide] | None = None,
     bring_to_minimum: bool = False,
     total_margin: str | None = None,
     total_value: str | None = None,
@@ -38,6 +40,7 @@ def check(
     openings_suspended: str | None = None,
     minimum_confidence: int | None = None,
 ) -> RiskCheck:
+    open_sides = open_sides or {}
     limits = RiskLimits(
         max_leverage,
         None if margin is None else Decimal(margin),
@@ -49,7 +52,7 @@ def check(
         "USDC",
         Decimal(funds),
         Decimal(liquidity),
-        dict.fromkeys(open_assets, TradeSide.LONG),
+        {asset: open_sides.get(asset, TradeSide.LONG) for asset in open_assets | open_sides.keys()},
         Decimal(open_margin),
         Decimal(open_value),
         openings_suspended=openings_suspended,
@@ -618,3 +621,42 @@ def test_with_the_openings_suspended_a_hold_stays_a_hold() -> None:
 
 def test_the_openings_are_not_suspended_unless_the_state_says_so() -> None:
     assert check().outcome(opening("0.03", 2), EXCHANGE) == ApprovedOpening("BTC", TradeSide.LONG, Decimal(60), 2, ())
+
+
+def reversal(asset: str = "BTC") -> ReverseIntent:
+    return ReverseIntent(asset, Decimal("0.2"), 3, 70, ExitPlan(Decimal(70000), Decimal(50000), None))
+
+
+def test_a_reversal_closes_the_position_and_waits_to_open_the_opposite_side() -> None:
+    outcome = check(open_sides={"BTC": TradeSide.SHORT}).outcome(reversal(), None)
+
+    assert outcome == ApprovedClose(
+        "BTC", OpenIntent("BTC", TradeSide.LONG, Decimal("0.2"), 3, 70, ExitPlan(Decimal(70000), Decimal(50000), None))
+    )
+    assert isinstance(outcome, ApprovedClose)
+    assert outcome.reason is CloseReason.REVERSAL
+
+
+def test_a_reversal_without_a_position_of_the_flow_is_blocked() -> None:
+    assert check().outcome(reversal("ETH"), None) == BlockedDecision("ETH", "nessuna posizione da invertire")
+
+
+def test_the_close_of_a_reversal_goes_while_openings_are_suspended() -> None:
+    outcome = check(open_sides={"BTC": TradeSide.LONG}, openings_suspended="perdita").outcome(reversal(), None)
+
+    assert isinstance(outcome, ApprovedClose)
+    assert outcome.reopening is not None
+    assert outcome.reopening.side is TradeSide.SHORT
+
+
+def test_the_close_of_a_reversal_frees_no_liquidity_before_it_is_executed() -> None:
+    risk = check(open_sides={"BTC": TradeSide.LONG}, liquidity="50", margin="100")
+    risk.outcome(reversal(), None)
+
+    assert risk.outcome(opening("0.06", 1, "ETH"), EXCHANGE) == BlockedDecision(
+        "ETH", "liquidità del flusso insufficiente: 50 USDC"
+    )
+
+
+def test_a_close_decided_by_the_agent_has_its_reason() -> None:
+    assert ApprovedClose("BTC").reason is CloseReason.AGENT

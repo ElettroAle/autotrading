@@ -14,12 +14,13 @@ from autotrading.application.flows.ports import (
     DecisionExitPlanPort,
     DecisionPlanChangePort,
     FailedModelCall,
+    ReversedExecutions,
     RiskReview,
     SourceReading,
 )
 from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
 from autotrading.domain.agent.decision import Decision as AgentDecision
-from autotrading.domain.agent.decision import TradeAction, TradeDirection, TradeOpening
+from autotrading.domain.agent.decision import TradeAction, TradeDirection, TradeOpening, TradeReversal
 from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.agent.model_usage import ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
@@ -30,6 +31,7 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
+from autotrading.domain.flows.risk_outcome import BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -73,13 +75,14 @@ class Decision:
     reasoning: str = "motivo"
     confidence: int = 60
 
-    def intent_with[O, C, H, U](
+    def intent_with[O, C, H, U, R](
         self,
         opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, DecisionPlanChangePort], U],  # noqa: ARG002 - the decisions of the journal never update
-    ) -> O | C | H | U:
+        reversing: Callable[[str, Decimal, int, DecisionExitPlanPort, int], R],  # noqa: ARG002 - nor reverse
+    ) -> O | C | H | U | R:
         if self.action == "open":
             return opening(self.asset, "long", Decimal("0.1"), 2, ExitPlan(), 70)
         if self.action == "close":
@@ -173,6 +176,19 @@ def test_the_risk_review_is_recorded_with_its_outcomes_and_the_approved_orders_c
     assert journal().describe(CycleStep.RISK_CHECK, RiskReview((), ())) == {"esiti": [], "ordini_approvati": 0}
 
 
+def test_the_executions_of_a_cycle_with_reversals_are_recorded_with_the_outcomes_of_their_openings() -> None:
+    executed = ReversedExecutions(
+        ("inviato",), (BlockedDecision("BTC", "apertura BTC non eseguita: chiusura non eseguita"),)
+    )
+
+    assert journal().describe(CycleStep.ORDER_EXECUTION, executed) == {
+        "risultato": ["inviato"],
+        "inversioni": [
+            {"tipo": "BlockedDecision", "asset": "BTC", "reason": "apertura BTC non eseguita: chiusura non eseguita"}
+        ],
+    }
+
+
 def test_any_other_result_is_recorded_as_it_is() -> None:
     assert journal().describe(CycleStep.ORDER_EXECUTION, ()) == {"risultato": []}
 
@@ -224,6 +240,7 @@ def test_the_decisions_are_recorded_one_by_asset_with_action_direction_confidenc
         AgentDecision("ETH", TradeAction.CLOSE, "obiettivo raggiunto", 80),
         AgentDecision("SOL", TradeAction.HOLD, "attesa", 40),
         AgentDecision("DOGE", TradeAction.UPDATE, "nuovo stop", 55, plan_change=ExitPlanChange(stop=Decimal(1))),
+        AgentDecision("XRP", TradeAction.REVERSE, "cambio", 65, reversal=TradeReversal(Decimal("0.2"), 3)),
     )
 
     assert journal().recorded_decisions(decisions) == (
@@ -231,6 +248,7 @@ def test_the_decisions_are_recorded_one_by_asset_with_action_direction_confidenc
         RecordedDecision("ETH", DecisionAction.CLOSE, None, 80, "obiettivo raggiunto"),
         RecordedDecision("SOL", DecisionAction.HOLD, None, 40, "attesa"),
         RecordedDecision("DOGE", DecisionAction.UPDATE, None, 55, "nuovo stop"),
+        RecordedDecision("XRP", DecisionAction.REVERSE, None, 65, "cambio"),
     )
 
 

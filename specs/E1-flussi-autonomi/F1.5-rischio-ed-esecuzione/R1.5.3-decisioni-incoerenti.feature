@@ -6,7 +6,8 @@ Funzionalità: R1.5.3 Decisioni incoerenti con lo stato del flusso
   Perché l'agente non agisca su posizioni o capitale che il flusso non ha
 
   Si bloccano: un'apertura su un asset su cui il flusso ha già una posizione aperta, una chiusura di una posizione
-  che il flusso non ha, un'apertura il cui margine supera la liquidità disponibile del flusso dopo le riduzioni
+  che il flusso non ha, un'inversione su un asset senza una posizione aperta del flusso (motivo "nessuna posizione da
+  invertire", R1.4.10), un'apertura il cui margine supera la liquidità disponibile del flusso dopo le riduzioni
   del rischio. Lo stato del flusso è quello letto all'inizio del ciclo; dentro lo stesso ciclo ogni apertura
   approvata impegna la liquidità per le decisioni successive, nell'ordine delle decisioni, mentre una chiusura
   la libera solo dopo l'esecuzione.

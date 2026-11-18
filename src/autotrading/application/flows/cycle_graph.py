@@ -25,6 +25,8 @@ from autotrading.application.flows.ports import (
     FailedModelCall,
     FlowSnapshot,
     OrderPort,
+    ReversalPort,
+    ReversedExecutions,
     RiskPort,
     RiskReview,
     SourcePort,
@@ -62,7 +64,8 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
 
     What one node hands to the next has the type the composition root binds: the state of the flow, the data of the
     sources, the context, the decisions, the approved orders and their executions (ADR 0082). The sources are asked
-    through the concurrent calls, so a source that does not answer within the wait of the cycle is left behind.
+    through the concurrent calls, so a source that does not answer within the wait of the cycle is left behind. The
+    openings of the reversals go after the orders, through the reversal (R1.4.10).
     """
 
     start: CycleStartPort[S]
@@ -72,6 +75,7 @@ class CycleSteps[S = object, D = object, C = object, A = object, O = object, E =
     agent: AgentPort[C, A]
     risk: RiskPort[S, A, O]
     orders: OrderPort[O, E]
+    reversal: ReversalPort[O, E]
     end: CycleEndPort[S, E]
     journal: CycleJournalPort
 
@@ -147,8 +151,9 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
     """The decision cycle of a flow as a LangGraph graph (docs/architecture.md §5, ADR 0104).
 
     START → load_state → one source node for each active source, together → collect_sources → compose_context →
-    decide → risk_filter → execute → update_ledger → persist → END. Every node calls the port of its step; the
-    checkpointer keeps the state after each node, so a cycle resumes from the last node done.
+    decide → risk_filter → execute → reverse, only with a reversal → update_ledger → persist → END. Every node calls
+    the port of its step; the checkpointer keeps the state after each node, so a cycle resumes from the last node done.
+    The two executions of a cycle with a reversal are one step of its record (ADR inversione-in-due-passi-nel-ciclo).
     """
 
     def __init__(
@@ -192,6 +197,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         graph.add_node("decide", lambda state: self._decide(cycle, state))
         graph.add_node("risk_filter", lambda state: self._risk_filter(cycle, state))
         graph.add_node("execute", lambda state: self._execute(cycle, state))
+        graph.add_node("reverse", lambda state: self._reverse(cycle, state))
         graph.add_node("update_ledger", lambda state: self._update_ledger(cycle, state))
         graph.add_node("persist", lambda state: self._persist(cycle, state))
         graph.add_edge(START, "load_state")
@@ -201,7 +207,8 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         graph.add_edge("compose_context", "decide")
         graph.add_edge("decide", "risk_filter")
         graph.add_edge("risk_filter", "execute")
-        graph.add_edge("execute", "update_ledger")
+        graph.add_conditional_edges("execute", _reversing, ["reverse", "update_ledger"])
+        graph.add_edge("reverse", "update_ledger")
         graph.add_edge("update_ledger", "persist")
         graph.add_edge("persist", END)
         return graph
@@ -250,8 +257,19 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         return {"review": review, **self._done(CycleStep.RISK_CHECK, review)}
 
     def _execute(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
-        executions = self._steps.orders.execute(cycle.flow_id, cycle.planned_at, state["review"].orders)
+        review = state["review"]
+        executions = self._steps.orders.execute(cycle.flow_id, cycle.planned_at, review.orders)
+        if review.reversing:
+            # The execution of the orders is done when the openings of the reversals are sent too.
+            return {"executions": executions}
         return {"executions": executions, **self._done(CycleStep.ORDER_EXECUTION, executions)}
+
+    def _reverse(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
+        reversed_ = self._steps.reversal.execute(
+            cycle.flow_id, cycle.planned_at, cycle.schedule.anchor, state["review"].orders
+        )
+        executed = ReversedExecutions((*state["executions"], *reversed_.executions), reversed_.reversals)
+        return {"executions": executed.executions, **self._done(CycleStep.ORDER_EXECUTION, executed)}
 
     def _update_ledger(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         updated = self._steps.end.execute(cycle.flow_id, cycle.schedule.anchor, state["executions"])
@@ -286,6 +304,10 @@ def _active_sources[S](state: CycleState[S]) -> list[Send] | str:
     if not snapshot.sources:
         return "collect_sources"
     return [Send("source", SourceTask(source=source, snapshot=snapshot)) for source in snapshot.sources]
+
+
+def _reversing[S](state: CycleState[S]) -> str:
+    return "reverse" if state["review"].reversing else "update_ledger"
 
 
 def _result_of[D](source: str, outcome: CallOutcome[D], wait: timedelta) -> SourceReading[D] | AbsentSource:

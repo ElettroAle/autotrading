@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.application.flows.cycle_graph import CompletedCycle, FailedCycle, PlannedCycle, real_seconds
-from autotrading.application.flows.ports import FailedModelCall, SourceReading
+from autotrading.application.flows.ports import FailedModelCall, ReversedExecutions, SourceReading
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -311,3 +311,67 @@ def test_a_resumed_cycle_records_the_decisions_taken_before_it_stopped(cycles: C
     record = completed(graph.run(planned(cycles), at("10:05:00")))
 
     assert record.decisions == (opening_of("BTC"),)
+
+
+def order_execution_of(record: CycleRecord) -> object:
+    document = record.document(CycleStep.ORDER_EXECUTION)
+    assert document is not None
+    return document["result"]
+
+
+# ADR-inversione-in-due-passi-nel-ciclo: the opening of a reversal goes in a second execution, after the first.
+def test_a_cycle_with_a_reversal_sends_its_opening_after_the_orders_and_records_both_executions(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    cycles.agent.decisions[flow_id] = ["BTC"]
+    cycles.risk.reversing = True
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert cycles.reversal.calls == [(flow_id, at("10:00:00"), cycles.flow("alfa").schedule.anchor, ("BTC",))]
+    executions = ({"order": "BTC", "filled": True}, {"reopened": "BTC"})
+    assert order_execution_of(record) == repr(ReversedExecutions(executions, {"BTC": "riaperta"}))
+    assert cycles.flows.updates == [(flow_id, executions)]
+    assert record.steps == tuple(CycleStep)
+    assert [document.step for document in record.documents] == list(CycleStep)[:-1]
+
+
+def test_a_cycle_without_reversals_has_no_second_execution(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC"]
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert cycles.reversal.calls == []
+    assert order_execution_of(record) == repr([{"order": "BTC", "filled": True}])
+
+
+def test_a_failed_reversal_fails_the_cycle_in_the_execution_of_the_orders(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC"]
+    cycles.risk.reversing = True
+    error = FakeTransientError("l'exchange non risponde")
+    cycles.reversal.failing = error
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.error is error
+    assert outcome.record.failure is not None
+    assert outcome.record.failure.step is CycleStep.ORDER_EXECUTION
+    assert CycleStep.ORDER_EXECUTION not in outcome.record.steps
+
+
+def test_an_interrupted_reversal_resumes_without_sending_the_orders_again(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC"]
+    cycles.risk.reversing = True
+    cycles.reversal.failing = FakeTransientError("l'exchange non risponde")
+    graph = cycles.graph()
+    graph.run(planned(cycles), at("10:00:00"))
+
+    record = completed(graph.run(planned(cycles), at("10:05:00")))
+
+    assert len(cycles.orders.sent) == 1
+    assert len(cycles.reversal.calls) == 1
+    assert record.steps == tuple(CycleStep)

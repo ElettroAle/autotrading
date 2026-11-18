@@ -16,6 +16,8 @@ class CloseReason(StrEnum):
     """Why a position of a flow was closed (R1.7.2, R3.1.2)."""
 
     AGENT = "decisione dell'agente"
+    # The agent closed it to open the opposite side in the same cycle (R1.4.10).
+    REVERSAL = "inversione"
     MANUAL = "comando manuale"
     FLOW_STOP = "stop del flusso"
     ACCOUNT_REMOVAL = "rimozione del conto"

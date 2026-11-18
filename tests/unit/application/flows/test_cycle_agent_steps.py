@@ -22,8 +22,9 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate, BlockedDecision
+from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
+from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
@@ -82,15 +83,18 @@ class Decision:
     confidence: int = 70
     reasoning: str = "motivo"
 
-    def intent_with[O, C, H, U](
+    def intent_with[O, C, H, U, R](
         self,
         opening: Callable[[str, str, Decimal, int, Plan, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, Change], U],
-    ) -> O | C | H | U:
+        reversing: Callable[[str, Decimal, int, Plan, int], R],
+    ) -> O | C | H | U | R:
         if self.action == "open":
             return opening(self.asset, "long", Decimal("0.1"), 2, self.plan, self.confidence)
+        if self.action == "reverse":
+            return reversing(self.asset, Decimal("0.2"), 3, self.plan, self.confidence)
         if self.action == "close":
             return closing(self.asset)
         if self.action == "update":
@@ -342,3 +346,34 @@ def test_a_close_blocked_and_an_opening_approved_as_asked_are_not_told() -> None
     assert isinstance(outcomes, tuple)
     assert [type(outcome) for outcome in outcomes] == [BlockedDecision, ApprovedOpening]
     assert (reduced.told, blocked.told) == ([], [])
+
+
+def short_on_btc() -> CycleFlow:
+    position = CyclePosition(
+        "BTC", TradeSide.SHORT, Decimal("0.01"), 2, Decimal(100000), Decimal(100000), Decimal(0), None
+    )
+    return replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (position,)))
+
+
+def test_a_reversal_closes_the_position_and_leaves_its_opening_waiting_for_the_second_execution() -> None:
+    flow = short_on_btc()
+    plan = Plan(Decimal(110000), Decimal(90000), None)
+    decisions = CycleDecisions(flow, Reply(Response((Decision("reverse", "BTC", plan),))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = review_of(check).execute(FLOW.id.value, FlowSnapshot((), flow), decisions)
+
+    [order] = review.orders
+    reopening = OpenIntent("BTC", TradeSide.LONG, Decimal("0.2"), 3, 70, ExitPlan(Decimal(110000), Decimal(90000)))
+    assert order.outcome == ApprovedClose("BTC", reopening)
+    assert review.reversing
+
+
+def test_a_cycle_without_reversals_has_nothing_waiting() -> None:
+    decisions = CycleDecisions(short_on_btc(), Reply(Response((Closing("BTC"),))))
+    check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
+
+    review = review_of(check).execute(FLOW.id.value, SNAPSHOT, decisions)
+
+    assert [order.outcome for order in review.orders] == [ApprovedClose("BTC")]
+    assert not review.reversing

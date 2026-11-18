@@ -33,6 +33,7 @@ FLOW_ID = uuid4()
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
 type Opened[T] = Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T]
 type Updated[T] = Callable[[str, Decimal | None, Decimal | None, bool], T]
+type Closed[T] = Callable[[str, bool], T]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,16 +45,17 @@ class Opening:
     stop: Decimal | None = None
     target: Decimal | None = None
 
-    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T], updating: Updated[T]) -> T:  # noqa: ARG002
+    def order_with[T](self, opening: Opened[T], closing: Closed[T], updating: Updated[T]) -> T:  # noqa: ARG002
         return opening(self.asset, self.side, self.value, self.leverage, self.stop, self.target)
 
 
 @dataclass(frozen=True, slots=True)
 class Closing:
     asset: str
+    reversing: bool = False
 
-    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T], updating: Updated[T]) -> T:  # noqa: ARG002
-        return closing(self.asset)
+    def order_with[T](self, opening: Opened[T], closing: Closed[T], updating: Updated[T]) -> T:  # noqa: ARG002
+        return closing(self.asset, self.reversing)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +65,7 @@ class Update:
     target: Decimal | None = None
     remove_target: bool = False
 
-    def order_with[T](self, opening: Opened[T], closing: Callable[[str], T], updating: Updated[T]) -> T:  # noqa: ARG002
+    def order_with[T](self, opening: Opened[T], closing: Closed[T], updating: Updated[T]) -> T:  # noqa: ARG002
         return updating(self.asset, self.stop, self.target, self.remove_target)
 
 
@@ -217,7 +219,17 @@ def test_a_closing_after_a_refused_stop_loss_is_followed_as_unprotected(bench: B
     opened, closed = bench.told.events
     assert opened[:3] == (FLOW_ID, "Trend BTC", "BTC")
     assert closed[:3] == (FLOW_ID, PLANNED_AT, "BTC")
-    assert closed[-1] is True
+    assert closed[-2:] == (True, False)
+
+
+def test_the_closing_of_a_reversal_is_followed_as_reversing(bench: Bench) -> None:
+    bench.hold("ETH")
+
+    bench.use_case().execute(bench.cycle(Closing("ETH", reversing=True), Closing("BTC")))
+
+    [closed] = bench.told.events
+    assert closed[:3] == (FLOW_ID, PLANNED_AT, "ETH")
+    assert closed[-2:] == (False, True)
 
 
 def test_an_update_replaces_the_stop_loss_within_the_default_stop_of_the_flow(bench: Bench) -> None:

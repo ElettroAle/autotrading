@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -60,6 +61,8 @@ class FakeOrderExchangeAdapter:
         self.unreachable_after_orders: int | None = None
         # The PnL every closing realizes, when a scenario fixes it.
         self.realized_on_close = REALIZED_ON_CLOSE
+        # Who hears every execution, as the account of the address shows it after the order.
+        self.observers: list[Callable[[TradingAccess, MarketOrder, Execution], None]] = []
 
     def hold(self, access: TradingAccess, position: HeldPosition) -> None:
         self.positions[access.value("account_address"), position.coin] = position
@@ -117,6 +120,8 @@ class FakeOrderExchangeAdapter:
         )
         self.executions[order.id] = execution
         self._move_position(access, order, execution)
+        for observer in self.observers:
+            observer(access, order, execution)
         return execution
 
     def _move_position(self, access: TradingAccess, order: MarketOrder, execution: Execution) -> None:

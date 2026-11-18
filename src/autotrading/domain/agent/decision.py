@@ -8,13 +8,14 @@ from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 class TradeAction(StrEnum):
     """The only actions the agent may take on an asset (R1.4.3, R1.4.4); an update changes the exit plan of a position
-    already open (R3.1.3).
+    already open (R3.1.3); a reversal closes the open position and opens the opposite side in the same cycle (R1.4.10).
     """
 
     OPEN = "apri"
     CLOSE = "chiudi"
     HOLD = "mantieni"
     UPDATE = "aggiorna"
+    REVERSE = "inverti"
 
 
 class TradeDirection(StrEnum):
@@ -35,12 +36,23 @@ class TradeOpening:
 
 
 @dataclass(frozen=True, slots=True)
+class TradeReversal:
+    """The operational fields of a reversal: those of an opening but the direction, always the opposite of the position
+    open (R1.4.10).
+    """
+
+    margin_fraction: Decimal
+    leverage: int
+    exit_plan: ExitPlan = field(default_factory=ExitPlan)
+
+
+@dataclass(frozen=True, slots=True)
 class Decision:
     """A conforming decision of the agent on one asset, with its reasoning and how convinced of it the agent is, from 0
     to 100 (R1.4.4, R3.1.4).
 
-    Only an opening carries operational fields and only an update the change of the plan (R3.1.3); a close is always
-    total.
+    Only an opening and a reversal carry operational fields and only an update the change of the plan (R3.1.3); a
+    close is always total.
     """
 
     asset: str
@@ -49,21 +61,29 @@ class Decision:
     confidence: int
     opening: TradeOpening | None = None
     plan_change: ExitPlanChange | None = None
+    reversal: TradeReversal | None = None
 
-    def intent_with[O, C, H, U](
+    def intent_with[O, C, H, U, R](
         self,
         opening: Callable[[str, str, Decimal, int, ExitPlan, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, ExitPlanChange], U],
-    ) -> O | C | H | U:
-        """What the decision asks, built by whoever checks it: an opening or an update without its fields holds the
-        asset; only an opening carries the confidence, the one decision a minimum confidence may stop (R3.1.4).
+        reversing: Callable[[str, Decimal, int, ExitPlan, int], R],
+    ) -> O | C | H | U | R:
+        """What the decision asks, built by whoever checks it: an opening, an update or a reversal without its fields
+        holds the asset; an opening and a reversal carry the confidence, which a minimum confidence may stop (R3.1.4,
+        R1.4.10).
         """
         if self.action is TradeAction.CLOSE:
             return closing(self.asset)
         if self.action is TradeAction.UPDATE and self.plan_change is not None:
             return updating(self.asset, self.plan_change)
+        if self.action is TradeAction.REVERSE and self.reversal is not None:
+            reversal = self.reversal
+            return reversing(
+                self.asset, reversal.margin_fraction, reversal.leverage, reversal.exit_plan, self.confidence
+            )
         if self.action is TradeAction.OPEN and self.opening is not None:
             fields = self.opening
             return opening(

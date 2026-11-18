@@ -21,9 +21,12 @@ class FlowOpening:
 
 @dataclass(frozen=True, slots=True)
 class FlowClosing:
-    """A close of the flow is always total (R1.4.4)."""
+    """A close of the flow is always total (R1.4.4); the close of a reversal is followed, once executed, by an opening
+    on the opposite side (R1.4.10).
+    """
 
     asset: str
+    reversing: bool = False
 
 
 @dataclass(frozen=True, slots=True)

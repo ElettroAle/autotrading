@@ -270,6 +270,8 @@ class FlowCycles:
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
             start_cycle=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             end_cycle=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            record_executions=record_executions,
+            read_cycle_flow=read_cycle_flow,
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),

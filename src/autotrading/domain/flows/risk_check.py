@@ -15,7 +15,7 @@ from autotrading.domain.flows.risk_outcome import (
     HeldPosition,
     RiskOutcome,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, TradeIntent, UpdateIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, ReverseIntent, TradeIntent, UpdateIntent
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.italian_text import money_text, number_text
 
@@ -113,6 +113,9 @@ class _Sizing:
 class RiskCheck:
     """Leverage, then exposure, then coherence with the state, then the exchange minimum (R1.5.1-R1.5.4).
 
+    A reversal on an asset without a position of the flow is incoherent; otherwise it approves the close and leaves its
+    opening waiting for the close to be executed (R1.4.10).
+
     An opening the agent is less convinced of than the minimum confidence of the flow is blocked before any of them
     (R3.1.4). An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
     The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
@@ -131,6 +134,8 @@ class RiskCheck:
     def outcome(self, intent: TradeIntent, limits: AssetLimits | None) -> RiskOutcome:
         if isinstance(intent, CloseIntent):
             return self._close(intent)
+        if isinstance(intent, ReverseIntent):
+            return self._reverse(intent)
         if isinstance(intent, OpenIntent) and self._state.openings_suspended is not None:
             return BlockedDecision.opening(intent.asset, self._state.openings_suspended)
         if isinstance(intent, OpenIntent) and limits is not None:
@@ -150,6 +155,15 @@ class RiskCheck:
         if intent.asset not in self._state.open_assets:
             return BlockedDecision.without_position(intent.asset)
         return ApprovedClose(intent.asset)
+
+    def _reverse(self, intent: ReverseIntent) -> RiskOutcome:
+        """The first step of a reversal is the close of the position: the opening on the opposite side is checked after
+        the close is executed, on the state read again (R1.4.10). Like any close, it frees nothing before.
+        """
+        side = self._state.open_positions.get(intent.asset)
+        if side is None:
+            return BlockedDecision.without_reversible_position(intent.asset)
+        return ApprovedClose(intent.asset, intent.opening(side))
 
     def _update(self, intent: UpdateIntent, limits: AssetLimits | None) -> RiskOutcome:
         """An update needs the position it changes; its levels follow the rule of an opening on its side (R3.1.3)."""

@@ -8,6 +8,7 @@ const NAMES: readonly IconName[] = [
   'square',
   'arrow-up',
   'arrow-down',
+  'arrow-left-right',
   'plus',
   'x',
   'refresh',

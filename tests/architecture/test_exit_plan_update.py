@@ -37,7 +37,7 @@ def test_adr_aggiornamento_del_piano_the_update_is_an_action_of_the_agent_in_the
     assert REMOVE_TARGET == "togli_obiettivo"
     assert decision["properties"][REMOVE_TARGET] == {"type": "boolean"}
     assert REMOVE_TARGET in decision["required"]
-    assert parameters(Decision.intent_with)[-1] == "updating"
+    assert "updating" in parameters(Decision.intent_with)
     assert "aggiorna" in DEFAULT_SYSTEM_PROMPT
 
 

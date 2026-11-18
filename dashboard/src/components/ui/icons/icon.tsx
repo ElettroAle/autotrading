@@ -1,5 +1,6 @@
 import {
   ArrowDown,
+  ArrowLeftRight,
   ArrowUp,
   ChevronDown,
   CircleAlert,
@@ -24,6 +25,7 @@ const DRAWINGS = {
   square: Square,
   'arrow-up': ArrowUp,
   'arrow-down': ArrowDown,
+  'arrow-left-right': ArrowLeftRight,
   plus: Plus,
   x: X,
   refresh: RefreshCw,

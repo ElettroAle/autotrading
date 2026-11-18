@@ -36,6 +36,7 @@ const filtersFor = (assets: readonly string[]): TableFilter[] => [
       { value: 'chiudi', label: 'Chiudi' },
       { value: 'mantieni', label: 'Mantieni' },
       { value: 'aggiorna', label: 'Aggiorna' },
+      { value: 'inverti', label: 'Inverti' },
     ],
   },
   {

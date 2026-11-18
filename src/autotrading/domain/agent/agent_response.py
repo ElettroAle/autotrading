@@ -4,7 +4,14 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from autotrading.domain.agent.decision import Decision, DiscardedDecision, TradeAction, TradeDirection, TradeOpening
+from autotrading.domain.agent.decision import (
+    Decision,
+    DiscardedDecision,
+    TradeAction,
+    TradeDirection,
+    TradeOpening,
+    TradeReversal,
+)
 from autotrading.domain.agent.errors import DecisionNotConformingError
 from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
@@ -101,6 +108,8 @@ def _decision_of(entry: object, asset: str, flow_assets: tuple[str, ...]) -> Dec
         return Decision(asset, action, reasoning, confidence, _opening_of(entry))
     if action is TradeAction.UPDATE:
         return Decision(asset, action, reasoning, confidence, plan_change=_plan_change_of(entry))
+    if action is TradeAction.REVERSE:
+        return Decision(asset, action, reasoning, confidence, reversal=_reversal_of(entry))
     return Decision(asset, action, reasoning, confidence)
 
 
@@ -118,6 +127,11 @@ def _opening_of(entry: Mapping[str, object]) -> TradeOpening:
     return TradeOpening(
         TradeDirection(direction), _margin_fraction_of(entry), _leverage_of(entry), _exit_plan_of(entry)
     )
+
+
+def _reversal_of(entry: Mapping[str, object]) -> TradeReversal:
+    """The direction of a reversal is the opposite of the position open, whatever the answer says (R1.4.10)."""
+    return TradeReversal(_margin_fraction_of(entry), _leverage_of(entry), _exit_plan_of(entry))
 
 
 def _margin_fraction_of(entry: Mapping[str, object]) -> Decimal:
