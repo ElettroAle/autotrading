@@ -182,9 +182,12 @@ class PositionOpenedNoticePort(Protocol):
 
 
 class FlowClosingRecorderPort(Protocol):
-    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution, *, unprotected: bool) -> None:
+    def execute(  # noqa: PLR0913 - the closing and the two marks of why it happened
+        self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution, *, unprotected: bool, reversing: bool
+    ) -> None:
         """Records in the history of the flow a position an order of its cycle closed (R1.7.2): unprotected when it
-        closed because the exchange refused its stop loss (R3.1.2).
+        closed because the exchange refused its stop loss (R3.1.2), reversing when the agent closed it to open the
+        opposite side (R1.4.10).
         """
         ...
 
@@ -201,11 +204,12 @@ class ApprovedOrderPort(Protocol):
     def order_with[T](
         self,
         opening: Callable[[str, str, Decimal, int, Decimal | None, Decimal | None], T],
-        closing: Callable[[str], T],
+        closing: Callable[[str, bool], T],
         updating: Callable[[str, Decimal | None, Decimal | None, bool], T],
     ) -> T:
         """Builds the order with the opening (asset, side, value, leverage, stop and target of the exit plan), the
-        closing (asset) or the update of the exit plan (asset, new stop, new target, target removed) it needs.
+        closing (asset, whether it reverses the position) or the update of the exit plan (asset, new stop, new target,
+        target removed) it needs.
         """
         ...
 

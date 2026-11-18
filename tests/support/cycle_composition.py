@@ -39,9 +39,12 @@ from autotrading.application.flows.ports import (
     OpeningsSuspensionPort,
     PlannedFlowsPort,
 )
+from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
 from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
+from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
+from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePositionsUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -79,6 +82,8 @@ class TenantCyclePorts:
     pause: AutomaticPausePort
     start_cycle: StartCycleFlowUseCase
     end_cycle: EndCycleFlowUseCase
+    record_executions: RecordAccountExecutionsUseCase
+    read_cycle_flow: ReadCycleFlowUseCase
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
@@ -133,6 +138,10 @@ def run_cycle_for(
 ) -> WorkerCycle:
     """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104)."""
     ports = ports_of(tenant_id)
+    check_risk = CheckRiskUseCase(services.exchange_limits)
+    loss_guard = GuardFlowLossUseCase(
+        ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock
+    )
     steps = CycleSteps(
         start=ports.start_cycle,
         sources=ReadCycleSourceUseCase(
@@ -156,15 +165,17 @@ def run_cycle_for(
                 ),
             )
         ),
-        risk=ReviewCycleRiskUseCase(
-            CheckRiskUseCase(services.exchange_limits),
-            GuardFlowLossUseCase(
-                ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock
-            ),
+        risk=ReviewCycleRiskUseCase(check_risk, loss_guard, ports.opening_reduced_notice, ports.opening_blocked_notice),
+        orders=ports.send_orders,
+        reversal=ReverseCyclePositionsUseCase(
+            ports.record_executions,
+            ports.read_cycle_flow,
+            check_risk,
+            loss_guard,
             ports.opening_reduced_notice,
             ports.opening_blocked_notice,
+            ports.send_orders,
         ),
-        orders=ports.send_orders,
         end=ports.end_cycle,
         journal=JsonCycleJournalAdapter(services.environment),
     )

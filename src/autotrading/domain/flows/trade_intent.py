@@ -61,4 +61,23 @@ class UpdateIntent:
         return cls(asset, ExitPlanChange(target, stop, invalidation, remove_target=remove_target))
 
 
-type TradeIntent = OpenIntent | CloseIntent | HoldIntent | UpdateIntent
+@dataclass(frozen=True, slots=True)
+class ReverseIntent:
+    """What the agent wants to reverse on an asset: the open position closed whole, then an opening on the opposite side
+    with the fields of an opening but the direction (R1.4.10).
+    """
+
+    asset: str
+    margin_fraction: Decimal
+    leverage: int
+    confidence: int
+    exit_plan: ExitPlan = field(default_factory=ExitPlan)
+
+    def opening(self, open_side: TradeSide) -> OpenIntent:
+        """The opening that follows the close of the position open on the given side: always the opposite one."""
+        return OpenIntent(
+            self.asset, open_side.opposite, self.margin_fraction, self.leverage, self.confidence, self.exit_plan
+        )
+
+
+type TradeIntent = OpenIntent | CloseIntent | HoldIntent | UpdateIntent | ReverseIntent

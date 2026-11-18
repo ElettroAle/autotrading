@@ -202,6 +202,17 @@ def test_a_cycle_closing_after_a_refused_stop_loss_enters_the_history_with_that_
     assert position.reason is CloseReason.PROTECTION_MISSING
 
 
+def test_a_cycle_closing_that_reverses_the_position_enters_the_history_as_a_reversal(bench: Bench) -> None:
+    bench.openings.openings[bench.flow.id, "BTC"] = OPENING
+    fill = Executed(Decimal(102000), CLOSED, Decimal("0.05"), Decimal("1.5"))
+
+    bench.cycle_closing.execute(bench.flow.id.value, CYCLE, "BTC", fill, reversing=True)
+
+    [position] = bench.history.positions
+    assert position.reason is CloseReason.REVERSAL
+    assert bench.exit_plans.current(bench.flow.id, "BTC") is None
+
+
 def test_a_closing_outside_cancels_the_protections_left_on_the_exchange(bench: Bench) -> None:
     bench.close_outside()
 

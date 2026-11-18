@@ -36,13 +36,19 @@ class RecordFlowClosingUseCase:
         self._notice = notice
         self._exit_plans = exit_plans
 
-    def execute(
-        self, flow_id: UUID, cycle: datetime, asset: str, fill: ExecutedFillPort, *, unprotected: bool = False
+    def execute(  # noqa: PLR0913 - the closing and the two marks of why it happened
+        self,
+        flow_id: UUID,
+        cycle: datetime,
+        asset: str,
+        fill: ExecutedFillPort,
+        *,
+        unprotected: bool = False,
+        reversing: bool = False,
     ) -> None:
         flow = self._flows.get(FlowId(flow_id))
         self._exit_plans.remove(flow.id, asset)
-        # A position the exchange would not protect is closed by the platform at once, not by the agent (R3.1.2).
-        reason = CloseReason.PROTECTION_MISSING if unprotected else CloseReason.AGENT
+        reason = _reason_of(unprotected=unprotected, reversing=reversing)
         opening = self._openings.last_opening(flow.id, asset)
         if opening is None:
             self._notice.execute(
@@ -53,3 +59,14 @@ class RecordFlowClosingUseCase:
         position = opening.closed(flow, asset, closing, reason, cycle=cycle)
         self._closed_positions.add(position)
         self._notice.execute(flow.id.value, flow.name.value, asset, position.pnl, reason.value, position.closing.at)
+
+
+def _reason_of(*, unprotected: bool, reversing: bool) -> CloseReason:
+    """A position the exchange would not protect is closed by the platform at once, not by the agent (R3.1.2); the agent
+    closes one either to leave it or to turn it (R1.4.10).
+    """
+    if unprotected:
+        return CloseReason.PROTECTION_MISSING
+    if reversing:
+        return CloseReason.REVERSAL
+    return CloseReason.AGENT

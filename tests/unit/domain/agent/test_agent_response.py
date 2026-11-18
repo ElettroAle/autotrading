@@ -4,7 +4,14 @@ from decimal import Decimal
 import pytest
 
 from autotrading.domain.agent.agent_response import AgentResponse
-from autotrading.domain.agent.decision import Decision, DiscardedDecision, TradeAction, TradeDirection, TradeOpening
+from autotrading.domain.agent.decision import (
+    Decision,
+    DiscardedDecision,
+    TradeAction,
+    TradeDirection,
+    TradeOpening,
+    TradeReversal,
+)
 from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 ASSETS = ("BTC", "ETH", "SOL")
@@ -312,8 +319,46 @@ def test_a_decision_keeps_its_confidence_from_0_to_100(confidence: int) -> None:
     assert read(answer(opening(confidenza=confidence))).decisions[0].confidence == confidence
 
 
-@pytest.mark.parametrize("action", ["mantieni", "chiudi", "aggiorna"])
+@pytest.mark.parametrize("action", ["mantieni", "chiudi", "aggiorna", "inverti"])
 def test_every_action_needs_its_confidence(action: str) -> None:
     response = read(answer(update("BTC", azione=action, confidenza=...)))
 
     assert reasons(response) == {"BTC": "campo obbligatorio mancante: confidenza"}
+
+
+def reversal(asset: str = "BTC", **fields: object) -> dict[str, object]:
+    return opening(asset, **{"azione": "inverti", "direzione": None, **fields})
+
+
+def test_a_reversal_keeps_the_fields_of_an_opening_without_a_direction() -> None:
+    decision = read(answer(reversal(quota=0.2, leva=3, obiettivo=70000, stop=64000, invalidazione="sotto 63000")))
+
+    assert decision.decisions == (
+        Decision(
+            "BTC",
+            TradeAction.REVERSE,
+            "rottura della resistenza",
+            75,
+            reversal=TradeReversal(Decimal("0.2"), 3, ExitPlan(Decimal(70000), Decimal(64000), "sotto 63000")),
+        ),
+    )
+
+
+@pytest.mark.parametrize("direction", ["short", "long", "di lato", ...])
+def test_a_reversal_ignores_its_direction(direction: object) -> None:
+    decision = read(answer(reversal(direzione=direction))).decisions[0]
+
+    assert (decision.opening, decision.reversal) == (None, TradeReversal(Decimal("0.1"), 3))
+
+
+@pytest.mark.parametrize(
+    ("fields", "reason"),
+    [
+        ({"quota": 2}, "valore fuori dall'intervallo: quota"),
+        ({"leva": 0}, "valore fuori dall'intervallo: leva"),
+        ({"leva": ...}, "campo obbligatorio mancante: leva"),
+        ({"stop": ...}, "campo obbligatorio mancante: stop"),
+    ],
+)
+def test_the_reasons_of_non_conformity_of_a_reversal(fields: dict[str, object], reason: str) -> None:
+    assert reasons(read(answer(reversal("BTC", **fields)))) == {"BTC": reason}

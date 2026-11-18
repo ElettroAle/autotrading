@@ -68,7 +68,7 @@ def test_the_default_asks_the_exit_plan_of_an_opening() -> None:
         " mercato e l'obiettivo sopra, per uno short il contrario; il piano in vigore di ogni posizione aperta è nello"
         " stato del flusso;"
     ) in rendered
-    assert "direzione, quota e leva servono solo per apri" in rendered
+    assert "direzione serve solo per apri, quota e leva solo per apri e inverti" in rendered
 
 
 def test_the_default_asks_how_to_update_the_plan_of_an_open_position() -> None:
@@ -81,9 +81,18 @@ def test_the_default_asks_how_to_update_the_plan_of_an_open_position() -> None:
     ) in rendered
     assert '"togli_obiettivo": <true per togliere l\'obiettivo, altrimenti false>' in rendered
     assert (
-        "obiettivo, stop e invalidazione servono solo per apri e aggiorna, togli_obiettivo solo per aggiorna"
+        "obiettivo, stop e invalidazione servono solo per apri, inverti e aggiorna, togli_obiettivo solo per aggiorna"
         in rendered
     )
+
+
+def test_the_default_explains_the_reversal_of_an_open_position() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert (
+        "- inverti chiude per intero la posizione aperta dell'asset e nello stesso ciclo apre il lato opposto, con"
+        " quota, leva, obiettivo, stop e invalidazione come apri: la direzione è quella opposta alla posizione aperta;"
+    ) in rendered
 
 
 def test_the_default_asks_the_confidence_of_every_decision() -> None:

@@ -7,9 +7,9 @@ Funzionalità: R6.5.3 Icone e colori per comandi, azioni e direzioni
 
   I comandi di stato del flusso hanno colore e icona propri: Pausa ambra con l'icona pausa, Riprendi verde con
   l'icona play, Stop rosso con l'icona quadrato, Avvia verde con l'icona play. Le direzioni hanno un'icona (long
-  freccia in su, short freccia in giù) e così le azioni dell'agente (apri, chiudi, mantieni, aggiorna) ovunque
-  compaiano: cicli, decisioni, posizioni aperte e chiuse. L'icona accompagna sempre il testo, non lo sostituisce, e
-  ha un nome accessibile; il colore non è l'unico segno.
+  freccia in su, short freccia in giù) e così le azioni dell'agente (apri, chiudi, mantieni, aggiorna, inverti)
+  ovunque compaiano: cicli, decisioni, posizioni aperte e chiuse. L'icona accompagna sempre il testo, non lo
+  sostituisce, e ha un nome accessibile; il colore non è l'unico segno.
   Le icone vengono dalla libreria lucide-react, da dichiarare in .claude/rules/tech-dashboard.md; comandi, azioni e
   direzioni usano componenti condivisi, non icone sparse nelle funzionalità.
 

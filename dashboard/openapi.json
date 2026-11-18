@@ -4358,10 +4358,10 @@
                   "type": "null"
                 }
               ],
-              "description": "apri, chiudi, mantieni o aggiorna",
+              "description": "apri, chiudi, mantieni, aggiorna o inverti",
               "title": "Action"
             },
-            "description": "apri, chiudi, mantieni o aggiorna"
+            "description": "apri, chiudi, mantieni, aggiorna o inverti"
           },
           {
             "name": "direction",

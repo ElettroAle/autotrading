@@ -14,7 +14,7 @@ from autotrading.domain.flows.risk_outcome import (
     BlockedDecision,
     HeldPosition,
 )
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, UpdateIntent
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, ReverseIntent, UpdateIntent
 from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 
@@ -95,3 +95,14 @@ def test_an_update_without_a_position_is_blocked_even_on_an_asset_the_exchange_d
     )
 
     assert outcomes == (BlockedDecision("DOGE", "nessuna posizione aperta su DOGE"),)
+
+
+def test_the_close_of_a_reversal_needs_no_limits_of_the_exchange() -> None:
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), {"MATIC": TradeSide.SHORT})
+    intents = (ReverseIntent("MATIC", Decimal("0.1"), 2, 70),)
+
+    outcomes = CheckRiskUseCase({EXCHANGE: FakeExchangeLimitsAdapter()}).execute(
+        CheckRiskCommand(intents, POLICY, state, EXCHANGE)
+    )
+
+    assert outcomes == (ApprovedClose("MATIC", OpenIntent("MATIC", TradeSide.LONG, Decimal("0.1"), 2, 70)),)

@@ -16,8 +16,8 @@ from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.opening_review import blocked_openings, reduced_openings
-from autotrading.domain.flows.risk_outcome import RiskOutcome, approved_of
-from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, UpdateIntent
+from autotrading.domain.flows.risk_outcome import ApprovedClose, RiskOutcome, approved_of
+from autotrading.domain.flows.trade_intent import CloseIntent, HoldIntent, OpenIntent, ReverseIntent, UpdateIntent
 
 
 class ReviewCycleRiskUseCase:
@@ -25,7 +25,8 @@ class ReviewCycleRiskUseCase:
     (R1.5.1-R1.5.4), with the minimum confidence of the flow for the openings (R3.1.4).
 
     The guard of the losses comes first: openings suspended for maximum loss are blocked by the check (R3.2.2). Every
-    opening reduced or blocked is told before the orders go (R3.5.1).
+    opening reduced or blocked is told before the orders go (R3.5.1). The opening of a reversal waits for the close of
+    its position, which goes with the orders (R1.4.10).
     """
 
     def __init__(
@@ -50,7 +51,7 @@ class ReviewCycleRiskUseCase:
         loss_suspension = self._loss_guard.execute(cycle_flow)
         command = CheckRiskCommand(
             tuple(
-                decision.intent_with(_open_intent, CloseIntent, HoldIntent, _update_intent)
+                decision.intent_with(_open_intent, CloseIntent, HoldIntent, _update_intent, _reverse_intent)
                 for decision in decisions.reply.response.decisions
             ),
             cycle_flow.configuration.risk_policy,
@@ -60,7 +61,7 @@ class ReviewCycleRiskUseCase:
         outcomes = self._check_risk.execute(command)
         self._tell_openings(cycle_flow, command, outcomes)
         orders = tuple(CycleOrder(cycle_flow, outcome) for outcome in approved_of(outcomes))
-        return RiskReview(orders, tuple(outcomes))
+        return RiskReview(orders, tuple(outcomes), reversing=_reversing(outcomes))
 
     def _tell_openings(
         self, cycle_flow: CycleFlow, command: CheckRiskCommand, outcomes: tuple[RiskOutcome, ...]
@@ -83,3 +84,14 @@ def _open_intent(  # noqa: PLR0913, PLR0917 - the fields of the opening the agen
 
 def _update_intent(asset: str, change: DecisionPlanChangePort) -> UpdateIntent:
     return UpdateIntent.of(asset, change.target, change.stop, change.invalidation, remove_target=change.remove_target)
+
+
+def _reverse_intent(
+    asset: str, margin_fraction: Decimal, leverage: int, exit_plan: DecisionExitPlanPort, confidence: int
+) -> ReverseIntent:
+    plan = ExitPlan(exit_plan.target, exit_plan.stop, exit_plan.invalidation)
+    return ReverseIntent(asset, margin_fraction, leverage, confidence, plan)
+
+
+def _reversing(outcomes: tuple[RiskOutcome, ...]) -> bool:
+    return any(isinstance(outcome, ApprovedClose) and outcome.reopening is not None for outcome in outcomes)

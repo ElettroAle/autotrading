@@ -8,6 +8,7 @@ from autotrading.application.flows.ports import (
     CycleContext,
     CycleDecisions,
     FailedModelCall,
+    ReversedExecutions,
     RiskReview,
     SourceReading,
 )
@@ -36,8 +37,8 @@ class JsonCycleJournalAdapter:
             return {"messaggi": [{"ruolo": str(message.role), "contenuto": message.content} for message in messages]}
         if isinstance(result, CycleDecisions):
             return _decisions_document(result.reply.response)
-        if isinstance(result, RiskReview):
-            return {"esiti": json_document(result.outcomes), "ordini_approvati": len(result.orders)}
+        if isinstance(result, RiskReview | ReversedExecutions):
+            return _orders_document(result)
         if step is CycleStep.COLLECT_SOURCES and isinstance(result, list):
             return {"fonti": [_reading_document(reading) for reading in result if isinstance(reading, SourceReading)]}
         return {"risultato": json_document(result)}
@@ -108,11 +109,20 @@ def _recorded(decision: AgentDecisionPort) -> RecordedDecision:
     )
 
 
+def _orders_document(result: RiskReview[object] | ReversedExecutions[object]) -> Mapping[str, object]:
+    """The orders the risk check approved, or those the cycle executed with the openings of its reversals (R1.4.10)."""
+    if isinstance(result, RiskReview):
+        return {"esiti": json_document(result.outcomes), "ordini_approvati": len(result.orders)}
+    return {"risultato": json_document(result.executions), "inversioni": json_document(result.reversals)}
+
+
 def _direction_of(decision: AgentDecisionPort) -> str | None:
-    # Only an opening with its fields has a direction: any other decision, or an opening without them, holds.
+    # Only an opening with its fields has a direction: any other decision, or an opening without them, holds. The
+    # direction of a reversal is the opposite of the position open, which only the risk check knows (R1.4.10).
     return decision.intent_with(
         lambda _asset, direction, _margin, _leverage, _plan, _confidence: direction,
         lambda _asset: None,
         lambda _asset: None,
         lambda _asset, _change: None,
+        lambda _asset, _margin, _leverage, _plan, _confidence: None,
     )

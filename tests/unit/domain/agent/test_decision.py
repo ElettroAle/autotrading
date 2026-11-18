@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection, TradeOpening
+from autotrading.domain.agent.decision import Decision, TradeAction, TradeDirection, TradeOpening, TradeReversal
 from autotrading.domain.agent.exit_plan import ExitPlan, ExitPlanChange
 
 
@@ -20,6 +20,7 @@ def built(decision: Decision) -> tuple[object, ...]:
         lambda asset: ("chiudi", asset),
         lambda asset: ("mantieni", asset),
         lambda asset, change: ("aggiorna", asset, change),
+        lambda asset, fraction, leverage, plan, confidence: ("inverti", asset, fraction, leverage, plan, confidence),
     )
 
 
@@ -68,3 +69,25 @@ def test_an_update_carries_the_change_of_the_plan() -> None:
 
 def test_an_update_without_its_change_holds_the_asset() -> None:
     assert built(Decision("BTC", TradeAction.UPDATE, "incompleta", 50)) == ("mantieni", "BTC")
+
+
+def test_a_reversal_carries_the_fields_of_an_opening_without_a_direction() -> None:
+    plan = ExitPlan(Decimal(70000), Decimal(64000), None)
+    reversal = TradeReversal(Decimal("0.2"), 3, plan)
+
+    assert built(Decision("BTC", TradeAction.REVERSE, "cambio di direzione", 75, reversal=reversal)) == (
+        "inverti",
+        "BTC",
+        Decimal("0.2"),
+        3,
+        plan,
+        75,
+    )
+
+
+def test_a_reversal_without_its_fields_holds_the_asset() -> None:
+    assert built(Decision("BTC", TradeAction.REVERSE, "incompleta", 50)) == ("mantieni", "BTC")
+
+
+def test_reverse_is_one_of_the_actions_of_the_agent() -> None:
+    assert TradeAction("inverti") is TradeAction.REVERSE

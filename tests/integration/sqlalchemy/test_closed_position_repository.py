@@ -66,6 +66,17 @@ def test_the_closed_positions_read_back_from_the_most_recent_close(database: Eng
     assert repository.matching(flow.id, EVERY, 0, 10) == [later, earlier]
 
 
+# ADR inversione-in-due-passi-nel-ciclo: the history keeps the closing of a reversal with its own reason (R1.4.10).
+def test_a_position_closed_by_a_reversal_reads_back_with_its_reason(database: Engine) -> None:
+    flow = new_flow(database)
+    repository = SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id)
+    reversed_position = replace(a_position(flow, timedelta(hours=1)), reason=CloseReason.REVERSAL)
+
+    repository.add(reversed_position)
+
+    assert repository.matching(flow.id, EVERY, 0, 10) == [reversed_position]
+
+
 def test_the_closed_positions_read_back_one_page_at_a_time(database: Engine) -> None:
     flow = new_flow(database)
     repository = SqlAlchemyClosedPositionRepositoryAdapter(database, flow.tenant_id)

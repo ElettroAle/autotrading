@@ -5,8 +5,9 @@ Funzionalità: R1.4.4 Decisione dell'agente per ogni asset
   Voglio che l'agente restituisca a ogni ciclo una decisione strutturata per ciascun asset del flusso
   Perché ogni decisione sia eseguibile senza interpretazioni e il suo ragionamento resti visibile
 
-  Per ogni asset la decisione è una tra: apri (long o short), chiudi, mantieni, aggiorna (stop e obiettivo di una posizione aperta, R3.1.3). Ogni decisione contiene il
-  ragionamento dell'agente, conservato anche per "mantieni".
+  Per ogni asset la decisione è una tra: apri (long o short), chiudi, mantieni, aggiorna (stop e obiettivo di una
+  posizione aperta, R3.1.3), inverti (chiusura della posizione aperta e apertura del lato opposto nello stesso ciclo,
+  R1.4.10). Ogni decisione contiene il ragionamento dell'agente, conservato anche per "mantieni".
   Un'apertura contiene in più: direzione, quota dei soldi del flusso da impegnare come margine (frazione da
   0 a 1, R1.5.1) e leva. Per "mantieni" e "chiudi" i campi operativi presenti si ignorano.
   La chiusura è sempre totale.

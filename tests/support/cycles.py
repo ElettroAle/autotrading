@@ -29,6 +29,7 @@ from tests.fakes.cycles import (
     FakeFlowActivityAdapter,
     FakeFlowsAdapter,
     FakeOrderAdapter,
+    FakeReversalAdapter,
     FakeRiskAdapter,
     FakeSourcesAdapter,
     InMemoryCycleCheckpointsAdapter,
@@ -64,6 +65,7 @@ class Cycles:
         self.agent = FakeAgentAdapter(self.failures)
         self.risk = FakeRiskAdapter(self.failures)
         self.orders = FakeOrderAdapter(self.failures)
+        self.reversal = FakeReversalAdapter()
         self.journal = FakeCycleJournalAdapter()
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
         self.failure_notices = RecordedCycleFailuresAdapter()
@@ -99,6 +101,7 @@ class Cycles:
             self.agent,
             self.risk,
             self.orders,
+            self.reversal,
             FakeCycleEndAdapter(self.flows),
             self.journal,
         )

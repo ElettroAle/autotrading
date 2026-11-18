@@ -5817,7 +5817,7 @@ export interface operations {
                 page?: number;
                 /** @description un asset del flusso */
                 asset?: string | null;
-                /** @description apri, chiudi, mantieni o aggiorna */
+                /** @description apri, chiudi, mantieni, aggiorna o inverti */
                 action?: string | null;
                 /** @description long o short */
                 direction?: string | null;

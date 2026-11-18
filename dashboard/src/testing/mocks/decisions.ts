@@ -9,7 +9,7 @@ import { COMPLETED, decisionResponse, decisionsOf } from './last-decision';
  */
 
 const DECISIONS_PER_PAGE = 50;
-const ACTIONS = ['apri', 'chiudi', 'mantieni', 'aggiorna'];
+const ACTIONS = ['apri', 'chiudi', 'mantieni', 'aggiorna', 'inverti'];
 const DIRECTIONS = ['long', 'short'];
 
 /** The answer of the API to a filter it rejects, with the reason it gives. */

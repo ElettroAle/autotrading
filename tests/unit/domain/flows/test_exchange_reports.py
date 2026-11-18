@@ -8,11 +8,12 @@ import pytest
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.stop_outcome import ClosingFill, PositionClosing
+from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
 
 BUILDERS = (
     lambda *values: ("apri", *values),
-    lambda asset: ("chiudi", asset),
+    lambda asset, reversing: ("chiudi", asset, reversing),
     lambda *values: ("aggiorna", *values),
 )
 AT = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
@@ -69,7 +70,13 @@ def test_an_approved_opening_hands_the_levels_of_its_exit_plan_to_its_order() ->
 def test_an_approved_close_becomes_the_order_that_closes() -> None:
     order = ApprovedClose("ETH").order_with(*BUILDERS)
 
-    assert order == ("chiudi", "ETH")
+    assert order == ("chiudi", "ETH", False)
+
+
+def test_the_close_of_a_reversal_tells_its_order_it_reverses() -> None:
+    reopening = OpenIntent("ETH", TradeSide.SHORT, Decimal("0.1"), 2, 70)
+
+    assert ApprovedClose("ETH", reopening).order_with(*BUILDERS) == ("chiudi", "ETH", True)
 
 
 def test_an_approved_update_becomes_the_order_that_replaces_the_protection() -> None:

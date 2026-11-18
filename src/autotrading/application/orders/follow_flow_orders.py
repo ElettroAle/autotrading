@@ -19,6 +19,8 @@ class FollowFlowOrdersCommand:
     orders: tuple[Order, ...]
     # The closings of the positions the exchange would not protect with a stop loss (R3.1.2).
     unprotected: frozenset[ClientOrderId] = frozenset()
+    # The assets whose closing reverses the position (R1.4.10).
+    reversals: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +60,7 @@ class FollowFlowOrdersUseCase:
                 market_order.coin,
                 execution,
                 unprotected=order.id in command.unprotected,
+                reversing=market_order.coin in command.reversals,
             )
             return
         self._followers.openings.execute(

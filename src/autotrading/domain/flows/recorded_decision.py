@@ -14,12 +14,15 @@ LOWEST_CONFIDENCE, HIGHEST_CONFIDENCE = 0, 100
 
 
 class DecisionAction(StrEnum):
-    """What the agent decided on an asset, as the cycle records it: the words of its actions (R1.4.3, R3.1.3)."""
+    """What the agent decided on an asset, as the cycle records it: the words of its actions (R1.4.3, R3.1.3,
+    R1.4.10).
+    """
 
     OPEN = "apri"
     CLOSE = "chiudi"
     HOLD = "mantieni"
     UPDATE = "aggiorna"
+    REVERSE = "inverti"
 
 
 @dataclass(frozen=True, slots=True)

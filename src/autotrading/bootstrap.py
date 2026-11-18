@@ -162,6 +162,7 @@ from autotrading.application.flows.record_flow_closing import RecordFlowClosingU
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
+from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePositionsUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.run_cycle_on_demand import RunCycleOnDemandUseCase
@@ -529,6 +530,38 @@ def cycle_of(
                 RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
+        check_risk = CheckRiskUseCase(markets)
+        loss_guard = GuardFlowLossUseCase(
+            SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
+            SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
+            NotifyOpeningsSuspendedUseCase(notify_flow),
+            clock,
+        )
+        reduced_notice = NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        blocked_notice = NotifyOpeningBlockedUseCase(notify_flow)
+        send_orders = SendCycleOrdersUseCase(
+            ExecuteCycleOrdersUseCase(
+                ExecuteFlowOrdersUseCase(
+                    access,
+                    order_exchanges,
+                    orders,
+                    slippage,
+                    FlowOrderProtection(
+                        ProtectFlowPositionUseCase(
+                            order_exchanges, protection_exchanges, protections, orders, slippage
+                        ),
+                        cancel_protections,
+                        UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
+                    ),
+                ),
+                follow_flow_orders,
+                ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
+            ),
+            openings,
+            exit_plans,
+            flows,
+            SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
+        )
         steps = CycleSteps(
             start=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             sources=ReadCycleSourceUseCase(
@@ -553,39 +586,16 @@ def cycle_of(
                     ),
                 )
             ),
-            risk=ReviewCycleRiskUseCase(
-                CheckRiskUseCase(markets),
-                GuardFlowLossUseCase(
-                    SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
-                    SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
-                    NotifyOpeningsSuspendedUseCase(notify_flow),
-                    clock,
-                ),
-                NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
-                NotifyOpeningBlockedUseCase(notify_flow),
-            ),
-            orders=SendCycleOrdersUseCase(
-                ExecuteCycleOrdersUseCase(
-                    ExecuteFlowOrdersUseCase(
-                        access,
-                        order_exchanges,
-                        orders,
-                        slippage,
-                        FlowOrderProtection(
-                            ProtectFlowPositionUseCase(
-                                order_exchanges, protection_exchanges, protections, orders, slippage
-                            ),
-                            cancel_protections,
-                            UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
-                        ),
-                    ),
-                    follow_flow_orders,
-                    ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
-                ),
-                openings,
-                exit_plans,
-                flows,
-                SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
+            risk=ReviewCycleRiskUseCase(check_risk, loss_guard, reduced_notice, blocked_notice),
+            orders=send_orders,
+            reversal=ReverseCyclePositionsUseCase(
+                record_executions,
+                read_cycle_flow,
+                check_risk,
+                loss_guard,
+                reduced_notice,
+                blocked_notice,
+                send_orders,
             ),
             end=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             journal=JsonCycleJournalAdapter(environment),

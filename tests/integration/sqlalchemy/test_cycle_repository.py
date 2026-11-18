@@ -384,6 +384,17 @@ def test_a_recorded_decision_cannot_be_deleted(database: Engine) -> None:
             connection.execute(cycle_decisions.delete())
 
 
+# ADR inversione-in-due-passi-nel-ciclo: a reversal is a decision of its own, without a direction (R1.4.10).
+def test_a_reversal_is_recorded_among_the_decisions_of_the_cycle(database: Engine) -> None:
+    tenant_id, flow_id = new_flow(database)
+    repository = SqlAlchemyCycleRepositoryAdapter(database, tenant_id)
+    reversal = RecordedDecision("BTC", DecisionAction.REVERSE, None, 70, "cambio di tendenza")
+
+    repository.record(a_completed_cycle(flow_id, 0, reversal))
+
+    assert repository.last_decided(flow_id) == DecidedCycle(PLANNED, (reversal,))
+
+
 CLOSING = RecordedDecision("ADA", DecisionAction.CLOSE, None, 55, "obiettivo raggiunto")
 SHORTING = RecordedDecision("ETH", DecisionAction.OPEN, TradeSide.SHORT, 61, "trend ribassista")
 

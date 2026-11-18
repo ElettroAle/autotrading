@@ -17,6 +17,7 @@ from autotrading.application.flows.ports import (
     CycleJob,
     FailedModelCall,
     FlowSnapshot,
+    ReversedExecutions,
     RiskReview,
     ScheduledFlow,
     SourceReading,
@@ -429,17 +430,37 @@ class FakeAgentAdapter:
 
 
 class FakeRiskAdapter:
-    """Approves every decision as an order."""
+    """Approves every decision as an order; reversing, it leaves the opening of a reversal waiting among them."""
 
     def __init__(self, failures: Failures) -> None:
         self.snapshots: list[FlowSnapshot] = []
+        self.reversing = False
         self._failures = failures
 
     def execute(self, flow_id: UUID, snapshot: FlowSnapshot, decisions: object) -> RiskReview:
         self._failures.raise_if_failing(flow_id, CycleStep.RISK_CHECK)
         self.snapshots.append(snapshot)
         assert isinstance(decisions, list)
-        return RiskReview(tuple(decisions), {asset: "approvata" for asset in decisions})
+        return RiskReview(tuple(decisions), {asset: "approvata" for asset in decisions}, reversing=self.reversing)
+
+
+class FakeReversalAdapter:
+    """Opens again every order it is given, once the orders of the cycle are sent; or fails, once, with its error."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[UUID, datetime, datetime, tuple[object, ...]]] = []
+        self.failing: AutotradingError | None = None
+
+    def execute(
+        self, flow_id: UUID, planned_at: datetime, anchor: datetime, orders: Sequence[object]
+    ) -> ReversedExecutions:
+        failing, self.failing = self.failing, None
+        if failing is not None:
+            raise failing
+        self.calls.append((flow_id, planned_at, anchor, tuple(orders)))
+        return ReversedExecutions(
+            tuple({"reopened": order} for order in orders), {order: "riaperta" for order in orders}
+        )
 
 
 class FakeOrderAdapter:

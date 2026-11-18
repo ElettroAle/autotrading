@@ -155,6 +155,28 @@ describe('DecisionsTable', () => {
     expect(await rowsOf()).toHaveLength(1);
   });
 
+  it('filters the reversals of the agent (R1.4.10)', async () => {
+    fakePlatform.recordCycles('alfa', [
+      ...decidedCycles(),
+      withDecisions(aCompletedCycle(hoursBack(2)), [
+        { asset: 'BTC', action: 'inverti', reasoning: 'cambio di tendenza', opening: null },
+      ]),
+    ]);
+    const user = userEvent.setup();
+    const { router } = await renderApp({ account: 'anna', url: '/flows/flow-alfa/decisions' });
+    await rowsOf();
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Azione' })).getByRole('button', {
+        name: 'Inverti',
+      }),
+    );
+
+    await screen.findByText('1 decisione');
+    expect(router.state.location.search).toBe('?action=inverti');
+    expect(cellOf((await rowsOf())[0] as HTMLElement, 2)).toHaveTextContent('inverti');
+  });
+
   it('filters by the assets of the flow', async () => {
     fakePlatform.recordCycles('alfa', decidedCycles());
     await renderApp({ account: 'anna', url: '/flows/flow-alfa/decisions?asset=ETH' });

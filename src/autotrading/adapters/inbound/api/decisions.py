@@ -85,7 +85,7 @@ class DecisionPageResponse(BaseModel):
 
 def decision_filter_of(
     asset: Annotated[str | None, Query(description="un asset del flusso")] = None,
-    action: Annotated[str | None, Query(description="apri, chiudi, mantieni o aggiorna")] = None,
+    action: Annotated[str | None, Query(description="apri, chiudi, mantieni, aggiorna o inverti")] = None,
     direction: Annotated[str | None, Query(description="long o short")] = None,
 ) -> DecisionFilter:
     """The filters of the history of the decisions, in any combination (R6.5.5)."""

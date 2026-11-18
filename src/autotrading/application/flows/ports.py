@@ -69,6 +69,8 @@ from autotrading.domain.tenancy.user_id import UserId
 
 if TYPE_CHECKING:
     from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
+    from autotrading.application.flows.read_cycle_flow import ReadCycleFlowCommand
+    from autotrading.application.flows.record_account_executions import RecordAccountExecutionsCommand
 
 
 @dataclass(frozen=True, slots=True)
@@ -830,11 +832,24 @@ class SourceReading[D = object]:
 class RiskReview[O = object]:
     """The orders the risk check approved, and the outcome of every decision; the execution orders them (R1.5.5).
 
-    The outcomes travel only to the record: approved, reduced, blocked or discarded (R1.7.1).
+    The outcomes travel only to the record: approved, reduced, blocked or discarded (R1.7.1). Reversing says that the
+    opening of a reversal waits for the close among the orders: the cycle checks and sends it in a second execution
+    (R1.4.10).
     """
 
     orders: tuple[O, ...]
     outcomes: object
+    reversing: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ReversedExecutions[E = object]:
+    """The executions of a cycle with reversals: those of the orders sent, and the outcome of the opening of every
+    reversal, checked on the state of the flow after its close (R1.4.10).
+    """
+
+    executions: tuple[E, ...]
+    reversals: object
 
 
 class PlannedFlowsPort(Protocol):
@@ -1044,6 +1059,28 @@ class OrderPort[O = object, E = object](Protocol):
         ...
 
 
+class ReversalPort[O = object, E = object](Protocol):
+    def execute(
+        self, flow_id: UUID, planned_at: datetime, anchor: datetime, orders: Sequence[O]
+    ) -> ReversedExecutions[E]:
+        """After the orders of the cycle are sent: the opening of every reversal among them checked on the state of the
+        flow after its close, the approved ones sent, with their outcomes (R1.4.10).
+        """
+        ...
+
+
+class AccountExecutionsRecorderPort(Protocol):
+    def execute(self, command: RecordAccountExecutionsCommand) -> object:
+        """Records in the ledger what the exchange added to the account since the last time (ADR 0063)."""
+        ...
+
+
+class CycleFlowReaderPort(Protocol):
+    def execute(self, command: ReadCycleFlowCommand) -> CycleFlow:
+        """The flow as a cycle reads it now: its account and the state attributed to it (R1.6.1)."""
+        ...
+
+
 class PromptMessagePort(Protocol):
     """A message the agent receives, as the record of the cycle keeps it."""
 
@@ -1115,7 +1152,7 @@ class AgentDecisionPort(Protocol):
 
     @property
     def action(self) -> str:
-        """The word of the action the agent took: apri, chiudi, mantieni or aggiorna (R6.5.4)."""
+        """The word of the action the agent took: apri, chiudi, mantieni, aggiorna or inverti (R6.5.4, R1.4.10)."""
         ...
 
     @property
@@ -1124,13 +1161,14 @@ class AgentDecisionPort(Protocol):
     @property
     def confidence(self) -> int: ...
 
-    def intent_with[O, C, H, U](
+    def intent_with[O, C, H, U, R](
         self,
         opening: Callable[[str, str, Decimal, int, DecisionExitPlanPort, int], O],
         closing: Callable[[str], C],
         holding: Callable[[str], H],
         updating: Callable[[str, DecisionPlanChangePort], U],
-    ) -> O | C | H | U: ...
+        reversing: Callable[[str, Decimal, int, DecisionExitPlanPort, int], R],
+    ) -> O | C | H | U | R: ...
 
 
 class AgentResponsePort(Protocol):

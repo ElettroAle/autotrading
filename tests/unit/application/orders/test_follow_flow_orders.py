@@ -49,15 +49,19 @@ class Closings:
     def __init__(self, recorded: RecordedEvents) -> None:
         self._recorded = recorded
 
-    def execute(self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution, *, unprotected: bool) -> None:
-        event = ("chiuso senza stop loss",) if unprotected else ("chiuso",)
+    def execute(
+        self, flow_id: UUID, cycle: datetime, asset: str, fill: Execution, *, unprotected: bool, reversing: bool
+    ) -> None:
+        event = ("chiuso senza stop loss",) if unprotected else ("chiuso per invertire",) if reversing else ("chiuso",)
         self._recorded.events.append((*event, flow_id, cycle, asset, fill))
 
 
-def follow(*orders: Order, unprotected: frozenset[ClientOrderId] = frozenset()) -> list[tuple[object, ...]]:
+def follow(
+    *orders: Order, unprotected: frozenset[ClientOrderId] = frozenset(), reversals: frozenset[str] = frozenset()
+) -> list[tuple[object, ...]]:
     recorded = RecordedEvents()
     followers = FlowOrderFollowers(Rejections(recorded), Openings(recorded), Closings(recorded))
-    command = FollowFlowOrdersCommand(FLOW, "Trend BTC", CYCLE, orders, unprotected)
+    command = FollowFlowOrdersCommand(FLOW, "Trend BTC", CYCLE, orders, unprotected, reversals)
     FollowFlowOrdersUseCase(followers).execute(command)
     return recorded.events
 
@@ -93,6 +97,16 @@ def test_a_closing_for_a_refused_stop_loss_is_recorded_as_such() -> None:
     assert follow(closing, unprotected=frozenset({closing.id})) == [
         ("chiuso senza stop loss", FLOW, CYCLE, "ETH", EXECUTION)
     ]
+
+
+def test_a_closing_that_reverses_the_position_is_recorded_as_such() -> None:
+    assert follow(a_closing(), reversals=frozenset({"ETH"})) == [
+        ("chiuso per invertire", FLOW, CYCLE, "ETH", EXECUTION)
+    ]
+
+
+def test_a_reversal_on_another_asset_leaves_the_closing_as_it_is() -> None:
+    assert follow(a_closing(), reversals=frozenset({"BTC"})) == [("chiuso", FLOW, CYCLE, "ETH", EXECUTION)]
 
 
 def test_every_order_is_followed_in_the_order_sent() -> None:
