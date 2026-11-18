@@ -49,6 +49,7 @@ FAILED = CycleRecord(
     failure=CycleFailure(CycleStep.COMPOSE_CONTEXT, "FakeTransientError", "timeout"),
     documents=(StepDocument(CycleStep.READ_FLOW_STATE, {"versione": 3, "pesi": {"notizie": 7}}),),
     cost=CallCost(2000, 500, Decimal("0.0031")),
+    model_attempts=4,
 )
 
 
@@ -70,6 +71,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "output_tokens": 500,
         "cost_usd": Decimal("0.0031"),
         "model_called": True,
+        "model_attempts": 4,
         "trigger": "scheduled",
     }
 
@@ -86,6 +88,7 @@ def test_a_skipped_record_has_no_failure_no_documents_and_no_cost() -> None:
     assert (row["outcome"], row["failure"], row["documents"], row["steps"]) == ("skipped", None, [], [])
     assert (row["input_tokens"], row["output_tokens"], row["cost_usd"]) == (None, None, None)
     assert not row["model_called"]
+    assert row["model_attempts"] is None
     assert record_of(row) == skipped
 
 

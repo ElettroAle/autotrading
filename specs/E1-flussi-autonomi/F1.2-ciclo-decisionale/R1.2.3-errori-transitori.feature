@@ -7,8 +7,8 @@ Funzionalità: R1.2.3 Ciclo fallito per un errore transitorio
 
   Un errore transitorio è un errore che può non ripetersi al ciclo successivo: rete non raggiungibile, fornitore
   IA o exchange momentaneamente indisponibile, tempo di risposta scaduto.
-  Un errore temporaneo del fornitore IA si ritenta nello stesso ciclo, fino a 2 volte con attese di 5 e 15 secondi
-  (R1.4.6, Bug 583); se nessun tentativo riesce, o per ogni altro errore transitorio, il ciclo si interrompe nel punto
+  Un errore temporaneo del fornitore IA si ritenta nello stesso ciclo, fino a 3 volte con attese di 2, 8 e 30 secondi
+  (R1.4.6, R1.4.9, Bug 583); se nessun tentativo riesce, o per ogni altro errore transitorio, il ciclo si interrompe nel punto
   dell'errore senza nuovi tentativi: nessun ordine successivo all'errore viene inviato. Il ciclo si registra come
   fallito con il passo, il tipo di errore e il messaggio originale.
   Il flusso resta attivo e il ciclo successivo parte al proprio istante. Gli altri flussi non ne risentono.

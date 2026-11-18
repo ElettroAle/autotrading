@@ -68,6 +68,7 @@ def everything_recorded(command: RunCycleCommand) -> CycleRecord:
         absent_sources=(AbsentSource("notizie", "nessuna risposta entro 60 secondi"),),
         documents=(StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "azione": "apri"}]}),),
         cost=CallCost(2000, 500, Decimal("0.0031")),
+        model_attempts=2,
         trigger=command.trigger,
     )
 

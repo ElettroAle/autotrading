@@ -1797,6 +1797,8 @@ export interface components {
             /** Documents */
             documents: components["schemas"]["StepDocumentResponse"][];
             cost: components["schemas"]["CallCostResponse"] | null;
+            /** Model Attempts */
+            model_attempts: number | null;
             /** Trigger */
             trigger: string;
         };

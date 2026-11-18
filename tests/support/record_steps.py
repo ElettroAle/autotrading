@@ -343,7 +343,7 @@ CALLS = r"^il fornitore riceve (?P<count>\d+) chiamat[ae] (?:con attese di (?P<p
 @then(parsers.re(CALLS))
 def provider_receives_calls(records: Records, count: str, pauses: str | None) -> None:
     flow_cycles = records.flow_cycles
-    waited = [] if pauses is None else [float(each) for each in pauses.split(" e ")]
+    waited = [] if pauses is None else [float(each) for each in pauses.replace(" e ", ", ").split(", ")]
     assert len(flow_cycles.model.calls) == int(count)
     assert flow_cycles.pause.pauses == waited
 

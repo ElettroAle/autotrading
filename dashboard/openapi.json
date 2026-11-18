@@ -6538,6 +6538,17 @@
               }
             ]
           },
+          "model_attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Attempts"
+          },
           "trigger": {
             "type": "string",
             "title": "Trigger"
@@ -6554,6 +6565,7 @@
           "absent_sources",
           "documents",
           "cost",
+          "model_attempts",
           "trigger"
         ],
         "title": "CycleDetailResponse",

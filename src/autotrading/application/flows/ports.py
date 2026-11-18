@@ -1158,7 +1158,9 @@ class ModelUsagePort(Protocol):
 
 
 class AgentReplyPort(Protocol):
-    """The answer of the agent to a cycle, with what the call consumed and cost (R1.4.4-R1.4.6)."""
+    """The answer of the agent to a cycle, with what its calls consumed and cost and how many calls it took
+    (R1.4.4-R1.4.6, R1.4.9).
+    """
 
     @property
     def response(self) -> AgentResponsePort: ...
@@ -1169,10 +1171,15 @@ class AgentReplyPort(Protocol):
     @property
     def cost_usd(self) -> Decimal | None: ...
 
+    @property
+    def attempts(self) -> int: ...
+
 
 class FlowAgentPort(Protocol):
     def execute(self, question: CycleQuestion) -> AgentReplyPort:
-        """Asks the model of the flow, with the key of the tenant; one call per cycle, never retried (R1.4.5)."""
+        """Asks the model of the flow, with the key of the tenant; a temporary failure of the provider is asked again
+        within the decision, an answer read but not conforming never is (R1.4.5, R1.4.9).
+        """
         ...
 
 
@@ -1291,11 +1298,14 @@ class FlowLossGuardPort(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class FailedModelCall:
-    """A model call that went out in a decision that failed: tokens and cost when the provider reported its usage,
-    None when nobody knows them (R1.4.6).
+    """The model calls of a decision that failed: tokens and cost when the provider reported their usage, None when
+    nobody knows them (R1.4.6), with how many calls the decision tried and whether any of them went out (R1.4.9, ADR
+    tentativi-del-modello-registrati-nel-ciclo).
     """
 
     cost: CallCost | None
+    attempts: int
+    sent: bool = True
 
 
 class CycleJournalPort(Protocol):
@@ -1309,9 +1319,14 @@ class CycleJournalPort(Protocol):
         """Tokens and cost of the model call behind the decision of the agent (R1.4.6)."""
         ...
 
+    def call_attempts(self, decision: object) -> int | None:
+        """How many calls the decision of the agent took, beside their cost (R1.4.9)."""
+        ...
+
     def failed_call(self, error: AutotradingError) -> FailedModelCall | None:
-        """The model call behind the error that failed the decision of the agent; None when no call went out
-        (R1.4.6, ADR costo-della-decisione-fallita-nel-registro-del-ciclo).
+        """The model calls behind the error that failed the decision of the agent; None when the error tried none
+        (R1.4.6, R1.4.9, ADR costo-della-decisione-fallita-nel-registro-del-ciclo, ADR
+        tentativi-del-modello-registrati-nel-ciclo).
         """
 
     def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:

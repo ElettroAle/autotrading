@@ -78,12 +78,14 @@ class ModelUnavailableError(ApplicationError):
     """The provider did not answer, or answered with an error that may not repeat: only the cycle fails (R1.2.3).
 
     A call that went out may have been charged: the error says so, with the usage the provider reported when it did,
-    so the cycle still records the call (R1.4.6, ADR uso-riportato-nell-errore-della-chiamata-al-modello).
+    so the cycle still records the call (R1.4.6, ADR uso-riportato-nell-errore-della-chiamata-al-modello), and with
+    how many calls the question tried, one until it is asked again (R1.4.9, ADR
+    tentativi-del-modello-registrati-nel-ciclo).
     """
 
     status_code = 503
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - the provider and its message, then what the calls spent, each by name
         self,
         provider: ProviderName,
         original: str,
@@ -91,6 +93,7 @@ class ModelUnavailableError(ApplicationError):
         usage: ModelUsage | None = None,
         sent: bool = False,
         cost_usd: Decimal | None = None,
+        attempts: int = 1,
     ) -> None:
         super().__init__(f"fornitore IA non raggiungibile: {provider.value}: {original}")
         self.provider = provider
@@ -98,24 +101,34 @@ class ModelUnavailableError(ApplicationError):
         self.usage = usage
         self.sent = sent
         self.cost_usd = cost_usd
+        self.attempts = attempts
 
     def priced(self, prices: ModelPrices | None) -> ModelUnavailableError:
         """The same error with the cost of the reported usage, priced as every answered call is (R1.4.6)."""
         cost = None if self.usage is None else self.usage.cost_usd(prices)
-        return ModelUnavailableError(self.provider, self.original, usage=self.usage, sent=self.sent, cost_usd=cost)
+        return ModelUnavailableError(
+            self.provider, self.original, usage=self.usage, sent=self.sent, cost_usd=cost, attempts=self.attempts
+        )
 
     def spent_after(self, spend: ModelSpend) -> ModelSpend:
-        """What the calls before this one spent, with this call when it went out (R1.4.6)."""
+        """What the calls before this one spent, with this call when it went out; tried, it is an attempt anyway
+        (R1.4.6, R1.4.9).
+        """
         if not self.sent:
-            return spend
+            return spend.with_attempt()
         return spend.with_call(self.usage, self.cost_usd)
 
     def with_spend(self, spend: ModelSpend) -> ModelUnavailableError:
-        """The same error carrying what every call of the question consumed, the retried ones included (R1.4.6, ADR
-        ritentativo-del-modello-nel-ciclo).
+        """The same error carrying what every call of the question consumed and how many it tried, the retried ones
+        included (R1.4.6, R1.4.9, ADR tentativi-del-modello-registrati-nel-ciclo).
         """
         return ModelUnavailableError(
-            self.provider, self.original, usage=spend.usage, sent=spend.sent, cost_usd=spend.cost_usd
+            self.provider,
+            self.original,
+            usage=spend.usage,
+            sent=spend.sent,
+            cost_usd=spend.cost_usd,
+            attempts=spend.attempts,
         )
 
 

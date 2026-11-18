@@ -118,6 +118,7 @@ class CycleState[S = object, D = object, C = object, A = object, O = object, E =
     context: C
     decisions: A
     cost: CallCost | None
+    model_attempts: int | None
     recorded_decisions: tuple[RecordedDecision, ...]
     review: RiskReview[O]
     executions: Sequence[E]
@@ -234,10 +235,12 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
     def _decide(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         decisions = self._steps.agent.execute(cycle.flow_id, state["context"])
         cost = self._steps.journal.call_cost(decisions)
+        attempts = self._steps.journal.call_attempts(decisions)
         recorded_decisions = self._steps.journal.recorded_decisions(decisions)
         return {
             "decisions": decisions,
             "cost": cost,
+            "model_attempts": attempts,
             "recorded_decisions": recorded_decisions,
             **self._done(CycleStep.AGENT_DECISION, decisions),
         }
@@ -304,7 +307,9 @@ def _last_state[S, D, C, A, O, E](state: CycleState[S, D, C, A, O, E]) -> S | No
 def _with_call(record: CycleRecord, call: FailedModelCall | None) -> CycleRecord:
     if call is None:
         return record
-    return replace(record, cost=call.cost, call_without_usage=call.cost is None)
+    return replace(
+        record, cost=call.cost, call_without_usage=call.sent and call.cost is None, model_attempts=call.attempts
+    )
 
 
 def _record_of[S, D, C, A, O, E](
@@ -326,6 +331,7 @@ def _record_of[S, D, C, A, O, E](
         failure=failure,
         documents=tuple(state.get("documents", [])),
         cost=state.get("cost"),
+        model_attempts=state.get("model_attempts"),
         decisions=tuple(state.get("recorded_decisions", ())),
         trigger=cycle.trigger,
     )

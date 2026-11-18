@@ -102,3 +102,19 @@ def test_a_cycle_keeps_the_decisions_the_agent_took_in_it() -> None:
 
 def test_a_cycle_that_never_got_to_the_agent_has_no_decision() -> None:
     assert CycleRecord.skipped(uuid4(), datetime(2026, 11, 16, 10, 0, tzinfo=UTC)).decisions == ()
+
+
+def test_a_cycle_that_never_asked_the_model_records_no_attempt() -> None:
+    record = CycleRecord(uuid4(), datetime(2026, 11, 12, tzinfo=UTC), CycleOutcome.FAILED)
+
+    assert record.model_attempts is None
+
+
+# ADR-tentativi-del-modello-registrati-nel-ciclo: the cycle keeps how many calls the decision of the agent took.
+def test_a_cycle_keeps_the_attempts_of_the_model_call() -> None:
+    cost = CallCost(2100, 500, Decimal("0.0032"))
+    record = CycleRecord(
+        uuid4(), datetime(2026, 11, 12, tzinfo=UTC), CycleOutcome.COMPLETED, cost=cost, model_attempts=2
+    )
+
+    assert (record.cost, record.model_attempts) == (cost, 2)

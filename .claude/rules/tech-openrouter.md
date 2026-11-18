@@ -29,8 +29,8 @@ paths:
   altri stati transitori. L'errore che OpenRouter mette nel corpo di una risposta 200 (`error` con `message`) è il motivo:
   con un `code` numerico passa dalla stessa traduzione degli stati HTTP, altrimenti è transitorio col suo messaggio; il
   costo, se `usage` c'è, resta (ADR errore-di-openrouter-nella-risposta). Una risposta che non si legge è transitoria.
-  L'adapter non ritenta: gli errori transitori li ritenta nel ciclo il caso d'uso (ADR
-  ritentativo-del-modello-nel-ciclo).
+  L'adapter non ritenta: gli errori transitori li ritenta nel ciclo il caso d'uso, fino a 3 volte con attese di 2, 8 e
+  30 secondi (R1.4.9, ADR ritentativo-del-modello-nel-ciclo, ADR tentativi-del-modello-registrati-nel-ciclo).
 - `composition.py` espone `openrouter_adapters()`; `configuration.py` la dataclass privata `_OpenRouterSettings` (solo
   il tempo di attesa: nessun indirizzo né chiave della piattaforma).
 - Test di integrazione `-m providers`: elenco pubblico vero e chiave inventata rifiutata, nessuna spesa.

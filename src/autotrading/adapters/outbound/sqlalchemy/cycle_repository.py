@@ -68,6 +68,7 @@ class _CycleRow(TypedDict):
     output_tokens: int | None
     cost_usd: Decimal | None
     model_called: bool
+    model_attempts: int | None
     trigger: str
 
 
@@ -299,6 +300,7 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
         "output_tokens": None if cost is None else cost.output_tokens,
         "cost_usd": None if cost is None else cost.cost_usd,
         "model_called": record.model_called,
+        "model_attempts": record.model_attempts,
         "trigger": record.trigger.value,
     }
 
@@ -354,6 +356,7 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
         ),
         cost=_cost_of(row),
         call_without_usage=row["model_called"] and _cost_of(row) is None,
+        model_attempts=row["model_attempts"],
         trigger=CycleTrigger(row["trigger"]),
     )
 

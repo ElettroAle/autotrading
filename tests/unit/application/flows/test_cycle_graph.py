@@ -185,7 +185,7 @@ def test_a_cycle_failed_in_the_decision_records_the_tokens_and_cost_of_the_call(
     cycles.add_flow("alfa")
     error = FakeTransientError("risposta del fornitore inattesa")
     cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, error)
-    cycles.journal.failed = FailedModelCall(CallCost(3000, 4000, Decimal("0.002")))
+    cycles.journal.failed = FailedModelCall(CallCost(3000, 4000, Decimal("0.002")), attempts=4)
 
     outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
 
@@ -193,18 +193,33 @@ def test_a_cycle_failed_in_the_decision_records_the_tokens_and_cost_of_the_call(
     assert cycles.journal.failures == [error]
     assert outcome.record.cost == CallCost(3000, 4000, Decimal("0.002"))
     assert not outcome.record.call_without_usage
+    assert outcome.record.model_attempts == 4
 
 
 def test_a_cycle_failed_in_the_decision_without_a_known_usage_records_a_call_without_cost(cycles: Cycles) -> None:
     cycles.add_flow("alfa")
     cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakeTransientError("scaduto"))
-    cycles.journal.failed = FailedModelCall(None)
+    cycles.journal.failed = FailedModelCall(None, attempts=4)
 
     outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
 
     assert isinstance(outcome, FailedCycle)
     assert (outcome.record.cost, outcome.record.call_without_usage) == (None, True)
     assert outcome.record.model_called
+    assert outcome.record.model_attempts == 4
+
+
+# ADR-tentativi-del-modello-registrati-nel-ciclo: attempts that never reached the provider are still attempts.
+def test_a_cycle_failed_in_the_decision_with_no_call_out_records_the_attempts_without_a_call(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakeTransientError("ConnectError"))
+    cycles.journal.failed = FailedModelCall(None, attempts=4, sent=False)
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert not outcome.record.model_called
+    assert outcome.record.model_attempts == 4
 
 
 def test_a_cycle_failed_in_the_decision_before_any_call_records_no_call(cycles: Cycles) -> None:
@@ -216,18 +231,32 @@ def test_a_cycle_failed_in_the_decision_before_any_call_records_no_call(cycles: 
 
     assert isinstance(outcome, FailedCycle)
     assert not outcome.record.model_called
+    assert outcome.record.model_attempts is None
 
 
 def test_a_cycle_failed_after_the_decision_keeps_the_cost_of_the_answered_call(cycles: Cycles) -> None:
     cycles.add_flow("alfa")
     cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.RISK_CHECK, FakeTransientError("timeout"))
-    cycles.journal.failed = FailedModelCall(None)
+    cycles.journal.failed = FailedModelCall(None, attempts=1)
+    cycles.journal.attempts = 3
 
     outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
 
     assert isinstance(outcome, FailedCycle)
     assert cycles.journal.failures == []
     assert (outcome.record.cost, outcome.record.call_without_usage) == (cycles.journal.cost, False)
+    assert outcome.record.model_attempts == 3
+
+
+# ADR-tentativi-del-modello-registrati-nel-ciclo: a completed cycle records the attempts beside the cost of the call.
+def test_a_completed_cycle_records_the_attempts_of_the_model_call(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.journal.attempts = 2
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, CompletedCycle)
+    assert (outcome.record.cost, outcome.record.model_attempts) == (cycles.journal.cost, 2)
 
 
 # ADR decisioni-del-ciclo-registrate-per-asset: the decide node reads the decisions one by asset through the journal

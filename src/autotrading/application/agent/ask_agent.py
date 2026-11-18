@@ -18,9 +18,10 @@ from autotrading.domain.agent.model_usage import ModelPrices, ModelSpend, ModelU
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 
-# Two more calls after the first, each after a longer pause: a provider that is down a moment is up again within the
-# cycle, one that stays down fails the cycle (ADR ritentativo-del-modello-nel-ciclo).
-RETRY_PAUSES_SECONDS = (5.0, 15.0)
+# Up to three more calls after the first, each after a longer pause, as the owner asked (R1.4.9): a provider that is
+# down a moment is up again within the cycle, one that stays down fails the cycle (ADR
+# tentativi-del-modello-registrati-nel-ciclo).
+RETRY_PAUSES_SECONDS = (2.0, 8.0, 30.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,20 +33,23 @@ class AskAgentCommand:
 
 @dataclass(frozen=True, slots=True)
 class AgentAnswer:
-    """The answer of the agent as the cycle keeps it, with what the call consumed and cost (R1.4.4-R1.4.6)."""
+    """The answer of the agent as the cycle keeps it, with what the calls consumed and cost and how many calls it took
+    (R1.4.4-R1.4.6, R1.4.9).
+    """
 
     response: AgentResponse
     usage: ModelUsage
     cost_usd: Decimal | None
+    attempts: int
 
 
 class AskAgentUseCase:
     """Asks the model of the flow with the key of the tenant, in the worker, and reads its answer (R1.4.3-R1.4.6).
 
     A failure of the provider that is not permanent, an answer that arrived unreadable included, is asked again in the
-    same cycle, up to twice and after a longer pause each time, even if the provider may have charged it (ADR
-    ritentativo-del-modello-nel-ciclo). An answer read but not conforming is not a failure and is not asked again
-    (R1.4.5). The gateway that calls is the one whose catalog holds the model of the flow (ADR 0109).
+    same cycle, up to three times and after a longer pause each time, even if the provider may have charged it (R1.4.9,
+    ADR tentativi-del-modello-registrati-nel-ciclo). An answer read but not conforming is not a failure and is not asked
+    again (R1.4.5). The gateway that calls is the one whose catalog holds the model of the flow (ADR 0109).
     """
 
     def __init__(
@@ -68,10 +72,12 @@ class AskAgentUseCase:
             lambda: call.call(definition.name, key, command.settings, command.context.messages(), DECISIONS_FORMAT),
             definition.prices,
         )
+        answered = spend.with_call(reply.usage, reply.usage.cost_usd(definition.prices))
         return AgentAnswer(
             AgentResponse.read(reply.text, command.context.assets),
             reply.usage.plus(spend.usage),
-            spend.with_call(reply.usage, reply.usage.cost_usd(definition.prices)).cost_usd,
+            answered.cost_usd,
+            answered.attempts,
         )
 
     def _reply_of(self, ask: Callable[[], ModelReply], prices: ModelPrices | None) -> tuple[ModelReply, ModelSpend]:

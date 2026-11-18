@@ -123,6 +123,24 @@ def test_the_cost_reported_by_the_provider_is_kept(world: World) -> None:
     assert answer.cost_usd == Decimal("0.0031")
 
 
+def test_an_answer_at_the_first_call_took_one_attempt(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert answer.attempts == 1
+
+
+def test_attempts_that_never_went_out_count_among_the_attempts_of_the_answer(world: World) -> None:
+    world.register("openrouter", TENANT_KEY)
+    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "ConnectError")] * 3
+
+    answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
+
+    assert answer.attempts == 4
+    assert world.pause.pauses == [2.0, 8.0, 30.0]
+
+
 def test_without_a_reported_cost_the_prices_of_the_catalog_give_it(world: World) -> None:
     world.register("anthropic", TENANT_KEY)
     world.model.usage = ModelUsage(1000, 1000, None)
@@ -169,17 +187,23 @@ def test_a_model_no_longer_in_the_catalog_is_not_called(world: World) -> None:
 
 def test_a_call_failing_at_every_attempt_fails_with_the_last_error(world: World) -> None:
     world.register("openrouter", TENANT_KEY)
-    world.model.first_failures = [ModelUnavailableError(OPENROUTER, "503"), ModelUnavailableError(OPENROUTER, "429")]
+    world.model.first_failures = [
+        ModelUnavailableError(OPENROUTER, "503"),
+        ModelUnavailableError(OPENROUTER, "429"),
+        ModelUnavailableError(OPENROUTER, "500"),
+    ]
     world.model.failure = ModelUnavailableError(OPENROUTER, "502 Provider returned error")
 
     with pytest.raises(ModelUnavailableError, match="502 Provider returned error") as raised:
         world.ask()
 
     assert raised.value.__cause__ is world.model.failure
-    assert len(world.model.calls) == 3
+    assert len(world.model.calls) == 4
+    assert raised.value.attempts == 4
 
 
-# ADR-ritentativo-del-modello-nel-ciclo: a temporary error is asked again in the same cycle, after 5 and 15 seconds.
+# ADR-tentativi-del-modello-registrati-nel-ciclo: a temporary error is asked again in the same cycle, up to 3 times,
+# after 2, 8 and 30 seconds.
 def test_a_temporary_error_is_asked_again_after_a_growing_pause(world: World) -> None:
     world.register("openrouter", TENANT_KEY)
     world.model.failure = ModelUnavailableError(OPENROUTER, "tempo di risposta scaduto", sent=True)
@@ -187,8 +211,8 @@ def test_a_temporary_error_is_asked_again_after_a_growing_pause(world: World) ->
     with pytest.raises(ModelUnavailableError):
         world.ask()
 
-    assert world.pause.pauses == [5.0, 15.0]
-    assert [call.messages for call in world.model.calls] == [CONTEXT.messages()] * 3
+    assert world.pause.pauses == [2.0, 8.0, 30.0]
+    assert [call.messages for call in world.model.calls] == [CONTEXT.messages()] * 4
 
 
 def test_a_temporary_error_then_an_answer_gives_the_answer_with_the_cost_of_both_calls(world: World) -> None:
@@ -201,7 +225,8 @@ def test_a_temporary_error_then_an_answer_gives_the_answer_with_the_cost_of_both
 
     assert [decision.asset for decision in answer.response.decisions] == ["BTC"]
     assert (answer.usage, answer.cost_usd) == (ModelUsage(2100, 500, Decimal("0.0032")), Decimal("0.0032"))
-    assert world.pause.pauses == [5.0]
+    assert world.pause.pauses == [2.0]
+    assert answer.attempts == 2
 
 
 def test_a_failed_call_priced_by_the_catalog_adds_its_cost_to_the_answer(world: World) -> None:
@@ -244,8 +269,8 @@ def test_the_last_error_carries_the_usage_and_the_cost_of_every_attempt(world: W
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask()
 
-    assert (raised.value.usage, raised.value.sent) == (ModelUsage(200, 0, Decimal("0.0002")), True)
-    assert raised.value.cost_usd == Decimal("0.0002")
+    assert (raised.value.usage, raised.value.sent) == (ModelUsage(300, 0, Decimal("0.0003")), True)
+    assert raised.value.cost_usd == Decimal("0.0003")
 
 
 def test_attempts_that_never_went_out_fail_without_a_cost(world: World) -> None:
@@ -256,6 +281,7 @@ def test_attempts_that_never_went_out_fail_without_a_cost(world: World) -> None:
         world.ask()
 
     assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (None, False, None)
+    assert raised.value.attempts == 4
 
 
 @pytest.mark.parametrize(
@@ -282,6 +308,7 @@ def test_an_unavailable_provider_made_permanent_by_its_cause_is_never_asked_agai
 
     assert raised.value.__cause__ is world.model.failure
     assert (len(world.model.calls), world.pause.pauses) == (1, [])
+    assert raised.value.attempts == 1
 
 
 # Owner decision (17/11/2026, "Riprova sempre"): an answer that arrived but cannot be read is asked again too.
@@ -294,7 +321,7 @@ def test_an_answer_that_arrived_unreadable_is_asked_again(world: World) -> None:
 
     answer = world.use_case.execute(AskAgentCommand("openrouter/deepseek-chat", {}, CONTEXT))
 
-    assert (len(world.model.calls), world.pause.pauses) == (2, [5.0])
+    assert (len(world.model.calls), world.pause.pauses) == (2, [2.0])
     assert answer.cost_usd == Decimal("0.002") + Decimal("0.001")
 
 
@@ -318,8 +345,8 @@ def test_a_call_without_a_usable_answer_fails_with_the_usage_and_the_cost_of_the
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask(PRICED)
 
-    every_attempt = ModelUsage(3000, 3000, None)
-    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (every_attempt, True, Decimal("0.009"))
+    every_attempt = ModelUsage(4000, 4000, None)
+    assert (raised.value.usage, raised.value.sent, raised.value.cost_usd) == (every_attempt, True, Decimal("0.012"))
     assert raised.value.__cause__ is world.model.failure
 
 
@@ -331,7 +358,7 @@ def test_a_call_without_a_usable_answer_keeps_the_cost_the_provider_reported(wor
     with pytest.raises(ModelUnavailableError) as raised:
         world.ask()
 
-    assert raised.value.cost_usd == Decimal("0.006")
+    assert raised.value.cost_usd == Decimal("0.008")
 
 
 def test_an_unreadable_answer_keeps_the_usage_and_the_cost_of_the_call(world: World) -> None:

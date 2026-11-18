@@ -83,6 +83,7 @@ def a_completed_cycle(flow_id: UUID, planned_at: datetime = PLANNED) -> CycleRec
             StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "azione": "apri"}]}),
         ),
         cost=CallCost(2000, 500, Decimal("0.0031")),
+        model_attempts=2,
     )
 
 
@@ -165,6 +166,7 @@ def test_the_detail_of_a_cycle_answers_with_everything_recorded(client_of: Clien
             {"step": "decisione dell'agente", "content": {"decisioni": [{"asset": "BTC", "azione": "apri"}]}},
         ],
         "cost": {"input_tokens": 2000, "output_tokens": 500, "cost_usd": "0.0031"},
+        "model_attempts": 2,
         "trigger": "scheduled",
     }
 

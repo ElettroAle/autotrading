@@ -114,6 +114,7 @@ def _record_of(flow_id: UUID, response: httpx.Response) -> CycleRecord:
             cost=None
             if cost is None
             else CallCost(cost["input_tokens"], cost["output_tokens"], _decimal(cost["cost_usd"])),
+            model_attempts=body["model_attempts"],
             trigger=CycleTrigger(body["trigger"]),
         )
     except (KeyError, TypeError, ValueError, InvalidOperation) as error:

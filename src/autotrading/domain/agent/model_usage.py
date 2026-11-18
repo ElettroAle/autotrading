@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from autotrading.domain.agent.errors import InvalidModelUsageError
@@ -53,21 +53,26 @@ class ModelUsage:
 
 @dataclass(frozen=True, slots=True)
 class ModelSpend:
-    """What the calls of one question to the model consumed together, the retried ones included (R1.4.6, ADR
-    ritentativo-del-modello-nel-ciclo).
+    """What the calls of one question to the model consumed together, the retried ones included, and how many calls
+    the question tried (R1.4.6, R1.4.9, ADR tentativi-del-modello-registrati-nel-ciclo).
 
     The usage adds up what the provider reported; the cost is not available as soon as one call that went out has none.
-    Nothing is spent until a call goes out.
+    Nothing is spent until a call goes out; every call tried is an attempt, the first one included.
     """
 
     usage: ModelUsage | None = None
     cost_usd: Decimal | None = None
     sent: bool = False
+    attempts: int = 0
 
     def with_call(self, usage: ModelUsage | None, cost_usd: Decimal | None) -> ModelSpend:
         """A call that went out, with its usage when the provider reported it and its cost when somebody knows it."""
         reported = self.usage if usage is None else usage.plus(self.usage)
-        return ModelSpend(reported, self._cost_with(cost_usd), sent=True)
+        return ModelSpend(reported, self._cost_with(cost_usd), sent=True, attempts=self.attempts + 1)
+
+    def with_attempt(self) -> ModelSpend:
+        """A call tried that never went out: it spends nothing, and it is an attempt all the same."""
+        return replace(self, attempts=self.attempts + 1)
 
     def _cost_with(self, cost_usd: Decimal | None) -> Decimal | None:
         if not self.sent:
