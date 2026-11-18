@@ -58,7 +58,7 @@ def test_a_notification_of_the_account_reads_no_state(flow_status: FakeFlowStatu
 
 def test_a_flow_no_longer_found_leaves_its_notification_without_state(flow_status: FakeFlowStatusAdapter) -> None:
     notifier = Notifier()
-    paused = Notification.flow_paused(uuid4(), "beta", "credito esaurito")
+    paused = Notification.flow_paused(uuid4(), "beta", "credito esaurito", uuid4())
 
     NotifyFlowEventUseCase(notifier, flow_status).execute(paused)
 

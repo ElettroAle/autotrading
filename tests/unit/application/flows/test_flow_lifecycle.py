@@ -50,8 +50,10 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.notifications.alert import AlertCause, AlertState
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.markets import FakeMarketsAdapter
@@ -85,8 +87,11 @@ class Flows:
         self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)
         self.running_verifications: RunningVerifications = set()
         self.verifications = InMemoryRunningVerificationsAdapter(self.running_verifications)
-        self.change_status = ChangeFlowStatusUseCase(self.repository, self.verifications, self.accounts.ports())
-        self.archive = ArchiveFlowUseCase(self.repository)
+        self.alerts = InMemoryAlertRepositoryAdapter({}, self.tenant_id)
+        self.change_status = ChangeFlowStatusUseCase(
+            self.repository, self.verifications, self.accounts.ports(), self.alerts
+        )
+        self.archive = ArchiveFlowUseCase(self.repository, self.alerts)
         self.get_version = GetFlowVersionUseCase(self.repository)
         self.compare = CompareFlowVersionsUseCase(self.repository)
         self.list = ListFlowsUseCase(self.repository)
@@ -630,6 +635,26 @@ def test_a_stopped_flow_on_an_account_out_of_reach_does_not_start(flows: Flows) 
     assert flows.current(flow) == flow
 
 
+def test_a_flow_that_resumes_resolves_the_alert_of_its_pause(flows: Flows) -> None:
+    flow = flows.saved(status=FlowStatus.PAUSED)
+    alert_id = flows.alerts.open(AlertCause.flow_paused(flow.id.value, "alfa", "credito esaurito"))
+    other = flows.alerts.open(AlertCause.flow_paused(uuid4(), "beta", "credito esaurito"))
+
+    flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.RESUME))
+
+    assert flows.alerts.get(alert_id).state is AlertState.RESOLVED
+    assert flows.alerts.get(other).state is AlertState.OPEN
+
+
+def test_a_flow_paused_by_the_user_keeps_the_alerts(flows: Flows) -> None:
+    flow = flows.saved(status=FlowStatus.ACTIVE)
+    alert_id = flows.alerts.open(AlertCause.flow_paused(flow.id.value, "alfa", "credito esaurito"))
+
+    flows.change_status.execute(ChangeFlowStatusCommand(flow.id, FlowAction.PAUSE))
+
+    assert flows.alerts.get(alert_id).state is AlertState.OPEN
+
+
 def test_a_paused_flow_resumes_without_reading_its_account(flows: Flows) -> None:
     flow = flows.saved(status=FlowStatus.PAUSED)
     flows.accounts.reachable = False
@@ -689,6 +714,15 @@ def test_an_archived_flow_leaves_the_flows_in_use(flows: Flows, caplog: pytest.L
     assert flows.list.execute() == [beta]
     assert flows.list.execute(archived=True) == [archived]
     assert [record.getMessage() for record in caplog.records] == ["flusso archiviato"]
+
+
+def test_an_archived_flow_resolves_the_alert_of_its_pause(flows: Flows) -> None:
+    flow = flows.saved()
+    alert_id = flows.alerts.open(AlertCause.flow_paused(flow.id.value, "alfa", "credito esaurito"))
+
+    flows.archive.execute(ArchiveFlowCommand(flow.id))
+
+    assert flows.alerts.get(alert_id).state is AlertState.RESOLVED
 
 
 def test_a_flow_not_stopped_is_not_archived(flows: Flows) -> None:

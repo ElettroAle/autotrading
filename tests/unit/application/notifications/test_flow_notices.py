@@ -20,6 +20,7 @@ from autotrading.application.notifications.notify_position_opened import NotifyP
 from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
 from autotrading.application.notifications.notify_unattributable_position import NotifyUnattributablePositionUseCase
+from autotrading.domain.notifications.alert import AlertCause, AlertKind, AlertResourceKind
 from autotrading.domain.notifications.flow_status import (
     FlowStatusFigures,
     FlowStatusLine,
@@ -27,6 +28,8 @@ from autotrading.domain.notifications.flow_status import (
     RecordedEquity,
 )
 from autotrading.domain.notifications.notification import Amount, Notification
+from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.flow_status import FakeFlowStatusAdapter
 
 FLOW_ID, ACCOUNT_ID = uuid4(), uuid4()
@@ -65,12 +68,20 @@ def test_openings_suspended_for_maximum_loss_are_told_with_the_threshold_passed(
     ]
 
 
-def test_a_flow_paused_on_its_own_is_told_with_the_reason() -> None:
-    notifier = Notifier()
+def alerts() -> InMemoryAlertRepositoryAdapter:
+    return InMemoryAlertRepositoryAdapter({}, TenantId.new())
 
-    NotifyFlowPausedUseCase(of_flow(notifier)).execute(FLOW_ID, "alfa", "credito esaurito")
 
-    assert notifier.sent == [Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito").with_flow_status(STATUS)]
+def test_a_flow_paused_on_its_own_opens_its_alert_and_is_told_with_the_reason_and_the_alert() -> None:
+    notifier, repository = Notifier(), alerts()
+
+    NotifyFlowPausedUseCase(of_flow(notifier), repository).execute(FLOW_ID, "alfa", "credito esaurito")
+
+    [alert] = repository.alerts
+    assert alert.cause == AlertCause.flow_paused(FLOW_ID, "alfa", "credito esaurito")
+    assert notifier.sent == [
+        Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito", alert.id.value).with_flow_status(STATUS)
+    ]
 
 
 def test_a_failed_cycle_is_told_with_the_message_of_its_error() -> None:
@@ -167,23 +178,45 @@ def test_an_emergency_closing_is_told_with_the_positions_closed_and_the_flows_pa
     assert notifier.sent == [Notification.emergency_closing_done(1, ("alfa",))]
 
 
-def test_the_cases_no_flow_explains_are_told_by_the_name_of_the_account() -> None:
-    notifier = Notifier()
+def test_the_cases_no_flow_explains_open_their_alerts_and_are_told_by_the_name_of_the_account() -> None:
+    notifier, repository = Notifier(), alerts()
 
-    NotifyUnattributablePositionUseCase(notifier).execute(ACCOUNT_ID, "principale", "BTC")
-    NotifyUnattributableFillUseCase(notifier).execute(ACCOUNT_ID, "principale", "ETH")
+    NotifyUnattributablePositionUseCase(notifier, repository).execute(ACCOUNT_ID, "principale", "BTC")
+    NotifyUnattributableFillUseCase(notifier, repository).execute(ACCOUNT_ID, "principale", "ETH")
 
+    position, fill = repository.alerts
+    assert (position.cause.kind, fill.cause.kind) == (AlertKind.UNATTRIBUTABLE_POSITION, AlertKind.UNATTRIBUTABLE_FILL)
+    assert {alert.cause.resource.kind for alert in (position, fill)} == {AlertResourceKind.ACCOUNT}
     assert notifier.sent == [
-        Notification.unattributable_position(ACCOUNT_ID, "principale", "BTC"),
-        Notification.unattributable_fill(ACCOUNT_ID, "principale", "ETH"),
+        Notification.unattributable_position(position.id.value, "principale", "BTC"),
+        Notification.unattributable_fill(fill.id.value, "principale", "ETH"),
     ]
+
+
+def test_a_case_already_open_is_told_again_with_the_same_alert() -> None:
+    notifier, repository = Notifier(), alerts()
+
+    NotifyUnattributablePositionUseCase(notifier, repository).execute(ACCOUNT_ID, "principale", "BTC")
+    NotifyUnattributablePositionUseCase(notifier, repository).execute(ACCOUNT_ID, "principale", "BTC")
+
+    [alert] = repository.alerts
+    assert [notification.targets for notification in notifier.sent] == [
+        Notification.unattributable_position(alert.id.value, "principale", "BTC").targets
+    ] * 2
 
 
 def test_an_alarm_of_reconciliation_is_told_with_the_balances_in_the_settlement_currency() -> None:
     notifier = Notifier()
 
-    NotifyReconciliationAlarmUseCase(notifier, "USDC").execute(ACCOUNT_ID, "test-1", Decimal("980.5"), Decimal(1000))
+    repository = alerts()
 
+    NotifyReconciliationAlarmUseCase(notifier, repository, "USDC").execute(
+        ACCOUNT_ID, "test-1", Decimal("980.5"), Decimal(1000)
+    )
+
+    [alert] = repository.alerts
+    assert alert.cause.kind is AlertKind.RECONCILIATION_ALARM
+    assert [str(value) for value in alert.cause.values] == ["Saldo letto: 980,50 USDC", "Saldo atteso: 1000 USDC"]
     assert texts(notifier) == [
         "\U0001f6a8 test-1: allarme di riconciliazione\n\nSaldo letto: 980,50 USDC\nSaldo atteso: 1000 USDC"
     ]

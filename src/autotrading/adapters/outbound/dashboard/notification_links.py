@@ -36,13 +36,14 @@ def _closed_position(target: NotificationTarget) -> str:
     return f"{_flow(target)}/closed-positions?{urlencode({'asset': target.asset or '', 'closed_at': closed_at})}"
 
 
-def _account_alarms(target: NotificationTarget) -> str:
-    return f"/accounts/{quote(str(target.owner_id))}/alarms"
+def _alert(target: NotificationTarget) -> str:
+    # The detail of the alert says what to do and leads to its resource (ADR api-degli-avvisi-e-link-nelle-notifiche).
+    return f"/alerts/{quote(str(target.owner_id))}"
 
 
 _ROUTES: dict[TargetKind, Callable[[NotificationTarget], str]] = {
     TargetKind.FLOW: _flow,
     TargetKind.OPEN_POSITION: _open_position,
     TargetKind.CLOSED_POSITION: _closed_position,
-    TargetKind.ACCOUNT_ALARMS: _account_alarms,
+    TargetKind.ALERT: _alert,
 }

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from autotrading.application.flows.ports import (
     AccountActivityPort,
+    AlertResolutionPort,
     FlowRepositoryPort,
     OutsideClosingRecorderPort,
     ProtectionClosingRecorderPort,
@@ -37,7 +38,8 @@ class ReconcileAccountUseCase:
 
     The new executions of the account enter the ledger first (ADR 0063). Every case is recorded once; a position
     of a flow closed outside the platform, or by its stop loss or take profit (R3.1.2), enters the history of the flow.
-    A balance beyond the threshold of the account opens an alarm, told to the user once while it stays open.
+    A balance beyond the threshold of the account opens an alarm, told to the user once while it stays open. A position
+    no flow explains that is no longer open resolves, with its alert (R6.2.3).
     Nothing on the exchange is touched but the protections such a closing leaves, and the cycles keep running.
     """
 
@@ -50,6 +52,7 @@ class ReconcileAccountUseCase:
         record_executions: RecordAccountExecutionsUseCase,
         protection_closings: ProtectionClosingRecorderPort,
         alarms: ReconciliationAlarmPorts,
+        alerts: AlertResolutionPort,
     ) -> None:
         self._flows = flows
         self._activity = activity
@@ -58,6 +61,7 @@ class ReconcileAccountUseCase:
         self._record_executions = record_executions
         self._protection_closings = protection_closings
         self._alarms = alarms
+        self._alerts = alerts
 
     def execute(self, command: ReconcileAccountCommand) -> ReconciliationOutcome:
         account_id = self._flows.get(command.flow_id).assigned_account_id
@@ -73,6 +77,7 @@ class ReconcileAccountUseCase:
         )
         new_items = tuple(item for item in reconciliation.items if self._readings.record(item))
         self._readings.resolve_positions(account_id, reconciliation.open_assets)
+        self._alerts.resolve_positions_gone(account_id, reconciliation.open_assets)
         for closing in reconciliation.closed_outside:
             self._closed_positions.execute(closing)
         for protection_closing in reconciliation.closed_by_protection:

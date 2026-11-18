@@ -62,6 +62,7 @@ from autotrading.application.flows.ports import (
     AccountDeviationThresholdPort,
     AccountRemovalPorts,
     AccountTransfersPort,
+    AlertResolutionPort,
     AutomaticPausePort,
     ClosedPositionRepositoryPort,
     CycleHistoryPort,
@@ -108,14 +109,18 @@ from autotrading.application.flows.request_on_demand_cycle import RequestOnDeman
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsUseCase
 from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelUseCase
+from autotrading.application.notifications.count_open_alerts import CountOpenAlertsUseCase
+from autotrading.application.notifications.get_alert import GetAlertUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.get_mail_server import GetMailServerUseCase
 from autotrading.application.notifications.get_notification_channels import GetNotificationChannelsUseCase
 from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
+from autotrading.application.notifications.list_alerts import ListAlertsUseCase
 from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
 from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.ports import (
+    AlertRepositoryPort,
     BotStartLinkPort,
     ChannelPreferencesRepositoryPort,
     EmailTestPort,
@@ -135,6 +140,7 @@ from autotrading.application.notifications.remove_mail_server import RemoveMailS
 from autotrading.application.notifications.remove_notification_email import RemoveNotificationEmailUseCase
 from autotrading.application.notifications.request_link_code import RequestLinkCodeUseCase
 from autotrading.application.notifications.request_test_email import RequestTestEmailUseCase
+from autotrading.application.notifications.resolve_alert import ResolveAlertUseCase
 from autotrading.application.notifications.send_linked_chat_test_notification import (
     SendLinkedChatTestNotificationUseCase,
 )
@@ -210,6 +216,8 @@ class TenantPorts:
     account_names: FlowAccountNamePort
     automatic_pause: AutomaticPausePort
     emergency_closings: EmergencyClosingLogPort
+    alerts: AlertRepositoryPort
+    alert_resolution: AlertResolutionPort
     environment: str
     settlement_currency: str
 
@@ -296,6 +304,10 @@ class TenantUseCases:
     confirm_reconciliation: ConfirmReconciliationUseCase
     close_in_emergency: CloseInEmergencyUseCase
     preview_emergency_closing: PreviewEmergencyClosingUseCase
+    list_alerts: ListAlertsUseCase
+    count_open_alerts: CountOpenAlertsUseCase
+    get_alert: GetAlertUseCase
+    resolve_alert: ResolveAlertUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -312,8 +324,8 @@ class TenantUseCases:
             remove_account_with_flows=RemoveAccountWithFlowsUseCase(
                 ports.flows,
                 ports.account_removal,
-                StopFlowUseCase(ports.flows, CloseFlowPositionsUseCase(ports.closing_ports)),
-                ArchiveFlowUseCase(ports.flows),
+                StopFlowUseCase(ports.flows, CloseFlowPositionsUseCase(ports.closing_ports), ports.alert_resolution),
+                ArchiveFlowUseCase(ports.flows, ports.alert_resolution),
             ),
             close_position=ClosePositionUseCase(ports.position_closing, ports.manual_closings),
             run_verification=RunVerificationUseCase(ports.verification),
@@ -366,10 +378,12 @@ class TenantUseCases:
             list_flow_versions=ListFlowVersionsUseCase(ports.flows),
             compare_flow_versions=CompareFlowVersionsUseCase(ports.flows),
             change_flow_status=ChangeFlowStatusUseCase(
-                ports.flows, ports.running_verifications, ports.flow_checks.accounts
+                ports.flows, ports.running_verifications, ports.flow_checks.accounts, ports.alert_resolution
             ),
-            archive_flow=ArchiveFlowUseCase(ports.flows),
-            stop_flow=StopFlowUseCase(ports.flows, CloseFlowPositionsUseCase(ports.closing_ports)),
+            archive_flow=ArchiveFlowUseCase(ports.flows, ports.alert_resolution),
+            stop_flow=StopFlowUseCase(
+                ports.flows, CloseFlowPositionsUseCase(ports.closing_ports), ports.alert_resolution
+            ),
             cash_out_profits=CashOutProfitsUseCase(
                 ports.flows,
                 CashOutPorts(
@@ -443,7 +457,9 @@ class TenantUseCases:
             ),
             list_reconciliation_alarms=ListReconciliationAlarmsUseCase(ports.reconciliation, ports.account_names),
             list_unattributable=ListUnattributableUseCase(ports.reconciliation, ports.account_names),
-            confirm_reconciliation=ConfirmReconciliationUseCase(ports.reconciliation, ports.account_names, ports.clock),
+            confirm_reconciliation=ConfirmReconciliationUseCase(
+                ports.reconciliation, ports.account_names, ports.clock, ports.alert_resolution
+            ),
             close_in_emergency=CloseInEmergencyUseCase(
                 tenant_id,
                 EmergencyClosingPorts(
@@ -458,4 +474,8 @@ class TenantUseCases:
             preview_emergency_closing=PreviewEmergencyClosingUseCase(
                 ListEmergencyFlowsUseCase(ports.flows, ports.account_names), ports.account_activity
             ),
+            list_alerts=ListAlertsUseCase(ports.alerts),
+            count_open_alerts=CountOpenAlertsUseCase(ports.alerts),
+            get_alert=GetAlertUseCase(ports.alerts),
+            resolve_alert=ResolveAlertUseCase(ports.alerts),
         )

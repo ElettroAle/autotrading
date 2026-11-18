@@ -31,6 +31,7 @@ from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter, RemovedAccount
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -111,11 +112,12 @@ class Removal:
             InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
         )
 
+        alerts = InMemoryAlertRepositoryAdapter({}, TENANT)
         self.use_case = RemoveAccountWithFlowsUseCase(
             repository,
             AccountRemovalPorts(self.positions, account_repository),
-            StopFlowUseCase(repository, CloseFlowPositionsUseCase(closing_ports)),
-            ArchiveFlowUseCase(repository),
+            StopFlowUseCase(repository, CloseFlowPositionsUseCase(closing_ports), alerts),
+            ArchiveFlowUseCase(repository, alerts),
         )
 
     def an_account(self, tenant_id: TenantId = TENANT) -> Account:

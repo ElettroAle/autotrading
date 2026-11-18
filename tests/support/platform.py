@@ -59,6 +59,7 @@ from tests.fakes.account_repository import AccountStore, InMemoryAccountReposito
 from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.account_transfers import FakeAccountTransfersAdapter
 from tests.fakes.activity_reader import FakeActivityReaderAdapter
+from tests.fakes.alert_repository import AlertStore, InMemoryAlertRepositoryAdapter
 from tests.fakes.bot_identity import FakeBotIdentityAdapter
 from tests.fakes.bot_inbox import FakeBotInboxAdapter
 from tests.fakes.channel_preferences_repository import (
@@ -211,6 +212,8 @@ class Platform:
         self.cycle_run_of: Callable[[TenantId], CycleRun] = no_cycle_run_of
         # The emergency closings of every tenant, as their record keeps them (R3.2.3).
         self.emergency_closings: list[EmergencyClosing] = []
+        # The alerts of every tenant, opened by the worker and read by the API (R6.2.3).
+        self.alerts: AlertStore = {}
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -328,6 +331,8 @@ class Platform:
             account_names=accounts,
             automatic_pause=InMemoryAutomaticPauseAdapter(self.flows, tenant_id),
             emergency_closings=InMemoryEmergencyClosingLogAdapter(self.emergency_closings, tenant_id),
+            alerts=self.alerts_of(tenant_id),
+            alert_resolution=self.alerts_of(tenant_id),
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -343,6 +348,10 @@ class Platform:
             return an_activity()
         state = self.worker_for(account.tenant_id).read_exchange_state.execute(ReadExchangeStateCommand(account.id))
         return an_activity(balance=state.balance.amount, available_margin=state.available_margin.amount)
+
+    def alerts_of(self, tenant_id: TenantId) -> InMemoryAlertRepositoryAdapter:
+        """The alerts of the tenant: each tenant reads its own, as with row level security."""
+        return InMemoryAlertRepositoryAdapter(self.alerts, tenant_id, lambda: self.now)
 
     def history_of(self, tenant_id: TenantId) -> InMemoryFlowHistoryAdapter:
         """The histories of the tenant: each tenant reads its own store, as row level security does (R2.5.1)."""

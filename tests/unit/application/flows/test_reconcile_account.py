@@ -15,12 +15,14 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableKind
+from autotrading.domain.notifications.alert import AlertCause, AlertState
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -52,8 +54,9 @@ class Bench:
         self.notices = FakeReconciliationAlarmNoticeAdapter()
         record = RecordAccountExecutionsUseCase(flows, self.activity, self.orders, self.ledger)
         alarms = ReconciliationAlarmPorts(self.thresholds, self.thresholds, self.notices)
+        self.alerts = InMemoryAlertRepositoryAdapter({}, TENANT)
         self.use_case = ReconcileAccountUseCase(
-            flows, self.activity, self.readings, self.closed, record, self.closed_by_protection, alarms
+            flows, self.activity, self.readings, self.closed, record, self.closed_by_protection, alarms, self.alerts
         )
 
     def flow(self, *assets: str, account_id: UUID = ACCOUNT) -> Flow:
@@ -102,6 +105,22 @@ def test_a_recorded_position_no_longer_open_is_resolved(bench: Bench) -> None:
     bench.use_case.execute(ReconcileAccountCommand(flow.id))
 
     assert [item.reference for item in bench.readings.resolved] == ["SOL"]
+
+
+def test_the_alert_of_a_position_no_longer_open_is_resolved_and_the_others_stay_open(bench: Bench) -> None:
+    flow = bench.flow("BTC")
+    gone = bench.alerts.open(AlertCause.unattributable_position(ACCOUNT, "test-1", "SOL"))
+    held = bench.alerts.open(AlertCause.unattributable_position(ACCOUNT, "test-1", "ETH"))
+    elsewhere = bench.alerts.open(AlertCause.unattributable_position(uuid4(), "test-2", "SOL"))
+    bench.activity.activities[ACCOUNT] = an_activity(positions=(a_position("ETH"),))
+
+    bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert [bench.alerts.get(alert_id).state for alert_id in (gone, held, elsewhere)] == [
+        AlertState.RESOLVED,
+        AlertState.OPEN,
+        AlertState.OPEN,
+    ]
 
 
 def test_the_flows_of_the_same_account_own_their_assets(bench: Bench) -> None:

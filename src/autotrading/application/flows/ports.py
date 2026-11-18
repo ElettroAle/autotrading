@@ -1445,3 +1445,17 @@ class HistoricalOrdersPort(Protocol):
     def order_totals(self, query: HistoryQuery) -> OrderHistoryTotals:
         """The fees of the executions of every order the filters admit, whatever the cursor (Bug 569)."""
         ...
+
+
+class AlertResolutionPort(Protocol):
+    """Bound to the tenant of the request or of the cycle: the alerts whose cause the flows remove (R6.2.3, ADR
+    avvisi-nel-contesto-delle-notifiche). Nothing open to resolve is no error.
+    """
+
+    def resolve_reconciliation_alarm(self, account_id: UUID) -> None: ...
+
+    def resolve_flow_pause(self, flow_id: FlowId) -> None: ...
+
+    def resolve_positions_gone(self, account_id: UUID, open_assets: frozenset[str]) -> None:
+        """Resolves the alerts of the positions of the account no flow explains on an asset no longer open."""
+        ...

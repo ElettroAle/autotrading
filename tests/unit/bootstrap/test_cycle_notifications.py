@@ -356,7 +356,7 @@ def test_every_flow_an_exhausted_credit_pauses_is_notified(world: World) -> None
         "beta": FlowStatus.PAUSED,
     }
     assert sorted(world.received) == sorted(
-        Notification.flow_paused(TEXT_ONLY_ID, name, str(error)).text
+        Notification.flow_paused(TEXT_ONLY_ID, name, str(error), TEXT_ONLY_ID).text
         for name in (world.flow.name.value, other.name.value)
     )
 
@@ -366,7 +366,7 @@ def test_a_refusal_of_the_credentials_pauses_the_flows_of_the_account(world: Wor
 
     world.pause(error)
 
-    assert world.received == [Notification.flow_paused(TEXT_ONLY_ID, "alfa", str(error)).text]
+    assert world.received == [Notification.flow_paused(TEXT_ONLY_ID, "alfa", str(error), TEXT_ONLY_ID).text]
 
 
 def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(world: World) -> None:
@@ -382,7 +382,7 @@ def test_an_incomplete_ledger_pauses_every_flow_of_the_account_and_no_other(worl
         "beta": FlowStatus.ACTIVE,
     }
     assert world.received == [
-        Notification.flow_paused(TEXT_ONLY_ID, "alfa", "registro delle esecuzioni incompleto").text
+        Notification.flow_paused(TEXT_ONLY_ID, "alfa", "registro delle esecuzioni incompleto", TEXT_ONLY_ID).text
     ]
 
 
@@ -523,7 +523,7 @@ def test_a_position_of_the_flow_closed_outside_is_notified_with_its_pnl(world: W
     assert world.received == [closed_with("-10"), Notification.unattributable_fill(TEXT_ONLY_ID, "test-1", "BTC").text]
 
 
-def test_a_case_no_flow_explains_leads_to_the_alarms_of_its_account(world: World) -> None:
+def test_a_case_no_flow_explains_leads_to_the_alert_it_opened(world: World) -> None:
     world.cycles.platform.links.dashboard = True
     reader = world.cycles.platform.activity_reader
     update(world)
@@ -532,8 +532,10 @@ def test_a_case_no_flow_explains_leads_to_the_alarms_of_its_account(world: World
 
     update(world)
 
-    alarms = links_to(world, NotificationTarget.account_alarms(world.flow.assigned_account_id))
-    assert world.cycles.platform.messenger.links_received_by(CHAT) == [alarms]
+    [alert] = world.cycles.platform.alerts[world.tenant_id]
+    assert alert.cause.resource.resource_id == world.flow.assigned_account_id
+    alerts = links_to(world, NotificationTarget.alert(alert.id.value))
+    assert world.cycles.platform.messenger.links_received_by(CHAT) == [alerts]
 
 
 def test_an_exchange_out_of_reach_leaves_the_reconciliation_and_the_state_to_the_next_cycle(

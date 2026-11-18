@@ -21,6 +21,7 @@ from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
@@ -75,6 +76,7 @@ class Bench:
             record,
             InMemoryProtectionClosingsAdapter(),
             ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
+            InMemoryAlertRepositoryAdapter({}, TENANT),
         )
         self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
         self.read = ReadCycleFlowStateUseCase(

@@ -13,6 +13,7 @@ from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.markets import FakeMarketsAdapter
@@ -45,7 +46,9 @@ class Drafts:
         self.duplicate = DuplicateFlowUseCase(self.repository)
         self.activity = FakeAccountActivityAdapter()
         self.modify = ModifyFlowUseCase(self.repository, checks, self.activity)
-        self.change_status = ChangeFlowStatusUseCase(self.repository, verifications, self.accounts.ports())
+        self.change_status = ChangeFlowStatusUseCase(
+            self.repository, verifications, self.accounts.ports(), InMemoryAlertRepositoryAdapter({}, self.tenant_id)
+        )
 
     def original(self, name: str = "alfa", assets: tuple[str, ...] = ("BTC",), capital: int = 100) -> Flow:
         configuration = replace(

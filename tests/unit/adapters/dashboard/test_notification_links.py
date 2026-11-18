@@ -16,7 +16,7 @@ from autotrading.domain.notifications.notification_target import NotificationTar
 
 DASHBOARD = "https://autotrading-dev.example.ts.net/dashboard"
 FLOW_ID = UUID("4f6c1d0e-7a3b-4e59-9c2d-1b8e5f0a6c71")
-ACCOUNT_ID = UUID("0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8")
+ALERT_ID = UUID("0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8")
 CLOSED_AT = datetime(2026, 11, 17, 10, 15, 30, tzinfo=UTC)
 
 
@@ -36,8 +36,8 @@ CLOSED_AT = datetime(2026, 11, 17, 10, 15, 30, tzinfo=UTC)
             ),
         ),
         (
-            NotificationTarget.account_alarms(ACCOUNT_ID),
-            NotificationLink("Apri allarmi", f"{DASHBOARD}/accounts/{ACCOUNT_ID}/alarms"),
+            NotificationTarget.alert(ALERT_ID),
+            NotificationLink("Apri avviso", f"{DASHBOARD}/alerts/{ALERT_ID}"),
         ),
     ],
 )

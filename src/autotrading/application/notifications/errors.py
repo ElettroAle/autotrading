@@ -125,3 +125,19 @@ class UnknownOutboxIntegrationError(ApplicationError):
     @property
     def details(self) -> Mapping[str, object]:
         return {"integration": self._integration}
+
+
+class AlertNotFoundError(ApplicationError):
+    """The same answer for an alert that does not exist and for one of another tenant (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("avviso non trovato")
+
+
+class AlertCursorInvalidError(ApplicationError):
+    """The cursor of a page of alerts is not one the list gave: the user starts again from the first page."""
+
+    def __init__(self) -> None:
+        super().__init__("cursore degli avvisi non valido")

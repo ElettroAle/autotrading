@@ -43,6 +43,7 @@ from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterMod
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.smtp.composition import smtp_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.alert_repository import SqlAlchemyAlertRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
 from autotrading.adapters.outbound.sqlalchemy.channel_preferences_repository import (
     SqlAlchemyChannelPreferencesRepositoryAdapter,
@@ -293,6 +294,7 @@ def tenant_use_cases(
         )
         history = SqlAlchemyFlowHistoryAdapter(engine, tenant_id)
         cycle_history = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
+        alerts = SqlAlchemyAlertRepositoryAdapter(engine, tenant_id)
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -355,6 +357,8 @@ def tenant_use_cases(
             account_names=accounts,
             automatic_pause=SqlAlchemyAutomaticPauseAdapter(engine, tenant_id),
             emergency_closings=SqlAlchemyEmergencyClosingLogAdapter(engine, tenant_id),
+            alerts=alerts,
+            alert_resolution=alerts,
             environment=environment,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -483,6 +487,7 @@ def cycle_of(
             ledger,
         )
         readings = SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id)
+        alerts = SqlAlchemyAlertRepositoryAdapter(engine, tenant_id)
         reconcile_account = ReconcileAccountUseCase(
             flows,
             activity,
@@ -495,16 +500,17 @@ def cycle_of(
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),
             ReconciliationAlarmPorts(
-                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, HYPERLIQUID_SETTLEMENT_CURRENCY)
+                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, alerts, HYPERLIQUID_SETTLEMENT_CURRENCY)
             ),
+            alerts,
         )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
             reconcile_account,
             NotifyUnattributableUseCase(
                 accounts,
                 UnattributableNotices(
-                    NotifyUnattributablePositionUseCase(notify),
-                    NotifyUnattributableFillUseCase(notify),
+                    NotifyUnattributablePositionUseCase(notify, alerts),
+                    NotifyUnattributableFillUseCase(notify, alerts),
                 ),
             ),
         )
@@ -585,7 +591,7 @@ def cycle_of(
         )
         cycles = SqlAlchemyCycleRepositoryAdapter(engine, tenant_id)
         pause = PauseAffectedFlowsUseCase(
-            flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify_flow)
+            flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify_flow, alerts)
         )
         guards = CycleGuards(
             cycles=cycles,

@@ -2,7 +2,12 @@ import logging
 from dataclasses import dataclass
 
 from autotrading.application.flows.flow_account import read_free_capital
-from autotrading.application.flows.ports import FlowAccountPorts, FlowRepositoryPort, RunningVerificationsPort
+from autotrading.application.flows.ports import (
+    AlertResolutionPort,
+    FlowAccountPorts,
+    FlowRepositoryPort,
+    RunningVerificationsPort,
+)
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
@@ -29,14 +34,21 @@ class ChangeFlowStatusUseCase:
 
     A stopped flow starts only with its capital within the free capital of its account read now, its own capital left
     out: the balance may have dropped while it was stopped (RF-02.05, ADR 0142). A resumed flow asks for no capital.
+
+    A flow that resumes removes the cause of the alert of its pause, which resolves (R6.2.3).
     """
 
     def __init__(
-        self, flows: FlowRepositoryPort, verifications: RunningVerificationsPort, accounts: FlowAccountPorts
+        self,
+        flows: FlowRepositoryPort,
+        verifications: RunningVerificationsPort,
+        accounts: FlowAccountPorts,
+        alerts: AlertResolutionPort,
     ) -> None:
         self._flows = flows
         self._verifications = verifications
         self._accounts = accounts
+        self._alerts = alerts
 
     def execute(self, command: ChangeFlowStatusCommand) -> Flow:
         current = self._flows.get(command.flow_id)
@@ -44,6 +56,8 @@ class ChangeFlowStatusUseCase:
         if command.command is FlowAction.START:
             self._require_startable(current.status, flow)
         self._record_status(flow)
+        if command.command is FlowAction.RESUME:
+            self._alerts.resolve_flow_pause(flow.id)
         operations.info("stato del flusso cambiato", extra={"flow_id": str(flow.id.value), "status": flow.status.name})
         return flow
 
