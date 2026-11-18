@@ -67,7 +67,7 @@ def test_a_usage_plus_nothing_reported_is_itself() -> None:
 
 
 def test_nothing_is_spent_before_a_call_goes_out() -> None:
-    assert ModelSpend() == ModelSpend(usage=None, cost_usd=None, sent=False)
+    assert ModelSpend() == ModelSpend(usage=None, cost_usd=None, sent=False, attempts=0)
 
 
 def test_the_calls_that_went_out_add_their_usage_and_their_cost() -> None:
@@ -76,7 +76,7 @@ def test_the_calls_that_went_out_add_their_usage_and_their_cost() -> None:
 
     spend = ModelSpend().with_call(first, Decimal("0.0001")).with_call(second, Decimal("0.0031"))
 
-    assert spend == ModelSpend(ModelUsage(2100, 500, None), Decimal("0.0032"), sent=True)
+    assert spend == ModelSpend(ModelUsage(2100, 500, None), Decimal("0.0032"), sent=True, attempts=2)
 
 
 def test_a_call_that_went_out_without_a_known_cost_makes_the_cost_not_available() -> None:
@@ -85,8 +85,8 @@ def test_a_call_that_went_out_without_a_known_cost_makes_the_cost_not_available(
     after_unknown = ModelSpend().with_call(None, None).with_call(known, Decimal("0.0001"))
     before_unknown = ModelSpend().with_call(known, Decimal("0.0001")).with_call(None, None)
 
-    assert after_unknown == ModelSpend(known, None, sent=True)
-    assert before_unknown == ModelSpend(known, None, sent=True)
+    assert after_unknown == ModelSpend(known, None, sent=True, attempts=2)
+    assert before_unknown == ModelSpend(known, None, sent=True, attempts=2)
 
 
 def test_a_reported_usage_whose_cost_nobody_knows_makes_the_cost_not_available() -> None:
@@ -94,3 +94,22 @@ def test_a_reported_usage_whose_cost_nobody_knows_makes_the_cost_not_available()
 
     assert spend.cost_usd is None
     assert spend.usage == ModelUsage(101, 1, None)
+
+
+# ADR-tentativi-del-modello-registrati-nel-ciclo: every call of the question counts, the first one as 1.
+def test_every_call_that_went_out_counts_as_an_attempt() -> None:
+    spend = ModelSpend().with_call(None, None).with_call(ModelUsage(1, 1, None), None).with_call(None, None)
+
+    assert spend.attempts == 3
+
+
+def test_a_call_that_never_went_out_counts_as_an_attempt_and_spends_nothing() -> None:
+    before = ModelSpend().with_call(ModelUsage(100, 0, None), Decimal("0.0001"))
+
+    spend = before.with_attempt()
+
+    assert spend == ModelSpend(ModelUsage(100, 0, None), Decimal("0.0001"), sent=True, attempts=2)
+
+
+def test_attempts_that_never_went_out_leave_nothing_spent() -> None:
+    assert ModelSpend().with_attempt().with_attempt() == ModelSpend(attempts=2)

@@ -114,6 +114,8 @@ class CycleDetailResponse(BaseModel):
     absent_sources: list[AbsentSourceResponse]
     documents: list[StepDocumentResponse]
     cost: CallCostResponse | None
+    # How many calls the decision of the agent tried, beside their cost; empty when it never asked (R1.4.9).
+    model_attempts: int | None
     # scheduled or on_demand: what started the cycle (R6.5.2).
     trigger: str
 
@@ -134,6 +136,7 @@ class CycleDetailResponse(BaseModel):
                 for document in record.documents
             ],
             cost=CallCostResponse.of(record.cost),
+            model_attempts=record.model_attempts,
             trigger=record.trigger.value,
         )
 

@@ -125,6 +125,7 @@ class Reply:
     response: Response
     usage: Usage = Usage()
     cost_usd: Decimal | None = None
+    attempts: int = 1
 
 
 class Agent:

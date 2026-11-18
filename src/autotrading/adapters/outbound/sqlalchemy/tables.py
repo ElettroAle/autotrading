@@ -281,6 +281,9 @@ cycles = Table(
     Column("cost_usd", Numeric),
     # The cycle called the model, even when the call failed before its usage was known (R1.4.6).
     Column("model_called", Boolean, nullable=False, server_default=text("false")),
+    # How many calls the decision of the agent tried; empty when it never asked, or before the attempts were kept
+    # (R1.4.9).
+    Column("model_attempts", Integer),
     # What started the cycle: its schedule or the user (R6.5.2); a row taken before the cycle runs is planned.
     Column("trigger", Text, nullable=False, server_default="scheduled"),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),

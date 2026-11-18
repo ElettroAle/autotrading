@@ -106,6 +106,7 @@ class Reply:
     response: Response
     usage: Usage
     cost_usd: Decimal | None
+    attempts: int = 2
 
 
 REPLY = Reply(Response("{}", (Decision("hold", "BTC"),), ("x",), ("ETH",)), Usage(120, 30), Decimal("0.01"))
@@ -181,22 +182,30 @@ def test_the_cost_of_the_call_comes_from_the_decisions_of_the_agent() -> None:
     assert journal().call_cost(object()) is None
 
 
+# ADR-tentativi-del-modello-registrati-nel-ciclo: the attempts travel beside the cost of the call.
+def test_the_attempts_of_the_call_come_from_the_decisions_of_the_agent() -> None:
+    assert journal().call_attempts(CycleDecisions(CYCLE_FLOW, REPLY)) == 2
+    assert journal().call_attempts(object()) is None
+
+
 # ADR-costo-della-decisione-fallita-nel-registro-del-ciclo: the failed call comes from the error of the decision.
 def test_a_failed_call_with_a_reported_usage_gives_its_tokens_and_cost() -> None:
     usage = ModelUsage(3000, 4000, None)
-    error = ModelUnavailableError(OPENROUTER, "inattesa", usage=usage, sent=True, cost_usd=Decimal("0.002"))
+    error = ModelUnavailableError(OPENROUTER, "inattesa", usage=usage, sent=True, cost_usd=Decimal("0.002"), attempts=4)
 
-    assert journal().failed_call(error) == FailedModelCall(CallCost(3000, 4000, Decimal("0.002")))
+    assert journal().failed_call(error) == FailedModelCall(CallCost(3000, 4000, Decimal("0.002")), attempts=4)
 
 
 def test_a_failed_call_without_a_reported_usage_has_no_cost() -> None:
     error = ModelUnavailableError(OPENROUTER, "tempo di risposta scaduto", sent=True)
 
-    assert journal().failed_call(error) == FailedModelCall(None)
+    assert journal().failed_call(error) == FailedModelCall(None, attempts=1)
 
 
-def test_a_call_that_never_went_out_is_no_failed_call() -> None:
-    assert journal().failed_call(ModelUnavailableError(OPENROUTER, "ConnectError")) is None
+def test_calls_that_never_went_out_are_attempts_without_a_call() -> None:
+    error = ModelUnavailableError(OPENROUTER, "ConnectError", attempts=4)
+
+    assert journal().failed_call(error) == FailedModelCall(None, attempts=4, sent=False)
 
 
 def test_an_error_that_is_not_of_the_model_call_is_no_failed_call() -> None:

@@ -61,6 +61,7 @@ def a_failed_cycle(flow_id: UUID, planned_at: datetime = PLANNED) -> CycleRecord
         failure=CycleFailure(CycleStep.AGENT_DECISION, "ModelUnavailableError", "fornitore IA non raggiungibile"),
         documents=(StepDocument(CycleStep.COMPOSE_CONTEXT, {"messaggi": ["regole"], "margine": "50.10"}),),
         cost=CallCost(2000, 500, Decimal("0.0031")),
+        model_attempts=4,
     )
 
 

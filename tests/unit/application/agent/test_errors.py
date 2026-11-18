@@ -55,20 +55,34 @@ def test_a_call_that_went_out_adds_its_usage_and_cost_to_what_was_spent() -> Non
 
     spend = error.spent_after(ModelSpend().with_call(ModelUsage(100, 0, None), Decimal("0.0001")))
 
-    assert spend == ModelSpend(ModelUsage(200, 0, None), Decimal("0.0002"), sent=True)
+    assert spend == ModelSpend(ModelUsage(200, 0, None), Decimal("0.0002"), sent=True, attempts=2)
 
 
-def test_a_call_that_never_went_out_spends_nothing() -> None:
+def test_a_call_that_never_went_out_spends_nothing_and_counts_as_an_attempt() -> None:
     before = ModelSpend().with_call(ModelUsage(100, 0, None), Decimal("0.0001"))
 
-    assert ModelUnavailableError(OPENROUTER, "ConnectError").spent_after(before) is before
+    spend = ModelUnavailableError(OPENROUTER, "ConnectError").spent_after(before)
+
+    assert spend == ModelSpend(ModelUsage(100, 0, None), Decimal("0.0001"), sent=True, attempts=2)
 
 
 def test_the_error_with_the_spend_carries_what_every_call_consumed() -> None:
-    spend = ModelSpend(ModelUsage(300, 0, None), Decimal("0.0003"), sent=True)
+    spend = ModelSpend(ModelUsage(300, 0, None), Decimal("0.0003"), sent=True, attempts=3)
     error = ModelUnavailableError(OPENROUTER, "inattesa")
 
     spent = error.with_spend(spend)
 
     assert (spent.provider, spent.original) == (OPENROUTER, "inattesa")
     assert (spent.usage, spent.cost_usd, spent.sent) == (ModelUsage(300, 0, None), Decimal("0.0003"), True)
+    assert spent.attempts == 3
+
+
+# ADR-tentativi-del-modello-registrati-nel-ciclo: the error says how many calls the question tried.
+def test_an_error_of_one_call_is_one_attempt() -> None:
+    assert ModelUnavailableError(OPENROUTER, "503").attempts == 1
+
+
+def test_the_priced_error_keeps_its_attempts() -> None:
+    error = ModelUnavailableError(OPENROUTER, "503", usage=ModelUsage(1, 1, None), sent=True, attempts=4)
+
+    assert error.priced(PRICES).attempts == 4

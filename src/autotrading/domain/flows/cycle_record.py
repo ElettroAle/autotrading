@@ -68,6 +68,8 @@ class CycleRecord:
     cost: CallCost | None = None
     # A call that went out and failed before the provider reported its usage: nobody knows its cost (R1.4.6).
     call_without_usage: bool = False
+    # How many calls the decision of the agent tried, the first one included; None when it never asked (R1.4.9).
+    model_attempts: int | None = None
     decisions: tuple[RecordedDecision, ...] = ()
     trigger: CycleTrigger = CycleTrigger.SCHEDULED
 

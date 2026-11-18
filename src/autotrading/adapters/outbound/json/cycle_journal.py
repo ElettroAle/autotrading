@@ -48,14 +48,21 @@ class JsonCycleJournalAdapter:
         usage = decision.reply.usage
         return CallCost(usage.input_tokens, usage.output_tokens, decision.reply.cost_usd)
 
+    def call_attempts(self, decision: object) -> int | None:
+        if not isinstance(decision, CycleDecisions):
+            return None
+        return decision.reply.attempts
+
     def failed_call(self, error: AutotradingError) -> FailedModelCall | None:
-        """Only a call that went out may have been charged; its usage is known when the provider reported it."""
-        if not isinstance(error, ModelUnavailableError) or not error.sent:
+        """Only a call that went out may have been charged; its usage is known when the provider reported it. Every
+        call tried is an attempt, also one that never went out (R1.4.9).
+        """
+        if not isinstance(error, ModelUnavailableError):
             return None
         usage = error.usage
         if usage is None:
-            return FailedModelCall(None)
-        return FailedModelCall(CallCost(usage.input_tokens, usage.output_tokens, error.cost_usd))
+            return FailedModelCall(None, error.attempts, sent=error.sent)
+        return FailedModelCall(CallCost(usage.input_tokens, usage.output_tokens, error.cost_usd), error.attempts)
 
     def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
         if not isinstance(decision, CycleDecisions):

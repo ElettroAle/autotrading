@@ -465,6 +465,7 @@ class FakeCycleJournalAdapter:
 
     def __init__(self) -> None:
         self.cost: CallCost | None = CallCost(1000, 200, Decimal("0.002"))
+        self.attempts: int | None = 1
         self.failed: FailedModelCall | None = None
         self.failures: list[AutotradingError] = []
 
@@ -473,6 +474,9 @@ class FakeCycleJournalAdapter:
 
     def call_cost(self, decision: object) -> CallCost | None:  # noqa: ARG002 - the same cost for every call
         return self.cost
+
+    def call_attempts(self, decision: object) -> int | None:  # noqa: ARG002 - the same attempts for every call
+        return self.attempts
 
     def failed_call(self, error: AutotradingError) -> FailedModelCall | None:
         """The same failed call for every error, keeping the errors it was asked about."""

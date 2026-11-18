@@ -6,7 +6,7 @@ only the system clock waits on the machine.
 import ast
 import inspect
 
-from autotrading.application.agent.ask_agent import RETRY_PAUSES_SECONDS, AskAgentUseCase
+from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ports import PausePort
 from tests.support.architecture import SOURCE_ROOT, SourceModule, source_modules
 
@@ -75,8 +75,9 @@ def test_adr_ritentativo_del_modello_nel_ciclo_a_model_call_adapter_asking_again
     assert asking_again(adapter) == [f"{MODEL_CALLS[1]}:call"]
 
 
-def test_adr_ritentativo_del_modello_nel_ciclo_the_use_case_waits_through_its_port_twice() -> None:
+# The number of the attempts and their pauses are the ADR tentativi-del-modello-registrati-nel-ciclo, which replaces
+# this one on them (tests/architecture/test_model_attempts_in_cycle.py).
+def test_adr_ritentativo_del_modello_nel_ciclo_the_use_case_waits_through_its_port() -> None:
     parameters = inspect.signature(AskAgentUseCase.__init__).parameters
 
     assert parameters["pause"].annotation is PausePort
-    assert RETRY_PAUSES_SECONDS == (5.0, 15.0)
