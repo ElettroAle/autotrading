@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router';
 import { Icon } from '@/components/ui/icons/icon';
 import { RefreshBar } from '@/components/ui/refresh-bar';
 import { paths } from '@/config/paths';
+import { useOpenAlertsCount } from '@/hooks/use-open-alerts-count';
 import { usePageData } from '@/hooks/use-page-data';
 
 import { AppHeader } from './app-header';
@@ -13,6 +14,8 @@ type NavigationEntry = {
   readonly to: string;
   /** The beginnings of the paths of the area of the entry: its sub-pages light it up too. */
   readonly area: readonly string[];
+  /** The entry shows how many alerts are open (ADR pagina-avvisi-nella-dashboard). */
+  readonly countsOpenAlerts?: boolean;
 };
 
 type NavigationGroup = { readonly heading?: string; readonly entries: readonly NavigationEntry[] };
@@ -30,6 +33,12 @@ const NAVIGATION: readonly NavigationGroup[] = [
       },
       { name: 'Conti', to: paths.accounts.getHref(), area: [paths.accounts.path] },
       { name: 'Storico', to: paths.history.getHref(), area: [paths.history.path] },
+      {
+        name: 'Avvisi',
+        to: paths.alerts.getHref(),
+        area: [paths.alerts.path],
+        countsOpenAlerts: true,
+      },
     ],
   },
   {
@@ -53,6 +62,24 @@ const isWithin = (pathname: string, start: string): boolean =>
 const isCurrentArea = (entry: NavigationEntry, pathname: string): boolean =>
   entry.area.some((start) => isWithin(pathname, start));
 
+// No number with no alert open: the entry asks for attention only when something waits for the user.
+const OpenAlertsCount = () => {
+  const { data: count = 0 } = useOpenAlertsCount();
+  if (count === 0) {
+    return null;
+  }
+  // The space keeps the name of the link a sentence for screen readers: «Avvisi 2 aperti».
+  return (
+    <>
+      {' '}
+      <span className="ml-1 rounded-full bg-red-700 px-2 py-0.5 text-xs font-semibold text-white">
+        {count}
+        <span className="sr-only"> aperti</span>
+      </span>
+    </>
+  );
+};
+
 const NavigationLinks = ({
   entries,
   labelledBy,
@@ -75,6 +102,7 @@ const NavigationLinks = ({
               }`}
             >
               {entry.name}
+              {entry.countsOpenAlerts === true && <OpenAlertsCount />}
             </Link>
           </li>
         );

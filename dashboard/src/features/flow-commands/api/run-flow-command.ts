@@ -9,11 +9,14 @@ type RunFlowCommandOptions = {
   readonly onSuccess?: (command: FlowCommand) => void;
 };
 
-// The list of the flows and every read of this flow show its status, its positions or its cycles (ADR 0132).
+// The list of the flows and every read of this flow show its status, its positions or its cycles (ADR 0132); a resumed,
+// stopped or archived flow resolves the alert of its pause, so the alerts are read again too (R6.2.3).
 const readsTheFlow =
   (flowId: string) =>
   (query: Query): boolean =>
-    query.queryKey[0] === 'flows' || query.queryKey.includes(flowId);
+    query.queryKey[0] === 'flows' ||
+    query.queryKey[0] === 'alerts' ||
+    query.queryKey.includes(flowId);
 
 // Stop and archive have their own functions in the API; the other commands share one (R1.1.4-R1.1.6).
 const sendCommand = (api: ApiClient, flowId: string, command: FlowCommand) => {

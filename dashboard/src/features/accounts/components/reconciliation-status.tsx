@@ -100,7 +100,10 @@ const ReconciliationContent = ({ account }: { readonly account: Account }) => {
             Ho verificato
           </CommandButton>
         )}
-        <Link to={paths.accountAlarms.getHref(account.id)} className={SECONDARY_COMMAND}>
+        <Link
+          to={paths.alerts.getHref({ resource_id: account.id, state: 'all' })}
+          className={SECONDARY_COMMAND}
+        >
           Allarmi
         </Link>
         <CommandButton tone="secondary" onClick={() => setAction('threshold')}>

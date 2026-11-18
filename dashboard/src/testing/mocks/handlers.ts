@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { accountHandlers } from './account-handlers';
+import { alertHandlers } from './alert-handlers';
 import { capitalChangeHandlers } from './capital-changes';
 import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
@@ -451,6 +452,7 @@ export const handlers = [
   ...emergencyClosingHandlers,
   ...accountHandlers,
   ...reconciliationHandlers,
+  ...alertHandlers,
   ...providerKeyHandlers,
   ...notificationEmailHandlers,
   ...notificationChannelHandlers,

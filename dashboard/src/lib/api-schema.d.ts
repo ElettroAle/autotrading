@@ -193,6 +193,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Alerts */
+        get: operations["list_alerts_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Alerts Summary */
+        get: operations["read_alerts_summary_alerts_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts/{alert_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Alert */
+        get: operations["get_alert_alerts__alert_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts/{alert_id}/resolution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Alert */
+        post: operations["resolve_alert_alerts__alert_id__resolution_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exchanges": {
         parameters: {
             query?: never;
@@ -1327,6 +1395,129 @@ export interface components {
             allocated_capital: string;
             /** Currency */
             currency: string;
+        };
+        /**
+         * AlertDetailResponse
+         * @description The alert with the values read when it opened and the commands that resolve it now; none once resolved.
+         */
+        AlertDetailResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["AlertKind"];
+            /** Title */
+            title: string;
+            severity: components["schemas"]["AlertSeverity"];
+            state: components["schemas"]["AlertState"];
+            resource: components["schemas"]["AlertResourceResponse"];
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Values */
+            values: components["schemas"]["AlertValueResponse"][];
+            /** Commands */
+            commands: components["schemas"]["AlertRemedy"][];
+        };
+        /**
+         * AlertKind
+         * @description A fact that asks the user to act, with its severity and how it resolves (R6.2.3, ADR
+         *     avvisi-nel-contesto-delle-notifiche): only a kind without a resolution of its own is resolved by hand.
+         * @enum {string}
+         */
+        AlertKind: "reconciliation_alarm" | "flow_paused" | "unattributable_position" | "unattributable_fill";
+        /**
+         * AlertPageResponse
+         * @description At most 50 alerts, newest first; `next` is the `cursor` of the following page, null on the last one. `count`
+         *     covers every alert of the filter, not only the page.
+         */
+        AlertPageResponse: {
+            /** Items */
+            items: components["schemas"]["AlertResponse"][];
+            /** Next */
+            next: string | null;
+            /** Count */
+            count: number;
+        };
+        /**
+         * AlertRemedy
+         * @description What removes the cause of an open alert, or resolves it when nothing else does (R6.2.3).
+         * @enum {string}
+         */
+        AlertRemedy: "confirm_reconciliation" | "resume_flow" | "resolve";
+        /**
+         * AlertResourceKind
+         * @description What an alert is about: an account, a flow or a key (R6.2.3).
+         * @enum {string}
+         */
+        AlertResourceKind: "account" | "flow" | "key";
+        /** AlertResourceResponse */
+        AlertResourceResponse: {
+            kind: components["schemas"]["AlertResourceKind"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * AlertResponse
+         * @description An alert of the tenant: what asks to act, how serious it is, on which resource, and whether it is resolved.
+         */
+        AlertResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["AlertKind"];
+            /** Title */
+            title: string;
+            severity: components["schemas"]["AlertSeverity"];
+            state: components["schemas"]["AlertState"];
+            resource: components["schemas"]["AlertResourceResponse"];
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /**
+         * AlertSeverity
+         * @enum {string}
+         */
+        AlertSeverity: "critical" | "warning";
+        /**
+         * AlertState
+         * @enum {string}
+         */
+        AlertState: "open" | "resolved";
+        /**
+         * AlertStateQuery
+         * @description The state the list asks for: `all` does not narrow.
+         * @enum {string}
+         */
+        AlertStateQuery: "open" | "resolved" | "all";
+        /** AlertValueResponse */
+        AlertValueResponse: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** AlertsSummaryResponse */
+        AlertsSummaryResponse: {
+            /** Open Count */
+            open_count: number;
         };
         /** AmountResponse */
         AmountResponse: {
@@ -3633,6 +3824,126 @@ export interface operations {
             header?: never;
             path: {
                 account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_alerts_alerts_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["AlertStateQuery"];
+                severity?: components["schemas"]["AlertSeverity"] | null;
+                resource_kind?: components["schemas"]["AlertResourceKind"] | null;
+                resource_id?: string | null;
+                /** @description aperti dall'istante incluso */
+                since?: string | null;
+                /** @description aperti fino all'istante escluso */
+                until?: string | null;
+                /** @description `next` della pagina precedente */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_alerts_summary_alerts_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertsSummaryResponse"];
+                };
+            };
+        };
+    };
+    get_alert_alerts__alert_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_alert_alerts__alert_id__resolution_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: string;
             };
             cookie?: never;
         };
