@@ -7,15 +7,16 @@ import { paths } from '@/config/paths';
 const FIRST_PAGE_KEY = 'default';
 
 /**
- * Back to the previous page of the dashboard, or to the main page when there is none (ADR 0145). Under 768 pixels only
- * the arrow shows, «Indietro» stays its name (ADR intestazione-su-una-riga).
+ * Back to the previous page of the dashboard; when there is none, to the main page or to the page above the page shown
+ * when the page names it (ADR 0145, ADR elenco-dei-conti-e-pagina-del-conto). Under 768 pixels only the arrow shows,
+ * «Indietro» stays its name (ADR intestazione-su-una-riga).
  */
-export const BackButton = () => {
+export const BackButton = ({ fallback = paths.home.getHref() }: { readonly fallback?: string }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const goBack = () => {
     if (location.key === FIRST_PAGE_KEY) {
-      void navigate(paths.home.getHref());
+      void navigate(fallback);
       return;
     }
     void navigate(-1);

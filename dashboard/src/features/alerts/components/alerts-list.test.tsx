@@ -72,7 +72,7 @@ describe('AlertsList', () => {
     expect(second).toHaveTextContent('Allarme di riconciliazione');
     expect(within(second ?? shown).getByRole('link', { name: 'Conto test-1' })).toHaveAttribute(
       'href',
-      '/accounts',
+      `/accounts/${ACCOUNT_ID}`,
     );
     expect(screen.getByText('2 avvisi')).toBeInTheDocument();
   });

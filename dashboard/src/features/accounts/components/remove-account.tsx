@@ -8,14 +8,19 @@ import { useRemoveAccount } from '../api/remove-account';
 
 const CONFLICT = 409;
 
-type RemoveAccountProps = { readonly account: Account; readonly onCancel: () => void };
+type RemoveAccountProps = {
+  readonly account: Account;
+  readonly onCancel: () => void;
+  /** What follows the removal, as leaving the page of the account removed. */
+  readonly onRemoved?: () => void;
+};
 
 /**
  * The removal of an account, in the two steps of the API (ADR 0130): the first request goes unconfirmed; when the API
  * refuses it for the flows or the positions of the account, the window tells its reason and the confirmation repeats
  * the request confirmed.
  */
-export const RemoveAccount = ({ account, onCancel }: RemoveAccountProps) => {
+export const RemoveAccount = ({ account, onCancel, onRemoved }: RemoveAccountProps) => {
   const removal = useRemoveAccount();
   const [reasonToConfirm, setReasonToConfirm] = useState<string | null>(null);
 
@@ -23,6 +28,7 @@ export const RemoveAccount = ({ account, onCancel }: RemoveAccountProps) => {
     removal.mutate(
       { accountId: account.id, confirmed: reasonToConfirm !== null },
       {
+        onSuccess: () => onRemoved?.(),
         onError: (error) => {
           if (error instanceof ApiError && error.status === CONFLICT && reasonToConfirm === null) {
             setReasonToConfirm(error.message);

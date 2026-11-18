@@ -25,6 +25,18 @@ describe('paths.flowCycles', () => {
   });
 });
 
+// ADR elenco-dei-conti-e-pagina-del-conto: the page of an account and its tabs, each with an address of its own.
+describe('paths of the page of an account', () => {
+  it.each([
+    ['account', '/accounts/account%201'],
+    ['accountReconciliation', '/accounts/account%201/reconciliation'],
+    ['accountCapital', '/accounts/account%201/capital'],
+    ['accountSettings', '/accounts/account%201/settings'],
+  ] as const)('leads %s to %s', (name, href) => {
+    expect(paths[name].getHref('account 1')).toBe(href);
+  });
+});
+
 describe('paths.accountAlarms', () => {
   it('leads to the alarms of the account', () => {
     expect(paths.accountAlarms.getHref('account-test-1')).toBe('/accounts/account-test-1/alarms');

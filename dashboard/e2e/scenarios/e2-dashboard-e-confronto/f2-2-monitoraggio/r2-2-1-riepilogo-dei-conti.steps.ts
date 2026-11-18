@@ -5,7 +5,9 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import { Given, Then } from '../../../support/fixtures';
 
 // The balance says it holds the result of the open positions; the capital allocated is shown under the value of the
-// flows, in the currency of that value (Bug 601, ADR scomposizione-del-saldo-nel-riquadro-del-conto).
+// flows, in the currency of that value (Bug 601, ADR scomposizione-del-saldo-nel-riquadro-del-conto). The list shows
+// balance and free capital; the breakdown is on the overview of the page of the account (ADR
+// elenco-dei-conti-e-pagina-del-conto).
 const BALANCE = 'Saldo (con risultato aperto)';
 const ALLOCATED = 'capitale allocato';
 
@@ -49,9 +51,10 @@ Then(
   ) => {
     // The network carries its kind beside the name the exchange gives it (R2.3.10).
     await expectShown(dashboard.accountNetwork(name), `TEST · ${network}`);
-    await expectShown(dashboard.accountDetail(name, BALANCE), `${balance} USDC`);
-    await expectShown(dashboard.accountDetail(name, ALLOCATED), String(allocated));
-    await expectShown(dashboard.accountDetail(name, 'Capitale libero'), `${free} USDC`);
+    await expectShown(dashboard.accountItemDetail(name, BALANCE), `${balance} USDC`);
+    await expectShown(dashboard.accountItemDetail(name, 'Capitale libero'), `${free} USDC`);
+    await dashboard.openAccount(name);
+    await expectShown(dashboard.accountPageDetail(ALLOCATED), String(allocated));
   },
 );
 
@@ -67,10 +70,11 @@ Then(
   'il conto {string} mostra {string} al posto del saldo',
   async ({ dashboard, memory }, name: string, message: string) => {
     memory.tradingAccount = name;
-    await expectShown(dashboard.accountDetail(name, BALANCE), message);
+    await expectShown(dashboard.accountItemDetail(name, BALANCE), message);
   },
 );
 
 Then('mostra il capitale allocato {int} USDC', async ({ dashboard, memory }, allocated: number) => {
-  await expectShown(dashboard.accountDetail(memory.tradingAccount, ALLOCATED), String(allocated));
+  await dashboard.openAccount(memory.tradingAccount);
+  await expectShown(dashboard.accountPageDetail(ALLOCATED), String(allocated));
 });

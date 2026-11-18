@@ -11,7 +11,7 @@ const ACCOUNT_ID = 'account-test-1';
 const FIELD = 'Soglia di scostamento (%)';
 
 const openThresholdForm = async (): Promise<HTMLElement> => {
-  await renderApp({ account: 'anna', url: '/accounts' });
+  await renderApp({ account: 'anna', url: '/accounts/account-test-1/reconciliation' });
   // The account is read first, its reconciliation after: the section has its title at once, its data once read.
   const section = await screen.findByRole('region', { name: 'Riconciliazione del conto test-1' });
   await userEvent.click(await within(section).findByRole('button', { name: 'Modifica la soglia' }));

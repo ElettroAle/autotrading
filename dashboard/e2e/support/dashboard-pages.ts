@@ -247,31 +247,69 @@ export class DashboardPages {
     return this.pageHeading().filter({ hasNotText: UNREAD_FLOW_TITLE });
   }
 
-  /** The box of the account on the page of the accounts (ADR conti-a-riquadri). */
-  accountBox(name: string): Locator {
+  /** The element of the account in the compact list of the accounts (ADR elenco-dei-conti-e-pagina-del-conto). */
+  accountItem(name: string): Locator {
     return this.page
       .getByRole('region', { name: 'Conti' })
       .getByRole('article', { name, exact: true });
   }
 
-  /** One value of the box of the account, by the term it shows: «Valore dei flussi», «capitale allocato», ... */
-  accountDetail(name: string, term: string): Locator {
-    return this.accountBox(name).getByLabel(term, { exact: true });
+  /** One value of the element of the account in the list, by the term it shows: «Saldo (con risultato aperto)», ... */
+  accountItemDetail(name: string, term: string): Locator {
+    return this.accountItem(name).getByLabel(term, { exact: true });
   }
 
-  /** The network of the account, in the header of its box, with its kind and the name the exchange gives it. */
+  /** The head of the account where the page shows it: its element in the list, or the head of its own page. */
+  private accountHead(name: string): Locator {
+    return this.accountItem(name).or(this.content().getByRole('region', { name, exact: true }));
+  }
+
+  /** The network of the account, beside its name, with its kind and the name the exchange gives it. */
   accountNetwork(name: string): Locator {
-    return this.accountBox(name).getByText(/^(TEST|REALE) · /);
+    return this.accountHead(name).getByText(/^(TEST|REALE) · /);
   }
 
-  /** The section of the reconciliation in the box of the account. */
-  accountReconciliation(name: string): Locator {
-    return this.accountBox(name).getByRole('region', { name: `Riconciliazione del conto ${name}` });
-  }
-
-  /** Whether the account is aligned, in the header of its box, with an icon and a text. */
+  /** Whether the account is aligned, beside its name, with an icon and a text. */
   accountReconciliationState(name: string): Locator {
-    return this.accountBox(name).getByRole('status', { name: 'Stato della riconciliazione' });
+    return this.accountHead(name).getByRole('status', { name: 'Stato della riconciliazione' });
+  }
+
+  /** Chooses an action of the menu «Azioni» of the element of the account in the list. */
+  async chooseAccountAction(name: string, action: string): Promise<void> {
+    await this.accountItem(name)
+      .getByRole('button', { name: `Azioni del conto ${name}`, exact: true })
+      .click();
+    await this.accountItem(name).getByRole('menuitem', { name: action, exact: true }).click();
+  }
+
+  /** A tab of the page of the account. */
+  accountTab(name: string): Locator {
+    return this.page
+      .getByRole('navigation', { name: 'Schede del conto' })
+      .getByRole('link', { name, exact: true });
+  }
+
+  /**
+   * Opens the page of the account on the tab, touching the account in the list of the accounts as a user does; on the
+   * page of the account already, it only chooses the tab.
+   */
+  async openAccount(name: string, tab = 'Panoramica'): Promise<void> {
+    if (!(await this.accountTab(tab).isVisible())) {
+      await this.accountItem(name).getByRole('link', { name, exact: true }).click();
+      await expect(this.pageHeading()).toHaveText(name);
+    }
+    await this.accountTab(tab).click();
+    await expect(this.accountTab(tab)).toHaveAttribute('aria-current', 'page');
+  }
+
+  /** One value of the tab of the page of the account, by the term it shows: «Valore dei flussi», «Soglia», ... */
+  accountPageDetail(term: string): Locator {
+    return this.content().getByLabel(term, { exact: true });
+  }
+
+  /** The section of the reconciliation of the account, in the tab Riconciliazione of its page. */
+  accountReconciliation(name: string): Locator {
+    return this.content().getByRole('region', { name: `Riconciliazione del conto ${name}` });
   }
 
   registerAccount(): Locator {

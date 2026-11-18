@@ -55,12 +55,13 @@ const accountOf = (account: string, name: string) =>
 
 const reopenWithAccount = async (dashboard: DashboardPages, name: string): Promise<void> => {
   await dashboard.openAccounts();
-  await expect(dashboard.accountBox(name)).toBeVisible();
+  await expect(dashboard.accountItem(name)).toBeVisible();
 };
 
-// The removal is asked in a window first; the API decides whether it needs a second confirmation (ADR 0130).
+// The removal is asked in a window first, from the menu of the account in the list; the API decides whether it needs a
+// second confirmation (ADR 0130, ADR elenco-dei-conti-e-pagina-del-conto).
 const requestRemoval = async (dashboard: DashboardPages, name: string): Promise<void> => {
-  await dashboard.accountBox(name).getByRole('button', { name: 'Rimuovi' }).click();
+  await dashboard.chooseAccountAction(name, 'Rimuovi');
   await dashboard
     .confirmation(`Rimozione del conto ${name}`)
     .getByRole('button', { name: CONFIRM_REMOVAL })
@@ -143,8 +144,8 @@ When(
   async ({ dashboard, memory }, account: string, name: string) => {
     expectSignedIn(memory, account);
     memory.secret = OTHER_SECRET_KEY;
-    const item = dashboard.accountBox(name);
-    await item.getByRole('button', { name: 'Sostituisci le credenziali' }).click();
+    const item = dashboard.accountItem(name);
+    await dashboard.chooseAccountAction(name, 'Sostituisci le credenziali');
     await dashboard.field("Chiave dell'API wallet", item).fill(OTHER_SECRET_KEY);
     await item.getByRole('button', { name: 'Sostituisci', exact: true }).click();
   },
@@ -155,10 +156,7 @@ When(
   async ({ dashboard, memory }, account: string, name: string) => {
     expectSignedIn(memory, account);
     memory.subject = name;
-    await dashboard
-      .accountBox(name)
-      .getByRole('button', { name: 'Sostituisci le credenziali' })
-      .click();
+    await dashboard.chooseAccountAction(name, 'Sostituisci le credenziali');
   },
 );
 
@@ -176,7 +174,9 @@ Then(
 Then(
   "il conto {string} mostra l'indirizzo con cui è registrato",
   async ({ dashboard }, name: string) => {
-    const cell = dashboard.accountDetail(name, ON_EXCHANGE);
+    // The public fields are a detail of the account: they show on the overview of its page.
+    await dashboard.openAccount(name);
+    const cell = dashboard.accountPageDetail(ON_EXCHANGE);
     await expect(cell).toContainText(ADDRESS_LABEL);
     await expect(cell).toContainText(VALID_ADDRESS);
   },
@@ -203,7 +203,7 @@ Then(
   "il conto {string} compare nell'elenco con il suo saldo",
   async ({ dashboard }, name: string) => {
     const { balance } = fakePlatform.accountNamed(name);
-    await expect(dashboard.accountDetail(name, 'Saldo (con risultato aperto)')).toContainText(
+    await expect(dashboard.accountItemDetail(name, 'Saldo (con risultato aperto)')).toContainText(
       `${formatAmount(String(balance))} USDC`,
     );
   },
@@ -211,7 +211,7 @@ Then(
 
 Then("il conto non compare nell'elenco", async ({ dashboard, memory }) => {
   expect(accountOf(memory.account, REJECTED_ACCOUNT)).toBeUndefined();
-  await expect(dashboard.accountBox(REJECTED_ACCOUNT)).toHaveCount(0);
+  await expect(dashboard.accountItem(REJECTED_ACCOUNT)).toHaveCount(0);
 });
 
 Then('la dashboard conferma la sostituzione', async ({ dashboard }) => {
@@ -221,7 +221,7 @@ Then('la dashboard conferma la sostituzione', async ({ dashboard }) => {
 Then(
   "il conto {string} non compare più nell'elenco",
   async ({ dashboard, memory }, name: string) => {
-    await expect(dashboard.accountBox(name)).toHaveCount(0);
+    await expect(dashboard.accountItem(name)).toHaveCount(0);
     expect(accountOf(memory.account, name)).toBeUndefined();
   },
 );

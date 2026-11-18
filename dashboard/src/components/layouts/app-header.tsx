@@ -10,12 +10,17 @@ import { UserMenu } from './user-menu';
 
 const PLATFORM_NAME = 'AutoTrading';
 
+type BackProps = {
+  /** Where «Indietro» leads from the page the dashboard was opened on: the main page when not given. */
+  readonly backTo?: string;
+};
+
 /** The way back from a page of the dashboard: the name leads to the main page, «Indietro» to the previous one. */
-const Navigation = () => {
+const Navigation = ({ backTo }: BackProps) => {
   const { pathname } = useLocation();
   return (
     <>
-      {pathname === paths.home.path ? null : <BackButton />}
+      {pathname === paths.home.path ? null : <BackButton fallback={backTo} />}
       <Link to={paths.home.getHref()} className="min-w-0 truncate font-semibold">
         {PLATFORM_NAME}
       </Link>
@@ -29,7 +34,7 @@ const Navigation = () => {
  * area-utente-in-alto-a-destra). Outside the router, before the dashboard opens, the name links nowhere. On one line
  * at every width (ADR intestazione-su-una-riga).
  */
-export const AppHeader = ({ children }: { children?: ReactNode }) => {
+export const AppHeader = ({ children, backTo }: BackProps & { children?: ReactNode }) => {
   const { environment } = useRuntimeConfig();
   const inDashboard = useInRouterContext();
   return (
@@ -39,7 +44,7 @@ export const AppHeader = ({ children }: { children?: ReactNode }) => {
       <div className="flex min-w-0 items-center gap-3">
         {children}
         {inDashboard ? (
-          <Navigation />
+          <Navigation backTo={backTo} />
         ) : (
           <span className="min-w-0 truncate font-semibold">{PLATFORM_NAME}</span>
         )}

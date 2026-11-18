@@ -3,11 +3,12 @@ import { Loading } from '@/components/ui/loading';
 
 import { useAccounts } from '../api/get-accounts';
 
-import { AccountCard } from './account-card';
+import { AccountItem } from './account-item';
 
 /**
- * Every account of the tenant in a box of its own, one column on a phone and two from a wide screen (Bug 565, ADR
- * conti-a-riquadri); what comes from the exchange may fail alone (ADR 0126).
+ * Every account of the tenant in a compact element of its own, one column on a phone and two from a wide screen (Bug
+ * 565, ADR conti-a-riquadri, ADR elenco-dei-conti-e-pagina-del-conto); what comes from the exchange may fail alone (ADR
+ * 0126).
  */
 export const AccountsList = () => {
   const accounts = useAccounts();
@@ -24,7 +25,7 @@ export const AccountsList = () => {
   return (
     <section aria-label="Conti" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
       {accounts.data.map((account) => (
-        <AccountCard key={account.id} account={account} />
+        <AccountItem key={account.id} account={account} />
       ))}
     </section>
   );

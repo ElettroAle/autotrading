@@ -28,7 +28,7 @@ const openTheAccounts = async (dashboard: DashboardPages, width: number): Promis
     await expect(dashboard.accountReconciliationState(name)).toBeVisible();
   }
   await dashboard.waitUntilRead();
-  return Promise.all(ACCOUNTS.map((name) => boxOf(dashboard.accountBox(name))));
+  return Promise.all(ACCOUNTS.map((name) => boxOf(dashboard.accountItem(name))));
 };
 
 test.beforeEach(async ({ page, baseURL }) => {

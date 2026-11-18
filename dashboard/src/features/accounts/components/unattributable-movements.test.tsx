@@ -8,7 +8,8 @@ import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 import { formatInstant } from '@/utils/format-instant';
 
-const ACCOUNTS_PAGE = '/accounts';
+// The record is in the tab Riconciliazione of the page of the account (ADR elenco-dei-conti-e-pagina-del-conto).
+const RECONCILIATION_TAB = '/accounts/account-test-1/reconciliation';
 const ACCOUNT_ID = 'account-test-1';
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -52,7 +53,7 @@ describe('UnattributableMovements', () => {
   it('lists the cases of the last 24 hours, the most recent first, with the net of the changes above the table', async () => {
     const recent = change(1, '0.05');
     record(change(30, '-9'), position(2, 'SOL'), recent, change(3, '-0.03'));
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const shown = await table();
     expect(
@@ -77,12 +78,11 @@ describe('UnattributableMovements', () => {
     expect(within(section).getByText('3 movimenti')).toBeInTheDocument();
   });
 
-  it('comes right after the section of the reconciliation in the box of the account', async () => {
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+  it('comes right after the section of the reconciliation in the tab of the account', async () => {
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await movements();
-    const card = screen.getByRole('article', { name: 'test-1' });
-    const sections = within(card)
+    const sections = within(screen.getByRole('main'))
       .getAllByRole('region', { name: /del conto test-1$/ })
       .map((region) => region.getAttribute('aria-label'));
     expect(sections).toEqual([
@@ -96,7 +96,7 @@ describe('UnattributableMovements', () => {
 
   it('says when nothing is unexplained in the period', async () => {
     record(change(30, '-9'));
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     const section = await movements();
     expect(
@@ -107,7 +107,7 @@ describe('UnattributableMovements', () => {
 
   it('narrows the cases by kind with the shared filters', async () => {
     record(change(1, '0.05'), position(2, 'SOL'));
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
     await table();
 
     await userEvent.click(within(await movements()).getByRole('button', { name: 'Posizioni' }));
@@ -119,7 +119,7 @@ describe('UnattributableMovements', () => {
 
   it('widens the period with the shared filters', async () => {
     record(change(1, '0.05'), change(30, '-9'));
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
     await table();
 
     await userEvent.click(within(await movements()).getByRole('button', { name: '7 giorni' }));
@@ -133,7 +133,7 @@ describe('UnattributableMovements', () => {
 
   it('keeps the last 24 hours for a period the record does not offer', async () => {
     record(change(1, '0.05'), change(30, '-9'));
-    await renderApp({ account: 'anna', url: `${ACCOUNTS_PAGE}?${ACCOUNT_ID}.period=range` });
+    await renderApp({ account: 'anna', url: `${RECONCILIATION_TAB}?${ACCOUNT_ID}.period=range` });
 
     expect(rowsOf(await table())).toHaveLength(1);
   });
@@ -147,14 +147,14 @@ describe('UnattributableMovements', () => {
         ),
       ),
     );
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
 
     expect(await within(await movements()).findByRole('alert')).toBeInTheDocument();
   });
 
   it('reads the next page with the command Altri, until the last one', async () => {
     record(...Array.from({ length: 51 }, (_, minute) => change(minute / 60, '1')));
-    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
     expect(rowsOf(await table())).toHaveLength(50);
 
     await userEvent.click(within(await movements()).getByRole('button', { name: 'Altri' }));
