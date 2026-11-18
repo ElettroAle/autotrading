@@ -169,7 +169,7 @@ def _notice_sources() -> dict[str, str]:
 def test_adr_stato_del_flusso_every_notice_of_a_flow_closes_with_its_state_and_none_of_the_account() -> None:
     sources = _notice_sources()
 
-    assert len(sources) >= 14
+    assert len(sources) >= 13
     assert notices_without_their_notifier(sources, _factory_events()) == []
 
 

@@ -295,6 +295,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
                 "period_gain_percent": "0.00",
                 "open_positions": 0,
                 "failed_cycles": 1,
+                "next_cycle_at": "2026-11-12T10:22:00Z",
             },
         },
         {
@@ -321,6 +322,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
                 "period_gain_percent": "0.00",
                 "open_positions": 0,
                 "failed_cycles": 0,
+                "next_cycle_at": None,
             },
         },
     ]

@@ -11,10 +11,11 @@ from autotrading.domain.flows.errors import (
 
 
 class StatisticsPeriodKind(StrEnum):
-    """The periods in the order the user chooses them, from the shortest (R6.4.6)."""
+    """The periods in the order the user chooses them, from the shortest (R6.4.6, R6.4.7)."""
 
     LAST_30_MINUTES = "30m"
     LAST_HOUR = "1h"
+    LAST_6_HOURS = "6h"
     LAST_12_HOURS = "12h"
     LAST_24_HOURS = "24h"
     LAST_7_DAYS = "7d"
@@ -26,6 +27,7 @@ class StatisticsPeriodKind(StrEnum):
 LAST_DURATIONS = {
     StatisticsPeriodKind.LAST_30_MINUTES: timedelta(minutes=30),
     StatisticsPeriodKind.LAST_HOUR: timedelta(hours=1),
+    StatisticsPeriodKind.LAST_6_HOURS: timedelta(hours=6),
     StatisticsPeriodKind.LAST_12_HOURS: timedelta(hours=12),
     StatisticsPeriodKind.LAST_24_HOURS: timedelta(hours=24),
     StatisticsPeriodKind.LAST_7_DAYS: timedelta(days=7),

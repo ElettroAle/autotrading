@@ -486,7 +486,9 @@ def update(world: World) -> object:
     return world.ports.end_cycle.execute(world.flow.id.value, ANCHOR, ())
 
 
-def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: World) -> None:
+def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle_but_a_change_within_the_threshold(
+    world: World,
+) -> None:
     reader = world.cycles.platform.activity_reader
     update(world)
     reader.executions[world.address] = [a_fill("ETH", None, executed_at=CLOSED_AT)]
@@ -505,7 +507,6 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle(world: W
         [
             Notification.unattributable_position(TEXT_ONLY_ID, "test-1", "SOL").text,
             Notification.unattributable_fill(TEXT_ONLY_ID, "test-1", "ETH").text,
-            Notification.unattributable_movement(TEXT_ONLY_ID, "test-1", usdc("5")).text,
         ]
     )
 

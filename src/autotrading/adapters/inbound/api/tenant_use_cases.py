@@ -55,6 +55,7 @@ from autotrading.application.flows.list_flow_versions import ListFlowVersionsUse
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.list_reconciliation_alarms import ListReconciliationAlarmsUseCase
 from autotrading.application.flows.list_tradable_assets import ListTradableAssetsUseCase
+from autotrading.application.flows.list_unattributable import ListUnattributableUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.ports import (
     AccountActivityPort,
@@ -76,6 +77,7 @@ from autotrading.application.flows.ports import (
     FlowPositionsPort,
     FlowRepositoryPort,
     FlowSummaryPort,
+    FlowTimingPort,
     HistoricalClosedPositionsPort,
     HistoricalCyclesPort,
     HistoricalOrdersPort,
@@ -95,12 +97,13 @@ from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_default_system_prompt import ReadDefaultSystemPromptUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
-from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
+from autotrading.application.flows.read_flow_results import FlowPeriodPorts, ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.read_last_decision import ReadLastDecisionUseCase
+from autotrading.application.flows.read_next_cycle import ReadNextCycleUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
@@ -198,6 +201,7 @@ class TenantPorts:
     decision_history: DecisionHistoryPort
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
+    flow_timing: FlowTimingPort
     equity_snapshots: EquitySnapshotRepositoryPort
     openings_suspensions: OpeningsSuspensionPort
     flow_forecasts: FlowForecastsPort
@@ -291,6 +295,7 @@ class TenantUseCases:
     set_deviation_threshold: SetDeviationThresholdUseCase
     read_account_reconciliation: ReadAccountReconciliationUseCase
     list_reconciliation_alarms: ListReconciliationAlarmsUseCase
+    list_unattributable: ListUnattributableUseCase
     confirm_reconciliation: ConfirmReconciliationUseCase
     close_in_emergency: CloseInEmergencyUseCase
     preview_emergency_closing: PreviewEmergencyClosingUseCase
@@ -332,8 +337,8 @@ class TenantUseCases:
                 ReadOpeningsSuspensionUseCase(
                     ports.flows, ports.openings_suspensions, ports.reconciliation, ports.account_names, ports.clock
                 ),
-                ports.equity_snapshots,
-                ports.cycle_history,
+                ReadNextCycleUseCase(ports.flows, ports.flow_timing, ports.clock),
+                FlowPeriodPorts(ports.equity_snapshots, ports.cycle_history),
                 ports.clock,
             ),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.bot_identity, ports.clock),
@@ -413,8 +418,8 @@ class TenantUseCases:
                     ReadOpeningsSuspensionUseCase(
                         ports.flows, ports.openings_suspensions, ports.reconciliation, ports.account_names, ports.clock
                     ),
-                    ports.equity_snapshots,
-                    ports.cycle_history,
+                    ReadNextCycleUseCase(ports.flows, ports.flow_timing, ports.clock),
+                    FlowPeriodPorts(ports.equity_snapshots, ports.cycle_history),
                     ports.clock,
                 ),
                 ports.environment,
@@ -440,6 +445,7 @@ class TenantUseCases:
                 ports.reconciliation, ports.account_thresholds
             ),
             list_reconciliation_alarms=ListReconciliationAlarmsUseCase(ports.reconciliation, ports.account_names),
+            list_unattributable=ListUnattributableUseCase(ports.reconciliation, ports.account_names),
             confirm_reconciliation=ConfirmReconciliationUseCase(ports.reconciliation, ports.account_names, ports.clock),
             close_in_emergency=CloseInEmergencyUseCase(
                 tenant_id,

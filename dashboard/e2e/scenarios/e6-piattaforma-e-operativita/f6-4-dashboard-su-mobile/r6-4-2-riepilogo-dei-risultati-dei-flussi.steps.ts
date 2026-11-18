@@ -137,9 +137,9 @@ When(
 );
 
 Then(
-  'il riepilogo mostra guadagno totale {string} e nel periodo {string}',
+  'il riepilogo mostra guadagno attuale {string} e nel periodo {string}',
   async ({ dashboard }, total: string, inThePeriod: string) => {
-    await expect(dashboard.result('Guadagno totale')).toHaveText(total);
+    await expect(dashboard.result('Guadagno attuale')).toHaveText(total);
     await expect(dashboard.result('Guadagno nel periodo')).toHaveText(inThePeriod);
   },
 );
@@ -152,9 +152,9 @@ Then(
   },
 );
 
-Then('il guadagno totale {string} è in rosso', async ({ dashboard }, total: string) => {
-  await expect(dashboard.result('Guadagno totale')).toHaveText(total);
-  await expect(dashboard.result('Guadagno totale')).toHaveClass(/text-red-/);
+Then('il guadagno attuale {string} è in rosso', async ({ dashboard }, total: string) => {
+  await expect(dashboard.result('Guadagno attuale')).toHaveText(total);
+  await expect(dashboard.result('Guadagno attuale')).toHaveClass(/text-red-/);
 });
 
 Then('il riepilogo dice {string} senza evidenza', async ({ dashboard }, words: string) => {
@@ -190,7 +190,7 @@ Then(
   'la scheda di {string} mostra il riepilogo e non mostra la fila degli esiti dei cicli né la voce Ambiente',
   async ({ dashboard }, flow: string) => {
     const card = dashboard.flowSummary(flow);
-    await expect(dashboard.result('Guadagno totale', card)).toHaveText('+2,50 USDC · +2,50%');
+    await expect(dashboard.result('Guadagno attuale', card)).toHaveText('+2,50 USDC · +2,50%');
     await expect(dashboard.flowFact(flow, 'Ultima esecuzione')).toBeVisible();
     await expect(card.getByRole('list', { name: 'Esito degli ultimi cicli' })).toHaveCount(0);
     await expect(dashboard.flowFact(flow, 'Ambiente')).toHaveCount(0);
@@ -198,6 +198,6 @@ Then(
 );
 
 Then('gli importi del riepilogo sono in {string}', async ({ dashboard }, currency: string) => {
-  await expect(dashboard.result('Guadagno totale')).toContainText(` ${currency}`);
+  await expect(dashboard.result('Guadagno attuale')).toContainText(` ${currency}`);
   await expect(dashboard.result('Guadagno nel periodo')).toContainText(` ${currency}`);
 });

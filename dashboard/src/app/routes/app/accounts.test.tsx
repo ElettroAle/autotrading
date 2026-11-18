@@ -42,7 +42,7 @@ describe('AccountsRoute', () => {
       'article',
       { name: 'principale' },
     );
-    expect(within(card).getByLabelText('Capitale allocato', { selector: 'dd' })).toBeVisible();
+    expect(within(card).getByLabelText('capitale allocato', { selector: 'dd' })).toBeVisible();
   });
 
   it('rereads the accounts of the flow editor after an account is registered', async () => {

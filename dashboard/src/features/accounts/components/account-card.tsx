@@ -3,7 +3,6 @@ import { useId } from 'react';
 import { DETAILS_GRID } from '@/components/ui/details-list';
 import { NetworkBadge } from '@/components/ui/network-notice';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
-import { formatAmount } from '@/utils/format-amount';
 
 import { useAccountBalance } from '../api/get-account-state';
 import type { Account } from '../api/get-accounts';
@@ -12,9 +11,11 @@ import { useFreeCapital } from '../api/get-free-capital';
 import { AccountActions } from './account-actions';
 import { Detail } from './detail';
 import { ExchangeAmount } from './exchange-amount';
+import { FlowsValue } from './flows-value';
 import { PublicFields } from './public-fields';
 import { ReconciliationState } from './reconciliation-state';
 import { ReconciliationStatus } from './reconciliation-status';
+import { UnattributableMovements } from './unattributable-movements';
 
 const Balance = ({ account }: { readonly account: Account }) => (
   <ExchangeAmount reading={useAccountBalance(account.id)} unavailable="Saldo non disponibile" />
@@ -39,7 +40,9 @@ const hasPublicFields = (account: Account): boolean =>
 
 /**
  * An account in a box of its own: its name, network and state of the reconciliation at the top, its data, the section
- * of the reconciliation, then the commands on the account (Bug 565, ADR conti-a-riquadri).
+ * of the reconciliation, the movements no flow explains, then the commands on the account (Bug 565, ADR conti-a-riquadri,
+ * ADR movimenti-non-spiegati-nel-riquadro-del-conto). Its balance reads as the value of the flows plus the free capital
+ * (Bug 601, ADR scomposizione-del-saldo-nel-riquadro-del-conto).
  */
 export const AccountCard = ({ account }: { readonly account: Account }) => {
   const titleId = useId();
@@ -61,17 +64,18 @@ export const AccountCard = ({ account }: { readonly account: Account }) => {
             <AccountOnExchange account={account} />
           </Detail>
         )}
-        <Detail term="Saldo">
+        <Detail term="Saldo (con risultato aperto)">
           <Balance account={account} />
         </Detail>
-        <Detail term="Capitale allocato">
-          {`${formatAmount(account.allocated_capital)} ${account.currency}`}
+        <Detail term="Valore dei flussi">
+          <FlowsValue account={account} />
         </Detail>
         <Detail term="Capitale libero">
           <FreeCapital account={account} />
         </Detail>
       </dl>
       <ReconciliationStatus account={account} />
+      <UnattributableMovements account={account} />
       <AccountActions account={account} />
     </article>
   );

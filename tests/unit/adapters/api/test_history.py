@@ -93,7 +93,9 @@ def test_rejects_a_period_the_platform_does_not_know(client_of: Client) -> None:
     response = client_of("anna").get("/history/orders", params={"period": "1y"})
 
     assert response.status_code == 400
-    assert reason_of(response) == {"detail": "periodo non valido: scegliere tra 30m, 1h, 12h, 24h, 7d, 30d, all, range"}
+    assert reason_of(response) == {
+        "detail": "periodo non valido: scegliere tra 30m, 1h, 6h, 12h, 24h, 7d, 30d, all, range"
+    }
 
 
 def test_rejects_a_page_the_platform_did_not_give(client_of: Client) -> None:

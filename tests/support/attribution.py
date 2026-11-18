@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 from pytest_bdd import parsers
 
+from autotrading.application.flows.notify_unattributable import NotifyUnattributableUseCase, UnattributableNotices
 from autotrading.application.flows.ports import ReconciliationAlarmPorts
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
@@ -24,6 +25,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import Execution, FlowTotals
+from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
@@ -35,6 +37,7 @@ from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.fakes.unattributable_notices import FakeUnattributableAssetNoticeAdapter
 from tests.support.activity import READ_AT, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -79,6 +82,12 @@ class AttributionBench:
         self.reconcile = ReconcileAccountUseCase(
             flows, self.exchange, self.readings, self.closed, self.record, self.closed_by_protection, alarms
         )
+        self.position_notices = FakeUnattributableAssetNoticeAdapter()
+        self.fill_notices = FakeUnattributableAssetNoticeAdapter()
+        self.notify = NotifyUnattributableUseCase(
+            self.thresholds, UnattributableNotices(self.position_notices, self.fill_notices)
+        )
+        self.new_items: tuple[UnattributableItem, ...] = ()
         self.state: FlowState | None = None
         self.recomputed: FlowTotals | None = None
 
@@ -146,7 +155,10 @@ class AttributionBench:
         self.state = self.read_state.execute(ReadFlowStateCommand(self.flow(name).id))
 
     def run_cycle(self, name: str) -> None:
-        self.reconcile.execute(ReconcileAccountCommand(self.flow(name).id))
+        """The reconciliation of a cycle, then the notices of the cases it found for the first time (R1.6.2)."""
+        outcome = self.reconcile.execute(ReconcileAccountCommand(self.flow(name).id))
+        self.new_items = outcome.new_items
+        self.notify.execute(outcome.new_items)
 
     def consulted(self) -> FlowState:
         assert self.state is not None

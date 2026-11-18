@@ -65,7 +65,7 @@ def test_the_free_capital_takes_off_the_balance_the_total_value_of_the_flows_hol
     bench.earned(alfa, "70")
     bench.holding("ETH", "-50")
 
-    assert bench.free_capital() == FreeCapital(Decimal(480), "USDC")
+    assert bench.free_capital() == FreeCapital(Decimal(480), "USDC", Decimal(520), Decimal(500))
     assert bench.accounts.activity.read == [bench.account_id]
 
 
@@ -80,7 +80,7 @@ def test_the_flow_left_out_holds_nothing(bench: Bench) -> None:
     alfa = bench.flow("alfa", status=FlowStatus.STOPPED)
     bench.flow("beta", asset="ETH")
 
-    assert bench.free_capital(alfa) == FreeCapital(Decimal(700), "USDC")
+    assert bench.free_capital(alfa) == FreeCapital(Decimal(700), "USDC", Decimal(300), Decimal(300))
 
 
 def test_the_profits_cashed_out_are_free_again(bench: Bench) -> None:
@@ -99,7 +99,7 @@ def test_the_profits_cashed_out_are_free_again(bench: Bench) -> None:
     )
     bench.flows.add_capital_change(alfa, cash_out)
 
-    assert bench.free_capital() == FreeCapital(Decimal(500), "USDC")
+    assert bench.free_capital() == FreeCapital(Decimal(500), "USDC", Decimal(500), Decimal(500))
 
 
 def test_an_account_that_cannot_be_read_makes_the_exchange_unavailable(bench: Bench) -> None:

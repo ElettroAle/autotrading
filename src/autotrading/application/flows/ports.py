@@ -63,6 +63,7 @@ from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
+from autotrading.domain.flows.unattributable_page import UnattributableCursor, UnattributableFilter, UnattributablePage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -509,12 +510,6 @@ class UnattributableFillNoticePort(Protocol):
         ...
 
 
-class UnattributableMovementNoticePort(Protocol):
-    def execute(self, account_id: UUID, account_name: str, amount: Decimal) -> None:
-        """Tells the user the balance of the account changed with no flow behind it (R1.6.2)."""
-        ...
-
-
 class AccountExecutionsPort(Protocol):
     """In the worker: the executions and the funding the exchange still holds of an account since a moment (ADR 0063).
 
@@ -642,6 +637,15 @@ class ReconciliationRepositoryPort(Protocol):
 
     def resolve_positions(self, account_id: UUID, open_assets: frozenset[str]) -> None:
         """Closes the recorded positions no longer open: a new position on that asset is a new case."""
+        ...
+
+    def unattributable_of(
+        self, account_id: UUID, criteria: UnattributableFilter, cursor: UnattributableCursor | None
+    ) -> UnattributablePage:
+        """The cases recorded for the account, open and resolved, that the filter admits: the page after the cursor,
+        newest first, and the count and the net of the changes of the balance of every case of the filter, whatever
+        the page (ADR movimenti-non-spiegati-nel-riquadro-del-conto).
+        """
         ...
 
     def open_alarm(self, account_id: UUID) -> ReconciliationAlarm | None:

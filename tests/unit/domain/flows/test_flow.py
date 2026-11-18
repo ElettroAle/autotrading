@@ -1,9 +1,11 @@
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
+from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.errors import (
     AllocatedCapitalNotPositiveError,
     AssetsRequiredError,
@@ -187,3 +189,21 @@ def test_the_minimum_confidence_is_absent_unless_given_and_reaches_the_risk_poli
     assert replace(configuration, minimum_confidence=MinimumConfidence(60)).risk_policy == RiskPolicy(
         configuration.risk_limits, bring_to_minimum=False, minimum_confidence=MinimumConfidence(60)
     )
+
+
+def test_an_active_flow_plans_its_cycles_every_interval_from_its_anchor() -> None:
+    anchor = datetime(2026, 11, 18, 10, 0, tzinfo=UTC)
+    flow = a_flow(TenantId.new(), status=FlowStatus.ACTIVE)
+
+    assert flow.planned_schedule(anchor) == CycleSchedule(anchor, timedelta(minutes=15))
+
+
+@pytest.mark.parametrize("status", [FlowStatus.PAUSED, FlowStatus.STOPPED, FlowStatus.ARCHIVED])
+def test_a_flow_that_is_not_active_plans_no_cycle(status: FlowStatus) -> None:
+    flow = a_flow(TenantId.new(), status=status)
+
+    assert flow.planned_schedule(datetime(2026, 11, 18, 10, 0, tzinfo=UTC)) is None
+
+
+def test_an_active_flow_without_anchor_plans_no_cycle() -> None:
+    assert a_flow(TenantId.new(), status=FlowStatus.ACTIVE).planned_schedule(None) is None

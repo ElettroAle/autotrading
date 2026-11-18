@@ -4,7 +4,19 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Connection, Engine, RowMapping, func, select, update
+from sqlalchemy import (
+    ColumnElement,
+    Connection,
+    Engine,
+    RowMapping,
+    Select,
+    case,
+    func,
+    literal,
+    select,
+    tuple_,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import (
@@ -17,18 +29,27 @@ from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
+from autotrading.domain.flows.unattributable_page import (
+    RecordedUnattributable,
+    UnattributableCursor,
+    UnattributableFilter,
+    UnattributablePage,
+)
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 OPEN_CASE = unattributable_items.c.resolved_at.is_(None)
 OPEN_ALARM = reconciliation_alarms.c.confirmed_at.is_(None)
 READING_VALUES = ("read_at", "open_assets", "reference_balance", "expected_balance", "read_balance")
+BALANCE_CHANGE = UnattributableKind.BALANCE_CHANGE.name.lower()
+NO_CHANGE = Decimal(0)
 
 
 class SqlAlchemyReconciliationRepositoryAdapter:
     """Bound to the tenant of the request: every transaction declares it, and row level security does the rest.
 
     The unique indexes on the open cases and on the open alarms make "recorded once" and "one alarm open" hold also
-    when two cycles of the account run together.
+    when two cycles of the account run together. The record of an account goes by keyset on instant and key, newest
+    first, and its totals are one aggregate over the same filters (ADR 0074).
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
@@ -75,6 +96,22 @@ class SqlAlchemyReconciliationRepositoryAdapter:
         )
         with self._transaction() as connection:
             connection.execute(statement)
+
+    def unattributable_of(
+        self, account_id: UUID, criteria: UnattributableFilter, cursor: UnattributableCursor | None
+    ) -> UnattributablePage:
+        admitted = _admitted(account_id, criteria)
+        page = (
+            select(unattributable_items)
+            .where(*admitted, *_after(cursor))
+            .order_by(unattributable_items.c.detected_at.desc(), unattributable_items.c.id.desc())
+            .limit(criteria.limit + 1)
+        )
+        with self._transaction() as connection:
+            rows = connection.execute(page).mappings().all()
+            totals = connection.execute(_totals(admitted)).mappings().one()
+        cases = [_recorded_of(row) for row in rows]
+        return UnattributablePage.of(cases, criteria.limit, totals["count"], totals["net_change"])
 
     def open_alarm(self, account_id: UUID) -> ReconciliationAlarm | None:
         query = select(reconciliation_alarms).where(OPEN_ALARM, reconciliation_alarms.c.account_id == account_id)
@@ -169,6 +206,45 @@ def _alarm_row_of(alarm: ReconciliationAlarm, tenant_id: TenantId) -> dict[str, 
         "opened_at": alarm.opened_at,
         "confirmed_at": alarm.confirmed_at,
     }
+
+
+def _admitted(account_id: UUID, criteria: UnattributableFilter) -> list[ColumnElement[bool]]:
+    columns = unattributable_items.c
+    admitted = [columns.account_id == account_id]
+    if criteria.kind is not None:
+        admitted.append(columns.kind == criteria.kind.name.lower())
+    if criteria.since is not None:
+        admitted.append(columns.detected_at >= criteria.since)
+    if criteria.until is not None:
+        admitted.append(columns.detected_at < criteria.until)
+    return admitted
+
+
+def _after(cursor: UnattributableCursor | None) -> list[ColumnElement[bool]]:
+    if cursor is None:
+        return []
+    columns = unattributable_items.c
+    return [tuple_(columns.detected_at, columns.id) < tuple_(literal(cursor.detected_at), literal(cursor.item_id))]
+
+
+def _totals(admitted: list[ColumnElement[bool]]) -> Select[tuple[int, Decimal]]:
+    columns = unattributable_items.c
+    change = case((columns.kind == BALANCE_CHANGE, columns.amount), else_=NO_CHANGE)
+    return select(func.count().label("count"), func.coalesce(func.sum(change), NO_CHANGE).label("net_change")).where(
+        *admitted
+    )
+
+
+def _recorded_of(row: RowMapping) -> RecordedUnattributable:
+    item = UnattributableItem(
+        row["account_id"],
+        UnattributableKind[row["kind"].upper()],
+        row["reference"],
+        row["asset"],
+        row["amount"],
+        row["detected_at"],
+    )
+    return RecordedUnattributable(row["id"], item)
 
 
 def _row_of(item: UnattributableItem, tenant_id: TenantId) -> dict[str, object]:

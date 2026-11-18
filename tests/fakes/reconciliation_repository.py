@@ -2,11 +2,17 @@
 like the database does."""
 
 from datetime import datetime
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
+from autotrading.domain.flows.unattributable_page import (
+    RecordedUnattributable,
+    UnattributableCursor,
+    UnattributableFilter,
+    UnattributablePage,
+)
 
 
 class InMemoryReconciliationRepositoryAdapter:
@@ -39,6 +45,17 @@ class InMemoryReconciliationRepositoryAdapter:
         self.items = [item for item in self.items if item not in closed]
         self.resolved.extend(closed)
 
+    def unattributable_of(
+        self, account_id: UUID, criteria: UnattributableFilter, cursor: UnattributableCursor | None
+    ) -> UnattributablePage:
+        recorded = [_recorded(item) for item in [*self.items, *self.resolved] if item.account_id == account_id]
+        admitted = sorted(
+            (case for case in recorded if criteria.admits(case)), key=lambda case: case.cursor, reverse=True
+        )
+        after = [case for case in admitted if cursor is None or case.cursor < cursor]
+        net_change = UnattributablePage.net_change_of(admitted)
+        return UnattributablePage.of(after[: criteria.limit + 1], criteria.limit, len(admitted), net_change)
+
     def open_alarm(self, account_id: UUID) -> ReconciliationAlarm | None:
         return next((alarm for alarm in self.alarms if alarm.account_id == account_id and alarm.is_open), None)
 
@@ -58,6 +75,12 @@ class InMemoryReconciliationRepositoryAdapter:
     def alarms_of(self, account_id: UUID) -> list[ReconciliationAlarm]:
         of_account = [alarm for alarm in self.alarms if alarm.account_id == account_id]
         return sorted(of_account, key=lambda alarm: alarm.opened_at, reverse=True)
+
+
+def _recorded(item: UnattributableItem) -> RecordedUnattributable:
+    """The same key for the same case at every reading, as the database keeps the row it recorded once."""
+    key = uuid5(NAMESPACE_URL, f"{item.account_id}/{item.kind.name}/{item.reference}/{item.detected_at.isoformat()}")
+    return RecordedUnattributable(key, item)
 
 
 def _same_case(item: UnattributableItem, recorded: UnattributableItem) -> bool:

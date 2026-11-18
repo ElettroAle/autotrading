@@ -15,11 +15,31 @@ export type FakeReconciliationAlarm = {
   confirmed_at: string | null;
 };
 
+/** A case no flow explains on an account, as the API answers it (R1.6.2). */
+export type FakeUnattributable = {
+  readonly detected_at: string;
+  readonly kind: 'posizione' | 'esecuzione' | 'variazione del saldo';
+  readonly asset: string | null;
+  readonly amount: string;
+};
+
+/** What the dashboard asks of the record of an account: a kind, a period and the page after a cursor. */
+export type FakeUnattributableQuery = {
+  readonly kind: string | null;
+  readonly since: string | null;
+  readonly until: string | null;
+  readonly cursor: string | null;
+};
+
 type FakeReconciliation = {
   thresholdPercent: string;
   lastComparison: FakeBalanceComparison | null;
   readonly alarms: FakeReconciliationAlarm[];
+  readonly unattributable: FakeUnattributable[];
 };
+
+/** The cases of a page of the record, as the API gives them (ADR movimenti-non-spiegati-nel-riquadro-del-conto). */
+export const UNATTRIBUTABLE_PAGE_SIZE = 50;
 
 const DEFAULT_THRESHOLD = '1';
 const LOWEST_THRESHOLD = 0.1;
@@ -56,10 +76,23 @@ const reconciliationOf = (accountId: string): FakeReconciliation => {
     thresholdPercent: DEFAULT_THRESHOLD,
     lastComparison: null,
     alarms: [],
+    unattributable: [],
   };
   reconciliations.set(accountId, created);
   return created;
 };
+
+const admits = (query: FakeUnattributableQuery, recorded: FakeUnattributable): boolean => {
+  const at = Date.parse(recorded.detected_at);
+  return (
+    (query.kind === null || recorded.kind === query.kind) &&
+    (query.since === null || at >= Date.parse(query.since)) &&
+    (query.until === null || at < Date.parse(query.until))
+  );
+};
+
+// The fake keeps its own cursor, the place of the next case: the dashboard only hands back what the API gave.
+const startOf = (cursor: string | null): number => (cursor === null ? 0 : Number(cursor));
 
 const openAlarmOf = (accountId: string): FakeReconciliationAlarm | undefined =>
   reconciliationOf(accountId).alarms.find((alarm) => alarm.confirmed_at === null);
@@ -139,6 +172,32 @@ export const fakeReconciliation = {
     return reconciliationOf(accountId).alarms.toSorted((first, second) =>
       second.opened_at.localeCompare(first.opened_at),
     );
+  },
+
+  /** A case no flow explains, recorded on the account by a reconciliation. */
+  recordUnattributable(accountId: string, recorded: FakeUnattributable): void {
+    reconciliationOf(accountId).unattributable.push(recorded);
+  },
+
+  /**
+   * A page of the record of the account, newest first, with the count and the net of the changes of the balance of the
+   * whole filter, as the API answers it.
+   */
+  unattributableOf(accountId: string, query: FakeUnattributableQuery) {
+    const admitted = reconciliationOf(accountId)
+      .unattributable.filter((recorded) => admits(query, recorded))
+      .toSorted((first, second) => second.detected_at.localeCompare(first.detected_at));
+    const start = startOf(query.cursor);
+    const end = start + UNATTRIBUTABLE_PAGE_SIZE;
+    const net = admitted
+      .filter((recorded) => recorded.kind === 'variazione del saldo')
+      .reduce((sum, recorded) => sum + Number(recorded.amount), 0);
+    return {
+      items: admitted.slice(start, end),
+      next: end < admitted.length ? String(end) : null,
+      count: admitted.length,
+      net_change: amountText(net),
+    };
   },
 
   /**
