@@ -6,6 +6,7 @@ import pytest
 from autotrading.domain.flows.errors import MalformedSystemPromptError, UnknownPromptPlaceholderError
 from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.risk_limits import RiskLimits
+from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.system_prompt import (
     DEFAULT_SYSTEM_PROMPT,
     PromptPlaceholder,
@@ -17,7 +18,22 @@ from tests.support.flows import a_configuration
 
 ACTIONS = ("apri", "chiudi", "mantieni")
 CONFIGURATION = replace(
-    a_configuration(assets=("BTC", "ETH")), instructions="Sei prudente", risk_limits=RiskLimits(3, Decimal(10))
+    a_configuration(assets=("BTC", "ETH")),
+    instructions="Sei prudente",
+    risk_limits=RiskLimits(3, Decimal(10)),
+    sources=(SourceSelection("forecast", 10), SourceSelection("indicatori", 2)),
+)
+WEIGHT_RULE = "\n".join(
+    (
+        "- il peso di una fonte è un intero da 1 a 10, predefinito 5: l'importanza relativa che l'utente dà a ogni"
+        " fonte;",
+        "- quando le fonti sono in disaccordo prevale quella col peso più alto, non il numero dei segnali;",
+        "- più valori della stessa fonte (per esempio medie, MACD e RSI degli indicatori) contano come una fonte"
+        " sola, col suo peso;",
+        "- le istruzioni del flusso prevalgono sui pesi quando li contraddicono;",
+        "- nel ragionamento di un'apertura nomina la fonte che ha deciso la direzione quando le fonti erano in"
+        " disaccordo;",
+    )
 )
 
 
@@ -27,6 +43,7 @@ def test_every_placeholder_declares_its_name_and_what_it_means() -> None:
         ("actions", "{actions}"),
         ("max_leverage", "{max_leverage}"),
         ("assets", "{assets}"),
+        ("source_weights", "{source_weights}"),
     ]
     assert all(placeholder.description for placeholder in PromptPlaceholder)
 
@@ -39,7 +56,33 @@ def test_every_placeholder_reads_its_value_from_the_flow() -> None:
         "actions": "apri, chiudi, mantieni",
         "max_leverage": "3",
         "assets": "BTC, ETH",
+        "source_weights": WEIGHT_RULE + "\n- pesi delle fonti attive del flusso: forecast 10, indicatori 2;",
     }
+
+
+def test_the_weights_follow_the_order_of_the_configuration() -> None:
+    reordered = replace(CONFIGURATION, sources=(SourceSelection("indicatori", 2), SourceSelection("forecast", 10)))
+
+    assert PromptPlaceholder.SOURCE_WEIGHTS.value_of(PromptSubject(reordered, ACTIONS)).endswith(
+        "\n- pesi delle fonti attive del flusso: indicatori 2, forecast 10;"
+    )
+
+
+def test_a_flow_without_active_sources_is_told_so_after_the_rule() -> None:
+    alone = replace(CONFIGURATION, sources=())
+
+    assert PromptPlaceholder.SOURCE_WEIGHTS.value_of(PromptSubject(alone, ACTIONS)) == (
+        WEIGHT_RULE + "\n- pesi delle fonti attive del flusso: nessuna fonte attiva;"
+    )
+
+
+def test_the_default_gives_the_rule_of_the_weights_among_the_operational_rules() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+    rules, _, answer_format = rendered.partition("Rispondi solo con")
+
+    assert WEIGHT_RULE + "\n- pesi delle fonti attive del flusso: forecast 10, indicatori 2;\n" in rules
+    assert rules.index("- la chiusura è sempre totale;") < rules.index(WEIGHT_RULE)
+    assert "peso" not in answer_format
 
 
 def test_the_default_uses_every_placeholder_and_renders_the_rules_and_the_format() -> None:

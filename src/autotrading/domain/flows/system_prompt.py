@@ -6,11 +6,23 @@ from typing import TYPE_CHECKING
 
 from autotrading.domain.flows.errors import MalformedSystemPromptError, UnknownPromptPlaceholderError
 from autotrading.domain.flows.risk_limits import LOWEST_LEVERAGE
+from autotrading.domain.flows.selections import DEFAULT_WEIGHT, MAXIMUM_WEIGHT, MINIMUM_WEIGHT, SourceSelection
 
 if TYPE_CHECKING:
     from autotrading.domain.flows.flow_configuration import FlowConfiguration
 
 LIST_SEPARATOR = ", "
+# The model decides with the weights: the platform only tells it what a weight means, never computes on it (Bug 622).
+SOURCE_WEIGHTS_RULE = (
+    f"- il peso di una fonte è un intero da {MINIMUM_WEIGHT} a {MAXIMUM_WEIGHT}, predefinito {DEFAULT_WEIGHT}:"
+    " l'importanza relativa che l'utente dà a ogni fonte;",
+    "- quando le fonti sono in disaccordo prevale quella col peso più alto, non il numero dei segnali;",
+    "- più valori della stessa fonte (per esempio medie, MACD e RSI degli indicatori) contano come una fonte sola, col"
+    " suo peso;",
+    "- le istruzioni del flusso prevalgono sui pesi quando li contraddicono;",
+    "- nel ragionamento di un'apertura nomina la fonte che ha deciso la direzione quando le fonti erano in disaccordo;",
+)
+NO_ACTIVE_SOURCE = "nessuna fonte attiva"
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +33,12 @@ class PromptSubject:
 
     configuration: FlowConfiguration
     actions: tuple[str, ...]
+
+
+def _source_weights(sources: tuple[SourceSelection, ...]) -> str:
+    """The rule of the weights and the weight of every active source, in the order of the configuration (R1.3.2)."""
+    weights = LIST_SEPARATOR.join(f"{source.name} {source.weight}" for source in sources) or NO_ACTIVE_SOURCE
+    return "\n".join((*SOURCE_WEIGHTS_RULE, f"- pesi delle fonti attive del flusso: {weights};"))
 
 
 class PromptPlaceholder(StrEnum):
@@ -60,6 +78,12 @@ class PromptPlaceholder(StrEnum):
         lambda subject: LIST_SEPARATOR.join(subject.configuration.assets),
     )
 
+    SOURCE_WEIGHTS = (
+        "source_weights",
+        "la regola del peso delle fonti e i pesi delle fonti attive del flusso",
+        lambda subject: _source_weights(subject.configuration.sources),
+    )
+
     @property
     def slot(self) -> str:
         """The placeholder as the text of the prompt writes it."""
@@ -84,6 +108,7 @@ DEFAULT_SYSTEM_PROMPT = "\n".join(
         " del flusso;",
         "- inverti chiude per intero la posizione aperta dell'asset e nello stesso ciclo apre il lato opposto, con"
         " quota, leva, obiettivo, stop e invalidazione come apri: la direzione è quella opposta alla posizione aperta;",
+        PromptPlaceholder.SOURCE_WEIGHTS.slot,
         "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato dello stato"
         " del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da un'altra rete o piazza e"
         " servono solo a stimare la direzione del mercato.",

@@ -10,6 +10,10 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
   I parametri non indicati assumono il valore predefinito del catalogo (R1.3.1); un parametro fuori dai valori
   ammessi rende la configurazione non valida.
   Selezione, pesi e parametri fanno parte della configurazione versionata del flusso (R1.1.3).
+  L'agente tiene conto dei pesi nel ragionamento (RF-14.02): il segnaposto {source_weights} del system prompt (R1.4.8),
+  presente nel predefinito, spiega il peso e riporta i pesi delle fonti attive. Quando le fonti sono in disaccordo
+  prevale quella col peso più alto, non il numero dei segnali; i valori di una stessa fonte contano come una fonte
+  sola; le istruzioni del flusso prevalgono sui pesi. Nessun calcolo sui pesi nel codice: decide il modello.
 
   Fuori ambito: la valutazione a posteriori della capacità predittiva delle fonti.
 
@@ -41,6 +45,23 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
     Dato che il flusso "alfa" ha attiva la fonte "notizie" senza parametri
     Quando il flusso "alfa" esegue un ciclo
     Allora la fonte "notizie" è interrogata con numero notizie 10 ed età massima 24 ore
+
+  Scenario: Il system prompt predefinito spiega il peso
+    Dato che il flusso "alfa" segue il system prompt predefinito
+    E che il flusso "alfa" ha attive le fonti "forecast" con peso 10 e "indicatori" con peso 2
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il system prompt inviato all'agente dice che il peso è un intero da 1 a 10, predefinito 5, importanza relativa data dall'utente a ogni fonte
+    E dice che quando le fonti sono in disaccordo prevale quella col peso più alto, non il numero dei segnali
+    E dice che più valori della stessa fonte contano come una fonte sola, col suo peso
+    E dice che le istruzioni del flusso prevalgono sui pesi
+    E chiede di nominare nel ragionamento di un'apertura la fonte che ha deciso la direzione quando le fonti erano in disaccordo
+    E riporta i pesi "forecast 10, indicatori 2"
+
+  Scenario: Regola del peso in un system prompt personalizzato
+    Dato che il flusso "alfa" ha attive le fonti "forecast" con peso 10 e "indicatori" con peso 2
+    E che il flusso "alfa" ha un system prompt personalizzato "Decidi con prudenza. {source_weights}"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il system prompt inviato all'agente contiene la regola del peso e i pesi "forecast 10, indicatori 2"
 
   Schema dello scenario: Peso o parametro non valido
     Quando "anna" modifica il flusso "alfa" con <valore>
