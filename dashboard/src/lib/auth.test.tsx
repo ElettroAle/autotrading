@@ -322,6 +322,42 @@ describe('useSignOut', () => {
     await vi.waitFor(() => expect(client.getAllAccounts()).toEqual([]));
     expect(Object.keys(localStorage).filter((key) => key.includes('token'))).toEqual([]);
   });
+
+  // Bug 610: MSAL empties its cache before it leaves for the identity provider; a protected page must not take the
+  // empty cache for a visitor and start a sign-in that races the sign-out.
+  it('starts no sign-in while the browser leaves for the identity provider', async () => {
+    const client = await authClientFor('anna');
+    client.setNavigationClient({
+      navigateInternal: () => Promise.resolve(true),
+      navigateExternal: () => new Promise<boolean>(() => undefined),
+    });
+    const redirect = stubRedirects(client);
+    showWithAuth(
+      client,
+      [
+        {
+          path: '/',
+          element: (
+            <ProtectedRoute>
+              <SignOut />
+            </ProtectedRoute>
+          ),
+        },
+        { path: '/login', element: <p>pagina di accesso</p> },
+      ],
+      '/',
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Esci' }));
+
+    await vi.waitFor(() => expect(client.getAllAccounts()).toEqual([]));
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Esci' })).not.toBeInTheDocument(),
+    );
+    expect(redirect).not.toHaveBeenCalled();
+    expect(screen.queryByText('pagina di accesso')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(AUTOMATIC_SIGN_IN_KEY)).toBe('/');
+  });
 });
 
 // ADR area-utente-in-alto-a-destra: the name comes from the identity token MSAL already holds, never from the API.

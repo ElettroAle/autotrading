@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { AuthProvider } from '@/lib/auth';
+import { queryConfig } from '@/lib/react-query';
 import { FAKE_IDENTITY_PROVIDER } from '@/testing/mocks/identity-provider';
 import { authClientFor } from '@/testing/test-utils';
 
@@ -12,7 +13,7 @@ import { UserMenu } from './user-menu';
 
 const renderMenu = async (account?: string) => {
   const client = await authClientFor(account);
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({ defaultOptions: queryConfig });
   queryClient.setQueryData(['flows'], ['alfa']);
   const router = createMemoryRouter([
     {

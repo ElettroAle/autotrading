@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { AuthProvider } from '@/lib/auth';
+import { queryConfig } from '@/lib/react-query';
 import { FAKE_IDENTITY_PROVIDER } from '@/testing/mocks/identity-provider';
 import { authClientFor } from '@/testing/test-utils';
 
@@ -11,7 +12,7 @@ import { SignOutButton } from './sign-out-button';
 
 const renderSignOut = async () => {
   const client = await authClientFor('anna');
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({ defaultOptions: queryConfig });
   queryClient.setQueryData(['flows'], ['alfa']);
   const router = createMemoryRouter([{ path: '/', element: <SignOutButton /> }]);
   render(

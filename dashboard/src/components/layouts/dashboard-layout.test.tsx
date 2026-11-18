@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
 import { RuntimeConfigProvider } from '@/config/runtime-config';
+import { queryConfig } from '@/lib/react-query';
 import { TEST_CONFIG } from '@/testing/test-utils';
 
 import { DashboardLayout } from './dashboard-layout';
@@ -24,7 +25,7 @@ const renderLayout = (url = '/') => {
   );
   render(
     <RuntimeConfigProvider config={TEST_CONFIG}>
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: queryConfig })}>
         <RouterProvider router={router} />
       </QueryClientProvider>
     </RuntimeConfigProvider>,

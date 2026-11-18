@@ -4,7 +4,14 @@ import {
   type INavigationClient,
   type IPublicClientApplication,
 } from '@azure/msal-browser';
-import { render, screen, within, type ByRoleMatcher } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+  type ByRoleMatcher,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { createMemoryRouter } from 'react-router';
 
@@ -14,6 +21,8 @@ import type { RuntimeConfig } from '@/config/runtime-config';
 import { authConfiguration, completeSignIn, createAuthClient } from '@/lib/auth';
 
 import { FAKE_IDENTITY_PROVIDER, tokenResponseOf } from './mocks/identity-provider';
+import { fakePlatform } from './mocks/platform';
+import { server } from './mocks/server';
 
 export const TEST_CONFIG: RuntimeConfig = { environment: 'dev', ...FAKE_IDENTITY_PROVIDER };
 
@@ -74,6 +83,52 @@ export const renderInApp = async (ui: ReactNode, { account }: { account?: string
   const router = createMemoryRouter([{ path: '*', element: ui }]);
   render(<App config={TEST_CONFIG} authClient={authClient} router={router} />);
 };
+
+export const WARM_UP_ACCOUNT = 'warm-up';
+
+const WARM_UP_FLOW = 'riscaldamento';
+
+// Measured with Vitest on 4 processors (Bug 610): the first opening of the dashboard in a file takes about 800 ms against
+// 300 ms for the next ones, the code of MSAL, MSW, React and the pages still cold. Under a load of two workers per
+// processor it lasts seconds, so it gets the time of a fixed cost here, never in a test.
+const WARM_UP_TIMEOUT_MS = 60_000;
+
+const pendingRequests = new Set<string>();
+
+server.events.on('request:start', ({ requestId }) => pendingRequests.add(requestId));
+server.events.on('request:end', ({ requestId }) => pendingRequests.delete(requestId));
+
+/**
+ * Resolves once the fake API has answered every request the page sent: an answer that arrived after the end of a test
+ * would act on the next one.
+ */
+export const untilEveryRequestIsAnswered = async (timeout?: number): Promise<void> => {
+  await waitFor(() => expect(pendingRequests).toHaveLength(0), { timeout });
+};
+
+/** Opens the dashboard of a user with a flow, until the list shows it and the API has answered every reading. */
+const openTheDashboardOnce = async (): Promise<void> => {
+  fakePlatform.addUser(WARM_UP_ACCOUNT, { hasUserRole: true });
+  fakePlatform.addFlow(WARM_UP_ACCOUNT, WARM_UP_FLOW);
+  await renderApp({ account: WARM_UP_ACCOUNT });
+  await screen.findByRole('link', { name: WARM_UP_FLOW }, { timeout: WARM_UP_TIMEOUT_MS });
+  await untilEveryRequestIsAnswered(WARM_UP_TIMEOUT_MS);
+};
+
+/** The first test finds what every test finds: no page, an empty platform, a browser that holds nothing. */
+const forgetTheOpening = (): void => {
+  cleanup();
+  fakePlatform.reset();
+  sessionStorage.clear();
+  localStorage.clear();
+};
+
+// The first test of a file would pay the first opening of the dashboard on its own clock (ADR
+// test-della-dashboard-deterministici): every file that renders the dashboard opens it once before its tests.
+beforeAll(async () => {
+  await openTheDashboardOnce();
+  forgetTheOpening();
+}, WARM_UP_TIMEOUT_MS);
 
 // What a user sees as a part of a page: its commands, its links, its titles, its tables, its lists and its boxes.
 const PARTS_OF_A_PAGE: readonly ByRoleMatcher[] = [

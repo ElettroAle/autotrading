@@ -9,7 +9,12 @@ import { http, HttpResponse } from 'msw';
 import { AUTOMATIC_SIGN_IN_KEY } from '@/lib/auth';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
-import { authClientFor, renderApp, TEST_CONFIG } from '@/testing/test-utils';
+import {
+  authClientFor,
+  renderApp,
+  TEST_CONFIG,
+  untilEveryRequestIsAnswered,
+} from '@/testing/test-utils';
 
 import { startApp } from '.';
 
@@ -18,8 +23,11 @@ const CONFIG_URL = `http://localhost:3000${import.meta.env.BASE_URL}config.json`
 const serveConfig = (config: object) =>
   server.use(http.get(CONFIG_URL, () => HttpResponse.json(config)));
 
-// The spies replace methods of every client of MSAL: no test leaves them to the next.
-afterEach(() => {
+// The spies replace methods of every client of MSAL: no test leaves them to the next. The router of startApp is bound
+// to the history of the window: an answer to a reading of a page left behind could still move it, in the next test
+// (Bug 610), so a test ends once every reading is answered.
+afterEach(async () => {
+  await untilEveryRequestIsAnswered();
   vi.restoreAllMocks();
 });
 
