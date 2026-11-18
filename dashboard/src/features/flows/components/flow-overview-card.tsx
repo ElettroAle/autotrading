@@ -6,17 +6,12 @@ import { OpeningsSuspendedNotice } from '@/components/ui/openings-notice';
 import { paths } from '@/config/paths';
 import { formatAmount } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
+import { gainTone } from '@/utils/gain-tone';
 
 import type { FlowOverview } from '../api/get-flow-overviews';
-import { formatReturn, returnTone, type ReturnTone } from '../utils/flow-figures';
+import { formatReturn } from '../utils/flow-figures';
 
 import { ResultsSummary } from './results-summary';
-
-const STYLE_BY_TONE: Readonly<Record<ReturnTone, string>> = {
-  positive: 'text-green-700',
-  negative: 'text-red-700',
-  neutral: 'text-slate-700',
-};
 
 const Fact = ({
   term,
@@ -67,10 +62,7 @@ export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
     <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
       <Fact term="Capitale iniziale">{capitalOf(flow.initial_capital, flow.currency)}</Fact>
       <Fact term="Capitale attuale">{capitalOf(flow.current_capital, flow.currency)}</Fact>
-      <Fact
-        term="Rendimento"
-        className={`font-semibold ${STYLE_BY_TONE[returnTone(flow.return_percent)]}`}
-      >
+      <Fact term="Rendimento" className={`font-semibold ${gainTone(flow.return_percent)}`}>
         {formatReturn(flow.return_percent)}
       </Fact>
     </dl>

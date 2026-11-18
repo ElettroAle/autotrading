@@ -402,7 +402,12 @@ def test_the_flows_of_the_tenant_are_listed_and_the_free_capital_shrinks(client_
     account_id = created["account_id"]
 
     assert [flow["id"] for flow in anna.get("/flows").json()] == [created["id"]]
-    assert anna.get(f"/accounts/{account_id}/free-capital").json() == {"amount": "600", "currency": "USDC"}
+    assert anna.get(f"/accounts/{account_id}/free-capital").json() == {
+        "amount": "600",
+        "currency": "USDC",
+        "flows_value": "400",
+        "flows_result": "0",
+    }
     assert client_of("bruno").get("/flows").json() == []
 
 

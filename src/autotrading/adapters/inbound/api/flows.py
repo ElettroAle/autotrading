@@ -392,12 +392,23 @@ class FlowResponse(BaseModel):
 
 
 class FreeCapitalResponse(BaseModel):
+    """The free capital of the account with the value and the result of its flows: the balance is the value of the flows
+    plus the free capital (ADR scomposizione-del-saldo-nel-riquadro-del-conto).
+    """
+
     amount: str
     currency: str
+    flows_value: str
+    flows_result: str
 
     @classmethod
     def of(cls, capital: FreeCapital) -> FreeCapitalResponse:
-        return cls(amount=amount_text(capital.amount), currency=capital.currency)
+        return cls(
+            amount=amount_text(capital.amount),
+            currency=capital.currency,
+            flows_value=amount_text(capital.flows_value),
+            flows_result=amount_text(capital.flows_result),
+        )
 
 
 class PositionLeftOpenResponse(BaseModel):

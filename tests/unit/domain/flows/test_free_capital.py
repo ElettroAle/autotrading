@@ -45,13 +45,39 @@ def state_of(capital: str, *, realized_pnl: str = "0", unrealized_pnl: str = "0"
 def test_the_free_capital_takes_off_the_balance_the_total_value_of_every_flow() -> None:
     states = (state_of("300", realized_pnl="70"), state_of("200", unrealized_pnl="-50"))
 
-    assert FreeCapital.of(Decimal(1000), "USDC", states) == FreeCapital(Decimal(480), "USDC")
+    assert FreeCapital.of(Decimal(1000), "USDC", states).amount == Decimal(480)
+
+
+def test_the_free_capital_carries_the_value_of_the_flows_it_takes_off_the_balance() -> None:
+    states = (state_of("300", realized_pnl="70"), state_of("200", unrealized_pnl="-50"))
+
+    assert FreeCapital.of(Decimal(1000), "USDC", states).flows_value == Decimal(520)
+
+
+def test_the_free_capital_carries_the_capital_allocated_to_the_flows_it_values() -> None:
+    states = (state_of("300", realized_pnl="70"), state_of("200", unrealized_pnl="-50"))
+
+    assert FreeCapital.of(Decimal(1000), "USDC", states).allocated_capital == Decimal(500)
+
+
+def test_the_result_of_the_flows_is_their_value_less_the_capital_allocated_to_them() -> None:
+    states = (state_of("300", realized_pnl="70"), state_of("200", unrealized_pnl="-50"))
+
+    assert FreeCapital.of(Decimal(1000), "USDC", states).flows_result == Decimal(20)
+
+
+def test_balance_is_the_value_of_the_flows_plus_the_free_capital() -> None:
+    free = FreeCapital.of(Decimal("1013.488977"), "USDC", (state_of("300", unrealized_pnl="8.927573"),))
+
+    assert free.flows_value + free.amount == Decimal("1013.488977")
 
 
 def test_a_profit_cashed_out_is_free_capital_again() -> None:
     cashed_out = state_of("500", realized_pnl="118", cashed="118")
 
-    assert FreeCapital.of(Decimal(1118), "USDC", (cashed_out,)) == FreeCapital(Decimal(618), "USDC")
+    assert FreeCapital.of(Decimal(1118), "USDC", (cashed_out,)) == FreeCapital(
+        Decimal(618), "USDC", flows_value=Decimal(500), allocated_capital=Decimal(500)
+    )
 
 
 def test_an_account_without_flows_has_its_whole_balance_free() -> None:

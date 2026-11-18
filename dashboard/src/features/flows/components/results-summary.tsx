@@ -5,17 +5,11 @@ import { usePeriodSearch } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
 import { formatGain, formatPercent } from '@/utils/format-amount';
 import { formatInstant } from '@/utils/format-instant';
+import { gainTone } from '@/utils/gain-tone';
 
 import type { ResultsSummary as Summary } from '../api/get-flow-results';
-import { returnTone, type ReturnTone } from '../utils/flow-figures';
 
 const FAILED_OUTCOME = 'fallito';
-
-const STYLE_BY_TONE: Readonly<Record<ReturnTone, string>> = {
-  positive: 'text-green-700',
-  negative: 'text-red-700',
-  neutral: 'text-slate-700',
-};
 
 const LINK = 'underline-offset-2 hover:underline';
 
@@ -62,7 +56,7 @@ const Gain = ({
   percent: string | null;
   currency: string;
 }) => (
-  <Value term={term} className={STYLE_BY_TONE[returnTone(amount)]}>
+  <Value term={term} className={gainTone(amount)}>
     {gainText(amount, percent, currency)}
   </Value>
 );

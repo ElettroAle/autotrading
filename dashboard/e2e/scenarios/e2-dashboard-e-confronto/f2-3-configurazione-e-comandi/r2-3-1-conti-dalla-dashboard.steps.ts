@@ -203,7 +203,7 @@ Then(
   "il conto {string} compare nell'elenco con il suo saldo",
   async ({ dashboard }, name: string) => {
     const { balance } = fakePlatform.accountNamed(name);
-    await expect(dashboard.accountDetail(name, 'Saldo')).toContainText(
+    await expect(dashboard.accountDetail(name, 'Saldo (con risultato aperto)')).toContainText(
       `${formatAmount(String(balance))} USDC`,
     );
   },

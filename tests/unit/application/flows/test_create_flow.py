@@ -269,7 +269,7 @@ def test_the_free_capital_of_an_account_is_its_balance_less_its_flows(flows: Flo
         ReadFreeCapitalCommand(flows.account_id)
     )
 
-    assert free == FreeCapital(Decimal(600), "USDC")
+    assert free == FreeCapital(Decimal(600), "USDC", Decimal(400), Decimal(400))
 
 
 def test_the_free_capital_of_an_unknown_account_is_not_found(flows: Flows) -> None:

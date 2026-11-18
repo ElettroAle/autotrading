@@ -36,6 +36,17 @@ describe('ReconciliationStatus', () => {
     fakePlatform.giveAccountTo('anna', 'test-1', 1000);
   });
 
+  it('says under its title that it compares the balance without the result of the open positions', async () => {
+    await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
+
+    const section = await screen.findByRole('region', { name: 'Riconciliazione del conto test-1' });
+    const title = within(section).getByRole('heading', { name: 'Riconciliazione' });
+    const note = within(section).getByText(
+      'Confronta il saldo senza il risultato delle posizioni aperte',
+    );
+    expect(title.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('shows an aligned account with its last comparison and threshold, without the confirmation', async () => {
     fakeReconciliation.compare(ACCOUNT_ID, 1000, 1000.5, COMPARED_AT);
     await renderApp({ account: 'anna', url: ACCOUNTS_PAGE });
