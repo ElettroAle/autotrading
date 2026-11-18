@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -17,6 +18,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from tests.support.activity import a_position, an_activity
@@ -116,6 +118,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
             "period_gain_percent": "0.00",
             "open_positions": 1,
             "failed_cycles": 0,
+            "next_cycle_at": None,
         },
         "openings_suspension": None,
     }
@@ -138,6 +141,19 @@ def test_the_state_of_a_flow_answers_its_results_in_the_period_asked_for(client_
     summary = anna.get(f"/flows/{flow.id.value}/state?period=7d").json()["summary"]
 
     assert (summary["period_gain"], summary["period_gain_percent"], summary["failed_cycles"]) == ("2", "0.40", 2)
+
+
+def test_the_state_of_an_active_flow_answers_when_its_next_cycle_falls(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = replace(flow_of(platform, "anna"), status=FlowStatus.ACTIVE)
+    platform.flows.flows[-1] = flow
+    platform.flows.anchors[flow.id] = NOW - timedelta(minutes=5)
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    platform.now = NOW
+
+    summary = anna.get(f"/flows/{flow.id.value}/state?period=7d").json()["summary"]
+
+    assert summary["next_cycle_at"] == "2026-11-14T12:10:00Z"
 
 
 def test_the_state_of_a_flow_refuses_a_period_the_user_cannot_have_meant(client_of: Client, platform: Platform) -> None:

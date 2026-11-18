@@ -1,6 +1,5 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
 from uuid import UUID
 
 from autotrading.application.flows.errors import CycleInProgressError, FlowNotActiveError
@@ -48,8 +47,7 @@ class RunCycleOnDemandUseCase:
         """The schedule of the flow as the planner reads it: from its last start or resume, every interval."""
         flow = self._flows.get(flow_id)
         anchor = self._timing.timings().get(flow_id, UNSTAMPED).anchor
-        interval = timedelta(minutes=flow.configuration.cycle_interval.minutes)
-        schedule = CycleSchedule.planned(flow.status.runs_cycles, anchor, interval)
+        schedule = flow.planned_schedule(anchor)
         if schedule is None:
             raise FlowNotActiveError
         return schedule

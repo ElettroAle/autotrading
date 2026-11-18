@@ -7753,6 +7753,18 @@
           "failed_cycles": {
             "type": "integer",
             "title": "Failed Cycles"
+          },
+          "next_cycle_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cycle At"
           }
         },
         "type": "object",
@@ -7762,10 +7774,11 @@
           "period_gain",
           "period_gain_percent",
           "open_positions",
-          "failed_cycles"
+          "failed_cycles",
+          "next_cycle_at"
         ],
         "title": "FlowResultsResponse",
-        "description": "How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains\nin the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without\ninitial capital."
+        "description": "How a flow is doing at a glance in the period asked for (R6.4.2, ADR riepilogo-dei-risultati-nell-api): gains\nin the currency of the flow as text (ADR 0018), percents of the initial capital with two decimals, null without\ninitial capital; the next planned cycle, whatever the period, null unless the flow is active (R6.4.8)."
       },
       "FlowStateResponse": {
         "properties": {

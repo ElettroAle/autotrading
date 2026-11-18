@@ -317,6 +317,7 @@ class Platform:
             decision_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
+            flow_timing=InMemoryFlowTimingAdapter(self.flows, tenant_id),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
             openings_suspensions=InMemoryOpeningsSuspensionAdapter(self.flows, tenant_id),
             flow_forecasts=InMemoryFlowForecastsAdapter(self.forecasts_of(tenant_id)),

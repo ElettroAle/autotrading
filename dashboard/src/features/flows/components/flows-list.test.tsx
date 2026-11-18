@@ -92,7 +92,7 @@ describe('FlowsList', () => {
 
     const alfa = await summaryOf('alfa');
     const results = within(alfa).getByRole('region', { name: 'Riepilogo dei risultati' });
-    expect(within(results).getByLabelText('Guadagno totale')).toHaveTextContent(
+    expect(within(results).getByLabelText('Guadagno attuale')).toHaveTextContent(
       '+2,50 USDC · +2,50%',
     );
     expect(within(alfa).queryByLabelText('Ambiente')).not.toBeInTheDocument();

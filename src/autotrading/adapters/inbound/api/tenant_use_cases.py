@@ -76,6 +76,7 @@ from autotrading.application.flows.ports import (
     FlowPositionsPort,
     FlowRepositoryPort,
     FlowSummaryPort,
+    FlowTimingPort,
     HistoricalClosedPositionsPort,
     HistoricalCyclesPort,
     HistoricalOrdersPort,
@@ -95,12 +96,13 @@ from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_default_system_prompt import ReadDefaultSystemPromptUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
-from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
+from autotrading.application.flows.read_flow_results import FlowPeriodPorts, ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
 from autotrading.application.flows.read_last_decision import ReadLastDecisionUseCase
+from autotrading.application.flows.read_next_cycle import ReadNextCycleUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
@@ -198,6 +200,7 @@ class TenantPorts:
     decision_history: DecisionHistoryPort
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
+    flow_timing: FlowTimingPort
     equity_snapshots: EquitySnapshotRepositoryPort
     openings_suspensions: OpeningsSuspensionPort
     flow_forecasts: FlowForecastsPort
@@ -332,8 +335,8 @@ class TenantUseCases:
                 ReadOpeningsSuspensionUseCase(
                     ports.flows, ports.openings_suspensions, ports.reconciliation, ports.account_names, ports.clock
                 ),
-                ports.equity_snapshots,
-                ports.cycle_history,
+                ReadNextCycleUseCase(ports.flows, ports.flow_timing, ports.clock),
+                FlowPeriodPorts(ports.equity_snapshots, ports.cycle_history),
                 ports.clock,
             ),
             request_link_code=RequestLinkCodeUseCase(tenant_id, ports.link_codes, ports.bot_identity, ports.clock),
@@ -413,8 +416,8 @@ class TenantUseCases:
                     ReadOpeningsSuspensionUseCase(
                         ports.flows, ports.openings_suspensions, ports.reconciliation, ports.account_names, ports.clock
                     ),
-                    ports.equity_snapshots,
-                    ports.cycle_history,
+                    ReadNextCycleUseCase(ports.flows, ports.flow_timing, ports.clock),
+                    FlowPeriodPorts(ports.equity_snapshots, ports.cycle_history),
                     ports.clock,
                 ),
                 ports.environment,
