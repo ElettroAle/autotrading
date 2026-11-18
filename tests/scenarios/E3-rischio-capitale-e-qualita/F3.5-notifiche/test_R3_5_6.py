@@ -200,7 +200,7 @@ def leads_to_flow_too(notices: Notices) -> None:
     assert notices.last_links()[0] == flow, notices.last_links()
 
 
-@then("la notifica porta alla pagina Allarmi del conto")
+@then("la notifica porta al dettaglio del suo avviso")
 def leads_to_alarms(notices: Notices) -> None:
     # The alarms of an account are its alerts (R6.2.3): the notification leads to the one it opened on the account.
     [alert] = notices.alerts.alerts
