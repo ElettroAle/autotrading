@@ -127,8 +127,9 @@ dal client di `src/lib/api-client.ts`.
   una navigazione del router fatta dal test sta dentro `act`; un test instabile si corregge alla radice, senza nuovi
   tentativi, prove disattivate né timeout più alti, salvo un costo fisso misurato e non riducibile, col motivo in un
   commento. Prova di stabilità: `npm run test:stability` esegue 10 volte di fila la suite del progetto `browser` in
-  ordine casuale (`--sequence.shuffle`) con `--maxWorkers` pari al doppio dei processori; la esegue lo sviluppatore che
-  tocca le prove o la loro configurazione, non i job obbligatori.
+  ordine casuale (`--sequence.shuffle`) con il numero di worker predefinito di Vitest, lo stesso della pipeline, mai più
+  dei processori disponibili; la esegue lo sviluppatore che tocca le prove o la loro configurazione, non i job
+  obbligatori.
 
 ## Controlli
 

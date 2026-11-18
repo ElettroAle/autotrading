@@ -98,13 +98,21 @@ const pendingRequests = new Set<string>();
 server.events.on('request:start', ({ requestId }) => pendingRequests.add(requestId));
 server.events.on('request:end', ({ requestId }) => pendingRequests.delete(requestId));
 
+/**
+ * Resolves once the fake API has answered every request the page sent: an answer that arrived after the end of a test
+ * would act on the next one.
+ */
+export const untilEveryRequestIsAnswered = async (timeout?: number): Promise<void> => {
+  await waitFor(() => expect(pendingRequests).toHaveLength(0), { timeout });
+};
+
 /** Opens the dashboard of a user with a flow, until the list shows it and the API has answered every reading. */
 const openTheDashboardOnce = async (): Promise<void> => {
   fakePlatform.addUser(WARM_UP_ACCOUNT, { hasUserRole: true });
   fakePlatform.addFlow(WARM_UP_ACCOUNT, WARM_UP_FLOW);
   await renderApp({ account: WARM_UP_ACCOUNT });
   await screen.findByRole('link', { name: WARM_UP_FLOW }, { timeout: WARM_UP_TIMEOUT_MS });
-  await waitFor(() => expect(pendingRequests).toHaveLength(0), { timeout: WARM_UP_TIMEOUT_MS });
+  await untilEveryRequestIsAnswered(WARM_UP_TIMEOUT_MS);
 };
 
 /** The first test finds what every test finds: no page, an empty platform, a browser that holds nothing. */
