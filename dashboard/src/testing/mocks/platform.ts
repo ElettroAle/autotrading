@@ -1,3 +1,4 @@
+import { fakeAlerts } from './alerts';
 import { FAKE_SYSTEM_PROMPT } from './catalogs';
 import { fakeClock } from './clock';
 import { aCompletedCycle, type FakeCycle } from './cycles';
@@ -625,6 +626,7 @@ export const fakePlatform = {
     state.apiAnswers = true;
     fakeReconciliation.reset();
     fakeNotificationChannels.reset();
+    fakeAlerts.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {
@@ -1114,6 +1116,10 @@ export const fakePlatform = {
       state.openPositions.delete(flow.id);
     }
     flow.status = transition.to;
+    // The pause of the flow is over: its alert resolves on its own (R6.2.3).
+    if (command !== 'pause') {
+      fakeAlerts.resolveFlowPause(flow.id, new Date());
+    }
     return flow;
   },
 

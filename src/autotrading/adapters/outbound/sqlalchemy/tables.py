@@ -565,3 +565,26 @@ emergency_closings = Table(
     Column("scope_id", Uuid),
     Column("outcome", JSON, nullable=False),
 )
+
+
+# The alerts of every tenant: one open per cause, forgotten 90 days after they resolve (R6.2.3, ADR
+# avvisi-nel-contesto-delle-notifiche).
+alerts = Table(
+    "alerts",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("resource_kind", Text, nullable=False),
+    Column("resource_id", Uuid, nullable=False),
+    Column("resource_name", Text, nullable=False),
+    Column("detail", Text, nullable=False),
+    Column("cause_key", Text, nullable=False),
+    Column("readings", JSON, nullable=False),
+    Column("opened_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("resolved_at", DateTime(timezone=True)),
+    Index(
+        "alerts_open_cause_unique", "tenant_id", "cause_key", unique=True, postgresql_where=text("resolved_at IS NULL")
+    ),
+    Index("alerts_newest", "tenant_id", text("opened_at DESC"), text("id DESC")),
+)

@@ -19,9 +19,22 @@ export const paths = {
     path: '/accounts/:accountId/capital',
     getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/capital`,
   },
+  // The alarms of an account of before the alerts: the address leads to the alerts of the account (R6.2.3).
   accountAlarms: {
     path: '/accounts/:accountId/alarms',
     getHref: (accountId: string) => `/accounts/${encodeURIComponent(accountId)}/alarms`,
+  },
+  // Filters ride in the query string, so a filtered list has a link of its own (R6.4.4).
+  alerts: {
+    path: '/alerts',
+    getHref: (filters: Readonly<Record<string, string>> = {}) => {
+      const query = new URLSearchParams(filters).toString();
+      return query === '' ? '/alerts' : `/alerts?${query}`;
+    },
+  },
+  alert: {
+    path: '/alerts/:alertId',
+    getHref: (alertId: string) => `/alerts/${encodeURIComponent(alertId)}`,
   },
   newFlow: {
     path: '/flows/new',

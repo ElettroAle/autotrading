@@ -23,15 +23,30 @@ const sourcesOf = (directory: string): SourceFile[] =>
     .filter((path) => !isFake(path) && !path.endsWith('.d.ts'))
     .map((path) => ({ path, source: readFileSync(join(directory, path), 'utf8') }));
 
-const RECONCILIATION_ENDPOINT = /'\/accounts\/\{account_id\}\/(reconciliation|deviation-threshold)/;
+const RECONCILIATION_ENDPOINT =
+  /'\/accounts\/\{account_id\}\/(reconciliation|deviation-threshold)[^']*'/g;
+const CONFIRMATION_ENDPOINT = "'/accounts/{account_id}/reconciliation/confirmation'";
 const ACCOUNTS_API = 'features/accounts/api/';
+// ADR-pagina-avvisi-nella-dashboard: the detail of an alarm confirms the balance with the command of the API.
+const ALERTS_API = 'features/alerts/api/';
 
-/** The files that call the reconciliation of the API outside the API of the feature accounts. */
+const isAdmitted = (path: string, endpoints: readonly string[]): boolean =>
+  path.startsWith(ACCOUNTS_API) ||
+  (path.startsWith(ALERTS_API) &&
+    endpoints.every((endpoint) => endpoint === CONFIRMATION_ENDPOINT));
+
+/**
+ * The files that call the reconciliation of the API outside the API of the feature accounts; the API of the alerts
+ * may only confirm the balance.
+ */
 const callsOutsideAccounts = (files: readonly SourceFile[]): string[] =>
   files
-    .filter((file) => RECONCILIATION_ENDPOINT.test(file.source))
-    .filter((file) => !file.path.startsWith(ACCOUNTS_API))
-    .map((file) => file.path);
+    .map((file) => ({
+      path: file.path,
+      endpoints: file.source.match(RECONCILIATION_ENDPOINT) ?? [],
+    }))
+    .filter(({ path, endpoints }) => endpoints.length > 0 && !isAdmitted(path, endpoints))
+    .map(({ path }) => path);
 
 // The reason of the suspension the API gives, as the dashboard would rewrite it.
 const DECIDED_BY_THE_API = /allarme di riconciliazione sul conto/;
@@ -40,13 +55,16 @@ const DECIDED_BY_THE_API = /allarme di riconciliazione sul conto/;
 const reasonsWrittenByTheDashboard = (files: readonly SourceFile[]): string[] =>
   files.filter((file) => DECIDED_BY_THE_API.test(file.source)).map((file) => file.path);
 
-/** The shared components each view of the reconciliation is built on, as the owner decided (16/11/2026). */
+/**
+ * The shared components each view of the reconciliation is built on, as the owner decided (16/11/2026); the alarms of
+ * an account are listed with the alerts (ADR-pagina-avvisi-nella-dashboard).
+ */
 const SHARED_COMPONENTS: Readonly<Record<string, readonly string[]>> = {
   'features/accounts/components/reconciliation-status.tsx': [
     '@/components/ui/confirmation-dialog',
     '@/components/ui/details-list',
   ],
-  'features/accounts/components/reconciliation-alarms.tsx': ['@/components/ui/data-table'],
+  'features/alerts/components/alerts-list.tsx': ['@/components/ui/data-table'],
   'features/accounts/components/deviation-threshold-form.tsx': ['@/components/ui/form/input-field'],
 };
 
@@ -71,7 +89,7 @@ const conformingViews = (): SourceFile[] => [
       "import { DETAILS_GRID } from '@/components/ui/details-list';\n",
   ),
   file(
-    'features/accounts/components/reconciliation-alarms.tsx',
+    'features/alerts/components/alerts-list.tsx',
     "import { DataTable } from '@/components/ui/data-table';\n",
   ),
   file(
@@ -95,11 +113,16 @@ describe('ADR-stato-della-riconciliazione-nella-dashboard: the reconciliation in
         'features/flows/api/set-threshold.ts',
         "api.PUT('/accounts/{account_id}/deviation-threshold')",
       ),
+      file(
+        'features/alerts/api/get-alarms.ts',
+        "api.GET('/accounts/{account_id}/reconciliation/alarms')",
+      ),
     ];
 
     expect(callsOutsideAccounts(files)).toEqual([
       'features/flows/api/get-alarms.ts',
       'features/flows/api/set-threshold.ts',
+      'features/alerts/api/get-alarms.ts',
     ]);
   });
 
@@ -110,6 +133,10 @@ describe('ADR-stato-della-riconciliazione-nella-dashboard: the reconciliation in
         "api.POST('/accounts/{account_id}/reconciliation/confirmation')",
       ),
       file('features/accounts/api/get-account-state.ts', "api.GET('/accounts/{account_id}/state')"),
+      file(
+        'features/alerts/api/run-alert-command.ts',
+        "api.POST('/accounts/{account_id}/reconciliation/confirmation')",
+      ),
     ];
 
     expect(callsOutsideAccounts(files)).toEqual([]);
@@ -143,15 +170,12 @@ describe('ADR-stato-della-riconciliazione-nella-dashboard: built on the shared c
     const [status, , form] = conformingViews();
     const files = [
       status ?? file('', ''),
-      file(
-        'features/accounts/components/reconciliation-alarms.tsx',
-        '<table aria-label="Allarmi">',
-      ),
+      file('features/alerts/components/alerts-list.tsx', '<table aria-label="Allarmi">'),
       form ?? file('', ''),
     ];
 
     expect(viewsWithoutSharedComponents(files)).toEqual([
-      'features/accounts/components/reconciliation-alarms.tsx: non usa @/components/ui/data-table',
+      'features/alerts/components/alerts-list.tsx: non usa @/components/ui/data-table',
     ]);
   });
 

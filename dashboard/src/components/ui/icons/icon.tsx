@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Settings,
   Square,
+  TriangleAlert,
   X,
 } from 'lucide-react';
 
@@ -32,6 +33,7 @@ const DRAWINGS = {
   'chevron-down': ChevronDown,
   settings: Settings,
   menu: Menu,
+  'triangle-alert': TriangleAlert,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;

@@ -27,7 +27,7 @@ WARNING = "⚠️"
 PAUSE = "⏸️"
 ALARM = "\U0001f6a8"
 FLOW_ID = uuid4()
-ACCOUNT_ID = uuid4()
+ALERT_ID = uuid4()
 CLOSED_AT = datetime(2026, 11, 17, 10, 15, tzinfo=UTC)
 STATUS = FlowStatusLine("Flusso: 312,40 USDC · PnL +12,40 USDC · 2 posizioni aperte · attivo")
 
@@ -111,7 +111,7 @@ def usdc(value: str | int) -> Amount:
             ("Errore: Order rejected",),
         ),
         (
-            Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito presso openrouter"),
+            Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito presso openrouter", ALERT_ID),
             f"{PAUSE} alfa: in pausa",
             ("Motivo: credito esaurito presso openrouter",),
         ),
@@ -121,17 +121,17 @@ def usdc(value: str | int) -> Amount:
             ("Motivo: perdita giornaliera 6% oltre il 5%",),
         ),
         (
-            Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"),
+            Notification.unattributable_position(ALERT_ID, "conto-1", "SOL"),
             f"{ALARM} conto-1: posizione non attribuibile",
             ("Asset: SOL",),
         ),
         (
-            Notification.unattributable_fill(ACCOUNT_ID, "conto-1", "ETH"),
+            Notification.unattributable_fill(ALERT_ID, "conto-1", "ETH"),
             f"{ALARM} conto-1: esecuzione non attribuibile",
             ("Asset: ETH",),
         ),
         (
-            Notification.reconciliation_alarm(ACCOUNT_ID, "test-1", usdc(980), usdc(1000)),
+            Notification.reconciliation_alarm(ALERT_ID, "test-1", usdc(980), usdc(1000)),
             f"{ALARM} test-1: allarme di riconciliazione",
             ("Saldo letto: 980 USDC", "Saldo atteso: 1000 USDC"),
         ),
@@ -212,10 +212,10 @@ def test_an_opening_is_told_by_its_value_in_whole_units() -> None:
 @pytest.mark.parametrize(
     ("notification", "subject"),
     [
-        (Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito"), f"{PAUSE} alfa: in pausa"),
+        (Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito", ALERT_ID), f"{PAUSE} alfa: in pausa"),
         (Notification.cycle_failed(FLOW_ID, "alfa", "timeout, riprova"), f"{WARNING} alfa: ciclo fallito"),
         (
-            Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"),
+            Notification.unattributable_position(ALERT_ID, "conto-1", "SOL"),
             f"{ALARM} conto-1: posizione non attribuibile",
         ),
         (Notification.test(), "\U0001f514 AutoTrading: prova delle notifiche"),
@@ -239,13 +239,13 @@ def test_the_subject_of_an_email_is_the_title(notification: Notification, subjec
         (Notification.position_liquidated(FLOW_ID, "alfa", "BTC", usdc(1), CLOSED_AT), "LIQUIDATION"),
         (Notification.cycle_failed(FLOW_ID, "alfa", "timeout"), "CYCLE_FAILED"),
         (Notification.order_rejected(FLOW_ID, "alfa", "rifiutato"), "ORDER_REJECTED"),
-        (Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito"), "FLOW_PAUSED"),
+        (Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito", ALERT_ID), "FLOW_PAUSED"),
         (Notification.openings_suspended(FLOW_ID, "alfa", "perdita giornaliera 6% oltre il 5%"), "MAXIMUM_LOSS"),
         (Notification.opening_reduced(FLOW_ID, "alfa", "BTC", usdc(2), usdc(1)), "OPENING_REDUCED"),
         (Notification.opening_blocked(FLOW_ID, "alfa", "BTC", "motivo"), "OPENING_BLOCKED"),
-        (Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"), "UNATTRIBUTABLE_POSITION"),
-        (Notification.unattributable_fill(ACCOUNT_ID, "conto-1", "SOL"), "UNATTRIBUTABLE_FILL"),
-        (Notification.reconciliation_alarm(ACCOUNT_ID, "test-1", usdc(1), usdc(2)), "RECONCILIATION_ALARM"),
+        (Notification.unattributable_position(ALERT_ID, "conto-1", "SOL"), "UNATTRIBUTABLE_POSITION"),
+        (Notification.unattributable_fill(ALERT_ID, "conto-1", "SOL"), "UNATTRIBUTABLE_FILL"),
+        (Notification.reconciliation_alarm(ALERT_ID, "test-1", usdc(1), usdc(2)), "RECONCILIATION_ALARM"),
         (Notification.cash_out_done(FLOW_ID, "alfa", usdc(1)), "CASH_OUT"),
         (Notification.emergency_closing_done(1, ("alfa",)), "EMERGENCY_CLOSING"),
     ],
@@ -266,8 +266,8 @@ def test_a_notification_of_a_flow_names_its_flow() -> None:
 @pytest.mark.parametrize(
     "notification",
     [
-        Notification.reconciliation_alarm(ACCOUNT_ID, "test-1", usdc(1), usdc(2)),
-        Notification.unattributable_fill(ACCOUNT_ID, "test-1", "SOL"),
+        Notification.reconciliation_alarm(ALERT_ID, "test-1", usdc(1), usdc(2)),
+        Notification.unattributable_fill(ALERT_ID, "test-1", "SOL"),
         Notification.emergency_closing_done(1, ("alfa", "beta")),
     ],
 )
@@ -278,6 +278,7 @@ def test_a_notification_of_the_account_names_no_flow(notification: Notification)
 # ADR destinazioni-delle-notifiche-nella-dashboard: the pages each notification leads to (R3.5.6).
 
 FLOW = NotificationTarget.flow(FLOW_ID)
+ALERT = NotificationTarget.alert(ALERT_ID)
 
 
 @pytest.mark.parametrize(
@@ -301,22 +302,22 @@ FLOW = NotificationTarget.flow(FLOW_ID)
         ),
         (Notification.cycle_failed(FLOW_ID, "alfa", "timeout"), (FLOW,)),
         (Notification.order_rejected(FLOW_ID, "alfa", "rifiutato"), (FLOW,)),
-        (Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito"), (FLOW,)),
+        (Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito", ALERT_ID), (ALERT, FLOW)),
         (Notification.openings_suspended(FLOW_ID, "alfa", "perdita"), (FLOW,)),
         (Notification.opening_reduced(FLOW_ID, "alfa", "BTC", usdc(2), usdc(1)), (FLOW,)),
         (Notification.opening_blocked(FLOW_ID, "alfa", "BTC", "motivo"), (FLOW,)),
         (Notification.cash_out_done(FLOW_ID, "alfa", usdc(118)), (FLOW,)),
         (
-            Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"),
-            (NotificationTarget.account_alarms(ACCOUNT_ID),),
+            Notification.unattributable_position(ALERT_ID, "conto-1", "SOL"),
+            (ALERT,),
         ),
         (
-            Notification.unattributable_fill(ACCOUNT_ID, "conto-1", "SOL"),
-            (NotificationTarget.account_alarms(ACCOUNT_ID),),
+            Notification.unattributable_fill(ALERT_ID, "conto-1", "SOL"),
+            (ALERT,),
         ),
         (
-            Notification.reconciliation_alarm(ACCOUNT_ID, "conto-1", usdc(980), usdc(1000)),
-            (NotificationTarget.account_alarms(ACCOUNT_ID),),
+            Notification.reconciliation_alarm(ALERT_ID, "conto-1", usdc(980), usdc(1000)),
+            (ALERT,),
         ),
         (Notification.emergency_closing_done(2, ["alfa"]), ()),
         (Notification.test(), ()),
@@ -335,7 +336,7 @@ def test_the_flow_of_a_notification_is_found_by_its_id() -> None:
 @pytest.mark.parametrize(
     "notification",
     [
-        Notification.unattributable_position(ACCOUNT_ID, "conto-1", "SOL"),
+        Notification.unattributable_position(ALERT_ID, "conto-1", "SOL"),
         Notification.emergency_closing_done(2, ["alfa"]),
         Notification.test(),
     ],
@@ -348,3 +349,7 @@ def test_the_state_of_the_flow_keeps_the_pages_of_the_notification() -> None:
     notification = Notification.cycle_failed(FLOW_ID, "alfa", "timeout").with_flow_status(STATUS)
 
     assert notification.targets == (FLOW,)
+
+
+def test_a_flow_paused_leads_to_its_alert_and_still_names_its_flow() -> None:
+    assert Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito", ALERT_ID).flow_id == FLOW_ID

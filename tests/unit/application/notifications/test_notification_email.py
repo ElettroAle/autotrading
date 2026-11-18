@@ -50,7 +50,7 @@ from tests.support.notifications import notification_routes
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 ANNA_ADDRESS = EmailAddress.parse("anna@example.com")
-PAUSED = Notification.flow_paused(uuid4(), "alfa", "credito esaurito")
+PAUSED = Notification.flow_paused(uuid4(), "alfa", "credito esaurito", uuid4())
 PAUSED_EVENT = NotificationEvent.FLOW_PAUSED
 FAILED_EMAIL = "invio dell'email fallito"
 

@@ -29,6 +29,7 @@ from autotrading.domain.notifications.notification_event import NotificationEven
 from autotrading.domain.notifications.notification_link import NotificationLink
 from autotrading.domain.notifications.notification_target import NotificationTarget, TargetKind
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.flow_status import FakeFlowStatusAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.mailer import FakeMailerAdapter
@@ -83,6 +84,7 @@ class Notices:
         )
         self.flow_ids: dict[str, UUID] = {}
         self.account_id = uuid4()
+        self.alerts = InMemoryAlertRepositoryAdapter({}, self.tenant_id)
         self.pending: Callable[[], None] = lambda: None
 
     @property
@@ -149,7 +151,7 @@ def flow_with_position_event(notices: Notices, flow: str, event: str) -> None:
 
 @given(quoted('una posizione non attribuibile sul conto "{account}"'))
 def unattributable_position(notices: Notices, account: str) -> None:
-    use_case = NotifyUnattributablePositionUseCase(notices.notify)
+    use_case = NotifyUnattributablePositionUseCase(notices.notify, notices.alerts)
     notices.pending = lambda: use_case.execute(notices.account_id, account, "SOL")
 
 
@@ -198,9 +200,12 @@ def leads_to_flow_too(notices: Notices) -> None:
     assert notices.last_links()[0] == flow, notices.last_links()
 
 
-@then("la notifica porta alla pagina Allarmi del conto")
+@then("la notifica porta al dettaglio del suo avviso")
 def leads_to_alarms(notices: Notices) -> None:
-    assert notices.last_links() == [notices.link_to(NotificationTarget.account_alarms(notices.account_id))]
+    # The alarms of an account are its alerts (R6.2.3): the notification leads to the one it opened on the account.
+    [alert] = notices.alerts.alerts
+    assert alert.cause.resource.resource_id == notices.account_id
+    assert notices.last_links() == [notices.link_to(NotificationTarget.alert(alert.id.value))]
 
 
 @then(quoted('sotto il messaggio ci sono i pulsanti "{first}" e "{second}"'))

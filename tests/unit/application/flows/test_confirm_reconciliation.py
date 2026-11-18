@@ -12,7 +12,11 @@ from autotrading.application.flows.errors import FlowAccountNotFoundError, Recon
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.notifications.alert import AlertCause, AlertState
+from autotrading.domain.notifications.notification import Amount
+from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
+from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT
 
@@ -24,8 +28,9 @@ COMPARISON = BalanceComparison(Decimal(1000), Decimal(980), READ_AT)
 class Bench:
     def __init__(self) -> None:
         self.readings = InMemoryReconciliationRepositoryAdapter()
+        self.alerts = InMemoryAlertRepositoryAdapter({}, TenantId.new())
         self.use_case = ConfirmReconciliationUseCase(
-            self.readings, FakeAccountThresholdsAdapter({ACCOUNT: "test-1"}), lambda: CONFIRMED_AT
+            self.readings, FakeAccountThresholdsAdapter({ACCOUNT: "test-1"}), lambda: CONFIRMED_AT, self.alerts
         )
 
     def alarm_beyond_the_threshold(self) -> None:
@@ -45,6 +50,16 @@ def test_the_confirmation_closes_the_alarm_with_its_moment(bench: Bench) -> None
 
     assert bench.readings.open_alarm(ACCOUNT) is None
     assert [alarm.confirmed_at for alarm in bench.readings.alarms] == [CONFIRMED_AT]
+
+
+def test_the_confirmation_resolves_the_alert_of_the_alarm(bench: Bench) -> None:
+    bench.alarm_beyond_the_threshold()
+    usdc = Amount(Decimal(980), "USDC")
+    alert_id = bench.alerts.open(AlertCause.reconciliation_alarm(ACCOUNT, "test-1", usdc, usdc))
+
+    bench.use_case.execute(ConfirmReconciliationCommand(ACCOUNT))
+
+    assert bench.alerts.get(alert_id).state is AlertState.RESOLVED
 
 
 def test_the_confirmation_takes_the_balance_read_as_the_new_reference(bench: Bench) -> None:

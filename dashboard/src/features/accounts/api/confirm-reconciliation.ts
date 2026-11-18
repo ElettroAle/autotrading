@@ -15,6 +15,11 @@ export const useConfirmReconciliation = (accountId: string) => {
           params: { path: { account_id: accountId } },
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: reconciliationQueryKey(accountId) }),
+    // The confirmation resolves the alert of the alarm too: the number of the open alerts in the menu changes (R6.2.3).
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: reconciliationQueryKey(accountId) }),
+        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+      ]),
   });
 };

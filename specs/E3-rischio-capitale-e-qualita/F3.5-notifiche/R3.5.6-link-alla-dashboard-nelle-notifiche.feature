@@ -6,8 +6,8 @@ Funzionalità: R3.5.6 Link alla dashboard nelle notifiche
   Perché voglio vedere subito il flusso o l'operazione senza cercarli
 
   Un'operazione porta alla scheda del flusso (Posizioni o Posizioni chiuse) con la posizione evidenziata, più il link
-  al flusso; su Telegram pulsanti sotto il messaggio, nell'email link in fondo. Gli eventi di un conto portano agli
-  Allarmi del conto.
+  al flusso; su Telegram pulsanti sotto il messaggio, nell'email link in fondo. Gli eventi di un conto portano al
+  dettaglio del loro avviso (R6.2.3).
 
   Scenario: Notifica di un flusso
     Dato un flusso "prova-btc" con un ciclo fallito
@@ -31,7 +31,7 @@ Funzionalità: R3.5.6 Link alla dashboard nelle notifiche
   Scenario: Notifica di un conto
     Dato una posizione non attribuibile sul conto "Hyperliquid testnet"
     Quando ricevo la notifica
-    Allora la notifica porta alla pagina Allarmi del conto
+    Allora la notifica porta al dettaglio del suo avviso
 
   Scenario: Pulsanti su Telegram e link nell'email
     Dato una notifica con i link al flusso e all'operazione
