@@ -30,9 +30,13 @@ const fillValidFlow = async ({ capital = '300' }: { capital?: string } = {}) => 
   await userEvent.clear(field('Intervallo del ciclo in minuti'));
   await userEvent.type(field('Intervallo del ciclo in minuti'), '30');
   await userEvent.click(screen.getByRole('checkbox', { name: 'indicatori' }));
-  await userEvent.type(field('Peso di indicatori'), '2');
-  await userEvent.type(await screen.findByLabelText('lunghezza serie di indicatori'), '20');
+  await userEvent.type(field('Peso di indicatori · Hyperliquid'), '2');
+  await userEvent.type(
+    await screen.findByLabelText('lunghezza serie di indicatori · Hyperliquid'),
+    '20',
+  );
   await userEvent.click(screen.getByRole('checkbox', { name: 'sentiment' }));
+  await userEvent.click(screen.getByRole('checkbox', { name: 'alternative.me' }));
   await userEvent.selectOptions(field('Modello'), MODEL);
   await userEvent.type(field('temperatura'), '0,5');
   await userEvent.selectOptions(field('livello di ragionamento'), 'high');
@@ -183,8 +187,11 @@ describe('CreateFlow', () => {
         parameters: { temperature: '0.5', max_tokens: '4096', reasoning_effort: 'high' },
       },
       sources: [
-        { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 20 } },
-        { name: 'sentiment', weight: 5, parameters: {} },
+        {
+          name: 'indicatori',
+          adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 20 } }],
+        },
+        { name: 'sentiment', adapters: [{ name: 'alternative.me', weight: 5, parameters: {} }] },
       ],
       instructions: 'prudente',
       risk_limits: {
@@ -398,16 +405,54 @@ describe('CreateFlow', () => {
     );
   });
 
-  it('tells why the parameters of a source could not be read', async () => {
-    server.use(
-      http.get('*/sources/:name', () =>
-        HttpResponse.json({ detail: 'fonte non disponibile: indicatori' }, { status: 404 }),
-      ),
-    );
+  // R4.1.1, ADR scelta-degli-adapter-nell-editor-del-flusso.
+  it('shows the adapters of an active source as they declare themselves, the only one already chosen', async () => {
     await renderApp({ account: 'anna', url: NEW_FLOW });
 
     await userEvent.click(await screen.findByRole('checkbox', { name: 'indicatori' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'sentiment' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('fonte non disponibile: indicatori');
+    expect(screen.getByRole('checkbox', { name: 'Hyperliquid' })).toBeChecked();
+    expect(field('Peso di indicatori · Hyperliquid')).toBeInTheDocument();
+    const sentiment = within(screen.getByRole('list', { name: 'Adapter di sentiment' }));
+    expect(sentiment.getAllByRole('checkbox').map((adapter) => adapter.getAttribute('id'))).toEqual(
+      ['flow-source-sentiment-alternative%2Eme', 'flow-source-sentiment-CoinMarketCap'],
+    );
+    expect(sentiment.getByRole('checkbox', { name: 'alternative.me' })).not.toBeChecked();
+    expect(sentiment.getByRole('checkbox', { name: 'alternative.me' })).toHaveAccessibleDescription(
+      'Crypto Fear & Greed Index di alternative.me. nessuna configurazione necessaria',
+    );
+    expect(screen.queryByLabelText('Peso di sentiment · alternative.me')).not.toBeInTheDocument();
+  });
+
+  it('sends two adapters of the same source, each with its own weight', async () => {
+    const { router } = await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'CoinMarketCap' }));
+    await userEvent.type(field('Peso di sentiment · alternative.me'), '3');
+    await userEvent.type(field('Peso di sentiment · CoinMarketCap'), '7');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).sources[1]).toEqual({
+      name: 'sentiment',
+      adapters: [
+        { name: 'alternative.me', weight: 3, parameters: {} },
+        { name: 'CoinMarketCap', weight: 7, parameters: {} },
+      ],
+    });
+  });
+
+  it('shows on the sources the refusal of an active source without adapters', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'alternative.me' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    expect(await screen.findByRole('group', { name: 'Fonti' })).toHaveAccessibleDescription(
+      'scegli almeno un adapter della fonte sentiment',
+    );
   });
 });

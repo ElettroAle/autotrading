@@ -13,9 +13,10 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration
+from tests.support.source_selections import a_source
 
 TENANT = TenantId.new()
 
@@ -24,7 +25,7 @@ def a_strategy() -> FlowStrategy:
     return FlowStrategy(
         cycle_interval=CycleInterval(60),
         model=ModelSelection("openrouter/deepseek-chat", {"temperature": Decimal("0.2")}),
-        sources=(SourceSelection("indicatori", 2, {"periodo": 14}),),
+        sources=(a_source("indicatori", 2, {"periodo": 14}),),
         instructions="compra basso",
         risk_limits=RiskLimits(3, Decimal(10), Decimal(50)),
         bring_to_minimum=True,
@@ -42,7 +43,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
     configuration = replace(
         a_configuration(assets=("BTC", "ETH"), allocated_capital=Decimal(300)),
         version=4,
-        sources=(SourceSelection("indicatori", 2),),
+        sources=(a_source("indicatori", 2),),
         instructions="compra basso",
         bring_to_minimum=True,
         system_prompt="{instructions}",
@@ -104,7 +105,7 @@ def test_the_draft_configuration_has_the_strategy_without_capital_or_assets() ->
 
 
 def test_the_draft_configuration_refuses_a_source_twice() -> None:
-    twice = replace(a_strategy(), sources=(SourceSelection("indicatori"), SourceSelection("indicatori")))
+    twice = replace(a_strategy(), sources=(a_source("indicatori"), a_source("indicatori")))
 
     with pytest.raises(RepeatedSourceError):
         twice.draft_configuration(FIRST_VERSION)

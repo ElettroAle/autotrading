@@ -23,9 +23,10 @@ from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_check import RiskPolicy
-from autotrading.domain.flows.selections import SourceSelection
+from autotrading.domain.flows.selections import ActiveSource, AdapterSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 
 def test_assets_are_upper_case_each_once_in_the_given_order() -> None:
@@ -44,7 +45,7 @@ def test_a_flow_out_of_draft_without_assets_is_refused() -> None:
 
 
 def test_a_source_cannot_appear_twice() -> None:
-    sources = (SourceSelection("notizie"), SourceSelection("indicatori"), SourceSelection("notizie", 3))
+    sources = (a_source("notizie"), a_source("indicatori"), a_source("notizie", 3))
 
     with pytest.raises(RepeatedSourceError, match=r"^fonte ripetuta: notizie$"):
         replace(a_configuration(), sources=sources)
@@ -207,3 +208,23 @@ def test_a_flow_that_is_not_active_plans_no_cycle(status: FlowStatus) -> None:
 
 def test_an_active_flow_without_anchor_plans_no_cycle() -> None:
     assert a_flow(TenantId.new(), status=FlowStatus.ACTIVE).planned_schedule(None) is None
+
+
+def test_the_active_sources_are_every_adapter_of_every_source_in_the_order_of_the_configuration() -> None:
+    configuration = replace(
+        a_configuration(),
+        sources=(
+            SourceSelection("sentiment", (AdapterSelection("alternative.me", 3), AdapterSelection("CoinMarketCap", 7))),
+            SourceSelection("notizie", (AdapterSelection("RSS"),)),
+        ),
+    )
+
+    assert configuration.active_sources == (
+        ActiveSource("sentiment", "alternative.me"),
+        ActiveSource("sentiment", "CoinMarketCap"),
+        ActiveSource("notizie", "RSS"),
+    )
+
+
+def test_a_configuration_without_sources_has_no_active_source() -> None:
+    assert a_configuration().active_sources == ()

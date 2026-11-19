@@ -17,6 +17,7 @@ from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.recorded_decision import RecordedDecision
+from autotrading.domain.flows.selections import ActiveSource
 
 
 class JsonCycleJournalAdapter:
@@ -81,7 +82,11 @@ class JsonCycleJournalAdapter:
             "versione": configuration.version,
             "fornitore": configuration.model.name.partition("/")[0],
             "modello": configuration.model.name,
-            "pesi_fonti": {source.name: source.weight for source in configuration.sources},
+            "pesi_fonti": {
+                ActiveSource(source.name, adapter.name).label: adapter.weight
+                for source in configuration.sources
+                for adapter in source.adapters
+            },
             "stato": _state_document(cycle_flow),
         }
 

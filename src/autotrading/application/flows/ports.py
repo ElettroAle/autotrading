@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
@@ -60,11 +60,12 @@ from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, RecordedDecision
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ActiveSource, ModelSelection, SourceSelection
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.flows.unattributable_page import UnattributableCursor, UnattributableFilter, UnattributablePage
+from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -297,11 +298,28 @@ class ModelSettingsPort(Protocol):
         ...
 
 
-class SourceSettingsPort(Protocol):
-    """It is SelectSourceUseCase (R1.3.1)."""
+@dataclass(frozen=True, slots=True)
+class AdapterRequest:
+    """An adapter of a source as the user asks it: no weight takes the default, a parameter not given its default."""
 
-    def execute(self, source: str, weight: int | None, requested: Mapping[str, int]) -> SourceSelection:
-        """The source with its parameters resolved. Raises InvalidFlowSettingError with the reason."""
+    name: str
+    weight: int | None = None
+    parameters: Mapping[str, int] = field(default_factory=dict)
+
+
+class SourceCatalogPort(Protocol):
+    """The sources a flow can activate, each with the adapters that offer it as they declare themselves: it is
+    ListSourcesUseCase of the sources (R4.1.1, ADR fonti-con-adapter-dichiarati)."""
+
+    def execute(self) -> SourceCatalog: ...
+
+
+class SourceSettingsPort(Protocol):
+    """It is SelectSourceUseCase (R1.3.1, R4.1.1)."""
+
+    def execute(self, source: str, adapters: Sequence[AdapterRequest]) -> SourceSelection:
+        """The source with the adapters chosen and their parameters resolved. Raises InvalidFlowSettingError with the
+        reason."""
         ...
 
 
@@ -801,13 +819,13 @@ class TenantScheduledFlow:
 
 @dataclass(frozen=True, slots=True)
 class FlowSnapshot[S = object]:
-    """The state of the flow read at the start of the cycle; the cycle only needs the names of its active sources.
+    """The state of the flow read at the start of the cycle; the cycle only needs the adapters of its active sources.
 
     The state itself belongs to the flow and travels to the context and the risk check as it is (ADR 0041): its type
     is the one the composition root binds, never known to the cycles context (ADR 0082).
     """
 
-    sources: tuple[str, ...]
+    sources: tuple[ActiveSource, ...]
     state: S
 
 
@@ -1003,6 +1021,7 @@ class SourceAsk:
     flow_id: UUID
     planned_at: datetime
     source: str
+    adapter: str
     weight: int
     parameters: Mapping[str, int]
     assets: tuple[str, ...]
@@ -1011,10 +1030,14 @@ class SourceAsk:
 
 
 class CollectedValuesPort(Protocol):
-    """What an active source collected in the cycle: each value with its asset, or the note of its silence."""
+    """What an adapter of an active source collected in the cycle: each value with its asset, or the note of its
+    silence."""
 
     @property
     def source(self) -> str: ...
+
+    @property
+    def adapter(self) -> str: ...
 
     @property
     def weight(self) -> int: ...
@@ -1030,8 +1053,8 @@ class SourceCollectionPort(Protocol):
 
 
 class SourcePort[S = object, D = object](Protocol):
-    def execute(self, request: SourceRequest[S], source: str) -> D:
-        """The data of one active source; any typed error makes the source absent for the cycle (R1.2.5)."""
+    def execute(self, request: SourceRequest[S], source: ActiveSource) -> D:
+        """The data of one adapter of an active source; any typed error makes it absent for the cycle (R1.2.5)."""
         ...
 
 

@@ -23,11 +23,53 @@ export type FakeSourceParameter = {
   readonly maximum: number;
 };
 
+/** An adapter of a source as it declares itself; no configuration field means none needed (R4.1.1). */
+export type FakeSourceAdapter = {
+  readonly name: string;
+  readonly description: string;
+  readonly parameters: FakeSourceParameter[];
+  readonly configuration_fields: {
+    readonly name: string;
+    readonly label: string;
+    readonly secret: boolean;
+  }[];
+  readonly offers_history: boolean;
+};
+
 export type FakeSource = {
   readonly name: string;
   readonly description: string;
   readonly per_asset: boolean;
   readonly parameters: FakeSourceParameter[];
+  readonly adapters: FakeSourceAdapter[];
+};
+
+const adapterOf = (
+  name: string,
+  description: string,
+  parameters: FakeSourceParameter[],
+  offersHistory: boolean,
+): FakeSourceAdapter => ({
+  name,
+  description,
+  parameters,
+  configuration_fields: [],
+  offers_history: offersHistory,
+});
+
+const SERIES_LENGTH: FakeSourceParameter = {
+  key: 'lunghezza_serie',
+  label: 'lunghezza serie',
+  default: 10,
+  minimum: 1,
+  maximum: 50,
+};
+const NEWS_COUNT: FakeSourceParameter = {
+  key: 'numero_notizie',
+  label: 'numero notizie',
+  default: 10,
+  minimum: 1,
+  maximum: 50,
 };
 
 /** The assets the exchange of the fake installation trades now, as the API lists them: by name (ADR 0147). */
@@ -90,8 +132,9 @@ export const FAKE_SOURCES: FakeSource[] = [
     name: 'indicatori',
     description: 'Prezzo e indicatori tecnici su due timeframe.',
     per_asset: true,
-    parameters: [
-      { key: 'lunghezza_serie', label: 'lunghezza serie', default: 10, minimum: 1, maximum: 50 },
+    parameters: [SERIES_LENGTH],
+    adapters: [
+      adapterOf('Hyperliquid', 'Dati di mercato pubblici di Hyperliquid.', [SERIES_LENGTH], true),
     ],
   },
   {
@@ -99,13 +142,16 @@ export const FAKE_SOURCES: FakeSource[] = [
     description: 'Indice Fear and Greed delle criptovalute.',
     per_asset: false,
     parameters: [],
+    adapters: [
+      adapterOf('alternative.me', 'Crypto Fear & Greed Index di alternative.me.', [], true),
+      adapterOf('CoinMarketCap', 'CMC Crypto Fear and Greed Index di CoinMarketCap.', [], false),
+    ],
   },
   {
     name: 'notizie',
     description: 'Le notizie recenti sugli asset del flusso.',
     per_asset: true,
-    parameters: [
-      { key: 'numero_notizie', label: 'numero notizie', default: 10, minimum: 1, maximum: 50 },
-    ],
+    parameters: [NEWS_COUNT],
+    adapters: [adapterOf('RSS', 'Feed RSS delle testate cripto.', [NEWS_COUNT], false)],
   },
 ];

@@ -131,7 +131,11 @@ def test_the_flow_read_at_the_start_is_recorded_with_its_configuration_and_its_s
         "versione": configuration.version,
         "fornitore": configuration.model.name.partition("/")[0],
         "modello": configuration.model.name,
-        "pesi_fonti": {source.name: source.weight for source in configuration.sources},
+        "pesi_fonti": {
+            f"{source.name} · {adapter.name}": adapter.weight
+            for source in configuration.sources
+            for adapter in source.adapters
+        },
         "stato": STATE,
     }
 
@@ -158,14 +162,21 @@ def test_the_decisions_are_recorded_with_the_raw_answer_the_discarded_and_the_mi
 
 
 def test_the_sources_are_recorded_one_reading_each() -> None:
-    reading = SourceReading("news", (SourceData("news", 2, None, {"titolo": "t"}),))
+    reading = SourceReading("news", (SourceData("news", "RSS", 2, None, {"titolo": "t"}),))
 
     assert journal().describe(CycleStep.COLLECT_SOURCES, [reading]) == {
         "fonti": [
             {
                 "fonte": "news",
                 "dati": [
-                    {"tipo": "SourceData", "source": "news", "weight": 2, "asset": None, "values": {"titolo": "t"}}
+                    {
+                        "tipo": "SourceData",
+                        "source": "news",
+                        "adapter": "RSS",
+                        "weight": 2,
+                        "asset": None,
+                        "values": {"titolo": "t"},
+                    }
                 ],
             }
         ]

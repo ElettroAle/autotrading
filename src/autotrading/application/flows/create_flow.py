@@ -7,6 +7,7 @@ from uuid import UUID
 from autotrading.application.flows.errors import FlowNameInUseError
 from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import (
+    AdapterRequest,
     FlowAccountPorts,
     FlowRepositoryPort,
     MarketsPort,
@@ -31,9 +32,10 @@ operations = logging.getLogger("autotrading.flows")
 
 @dataclass(frozen=True, slots=True)
 class SourceRequest:
+    """An active source with the adapters the user chose (R4.1.1)."""
+
     name: str
-    weight: int | None = None
-    parameters: Mapping[str, int] = field(default_factory=dict)
+    adapters: tuple[AdapterRequest, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,4 +136,4 @@ class CreateFlowUseCase:
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:
-        return self._checks.sources.execute(request.name, request.weight, request.parameters)
+        return self._checks.sources.execute(request.name, request.adapters)

@@ -30,6 +30,24 @@ def test_a_value_outside_the_range_or_not_whole_is_refused(value: object) -> Non
         NEWS.settings({"max_items": value})  # type: ignore[dict-item]  # what an untyped request could carry
 
 
+def test_the_refusal_names_the_parameter_and_the_values_it_admits() -> None:
+    with pytest.raises(SourceParameterOutOfRangeError) as raised:
+        NEWS.settings({"max_items": 51})
+
+    assert (str(raised.value), raised.value.label, raised.value.minimum, raised.value.maximum) == (
+        "parametro fuori dai valori ammessi: numero massimo di notizie, da 1 a 50",
+        "numero massimo di notizie",
+        1,
+        50,
+    )
+
+
+def test_the_parameters_of_an_adapter_are_checked_with_those_of_the_source() -> None:
+    own = SourceParameter("lingua", "lingua", 1, 1, 3)
+
+    assert NEWS.settings({"lingua": 2}, (own,)) == {"max_items": 10, "hours": 24, "lingua": 2}
+
+
 def test_a_parameter_the_source_does_not_have_is_refused() -> None:
     with pytest.raises(UnknownSourceParameterError, match=r"^parametro sconosciuto della fonte notizie: lingua$"):
         NEWS.settings({"lingua": 1})

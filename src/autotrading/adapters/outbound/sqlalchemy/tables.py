@@ -383,6 +383,8 @@ source_samples = Table(
     Column("flow_id", Uuid, nullable=False),
     Column("cycle_planned_at", DateTime(timezone=True), nullable=False),
     Column("source", Text, nullable=False),
+    # The adapter of the source that read the value (R4.1.1); the migration gave the values collected before theirs.
+    Column("adapter", Text, nullable=False),
     Column("asset", Text),
     Column("reference_at", DateTime(timezone=True), nullable=False),
     Column("collected_at", DateTime(timezone=True), nullable=False),

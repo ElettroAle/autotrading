@@ -4,6 +4,7 @@ import { fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then, When } from '../../../support/fixtures';
 import { onFlowPage } from '../../../support/flow-page';
+import { aSource, labelOf } from '../../../support/sources';
 
 Given(
   'che {string} ha il flusso {string} sul conto {string} con asset {string}, fonti {string} peso {int} e modello {string}',
@@ -21,7 +22,7 @@ Given(
     fakePlatform.addFlow(account, flow, {
       accountName,
       assets: [asset],
-      sources: [{ name: source, weight }],
+      sources: [aSource(source, weight)],
       model,
     });
   },
@@ -57,7 +58,7 @@ Then(
 Then(
   'ha fonti {string} peso {int} e modello {string}',
   async ({ dashboard }, source: string, weight: number, model: string) => {
-    await expect(dashboard.detail('Fonti')).toHaveText(`${source} (peso ${weight})`);
+    await expect(dashboard.detail('Fonti')).toHaveText(`${labelOf(source)} (peso ${weight})`);
     await expect(dashboard.detail('Modello')).toHaveText(model);
   },
 );

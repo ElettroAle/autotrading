@@ -21,12 +21,29 @@ const maxLossText = numberText.refine(withinMaxLoss, MAX_LOSS_RANGE);
 export const OPENINGS_RESUMES = ['manual', 'next_day'] as const;
 export type OpeningsResume = (typeof OPENINGS_RESUMES)[number];
 
-// A source never activated has only its choice: weight and parameters show once it is active.
-const sourceValuesSchema = z.object({
+// An adapter never chosen has only its choice: weight and parameters show once it is chosen (R4.1.1).
+const adapterValuesSchema = z.object({
   active: z.boolean(),
   weight: numberText.optional(),
   parameters: z.record(z.string(), numberText).optional(),
 });
+
+// A source never activated has only its choice: its adapters show once it is active (R4.1.1).
+const sourceValuesSchema = z.object({
+  active: z.boolean(),
+  adapters: z.record(z.string(), adapterValuesSchema).optional(),
+});
+
+// The name of an adapter may hold a dot ("alternative.me"), which the form reads as a step of the path of a field: the
+// key of its values keeps it encoded.
+const DOT = /\./g;
+const ENCODED_DOT = '%2E';
+
+/** The key of the values of an adapter in the form, its name with nothing the form reads as a path. */
+export const adapterKeyOf = (name: string): string =>
+  encodeURIComponent(name).replace(DOT, ENCODED_DOT);
+
+const adapterNameOf = (key: string): string => decodeURIComponent(key);
 
 export const flowFormSchema = z.object({
   name: z.string(),
@@ -58,11 +75,17 @@ export const flowFormSchema = z.object({
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
 export type SourceValues = z.infer<typeof sourceValuesSchema>;
+export type AdapterValues = z.infer<typeof adapterValuesSchema>;
 
-type SourceRequest = {
+type AdapterRequest = {
   readonly name: string;
   readonly weight: number | null;
   readonly parameters: Record<string, number>;
+};
+
+type SourceRequest = {
+  readonly name: string;
+  readonly adapters: AdapterRequest[];
 };
 
 /** The settings a version of the configuration has, as the API takes them. */
@@ -148,19 +171,25 @@ const filledOf = (values: Record<string, string>): Record<string, string> =>
       .map(([key, value]) => [key, decimalOf(value)]),
   );
 
-const sourcesOf = (sources: Record<string, SourceValues>): SourceRequest[] =>
-  Object.entries(sources)
-    .filter(([, source]) => source.active)
-    .map(([name, source]) => ({
-      name,
-      weight: numberOrNull(source.weight ?? ''),
+const adaptersOf = (adapters: Record<string, AdapterValues>): AdapterRequest[] =>
+  Object.entries(adapters)
+    .filter(([, adapter]) => adapter.active)
+    .map(([key, adapter]) => ({
+      name: adapterNameOf(key),
+      weight: numberOrNull(adapter.weight ?? ''),
       parameters: Object.fromEntries(
-        Object.entries(filledOf(source.parameters ?? {})).map(([key, value]) => [
-          key,
+        Object.entries(filledOf(adapter.parameters ?? {})).map(([parameter, value]) => [
+          parameter,
           Number(value),
         ]),
       ),
     }));
+
+// An active source goes with the adapters chosen, none included: the API refuses it with the reason (R4.1.1).
+const sourcesOf = (sources: Record<string, SourceValues>): SourceRequest[] =>
+  Object.entries(sources)
+    .filter(([, source]) => source.active)
+    .map(([name, source]) => ({ name, adapters: adaptersOf(source.adapters ?? {}) }));
 
 const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   account_id: values.account_id,
@@ -211,9 +240,17 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
       source.name,
       {
         active: true,
-        weight: String(source.weight),
-        parameters: Object.fromEntries(
-          Object.entries(source.parameters).map(([key, value]) => [key, String(value)]),
+        adapters: Object.fromEntries(
+          source.adapters.map((adapter) => [
+            adapterKeyOf(adapter.name),
+            {
+              active: true,
+              weight: String(adapter.weight),
+              parameters: Object.fromEntries(
+                Object.entries(adapter.parameters).map(([key, value]) => [key, String(value)]),
+              ),
+            },
+          ]),
         ),
       },
     ]),

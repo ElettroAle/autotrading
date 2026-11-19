@@ -10,13 +10,14 @@ import pytest
 from pytest_bdd import given, then, when
 
 from autotrading.application.agent.register_provider_key import RegisterProviderKeyCommand
-from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
+from autotrading.application.flows.create_flow import CreateFlowCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from tests.support.flows import OPENROUTER_MODEL, account_id_of
 from tests.support.platform import HYPERLIQUID, Platform
 from tests.support.provider_key import key_values
+from tests.support.source_selections import a_source_request
 from tests.support.steps import quoted
 
 KEY = "K-REGISTERED"
@@ -105,7 +106,7 @@ def create_complete_flow(
         allocated_capital=Decimal(capital),
         max_leverage=int(leverage),
         max_margin_exposure_percent=Decimal(margin),
-        sources=tuple(SourceRequest(source) for source in names(sources)),
+        sources=tuple(a_source_request(source) for source in names(sources)),
     )
     create(platform, creation, user, command)
 
@@ -127,7 +128,7 @@ def create_with_model(platform: Platform, creation: Creation, user: str, name: s
 
 @when(quoted('"{user}" crea il flusso "{name}" con fonte "{source}"'))
 def create_with_source(platform: Platform, creation: Creation, user: str, name: str, source: str) -> None:
-    command = replace(valid_command(platform, user, name), sources=(SourceRequest(source),))
+    command = replace(valid_command(platform, user, name), sources=(a_source_request(source),))
     create(platform, creation, user, command)
 
 

@@ -8,6 +8,7 @@ import {
 
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
+import { adapterOf, labelOf } from '../../../support/sources';
 
 const MODEL = 'openrouter/deepseek-chat';
 const SAVE = 'Salva le modifiche';
@@ -40,7 +41,10 @@ const fillNewFlow = async (dashboard: DashboardPages, flow: NewFlow): Promise<vo
   await dashboard.field('Intervallo del ciclo in minuti').fill(String(flow.minutes));
   for (const source of flow.sources) {
     await dashboard.page.getByRole('checkbox', { name: source.name, exact: true }).check();
-    await dashboard.field(`Peso di ${source.name}`).fill(String(source.weight));
+    await dashboard.page
+      .getByRole('checkbox', { name: adapterOf(source.name), exact: true })
+      .check();
+    await dashboard.field(`Peso di ${labelOf(source.name)}`).fill(String(source.weight));
   }
   await dashboard.field('Modello').selectOption(flow.model);
   await dashboard.field('Leva massima').fill('3');
@@ -94,8 +98,16 @@ Given(
       version,
       assets: ['BTC'],
       sources: [
-        { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 10 } },
-        { name: 'sentiment', weight: 1, parameters: {} },
+        {
+          name: 'indicatori',
+          adapters: [
+            { name: adapterOf('indicatori'), weight: 2, parameters: { lunghezza_serie: 10 } },
+          ],
+        },
+        {
+          name: 'sentiment',
+          adapters: [{ name: adapterOf('sentiment'), weight: 1, parameters: {} }],
+        },
       ],
       allocated_capital: '300',
     });
@@ -168,7 +180,7 @@ When(
   async ({ dashboard, memory }, account: string, source: string, weight: number) => {
     expectSignedIn(memory, account);
     await dashboard.openFlowEditor(memory.flow);
-    await dashboard.field(`Peso di ${source}`).fill(String(weight));
+    await dashboard.field(`Peso di ${labelOf(source)}`).fill(String(weight));
     await dashboard.button(SAVE).click();
   },
 );
@@ -223,7 +235,7 @@ Then(
   'il flusso {string} è alla versione {int} con peso {int} per {string}',
   async ({ dashboard }, name: string, version: number, weight: number, source: string) => {
     await expect(dashboard.message(`Modifiche salvate: versione ${version}`)).toBeVisible();
-    await expect(dashboard.field(`Peso di ${source}`)).toHaveValue(String(weight));
+    await expect(dashboard.field(`Peso di ${labelOf(source)}`)).toHaveValue(String(weight));
     expect(configurationOf(fakePlatform.flowNamed(name)).version).toBe(version);
   },
 );

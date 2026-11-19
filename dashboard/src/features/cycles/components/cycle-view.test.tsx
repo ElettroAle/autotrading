@@ -186,11 +186,13 @@ describe('CycleView', () => {
   it('names the sources that gave no data, with the reason', async () => {
     await openCycle({
       ...aCompletedCycle(PLANNED_AT),
-      absent_sources: [{ source: 'notizie', reason: 'nessuna risposta entro 30 secondi' }],
+      absent_sources: [
+        { source: 'notizie', reason: 'nessuna risposta entro 30 secondi', adapter: 'RSS' },
+      ],
     });
 
     expect(await section('Fonti assenti')).toHaveTextContent(
-      'notizie: nessuna risposta entro 30 secondi',
+      'notizie · RSS: nessuna risposta entro 30 secondi',
     );
   });
 

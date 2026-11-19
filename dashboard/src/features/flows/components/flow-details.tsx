@@ -12,12 +12,20 @@ const accountName = (flow: Flow, accounts: Account[]): string => {
   return accounts.find((account) => account.id === flow.account_id)?.name ?? flow.account_id;
 };
 
+// Every adapter chosen of every source, «fonte · adapter (peso N)» (R4.1.1).
+const sourcesText = (flow: Flow): string =>
+  flow.sources
+    .flatMap((source) =>
+      source.adapters.map((adapter) => `${source.name} · ${adapter.name} (peso ${adapter.weight})`),
+    )
+    .join(', ');
+
 /** The configuration in force; a draft shows what it still lacks before it can start (ADR 0125). */
 export const FlowDetails = ({ flow, accounts }: { flow: Flow; accounts: Account[] }) => {
   const details: [string, string][] = [
     ['Versione', String(flow.version)],
     ['Modello', flow.model.name],
-    ['Fonti', flow.sources.map((source) => `${source.name} (peso ${source.weight})`).join(', ')],
+    ['Fonti', sourcesText(flow)],
     ['Conto', accountName(flow, accounts)],
     [
       'Capitale allocato',

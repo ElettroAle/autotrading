@@ -13,10 +13,16 @@ const sortedEntries = (parameters: Record<string, string | number>): string[] =>
     .sort()
     .map((key) => `${key} ${parameters[key]}`);
 
+// Every adapter of a source with its weight and parameters, «fonte · adapter», as the API names it (R4.1.1).
 const sourceText = (source: Source): string =>
-  `${source.name} (peso ${source.weight}${sortedEntries(source.parameters)
-    .map((entry) => `, ${entry}`)
-    .join('')})`;
+  source.adapters
+    .map(
+      (adapter) =>
+        `${source.name} · ${adapter.name} (peso ${adapter.weight}${sortedEntries(adapter.parameters)
+          .map((entry) => `, ${entry}`)
+          .join('')})`,
+    )
+    .join('; ');
 
 const percentText = (percent: string | null): string => (percent === null ? NONE : `${percent}%`);
 

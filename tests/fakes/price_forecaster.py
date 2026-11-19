@@ -5,6 +5,9 @@ from decimal import Decimal
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceHistory
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
+
+FORECASTER_DECLARATION = SourceAdapterDeclaration("Prophet", "previsioni", (), (), offers_history=True)
 
 
 @dataclass
@@ -13,6 +16,10 @@ class FakePriceForecasterAdapter:
 
     missing: set[str] = field(default_factory=set)
     requests: list[tuple[str, int, tuple[ForecastHorizon, ...]]] = field(default_factory=list)
+    declared: SourceAdapterDeclaration = FORECASTER_DECLARATION
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        return self.declared
 
     def predict(
         self, asset: str, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]

@@ -15,15 +15,15 @@ CYCLE = CycleReference(uuid4(), PLANNED)
 def test_a_sample_keeps_the_value_with_its_reference_and_its_collection() -> None:
     values = {"prezzo": "100"}
 
-    sample = SourceSample.of(CYCLE, "indicatori", "BTC", SourceValue(REFERENCE, values), COLLECTED)
+    sample = SourceSample.of(CYCLE, ("indicatori", "Hyperliquid"), "BTC", SourceValue(REFERENCE, values), COLLECTED)
 
-    assert sample == SourceSample(CYCLE, "indicatori", "BTC", REFERENCE, COLLECTED, {"prezzo": "100"})
+    assert sample == SourceSample(CYCLE, "indicatori", "Hyperliquid", "BTC", REFERENCE, COLLECTED, {"prezzo": "100"})
 
 
 def test_a_sample_owns_a_copy_of_the_values() -> None:
     values = {"prezzo": "100"}
 
-    sample = SourceSample.of(CYCLE, "indicatori", "BTC", SourceValue(REFERENCE, values), COLLECTED)
+    sample = SourceSample.of(CYCLE, ("indicatori", "Hyperliquid"), "BTC", SourceValue(REFERENCE, values), COLLECTED)
     values["prezzo"] = "200"
 
     assert sample.values == {"prezzo": "100"}
@@ -39,6 +39,6 @@ def test_a_sample_owns_a_copy_of_the_values() -> None:
 )
 def test_an_instant_without_time_zone_is_a_defect(planned: datetime, reference: datetime, collected: datetime) -> None:
     with pytest.raises(InvalidSourceSampleError, match="valore raccolto non valido") as raised:
-        SourceSample(CycleReference(CYCLE.flow_id, planned), "notizie", None, reference, collected, {})
+        SourceSample(CycleReference(CYCLE.flow_id, planned), "notizie", "RSS", None, reference, collected, {})
 
     assert raised.value.status_code == 500

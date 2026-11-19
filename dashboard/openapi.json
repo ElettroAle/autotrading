@@ -5485,12 +5485,24 @@
           "reason": {
             "type": "string",
             "title": "Reason"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter"
           }
         },
         "type": "object",
         "required": [
           "source",
-          "reason"
+          "reason",
+          "adapter"
         ],
         "title": "AbsentSourceResponse"
       },
@@ -5792,6 +5804,63 @@
         ],
         "title": "AccountSummaryResponse",
         "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state\n(`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it\n(R6.2.2)."
+      },
+      "AdapterSelectionRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AdapterSelectionRequest"
+      },
+      "AdapterSelectionResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight": {
+            "type": "integer",
+            "title": "Weight"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "weight",
+          "parameters"
+        ],
+        "title": "AdapterSelectionResponse"
       },
       "AlertDetailResponse": {
         "properties": {
@@ -10914,6 +10983,69 @@
         ],
         "title": "RiskLimitsResponse"
       },
+      "SourceAdapterResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/SourceParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters"
+          },
+          "configuration_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SourceConfigurationFieldResponse"
+            },
+            "type": "array",
+            "title": "Configuration Fields"
+          },
+          "offers_history": {
+            "type": "boolean",
+            "title": "Offers History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "parameters",
+          "configuration_fields",
+          "offers_history"
+        ],
+        "title": "SourceAdapterResponse",
+        "description": "An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1)."
+      },
+      "SourceConfigurationFieldResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "secret": {
+            "type": "boolean",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "secret"
+        ],
+        "title": "SourceConfigurationFieldResponse"
+      },
       "SourceParameterResponse": {
         "properties": {
           "key": {
@@ -10967,6 +11099,13 @@
             },
             "type": "array",
             "title": "Parameters"
+          },
+          "adapters": {
+            "items": {
+              "$ref": "#/components/schemas/SourceAdapterResponse"
+            },
+            "type": "array",
+            "title": "Adapters"
           }
         },
         "type": "object",
@@ -10974,7 +11113,8 @@
           "name",
           "description",
           "per_asset",
-          "parameters"
+          "parameters",
+          "adapters"
         ],
         "title": "SourceResponse"
       },
@@ -10984,30 +11124,20 @@
             "type": "string",
             "title": "Name"
           },
-          "weight": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Weight"
-          },
-          "parameters": {
-            "additionalProperties": {
-              "type": "integer"
+          "adapters": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterSelectionRequest"
             },
-            "type": "object",
-            "title": "Parameters"
+            "type": "array",
+            "title": "Adapters"
           }
         },
         "type": "object",
         "required": [
           "name"
         ],
-        "title": "SourceSelectionRequest"
+        "title": "SourceSelectionRequest",
+        "description": "An active source with the adapters chosen: none is refused with the reason (R4.1.1)."
       },
       "SourceSelectionResponse": {
         "properties": {
@@ -11015,23 +11145,18 @@
             "type": "string",
             "title": "Name"
           },
-          "weight": {
-            "type": "integer",
-            "title": "Weight"
-          },
-          "parameters": {
-            "additionalProperties": {
-              "type": "integer"
+          "adapters": {
+            "items": {
+              "$ref": "#/components/schemas/AdapterSelectionResponse"
             },
-            "type": "object",
-            "title": "Parameters"
+            "type": "array",
+            "title": "Adapters"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "weight",
-          "parameters"
+          "adapters"
         ],
         "title": "SourceSelectionResponse"
       },
@@ -11127,6 +11252,37 @@
         "title": "StopOutcomeResponse",
         "description": "The flow stopped and the positions the exchange did not close, each with its reason (R1.1.5)."
       },
+      "StrategyAdapter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "StrategyAdapter"
+      },
       "StrategyBody-Input": {
         "properties": {
           "cycle_minutes": {
@@ -11152,7 +11308,14 @@
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/StrategySource"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StrategySource"
+                },
+                {
+                  "$ref": "#/components/schemas/StrategySourceBeforeTheAdapters"
+                }
+              ]
             },
             "type": "array",
             "title": "Sources"
@@ -11293,7 +11456,14 @@
           },
           "sources": {
             "items": {
-              "$ref": "#/components/schemas/StrategySource"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StrategySource"
+                },
+                {
+                  "$ref": "#/components/schemas/StrategySourceBeforeTheAdapters"
+                }
+              ]
             },
             "type": "array",
             "title": "Sources"
@@ -11626,6 +11796,28 @@
             "type": "string",
             "title": "Name"
           },
+          "adapters": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyAdapter"
+            },
+            "type": "array",
+            "title": "Adapters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "adapters"
+        ],
+        "title": "StrategySource",
+        "description": "A source with the adapters the strategy chose (R4.1.1)."
+      },
+      "StrategySourceBeforeTheAdapters": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
           "weight": {
             "anyOf": [
               {
@@ -11649,7 +11841,8 @@
         "required": [
           "name"
         ],
-        "title": "StrategySource"
+        "title": "StrategySourceBeforeTheAdapters",
+        "description": "A source of a file of the first version: its weight and parameters pass to the adapter it became."
       },
       "TargetKind": {
         "type": "string",

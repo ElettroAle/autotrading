@@ -1,6 +1,7 @@
 import type { Flow } from '../api/get-flow';
 
 import {
+  adapterKeyOf,
   changesOf,
   creationRequestOf,
   emptyFormValues,
@@ -19,9 +20,20 @@ const filled = (changes: Partial<FlowFormValues> = {}): FlowFormValues => ({
   model: 'openrouter/deepseek-chat',
   model_parameters: { temperature: '0,7', max_tokens: '', reasoning_effort: 'high' },
   sources: {
-    indicatori: { active: true, weight: '2', parameters: { lunghezza_serie: '20' } },
-    sentiment: { active: true, weight: '', parameters: {} },
-    notizie: { active: false },
+    indicatori: {
+      active: true,
+      adapters: {
+        Hyperliquid: { active: true, weight: '2', parameters: { lunghezza_serie: '20' } },
+      },
+    },
+    sentiment: {
+      active: true,
+      adapters: {
+        'alternative%2Eme': { active: true, weight: '', parameters: {} },
+        CoinMarketCap: { active: false },
+      },
+    },
+    notizie: { active: false, adapters: { RSS: { active: true, weight: '4' } } },
     pivot: { active: true },
   },
   instructions: 'prudente',
@@ -42,8 +54,11 @@ const FLOW: Flow = {
   cycle_minutes: 15,
   model: { name: 'openrouter/deepseek-chat', parameters: { temperature: '0.7' } },
   sources: [
-    { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 10 } },
-    { name: 'sentiment', weight: 1, parameters: {} },
+    {
+      name: 'indicatori',
+      adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 10 } }],
+    },
+    { name: 'sentiment', adapters: [{ name: 'alternative.me', weight: 1, parameters: {} }] },
   ],
   instructions: 'prudente',
   risk_limits: {
@@ -88,9 +103,12 @@ describe('creationRequestOf', () => {
       model: 'openrouter/deepseek-chat',
       model_parameters: { temperature: '0.7', reasoning_effort: 'high' },
       sources: [
-        { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 20 } },
-        { name: 'sentiment', weight: null, parameters: {} },
-        { name: 'pivot', weight: null, parameters: {} },
+        {
+          name: 'indicatori',
+          adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 20 } }],
+        },
+        { name: 'sentiment', adapters: [{ name: 'alternative.me', weight: null, parameters: {} }] },
+        { name: 'pivot', adapters: [] },
       ],
       instructions: 'prudente',
       max_leverage: 3,
@@ -162,6 +180,15 @@ describe('creationRequestOf', () => {
   });
 });
 
+describe('adapterKeyOf', () => {
+  it('keeps the name of an adapter whole as the key of a field, its dots encoded', () => {
+    expect([adapterKeyOf('alternative.me'), adapterKeyOf('CoinMarketCap')]).toEqual([
+      'alternative%2Eme',
+      'CoinMarketCap',
+    ]);
+  });
+});
+
 describe('formValuesOf', () => {
   it('fills the form with the configuration version in force', () => {
     expect(formValuesOf(FLOW)).toEqual({
@@ -172,8 +199,16 @@ describe('formValuesOf', () => {
       model: 'openrouter/deepseek-chat',
       model_parameters: { temperature: '0.7' },
       sources: {
-        indicatori: { active: true, weight: '2', parameters: { lunghezza_serie: '10' } },
-        sentiment: { active: true, weight: '1', parameters: {} },
+        indicatori: {
+          active: true,
+          adapters: {
+            Hyperliquid: { active: true, weight: '2', parameters: { lunghezza_serie: '10' } },
+          },
+        },
+        sentiment: {
+          active: true,
+          adapters: { 'alternative%2Eme': { active: true, weight: '1', parameters: {} } },
+        },
       },
       instructions: 'prudente',
       max_leverage: '3',
@@ -253,14 +288,29 @@ describe('changesOf', () => {
 
   it('sends only the settings that changed, the sources whole', () => {
     const values = formValuesOf(FLOW);
-    values.sources.sentiment = { active: true, weight: '3', parameters: {} };
+    values.sources.sentiment = {
+      active: true,
+      adapters: {
+        'alternative%2Eme': { active: true, weight: '3', parameters: {} },
+        CoinMarketCap: { active: true, weight: '7' },
+      },
+    };
     values.instructions = 'audace';
 
     expect(changesOf(FLOW, values)).toEqual({
       settings: {
         sources: [
-          { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 10 } },
-          { name: 'sentiment', weight: 3, parameters: {} },
+          {
+            name: 'indicatori',
+            adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 10 } }],
+          },
+          {
+            name: 'sentiment',
+            adapters: [
+              { name: 'alternative.me', weight: 3, parameters: {} },
+              { name: 'CoinMarketCap', weight: 7, parameters: {} },
+            ],
+          },
         ],
         instructions: 'audace',
       },

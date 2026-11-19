@@ -42,7 +42,7 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 def factory(engine: Engine, outbox: OutboxPort) -> Callable[[TenantId], WorkerUseCases]:
     opener = SodiumCredentialOpenerAdapter({})
-    environment, hyperliquid = dev_installation_on_testnet()
+    environment, hyperliquid, _ = dev_installation_on_testnet()
     return worker_use_cases(
         engine,
         (opener, partial(SodiumMailPasswordOpenerAdapter, {})),

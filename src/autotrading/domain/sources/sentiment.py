@@ -1,16 +1,10 @@
 from autotrading.domain.sources.source_definition import SourceDefinition
 
-# Two different indices with the same name and their own methodology: the owner wants both (R1.3.6).
-SENTIMENT_ALTERNATIVE_ME = SourceDefinition(
-    name="sentiment-alternative-me",
-    description="Crypto Fear & Greed Index di alternative.me: valore, classificazione e istante di aggiornamento.",
-    per_asset=False,
-    parameters=(),
-)
-
-SENTIMENT_COINMARKETCAP = SourceDefinition(
-    name="sentiment-coinmarketcap",
-    description="CMC Crypto Fear and Greed Index di CoinMarketCap: valore, classificazione e istante di aggiornamento.",
+# One source with an adapter for every provider of the index: the indices of different providers share the name and
+# have their own methodology, the flow chooses which ones to read (R4.1.1, superseding the two sources of ADR 0033).
+SENTIMENT = SourceDefinition(
+    name="sentiment",
+    description="Indice Fear & Greed del mercato cripto: valore, classificazione e istante di aggiornamento.",
     per_asset=False,
     parameters=(),
 )

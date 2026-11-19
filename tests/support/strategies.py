@@ -9,12 +9,12 @@ from autotrading.application.flows.export_flow_strategy import (
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyUseCase
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.model_settings import FakeModelSettingsAdapter
 from tests.fakes.source_settings import FakeSourceSettingsAdapter
 from tests.support.flows import OPENROUTER_MODEL, a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 
 class Strategies:
@@ -34,7 +34,7 @@ class Strategies:
         configuration = replace(
             a_configuration(assets=("BTC",), allocated_capital=Decimal(300)),
             version=3,
-            sources=(SourceSelection("indicatori", 2),),
+            sources=(a_source("indicatori", 2),),
             instructions="compra basso",
         )
         flow = a_flow(self.tenant_id, status=status, configuration=configuration)

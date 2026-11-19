@@ -45,7 +45,7 @@ FAILED = CycleRecord(
     started_at=PLANNED,
     delay_seconds=90,
     steps=(CycleStep.READ_FLOW_STATE, CycleStep.COLLECT_SOURCES),
-    absent_sources=(AbsentSource("notizie", "nessuna risposta entro 60 secondi"),),
+    absent_sources=(AbsentSource("notizie", "nessuna risposta entro 60 secondi", "RSS"),),
     failure=CycleFailure(CycleStep.COMPOSE_CONTEXT, "FakeTransientError", "timeout"),
     documents=(StepDocument(CycleStep.READ_FLOW_STATE, {"versione": 3, "pesi": {"notizie": 7}}),),
     cost=CallCost(2000, 500, Decimal("0.0031")),
@@ -64,7 +64,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "started_at": PLANNED,
         "delay_seconds": 90,
         "steps": ["read_flow_state", "collect_sources"],
-        "absent_sources": [{"source": "notizie", "reason": "nessuna risposta entro 60 secondi"}],
+        "absent_sources": [{"source": "notizie", "reason": "nessuna risposta entro 60 secondi", "adapter": "RSS"}],
         "failure": {"step": "compose_context", "error_type": "FakeTransientError", "message": "timeout"},
         "documents": [{"step": "read_flow_state", "content": {"versione": 3, "pesi": {"notizie": 7}}}],
         "input_tokens": 2000,
@@ -78,6 +78,12 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
 
 def test_a_saved_record_reads_back_as_it_was() -> None:
     assert record_of(row_of(FAILED, TENANT)) == FAILED
+
+
+def test_an_absent_source_recorded_before_the_adapters_reads_back_without_adapter() -> None:
+    row = row_of(FAILED, TENANT) | {"absent_sources": [{"source": "notizie", "reason": "fonte giù"}]}
+
+    assert record_of(row).absent_sources == (AbsentSource("notizie", "fonte giù"),)
 
 
 def test_a_skipped_record_has_no_failure_no_documents_and_no_cost() -> None:

@@ -25,7 +25,7 @@ test('ADR 0146: every field of the form of a new flow stays within the width of 
   const form = page.getByRole('form', { name: 'Configurazione del flusso' });
   await expect(dashboard.field('Modello')).toBeVisible();
   await page.getByRole('checkbox', { name: 'indicatori', exact: true }).check();
-  await expect(dashboard.field('Peso di indicatori')).toBeVisible();
+  await expect(dashboard.field('Peso di indicatori · Hyperliquid')).toBeVisible();
 
   const width = page.viewportSize()?.width ?? 0;
   const overflowing = await form

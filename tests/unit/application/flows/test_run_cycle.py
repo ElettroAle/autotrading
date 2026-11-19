@@ -187,7 +187,7 @@ def test_the_absent_sources_are_recorded(cycles: Cycles) -> None:
     record = run(cycles)
 
     assert record is not None
-    assert record.absent_sources == (AbsentSource("notizie", "fonte giù"),)
+    assert record.absent_sources == (AbsentSource("notizie", "fonte giù", "RSS"),)
     assert cycles.context.composed[cycles.id_of("alfa")].absent == record.absent_sources
 
 
@@ -199,7 +199,7 @@ def test_the_sources_wait_follows_the_interval(cycles: Cycles) -> None:
     record = run(cycles)
 
     assert record is not None
-    assert record.absent_sources == (AbsentSource("notizie", "nessuna risposta entro 30 secondi"),)
+    assert record.absent_sources == (AbsentSource("notizie", "nessuna risposta entro 30 secondi", "RSS"),)
 
 
 # A source that fails is absent, never a failed cycle (R1.2.5); the record of the cycle closes it.

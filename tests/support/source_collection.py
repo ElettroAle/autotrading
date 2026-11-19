@@ -8,15 +8,21 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from autotrading.application.sources.collect_source import CollectedSource, CollectSourceCommand, CollectSourceUseCase
+from autotrading.application.sources.collect_source import (
+    CollectedSource,
+    CollectSourceCommand,
+    CollectSourceUseCase,
+    Reader,
+)
 from autotrading.domain.agent.agent_context import AgentContext, FlowStateView, SourceData
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.sources.source_sample import CycleReference, SourceValue
 from tests.fakes.source_readers import FakeSourceReaderAdapter, InMemorySampleRepositoryAdapter
+from tests.support.source_selections import PLATFORM_CATALOG, a_source, reader_of
 
 STARTED_AT = datetime(2026, 11, 12, 8, 0, tzinfo=UTC)
 COLLECTED_AT = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
+CATALOG = PLATFORM_CATALOG
 STATE = FlowStateView("USDC", Decimal(1000), Decimal(1000), Decimal(1000), Decimal(1000), Decimal(0), ())
 
 
@@ -27,10 +33,11 @@ class SourceCycle:
     flow_id: UUID = field(default_factory=uuid4)
     assets: tuple[str, ...] = ()
     selections: list[SourceSelection] = field(default_factory=list)
-    readers: dict[str, FakeSourceReaderAdapter] = field(
+    readers: dict[Reader, FakeSourceReaderAdapter] = field(
         default_factory=lambda: {
-            source.name: FakeSourceReaderAdapter([SourceValue(COLLECTED_AT, {"valore": "1"})])
-            for source in SOURCE_CATALOG.sources
+            (source.name, adapter.name): FakeSourceReaderAdapter([SourceValue(COLLECTED_AT, {"valore": "1"})])
+            for source in CATALOG.sources
+            for adapter in source.adapters
         }
     )
     samples: InMemorySampleRepositoryAdapter = field(default_factory=InMemorySampleRepositoryAdapter)
@@ -38,19 +45,31 @@ class SourceCycle:
     context: AgentContext | None = None
 
     def activate(self, source: str, weight: int = DEFAULT_WEIGHT) -> None:
-        self.selections.append(SourceSelection(source, weight))
+        name, adapter = reader_of(source)
+        self.selections.append(a_source(name, weight, adapter=adapter))
+
+    def reader(self, source: str) -> FakeSourceReaderAdapter:
+        """The reader of the adapter a name of the specifications means."""
+        return self.readers[reader_of(source)]
 
     def run(self, collected_at: datetime = COLLECTED_AT) -> CycleReference:
         """Runs the cycle planned at the instant of the collection, and gives back that cycle."""
-        use_case = CollectSourceUseCase(SOURCE_CATALOG, self.readers, self.samples)
+        use_case = CollectSourceUseCase(CATALOG, self.readers, self.samples)
         reference = CycleReference(self.flow_id, collected_at)
         self.collected = [
             use_case.execute(
                 CollectSourceCommand(
-                    reference, selection.name, selection.weight, selection.parameters, self.assets, collected_at
+                    reference,
+                    selection.name,
+                    adapter.name,
+                    adapter.weight,
+                    adapter.parameters,
+                    self.assets,
+                    collected_at,
                 )
             )
             for selection in self.selections
+            for adapter in selection.adapters
         ]
         self.context = AgentContext(
             "istruzioni",
@@ -59,7 +78,7 @@ class SourceCycle:
             collected_at,
             STATE,
             tuple(
-                SourceData(collected.source, collected.weight, asset, values)
+                SourceData(collected.source, collected.adapter, collected.weight, asset, values)
                 for collected in self.collected
                 for asset, values in collected.entries
             ),

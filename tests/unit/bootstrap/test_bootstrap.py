@@ -11,6 +11,8 @@ from sqlalchemy import create_engine
 from autotrading import bootstrap
 from autotrading.adapters.configuration.errors import MissingConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
+from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters
 from autotrading.adapters.outbound.libsodium.composition import SealersOfTenant
 from autotrading.adapters.outbound.libsodium.mail_password_opener import SodiumMailPasswordOpenerAdapter
 from autotrading.adapters.outbound.libsodium.mail_password_sealer import SodiumMailPasswordSealerAdapter
@@ -40,11 +42,13 @@ from autotrading.application.notifications.notify_position_closed import NotifyP
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.application.orders.errors import OrderAccountNotFoundError, OrderExchangeUnavailableError
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
+from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError
 from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.bootstrap import (
     create_application,
     create_worker_application,
+    source_systems,
     tenant_use_cases,
     worker_use_cases,
 )
@@ -260,6 +264,25 @@ def test_application_refuses_to_start_without_the_worker(tmp_path: Path, name: s
     assert raised.value.name == name
 
 
+def test_application_refuses_to_start_without_the_forecaster_its_sources_declare(tmp_path: Path) -> None:
+    with pytest.raises(AutotradingError):
+        create_application(installation_configuration(tmp_path, FORECASTER_URL=""))
+
+
+def test_the_sources_of_the_api_are_offered_by_the_adapters_of_the_installation() -> None:
+    forecaster = forecaster_adapters(ConfigurationSource({"FORECASTER_URL": "http://forecaster:8000"}))
+
+    catalog = ListSourcesUseCase(source_systems(hyperliquid_adapters(), forecaster)).execute()
+
+    assert [(source.name, [adapter.name for adapter in source.adapters]) for source in catalog.sources] == [
+        ("indicatori", ["Hyperliquid"]),
+        ("pivot", ["Hyperliquid"]),
+        ("forecast", ["Prophet"]),
+        ("sentiment", ["alternative.me", "CoinMarketCap"]),
+        ("notizie", ["RSS"]),
+    ]
+
+
 def test_the_worker_answers_only_with_the_token_generated_on_the_machine(tmp_path: Path) -> None:
     client = TestClient(create_worker_application(worker_configuration(tmp_path)))
     path = f"/tenants/{uuid4()}/accounts/{uuid4()}/state"
@@ -342,7 +365,7 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     opener = SodiumCredentialOpenerAdapter({})
-    environment, hyperliquid = dev_installation_on_testnet()
+    environment, hyperliquid, _ = dev_installation_on_testnet()
     factory = worker_use_cases(
         create_engine("sqlite://"),
         (opener, partial(SodiumMailPasswordOpenerAdapter, {})),

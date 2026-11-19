@@ -52,7 +52,7 @@ describe('Strategy export and import', () => {
     fakePlatform.addUser('anna', { hasUserRole: true });
     fakePlatform.addFlow('anna', 'alfa', {
       model: 'openrouter/deepseek-chat',
-      sources: [{ name: 'indicatori', weight: 2 }],
+      sources: [{ name: 'indicatori', adapters: [{ name: 'Hyperliquid', weight: 2 }] }],
     });
   });
 
@@ -101,7 +101,9 @@ describe('Strategy export and import', () => {
     expect(screen.getByRole('note', { name: 'Da configurare' })).toHaveTextContent(
       "Prima dell'avvio mancano: conto, capitale allocato e asset",
     );
-    expect(fakePlatform.flowNamed('alfa bis').sources).toEqual([{ name: 'indicatori', weight: 2 }]);
+    expect(fakePlatform.flowNamed('alfa bis').sources).toEqual([
+      { name: 'indicatori', adapters: [{ name: 'Hyperliquid', weight: 2 }] },
+    ]);
   });
 
   it('sends the file as it is, the API decides whether it is valid', async () => {

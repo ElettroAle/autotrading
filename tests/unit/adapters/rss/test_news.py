@@ -9,6 +9,7 @@ import pytest
 from autotrading.adapters.outbound.rss.news import RssNewsAdapter
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.news_item import NewsItem
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 FIRST, SECOND = "https://outlet.example/rss", "https://other.example/feed"
 REFUSED = "connection refused"
@@ -36,6 +37,18 @@ def adapter_serving(pages: Mapping[str, str | int], feeds: tuple[str, ...] = (FI
         return httpx.Response(200, text=page)
 
     return RssNewsAdapter(httpx.Client(transport=httpx.MockTransport(answer)), feeds)
+
+
+def test_the_feeds_declare_the_adapter_of_the_news_without_configuration_nor_history() -> None:
+    declaration = RssNewsAdapter(httpx.Client()).declaration()
+
+    assert declaration == SourceAdapterDeclaration(
+        "RSS",
+        "Feed RSS di CoinDesk, Cointelegraph e Decrypt, senza chiave.",
+        (),
+        (),
+        offers_history=False,
+    )
 
 
 def test_the_stories_of_every_feed_are_read() -> None:

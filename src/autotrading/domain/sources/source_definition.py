@@ -22,16 +22,22 @@ class SourceDefinition:
             return None
         return self.silence(settings)
 
-    def settings(self, requested: Mapping[str, int]) -> dict[str, int]:
-        """The parameters of a flow: the requested values checked, the catalog defaults for the others (R1.3.2)."""
-        chosen = {key: self._accepted(key, value) for key, value in requested.items()}
-        return {parameter.key: chosen.get(parameter.key, parameter.default) for parameter in self.parameters}
+    def settings(
+        self, requested: Mapping[str, int], adapter_parameters: tuple[SourceParameter, ...] = ()
+    ) -> dict[str, int]:
+        """The parameters of a flow: the requested values checked, the catalog defaults for the others (R1.3.2).
 
-    def _accepted(self, key: str, value: int) -> int:
-        parameter = next((parameter for parameter in self.parameters if parameter.key == key), None)
+        The parameters of the source hold for every adapter; the adapter may add its own (R4.1.1).
+        """
+        parameters = (*self.parameters, *adapter_parameters)
+        chosen = {key: self._accepted(parameters, key, value) for key, value in requested.items()}
+        return {parameter.key: chosen.get(parameter.key, parameter.default) for parameter in parameters}
+
+    def _accepted(self, parameters: tuple[SourceParameter, ...], key: str, value: int) -> int:
+        parameter = next((parameter for parameter in parameters if parameter.key == key), None)
         if parameter is None:
             raise UnknownSourceParameterError(self.name, key)
         # A boolean is an int in Python, never a number a user meant.
         if isinstance(value, bool) or not isinstance(value, int) or not parameter.accepts(value):
-            raise SourceParameterOutOfRangeError(parameter.label)
+            raise SourceParameterOutOfRangeError(parameter.label, parameter.minimum, parameter.maximum)
         return value

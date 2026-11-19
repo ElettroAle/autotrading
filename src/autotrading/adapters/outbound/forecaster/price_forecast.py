@@ -7,9 +7,18 @@ import httpx
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceHistory
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 # The first fit of an asset takes seconds on one vCPU; the wait of the cycle bounds the source anyway.
 TIMEOUT_SECONDS = 60.0
+# The adapter of the forecast (R4.1.1): it forecasts from any history it is sent, a past one too.
+DECLARATION = SourceAdapterDeclaration(
+    "Prophet",
+    "Previsione di Prophet dal servizio forecaster dell'installazione, sullo storico dei prezzi dell'exchange.",
+    (),
+    (),
+    offers_history=True,
+)
 
 
 class _HorizonForecast(TypedDict):
@@ -26,6 +35,9 @@ class ForecasterPriceForecastAdapter:
 
     def __init__(self, client: httpx.Client) -> None:
         self._client = client
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        return DECLARATION
 
     def predict(
         self, asset: str, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]

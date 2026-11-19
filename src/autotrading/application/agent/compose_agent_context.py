@@ -23,7 +23,8 @@ class ComposeAgentContextUseCase:
             now=question.now,
             state=_state_of(question.state),
             sources=tuple(
-                SourceData(source.source, source.weight, source.asset, source.values) for source in question.sources
+                SourceData(source.source, source.adapter, source.weight, source.asset, source.values)
+                for source in question.sources
             ),
             missing=tuple(question.missing),
         )

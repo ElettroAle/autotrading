@@ -9,6 +9,7 @@ from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.errors import UnknownCycleOutcomeError
 from autotrading.domain.flows.recorded_decision import RecordedDecision
+from autotrading.domain.flows.selections import ActiveSource
 
 
 class CycleOutcome(StrEnum):
@@ -36,10 +37,20 @@ class CycleFailure:
 
 @dataclass(frozen=True, slots=True)
 class AbsentSource:
-    """A source that gave no data in the cycle, with the reason declared to the agent (R1.2.5)."""
+    """A source that gave no data in the cycle, with the reason declared to the agent (R1.2.5), and the adapter that
+    gave none; None in the cycles recorded before the adapters (R4.1.1).
+    """
 
     source: str
     reason: str
+    adapter: str | None = None
+
+    @property
+    def label(self) -> str:
+        """The source and its adapter, as the agent and the user read them."""
+        if self.adapter is None:
+            return self.source
+        return ActiveSource(self.source, self.adapter).label
 
 
 @dataclass(frozen=True, slots=True)

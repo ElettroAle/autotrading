@@ -23,8 +23,8 @@ LONG_BTC = PositionView(
     "BTC", TradeDirection.LONG, Decimal("0.01"), 3, Decimal(60000), Decimal(61250), Decimal("12.5"), Decimal(41000)
 )
 STATE = FlowStateView("USDC", Decimal(400), Decimal(380), Decimal(250), Decimal(412), Decimal("2.5"), (LONG_BTC,))
-RSI = SourceData("indicatori", 7, "BTC", {"rsi_14": "61.2"})
-FEAR = SourceData("sentiment-alternative-me", 3, None, {"valore": "29", "classificazione": "Fear"})
+RSI = SourceData("indicatori", "Hyperliquid", 7, "BTC", {"rsi_14": "61.2"})
+FEAR = SourceData("sentiment", "alternative.me", 3, None, {"valore": "29", "classificazione": "Fear"})
 
 
 def context(**changes: object) -> AgentContext:
@@ -130,9 +130,10 @@ def test_the_user_message_has_the_sources_with_their_weights_and_the_missing_dat
     document = user_document(context())
 
     assert document["fonti"] == [
-        {"fonte": "indicatori", "peso": 7, "asset": "BTC", "valori": {"rsi_14": "61.2"}},
+        {"fonte": "indicatori", "adapter": "Hyperliquid", "peso": 7, "asset": "BTC", "valori": {"rsi_14": "61.2"}},
         {
-            "fonte": "sentiment-alternative-me",
+            "fonte": "sentiment",
+            "adapter": "alternative.me",
             "peso": 3,
             "asset": None,
             "valori": {"valore": "29", "classificazione": "Fear"},

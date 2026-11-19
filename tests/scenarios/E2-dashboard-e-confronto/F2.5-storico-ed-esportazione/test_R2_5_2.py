@@ -8,7 +8,6 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument
-from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, shared by the features
@@ -18,6 +17,7 @@ from tests.support.flows import account_id_of, scenario_catalog
 from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the life of a flow, shared by the features
 from tests.support.lifecycle_steps import Lifecycle, attempt, flow_named
 from tests.support.platform import Platform
+from tests.support.source_selections import a_source_request
 from tests.support.steps import quoted
 
 scenarios(
@@ -132,7 +132,7 @@ def flow_with_strategy(
         account_id=account_id_of(platform, user, account),
         assets=(asset,),
         model=model,
-        sources=(SourceRequest(source, int(weight)),),
+        sources=(a_source_request(source, int(weight)),),
         allocated_capital=Decimal(capital),
         instructions="compra solo in tendenza",
     )
@@ -149,7 +149,10 @@ def export_flow(platform: Platform, transfer: Transfer, user: str, name: str) ->
 def file_strategy(transfer: Transfer, source: str, *, weight: str, model: str) -> None:
     strategy = strategy_of(transfer.file)
     sources = cast(list[Document], strategy["sources"])
-    assert [(each["name"], each["weight"]) for each in sources] == [(source, int(weight))]
+    weights = [
+        (each["name"], adapter["weight"]) for each in sources for adapter in cast(list[Document], each["adapters"])
+    ]
+    assert weights == [(source, int(weight))]
     assert cast(Document, strategy["model"])["name"] == model
 
 

@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, Select, and_, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
+from autotrading.adapters.outbound.sqlalchemy.source_correspondence import document_in_adapters
 from autotrading.adapters.outbound.sqlalchemy.tables import flow_capital_changes, flow_versions, flows
 from autotrading.application.agent.ports import ModelUse
 from autotrading.application.flows.errors import (
@@ -30,7 +31,12 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelParameterValue, ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import (
+    AdapterSelection,
+    ModelParameterValue,
+    ModelSelection,
+    SourceSelection,
+)
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -45,10 +51,15 @@ class _ModelDocument(TypedDict):
     parameters: dict[str, dict[str, str]]
 
 
-class _SourceDocument(TypedDict):
+class _AdapterDocument(TypedDict):
     name: str
     weight: int
     parameters: dict[str, int]
+
+
+class _SourceDocument(TypedDict):
+    name: str
+    adapters: list[_AdapterDocument]
 
 
 class _RiskLimitsDocument(TypedDict):
@@ -312,7 +323,13 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         "cycle_minutes": configuration.cycle_interval.minutes,
         "model": {"name": configuration.model.name, "parameters": _texts(configuration.model.parameters)},
         "sources": [
-            {"name": source.name, "weight": source.weight, "parameters": dict(source.parameters)}
+            {
+                "name": source.name,
+                "adapters": [
+                    {"name": adapter.name, "weight": adapter.weight, "parameters": dict(adapter.parameters)}
+                    for adapter in source.adapters
+                ],
+            }
             for source in configuration.sources
         ],
         "instructions": configuration.instructions,
@@ -339,7 +356,8 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
 
 
 def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfiguration:
-    document = cast("_ConfigurationDocument", saved)
+    # A version saved before the adapters reads in their model, so history, differences and restore see only it.
+    document = cast("_ConfigurationDocument", document_in_adapters(saved))
     limits = document["risk_limits"]
     model = document["model"]
     return FlowConfiguration(
@@ -348,7 +366,13 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         cycle_interval=CycleInterval(document["cycle_minutes"]),
         model=ModelSelection(model["name"], {key: _parameter(value) for key, value in model["parameters"].items()}),
         sources=tuple(
-            SourceSelection(source["name"], source["weight"], dict(source["parameters"]))
+            SourceSelection(
+                source["name"],
+                tuple(
+                    AdapterSelection(adapter["name"], adapter["weight"], dict(adapter["parameters"]))
+                    for adapter in source["adapters"]
+                ),
+            )
             for source in document["sources"]
         ),
         instructions=document["instructions"],

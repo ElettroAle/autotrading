@@ -39,12 +39,16 @@ const CycleFailureView = ({ failure }: { failure: Failure }) => (
   </section>
 );
 
+// The source and the adapter that gave no data, «fonte · adapter», or the source alone before the adapters (R4.1.1).
+const absentLabel = (absent: Cycle['absent_sources'][number]): string =>
+  absent.adapter === null ? absent.source : `${absent.source} · ${absent.adapter}`;
+
 const AbsentSources = ({ sources }: { sources: Cycle['absent_sources'] }) => (
   <CycleSection title="Fonti assenti">
     <ul className="list-inside list-disc text-sm">
       {sources.map((absent) => (
-        <li key={absent.source}>
-          {absent.source}: {absent.reason}
+        <li key={absentLabel(absent)}>
+          {absentLabel(absent)}: {absent.reason}
         </li>
       ))}
     </ul>

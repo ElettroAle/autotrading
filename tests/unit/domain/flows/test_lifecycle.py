@@ -20,9 +20,10 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 TENANT = TenantId.new()
 ACCOUNT = uuid4()
@@ -145,7 +146,7 @@ def test_two_equal_versions_have_no_difference() -> None:
 def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration() -> None:
     before = replace(
         a_configuration(assets=("BTC", "ETH")),
-        sources=(SourceSelection("notizie", 5, {"numero_notizie": 10, "eta_massima_ore": 24}),),
+        sources=(a_source("notizie", 5, {"numero_notizie": 10, "eta_massima_ore": 24}),),
         instructions="prudente",
     )
     after = replace(
@@ -169,7 +170,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("intervallo di ciclo", "15 minuti", "30 minuti"),
         ConfigurationDifference("modello", "openrouter/deepseek-chat", "anthropic/claude-sonnet"),
         ConfigurationDifference("parametri del modello", "temperature 1", "max_tokens 900, temperature 0.5"),
-        ConfigurationDifference("fonti", "notizie (peso 5, eta_massima_ore 24, numero_notizie 10)", "nessuno"),
+        ConfigurationDifference("fonti", "notizie · RSS (peso 5, eta_massima_ore 24, numero_notizie 10)", "nessuno"),
         ConfigurationDifference("istruzioni", "prudente", "aggressivo"),
         ConfigurationDifference("leva massima", "5", "3"),
         ConfigurationDifference("esposizione massima del margine", "10%", "nessuno"),
@@ -191,10 +192,10 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
 
 def test_several_sources_and_no_parameter_are_written_in_full() -> None:
     before = replace(a_configuration(), model=ModelSelection("openrouter/deepseek-chat"))
-    after = replace(before, sources=(SourceSelection("indicatori", 2), SourceSelection("pivot")))
+    after = replace(before, sources=(a_source("indicatori", 2), a_source("pivot")))
 
     assert differences(before, after) == (
-        ConfigurationDifference("fonti", "nessuno", "indicatori (peso 2); pivot (peso 5)"),
+        ConfigurationDifference("fonti", "nessuno", "indicatori · Hyperliquid (peso 2); pivot · Hyperliquid (peso 5)"),
     )
     assert differences(before, replace(before, model=ModelSelection("openrouter/deepseek-chat", {"t": "alto"}))) == (
         ConfigurationDifference("parametri del modello", "nessuno", "t alto"),

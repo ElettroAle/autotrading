@@ -45,6 +45,7 @@ from autotrading.application.orders.close_flow_position import CloseFlowPosition
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
+from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
 from autotrading.application.verification.run_exchange_verification import (
@@ -58,7 +59,6 @@ from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
@@ -150,6 +150,7 @@ from tests.support.mail_servers import MailServers
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.procedure_orders import procedure_orders
+from tests.support.source_selections import platform_systems
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -184,7 +185,9 @@ class Platform:
         self.flows = FlowStore()
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
-        self.markets = {HYPERLIQUID: FakeMarketsAdapter()}
+        # The markets of the exchanges, and the adapters of the sources, the same in the API and in the worker
+        # (R4.1.1): FlowCycles puts its own.
+        self.markets, self.source_systems = {HYPERLIQUID: FakeMarketsAdapter()}, platform_systems()
         self.model_catalog: ModelCatalog = PLATFORM_MODELS
         self.link_codes: LinkCodeStore = {}
         self.chats: LinkedChatStore = {}
@@ -281,6 +284,7 @@ class Platform:
         closing_ports = ClosingPorts(
             self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
         )
+        sources = ListSourcesUseCase(self.source_systems)
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -292,7 +296,7 @@ class Platform:
                 flows, flow_openings, closed_positions, closing_notice, exit_plans
             ),
             verification=verification,
-            source_catalog=SOURCE_CATALOG,
+            sources=sources,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_usage=flows,
@@ -303,7 +307,7 @@ class Platform:
                 accounts=FlowAccountPorts(accounts, self.account_activity, self.ledger),
                 markets=self.markets,
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
-                sources=SelectSourceUseCase(SOURCE_CATALOG),
+                sources=SelectSourceUseCase(sources),
             ),
             flow_positions=flow_positions,
             closing_ports=closing_ports,

@@ -1,12 +1,50 @@
-from autotrading.domain.sources.source_catalog import SourceCatalog
-from autotrading.domain.sources.source_definition import SourceDefinition
+from dataclasses import dataclass
+
+from autotrading.application.sources.ports import (
+    MarketDataPort,
+    NewsPort,
+    PriceForecasterPort,
+    PriceHistoryPort,
+    SentimentPort,
+)
+from autotrading.domain.sources.forecast import FORECAST
+from autotrading.domain.sources.indicators import INDICATORS
+from autotrading.domain.sources.news import NEWS
+from autotrading.domain.sources.pivots import PIVOTS
+from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.source_catalog import OfferedSource, SourceCatalog
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSystems:
+    """The systems the sources of the catalog read, the same for every tenant (ADR 0042): every adapter of a source
+    declares itself (R4.1.1).
+    """
+
+    sentiments: tuple[SentimentPort, ...]
+    news: NewsPort
+    prices: PriceHistoryPort
+    forecaster: PriceForecasterPort
+    market: MarketDataPort
 
 
 class ListSourcesUseCase:
-    """The sources a flow can activate, with their parameters (R1.3.1)."""
+    """The sources a flow can activate, each with the adapters that offer it as they declare themselves (R1.3.1,
+    R4.1.1, ADR fonti-con-adapter-dichiarati).
+    """
 
-    def __init__(self, catalog: SourceCatalog) -> None:
-        self._catalog = catalog
+    def __init__(self, systems: SourceSystems) -> None:
+        self._systems = systems
 
-    def execute(self) -> list[SourceDefinition]:
-        return list(self._catalog.sources)
+    def execute(self) -> SourceCatalog:
+        systems = self._systems
+        market = systems.market.declaration()
+        return SourceCatalog(
+            (
+                OfferedSource(INDICATORS, (market,)),
+                OfferedSource(PIVOTS, (market,)),
+                OfferedSource(FORECAST, (systems.forecaster.declaration(),)),
+                OfferedSource(SENTIMENT, tuple(sentiment.declaration() for sentiment in systems.sentiments)),
+                OfferedSource(NEWS, (systems.news.declaration(),)),
+            )
+        )

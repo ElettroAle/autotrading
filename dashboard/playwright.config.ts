@@ -19,6 +19,7 @@ const testDir = defineBddConfig({
   features: [
     '../specs/E2-dashboard-e-confronto/**/*.feature',
     '../specs/E3-rischio-capitale-e-qualita/**/*.feature',
+    '../specs/E4-replay-e-analisi/F4.1-fonti-ad-adapter-configurabili/*.feature',
     '../specs/E6-piattaforma-e-operativita/F6.2-avvisi-e-scadenze/*.feature',
     '../specs/E6-piattaforma-e-operativita/F6.4-dashboard-su-mobile/*.feature',
     '../specs/E6-piattaforma-e-operativita/F6.5-usabilita-della-dashboard/*.feature',

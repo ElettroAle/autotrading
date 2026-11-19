@@ -40,12 +40,12 @@ def flow_with_source(cycle: SourceCycle, source: str) -> None:
 
 @given(quoted('che l\'ultima candela a 15 minuti di "{asset}" chiude alle {clock}'))
 def last_candle(cycle: SourceCycle, clock: str) -> None:
-    cycle.readers["indicatori"].values = [SourceValue(at(clock), {"prezzo": "100"})]
+    cycle.reader("indicatori").values = [SourceValue(at(clock), {"prezzo": "100"})]
 
 
 @given(quoted("che una notizia è stata pubblicata alle {clock}"))
 def published_story(cycle: SourceCycle, clock: str) -> None:
-    cycle.readers["notizie"].values = [SourceValue(at(clock), {"titolo": "Bitcoin"})]
+    cycle.reader("notizie").values = [SourceValue(at(clock), {"titolo": "Bitcoin"})]
 
 
 @when(quoted('il flusso "{flow}" esegue alle {clock} il ciclo "{name}"'))

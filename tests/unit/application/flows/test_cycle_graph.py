@@ -58,8 +58,8 @@ def test_every_active_source_that_answers_gives_its_reading_in_the_order_of_the_
 
     assert readings_of(record) == repr(
         [
-            SourceReading("indicatori", {"source": "indicatori", "flow_id": flow_id}),
-            SourceReading("notizie", {"source": "notizie", "flow_id": flow_id}),
+            SourceReading("indicatori · Hyperliquid", {"source": "indicatori", "flow_id": flow_id}),
+            SourceReading("notizie · RSS", {"source": "notizie", "flow_id": flow_id}),
         ]
     )
 
@@ -72,7 +72,7 @@ def test_a_silent_source_is_absent_with_the_wait_in_seconds_and_the_cycle_goes_o
 
     wait = int(cycles.flow("alfa").schedule.source_wait.total_seconds())
     assert record.outcome is CycleOutcome.COMPLETED
-    assert record.absent_sources == (AbsentSource("notizie", f"nessuna risposta entro {wait} secondi"),)
+    assert record.absent_sources == (AbsentSource("notizie", f"nessuna risposta entro {wait} secondi", "RSS"),)
 
 
 def test_a_source_that_fails_is_absent_with_its_message(cycles: Cycles) -> None:
@@ -81,7 +81,7 @@ def test_a_source_that_fails_is_absent_with_its_message(cycles: Cycles) -> None:
 
     record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
 
-    assert record.absent_sources == (AbsentSource("notizie", "limite di richieste superato"),)
+    assert record.absent_sources == (AbsentSource("notizie", "limite di richieste superato", "RSS"),)
 
 
 def test_the_source_nodes_run_together(cycles: Cycles) -> None:

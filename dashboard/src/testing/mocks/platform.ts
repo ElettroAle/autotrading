@@ -75,11 +75,23 @@ export type FakeVersion = {
   readonly configuration: FakeConfiguration;
 };
 
-export type FakeSource = {
+/** An adapter chosen for a source of a flow, with its weight and its parameters (R4.1.1). */
+export type FakeAdapterChoice = {
   readonly name: string;
   readonly weight: number;
   readonly parameters?: Readonly<Record<string, number>>;
 };
+
+/** An active source of a flow with the adapters chosen (R4.1.1). */
+export type FakeSource = {
+  readonly name: string;
+  readonly adapters: FakeAdapterChoice[];
+};
+
+const copyOf = (source: FakeSource): FakeSource => ({
+  name: source.name,
+  adapters: source.adapters.map((adapter) => ({ ...adapter })),
+});
 
 /** The risk rules of a flow, as the API names them (R1.1.3). */
 export type FakeRiskLimits = {
@@ -177,7 +189,10 @@ export type FakeFlowConfiguration = {
   assets: string[];
   cycle_minutes: number;
   model: { name: string; parameters: Record<string, string> };
-  sources: { name: string; weight: number; parameters: Readonly<Record<string, number>> }[];
+  sources: {
+    name: string;
+    adapters: { name: string; weight: number; parameters: Readonly<Record<string, number>> }[];
+  }[];
   instructions: string;
   risk_limits: {
     max_leverage: number;
@@ -207,7 +222,10 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   assets: flow.assets,
   cycle_minutes: flow.cycleMinutes,
   model: { name: flow.model, parameters: flow.modelParameters },
-  sources: flow.sources.map((source) => ({ parameters: {}, ...source })),
+  sources: flow.sources.map((source) => ({
+    name: source.name,
+    adapters: source.adapters.map((adapter) => ({ parameters: {}, ...adapter })),
+  })),
   instructions: flow.instructions,
   risk_limits: {
     max_leverage: flow.riskLimits.maxLeverage,
@@ -306,7 +324,10 @@ export type FakeStrategyDocument = {
   readonly strategy: {
     readonly cycle_minutes?: number;
     readonly model?: { readonly name: string; readonly parameters: Record<string, string> };
-    readonly sources?: { readonly name: string; readonly weight: number }[];
+    readonly sources?: {
+      readonly name: string;
+      readonly adapters: { readonly name: string; readonly weight: number }[];
+    }[];
     readonly instructions?: string;
     readonly risk_limits?: Record<string, number | string | null>;
     readonly bring_to_minimum?: boolean;
@@ -314,6 +335,8 @@ export type FakeStrategyDocument = {
 };
 
 export const STRATEGY_FORMAT = 'autotrading-strategy';
+// The sources with their adapters came with the second version of the file (R4.1.1).
+const STRATEGY_FORMAT_VERSION = 2;
 
 /** The models the catalog of the fake platform offers: any other model is not available (R1.4.2). */
 export const FAKE_MODEL_CATALOG = new Set([
@@ -511,7 +534,7 @@ const draftOf = (
   allocatedCapital: null,
   model: strategy.model,
   modelParameters: { ...strategy.modelParameters },
-  sources: strategy.sources.map((source) => ({ ...source })),
+  sources: strategy.sources.map(copyOf),
   cycleMinutes: strategy.cycleMinutes,
   instructions: strategy.instructions ?? '',
   riskLimits: strategy.riskLimits ?? DEFAULT_RISK_LIMITS,
@@ -535,7 +558,7 @@ const draftOf = (
 });
 
 const modelOfStrategy = (document: FakeStrategyDocument): string => {
-  if (document.format !== STRATEGY_FORMAT || document.format_version !== 1) {
+  if (document.format !== STRATEGY_FORMAT || document.format_version !== STRATEGY_FORMAT_VERSION) {
     throw new FakeRefusal(
       400,
       `formato del file non supportato: ${document.format} versione ${document.format_version}`,
@@ -1083,11 +1106,14 @@ export const fakePlatform = {
     const flow = flowOf(user, flowId);
     const document: FakeStrategyDocument = {
       format: STRATEGY_FORMAT,
-      format_version: 1,
+      format_version: STRATEGY_FORMAT_VERSION,
       strategy: {
         cycle_minutes: flow.cycleMinutes,
         model: { name: flow.model, parameters: {} },
-        sources: flow.sources.map((source) => ({ ...source, parameters: {} })),
+        sources: flow.sources.map((source) => ({
+          name: source.name,
+          adapters: source.adapters.map((adapter) => ({ ...adapter, parameters: {} })),
+        })),
         instructions: '',
         risk_limits: {
           max_leverage: 3,
@@ -1109,7 +1135,10 @@ export const fakePlatform = {
     requireFreeName(user, flowName);
     const draft = draftOf(flowName, {
       model: modelOfStrategy(document),
-      sources: (document.strategy.sources ?? []).map(({ name, weight }) => ({ name, weight })),
+      sources: (document.strategy.sources ?? []).map(({ name, adapters }) => ({
+        name,
+        adapters: adapters.map((adapter) => ({ name: adapter.name, weight: adapter.weight })),
+      })),
       cycleMinutes: document.strategy.cycle_minutes ?? 15,
     });
     user.flows.push(draft);

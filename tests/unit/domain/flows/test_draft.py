@@ -20,9 +20,9 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
-from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 TENANT = TenantId.new()
 ACCOUNT = uuid4()
@@ -32,7 +32,7 @@ def a_strategy_flow() -> Flow:
     configuration = replace(
         a_configuration(assets=("BTC", "ETH"), allocated_capital=Decimal(300)),
         version=4,
-        sources=(SourceSelection("indicatori", 2),),
+        sources=(a_source("indicatori", 2),),
         instructions="compra basso",
         bring_to_minimum=True,
     )

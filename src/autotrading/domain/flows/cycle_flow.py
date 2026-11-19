@@ -11,6 +11,7 @@ from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
+from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -78,9 +79,11 @@ class CycleFlow:
         return OpeningsSuspension.first_of(loss_suspension, alarm_suspension)
 
     @property
-    def sources(self) -> tuple[str, ...]:
-        """The active sources of the configuration in force at the start: a change waits for the next cycle."""
-        return tuple(source.name for source in self.configuration.sources)
+    def sources(self) -> tuple[ActiveSource, ...]:
+        """The adapters of the active sources of the configuration in force at the start: a change waits for the next
+        cycle (R4.1.1).
+        """
+        return self.configuration.active_sources
 
     def state_view(self) -> FlowStateView:
         """The state of the flow alone, as the agent and the record of the cycle see it (R1.4.3)."""

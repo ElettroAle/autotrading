@@ -49,7 +49,7 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 from autotrading.domain.notifications.alert import AlertCause, AlertState
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
@@ -63,6 +63,7 @@ from tests.fakes.source_settings import FakeSourceSettingsAdapter
 from tests.fakes.verification_run_repository import RunningVerifications
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source, a_source_request
 
 OPENROUTER = "openrouter/deepseek-chat"
 ANTHROPIC = "anthropic/claude-sonnet"
@@ -150,7 +151,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         flow.id,
         account_id=flows.account_id,
         assets=("eth", "SOL"),
-        sources=(SourceRequest("notizie", 7, {"numero_notizie": 3}),),
+        sources=(a_source_request("notizie", 7, {"numero_notizie": 3}),),
         instructions="  prudente ",
         cycle_minutes=60,
         max_leverage=2,
@@ -171,7 +172,7 @@ def test_every_part_given_replaces_the_one_in_force(flows: Flows) -> None:
         flow.configuration,
         version=2,
         assets=("ETH", "SOL"),
-        sources=(SourceSelection("notizie", 7, {"numero_notizie": 3}),),
+        sources=(a_source("notizie", 7, {"numero_notizie": 3}),),
         instructions="prudente",
         cycle_interval=CycleInterval(60),
         risk_limits=RiskLimits(2, Decimal(20), Decimal(30), Decimal(40), Decimal(200)),

@@ -34,10 +34,12 @@ from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.flow_cost import CycleCost
 from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
+from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_repository import FlowStore
+from tests.support.source_selections import adapter_of
 
 ACTIVE, PAUSED = "attivo", "in pausa"
 TENANT = TenantId(UUID("00000000-0000-4000-8000-000000000001"))
@@ -358,7 +360,8 @@ class FakeFlowsAdapter:
         self.reads.append(flow_id)
         self._failures.raise_if_failing(flow_id, CycleStep.READ_FLOW_STATE)
         flow = self.flows[flow_id]
-        return FlowSnapshot(flow.sources, {"flow": flow.name, "positions": sorted(flow.positions)})
+        sources = tuple(ActiveSource(source, adapter_of(source)) for source in flow.sources)
+        return FlowSnapshot(sources, {"flow": flow.name, "positions": sorted(flow.positions)})
 
     def update(
         self,
@@ -392,8 +395,9 @@ class FakeSourcesAdapter:
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
 
-    def execute(self, request: SourceRequest, source: str) -> object:
+    def execute(self, request: SourceRequest, active: ActiveSource) -> object:
         flow_id = request.flow_id
+        source = active.source
         if source in self.silent:
             self.released.wait(LONGEST_HOLD)
         if source in self.late:

@@ -8,11 +8,13 @@ from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.exit_plan import ExitPlan
+from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK, OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
+from autotrading.domain.flows.selections import ActiveSource, AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
@@ -153,3 +155,20 @@ def test_a_position_without_a_plan_shows_the_empty_one() -> None:
     [position] = cycle_flow(attributed()).state_view().positions
 
     assert position.exit_plan == ExitPlan()
+
+
+def held_nothing(flow: Flow) -> FlowState:
+    return FlowState(flow.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0))
+
+
+def test_the_sources_of_the_cycle_are_the_active_sources_of_the_configuration_in_force() -> None:
+    configuration = replace(
+        a_configuration(), sources=(SourceSelection("notizie", (AdapterSelection("RSS"), AdapterSelection("altro"))),)
+    )
+    flow = a_flow(TENANT, configuration=configuration)
+
+    cycle = CycleFlow(
+        TENANT, flow, "test-1", "Hyperliquid", READ_AT, CycleAccount("USDC", Decimal(10000), ()), held_nothing(flow)
+    )
+
+    assert cycle.sources == (ActiveSource("notizie", "RSS"), ActiveSource("notizie", "altro"))

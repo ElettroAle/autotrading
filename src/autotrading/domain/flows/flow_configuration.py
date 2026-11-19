@@ -18,7 +18,7 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_check import RiskPolicy
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ActiveSource, ModelSelection, SourceSelection
 from autotrading.domain.flows.system_prompt import (
     DEFAULT_SYSTEM_PROMPT,
     PromptSubject,
@@ -110,6 +110,13 @@ class FlowConfiguration:
         if selection is None:
             raise SourceNotSelectedError(name)
         return selection
+
+    @property
+    def active_sources(self) -> tuple[ActiveSource, ...]:
+        """Every adapter of every active source, in the order of the configuration: the cycle reads each one
+        (R4.1.1).
+        """
+        return tuple(active for source in self.sources for active in source.active)
 
     @property
     def system_prompt_template(self) -> str:

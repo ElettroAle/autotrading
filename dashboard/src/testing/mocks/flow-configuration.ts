@@ -1,7 +1,13 @@
-import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT } from './catalogs';
+import {
+  FAKE_MODELS,
+  FAKE_SOURCES,
+  FAKE_SYSTEM_PROMPT,
+  type FakeSource as FakeCatalogSource,
+} from './catalogs';
 import {
   fakePlatform,
   type FakeAccount,
+  type FakeAdapterChoice,
   type FakeFlow,
   type FakeOpeningsResume,
   type FakeRiskLimits,
@@ -34,7 +40,9 @@ export class InvalidRequest extends Error {
   }
 }
 
-type SourceRequest = { name?: unknown; weight?: unknown; parameters?: unknown };
+type AdapterRequest = { name?: unknown; weight?: unknown; parameters?: unknown };
+
+type SourceRequest = { name?: unknown; adapters?: unknown };
 
 type ConfigurationRequest = {
   name?: unknown;
@@ -164,27 +172,63 @@ const modelOf = (user: FakeUser, name: unknown, parameters: unknown) => {
   return { name: model.name, parameters: resolved };
 };
 
-const sourceOf = (request: SourceRequest): FakeSource => {
+// Every adapter chosen, checked against what it declares in the catalog, as the API does (R4.1.1).
+const adapterOf = (source: FakeCatalogSource, request: AdapterRequest): FakeAdapterChoice => {
   const name = textOf(request.name);
-  const source = FAKE_SOURCES.find((candidate) => candidate.name === name);
-  if (source === undefined) {
-    throw new Refusal(422, `fonte non disponibile: ${name}`, 'sources');
+  const adapter = source.adapters.find((candidate) => candidate.name === name);
+  if (adapter === undefined) {
+    throw new Refusal(
+      422,
+      `adapter non disponibile per la fonte ${source.name}: ${name}`,
+      'sources',
+    );
   }
   const weight =
     request.weight === undefined || request.weight === null
       ? DEFAULT_WEIGHT
       : Number(request.weight);
   if (weight < 1 || weight > MAX_WEIGHT) {
-    throw new Refusal(422, `peso fuori da 1-10: ${name}`, 'sources');
+    throw new Refusal(422, `peso fuori da 1-10: ${source.name}`, 'sources');
   }
   const given = (request.parameters ?? {}) as Record<string, number>;
+  const outOfRange = adapter.parameters.find((parameter) => {
+    const value = given[parameter.key];
+    return value !== undefined && (value < parameter.minimum || value > parameter.maximum);
+  });
+  if (outOfRange !== undefined) {
+    throw new Refusal(
+      422,
+      `parametro fuori dai valori ammessi: ${outOfRange.label}, da ${outOfRange.minimum} a ${outOfRange.maximum}`,
+      'sources',
+    );
+  }
   const parameters = Object.fromEntries(
-    source.parameters.map((parameter) => [
+    adapter.parameters.map((parameter) => [
       parameter.key,
       given[parameter.key] ?? parameter.default,
     ]),
   );
   return { name, weight, parameters };
+};
+
+const sourceOf = (request: SourceRequest): FakeSource => {
+  const name = textOf(request.name);
+  const source = FAKE_SOURCES.find((candidate) => candidate.name === name);
+  if (source === undefined) {
+    throw new Refusal(422, `fonte non disponibile: ${name}`, 'sources');
+  }
+  const requested = (Array.isArray(request.adapters) ? request.adapters : []) as AdapterRequest[];
+  if (requested.length === 0) {
+    throw new Refusal(422, `scegli almeno un adapter della fonte ${name}`, 'sources');
+  }
+  const adapters = requested.map((adapter) => adapterOf(source, adapter));
+  const repeated = adapters.find(
+    (adapter, index) => adapters.findIndex((other) => other.name === adapter.name) !== index,
+  );
+  if (repeated !== undefined) {
+    throw new Refusal(422, `adapter ripetuto nella fonte ${name}: ${repeated.name}`, 'sources');
+  }
+  return { name, adapters };
 };
 
 const sourcesOf = (requested: unknown): FakeSource[] => {

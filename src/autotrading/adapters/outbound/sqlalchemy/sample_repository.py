@@ -30,6 +30,7 @@ def _row_of(sample: SourceSample, tenant_id: TenantId) -> dict[str, object]:
         "flow_id": sample.cycle.flow_id,
         "cycle_planned_at": sample.cycle.planned_at,
         "source": sample.source,
+        "adapter": sample.adapter,
         "asset": sample.asset,
         "reference_at": sample.reference_at,
         "collected_at": sample.collected_at,

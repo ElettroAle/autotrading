@@ -6,7 +6,6 @@ import pytest
 from autotrading.domain.flows.errors import MalformedSystemPromptError, UnknownPromptPlaceholderError
 from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.system_prompt import (
     DEFAULT_SYSTEM_PROMPT,
     PromptPlaceholder,
@@ -15,13 +14,14 @@ from autotrading.domain.flows.system_prompt import (
     rendered_system_prompt,
 )
 from tests.support.flows import a_configuration
+from tests.support.source_selections import a_source
 
 ACTIONS = ("apri", "chiudi", "mantieni")
 CONFIGURATION = replace(
     a_configuration(assets=("BTC", "ETH")),
     instructions="Sei prudente",
     risk_limits=RiskLimits(3, Decimal(10)),
-    sources=(SourceSelection("forecast", 10), SourceSelection("indicatori", 2)),
+    sources=(a_source("forecast", 10), a_source("indicatori", 2)),
 )
 WEIGHT_RULE = "\n".join(
     (
@@ -56,15 +56,16 @@ def test_every_placeholder_reads_its_value_from_the_flow() -> None:
         "actions": "apri, chiudi, mantieni",
         "max_leverage": "3",
         "assets": "BTC, ETH",
-        "source_weights": WEIGHT_RULE + "\n- pesi delle fonti attive del flusso: forecast 10, indicatori 2;",
+        "source_weights": WEIGHT_RULE
+        + "\n- pesi delle fonti attive del flusso: forecast · Prophet 10, indicatori · Hyperliquid 2;",
     }
 
 
 def test_the_weights_follow_the_order_of_the_configuration() -> None:
-    reordered = replace(CONFIGURATION, sources=(SourceSelection("indicatori", 2), SourceSelection("forecast", 10)))
+    reordered = replace(CONFIGURATION, sources=(a_source("indicatori", 2), a_source("forecast", 10)))
 
     assert PromptPlaceholder.SOURCE_WEIGHTS.value_of(PromptSubject(reordered, ACTIONS)).endswith(
-        "\n- pesi delle fonti attive del flusso: indicatori 2, forecast 10;"
+        "\n- pesi delle fonti attive del flusso: indicatori · Hyperliquid 2, forecast · Prophet 10;"
     )
 
 
@@ -80,7 +81,8 @@ def test_the_default_gives_the_rule_of_the_weights_among_the_operational_rules()
     rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
     rules, _, answer_format = rendered.partition("Rispondi solo con")
 
-    assert WEIGHT_RULE + "\n- pesi delle fonti attive del flusso: forecast 10, indicatori 2;\n" in rules
+    weights = "\n- pesi delle fonti attive del flusso: forecast · Prophet 10, indicatori · Hyperliquid 2;\n"
+    assert WEIGHT_RULE + weights in rules
     assert rules.index("- la chiusura è sempre totale;") < rules.index(WEIGHT_RULE)
     assert "peso" not in answer_format
 

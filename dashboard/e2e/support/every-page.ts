@@ -14,6 +14,7 @@ import { aClosedPosition, anOpenPosition } from '@/testing/mocks/positions';
 import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 
 import type { DashboardPages } from './dashboard-pages';
+import { aSource } from './sources';
 
 /** A name of a model with no space to break it, as the catalogs of the providers have (R6.4.1). */
 export const LONG_MODEL = 'openrouter/~deepseek/deepseek-flash-latest';
@@ -43,7 +44,7 @@ export const preparePagesWithLongWords = (
   flowName: string,
 ): Record<keyof typeof paths, string> => {
   const flow = aStoppedFlow(account, flowName, LONG_MODEL);
-  flow.sources = [{ name: 'indicatori', weight: 1 }];
+  flow.sources = [aSource('indicatori', 1)];
   const completed = aCompletedCycle(new Date(DAY));
   const failed = aFailedCycle(aCompletedCycle(new Date(DAY - HOUR)), STEPS.agentDecision, {
     errorType: 'ModelCallTimeoutError',
