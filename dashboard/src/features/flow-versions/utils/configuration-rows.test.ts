@@ -10,8 +10,14 @@ const CONFIGURATION: Configuration = {
   cycle_minutes: 30,
   model: { name: 'openrouter/deepseek-chat', parameters: { temperature: '0.5', effort: 'alto' } },
   sources: [
-    { name: 'notizie', weight: 7, parameters: { hours: 6 } },
-    { name: 'indicatori', weight: 5, parameters: {} },
+    { name: 'notizie', adapters: [{ name: 'RSS', weight: 7, parameters: { hours: 6 } }] },
+    {
+      name: 'sentiment',
+      adapters: [
+        { name: 'alternative.me', weight: 5, parameters: {} },
+        { name: 'CoinMarketCap', weight: 3, parameters: {} },
+      ],
+    },
   ],
   instructions: 'prudente',
   risk_limits: {
@@ -74,7 +80,11 @@ describe('configurationRows', () => {
       { part: 'intervallo di ciclo', value: '30 minuti' },
       { part: 'modello', value: 'openrouter/deepseek-chat' },
       { part: 'parametri del modello', value: 'effort alto, temperature 0.5' },
-      { part: 'fonti', value: 'notizie (peso 7, hours 6); indicatori (peso 5)' },
+      {
+        part: 'fonti',
+        value:
+          'notizie · RSS (peso 7, hours 6); sentiment · alternative.me (peso 5); sentiment · CoinMarketCap (peso 3)',
+      },
       { part: 'istruzioni', value: 'prudente' },
       { part: 'leva massima', value: '5' },
       { part: 'esposizione massima del margine', value: '10%' },

@@ -15,7 +15,11 @@ export type FakeCycle = {
     readonly message: string;
   } | null;
   readonly steps: string[];
-  readonly absent_sources: { readonly source: string; readonly reason: string }[];
+  readonly absent_sources: {
+    readonly source: string;
+    readonly reason: string;
+    readonly adapter: string | null;
+  }[];
   readonly documents: FakeStepDocument[];
   readonly cost: {
     readonly input_tokens: number;

@@ -1389,6 +1389,8 @@ export interface components {
             source: string;
             /** Reason */
             reason: string;
+            /** Adapter */
+            adapter: string | null;
         };
         /**
          * AccountDetailsResponse
@@ -1513,6 +1515,28 @@ export interface components {
             days_left: number | null;
             /** Expiry Editable */
             expiry_editable: boolean;
+        };
+        /** AdapterSelectionRequest */
+        AdapterSelectionRequest: {
+            /** Name */
+            name: string;
+            /** Weight */
+            weight?: number | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: number;
+            };
+        };
+        /** AdapterSelectionResponse */
+        AdapterSelectionResponse: {
+            /** Name */
+            name: string;
+            /** Weight */
+            weight: number;
+            /** Parameters */
+            parameters: {
+                [key: string]: number;
+            };
         };
         /**
          * AlertDetailResponse
@@ -3367,6 +3391,31 @@ export interface components {
             /** Max Total Value Exposure Percent */
             max_total_value_exposure_percent: string | null;
         };
+        /**
+         * SourceAdapterResponse
+         * @description An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1).
+         */
+        SourceAdapterResponse: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Parameters */
+            parameters: components["schemas"]["SourceParameterResponse"][];
+            /** Configuration Fields */
+            configuration_fields: components["schemas"]["SourceConfigurationFieldResponse"][];
+            /** Offers History */
+            offers_history: boolean;
+        };
+        /** SourceConfigurationFieldResponse */
+        SourceConfigurationFieldResponse: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Secret */
+            secret: boolean;
+        };
         /** SourceParameterResponse */
         SourceParameterResponse: {
             /** Key */
@@ -3390,28 +3439,25 @@ export interface components {
             per_asset: boolean;
             /** Parameters */
             parameters: components["schemas"]["SourceParameterResponse"][];
+            /** Adapters */
+            adapters: components["schemas"]["SourceAdapterResponse"][];
         };
-        /** SourceSelectionRequest */
+        /**
+         * SourceSelectionRequest
+         * @description An active source with the adapters chosen: none is refused with the reason (R4.1.1).
+         */
         SourceSelectionRequest: {
             /** Name */
             name: string;
-            /** Weight */
-            weight?: number | null;
-            /** Parameters */
-            parameters?: {
-                [key: string]: number;
-            };
+            /** Adapters */
+            adapters?: components["schemas"]["AdapterSelectionRequest"][];
         };
         /** SourceSelectionResponse */
         SourceSelectionResponse: {
             /** Name */
             name: string;
-            /** Weight */
-            weight: number;
-            /** Parameters */
-            parameters: {
-                [key: string]: number;
-            };
+            /** Adapters */
+            adapters: components["schemas"]["AdapterSelectionResponse"][];
         };
         /** StepDocumentResponse */
         StepDocumentResponse: {
@@ -3442,6 +3488,17 @@ export interface components {
             /** Left Open */
             left_open: components["schemas"]["PositionLeftOpenResponse"][];
         };
+        /** StrategyAdapter */
+        StrategyAdapter: {
+            /** Name */
+            name: string;
+            /** Weight */
+            weight?: number | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: number;
+            };
+        };
         /**
          * StrategyBody
          * @description What a flow does, without account, capital, assets, keys or cycles (R2.5.2).
@@ -3453,7 +3510,7 @@ export interface components {
             cycle_minutes?: number | null;
             model?: components["schemas"]["StrategyModel-Input"] | null;
             /** Sources */
-            sources?: components["schemas"]["StrategySource"][];
+            sources?: (components["schemas"]["StrategySource"] | components["schemas"]["StrategySourceBeforeTheAdapters"])[];
             /**
              * Instructions
              * @default
@@ -3493,7 +3550,7 @@ export interface components {
             cycle_minutes?: number | null;
             model?: components["schemas"]["StrategyModel-Output"] | null;
             /** Sources */
-            sources?: components["schemas"]["StrategySource"][];
+            sources?: (components["schemas"]["StrategySource"] | components["schemas"]["StrategySourceBeforeTheAdapters"])[];
             /**
              * Instructions
              * @default
@@ -3594,8 +3651,21 @@ export interface components {
             /** Max Total Value Exposure Percent */
             max_total_value_exposure_percent?: string | null;
         };
-        /** StrategySource */
+        /**
+         * StrategySource
+         * @description A source with the adapters the strategy chose (R4.1.1).
+         */
         StrategySource: {
+            /** Name */
+            name: string;
+            /** Adapters */
+            adapters: components["schemas"]["StrategyAdapter"][];
+        };
+        /**
+         * StrategySourceBeforeTheAdapters
+         * @description A source of a file of the first version: its weight and parameters pass to the adapter it became.
+         */
+        StrategySourceBeforeTheAdapters: {
             /** Name */
             name: string;
             /** Weight */

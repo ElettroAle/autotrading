@@ -15,11 +15,17 @@ export const flowSchema = z.object({
   assets: z.array(z.string()),
   cycle_minutes: z.number(),
   model: z.object({ name: z.string(), parameters: z.record(z.string(), z.string()) }),
+  // Every active source with the adapters chosen, each with its weight and its parameters (R4.1.1).
   sources: z.array(
     z.object({
       name: z.string(),
-      weight: z.number(),
-      parameters: z.record(z.string(), z.number()),
+      adapters: z.array(
+        z.object({
+          name: z.string(),
+          weight: z.number(),
+          parameters: z.record(z.string(), z.number()),
+        }),
+      ),
     }),
   ),
   instructions: z.string(),

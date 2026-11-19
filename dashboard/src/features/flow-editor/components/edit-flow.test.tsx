@@ -26,8 +26,11 @@ const giveAlfa = () =>
     assets: ['BTC'],
     model: { name: 'openrouter/deepseek-chat', parameters: { temperature: '1' } },
     sources: [
-      { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 10 } },
-      { name: 'sentiment', weight: 1, parameters: {} },
+      {
+        name: 'indicatori',
+        adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 10 } }],
+      },
+      { name: 'sentiment', adapters: [{ name: 'alternative.me', weight: 1, parameters: {} }] },
     ],
     risk_limits: {
       max_leverage: 3,
@@ -64,8 +67,12 @@ describe('EditFlow', () => {
       within(screen.getByRole('list', { name: 'Asset scelti' })).getByRole('listitem'),
     ).toHaveTextContent('BTC');
     expect(screen.getByRole('checkbox', { name: 'indicatori' })).toBeChecked();
-    expect(field('Peso di sentiment')).toHaveValue(1);
-    expect(await screen.findByLabelText('lunghezza serie di indicatori')).toHaveValue(10);
+    expect(screen.getByRole('checkbox', { name: 'alternative.me' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'CoinMarketCap' })).not.toBeChecked();
+    expect(field('Peso di sentiment · alternative.me')).toHaveValue(1);
+    expect(await screen.findByLabelText('lunghezza serie di indicatori · Hyperliquid')).toHaveValue(
+      10,
+    );
     expect(field('temperatura')).toHaveValue('1');
     expect(field('Capitale allocato')).toHaveValue('300');
   });
@@ -105,7 +112,7 @@ describe('EditFlow', () => {
     });
     await renderApp({ account: 'anna', url: EDIT_ALFA });
 
-    const weight = await screen.findByLabelText('Peso di sentiment');
+    const weight = await screen.findByLabelText('Peso di sentiment · alternative.me');
     await userEvent.clear(weight);
     await userEvent.type(weight, '3');
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
@@ -117,8 +124,11 @@ describe('EditFlow', () => {
     expect(sent).toEqual([
       {
         sources: [
-          { name: 'indicatori', weight: 2, parameters: { lunghezza_serie: 10 } },
-          { name: 'sentiment', weight: 3, parameters: {} },
+          {
+            name: 'indicatori',
+            adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 10 } }],
+          },
+          { name: 'sentiment', adapters: [{ name: 'alternative.me', weight: 3, parameters: {} }] },
         ],
       },
     ]);

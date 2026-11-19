@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 import { fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then, When } from '../../../support/fixtures';
+import { aSource } from '../../../support/sources';
 
 // R3.6.1 on the flow page; pytest-bdd runs every scenario on the use cases (ADR errore-medio-della-previsione-nell-api,
 // ADR errore-della-previsione-nella-pagina-del-flusso).
@@ -18,7 +19,7 @@ Given(
     fakePlatform.ensureUser(account);
     fakePlatform.addFlow(account, flow, {
       assets: [asset],
-      sources: [{ name: 'forecast', weight: 5, parameters: { profondita_storico_giorni: 7 } }],
+      sources: [aSource('forecast', 5, { profondita_storico_giorni: 7 })],
     });
     memory.account = account;
     memory.flow = flow;

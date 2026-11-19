@@ -1,5 +1,6 @@
 import { createBdd, defineParameterType, test as base } from 'playwright-bdd';
 
+import type { FakeSource, FakeSourceParameter } from '@/testing/mocks/catalogs';
 import type { FakeCycle } from '@/testing/mocks/cycles';
 import { fakePlatform, type FakeFlowHistory, type FakeVersion } from '@/testing/mocks/platform';
 
@@ -57,6 +58,10 @@ export type ScenarioMemory = {
   loadedPage: { readonly headers: Record<string, string>; readonly body: string } | undefined;
   /** What the browser blocked under the content security policy of the dashboard (R6.5.1). */
   policyViolations: string[];
+  /** The sources and their adapters as the API listed them to the editor of the flow (R4.1.1). */
+  sourceCatalog: FakeSource[];
+  /** The parameter of an adapter the user set to a value it does not admit (R4.1.1). */
+  sourceParameter: FakeSourceParameter | undefined;
 };
 
 type Fixtures = {
@@ -115,6 +120,8 @@ export const test = base.extend<Fixtures>({
       signInRedirects: 0,
       loadedPage: undefined,
       policyViolations: [],
+      sourceCatalog: [],
+      sourceParameter: undefined,
     });
   },
 });

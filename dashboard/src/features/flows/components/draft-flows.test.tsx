@@ -20,7 +20,7 @@ describe('Draft flows', () => {
     fakePlatform.addUser('anna', { hasUserRole: true });
     fakePlatform.addFlow('anna', 'alfa', {
       model: 'openrouter/deepseek-chat',
-      sources: [{ name: 'indicatori', weight: 2 }],
+      sources: [{ name: 'indicatori', adapters: [{ name: 'Hyperliquid', weight: 2 }] }],
     });
     fakePlatform.addAccount('anna', 'secondario');
   });
@@ -36,7 +36,7 @@ describe('Draft flows', () => {
     await waitFor(() => expect(detail('Conto')).toBe('principale'));
     expect(detail('Versione')).toBe('1');
     expect(detail('Modello')).toBe('openrouter/deepseek-chat');
-    expect(detail('Fonti')).toBe('indicatori (peso 2)');
+    expect(detail('Fonti')).toBe('indicatori · Hyperliquid (peso 2)');
     expect(detail('Capitale allocato')).toBe('100 USDC');
     expect(detail('Asset')).toBe('BTC');
   });
@@ -52,7 +52,7 @@ describe('Draft flows', () => {
     await openConfiguration();
     await screen.findByRole('heading', { level: 1, name: 'Impostazioni di alfa (copia)' });
     expect(detail('Versione')).toBe('1');
-    expect(detail('Fonti')).toBe('indicatori (peso 2)');
+    expect(detail('Fonti')).toBe('indicatori · Hyperliquid (peso 2)');
     expect([detail('Conto'), detail('Capitale allocato'), detail('Asset')]).toEqual([
       'principale',
       '100 USDC',

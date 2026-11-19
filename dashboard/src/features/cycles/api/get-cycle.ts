@@ -13,7 +13,10 @@ const cycleSchema = z.object({
   outcome: z.string(),
   failure: failureSchema.nullable(),
   steps: z.array(z.string()),
-  absent_sources: z.array(z.object({ source: z.string(), reason: z.string() })),
+  // The adapter that gave no data; null in the cycles recorded before the adapters (R4.1.1).
+  absent_sources: z.array(
+    z.object({ source: z.string(), reason: z.string(), adapter: z.string().nullable() }),
+  ),
   documents: z.array(z.object({ step: z.string(), content: z.record(z.string(), z.unknown()) })),
   cost: z
     .object({

@@ -5,6 +5,7 @@ import { fakePlatform, type FakeStrategyDocument } from '@/testing/mocks/platfor
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
 import { onFlowPage, onFlowsPage } from '../../../support/flow-page';
+import { aSource, sourcesText } from '../../../support/sources';
 
 // The parts of a flow the file never carries (RF-21.06): where the strategy runs, with how much, with which keys.
 const EXCLUDED_KEYS = [
@@ -80,7 +81,7 @@ Given(
     fakePlatform.addFlow(account, flow, {
       accountName,
       assets: [asset],
-      sources: [{ name: source, weight }],
+      sources: [aSource(source, weight)],
       model,
       allocatedCapital: capital,
     });
@@ -101,7 +102,11 @@ Then(
   'ottiene un file con fonti {string} peso {int} e modello {string}',
   async ({ memory }, source: string, weight: number, model: string) => {
     const strategy = strategyOf(memory);
-    expect(strategy.sources?.map((each) => [each.name, each.weight])).toEqual([[source, weight]]);
+    expect(
+      strategy.sources?.flatMap((each) =>
+        each.adapters.map((adapter) => [each.name, adapter.weight]),
+      ),
+    ).toEqual([[source, weight]]);
     expect(strategy.model?.name).toBe(model);
   },
 );
@@ -143,9 +148,7 @@ Then(
     await dashboard.openConfiguration();
     await expect(dashboard.detail('Versione')).toHaveText(String(version));
     await expect(dashboard.detail('Modello')).toHaveText(source.model);
-    await expect(dashboard.detail('Fonti')).toHaveText(
-      source.sources.map((each) => `${each.name} (peso ${each.weight})`).join(', '),
-    );
+    await expect(dashboard.detail('Fonti')).toHaveText(sourcesText(source.sources));
   },
 );
 
