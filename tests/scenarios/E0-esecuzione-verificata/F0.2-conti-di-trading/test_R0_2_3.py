@@ -107,7 +107,8 @@ def operation_recorded(platform: Platform, keyring: Keyring, seen: Seen, account
 def examine_saved_data(platform: Platform, seen: Seen, account: str) -> None:
     saved = platform.account_named(seen.owner, account)
     for value in (getattr(saved, column.name) for column in dataclasses.fields(saved)):
-        parts = dataclasses.astuple(value)
+        # An account without an expiry of its key has nothing there to examine (R6.2.2).
+        parts = () if value is None else dataclasses.astuple(value)
         seen.texts += [repr(value), *(str(part) for part in parts)]
         seen.texts += [part.hex() for part in parts if isinstance(part, bytes)]
 
