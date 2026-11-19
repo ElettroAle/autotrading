@@ -58,6 +58,21 @@ describe('CreateFlow', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Nuovo flusso');
   });
 
+  // ADR pannello-del-system-prompt-chiuso: a new flow follows the default, in a closed panel.
+  it('keeps the system prompt of a new flow in a closed panel that says it follows the default', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    const summary = await screen.findByText('System prompt', { selector: 'summary *' });
+    const panel = screen.getByRole('group', { name: /^System prompt/ });
+    expect(panel).not.toHaveAttribute('open');
+    expect(within(panel).getByText('predefinito')).toBeVisible();
+    expect(screen.getByLabelText('System prompt')).not.toBeVisible();
+
+    await userEvent.click(summary);
+
+    expect(screen.getByLabelText('System prompt')).toHaveValue(FAKE_SYSTEM_PROMPT.system_prompt);
+  });
+
   it('offers the choices of the catalogs of the API', async () => {
     await renderApp({ account: 'anna', url: NEW_FLOW });
 

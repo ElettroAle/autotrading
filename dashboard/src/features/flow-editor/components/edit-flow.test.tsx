@@ -13,6 +13,13 @@ const RESTORE = 'Ripristina predefinito';
 
 const field = (label: string) => screen.getByLabelText(label, { exact: true });
 
+/** The panel that holds the system prompt, named by its summary. */
+const systemPromptPanel = () => screen.findByRole('group', { name: /^System prompt/ });
+
+const openSystemPrompt = async () => {
+  await userEvent.click(await screen.findByText('System prompt', { selector: 'summary *' }));
+};
+
 const giveAlfa = () =>
   fakePlatform.addConfiguredFlow('anna', 'alfa', {
     account_id: 'account-principale',
@@ -118,17 +125,43 @@ describe('EditFlow', () => {
     server.events.removeAllListeners();
   });
 
-  it('shows the default system prompt with the placeholders the API declares', async () => {
+  // ADR pannello-del-system-prompt-chiuso: the system prompt waits in a closed panel, opened to change it.
+  it('keeps the system prompt in a closed panel that says the flow follows the default', async () => {
     giveAlfa();
     await renderApp({ account: 'anna', url: EDIT_ALFA });
 
-    const prompt = await screen.findByLabelText('System prompt');
+    const panel = await systemPromptPanel();
+    expect(panel).not.toHaveAttribute('open');
+    expect(within(panel).getByText('System prompt', { selector: 'summary *' })).toBeVisible();
+    expect(within(panel).getByText('predefinito')).toBeVisible();
+    expect(screen.getByLabelText('System prompt')).not.toBeVisible();
+  });
+
+  it('says in the closed panel that the flow follows a system prompt of its own', async () => {
+    giveAlfa();
+    fakePlatform.flowNamed('alfa').systemPrompt = 'Leva {max_leverage}';
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const panel = await systemPromptPanel();
+    expect(panel).not.toHaveAttribute('open');
+    expect(within(panel).getByText('personalizzato')).toBeVisible();
+    expect(within(panel).queryByText('predefinito')).not.toBeInTheDocument();
+  });
+
+  it('shows, once opened, the default system prompt with the placeholders the API declares', async () => {
+    giveAlfa();
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await openSystemPrompt();
+
+    const prompt = screen.getByLabelText('System prompt');
+    expect(prompt).toBeVisible();
     expect(prompt).toHaveValue(FAKE_SYSTEM_PROMPT.system_prompt);
     expect(screen.getByText('predefinito')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: RESTORE })).not.toBeInTheDocument();
     for (const placeholder of FAKE_SYSTEM_PROMPT.system_prompt_placeholders) {
-      expect(screen.getByText(`{${placeholder.name}}`)).toBeInTheDocument();
-      expect(screen.getByText(placeholder.description)).toBeInTheDocument();
+      expect(screen.getByText(`{${placeholder.name}}`)).toBeVisible();
+      expect(screen.getByText(placeholder.description)).toBeVisible();
     }
   });
 
@@ -145,9 +178,11 @@ describe('EditFlow', () => {
     });
     await renderApp({ account: 'anna', url: EDIT_ALFA });
 
-    const prompt = await screen.findByLabelText('System prompt');
+    await openSystemPrompt();
+    const prompt = screen.getByLabelText('System prompt');
     await userEvent.clear(prompt);
     await userEvent.type(prompt, 'Leva {{max_leverage}');
+    expect(screen.getByText('personalizzato')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
@@ -155,6 +190,7 @@ describe('EditFlow', () => {
     expect(screen.queryByText('predefinito')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: RESTORE }));
     expect(screen.getByLabelText('System prompt')).toHaveValue(FAKE_SYSTEM_PROMPT.system_prompt);
+    expect(screen.getByText('predefinito')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: SAVE }));
 
     await waitFor(() =>
@@ -162,6 +198,49 @@ describe('EditFlow', () => {
     );
     expect(sent).toEqual([{ system_prompt: 'Leva {max_leverage}' }, { system_prompt: null }]);
     server.events.removeAllListeners();
+  });
+
+  it('opens the panel of the system prompt by itself to show why the system prompt is refused', async () => {
+    giveAlfa();
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await openSystemPrompt();
+    const prompt = screen.getByLabelText('System prompt');
+    await userEvent.clear(prompt);
+    await userEvent.type(prompt, 'Leva al massimo {{leverage}');
+    await userEvent.click(screen.getByText('System prompt', { selector: 'summary *' }));
+    expect(prompt).not.toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(prompt).toHaveAccessibleDescription(
+        expect.stringContaining('il segnaposto "leverage" non esiste'),
+      ),
+    );
+    expect(await systemPromptPanel()).toHaveAttribute('open');
+    expect(prompt).toBeVisible();
+    expect(fakePlatform.flowNamed('alfa').systemPrompt).toBeNull();
+  });
+
+  it('keeps the panel of the system prompt open while the user corrects the refused text', async () => {
+    giveAlfa();
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await openSystemPrompt();
+    const prompt = screen.getByLabelText('System prompt');
+    await userEvent.clear(prompt);
+    await userEvent.type(prompt, 'Leva al massimo {{leverage}');
+    await userEvent.click(screen.getByText('System prompt', { selector: 'summary *' }));
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+    await waitFor(() => expect(prompt).toHaveAttribute('aria-invalid', 'true'));
+    await userEvent.clear(prompt);
+    await userEvent.type(prompt, 'Leva al massimo {{max_leverage}');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(await systemPromptPanel()).toHaveAttribute('open');
   });
 
   it('changes the capital through its own request, as one more version', async () => {

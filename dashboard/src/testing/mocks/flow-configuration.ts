@@ -1,4 +1,4 @@
-import { FAKE_MODELS, FAKE_SOURCES } from './catalogs';
+import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT } from './catalogs';
 import {
   fakePlatform,
   type FakeAccount,
@@ -86,6 +86,23 @@ const numberOf = (value: unknown, field: string): number => {
 
 const optionalTextOf = (value: unknown): string | null =>
   value === undefined || value === null ? null : String(value);
+
+const PLACEHOLDER = /\{(\w+)\}/g;
+const KNOWN_PLACEHOLDERS = new Set(
+  FAKE_SYSTEM_PROMPT.system_prompt_placeholders.map(({ name }) => name),
+);
+
+// An unknown placeholder refused, with the reason of the API; null follows the default (R1.4.8).
+const systemPromptOf = (value: unknown): string | null => {
+  const text = optionalTextOf(value);
+  const unknown = [...(text ?? '').matchAll(PLACEHOLDER)]
+    .map(([, name]) => name)
+    .find((name) => name !== undefined && !KNOWN_PLACEHOLDERS.has(name));
+  if (unknown !== undefined) {
+    throw new Refusal(422, `il segnaposto "${unknown}" non esiste`, 'system_prompt');
+  }
+  return text;
+};
 
 // The range of the minimum confidence, as the API checks it (R3.1.4).
 const minimumConfidenceOf = (requested: unknown): number | null => {
@@ -379,7 +396,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     instructions: textOf(request.instructions).trim(),
     riskLimits,
     bringToMinimum: request.bring_to_minimum === true,
-    systemPrompt: typeof request.system_prompt === 'string' ? request.system_prompt : null,
+    systemPrompt: systemPromptOf(request.system_prompt),
     maxConsecutiveFailures:
       request.max_consecutive_failures === undefined || request.max_consecutive_failures === null
         ? null
@@ -526,7 +543,7 @@ export const modifyFlow = (
     systemPrompt:
       request.system_prompt === undefined
         ? flow.systemPrompt
-        : optionalTextOf(request.system_prompt),
+        : systemPromptOf(request.system_prompt),
     // A null sent on purpose removes the maximum; a missing one keeps it (R3.2.4).
     maxConsecutiveFailures:
       request.max_consecutive_failures === undefined
