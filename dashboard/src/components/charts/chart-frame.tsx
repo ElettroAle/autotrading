@@ -8,7 +8,7 @@ export const CHART_HEIGHT = 320;
 const TIME_TICK_GAP = 32;
 // Narrower than the plot of a chart on a phone, so the tooltip always finds room inside it.
 export const TOOLTIP_MAX_WIDTH = 224;
-const DOT_RADIUS = 4;
+export const DOT_RADIUS = 4;
 export const MIN_DOT_RADIUS = 1.5;
 // A point keeps a quarter of the room each point has on the axis, between the least and the full size.
 const ROOM_PER_RADIUS = 4;

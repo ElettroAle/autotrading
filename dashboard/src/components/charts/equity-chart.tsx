@@ -15,7 +15,15 @@ import {
   type MouseHandlerDataParam,
 } from 'recharts';
 
-import { ChartFrame, ChartTooltip, dotRadius, TimeAxis, useChartWidth } from './chart-frame';
+import {
+  ChartFrame,
+  ChartTooltip,
+  DOT_RADIUS,
+  dotRadius,
+  TimeAxis,
+  useChartWidth,
+} from './chart-frame';
+import { ChartLegend, type LegendEntry } from './chart-legend';
 
 export type EquityPoint = { readonly plannedAt: string; readonly equity: number };
 
@@ -55,6 +63,8 @@ type EquityDatum = EquityPoint & { readonly time: number };
 export const ABOVE_COLOR = '#16a34a';
 export const BELOW_COLOR = '#dc2626';
 export const CHANGE_COLOR = '#7c3aed';
+const BASELINE_COLOR = '#475569';
+export const BASELINE_DASH = '4 4';
 const SELECTION_COLOR = '#2563eb';
 const MARK_SIZE = 6;
 // A finger needs more than the cross to hit it (ADR viste-e-comandi-della-pagina-del-flusso).
@@ -172,6 +182,39 @@ const MARKS: Readonly<Record<ChartEvent['kind'], ReactElement>> = {
   'capital-change': <path d={DIAMOND} fill={CHANGE_COLOR} stroke="#ffffff" strokeWidth={1} />,
 };
 
+// The legend names the marks the chart draws, with the same marks (ADR legenda-condivisa-dei-grafici).
+const POINT_LEGEND: readonly LegendEntry[] = [
+  { mark: <circle r={DOT_RADIUS} fill={ABOVE_COLOR} />, label: 'sopra il capitale iniziale' },
+  { mark: <circle r={DOT_RADIUS} fill={BELOW_COLOR} />, label: 'sotto il capitale iniziale' },
+  {
+    mark: (
+      <line
+        x1={-MARK_SIZE}
+        x2={MARK_SIZE}
+        stroke={BASELINE_COLOR}
+        strokeDasharray={BASELINE_DASH}
+      />
+    ),
+    label: 'capitale iniziale',
+  },
+];
+
+const EVENT_NAMES: Readonly<Record<ChartEvent['kind'], string>> = {
+  'failed-cycle': 'ciclo fallito',
+  'capital-change': 'variazione di capitale',
+};
+
+const EVENT_KINDS: readonly ChartEvent['kind'][] = ['failed-cycle', 'capital-change'];
+
+/** The entries of the legend: the points and the initial capital always, a kind of event only if the chart has one. */
+const legendOf = (events: readonly ChartEvent[]): LegendEntry[] => [
+  ...POINT_LEGEND,
+  ...EVENT_KINDS.filter((kind) => events.some((event) => event.kind === kind)).map((kind) => ({
+    mark: MARKS[kind],
+    label: EVENT_NAMES[kind],
+  })),
+];
+
 // Inside the chart, where its scales place each event on the curve at its instant.
 const EventMarks = ({
   events,
@@ -233,7 +276,8 @@ const domainOf = (data: readonly EquityDatum[], events: readonly ChartEvent[]): 
  * chooses an interval (ADR intervallo-trascinando-sull-equity-curve). The chart is as wide as its room, never wider,
  * with fewer dates and smaller points as they crowd, in the frame every chart shares (ADR equity-curve-larga-come-lo-schermo,
  * ADR grafici-condivisi-larghi-come-lo-schermo). A lone point shows in the
- * middle of the chart, and without points the chart says so (ADR periodi-brevi-nel-selettore-condiviso).
+ * middle of the chart, and without points the chart says so (ADR periodi-brevi-nel-selettore-condiviso). Below the
+ * chart the shared legend names its marks (ADR legenda-condivisa-dei-grafici).
  */
 export const EquityChart = ({ points, empty = NO_CYCLE, ...chart }: EquityChartProps) =>
   points.length === 0 ? (
@@ -297,7 +341,12 @@ const EquityArea = ({
   // A horizontal drag on the chart chooses an interval: on a touch screen the page scrolls only up and down.
   const touches = onSelect === undefined ? undefined : 'touch-pan-y';
   return (
-    <ChartFrame label="Equity curve" className={touches} onResize={setWidth}>
+    <ChartFrame
+      label="Equity curve"
+      className={touches}
+      onResize={setWidth}
+      footer={<ChartLegend entries={legendOf(events)} />}
+    >
       <AreaChart data={data} accessibilityLayer {...selecting}>
         <defs>
           {colours('fill')}
@@ -309,8 +358,8 @@ const EquityArea = ({
         <ChartTooltip labelFormatter={tooltipLabel} formatter={tooltipValue} />
         <ReferenceLine
           y={baseline}
-          stroke="#475569"
-          strokeDasharray="4 4"
+          stroke={BASELINE_COLOR}
+          strokeDasharray={BASELINE_DASH}
           label={`Capitale iniziale ${amountText(baseline)}`}
         />
         <Area

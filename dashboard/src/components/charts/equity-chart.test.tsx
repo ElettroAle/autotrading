@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { MIN_DOT_RADIUS } from './chart-frame';
 import {
   ABOVE_COLOR,
+  BASELINE_DASH,
   BELOW_COLOR,
   CHANGE_COLOR,
   chosenRange,
@@ -167,6 +168,69 @@ describe('the events on the chart, ADR cicli-falliti-sull-equity-curve', () => {
     await screen.findAllByRole('img');
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+});
+
+// ADR legenda-condivisa-dei-grafici: below the chart the shared legend names each mark the chart draws, with the same
+// mark; the marks of the events only when the period has one of them.
+describe('the legend of the chart, ADR legenda-condivisa-dei-grafici', () => {
+  const legendEntries = () =>
+    within(screen.getByRole('list', { name: 'Legenda' })).getAllByRole('listitem');
+  const markOf = (label: string) =>
+    within(legendEntries().find((item) => item.textContent === label) as HTMLElement).getByRole(
+      'img',
+      { hidden: true },
+    );
+
+  it('names the points and the initial capital, always', () => {
+    render(<EquityChart points={POINTS} baseline={300} />);
+
+    expect(legendEntries().map((item) => item.textContent)).toEqual([
+      'sopra il capitale iniziale',
+      'sotto il capitale iniziale',
+      'capitale iniziale',
+    ]);
+  });
+
+  it('draws each entry with the mark of the chart', () => {
+    render(<EquityChart points={POINTS} baseline={300} />);
+
+    expect(markOf('sopra il capitale iniziale')).toContainHTML(`fill="${ABOVE_COLOR}"`);
+    expect(markOf('sotto il capitale iniziale')).toContainHTML(`fill="${BELOW_COLOR}"`);
+    expect(markOf('capitale iniziale')).toContainHTML(`stroke-dasharray="${BASELINE_DASH}"`);
+  });
+
+  it('names a failed cycle and a change of the capital when the period has them', async () => {
+    renderWithEvents([FAILED, CASH_OUT]);
+    await screen.findByRole('link', { name: FAILED.label });
+
+    expect(legendEntries().map((item) => item.textContent)).toEqual([
+      'sopra il capitale iniziale',
+      'sotto il capitale iniziale',
+      'capitale iniziale',
+      'ciclo fallito',
+      'variazione di capitale',
+    ]);
+    expect(markOf('ciclo fallito')).toContainHTML(`stroke="${BELOW_COLOR}"`);
+    expect(markOf('variazione di capitale')).toContainHTML(`fill="${CHANGE_COLOR}"`);
+  });
+
+  it('names only the kind of event the period has', async () => {
+    renderWithEvents([CASH_OUT, { ...CASH_OUT, instant: '2026-11-12T09:40:00Z' }]);
+    await screen.findAllByRole('link');
+
+    expect(legendEntries().map((item) => item.textContent)).toEqual([
+      'sopra il capitale iniziale',
+      'sotto il capitale iniziale',
+      'capitale iniziale',
+      'variazione di capitale',
+    ]);
+  });
+
+  it('has no legend without points', () => {
+    render(<EquityChart points={[]} baseline={300} />);
+
+    expect(screen.queryByRole('list', { name: 'Legenda' })).not.toBeInTheDocument();
   });
 });
 

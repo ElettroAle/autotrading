@@ -51,9 +51,13 @@ describe('ComparisonChart', () => {
     const legend = screen.getByRole('list', { name: 'Legenda' });
     const [first, second] = within(legend).getAllByRole('listitem');
     expect(first).toHaveTextContent('alfa');
-    expect(first).toHaveAttribute('data-color', COMPARISON_COLORS[0]);
+    expect(within(first as HTMLElement).getByRole('img', { hidden: true })).toContainHTML(
+      `fill="${COMPARISON_COLORS[0]}"`,
+    );
     expect(second).toHaveTextContent('beta');
-    expect(second).toHaveAttribute('data-color', COMPARISON_COLORS[1]);
+    expect(within(second as HTMLElement).getByRole('img', { hidden: true })).toContainHTML(
+      `fill="${COMPARISON_COLORS[1]}"`,
+    );
     expect(screen.getAllByRole('img', { name: /^beta / })[0]).toHaveAttribute(
       'fill',
       COMPARISON_COLORS[1],

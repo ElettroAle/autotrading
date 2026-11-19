@@ -103,8 +103,8 @@ Then(
     const colorOf = (flow: string) =>
       dashboard
         .legendEntry(flow)
-        .locator('span')
-        .evaluate((swatch) => getComputedStyle(swatch).backgroundColor);
+        .locator('svg > circle')
+        .evaluate((point) => getComputedStyle(point).fill);
     await expect(dashboard.legendEntry(first)).toBeVisible();
     await expect(dashboard.legendEntry(second)).toBeVisible();
     expect(await colorOf(first)).not.toBe(await colorOf(second));
