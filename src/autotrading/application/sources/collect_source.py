@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from autotrading.application.sources.ports import SampleRepositoryPort, SourceReaderPort, SourceRequest
@@ -22,6 +22,8 @@ class CollectSourceCommand:
     parameters: Mapping[str, int]
     assets: tuple[str, ...]
     collected_at: datetime
+    # What the worker opened of the credentials of the adapter, none when it declares no field (R4.1.2).
+    credentials: Mapping[str, str] = field(default_factory=dict, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +71,9 @@ class CollectSourceUseCase:
         samples = tuple(
             SourceSample.of(command.cycle, named, asset, value, command.collected_at)
             for asset in _targets_of(offered, command.assets)
-            for value in reader.execute(SourceRequest(command.cycle.flow_id, asset, settings, command.collected_at))
+            for value in reader.execute(
+                SourceRequest(command.cycle.flow_id, asset, settings, command.collected_at, command.credentials)
+            )
         )
         self._samples.add(samples)
         note = None if samples else offered.definition.silence_note(settings)

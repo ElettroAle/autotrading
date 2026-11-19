@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { accountHandlers } from './account-handlers';
 import { alertHandlers } from './alert-handlers';
 import { capitalChangeHandlers } from './capital-changes';
-import { FAKE_MODELS, FAKE_SOURCES, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
+import { FAKE_MODELS, FAKE_SYSTEM_PROMPT, FAKE_TRADABLE_ASSETS } from './catalogs';
 import { apiInstant, STEPS, summaryOf, type FakeCycle } from './cycles';
 import { decisionPageOf, InvalidDecisionFilter } from './decisions';
 import { emergencyClosingHandlers } from './emergency-closings';
@@ -54,6 +54,8 @@ import { API_KEY_FIELD, providerKeyHandlers } from './provider-key-handlers';
 import { fakeReconciliation } from './reconciliation';
 import { reconciliationHandlers } from './reconciliation-handlers';
 import { problem, withUser } from './responses';
+import { sourceCredentialHandlers } from './source-credential-handlers';
+import { fakeSourceCredentials } from './source-credentials';
 
 const NO_LINKED_CHAT = 'nessuna chat collegata';
 
@@ -458,6 +460,7 @@ export const handlers = [
   ...reconciliationHandlers,
   ...alertHandlers,
   ...providerKeyHandlers,
+  ...sourceCredentialHandlers,
   ...notificationEmailHandlers,
   ...notificationChannelHandlers,
   ...notificationInboxHandlers,
@@ -524,13 +527,17 @@ export const handlers = [
   http.get('*/assets', ({ request }) =>
     withUser(request, () => HttpResponse.json(FAKE_TRADABLE_ASSETS)),
   ),
-  http.get('*/sources', ({ request }) => withUser(request, () => HttpResponse.json(FAKE_SOURCES))),
+  http.get('*/sources', ({ request }) =>
+    withUser(request, (user) => HttpResponse.json(fakeSourceCredentials.offeredTo(user.account))),
+  ),
   http.get('*/flows/system-prompt', ({ request }) =>
     withUser(request, () => HttpResponse.json(FAKE_SYSTEM_PROMPT)),
   ),
   http.get('*/sources/:name', ({ request, params }) =>
-    withUser(request, () => {
-      const source = FAKE_SOURCES.find((candidate) => candidate.name === params.name);
+    withUser(request, (user) => {
+      const source = fakeSourceCredentials
+        .offeredTo(user.account)
+        .find((candidate) => candidate.name === params.name);
       return source === undefined
         ? problem(404, 'Not Found', `fonte non disponibile: ${String(params.name)}`)
         : HttpResponse.json(source);

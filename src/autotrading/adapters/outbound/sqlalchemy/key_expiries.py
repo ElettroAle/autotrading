@@ -6,7 +6,12 @@ from sqlalchemy import Connection, Engine, RowMapping, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import NOT_ARCHIVED, flow_of, flows_in_force
-from autotrading.adapters.outbound.sqlalchemy.tables import accounts, key_expiry_notices, provider_keys
+from autotrading.adapters.outbound.sqlalchemy.tables import (
+    accounts,
+    key_expiry_notices,
+    provider_keys,
+    source_credentials,
+)
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_key import FlowKey
 from autotrading.domain.notifications.expiring_key import ExpiringKey, KeyExpiryNotice, KeyKind
@@ -15,6 +20,8 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 # The key of a provider has no id of its own: its tenant and provider are its identity. A fixed namespace gives it the
 # same id at every reading, so its alert and its notices find it again.
 PROVIDER_KEY_NAMESPACE = UUID("6f0b3c2e-5a43-4c39-9a7e-0c1f3a6e2d47")
+# The same for the credentials of an adapter of a source: its tenant and adapter are its identity (R4.1.2).
+SOURCE_CREDENTIALS_NAMESPACE = UUID("2c8e5f1a-7b64-4d0e-8f3a-9d5b6c1e4a27")
 
 
 class SqlAlchemyKeyExpiriesAdapter:
@@ -22,6 +29,9 @@ class SqlAlchemyKeyExpiriesAdapter:
     the keys of its providers, with the flows not archived that use each (R6.2.2, ADR
     controllo-giornaliero-delle-scadenze). It reads them for the notifications and for the flows, under row level
     security; an account removed has no credentials left to expire.
+
+    The credentials of the adapters of the sources are told like the other keys, with the flows that chose the adapter,
+    but never pause a flow: credentials an adapter cannot use make it an absent source (R4.1.2, R1.2.5).
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:
@@ -30,14 +40,24 @@ class SqlAlchemyKeyExpiriesAdapter:
 
     def expiring_keys(self) -> tuple[ExpiringKey, ...]:
         account_rows, provider_rows, flows = self._read()
-        return tuple(
+        keys = tuple(
             ExpiringKey(kind, key_id, key.name, key.expires_on, _users_of(key, flows))
             for kind, key_id, key in _keys_of(account_rows, provider_rows)
         )
+        return (*keys, *(_source_key_of(row, flows) for row in self._read_sources()))
 
     def dated_keys(self) -> tuple[FlowKey, ...]:
         account_rows, provider_rows, _ = self._read()
         return tuple(key for _, _, key in _keys_of(account_rows, provider_rows))
+
+    def _read_sources(self) -> Sequence[RowMapping]:
+        dated = (
+            select(source_credentials.c.adapter, source_credentials.c.expires_on)
+            .where(source_credentials.c.expires_on.is_not(None))
+            .order_by(source_credentials.c.adapter)
+        )
+        with self._transaction() as connection:
+            return connection.execute(dated).mappings().all()
 
     def _read(self) -> tuple[Sequence[RowMapping], Sequence[RowMapping], list[Flow]]:
         dated_accounts = (
@@ -118,5 +138,19 @@ def _keys_of(
     ]
 
 
+def source_credentials_id(adapter: str) -> UUID:
+    return uuid5(SOURCE_CREDENTIALS_NAMESPACE, adapter)
+
+
 def _users_of(key: FlowKey, flows: list[Flow]) -> tuple[str, ...]:
     return tuple(flow.name.value for flow in flows if key.used_by(flow))
+
+
+def _source_key_of(row: RowMapping, flows: list[Flow]) -> ExpiringKey:
+    adapter = row["adapter"]
+    users = tuple(
+        flow.name.value
+        for flow in flows
+        if any(active.adapter == adapter for active in flow.configuration.active_sources)
+    )
+    return ExpiringKey(KeyKind.SOURCE, source_credentials_id(adapter), adapter, row["expires_on"], users)

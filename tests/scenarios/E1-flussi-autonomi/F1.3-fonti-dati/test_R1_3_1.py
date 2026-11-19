@@ -2,7 +2,8 @@ import pytest
 from pytest_bdd import scenarios, then, when
 
 from autotrading.application.sources.get_source import GetSourceCommand
-from autotrading.domain.sources.source_catalog import OfferedSource, SourceCatalog
+from autotrading.application.sources.source_offer import SourceOffer
+from autotrading.domain.sources.source_catalog import SourceCatalog
 from tests.support.platform import Platform
 from tests.support.source_selections import reader_of
 from tests.support.steps import quoted
@@ -42,8 +43,9 @@ def catalog_contains(consulted: dict[str, object], datatable: list[list[str]]) -
 
 @then(quoted('la fonte "{name}" ha i parametri:'))
 def source_has_parameters(consulted: dict[str, object], name: str, datatable: list[list[str]]) -> None:
-    offered = consulted[name]
-    assert isinstance(offered, OfferedSource)
+    offer = consulted[name]
+    assert isinstance(offer, SourceOffer)
+    offered = offer.source
     shown = [
         [parameter.label, str(parameter.default), f"da {parameter.minimum} a {parameter.maximum}"]
         for parameter in offered.definition.parameters

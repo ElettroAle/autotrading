@@ -62,7 +62,7 @@ def test_alternative_me_answers_with_its_latest_index() -> None:
     requested: list[str] = []
     adapter = AlternativeMeSentimentAdapter(client_answering(200, ALTERNATIVE_ME_BODY, requested))
 
-    index = adapter.read_index()
+    index = adapter.read_index({})
 
     assert index == SentimentIndex(29, "Fear", datetime(2026, 11, 11, tzinfo=UTC))
     assert requested == [ALTERNATIVE_ME_URL]
@@ -79,7 +79,7 @@ def test_coinmarketcap_answers_with_its_latest_index_without_a_key() -> None:
 
     adapter = CoinMarketCapSentimentAdapter(httpx.Client(transport=httpx.MockTransport(answer)))
 
-    index = adapter.read_index()
+    index = adapter.read_index({})
 
     assert index == SentimentIndex(26, "Fear", datetime(2026, 11, 11, 22, 53, 10, 223000, tzinfo=UTC))
     assert requested == [COINMARKETCAP_URL]
@@ -113,7 +113,7 @@ def test_coinmarketcap_declares_an_adapter_of_the_sentiment_without_configuratio
 @pytest.mark.parametrize(("adapter_type", "source"), BOTH)
 def test_an_unreachable_provider_is_an_unavailable_source(adapter_type: AdapterType, source: str) -> None:
     with pytest.raises(SourceUnavailableError, match=rf"^fonte non raggiungibile: {source}$") as raised:
-        adapter_type(unreachable_client()).read_index()
+        adapter_type(unreachable_client()).read_index({})
 
     assert raised.value.source == source
     assert raised.value.status_code == 503
@@ -125,19 +125,19 @@ def test_a_refusal_of_the_provider_is_an_unavailable_source(
     adapter_type: AdapterType, body: object, status: int
 ) -> None:
     with pytest.raises(SourceUnavailableError):
-        adapter_type(client_answering(status, body)).read_index()
+        adapter_type(client_answering(status, body)).read_index({})
 
 
 @pytest.mark.parametrize(("adapter_type", "source"), BOTH)
 def test_an_answer_that_is_not_json_is_an_unavailable_source(adapter_type: AdapterType, source: str) -> None:
     with pytest.raises(SourceUnavailableError, match=rf"^fonte non raggiungibile: {source}$"):
-        adapter_type(client_answering_text("<html>maintenance</html>")).read_index()
+        adapter_type(client_answering_text("<html>maintenance</html>")).read_index({})
 
 
 @pytest.mark.parametrize(("adapter_type", "source"), BOTH)
 def test_an_answer_that_is_not_an_object_is_an_unavailable_source(adapter_type: AdapterType, source: str) -> None:
     with pytest.raises(SourceUnavailableError, match=rf"^fonte non raggiungibile: {source}$"):
-        adapter_type(client_answering(200, [1, 2, 3])).read_index()
+        adapter_type(client_answering(200, [1, 2, 3])).read_index({})
 
 
 @pytest.mark.parametrize(
@@ -152,7 +152,7 @@ def test_an_answer_that_is_not_an_object_is_an_unavailable_source(adapter_type: 
 )
 def test_an_alternative_me_answer_in_another_shape_is_an_unavailable_source(body: object) -> None:
     with pytest.raises(SourceUnavailableError, match=r"^fonte non raggiungibile: alternative.me$"):
-        AlternativeMeSentimentAdapter(client_answering(200, body)).read_index()
+        AlternativeMeSentimentAdapter(client_answering(200, body)).read_index({})
 
 
 @pytest.mark.parametrize(
@@ -168,4 +168,4 @@ def test_an_alternative_me_answer_in_another_shape_is_an_unavailable_source(body
 )
 def test_a_coinmarketcap_answer_in_another_shape_is_an_unavailable_source(body: object) -> None:
     with pytest.raises(SourceUnavailableError, match=r"^fonte non raggiungibile: CoinMarketCap$"):
-        CoinMarketCapSentimentAdapter(client_answering(200, body)).read_index()
+        CoinMarketCapSentimentAdapter(client_answering(200, body)).read_index({})

@@ -32,6 +32,7 @@ from autotrading.adapters.inbound.api.operations import operations_router
 from autotrading.adapters.inbound.api.orders import orders_router
 from autotrading.adapters.inbound.api.provider_keys import provider_keys_router
 from autotrading.adapters.inbound.api.reconciliation import reconciliation_router
+from autotrading.adapters.inbound.api.source_credentials import source_credentials_router
 from autotrading.adapters.inbound.api.sources import sources_router
 from autotrading.adapters.inbound.api.telegram import telegram_router
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
@@ -116,6 +117,7 @@ def create_api(
     protected.include_router(orders_router(use_cases_of_request, current_user))
     protected.include_router(verifications_router(use_cases_of_request, current_user))
     protected.include_router(sources_router(use_cases_of_request))
+    protected.include_router(source_credentials_router(use_cases_of_request))
     protected.include_router(provider_keys_router(use_cases_of_request))
     protected.include_router(models_router(use_cases_of_request))
     protected.include_router(telegram_router(use_cases_of_request))

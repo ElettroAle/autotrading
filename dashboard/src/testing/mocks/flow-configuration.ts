@@ -1,9 +1,4 @@
-import {
-  FAKE_MODELS,
-  FAKE_SOURCES,
-  FAKE_SYSTEM_PROMPT,
-  type FakeSource as FakeCatalogSource,
-} from './catalogs';
+import { FAKE_MODELS, FAKE_SYSTEM_PROMPT, type FakeSource as FakeCatalogSource } from './catalogs';
 import {
   fakePlatform,
   type FakeAccount,
@@ -14,6 +9,7 @@ import {
   type FakeSource,
   type FakeUser,
 } from './platform';
+import { fakeSourceCredentials, notConfiguredReason } from './source-credentials';
 
 /**
  * A configuration the API refuses, with the status, the reason and the setting it names, as the API answers it
@@ -173,7 +169,11 @@ const modelOf = (user: FakeUser, name: unknown, parameters: unknown) => {
 };
 
 // Every adapter chosen, checked against what it declares in the catalog, as the API does (R4.1.1).
-const adapterOf = (source: FakeCatalogSource, request: AdapterRequest): FakeAdapterChoice => {
+const adapterOf = (
+  source: FakeCatalogSource,
+  request: AdapterRequest,
+  account: string,
+): FakeAdapterChoice => {
   const name = textOf(request.name);
   const adapter = source.adapters.find((candidate) => candidate.name === name);
   if (adapter === undefined) {
@@ -182,6 +182,13 @@ const adapterOf = (source: FakeCatalogSource, request: AdapterRequest): FakeAdap
       `adapter non disponibile per la fonte ${source.name}: ${name}`,
       'sources',
     );
+  }
+  // An adapter that needs credentials the tenant did not give is not activatable (R4.1.2).
+  if (
+    adapter.configuration_fields.length > 0 &&
+    fakeSourceCredentials.of(account, name) === undefined
+  ) {
+    throw new Refusal(422, notConfiguredReason(name), 'sources');
   }
   const weight =
     request.weight === undefined || request.weight === null
@@ -211,9 +218,9 @@ const adapterOf = (source: FakeCatalogSource, request: AdapterRequest): FakeAdap
   return { name, weight, parameters };
 };
 
-const sourceOf = (request: SourceRequest): FakeSource => {
+const sourceOf = (request: SourceRequest, account: string): FakeSource => {
   const name = textOf(request.name);
-  const source = FAKE_SOURCES.find((candidate) => candidate.name === name);
+  const source = fakeSourceCredentials.sources().find((candidate) => candidate.name === name);
   if (source === undefined) {
     throw new Refusal(422, `fonte non disponibile: ${name}`, 'sources');
   }
@@ -221,7 +228,7 @@ const sourceOf = (request: SourceRequest): FakeSource => {
   if (requested.length === 0) {
     throw new Refusal(422, `scegli almeno un adapter della fonte ${name}`, 'sources');
   }
-  const adapters = requested.map((adapter) => adapterOf(source, adapter));
+  const adapters = requested.map((adapter) => adapterOf(source, adapter, account));
   const repeated = adapters.find(
     (adapter, index) => adapters.findIndex((other) => other.name === adapter.name) !== index,
   );
@@ -231,9 +238,9 @@ const sourceOf = (request: SourceRequest): FakeSource => {
   return { name, adapters };
 };
 
-const sourcesOf = (requested: unknown): FakeSource[] => {
+const sourcesOf = (requested: unknown, account: string): FakeSource[] => {
   const sources = (Array.isArray(requested) ? requested : []) as SourceRequest[];
-  const selected = sources.map(sourceOf);
+  const selected = sources.map((source) => sourceOf(source, account));
   const repeated = selected.find(
     (source, index) => selected.findIndex((other) => other.name === source.name) !== index,
   );
@@ -411,7 +418,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
   const assets = assetsOf(request.assets);
   const cycleMinutes = cycleMinutesOf(request.cycle_minutes);
   const model = modelOf(user, request.model, request.model_parameters);
-  const sources = sourcesOf(request.sources);
+  const sources = sourcesOf(request.sources, user.account);
   const riskLimits = riskLimitsOf(request.max_leverage, {
     margin: request.max_margin_exposure_percent,
     value: request.max_value_exposure_percent,
@@ -551,7 +558,9 @@ export const modifyFlow = (
     cycleMinutes: changed(request.cycle_minutes, flow.cycleMinutes, cycleMinutesOf),
     model: model.name,
     modelParameters: model.parameters,
-    sources: changed(request.sources, flow.sources, sourcesOf),
+    sources: changed(request.sources, flow.sources, (requested) =>
+      sourcesOf(requested, user.account),
+    ),
     instructions: changed(request.instructions, flow.instructions, (value) => textOf(value).trim()),
     // A null limit of exposure sent on purpose removes it; a missing one keeps the limit in force (R1.1.3).
     riskLimits: riskLimitsOf(request.max_leverage ?? flow.riskLimits.maxLeverage, {

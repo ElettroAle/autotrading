@@ -376,3 +376,15 @@ def test_the_notice_of_an_expiring_key_leads_to_its_alert_and_belongs_to_no_flow
     assert notification.heading == "chiave openrouter: è scaduta"
     assert notification.targets == (NotificationTarget.alert(ALERT_ID),)
     assert (notification.event, notification.flow, notification.flow_id) == (NotificationEvent.KEY_EXPIRY, None, None)
+
+
+def test_credentials_of_a_source_refused_tell_the_adapter_and_what_to_do_for_no_flow() -> None:
+    notification = Notification.source_credentials_rejected("LunarCrush")
+
+    assert notification.title == f"{KEY} adapter LunarCrush: credenziali rifiutate dal fornitore"
+    assert notification.body_lines() == ("Cosa fare: sostituiscile in Impostazioni \u203a Chiavi",)
+    assert (notification.event, notification.flow, notification.targets) == (
+        NotificationEvent.SOURCE_CREDENTIALS_REJECTED,
+        None,
+        (),
+    )

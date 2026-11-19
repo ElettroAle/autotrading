@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
+from autotrading.adapters.outbound.libsodium.source_secrets_opener import SodiumSourceSecretsOpenerAdapter
 from autotrading.application.agent.errors import ModelCreditExhaustedError
 from autotrading.application.flows.errors import (
     FlowCredentialsRejectedError,
@@ -567,7 +568,7 @@ def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
     catalog = InMemoryModelCatalogAdapter(scenario_catalog())
     worker = cycle_of(
         create_engine("sqlite://"),
-        (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({})),
+        (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({}), SodiumSourceSecretsOpenerAdapter({})),
         ("dev", Slippage.default(), dev_installation_on_testnet()[1]),
         (InMemoryOutboxAdapter(), FakeNotificationLinkAdapter()),
         ({"models": FakeModelGatewayAdapter(catalog)}, FakePriceForecasterAdapter()),

@@ -1,7 +1,12 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from autotrading.domain.sources.errors import SourceAdapterNotAvailableError, SourceNotAvailableError
+from autotrading.domain.sources.errors import (
+    SourceAdapterNotAvailableError,
+    SourceAdapterNotFoundError,
+    SourceAdapterWithoutConfigurationError,
+    SourceNotAvailableError,
+)
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
@@ -49,6 +54,20 @@ class OfferedSource:
         return self.definition.settings(requested, self.adapter(adapter).parameters)
 
 
+@dataclass(frozen=True, slots=True)
+class ConfigurableAdapter:
+    """An adapter that needs configuration, with the sources it offers: the tenant configures it once for all of them
+    (R4.1.2).
+    """
+
+    declaration: SourceAdapterDeclaration
+    sources: tuple[str, ...]
+
+    @property
+    def name(self) -> str:
+        return self.declaration.name
+
+
 class SourceCatalog:
     """The sources a flow can activate, each with its adapters: a source or an adapter added becomes selectable in the
     flows with no other change (R1.3.1, R4.1.1).
@@ -66,3 +85,23 @@ class SourceCatalog:
             if source.name == name:
                 return source
         raise SourceNotAvailableError(name)
+
+    def configurable_adapters(self) -> tuple[ConfigurableAdapter, ...]:
+        """Every adapter that needs configuration once, by name, with the sources it offers (R4.1.2)."""
+        sources_of: dict[str, list[str]] = {}
+        declarations: dict[str, SourceAdapterDeclaration] = {}
+        for source in self._sources:
+            for adapter in source.adapters:
+                if adapter.needs_configuration:
+                    declarations.setdefault(adapter.name, adapter)
+                    sources_of.setdefault(adapter.name, []).append(source.name)
+        return tuple(ConfigurableAdapter(declarations[name], tuple(sources_of[name])) for name in sorted(declarations))
+
+    def configurable_adapter(self, name: str) -> ConfigurableAdapter:
+        """The adapter the tenant gives credentials to; one that needs none, or that no source offers, is refused."""
+        for configurable in self.configurable_adapters():
+            if configurable.name == name:
+                return configurable
+        if any(adapter.name == name for source in self._sources for adapter in source.adapters):
+            raise SourceAdapterWithoutConfigurationError(name)
+        raise SourceAdapterNotFoundError(name)

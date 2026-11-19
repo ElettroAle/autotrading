@@ -63,7 +63,8 @@ const AdapterSettings = ({ source, adapter }: { source: Source; adapter: SourceA
   );
 };
 
-// An adapter of an active source: its choice, what it declares of itself and, once chosen, its settings (R4.1.1).
+// An adapter of an active source: its choice, what it declares of itself and, once chosen, its settings (R4.1.1); one
+// the tenant did not configure says why it cannot be chosen, and only the flow that already has it can drop it (R4.1.2).
 const AdapterChoice = ({ source, adapter }: { source: Source; adapter: SourceAdapter }) => {
   const { register, control } = useFormContext<FlowFormValues>();
   const key = adapterKeyOf(adapter.name);
@@ -74,6 +75,7 @@ const AdapterChoice = ({ source, adapter }: { source: Source; adapter: SourceAda
     adapter.configuration_fields.length === 0
       ? NO_CONFIGURATION
       : adapter.configuration_fields.map((field) => field.label).join(', ');
+  const unavailable = adapter.unavailable_reason !== null && !chosen;
   return (
     <li className="min-w-0 space-y-2">
       <div className="flex items-center gap-2">
@@ -81,6 +83,7 @@ const AdapterChoice = ({ source, adapter }: { source: Source; adapter: SourceAda
           id={id}
           type="checkbox"
           aria-describedby={`${id}-description`}
+          disabled={unavailable}
           {...register(`sources.${source.name}.adapters.${key}.active`)}
         />
         <label htmlFor={id} className="font-medium break-words">
@@ -90,6 +93,9 @@ const AdapterChoice = ({ source, adapter }: { source: Source; adapter: SourceAda
       <div id={`${id}-description`} className="space-y-1 text-sm text-slate-600">
         <p>{adapter.description}</p>
         <p>{configuration}</p>
+        {adapter.unavailable_reason !== null && (
+          <p className="text-amber-800">{adapter.unavailable_reason}</p>
+        )}
       </div>
       {chosen && <AdapterSettings source={source} adapter={adapter} />}
     </li>

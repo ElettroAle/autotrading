@@ -1,6 +1,7 @@
 """ADR controllo-giornaliero-delle-scadenze: the expiries of the keys of a tenant with the flows that use them, and the
 thresholds told once, on PostgreSQL under row level security."""
 
+from dataclasses import replace
 from datetime import date
 from uuid import uuid4
 
@@ -14,8 +15,12 @@ from autotrading.adapters.outbound.sqlalchemy.key_expiries import (
     SqlAlchemyKeyExpiriesAdapter,
     SqlAlchemyKeyExpiryNoticeRepositoryAdapter,
     provider_key_id,
+    source_credentials_id,
 )
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.source_credentials_repository import (
+    SqlAlchemySourceCredentialsRepositoryAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.domain.accounts.key_expiry import KeyExpiry as AccountKeyExpiry
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
@@ -28,11 +33,15 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.notifications.alert import AlertCause, AlertKind, AlertState
 from autotrading.domain.notifications.alert_page import AlertFilter
 from autotrading.domain.notifications.expiring_key import ExpiringKey, KeyExpiryNotice, KeyKind
+from autotrading.domain.sources.key_expiry import KeyExpiry as SourceKeyExpiry
+from autotrading.domain.sources.sealed_source_secrets import SealedSourceSecrets
+from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.accounts import an_account
 from tests.support.flows import OPENROUTER_MODEL, a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 pytestmark = pytest.mark.integration
 
@@ -98,3 +107,27 @@ def test_every_tenant_is_listed_for_the_daily_check(database: Engine) -> None:
     anna, bruno = new_tenant(database), new_tenant(database)
 
     assert {anna, bruno} <= set(SqlAlchemyTenantRepositoryAdapter(database).tenant_ids())
+
+
+def test_the_credentials_of_a_source_come_with_the_flows_that_chose_the_adapter_and_never_pause_them(
+    database: Engine,
+) -> None:
+    """R4.1.2: told like the other keys; credentials an adapter cannot use make it an absent source, not a pause."""
+    anna = new_tenant(database)
+    sealed = SealedSourceSecrets(1, b"sealed")
+    credentials = SqlAlchemySourceCredentialsRepositoryAdapter(database, anna)
+    credentials.save(SourceCredentials(anna, "LunarCrush", {}, sealed, SourceKeyExpiry.entered(EXPIRES_ON)))
+    credentials.save(SourceCredentials(anna, "Arkham", {}, sealed))
+    flows = SqlAlchemyFlowRepositoryAdapter(database, anna)
+    paid = replace(a_configuration(model=OPENROUTER_MODEL), sources=(a_source("sentiment", adapter="LunarCrush"),))
+    flows.add(a_flow(anna, name="alfa", configuration=paid))
+    flows.add(a_flow(anna, name="beta", configuration=a_configuration(model=OPENROUTER_MODEL)))
+    notices = SqlAlchemyKeyExpiryNoticeRepositoryAdapter(database, anna)
+
+    expiries = SqlAlchemyKeyExpiriesAdapter(database, anna)
+
+    assert expiries.expiring_keys() == (
+        ExpiringKey(KeyKind.SOURCE, source_credentials_id("LunarCrush"), "LunarCrush", EXPIRES_ON, ("alfa",)),
+    )
+    assert expiries.dated_keys() == ()
+    assert notices.record(KeyExpiryNotice(KeyKind.SOURCE, source_credentials_id("LunarCrush"), EXPIRES_ON, 7))

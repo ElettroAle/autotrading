@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from autotrading.domain.errors import DomainError
 
 
@@ -108,3 +110,60 @@ class TimeframeNotAvailableError(DomainError):
     def __init__(self, cycle_minutes: int) -> None:
         super().__init__(f"nessun intervallo di candela dell'exchange entro {cycle_minutes} minuti")
         self.cycle_minutes = cycle_minutes
+
+
+class SourceAdapterNotFoundError(DomainError):
+    """No source of the catalog is offered by an adapter of that name (R4.1.2)."""
+
+    status_code = 404
+
+    def __init__(self, adapter: str) -> None:
+        super().__init__(f"adapter della fonte non disponibile: {adapter}")
+        self.adapter = adapter
+
+
+class SourceAdapterWithoutConfigurationError(DomainError):
+    """Credentials given to an adapter that declares no field of configuration (R4.1.1, R4.1.2)."""
+
+    status_code = 422
+
+    def __init__(self, adapter: str) -> None:
+        super().__init__(f"l'adapter {adapter} non richiede configurazione")
+        self.adapter = adapter
+
+
+class SourceAdapterNotConfiguredError(DomainError):
+    """An adapter that needs configuration the tenant did not give: it stays in the list of the flow, not activatable,
+    and in a cycle it is an absent source (R4.1.2).
+    """
+
+    status_code = 409
+
+    def __init__(self, adapter: str) -> None:
+        super().__init__(f"configura l'adapter {adapter} in Impostazioni \u203a Chiavi")
+        self.adapter = adapter
+
+
+class SourceConfigurationFieldRequiredError(DomainError):
+    status_code = 422
+
+    def __init__(self, field: str, label: str) -> None:
+        # Only the first letter changes: the label may hold a name, as in "chiave API".
+        super().__init__(f"{label[:1].lower()}{label[1:]} obbligatorio")
+        self.field = field
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.field}
+
+
+class UnknownSourceConfigurationFieldError(DomainError):
+    status_code = 422
+
+    def __init__(self, field: str) -> None:
+        super().__init__(f"campo non previsto: {field}")
+        self.field = field
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.field}

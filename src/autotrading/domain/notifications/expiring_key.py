@@ -11,10 +11,12 @@ DAILY_CHECK_AT = time(6, 0, tzinfo=UTC)
 
 
 class KeyKind(StrEnum):
-    """Which key: the credentials of an account or the key of a provider (R6.2.2)."""
+    """Which key: the credentials of an account, the key of a provider or the credentials of an adapter of a source
+    (R6.2.2, R4.1.2)."""
 
     ACCOUNT = "account"
     PROVIDER = "provider"
+    SOURCE = "source"
 
 
 @dataclass(frozen=True, slots=True)

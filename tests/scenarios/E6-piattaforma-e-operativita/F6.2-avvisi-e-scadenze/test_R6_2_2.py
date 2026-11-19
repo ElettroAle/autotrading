@@ -18,6 +18,7 @@ from autotrading.application.agent.provider_key_summary import ProviderKeySummar
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyCommand
 from autotrading.application.agent.set_provider_key_expiry import SetProviderKeyExpiryCommand
 from autotrading.application.notifications.list_inbox_notifications import ListInboxNotificationsCommand
+from autotrading.application.sources.source_credentials_summary import SourceCredentialsSummary
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.key_expiry import KeyExpiry as AccountKeyExpiry
 from autotrading.domain.agent.key_expiry import KeyExpiry as ProviderKeyExpiry
@@ -27,10 +28,12 @@ from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.notifications.alert import Alert, AlertKind, AlertSeverity
 from autotrading.domain.notifications.alert_page import AlertFilter
 from autotrading.domain.notifications.linked_chat import LinkedChat
+from autotrading.domain.sources.key_expiry import KeyExpiryStatus as SourceKeyExpiryStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flow_cycles import FlowCycles
 from tests.support.notifications import chat_named
 from tests.support.platform import Platform
+from tests.support.source_keys import configure_paid, offer_paid_sentiment, use_paid_sentiment
 from tests.support.steps import quoted
 
 scenarios("E6-piattaforma-e-operativita/F6.2-avvisi-e-scadenze/R6.2.2-avviso-di-scadenza-delle-chiavi.feature")
@@ -63,6 +66,9 @@ class Expiries:
     cycles: FlowCycles = field(default_factory=FlowCycles)
     key: str = "openrouter"
     seen: ProviderKeySummary | None = None
+    # The adapter of a source the scenario configured, and what the section Fonti showed of it (R4.1.2).
+    source_adapter: str | None = None
+    source_seen: SourceCredentialsSummary | None = None
 
     @property
     def platform(self) -> Platform:
@@ -88,6 +94,13 @@ class Expiries:
 
     def summary(self) -> ProviderKeySummary:
         [summary] = [each for each in self.use_cases().list_provider_keys.execute() if each.provider.value == self.key]
+        return summary
+
+    def source_summary(self) -> SourceCredentialsSummary | None:
+        if self.source_adapter is None:
+            return None
+        summaries = self.use_cases().list_source_credentials.execute()
+        [summary] = [each for each in summaries if each.adapter == self.source_adapter]
         return summary
 
     def telegram(self) -> list[str]:
@@ -182,6 +195,17 @@ def expires_in_days(expiries: Expiries, key: str, days: str) -> None:
     assert expiries.summary().reading.days_left == int(days)
 
 
+@given("che la chiave di un adapter di fonte non ha una data di scadenza")
+def source_key_without_expiry(expiries: Expiries) -> None:
+    expiries.source_adapter = "LunarCrush"
+    offer_paid_sentiment(expiries.cycles, expiries.source_adapter)
+    configure_paid(expiries.cycles, "anna", expiries.source_adapter)
+    use_paid_sentiment(expiries.cycles, "alfa", expiries.source_adapter)
+    summary = expiries.source_summary()
+    assert summary is not None
+    assert summary.expiry is None
+
+
 # When
 
 
@@ -230,6 +254,7 @@ def checks(expiries: Expiries) -> None:
 def opens_keys_page(expiries: Expiries, user: str) -> None:
     assert user == "anna"
     expiries.seen = expiries.summary()
+    expiries.source_seen = expiries.source_summary()
 
 
 # Then
@@ -301,8 +326,13 @@ def unknown_and_silent(expiries: Expiries, state: str) -> None:
     assert state == "scadenza sconosciuta"
     assert expiries.seen is not None
     assert expiries.seen.reading.status is KeyExpiryStatus.UNKNOWN
+    if expiries.source_adapter is not None:
+        assert expiries.source_seen is not None
+        assert expiries.source_seen.reading.status is SourceKeyExpiryStatus.UNKNOWN
     expiries.check()
     assert expiries.telegram() == []
+    assert expiries.bell() == []
+    assert expiries.platform.alerts_of(expiries.tenant()).list(AlertFilter(), None).alerts == ()
 
 
 @then(quoted('il centro degli avvisi ha un avviso aperto "{severity}" per la chiave "{key}"'))

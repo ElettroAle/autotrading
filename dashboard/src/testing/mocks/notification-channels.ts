@@ -45,6 +45,7 @@ export const FAKE_EVENT_TYPES: readonly FakeEventType[] = [
   flowEvent('incasso eseguito'),
   accountEvent('chiusura di emergenza eseguita'),
   accountEvent('scadenza di una chiave'),
+  accountEvent('credenziali di una fonte rifiutate'),
 ];
 
 /** Every channel of the platform, in its order (ADR canali-delle-notifiche-come-insieme). */

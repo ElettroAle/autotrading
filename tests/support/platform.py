@@ -140,6 +140,12 @@ from tests.fakes.provider_keys import (
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
 from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
+from tests.fakes.source_credentials import (
+    FakeSourceSecretsSealerAdapter,
+    InMemorySourceCredentialsRepositoryAdapter,
+    SourceCredentialsStore,
+    SourceSecretsVault,
+)
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
@@ -168,6 +174,8 @@ def new_credentials() -> Credentials:
 class Platform:
     alerts: AlertStore
     inbox: InboxStore
+    key_vault: ProviderKeyVault
+    source_vault: SourceSecretsVault
 
     def __init__(self) -> None:
         self.directory = Directory()
@@ -180,8 +188,10 @@ class Platform:
         self.orders: dict[TenantId, InMemoryOrderRepositoryAdapter] = {}
         self.slippage = Slippage.default()
         self.runs: dict[TenantId, InMemoryVerificationRunRepositoryAdapter] = {}
-        self.provider_keys = ProviderKeyStore()
-        self.key_vault: ProviderKeyVault = {}
+        # The keys of the AI providers and the credentials of the adapters of the sources, with what their private key
+        # would open (R4.1.2).
+        self.provider_keys, self.source_credentials = ProviderKeyStore(), SourceCredentialsStore()
+        self.key_vault, self.source_vault = {}, {}
         self.flows = FlowStore()
         # The verifications in progress, by account and asset: what the database locks while one runs (ADR 0079).
         self.running_verifications: set[tuple[UUID, str]] = set()
@@ -285,6 +295,7 @@ class Platform:
             self.running_cycles, flow_positions, flow_openings, closed_positions, closing_notice, exit_plans
         )
         sources = ListSourcesUseCase(self.source_systems)
+        source_credentials = InMemorySourceCredentialsRepositoryAdapter(self.source_credentials, tenant_id)
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
@@ -297,6 +308,8 @@ class Platform:
             ),
             verification=verification,
             sources=sources,
+            source_credentials=source_credentials,
+            source_secrets_sealer=FakeSourceSecretsSealerAdapter(tenant_id, self.source_vault),
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_usage=flows,
@@ -307,7 +320,7 @@ class Platform:
                 accounts=FlowAccountPorts(accounts, self.account_activity, self.ledger),
                 markets=self.markets,
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
-                sources=SelectSourceUseCase(sources),
+                sources=SelectSourceUseCase(sources, source_credentials),
             ),
             flow_positions=flow_positions,
             closing_ports=closing_ports,
@@ -448,7 +461,9 @@ class Platform:
 
     def check_key_expiries(self, tenant_id: TenantId) -> None:
         """What the daily check of the worker runs for a tenant, on its clock (R6.2.2): bootstrap.check_key_expiries."""
-        keys = InMemoryKeyExpiriesAdapter(self.accounts, self.provider_keys, self.flows, tenant_id)
+        keys = InMemoryKeyExpiriesAdapter(
+            self.accounts, self.provider_keys, self.flows, tenant_id, self.source_credentials
+        )
         notify, alerts = self.notify_for(tenant_id), self.alerts_of(tenant_id)
         notices = InMemoryKeyExpiryNoticeRepositoryAdapter(self.key_expiry_notices, tenant_id)
         CheckKeyExpiriesUseCase(keys, notices, alerts, notify, self.worker_clock).execute()

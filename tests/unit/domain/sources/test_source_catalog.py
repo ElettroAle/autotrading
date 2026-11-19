@@ -2,6 +2,8 @@ import pytest
 
 from autotrading.domain.sources.errors import (
     SourceAdapterNotAvailableError,
+    SourceAdapterNotFoundError,
+    SourceAdapterWithoutConfigurationError,
     SourceNotAvailableError,
     SourceParameterOutOfRangeError,
 )
@@ -10,7 +12,7 @@ from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
-from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
 from autotrading.domain.sources.source_catalog import SOURCES, OfferedSource, SourceCatalog
 from autotrading.domain.sources.source_definition import SourceDefinition
 from autotrading.domain.sources.source_parameter import SourceParameter
@@ -93,3 +95,47 @@ def test_the_name_and_the_description_are_those_of_the_source() -> None:
     source = OfferedSource(NEWS, (adapter("lettore"),))
 
     assert (source.name, source.description, source.per_asset) == (NEWS.name, NEWS.description, False)
+
+
+KEY = SourceConfigurationField("api_key", "Chiave API", secret=True)
+
+
+def configured(name: str) -> SourceAdapterDeclaration:
+    return SourceAdapterDeclaration(name, f"adapter {name}", (), (KEY,), offers_history=False)
+
+
+def test_the_configurable_adapters_are_those_that_need_configuration_each_once_with_the_sources_it_offers() -> None:
+    catalog = SourceCatalog(
+        [
+            offered("sentiment", adapter("libero"), configured("LunarCrush")),
+            offered("social", configured("LunarCrush")),
+            offered("balene", configured("Arkham")),
+        ]
+    )
+
+    assert [(each.declaration.name, each.sources) for each in catalog.configurable_adapters()] == [
+        ("Arkham", ("balene",)),
+        ("LunarCrush", ("sentiment", "social")),
+    ]
+
+
+def test_finds_a_configurable_adapter_by_name() -> None:
+    catalog = SourceCatalog([offered("sentiment", configured("LunarCrush"))])
+
+    assert catalog.configurable_adapter("LunarCrush").declaration == configured("LunarCrush")
+
+
+def test_an_adapter_without_configuration_is_not_configurable() -> None:
+    catalog = SourceCatalog([offered("sentiment", adapter("libero"))])
+
+    with pytest.raises(SourceAdapterWithoutConfigurationError) as raised:
+        catalog.configurable_adapter("libero")
+
+    assert (str(raised.value), raised.value.status_code) == ("l'adapter libero non richiede configurazione", 422)
+
+
+def test_an_adapter_offered_by_no_source_is_not_available() -> None:
+    with pytest.raises(SourceAdapterNotFoundError) as raised:
+        SourceCatalog([offered("sentiment")]).configurable_adapter("oroscopo")
+
+    assert (str(raised.value), raised.value.status_code) == ("adapter della fonte non disponibile: oroscopo", 404)

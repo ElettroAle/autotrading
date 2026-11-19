@@ -20,7 +20,7 @@ def test_the_public_endpoint_answers_with_a_recent_index(
     adapter_type: Callable[[httpx.Client], AlternativeMeSentimentAdapter | CoinMarketCapSentimentAdapter],
 ) -> None:
     with httpx.Client() as client:
-        index = adapter_type(client).read_index()
+        index = adapter_type(client).read_index({})
 
     assert 0 <= index.value <= 100
     assert index.classification

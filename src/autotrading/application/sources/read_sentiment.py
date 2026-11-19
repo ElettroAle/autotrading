@@ -8,8 +8,9 @@ class ReadSentimentUseCase:
     def __init__(self, sentiment: SentimentPort) -> None:
         self._sentiment = sentiment
 
-    def execute(self, command: SourceRequest) -> tuple[SourceValue]:  # noqa: ARG002 - the index is of the whole market
-        index = self._sentiment.read_index()
+    def execute(self, command: SourceRequest) -> tuple[SourceValue]:
+        # The index is of the whole market: of the request it needs only the credentials of the adapter (R4.1.2).
+        index = self._sentiment.read_index(command.credentials)
         values = {
             "valore": str(index.value),
             "classificazione": index.classification,

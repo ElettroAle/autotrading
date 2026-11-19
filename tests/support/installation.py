@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.hyperliquid.composition import (
 )
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
+from autotrading.adapters.outbound.libsodium.source_secrets_opener import SodiumSourceSecretsOpenerAdapter
 from autotrading.application.sources.list_sources import SourceSystems
 from autotrading.bootstrap import WorkerCycle, cycle_of, source_systems
 from autotrading.domain.orders.slippage import Slippage
@@ -78,7 +79,7 @@ def cycles_of_installation(opener: SodiumCredentialOpenerAdapter) -> Callable[[T
     environment, hyperliquid, _ = dev_installation_on_testnet()
     return cycle_of(
         create_engine("sqlite://"),
-        (opener, SodiumProviderKeyOpenerAdapter({})),
+        (opener, SodiumProviderKeyOpenerAdapter({}), SodiumSourceSecretsOpenerAdapter({})),
         (environment, Slippage.default(), hyperliquid),
         (InMemoryOutboxAdapter(), FakeNotificationLinkAdapter()),
         ({}, FakePriceForecasterAdapter()),

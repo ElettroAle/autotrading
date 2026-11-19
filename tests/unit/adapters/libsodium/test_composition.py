@@ -13,6 +13,7 @@ from autotrading.adapters.outbound.libsodium.composition import (
 from autotrading.adapters.outbound.libsodium.opener import InvalidPrivateCredentialsKeyError
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError
 from autotrading.domain.accounts.account_id import AccountId
+from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.credentials import hyperliquid_credentials
 
@@ -37,7 +38,7 @@ def _opening(tmp_path: Path, content: str | None = None, **overrides: str) -> Co
 
 
 def test_the_sealers_of_a_tenant_seal_with_the_declared_key_and_version(tmp_path: Path) -> None:
-    credential_sealer, provider_key_sealer, mail_password_sealer = libsodium_sealing_adapters(
+    credential_sealer, provider_key_sealer, mail_password_sealer, source_secrets_sealer = libsodium_sealing_adapters(
         _sealing(tmp_path, CREDENTIALS_KEY_VERSION="3")
     )
     tenant_id = TenantId.new()
@@ -47,6 +48,7 @@ def test_the_sealers_of_a_tenant_seal_with_the_declared_key_and_version(tmp_path
     assert sealed.key_version == 3
     assert "key_version=3" in repr(provider_key_sealer(tenant_id))
     assert mail_password_sealer(tenant_id).seal("segreta").key_version == 3
+    assert source_secrets_sealer(tenant_id).seal("LunarCrush", {"api_key": "segreta"}).key_version == 3
 
 
 def test_the_key_version_is_one_unless_declared(tmp_path: Path) -> None:
@@ -77,7 +79,7 @@ def test_a_malformed_public_key_is_refused(tmp_path: Path, content: str) -> None
 
 
 def test_the_openers_hold_the_private_key_under_its_version(tmp_path: Path) -> None:
-    opener, provider_key_opener, mail_password_opener = libsodium_opening_adapters(
+    opener, provider_key_opener, mail_password_opener, source_secrets_opener = libsodium_opening_adapters(
         _opening(tmp_path, CREDENTIALS_KEY_VERSION="2")
     )
     tenant_id = TenantId.new()
@@ -87,11 +89,12 @@ def test_the_openers_hold_the_private_key_under_its_version(tmp_path: Path) -> N
     assert repr(mail_password_opener(tenant_id)) == (
         f"SodiumMailPasswordOpenerAdapter(tenant_id={tenant_id.value}, key_versions=[2])"
     )
+    assert repr(source_secrets_opener) == "SodiumSourceSecretsOpenerAdapter(key_versions=[2])"
 
 
 def test_the_mail_password_sealed_by_the_api_is_opened_by_the_worker_for_the_same_tenant(tmp_path: Path) -> None:
-    *_, mail_password_sealer = libsodium_sealing_adapters(_sealing(tmp_path))
-    *_, mail_password_opener = libsodium_opening_adapters(_opening(tmp_path))
+    *_, mail_password_sealer, _ = libsodium_sealing_adapters(_sealing(tmp_path))
+    *_, mail_password_opener, _ = libsodium_opening_adapters(_opening(tmp_path))
     tenant_id = TenantId.new()
 
     assert mail_password_opener(tenant_id).open(mail_password_sealer(tenant_id).seal("segreta")) == "segreta"
@@ -108,3 +111,14 @@ def test_the_private_key_must_be_declared() -> None:
 def test_a_malformed_private_key_is_refused(tmp_path: Path, content: str) -> None:
     with pytest.raises(InvalidPrivateCredentialsKeyError):
         libsodium_opening_adapters(_opening(tmp_path, content))
+
+
+def test_the_secrets_of_a_source_sealed_by_the_api_are_opened_by_the_worker_for_the_same_tenant(tmp_path: Path) -> None:
+    *_, source_secrets_sealer = libsodium_sealing_adapters(_sealing(tmp_path))
+    *_, source_secrets_opener = libsodium_opening_adapters(_opening(tmp_path))
+    tenant_id = TenantId.new()
+    sealed = source_secrets_sealer(tenant_id).seal("LunarCrush", {"api_key": "segreta"})
+
+    opened = source_secrets_opener.open(SourceCredentials(tenant_id, "LunarCrush", {}, sealed))
+
+    assert opened == {"api_key": "segreta"}

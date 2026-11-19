@@ -37,6 +37,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
     SodiumCredentialOpenerAdapter,
 )
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
+from autotrading.adapters.outbound.libsodium.source_secrets_opener import SodiumSourceSecretsOpenerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
@@ -99,6 +100,9 @@ from autotrading.adapters.outbound.sqlalchemy.sample_repository import SqlAlchem
 from autotrading.adapters.outbound.sqlalchemy.scheduling import (
     SqlAlchemyFlowLockAdapter,
     SqlAlchemyScheduledFlowsAdapter,
+)
+from autotrading.adapters.outbound.sqlalchemy.source_credentials_repository import (
+    SqlAlchemySourceCredentialsRepositoryAdapter,
 )
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlchemyRunningVerificationsAdapter
@@ -195,6 +199,9 @@ from autotrading.application.notifications.notify_order_rejected import NotifyOr
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
 from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
+from autotrading.application.notifications.notify_source_credentials_rejected import (
+    NotifySourceCredentialsRejectedUseCase,
+)
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
 from autotrading.application.notifications.notify_unattributable_position import (
     NotifyUnattributablePositionUseCase,
@@ -235,7 +242,7 @@ from autotrading.application.orders.protect_open_positions import ProtectOpenPos
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
-from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase
+from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceCredentialServices
 from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.application.sources.ports import (
     PriceForecasterPort,
@@ -266,7 +273,7 @@ def tenant_use_cases(
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     model_catalogs, flow_models = models
-    credential_sealer, provider_key_sealer, mail_password_sealer = sealers
+    credential_sealer, provider_key_sealer, mail_password_sealer, source_secrets_sealer = sealers
     environment, hyperliquid, systems = installation
     exchanges, markets, *_ = hyperliquid
     sources = ListSourcesUseCase(systems)
@@ -287,6 +294,7 @@ def tenant_use_cases(
         ) = worker_of(tenant_id)
         flow_ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
+        source_credentials = SqlAlchemySourceCredentialsRepositoryAdapter(engine, tenant_id)
         flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
         flow_positions = CloseFlowPositionUseCase(position_closing)
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
@@ -320,6 +328,8 @@ def tenant_use_cases(
             ),
             verification=verification,
             sources=sources,
+            source_credentials=source_credentials,
+            source_secrets_sealer=source_secrets_sealer(tenant_id),
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_usage=flows,
@@ -330,7 +340,7 @@ def tenant_use_cases(
                 accounts=FlowAccountPorts(accounts, account_activity, flow_ledger),
                 markets=markets,
                 models=SelectModelUseCase(flow_models, provider_keys),
-                sources=SelectSourceUseCase(sources),
+                sources=SelectSourceUseCase(sources, source_credentials),
             ),
             flow_positions=flow_positions,
             closing_ports=closing_ports,
@@ -456,7 +466,7 @@ def worker_use_cases(
 
 def cycle_of(
     engine: SqlAlchemyEngine,
-    openers: tuple[SodiumCredentialOpenerAdapter, SodiumProviderKeyOpenerAdapter],
+    openers: tuple[SodiumCredentialOpenerAdapter, SodiumProviderKeyOpenerAdapter, SodiumSourceSecretsOpenerAdapter],
     trading: tuple[str, Slippage, HyperliquidAdaptersOfInstallation],
     notifications: tuple[OutboxPort, NotificationLinkPort],
     predictors: tuple[ModelGateways, PriceForecasterPort],
@@ -467,7 +477,7 @@ def cycle_of(
     """
     environment, slippage, hyperliquid = trading
     models, forecaster = predictors
-    opener, provider_key_opener = openers
+    opener, provider_key_opener, source_secrets_opener = openers
     exchanges, markets, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
     clock = system_clock_adapters()
     systems = source_systems(hyperliquid, forecaster)
@@ -577,6 +587,11 @@ def cycle_of(
                     systems,
                     SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
                     SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
+                    SourceCredentialServices(
+                        SqlAlchemySourceCredentialsRepositoryAdapter(engine, tenant_id),
+                        source_secrets_opener,
+                        NotifySourceCredentialsRejectedUseCase(notify),
+                    ),
                 ),
                 clock,
             ),
@@ -714,7 +729,7 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
     source = ConfigurationSource(configuration)
     environment = source.environment()
-    opener, provider_key_opener, mail_password_opener = libsodium_opening_adapters(source)
+    opener, provider_key_opener, mail_password_opener, source_secrets_opener = libsodium_opening_adapters(source)
     slippage = hyperliquid_slippage_adapters(source)
     hyperliquid = hyperliquid_adapters()
     engine = sqlalchemy_adapters(source)
@@ -727,7 +742,11 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     models: ModelGateways = {**library_gateways, **openrouter_adapters()}
     predictors = (models, forecaster_adapters(source))
     cycle_for = cycle_of(
-        engine, (opener, provider_key_opener), (environment, slippage, hyperliquid), (outbox, links), predictors
+        engine,
+        (opener, provider_key_opener, source_secrets_opener),
+        (environment, slippage, hyperliquid),
+        (outbox, links),
+        predictors,
     )
     for_tenant = worker_use_cases(
         engine, (opener, mail_password_opener), (environment, slippage, hyperliquid), (outbox, mailer, links), cycle_for

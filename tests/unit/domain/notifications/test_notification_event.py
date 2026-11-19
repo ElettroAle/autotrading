@@ -10,6 +10,7 @@ OF_ACCOUNT = frozenset(
         NotificationEvent.RECONCILIATION_ALARM,
         NotificationEvent.EMERGENCY_CLOSING,
         NotificationEvent.KEY_EXPIRY,
+        NotificationEvent.SOURCE_CREDENTIALS_REJECTED,
     }
 )
 TOLD_AS_THEIR_REASON = frozenset({CloseReason.STOP_LOSS, CloseReason.TAKE_PROFIT, CloseReason.LIQUIDATION})
@@ -34,6 +35,7 @@ def test_each_type_of_event_has_the_name_the_user_chooses_its_channels_by() -> N
         "incasso eseguito",
         "chiusura di emergenza eseguita",
         "scadenza di una chiave",
+        "credenziali di una fonte rifiutate",
     ]
 
 

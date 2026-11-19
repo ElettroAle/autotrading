@@ -22,6 +22,10 @@ const sourceAdapterSchema = z.object({
     z.object({ name: z.string(), label: z.string(), secret: z.boolean() }),
   ),
   offers_history: z.boolean(),
+  // An adapter that needs configuration says whether the tenant gave it and, when not, why it is not activatable;
+  // none for an adapter that needs no configuration (R4.1.2).
+  configured: z.boolean().nullable(),
+  unavailable_reason: z.string().nullable(),
 });
 
 export type SourceAdapter = z.infer<typeof sourceAdapterSchema>;

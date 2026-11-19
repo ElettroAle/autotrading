@@ -259,6 +259,17 @@ class Notification:
         )
 
     @classmethod
+    def source_credentials_rejected(cls, adapter: str) -> Notification:
+        """The provider of an adapter of a source refused the credentials of the tenant: the adapter is absent from the
+        cycles until they are replaced, told once (R4.1.2)."""
+        return cls.told(
+            NotificationEvent.SOURCE_CREDENTIALS_REJECTED,
+            f"adapter {adapter}",
+            "credenziali rifiutate dal fornitore",
+            NotificationLine("Cosa fare", "sostituiscile in Impostazioni \u203a Chiavi"),
+        )
+
+    @classmethod
     def of_flow(
         cls, event: NotificationEvent, flow_id: UUID, flow: str, headline: str, *lines: NotificationLine
     ) -> Notification:

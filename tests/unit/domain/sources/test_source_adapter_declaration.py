@@ -1,6 +1,6 @@
 import pytest
 
-from autotrading.domain.sources.errors import InvalidSourceAdapterDeclarationError
+from autotrading.domain.sources.errors import InvalidSourceAdapterDeclarationError, SourceAdapterNotConfiguredError
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
 from autotrading.domain.sources.source_parameter import SourceParameter
 
@@ -38,3 +38,22 @@ def test_an_adapter_without_a_name_is_a_defect(name: str) -> None:
 def test_two_configuration_fields_with_the_same_name_are_a_defect() -> None:
     with pytest.raises(InvalidSourceAdapterDeclarationError, match=r"^campo ripetuto nell'adapter fornitore: api_key$"):
         a_declaration(configuration_fields=(KEY, KEY))
+
+
+def test_an_adapter_that_needs_configuration_without_it_is_not_activatable_with_the_reason() -> None:
+    declaration = a_declaration("LunarCrush", configuration_fields=(KEY,))
+
+    with pytest.raises(SourceAdapterNotConfiguredError) as raised:
+        declaration.require_configured(frozenset())
+
+    assert str(raised.value) == "configura l'adapter LunarCrush in Impostazioni \u203a Chiavi"
+    assert raised.value.status_code == 409
+    assert declaration.missing_configuration(frozenset()) == str(raised.value)
+
+
+def test_an_adapter_configured_or_without_configuration_is_activatable() -> None:
+    a_declaration("LunarCrush", configuration_fields=(KEY,)).require_configured(frozenset({"LunarCrush"}))
+    a_declaration().require_configured(frozenset())
+
+    assert a_declaration().missing_configuration(frozenset()) is None
+    assert a_declaration("LunarCrush", configuration_fields=(KEY,)).missing_configuration({"LunarCrush"}) is None

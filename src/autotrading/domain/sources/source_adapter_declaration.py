@@ -1,6 +1,7 @@
+from collections.abc import Collection
 from dataclasses import dataclass
 
-from autotrading.domain.sources.errors import InvalidSourceAdapterDeclarationError
+from autotrading.domain.sources.errors import InvalidSourceAdapterDeclarationError, SourceAdapterNotConfiguredError
 from autotrading.domain.sources.source_parameter import SourceParameter
 
 
@@ -37,3 +38,14 @@ class SourceAdapterDeclaration:
     @property
     def needs_configuration(self) -> bool:
         return bool(self.configuration_fields)
+
+    def require_configured(self, configured: Collection[str]) -> None:
+        """An adapter that needs configuration is activatable only once the tenant gave it (R4.1.2)."""
+        if self.needs_configuration and self.name not in configured:
+            raise SourceAdapterNotConfiguredError(self.name)
+
+    def missing_configuration(self, configured: Collection[str]) -> str | None:
+        """Why the adapter is not activatable for the tenant, none when it is (R4.1.2)."""
+        if self.needs_configuration and self.name not in configured:
+            return str(SourceAdapterNotConfiguredError(self.name))
+        return None

@@ -57,7 +57,6 @@ Funzionalità: R6.2.2 Avviso di scadenza delle chiavi
     Allora l'avviso nelle pagine Chiavi e Conti sparisce
     E "anna" riceverà di nuovo gli avvisi a 30, 7 e 1 giorno dalla nuova scadenza
 
-  @wip
   Scenario: Scadenza sconosciuta
     Dato che la chiave di un adapter di fonte non ha una data di scadenza
     Quando "anna" apre la pagina Chiavi

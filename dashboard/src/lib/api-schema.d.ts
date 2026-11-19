@@ -387,6 +387,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/source-credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Source Credentials */
+        get: operations["list_source_credentials_source_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/source-credentials/{adapter}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Configure Source Adapter
+         * @description Saves the credentials of the adapter, or replaces them: the secret values are sealed and never answered.
+         */
+        put: operations["configure_source_adapter_source_credentials__adapter__put"];
+        post?: never;
+        /** Remove Source Credentials */
+        delete: operations["remove_source_credentials_source_credentials__adapter__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/source-credentials/{adapter}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Source Credentials Expiry
+         * @description The day the user says the credentials stop working, none to forget it (R6.2.2).
+         */
+        put: operations["set_source_credentials_expiry_source_credentials__adapter__expiry_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/provider-keys": {
         parameters: {
             query?: never;
@@ -3088,7 +3146,7 @@ export interface components {
          *     An event belongs to a flow, or to the account when no single flow explains it.
          * @enum {string}
          */
-        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita" | "scadenza di una chiave";
+        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita" | "scadenza di una chiave" | "credenziali di una fonte rifiutate";
         /**
          * OpeningsResume
          * @description How the openings of a flow suspended for maximum loss resume (R3.2.2).
@@ -3394,6 +3452,8 @@ export interface components {
         /**
          * SourceAdapterResponse
          * @description An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1).
+         *
+         *     One that needs configuration says whether the tenant gave it and, when not, why it is not activatable (R4.1.2).
          */
         SourceAdapterResponse: {
             /** Name */
@@ -3406,6 +3466,10 @@ export interface components {
             configuration_fields: components["schemas"]["SourceConfigurationFieldResponse"][];
             /** Offers History */
             offers_history: boolean;
+            /** Configured */
+            configured: boolean | null;
+            /** Unavailable Reason */
+            unavailable_reason: string | null;
         };
         /** SourceConfigurationFieldResponse */
         SourceConfigurationFieldResponse: {
@@ -3415,6 +3479,45 @@ export interface components {
             label: string;
             /** Secret */
             secret: boolean;
+        };
+        /** SourceCredentialsRequest */
+        SourceCredentialsRequest: {
+            /** Values */
+            values?: {
+                [key: string]: string;
+            };
+            /** Expires On */
+            expires_on?: string | null;
+        };
+        /**
+         * SourceCredentialsResponse
+         * @description An adapter that needs configuration on the page of the keys: the sources it offers, the fields it declares,
+         *     whether the tenant configured it, the values that are not secret and when they were saved, the expiry as of today
+         *     and whether the provider refused the credentials; never a secret (R4.1.2, R6.2.2).
+         */
+        SourceCredentialsResponse: {
+            /** Adapter */
+            adapter: string;
+            /** Sources */
+            sources: string[];
+            /** Configuration Fields */
+            configuration_fields: components["schemas"]["SourceConfigurationFieldResponse"][];
+            /** Configured */
+            configured: boolean;
+            /** Public Values */
+            public_values: {
+                [key: string]: string;
+            };
+            /** Registered At */
+            registered_at: string | null;
+            /** Rejected */
+            rejected: boolean;
+            expiry: components["schemas"]["KeyExpiryResponse"] | null;
+            expiry_status: components["schemas"]["ExpiryStatus"];
+            /** Days Left */
+            days_left: number | null;
+            /** Expiry Editable */
+            expiry_editable: boolean;
         };
         /** SourceParameterResponse */
         SourceParameterResponse: {
@@ -4488,6 +4591,126 @@ export interface operations {
             };
             /** @description fonte non disponibile */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_source_credentials_source_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceCredentialsResponse"][];
+                };
+            };
+        };
+    };
+    configure_source_adapter_source_credentials__adapter__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adapter: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceCredentialsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description adapter non disponibile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description valori non validi */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_source_credentials_source_credentials__adapter__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adapter: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_source_credentials_expiry_source_credentials__adapter__expiry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adapter: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyExpiryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
