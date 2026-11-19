@@ -31,17 +31,30 @@ def client_of() -> Client:
     return client
 
 
-def test_the_catalog_lists_the_sources_with_their_parameters(client_of: Client) -> None:
+def test_the_catalog_lists_the_sources_with_the_adapters_that_offer_them(client_of: Client) -> None:
     response = client_of("anna").get("/sources")
 
     assert response.status_code == 200
-    assert [source["name"] for source in response.json()] == [
-        "indicatori",
-        "pivot",
-        "forecast",
-        "sentiment-alternative-me",
-        "sentiment-coinmarketcap",
-        "notizie",
+    assert [(source["name"], [adapter["name"] for adapter in source["adapters"]]) for source in response.json()] == [
+        ("indicatori", ["Hyperliquid"]),
+        ("pivot", ["Hyperliquid"]),
+        ("forecast", ["Prophet"]),
+        ("sentiment", ["alternative.me", "CoinMarketCap"]),
+        ("notizie", ["RSS"]),
+    ]
+
+
+def test_every_adapter_shows_its_parameters_its_configuration_and_its_history(client_of: Client) -> None:
+    body = client_of("anna").get("/sources/notizie").json()
+
+    assert body["adapters"] == [
+        {
+            "name": "RSS",
+            "description": "feed delle testate",
+            "parameters": body["parameters"],
+            "configuration_fields": [],
+            "offers_history": False,
+        }
     ]
 
 

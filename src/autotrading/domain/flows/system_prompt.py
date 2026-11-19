@@ -6,7 +6,13 @@ from typing import TYPE_CHECKING
 
 from autotrading.domain.flows.errors import MalformedSystemPromptError, UnknownPromptPlaceholderError
 from autotrading.domain.flows.risk_limits import LOWEST_LEVERAGE
-from autotrading.domain.flows.selections import DEFAULT_WEIGHT, MAXIMUM_WEIGHT, MINIMUM_WEIGHT, SourceSelection
+from autotrading.domain.flows.selections import (
+    DEFAULT_WEIGHT,
+    MAXIMUM_WEIGHT,
+    MINIMUM_WEIGHT,
+    ActiveSource,
+    SourceSelection,
+)
 
 if TYPE_CHECKING:
     from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -36,8 +42,17 @@ class PromptSubject:
 
 
 def _source_weights(sources: tuple[SourceSelection, ...]) -> str:
-    """The rule of the weights and the weight of every active source, in the order of the configuration (R1.3.2)."""
-    weights = LIST_SEPARATOR.join(f"{source.name} {source.weight}" for source in sources) or NO_ACTIVE_SOURCE
+    """The rule of the weights and the weight of every adapter of every active source, in the order of the
+    configuration (R1.3.2, R4.1.1).
+    """
+    weights = (
+        LIST_SEPARATOR.join(
+            f"{ActiveSource(source.name, adapter.name).label} {adapter.weight}"
+            for source in sources
+            for adapter in source.adapters
+        )
+        or NO_ACTIVE_SOURCE
+    )
     return "\n".join((*SOURCE_WEIGHTS_RULE, f"- pesi delle fonti attive del flusso: {weights};"))
 
 

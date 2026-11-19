@@ -23,7 +23,7 @@ from autotrading.application.flows.export_flow_strategy import ExportFlowStrateg
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
-from autotrading.application.flows.ports import FlowVersion
+from autotrading.application.flows.ports import AdapterRequest, FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleCommand
@@ -45,10 +45,23 @@ from autotrading.domain.flows.system_prompt import PromptPlaceholder
 from autotrading.domain.tenancy.user_id import UserId
 
 
-class SourceSelectionRequest(BaseModel):
+class AdapterSelectionRequest(BaseModel):
     name: str
     weight: int | None = None
     parameters: dict[str, int] = Field(default_factory=dict)
+
+    def request(self) -> AdapterRequest:
+        return AdapterRequest(self.name, self.weight, self.parameters)
+
+
+class SourceSelectionRequest(BaseModel):
+    """An active source with the adapters chosen: none is refused with the reason (R4.1.1)."""
+
+    name: str
+    adapters: list[AdapterSelectionRequest] = Field(default_factory=list)
+
+    def request(self) -> SourceRequest:
+        return SourceRequest(self.name, tuple(adapter.request() for adapter in self.adapters))
 
 
 class FlowCreationRequest(BaseModel):
@@ -97,7 +110,7 @@ class FlowCreationRequest(BaseModel):
             max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
             max_total_value_exposure_percent=self.max_total_value_exposure_percent,
             model_parameters=self.model_parameters,
-            sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in self.sources),
+            sources=tuple(source.request() for source in self.sources),
             instructions=self.instructions,
             cycle_minutes=self.cycle_minutes,
             bring_to_minimum=self.bring_to_minimum,
@@ -157,9 +170,7 @@ class FlowModificationRequest(BaseModel):
             assets=None if self.assets is None else tuple(self.assets),
             model=self.model,
             model_parameters=self.model_parameters,
-            sources=None
-            if self.sources is None
-            else tuple(SourceRequest(source.name, source.weight, source.parameters) for source in self.sources),
+            sources=None if self.sources is None else tuple(source.request() for source in self.sources),
             instructions=self.instructions,
             cycle_minutes=self.cycle_minutes,
             max_leverage=self.max_leverage,
@@ -198,14 +209,25 @@ class ModelSelectionResponse(BaseModel):
     parameters: dict[str, str]
 
 
-class SourceSelectionResponse(BaseModel):
+class AdapterSelectionResponse(BaseModel):
     name: str
     weight: int
     parameters: dict[str, int]
 
+
+class SourceSelectionResponse(BaseModel):
+    name: str
+    adapters: list[AdapterSelectionResponse]
+
     @classmethod
     def of(cls, source: SourceSelection) -> SourceSelectionResponse:
-        return cls(name=source.name, weight=source.weight, parameters=dict(source.parameters))
+        return cls(
+            name=source.name,
+            adapters=[
+                AdapterSelectionResponse(name=adapter.name, weight=adapter.weight, parameters=dict(adapter.parameters))
+                for adapter in source.adapters
+            ],
+        )
 
 
 class RiskLimitsResponse(BaseModel):

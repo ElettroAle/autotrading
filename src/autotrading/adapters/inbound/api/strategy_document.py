@@ -7,12 +7,25 @@ from pydantic import BaseModel, Field
 
 from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
+from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.openings_resume import OpeningsResume
 
 FORMAT = "autotrading-strategy"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+# The first version had a weight and parameters per source, before the adapters: a file of it is still read (R4.1.1).
+VERSION_BEFORE_THE_ADAPTERS = 1
+# The source and the adapter each source of the first version became: the correspondence of the migration of the flows,
+# which this adapter cannot import (ADR migrazione-delle-fonti-al-modello-ad-adapter, ADR fonti-con-adapter-dichiarati).
+SOURCE_AND_ADAPTER = {
+    "indicatori": ("indicatori", "Hyperliquid"),
+    "pivot": ("pivot", "Hyperliquid"),
+    "forecast": ("forecast", "Prophet"),
+    "sentiment-alternative-me": ("sentiment", "alternative.me"),
+    "sentiment-coinmarketcap": ("sentiment", "CoinMarketCap"),
+    "notizie": ("notizie", "RSS"),
+}
 FILE_EXTENSION = ".json"
 # What every client reads in the plain file name; the full name travels encoded beside it (RFC 6266).
 UNSAFE_IN_PLAIN_NAME = re.compile(r"[^A-Za-z0-9 ._-]")
@@ -37,7 +50,22 @@ class StrategyModel(BaseModel):
     parameters: dict[str, Decimal | str] = Field(default_factory=dict)
 
 
+class StrategyAdapter(BaseModel):
+    name: str
+    weight: int | None = None
+    parameters: dict[str, int] = Field(default_factory=dict)
+
+
 class StrategySource(BaseModel):
+    """A source with the adapters the strategy chose (R4.1.1)."""
+
+    name: str
+    adapters: list[StrategyAdapter]
+
+
+class StrategySourceBeforeTheAdapters(BaseModel):
+    """A source of a file of the first version: its weight and parameters pass to the adapter it became."""
+
     name: str
     weight: int | None = None
     parameters: dict[str, int] = Field(default_factory=dict)
@@ -60,7 +88,7 @@ class StrategyBody(BaseModel):
 
     cycle_minutes: int | None = None
     model: StrategyModel | None = None
-    sources: list[StrategySource] = Field(default_factory=list)
+    sources: list[StrategySource | StrategySourceBeforeTheAdapters] = Field(default_factory=list)
     instructions: str = ""
     risk_limits: StrategyRiskLimits = Field(default_factory=StrategyRiskLimits)
     bring_to_minimum: bool = False
@@ -99,7 +127,15 @@ class StrategyDocument(BaseModel):
                     parameters={key: str(value) for key, value in strategy.model.parameters.items()},
                 ),
                 sources=[
-                    StrategySource(name=source.name, weight=source.weight, parameters=dict(source.parameters))
+                    StrategySource(
+                        name=source.name,
+                        adapters=[
+                            StrategyAdapter(
+                                name=adapter.name, weight=adapter.weight, parameters=dict(adapter.parameters)
+                            )
+                            for adapter in source.adapters
+                        ],
+                    )
                     for source in strategy.sources
                 ],
                 instructions=strategy.instructions,
@@ -135,7 +171,7 @@ class StrategyDocument(BaseModel):
             max_total_margin_exposure_percent=limits.max_total_margin_exposure_percent,
             max_total_value_exposure_percent=limits.max_total_value_exposure_percent,
             model_parameters={} if model is None else model.parameters,
-            sources=tuple(SourceRequest(source.name, source.weight, source.parameters) for source in strategy.sources),
+            sources=_source_requests(strategy.sources),
             instructions=strategy.instructions,
             cycle_minutes=strategy.cycle_minutes,
             bring_to_minimum=strategy.bring_to_minimum,
@@ -150,8 +186,25 @@ class StrategyDocument(BaseModel):
         )
 
     def _require_supported(self) -> None:
-        if (self.format, self.format_version) != (FORMAT, FORMAT_VERSION):
+        if self.format != FORMAT or self.format_version not in {VERSION_BEFORE_THE_ADAPTERS, FORMAT_VERSION}:
             raise StrategyFormatNotSupportedError(self.format, self.format_version)
+
+
+def _source_requests(
+    sources: list[StrategySource | StrategySourceBeforeTheAdapters],
+) -> tuple[SourceRequest, ...]:
+    """The sources of the file with their adapters; two sources of the first version that became one are one source
+    with both adapters, in their order. A source without adapters reaches the flow, which refuses it with the reason."""
+    adapters_of: dict[str, list[AdapterRequest]] = {}
+    for source in sources:
+        if isinstance(source, StrategySource):
+            adapters_of.setdefault(source.name, []).extend(
+                AdapterRequest(adapter.name, adapter.weight, adapter.parameters) for adapter in source.adapters
+            )
+            continue
+        name, adapter = SOURCE_AND_ADAPTER.get(source.name, (source.name, source.name))
+        adapters_of.setdefault(name, []).append(AdapterRequest(adapter, source.weight, source.parameters))
+    return tuple(SourceRequest(name, tuple(adapters)) for name, adapters in adapters_of.items())
 
 
 def attachment_of(flow_name: str) -> str:

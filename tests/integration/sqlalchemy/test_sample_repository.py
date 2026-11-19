@@ -38,8 +38,8 @@ def new_flow(database: Engine) -> tuple[TenantId, UUID]:
 def samples_of(flow_id: UUID) -> list[SourceSample]:
     cycle = CycleReference(flow_id, PLANNED)
     return [
-        SourceSample(cycle, "indicatori", "BTC", REFERENCE, COLLECTED, {"prezzo": "100.5"}),
-        SourceSample(cycle, "notizie", None, REFERENCE, COLLECTED, {"titolo": "Bitcoin è salito"}),
+        SourceSample(cycle, "indicatori", "Hyperliquid", "BTC", REFERENCE, COLLECTED, {"prezzo": "100.5"}),
+        SourceSample(cycle, "notizie", "RSS", None, REFERENCE, COLLECTED, {"titolo": "Bitcoin è salito"}),
     ]
 
 
@@ -61,6 +61,7 @@ def test_every_sample_is_recorded_with_its_instants_and_its_cycle(database: Engi
             row.flow_id,
             row.cycle_planned_at,
             row.source,
+            row.adapter,
             row.asset,
             row.reference_at,
             row.collected_at,
@@ -69,8 +70,8 @@ def test_every_sample_is_recorded_with_its_instants_and_its_cycle(database: Engi
         for row in rows_of(database, tenant_id)
     ]
     assert recorded == [
-        (flow_id, PLANNED, "indicatori", "BTC", REFERENCE, COLLECTED, {"prezzo": "100.5"}),
-        (flow_id, PLANNED, "notizie", None, REFERENCE, COLLECTED, {"titolo": "Bitcoin è salito"}),
+        (flow_id, PLANNED, "indicatori", "Hyperliquid", "BTC", REFERENCE, COLLECTED, {"prezzo": "100.5"}),
+        (flow_id, PLANNED, "notizie", "RSS", None, REFERENCE, COLLECTED, {"titolo": "Bitcoin è salito"}),
     ]
 
 

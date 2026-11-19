@@ -84,6 +84,25 @@ class RepeatedSourceError(FlowSettingError):
         self.source = source
 
 
+class SourceAdapterRequiredError(FlowSettingError):
+    """An active source without an adapter: the answer names the source, so the user sees it beside it (R4.1.1)."""
+
+    def __init__(self, source: str) -> None:
+        super().__init__(f"scegli almeno un adapter della fonte {source}", FlowSetting.SOURCES)
+        self.source = source
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {**super().details, "source": self.source}
+
+
+class RepeatedSourceAdapterError(FlowSettingError):
+    def __init__(self, source: str, adapter: str) -> None:
+        super().__init__(f"adapter ripetuto nella fonte {source}: {adapter}", FlowSetting.SOURCES)
+        self.source = source
+        self.adapter = adapter
+
+
 class AllocatedCapitalNotPositiveError(FlowSettingError):
     def __init__(self) -> None:
         super().__init__("il capitale allocato deve essere positivo", FlowSetting.ALLOCATED_CAPITAL)

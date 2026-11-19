@@ -60,7 +60,7 @@ def a_request(platform: Platform, user: str, **changes: Any) -> dict[str, Any]:
         "assets": ["BTC", "eth"],
         "model": OPENROUTER_MODEL,
         "model_parameters": {"temperature": "0.5"},
-        "sources": [{"name": "notizie", "weight": 7}],
+        "sources": [{"name": "notizie", "adapters": [{"name": "RSS", "weight": 7}]}],
         "instructions": "prudente",
         "max_leverage": 5,
         "max_margin_exposure_percent": "10",
@@ -109,7 +109,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "minimum_confidence": None,
         "missing": [],
     }
-    assert [(source["name"], source["weight"]) for source in sources] == [("notizie", 7)]
+    assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]
 
 
 def test_the_minimum_confidence_is_created_changed_and_removed_with_a_null(

@@ -2,8 +2,9 @@ import pytest
 from pytest_bdd import scenarios, then, when
 
 from autotrading.application.sources.get_source import GetSourceCommand
-from autotrading.domain.sources.source_definition import SourceDefinition
+from autotrading.domain.sources.source_catalog import OfferedSource, SourceCatalog
 from tests.support.platform import Platform
+from tests.support.source_selections import reader_of
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.3-fonti-dati/R1.3.1-catalogo-delle-fonti.feature")
@@ -31,17 +32,20 @@ def consult_source(platform: Platform, user: str, name: str, consulted: dict[str
 
 @then("il catalogo contiene le fonti:")
 def catalog_contains(consulted: dict[str, object], datatable: list[list[str]]) -> None:
+    """Every source of the table with the adapter that offers it; the two sentiments are now the two adapters of the
+    source sentiment (R4.1.1, ADR fonti-con-adapter-dichiarati)."""
     catalog = consulted["catalog"]
-    assert isinstance(catalog, list)
-    assert [definition.name for definition in catalog] == [row[0] for row in datatable[1:]]
+    assert isinstance(catalog, SourceCatalog)
+    offered = [(source.name, adapter.name) for source in catalog.sources for adapter in source.adapters]
+    assert offered == [reader_of(row[0].strip()) for row in datatable[1:]]
 
 
 @then(quoted('la fonte "{name}" ha i parametri:'))
 def source_has_parameters(consulted: dict[str, object], name: str, datatable: list[list[str]]) -> None:
-    definition = consulted[name]
-    assert isinstance(definition, SourceDefinition)
+    offered = consulted[name]
+    assert isinstance(offered, OfferedSource)
     shown = [
         [parameter.label, str(parameter.default), f"da {parameter.minimum} a {parameter.maximum}"]
-        for parameter in definition.parameters
+        for parameter in offered.definition.parameters
     ]
     assert shown == [[cell.strip() for cell in row] for row in datatable[1:]]

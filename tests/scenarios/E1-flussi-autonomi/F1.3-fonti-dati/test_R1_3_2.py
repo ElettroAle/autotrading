@@ -4,14 +4,19 @@ from dataclasses import replace
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.application.flows.create_flow import SourceRequest
-from autotrading.domain.flows.selections import DEFAULT_WEIGHT, SourceSelection
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
+from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ActiveSource
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flows import scenario_catalog
 from tests.support.lifecycle_steps import Lifecycle, add_flow, modify
 from tests.support.platform import Platform
 from tests.support.source_collection import SourceCycle
+from tests.support.source_selections import (
+    BEFORE_THE_ADAPTERS,
+    PLATFORM_CATALOG,
+    a_source,
+    a_source_request,
+    reader_of,
+)
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.3-fonti-dati/R1.3.2-selezione-pesi-e-parametri-delle-fonti.feature")
@@ -46,17 +51,23 @@ def names(text: str) -> list[str]:
 
 def select(cycle: SourceCycle, flow_cycles: FlowCycles, flow: str, source: str, weight: int = DEFAULT_WEIGHT) -> None:
     cycle.activate(source, weight)
-    selection = SourceSelection(source, weight, SOURCE_CATALOG.find(source).settings({}))
+    name, adapter = reader_of(source)
+    parameters = PLATFORM_CATALOG.find(name).settings(adapter, {})
+    selection = a_source(name, weight, parameters, adapter)
     flow_cycles.reconfigure(
         flow, lambda configuration: replace(configuration, sources=(*configuration.sources, selection))
     )
 
 
 def weights_in_context(cycle: SourceCycle) -> dict[str, set[int]]:
+    """The weights in the context by the names of the specifications: a sentiment by the name it had before the
+    adapters (R4.1.1)."""
     document = json.loads(cycle.agent_context().messages()[1].content)
+    named = {reader: name for name, reader in BEFORE_THE_ADAPTERS.items()}
     weights: dict[str, set[int]] = {}
     for source in document["fonti"]:
-        weights.setdefault(source["fonte"], set()).add(source["peso"])
+        name = named.get((source["fonte"], source["adapter"]), source["fonte"])
+        weights.setdefault(name, set()).add(source["peso"])
     return weights
 
 
@@ -128,9 +139,9 @@ def modify_source(
     # The cycle of this feature runs on its own fakes: the flow to modify lives on the platform, with the same assets.
     add_flow(platform, lifecycle, user, flow, assets=cycle.assets)
     request = (
-        SourceRequest(source, int(value))
+        a_source_request(source, int(value))
         if kind == "peso"
-        else SourceRequest(source, None, {"numero_notizie": int(value)})
+        else a_source_request(source, None, {"numero_notizie": int(value)})
     )
     modify(platform, lifecycle, user, flow, sources=(request,))
 
@@ -143,12 +154,12 @@ def run_cycle(cycle: SourceCycle, flow_cycles: FlowCycles, flow: str) -> None:
 
 @then(quoted('la fonte "{source}" è interrogata per "{first}" e per "{second}"'))
 def asked_for_every_asset(cycle: SourceCycle, source: str, first: str, second: str) -> None:
-    assert [reading.asset for reading in cycle.readers[source].readings] == [first, second]
+    assert [reading.asset for reading in cycle.reader(source).readings] == [first, second]
 
 
 @then(quoted('la fonte "{source}" non è interrogata'))
 def not_asked(cycle: SourceCycle, source: str) -> None:
-    assert cycle.readers[source].readings == []
+    assert cycle.reader(source).readings == []
 
 
 @then("il contesto inviato all'agente non contiene notizie")
@@ -185,7 +196,7 @@ def own_weights(cycle: SourceCycle, first: str, first_weight: str, second: str, 
     )
 )
 def asked_with_defaults(cycle: SourceCycle, source: str, count: str, hours: str) -> None:
-    settings = [reading.settings for reading in cycle.readers[source].readings]
+    settings = [reading.settings for reading in cycle.reader(source).readings]
     assert settings == [{"numero_notizie": int(count), "eta_massima_ore": int(hours)}]
 
 
@@ -211,7 +222,11 @@ def weight_meaning(minimum: str, maximum: str, default: str) -> str:
 
 
 def weights_line(weights: str) -> str:
-    return f"- pesi delle fonti attive del flusso: {weights};"
+    """The weights as the system prompt reports them: every source of the specifications with the adapter that offers
+    it, «fonte · adapter» (R4.1.1, ADR fonti-con-adapter-dichiarati)."""
+    pairs = (weight.strip().rpartition(" ") for weight in weights.split(","))
+    labelled = ", ".join(f"{ActiveSource(*reader_of(name)).label} {value}" for name, _, value in pairs)
+    return f"- pesi delle fonti attive del flusso: {labelled};"
 
 
 @then(

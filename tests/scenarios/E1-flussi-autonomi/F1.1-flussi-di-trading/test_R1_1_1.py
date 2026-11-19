@@ -4,11 +4,11 @@ import pytest
 from pytest_bdd import given, scenarios
 
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from tests.support.activity import a_fill
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.flows import a_configuration, a_flow, account_id_of, scenario_catalog
 from tests.support.platform import Platform
+from tests.support.source_selections import PLATFORM_CATALOG
 from tests.support.steps import quoted
 
 scenarios("E1-flussi-autonomi/F1.1-flussi-di-trading/R1.1.1-creazione-di-un-flusso.feature")
@@ -54,4 +54,4 @@ def catalog_with_model(platform: Platform, model: str) -> None:
 
 @given(quoted('che il catalogo delle fonti contiene "{first}" e "{second}"'))
 def catalog_with_sources(first: str, second: str) -> None:
-    assert {first, second} <= {source.name for source in SOURCE_CATALOG.sources}
+    assert {first, second} <= {source.name for source in PLATFORM_CATALOG.sources}

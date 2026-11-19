@@ -5,11 +5,19 @@ import httpx
 
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.errors import InvalidSentimentIndexError
-from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 TIMEOUT_SECONDS = 10.0
 ALTERNATIVE_ME_URL = "https://api.alternative.me/fng/?limit=1"
+# An adapter of the sentiment (R4.1.1): the endpoint keeps the daily history of the index, with no key.
+DECLARATION = SourceAdapterDeclaration(
+    "alternative.me",
+    "Crypto Fear & Greed Index di alternative.me, dall'endpoint pubblico senza chiave.",
+    (),
+    (),
+    offers_history=True,
+)
 
 
 class _AlternativeMeEntry(TypedDict):
@@ -28,8 +36,11 @@ class AlternativeMeSentimentAdapter:
     def __init__(self, client: httpx.Client) -> None:
         self._client = client
 
+    def declaration(self) -> SourceAdapterDeclaration:
+        return DECLARATION
+
     def read_index(self) -> SentimentIndex:
-        source = SENTIMENT_ALTERNATIVE_ME.name
+        source = DECLARATION.name
         document = cast("_AlternativeMeDocument", _document(self._client, ALTERNATIVE_ME_URL, source))
         try:
             entry = document["data"][0]

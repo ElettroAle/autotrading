@@ -235,10 +235,10 @@ from autotrading.application.orders.protect_open_positions import ProtectOpenPos
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
-from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
+from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase
+from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.application.sources.ports import (
     PriceForecasterPort,
-    SentimentPort,
 )
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
@@ -254,23 +254,22 @@ from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.orders.slippage import Slippage
-from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
 def tenant_use_cases(
     engine: SqlAlchemyEngine,
     sealers: SealersOfTenant,
-    installation: tuple[str, HyperliquidAdaptersOfInstallation],
+    installation: tuple[str, HyperliquidAdaptersOfInstallation, SourceSystems],
     worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
     models: tuple[ModelCatalogs, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
     """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
     model_catalogs, flow_models = models
     credential_sealer, provider_key_sealer, mail_password_sealer = sealers
-    environment, hyperliquid = installation
+    environment, hyperliquid, systems = installation
     exchanges, markets, *_ = hyperliquid
+    sources = ListSourcesUseCase(systems)
 
     def for_tenant(tenant_id: TenantId) -> TenantUseCases:
         accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
@@ -320,7 +319,7 @@ def tenant_use_cases(
                 flows, flow_openings, closed_positions, closing_notice, exit_plans
             ),
             verification=verification,
-            source_catalog=SOURCE_CATALOG,
+            sources=sources,
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_usage=flows,
@@ -331,7 +330,7 @@ def tenant_use_cases(
                 accounts=FlowAccountPorts(accounts, account_activity, flow_ledger),
                 markets=markets,
                 models=SelectModelUseCase(flow_models, provider_keys),
-                sources=SelectSourceUseCase(SOURCE_CATALOG),
+                sources=SelectSourceUseCase(sources),
             ),
             flow_positions=flow_positions,
             closing_ports=closing_ports,
@@ -470,13 +469,8 @@ def cycle_of(
     models, forecaster = predictors
     opener, provider_key_opener = openers
     exchanges, markets, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
-    *_, prices, market = hyperliquid
     clock = system_clock_adapters()
-    sentiments: Mapping[str, SentimentPort] = {
-        SENTIMENT_ALTERNATIVE_ME.name: alternative_me_adapters(),
-        SENTIMENT_COINMARKETCAP.name: coinmarketcap_adapters(),
-    }
-    news = rss_adapters()
+    systems = source_systems(hyperliquid, forecaster)
     lock = SqlAlchemyFlowLockAdapter(engine)
 
     def cycle_for(tenant_id: TenantId) -> WorkerCycle:
@@ -580,8 +574,7 @@ def cycle_of(
             start=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             sources=ReadCycleSourceUseCase(
                 CollectCycleSourceUseCase(
-                    SOURCE_CATALOG,
-                    SourceSystems(sentiments, news, prices, forecaster, market),
+                    systems,
                     SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
                     SqlAlchemySampleRepositoryAdapter(engine, tenant_id),
                 ),
@@ -688,6 +681,15 @@ def link_stores_for(engine: SqlAlchemyEngine, tenant_id: TenantId) -> LinkStores
     )
 
 
+def source_systems(hyperliquid: HyperliquidAdaptersOfInstallation, forecaster: PriceForecasterPort) -> SourceSystems:
+    """The adapters of the sources, the same in the api and in the worker: their declarations need no secret (R4.1.1,
+    ADR fonti-con-adapter-dichiarati)."""
+    *_, prices, market = hyperliquid
+    return SourceSystems(
+        (alternative_me_adapters(), coinmarketcap_adapters()), rss_adapters(), prices, forecaster, market
+    )
+
+
 def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
     source = ConfigurationSource(configuration)
     engine = sqlalchemy_adapters(source)
@@ -697,10 +699,11 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
         **worker_model_catalog_adapters(source),
         **{name: gateway.model_catalog() for name, gateway in openrouter_adapters().items()},
     }
+    hyperliquid = hyperliquid_adapters()
     for_tenant = tenant_use_cases(
         engine,
         libsodium_sealing_adapters(source),
-        (source.environment(), hyperliquid_adapters()),
+        (source.environment(), hyperliquid, source_systems(hyperliquid, forecaster_adapters(source))),
         worker_adapters(source),
         (catalogs, catalogs),
     )

@@ -13,10 +13,10 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyCommand
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.forecast_accuracy import ForecastAccuracy
-from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from tests.support.flows import a_configuration, a_flow
 from tests.support.platform import Platform
+from tests.support.source_selections import a_source
 from tests.support.steps import quoted
 
 scenarios("E3-rischio-capitale-e-qualita/F3.6-qualita-delle-previsioni/R3.6.1-errore-medio-della-previsione.feature")
@@ -24,7 +24,7 @@ scenarios("E3-rischio-capitale-e-qualita/F3.6-qualita-delle-previsioni/R3.6.1-er
 NOW = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
 HORIZONS = {"1 ora": ForecastHorizon.HOUR_1, "15 minuti": ForecastHorizon.MINUTES_15}
 ACTUAL = Decimal(60000)
-FORECAST_SOURCE = SourceSelection("forecast", parameters={"profondita_storico_giorni": 7})
+FORECAST_SOURCE = a_source("forecast", parameters={"profondita_storico_giorni": 7})
 
 
 def amount(text: str) -> Decimal:

@@ -10,7 +10,6 @@ from autotrading.domain.flows.errors import (
     InvalidRiskLimitError,
     MaxLeverageRequiredError,
     ModelRequiredError,
-    SourceWeightOutOfRangeError,
     TotalExposureOutOfRangeError,
 )
 from autotrading.domain.flows.flow_id import FlowId
@@ -18,7 +17,7 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 
 
 def test_a_flow_name_is_kept_without_surrounding_spaces() -> None:
@@ -137,18 +136,3 @@ def test_the_limits_the_user_configures_carry_the_overall_exposures() -> None:
 def test_a_model_selection_needs_a_model() -> None:
     with pytest.raises(ModelRequiredError, match=r"^modello obbligatorio$"):
         ModelSelection(" ")
-
-
-def test_a_source_weighs_five_unless_chosen() -> None:
-    assert SourceSelection("notizie").weight == DEFAULT_WEIGHT == 5
-
-
-@pytest.mark.parametrize("weight", [1, 10])
-def test_a_source_weighs_from_one_to_ten(weight: int) -> None:
-    assert SourceSelection("notizie", weight).weight == weight
-
-
-@pytest.mark.parametrize("weight", [0, 11])
-def test_a_weight_out_of_range_is_refused(weight: int) -> None:
-    with pytest.raises(SourceWeightOutOfRangeError, match=r"^peso fuori da 1-10: notizie$"):
-        SourceSelection("notizie", weight)

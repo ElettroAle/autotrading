@@ -8,8 +8,10 @@ from pytest_bdd import given, parsers, then, when
 
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.selections import ActiveSource
 from tests.fakes.cycles import ACTIVE, FakePermanentError, FakeTransientError
 from tests.support.cycles import Cycles, at
+from tests.support.source_selections import adapter_of
 from tests.support.steps import quoted
 
 TIME = r"(?P<instant>\d\d:\d\d:\d\d)"
@@ -386,7 +388,8 @@ def position_stays_open(cycles: Cycles, asset: str) -> None:
 
 @then(quoted('il contesto inviato all\'agente contiene i dati della fonte "{source}"'))
 def context_has_source(cycles: Cycles, source: str) -> None:
-    assert [reading.source for reading in cycles.context.composed[cycles.id_of("alfa")].readings] == [source]
+    readings = cycles.context.composed[cycles.id_of("alfa")].readings
+    assert [reading.source for reading in readings] == [ActiveSource(source, adapter_of(source)).label]
 
 
 @then("il contesto inviato all'agente contiene lo stato del flusso")

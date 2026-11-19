@@ -8,6 +8,7 @@ import pytest
 from autotrading.adapters.outbound.forecaster.price_forecast import ForecasterPriceForecastAdapter
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PricePoint, history_of
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 NOW = datetime(2026, 11, 13, 10, 0, tzinfo=UTC)
 HISTORY = history_of([PricePoint(NOW - timedelta(minutes=3 * age), Decimal(100 + age)) for age in (2, 1, 0)], 7, NOW)
@@ -31,6 +32,18 @@ def answering(document: object, status: int = 200, requests: list[httpx.Request]
         return httpx.Response(status, json=document)
 
     return httpx.MockTransport(handle)
+
+
+def test_the_forecaster_declares_the_adapter_of_the_forecast_without_configuration_and_with_history() -> None:
+    declaration = adapter(answering({})).declaration()
+
+    assert declaration == SourceAdapterDeclaration(
+        "Prophet",
+        "Previsione di Prophet dal servizio forecaster dell'installazione, sullo storico dei prezzi dell'exchange.",
+        (),
+        (),
+        offers_history=True,
+    )
 
 
 def test_the_history_is_sent_and_the_predicted_price_of_every_horizon_returned() -> None:

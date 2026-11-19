@@ -57,22 +57,17 @@ from autotrading.application.notifications.notify_opening_blocked import NotifyO
 from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersUseCase
-from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceSystems
+from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase
+from autotrading.application.sources.list_sources import SourceSystems
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
-    MarketDataPort,
-    NewsPort,
-    PriceForecasterPort,
-    PriceHistoryPort,
     SampleRepositoryPort,
-    SentimentPort,
 )
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.source_data import SourceData
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -116,11 +111,7 @@ class CycleServices:
     model_gateways: ModelGateways
     provider_key_opener: ProviderKeyOpenerPort
     pause: PausePort
-    sentiments: Mapping[str, SentimentPort]
-    news: NewsPort
-    prices: PriceHistoryPort
-    forecaster: PriceForecasterPort
-    market: MarketDataPort
+    sources: SourceSystems
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
 
@@ -149,10 +140,7 @@ def run_cycle_for(
         start=ports.start_cycle,
         sources=ReadCycleSourceUseCase(
             CollectCycleSourceUseCase(
-                SOURCE_CATALOG,
-                SourceSystems(
-                    services.sentiments, services.news, services.prices, services.forecaster, services.market
-                ),
+                services.sources,
                 ports.forecasts,
                 ports.samples,
             ),
@@ -200,6 +188,6 @@ def run_cycle_for(
 def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
     """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
     record = RecordActualPricesOfTenantsUseCase(
-        services.prices, planned.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
+        services.sources.prices, planned.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
     )
     record.execute(RecordActualPricesCommand(services.clock.now()))

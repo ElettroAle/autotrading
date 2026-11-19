@@ -10,7 +10,7 @@ from autotrading.domain.flows.risk_limits import (
     TOTAL_VALUE_EXPOSURE,
     VALUE_EXPOSURE,
 )
-from autotrading.domain.flows.selections import SourceSelection
+from autotrading.domain.flows.selections import ActiveSource, SourceSelection
 from autotrading.domain.italian_text import money_text, number_text
 
 NONE = "nessuno"
@@ -41,10 +41,12 @@ def _parameters(parameters: Mapping[str, object]) -> str:
 
 
 def _source(source: SourceSelection) -> str:
-    return (
-        f"{source.name} (peso {source.weight}"
-        + "".join(f", {key} {source.parameters[key]}" for key in sorted(source.parameters))
+    """Every adapter of the source with its weight and its parameters (R4.1.1)."""
+    return "; ".join(
+        f"{ActiveSource(source.name, adapter.name).label} (peso {adapter.weight}"
+        + "".join(f", {key} {adapter.parameters[key]}" for key in sorted(adapter.parameters))
         + ")"
+        for adapter in source.adapters
     )
 
 

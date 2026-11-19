@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from autotrading.domain.sources.source_catalog import SourceCatalog
-from autotrading.domain.sources.source_definition import SourceDefinition
+from autotrading.application.sources.list_sources import ListSourcesUseCase
+from autotrading.domain.sources.source_catalog import OfferedSource
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,8 +10,10 @@ class GetSourceCommand:
 
 
 class GetSourceUseCase:
-    def __init__(self, catalog: SourceCatalog) -> None:
-        self._catalog = catalog
+    """One source of the catalog with its adapters (R1.3.1, R4.1.1)."""
 
-    def execute(self, command: GetSourceCommand) -> SourceDefinition:
-        return self._catalog.find(command.name)
+    def __init__(self, sources: ListSourcesUseCase) -> None:
+        self._sources = sources
+
+    def execute(self, command: GetSourceCommand) -> OfferedSource:
+        return self._sources.execute().find(command.name)

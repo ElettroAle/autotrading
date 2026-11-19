@@ -59,6 +59,7 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
+from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.agent_context import MessageRole
 from autotrading.domain.agent.provider_name import ProviderName
@@ -73,9 +74,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
-from autotrading.domain.sources.sentiment import SENTIMENT_ALTERNATIVE_ME, SENTIMENT_COINMARKETCAP
-from autotrading.domain.sources.source_catalog import SOURCE_CATALOG
+from autotrading.domain.flows.selections import AdapterSelection, ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.closed_position_repository import InMemoryClosedPositionRepositoryAdapter
@@ -124,6 +123,7 @@ from tests.support.cycle_composition import (
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 from tests.support.provider_key import api_key_of
+from tests.support.source_selections import BEFORE_THE_ADAPTERS, reader_of
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 ACCOUNT = "test-1"
@@ -165,13 +165,13 @@ class FlowCycles:
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
         self.pause = FakePauseAdapter()
-        self.sentiments = {
-            name: FakeSentimentAdapter(name) for name in (SENTIMENT_ALTERNATIVE_ME.name, SENTIMENT_COINMARKETCAP.name)
-        }
+        # The two adapters of the sentiment, by the name each declares (R4.1.1).
+        self.sentiments = {name: FakeSentimentAdapter(name) for name in ("alternative.me", "CoinMarketCap")}
         self.news = FakeNewsAdapter()
         self.prices = FakePriceHistoryAdapter()
         self.forecaster = FakePriceForecasterAdapter()
         self.market = FakeMarketDataAdapter()
+        self.platform.source_systems = self.systems()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
         self.samples: dict[TenantId, InMemorySampleRepositoryAdapter] = {}
         self.limits = FakeExchangeLimitsAdapter()
@@ -314,13 +314,12 @@ class FlowCycles:
             },
             provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),
             pause=self.pause,
-            sentiments=self.sentiments,
-            news=self.news,
-            prices=self.prices,
-            forecaster=self.forecaster,
-            market=self.market,
+            sources=self.systems(),
             exchange_limits={HYPERLIQUID: self.limits},
         )
+
+    def systems(self) -> SourceSystems:
+        return SourceSystems(tuple(self.sentiments.values()), self.news, self.prices, self.forecaster, self.market)
 
     def samples_of(self, tenant_id: TenantId) -> InMemorySampleRepositoryAdapter:
         return self.samples.setdefault(tenant_id, InMemorySampleRepositoryAdapter())
@@ -367,7 +366,7 @@ class FlowCycles:
             assets=assets,
             cycle_interval=CycleInterval(15),
             model=ModelSelection(model, {}),
-            sources=tuple(SourceSelection(source, 5, SOURCE_CATALOG.find(source).settings({})) for source in sources),
+            sources=self.selections(sources),
             instructions="Sei un trader",
             risk_limits=RiskLimits(5, Decimal(10)),
             allocated_capital=Decimal(100),
@@ -397,7 +396,13 @@ class FlowCycles:
     def set_source_parameters(self, name: str, source: str, **parameters: int) -> None:
         def changed(configuration: FlowConfiguration) -> FlowConfiguration:
             selections = tuple(
-                replace(selection, parameters={**selection.parameters, **parameters})
+                replace(
+                    selection,
+                    adapters=tuple(
+                        replace(adapter, parameters={**adapter.parameters, **parameters})
+                        for adapter in selection.adapters
+                    ),
+                )
                 if selection.name == source
                 else selection
                 for selection in configuration.sources
@@ -460,10 +465,25 @@ class FlowCycles:
         return document
 
     def sources_in_context(self, source: str, asset: str | None = None) -> list[dict[str, str]]:
+        """The values of a source in the context; a name before the adapters means only the adapter it became."""
         entries = self.context()["fonti"]
         assert isinstance(entries, list)
+        name, adapter = reader_of(source)
         return [
             entry["valori"]
             for entry in entries
-            if entry["fonte"] == source and (asset is None or entry["asset"] == asset)
+            if entry["fonte"] == name
+            and (source not in BEFORE_THE_ADAPTERS or entry["adapter"] == adapter)
+            and (asset is None or entry["asset"] == asset)
         ]
+
+    def selections(self, sources: tuple[str, ...]) -> tuple[SourceSelection, ...]:
+        """The sources named, each with its adapter at weight 5 and the defaults of the catalog; two names of the same
+        source are one source with both adapters."""
+        catalog = ListSourcesUseCase(self.systems()).execute()
+        adapters_of: dict[str, list[AdapterSelection]] = {}
+        for source in sources:
+            name, adapter = reader_of(source)
+            settings = catalog.find(name).settings(adapter, {})
+            adapters_of.setdefault(name, []).append(AdapterSelection(adapter, 5, settings))
+        return tuple(SourceSelection(name, tuple(adapters)) for name, adapters in adapters_of.items())

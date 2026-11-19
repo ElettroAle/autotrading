@@ -188,9 +188,7 @@ class ModifyFlowUseCase:
         return self._checks.models.execute(command.model, command.model_parameters or {})
 
     def _sources(self, requests: tuple[SourceRequest, ...]) -> tuple[SourceSelection, ...]:
-        return tuple(
-            self._checks.sources.execute(request.name, request.weight, request.parameters) for request in requests
-        )
+        return tuple(self._checks.sources.execute(request.name, request.adapters) for request in requests)
 
     def _require_assets_admitted(self, flow: Flow, assets: tuple[str, ...]) -> None:
         exchange = self._checks.accounts.directory.exchange_of(flow.assigned_account_id)

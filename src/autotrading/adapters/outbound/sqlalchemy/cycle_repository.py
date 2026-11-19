@@ -3,7 +3,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
-from typing import TypedDict, cast
+from typing import NotRequired, TypedDict, cast
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, Connection, Engine, RowMapping, Select, exists, func, or_, select
@@ -38,6 +38,8 @@ COMPLETED = CycleOutcome.COMPLETED.name.lower()
 class _AbsentSourceColumn(TypedDict):
     source: str
     reason: str
+    # Absent in the cycles recorded before the adapters of the sources (R4.1.1).
+    adapter: NotRequired[str | None]
 
 
 class _DocumentColumn(TypedDict):
@@ -291,7 +293,9 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
         "started_at": record.started_at,
         "delay_seconds": record.delay_seconds,
         "steps": [step.name.lower() for step in record.steps],
-        "absent_sources": [{"source": item.source, "reason": item.reason} for item in record.absent_sources],
+        "absent_sources": [
+            {"source": item.source, "reason": item.reason, "adapter": item.adapter} for item in record.absent_sources
+        ],
         "failure": _failure_row(record.failure),
         "documents": [
             {"step": document.step.name.lower(), "content": plain(document.content)} for document in record.documents
@@ -349,7 +353,9 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
         started_at=row["started_at"],
         delay_seconds=row["delay_seconds"],
         steps=tuple(_step(name) for name in row["steps"] or ()),
-        absent_sources=tuple(AbsentSource(item["source"], item["reason"]) for item in row["absent_sources"] or ()),
+        absent_sources=tuple(
+            AbsentSource(item["source"], item["reason"], item.get("adapter")) for item in row["absent_sources"] or ()
+        ),
         failure=_failure_of(row["failure"]),
         documents=tuple(
             StepDocument(_step(document["step"]), document["content"]) for document in row["documents"] or ()

@@ -10,7 +10,6 @@ from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand, D
 from autotrading.application.flows.modify_flow import ModifyFlowCommand, ModifyFlowUseCase
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
-from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
@@ -22,6 +21,7 @@ from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapte
 from tests.fakes.source_settings import FakeSourceSettingsAdapter
 from tests.fakes.verification_run_repository import RunningVerifications
 from tests.support.flows import OPENROUTER_MODEL, a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 
 class Drafts:
@@ -53,7 +53,7 @@ class Drafts:
     def original(self, name: str = "alfa", assets: tuple[str, ...] = ("BTC",), capital: int = 100) -> Flow:
         configuration = replace(
             a_configuration(assets=assets, allocated_capital=Decimal(capital)),
-            sources=(SourceSelection("indicatori", 2),),
+            sources=(a_source("indicatori", 2),),
         )
         flow = a_flow(self.tenant_id, name=name, account_id=self.account_id, configuration=configuration)
         self.repository.add(flow)

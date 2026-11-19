@@ -43,6 +43,6 @@ class ComposeCycleContextUseCase:
             now=self._clock.now(),
             state=cycle_flow.state_view(),
             sources=tuple(data for reading in readings for data in reading.data),
-            missing=tuple(f"{source.source}: {source.reason}" for source in absent),
+            missing=tuple(f"{source.label}: {source.reason}" for source in absent),
         )
         return CycleContext(cycle_flow, question, self._composer.execute(question))

@@ -77,7 +77,7 @@ def a_completed_cycle(flow_id: UUID, planned_at: datetime = PLANNED) -> CycleRec
         outcome=CycleOutcome.COMPLETED,
         started_at=planned_at + timedelta(seconds=2),
         steps=(CycleStep.READ_FLOW_STATE, CycleStep.AGENT_DECISION),
-        absent_sources=(AbsentSource("notizie", "nessuna risposta entro 60 secondi"),),
+        absent_sources=(AbsentSource("notizie", "nessuna risposta entro 60 secondi", "RSS"),),
         documents=(
             StepDocument(CycleStep.READ_FLOW_STATE, {"versione": 3}),
             StepDocument(CycleStep.AGENT_DECISION, {"decisioni": [{"asset": "BTC", "azione": "apri"}]}),
@@ -160,7 +160,7 @@ def test_the_detail_of_a_cycle_answers_with_everything_recorded(client_of: Clien
         "outcome": "concluso",
         "failure": None,
         "steps": ["lettura dello stato del flusso", "decisione dell'agente"],
-        "absent_sources": [{"source": "notizie", "reason": "nessuna risposta entro 60 secondi"}],
+        "absent_sources": [{"source": "notizie", "reason": "nessuna risposta entro 60 secondi", "adapter": "RSS"}],
         "documents": [
             {"step": "lettura dello stato del flusso", "content": {"versione": 3}},
             {"step": "decisione dell'agente", "content": {"decisioni": [{"asset": "BTC", "azione": "apri"}]}},

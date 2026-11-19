@@ -15,6 +15,7 @@ from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import PricePoint
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
 
 
@@ -56,6 +57,14 @@ DAY = CANDLE_INTERVALS[MINUTES_PER_DAY]
 # Never coarser than one hour: the 15-minute forecast would become a fraction of a step (ADR 0043).
 INTERVALS = tuple((minutes, name) for minutes, name in CANDLE_INTERVALS.items() if minutes <= MINUTES_PER_HOUR)
 MARKET_DATA = "dati di mercato di Hyperliquid"
+# The adapter of the indicators and of the pivots (R4.1.1): the candles of the past stay on the info endpoint.
+DECLARATION = SourceAdapterDeclaration(
+    "Hyperliquid",
+    "Dati di mercato pubblici di Hyperliquid: candele chiuse, mark price, open interest e funding rate.",
+    (),
+    (),
+    offers_history=True,
+)
 # An exchange that refuses, does not answer or answers in another shape: the source is absent from the cycle.
 UNAVAILABLE = (ClientError, ServerError, requests.RequestException, KeyError, TypeError, InvalidOperation)
 
@@ -146,6 +155,9 @@ class HyperliquidMarketDataAdapter:
     @property
     def base_url(self) -> str:
         return self._base_url
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        return DECLARATION
 
     def timeframes(self) -> Sequence[Timeframe]:
         return tuple(Timeframe(minutes) for minutes in CANDLE_INTERVALS)

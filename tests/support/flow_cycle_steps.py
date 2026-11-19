@@ -24,6 +24,7 @@ from autotrading.domain.sources.sentiment_index import SentimentIndex
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import BALANCE, FlowCycles, at
 from tests.support.flows import ANTHROPIC_MODEL
+from tests.support.source_selections import reader_of
 from tests.support.steps import quoted
 
 
@@ -281,7 +282,8 @@ def short_history(flow_cycles: FlowCycles, asset: str, days: str) -> None:  # no
 
 @given(quoted('che l\'indice Fear & Greed di "{source}" vale {value} con classificazione "{classification}"'))
 def sentiment_index(flow_cycles: FlowCycles, source: str, value: str, classification: str) -> None:
-    flow_cycles.sentiments[source].index = SentimentIndex(int(value), classification, at("06:00"))
+    _, adapter = reader_of(source)
+    flow_cycles.sentiments[adapter].index = SentimentIndex(int(value), classification, at("06:00"))
 
 
 @given(

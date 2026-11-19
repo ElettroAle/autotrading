@@ -23,6 +23,7 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate, BlockedDecision
+from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
@@ -38,7 +39,7 @@ TENANT = TenantId.new()
 FLOW = a_flow(TENANT, configuration=replace(a_configuration(), assets=("BTC", "ETH")))
 STATE = FlowState(FLOW.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0))
 CYCLE_FLOW = CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", READ_AT, CycleAccount("USDC", Decimal(500), ()), STATE)
-SNAPSHOT = FlowSnapshot(("news",), CYCLE_FLOW)
+SNAPSHOT = FlowSnapshot((ActiveSource("news", "RSS"),), CYCLE_FLOW)
 
 
 class Clock:
@@ -173,7 +174,7 @@ class Actions:
 
 
 def a_context() -> CycleContext:
-    readings = [SourceReading("news", (SourceData("news", 2, None, {"titolo": "t"}),))]
+    readings = [SourceReading("news", (SourceData("news", "RSS", 2, None, {"titolo": "t"}),))]
     return ComposeCycleContextUseCase(Composer(), Actions(), Clock()).execute(
         FLOW.id.value, SNAPSHOT, readings, [AbsentSource("pivots", "fonte non disponibile")]
     )
@@ -190,7 +191,7 @@ def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_mi
         started_at=CYCLE_FLOW.started_at,
         now=NOW,
         state=CYCLE_FLOW.state_view(),
-        sources=(SourceData("news", 2, None, {"titolo": "t"}),),
+        sources=(SourceData("news", "RSS", 2, None, {"titolo": "t"}),),
         missing=("pivots: fonte non disponibile",),
     )
 

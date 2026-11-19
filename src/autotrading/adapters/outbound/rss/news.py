@@ -9,6 +9,7 @@ from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.errors import InvalidNewsItemError
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.news_item import NewsItem
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 TIMEOUT_SECONDS = 10.0
 # Three general crypto outlets with RSS 2.0 feeds, no key and dozens of stories each (ADR 0034).
@@ -20,6 +21,14 @@ NEWS_FEEDS = (
 # Bounds the context the agent receives: up to 50 stories reach every cycle.
 SUMMARY_LIMIT = 500
 ELLIPSIS = "…"
+# The adapter of the news (R4.1.1): a feed carries only its latest stories, so no history for the replay.
+DECLARATION = SourceAdapterDeclaration(
+    "RSS",
+    "Feed RSS di CoinDesk, Cointelegraph e Decrypt, senza chiave.",
+    (),
+    (),
+    offers_history=False,
+)
 
 
 class RssNewsAdapter:
@@ -32,6 +41,9 @@ class RssNewsAdapter:
     def __init__(self, client: httpx.Client, feeds: Sequence[str] = NEWS_FEEDS) -> None:
         self._client = client
         self._feeds = feeds
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        return DECLARATION
 
     def read_latest(self) -> Sequence[NewsItem]:
         channels = [channel for url in self._feeds if (channel := self._channel_of(url)) is not None]

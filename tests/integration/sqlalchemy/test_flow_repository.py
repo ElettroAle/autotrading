@@ -26,12 +26,13 @@ from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.accounts import an_account
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 pytestmark = pytest.mark.integration
 
@@ -68,7 +69,7 @@ def test_a_saved_flow_reads_back_with_its_whole_configuration(database: Engine) 
     configuration = replace(
         a_configuration(assets=("BTC", "ETH"), allocated_capital=Decimal("400.50")),
         model=ModelSelection("openrouter/deepseek-chat", {"temperature": Decimal("0.70"), "reasoning_effort": "alto"}),
-        sources=(SourceSelection("notizie", 7, {"hours": 6}), SourceSelection("indicatori")),
+        sources=(a_source("notizie", 7, {"hours": 6}), a_source("indicatori")),
         instructions="prudente",
         risk_limits=RiskLimits(3, None, Decimal("12.5")),
     )

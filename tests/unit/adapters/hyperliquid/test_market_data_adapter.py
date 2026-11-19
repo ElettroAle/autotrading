@@ -15,6 +15,7 @@ from autotrading.application.sources.errors import SourceUnavailableError, Timef
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.pivot_levels import DailyRange
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
 
 NOW = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
@@ -59,6 +60,16 @@ class FakeSdk(HyperliquidSdkAdapter):
 
 def adapter(sdk: FakeSdk) -> HyperliquidMarketDataAdapter:
     return HyperliquidMarketDataAdapter(TESTNET_API_URL, sdk)
+
+
+def test_the_market_data_declare_the_adapter_of_indicators_and_pivots_without_configuration_and_with_history() -> None:
+    assert adapter(FakeSdk()).declaration() == SourceAdapterDeclaration(
+        "Hyperliquid",
+        "Dati di mercato pubblici di Hyperliquid: candele chiuse, mark price, open interest e funding rate.",
+        (),
+        (),
+        offers_history=True,
+    )
 
 
 def test_the_candles_are_the_closed_ones_with_close_and_volume() -> None:

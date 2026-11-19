@@ -14,7 +14,8 @@ from autotrading.adapters.outbound.hyperliquid.composition import (
 )
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
-from autotrading.bootstrap import WorkerCycle, cycle_of
+from autotrading.application.sources.list_sources import SourceSystems
+from autotrading.bootstrap import WorkerCycle, cycle_of, source_systems
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
@@ -49,6 +50,8 @@ def installation_configuration(secrets: Path, **overrides: str) -> dict[str, str
         "APP_VERSION": "1.0.0",
         "CREDENTIALS_PUBLIC_KEY_FILE": _secret(secrets, "credentials_public_key", public_key),
         "WORKER_URL": "http://worker:8000",
+        # The API lists the sources as their adapters declare themselves, the forecaster among them (R4.1.1).
+        "FORECASTER_URL": "http://forecaster:8000",
     }
     return configuration | overrides
 
@@ -63,15 +66,16 @@ def worker_configuration(secrets: Path, **overrides: str) -> dict[str, str]:
     return configuration | overrides
 
 
-def dev_installation_on_testnet() -> tuple[str, HyperliquidAdaptersOfInstallation]:
-    """The dev installation with Hyperliquid and Hyperliquid Testnet, as bootstrap hands them to the use cases
-    (R2.3.11)."""
-    return "dev", hyperliquid_adapters()
+def dev_installation_on_testnet() -> tuple[str, HyperliquidAdaptersOfInstallation, SourceSystems]:
+    """The dev installation with Hyperliquid and Hyperliquid Testnet, and the adapters of the sources, as bootstrap
+    hands them to the use cases (R2.3.11, R4.1.1)."""
+    hyperliquid = hyperliquid_adapters()
+    return "dev", hyperliquid, source_systems(hyperliquid, FakePriceForecasterAdapter())
 
 
 def cycles_of_installation(opener: SodiumCredentialOpenerAdapter) -> Callable[[TenantId], WorkerCycle]:
     """The cycles of the worker of an installation dev on the testnet, on a database that is never reached."""
-    environment, hyperliquid = dev_installation_on_testnet()
+    environment, hyperliquid, _ = dev_installation_on_testnet()
     return cycle_of(
         create_engine("sqlite://"),
         (opener, SodiumProviderKeyOpenerAdapter({})),

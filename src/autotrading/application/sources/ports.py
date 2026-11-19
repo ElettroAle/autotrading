@@ -11,12 +11,17 @@ from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, PricePoint
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.timeframe import Timeframe
 
 
 class SentimentPort(Protocol):
-    """One Fear & Greed provider: each sentiment source of the catalog has its own adapter (R1.3.6)."""
+    """One Fear & Greed provider: each one is an adapter of the sentiment source (R1.3.6, R4.1.1)."""
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter declares of itself, without asking the provider (R4.1.1)."""
+        ...
 
     def read_index(self) -> SentimentIndex:
         """The current index of the provider; raises SourceUnavailableError when it cannot be read."""
@@ -25,6 +30,10 @@ class SentimentPort(Protocol):
 
 class NewsPort(Protocol):
     """The crypto outlets the news source reads from (R1.3.7)."""
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter declares of itself, without asking the outlets (R4.1.1)."""
+        ...
 
     def read_latest(self) -> Sequence[NewsItem]:
         """The stories the outlets publish now, in any order; raises SourceUnavailableError when none answers."""
@@ -49,6 +58,12 @@ class PriceHistoryPort(Protocol):
 class MarketDataPort(Protocol):
     """The public market data of the exchange for an asset, without credentials (R1.3.3, R1.3.4)."""
 
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter of the indicators and of the pivots declares of itself, without asking the exchange
+        (R4.1.1).
+        """
+        ...
+
     def timeframes(self) -> Sequence[Timeframe]:
         """The candle intervals the exchange publishes."""
         ...
@@ -71,6 +86,10 @@ class MarketDataPort(Protocol):
 
 class PriceForecasterPort(Protocol):
     """The model that forecasts the price of an asset from its history (R1.3.5, ADR 0107)."""
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter of the forecast declares of itself, without asking the model (R4.1.1)."""
+        ...
 
     def predict(
         self, asset: str, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]
@@ -104,7 +123,7 @@ class SourceRequest:
 
 
 class SourceReaderPort(Protocol):
-    """Reads one source of the catalog with the parameters of the flow (R1.3.2)."""
+    """Reads one adapter of a source of the catalog with the parameters of the flow (R1.3.2, R4.1.1)."""
 
     def execute(self, command: SourceRequest) -> Sequence[SourceValue]:
         """The values read, each with its reference instant. Raises a typed error when the source has no data."""
@@ -128,6 +147,9 @@ class CycleSourceAskPort(Protocol):
 
     @property
     def source(self) -> str: ...
+
+    @property
+    def adapter(self) -> str: ...
 
     @property
     def weight(self) -> int: ...

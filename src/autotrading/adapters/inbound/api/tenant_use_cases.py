@@ -163,7 +163,6 @@ from autotrading.application.sources.get_source import GetSourceUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.verification.ports import VerificationPort
 from autotrading.application.verification.run_verification import RunVerificationUseCase
-from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -179,7 +178,8 @@ class TenantPorts:
     position_closing: PositionClosingPort
     manual_closings: ManualClosingRecorderPort
     verification: VerificationPort
-    source_catalog: SourceCatalog
+    # The sources with the adapters the installation composes (R4.1.1).
+    sources: ListSourcesUseCase
     provider_keys: ProviderKeyRepositoryPort
     provider_key_sealer: ProviderKeySealerPort
     provider_key_usage: ProviderKeyUsagePort
@@ -351,8 +351,8 @@ class TenantUseCases:
             ),
             close_position=ClosePositionUseCase(ports.position_closing, ports.manual_closings),
             run_verification=RunVerificationUseCase(ports.verification),
-            list_sources=ListSourcesUseCase(ports.source_catalog),
-            get_source=GetSourceUseCase(ports.source_catalog),
+            list_sources=ports.sources,
+            get_source=GetSourceUseCase(ports.sources),
             register_provider_key=RegisterProviderKeyUseCase(tenant_id, keys, key_services),
             replace_provider_key=ReplaceProviderKeyUseCase(keys, key_services),
             remove_provider_key=RemoveProviderKeyUseCase(keys, ports.provider_key_usage),

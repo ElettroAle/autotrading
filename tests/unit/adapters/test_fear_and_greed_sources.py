@@ -10,6 +10,7 @@ from autotrading.adapters.outbound.alternative_me.sentiment import AlternativeMe
 from autotrading.adapters.outbound.coinmarketcap.sentiment import CoinMarketCapSentimentAdapter
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 ALTERNATIVE_ME_BODY = {
     "name": "Fear and Greed Index",
@@ -28,8 +29,8 @@ REFUSED = "connection refused"
 type Adapter = AlternativeMeSentimentAdapter | CoinMarketCapSentimentAdapter
 type AdapterType = Callable[[httpx.Client], Adapter]
 BOTH: list[tuple[AdapterType, str]] = [
-    (AlternativeMeSentimentAdapter, "sentiment-alternative-me"),
-    (CoinMarketCapSentimentAdapter, "sentiment-coinmarketcap"),
+    (AlternativeMeSentimentAdapter, "alternative.me"),
+    (CoinMarketCapSentimentAdapter, "CoinMarketCap"),
 ]
 WITH_BODY: list[tuple[AdapterType, object]] = [
     (AlternativeMeSentimentAdapter, ALTERNATIVE_ME_BODY),
@@ -85,6 +86,30 @@ def test_coinmarketcap_answers_with_its_latest_index_without_a_key() -> None:
     assert "x-cmc_pro_api_key" not in seen_headers[0]
 
 
+def test_alternative_me_declares_an_adapter_of_the_sentiment_without_configuration_and_with_history() -> None:
+    declaration = AlternativeMeSentimentAdapter(unreachable_client()).declaration()
+
+    assert declaration == SourceAdapterDeclaration(
+        "alternative.me",
+        "Crypto Fear & Greed Index di alternative.me, dall'endpoint pubblico senza chiave.",
+        (),
+        (),
+        offers_history=True,
+    )
+
+
+def test_coinmarketcap_declares_an_adapter_of_the_sentiment_without_configuration_nor_history() -> None:
+    declaration = CoinMarketCapSentimentAdapter(unreachable_client()).declaration()
+
+    assert declaration == SourceAdapterDeclaration(
+        "CoinMarketCap",
+        "CMC Crypto Fear and Greed Index di CoinMarketCap, dall'endpoint pubblico senza chiave.",
+        (),
+        (),
+        offers_history=False,
+    )
+
+
 @pytest.mark.parametrize(("adapter_type", "source"), BOTH)
 def test_an_unreachable_provider_is_an_unavailable_source(adapter_type: AdapterType, source: str) -> None:
     with pytest.raises(SourceUnavailableError, match=rf"^fonte non raggiungibile: {source}$") as raised:
@@ -126,7 +151,7 @@ def test_an_answer_that_is_not_an_object_is_an_unavailable_source(adapter_type: 
     ],
 )
 def test_an_alternative_me_answer_in_another_shape_is_an_unavailable_source(body: object) -> None:
-    with pytest.raises(SourceUnavailableError, match=r"^fonte non raggiungibile: sentiment-alternative-me$"):
+    with pytest.raises(SourceUnavailableError, match=r"^fonte non raggiungibile: alternative.me$"):
         AlternativeMeSentimentAdapter(client_answering(200, body)).read_index()
 
 
@@ -142,5 +167,5 @@ def test_an_alternative_me_answer_in_another_shape_is_an_unavailable_source(body
     ],
 )
 def test_a_coinmarketcap_answer_in_another_shape_is_an_unavailable_source(body: object) -> None:
-    with pytest.raises(SourceUnavailableError, match=r"^fonte non raggiungibile: sentiment-coinmarketcap$"):
+    with pytest.raises(SourceUnavailableError, match=r"^fonte non raggiungibile: CoinMarketCap$"):
         CoinMarketCapSentimentAdapter(client_answering(200, body)).read_index()

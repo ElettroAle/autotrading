@@ -47,6 +47,7 @@ class State:
 @dataclass(frozen=True, slots=True)
 class Source:
     source: str = "indicatori"
+    adapter: str = "Hyperliquid"
     weight: int = 8
     asset: str | None = "BTC"
     values: Mapping[str, str] = field(default_factory=lambda: {"rsi": "71"})
@@ -86,7 +87,7 @@ def test_the_question_becomes_the_context_of_the_agent() -> None:
                 ),
             ),
         ),
-        sources=(SourceData("indicatori", 8, "BTC", {"rsi": "71"}),),
+        sources=(SourceData("indicatori", "Hyperliquid", 8, "BTC", {"rsi": "71"}),),
         missing=("notizie: timeout",),
     )
 

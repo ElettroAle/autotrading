@@ -21,9 +21,10 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import AdapterSelection, ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 # The engine never connects: these tests stop before the database.
 ENGINE = create_engine("postgresql+psycopg://nobody@unreachable.invalid/none")
@@ -31,7 +32,7 @@ ENGINE = create_engine("postgresql+psycopg://nobody@unreachable.invalid/none")
 CONFIGURATION = replace(
     a_configuration(assets=("BTC", "ETH"), allocated_capital=Decimal("400.50")),
     model=ModelSelection("openrouter/deepseek-chat", {"temperature": Decimal("0.70"), "reasoning_effort": "1"}),
-    sources=(SourceSelection("notizie", 7, {"hours": 6}),),
+    sources=(a_source("notizie", 7, {"hours": 6}),),
     instructions="prudente",
     risk_limits=RiskLimits(3, None, Decimal("12.5"), Decimal("30.5"), Decimal(200)),
     bring_to_minimum=True,
@@ -53,7 +54,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
             "name": "openrouter/deepseek-chat",
             "parameters": {"temperature": {"number": "0.70"}, "reasoning_effort": {"choice": "1"}},
         },
-        "sources": [{"name": "notizie", "weight": 7, "parameters": {"hours": 6}}],
+        "sources": [{"name": "notizie", "adapters": [{"name": "RSS", "weight": 7, "parameters": {"hours": 6}}]}],
         "instructions": "prudente",
         "risk_limits": {
             "max_leverage": 3,
@@ -73,6 +74,24 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "default_take_profit_percent": "10",
         "minimum_confidence": 60,
     }
+
+
+def test_a_version_saved_before_the_adapters_reads_in_the_model_of_the_adapters() -> None:
+    document = document_of(CONFIGURATION)
+    document["sources"] = [
+        {"name": "sentiment-alternative-me", "weight": 4, "parameters": {}},
+        {"name": "sentiment-coinmarketcap", "weight": 6, "parameters": {}},
+    ]
+
+    assert configuration_of(3, document).sources == (
+        SourceSelection("sentiment", (AdapterSelection("alternative.me", 4), AdapterSelection("CoinMarketCap", 6))),
+    )
+
+
+def test_the_marker_of_the_migration_is_not_part_of_the_configuration() -> None:
+    document = {**document_of(CONFIGURATION), "migrated_from": "sources-v1"}
+
+    assert configuration_of(CONFIGURATION.version, document) == CONFIGURATION
 
 
 def test_a_configuration_read_back_from_json_is_the_same_with_its_version() -> None:

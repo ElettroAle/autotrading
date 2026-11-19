@@ -81,9 +81,7 @@ class ImportFlowStrategyUseCase:
         return FlowStrategy(
             cycle_interval=CycleInterval.of(command.cycle_minutes),
             model=self._models.execute(strategy_model(command.model), command.model_parameters),
-            sources=tuple(
-                self._sources.execute(source.name, source.weight, source.parameters) for source in command.sources
-            ),
+            sources=tuple(self._sources.execute(source.name, source.adapters) for source in command.sources),
             instructions=command.instructions.strip(),
             risk_limits=RiskLimits.of(
                 command.max_leverage,

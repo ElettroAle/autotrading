@@ -23,9 +23,9 @@ from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.risk_check import RiskPolicy
-from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source
 
 
 def test_assets_are_upper_case_each_once_in_the_given_order() -> None:
@@ -44,7 +44,7 @@ def test_a_flow_out_of_draft_without_assets_is_refused() -> None:
 
 
 def test_a_source_cannot_appear_twice() -> None:
-    sources = (SourceSelection("notizie"), SourceSelection("indicatori"), SourceSelection("notizie", 3))
+    sources = (a_source("notizie"), a_source("indicatori"), a_source("notizie", 3))
 
     with pytest.raises(RepeatedSourceError, match=r"^fonte ripetuta: notizie$"):
         replace(a_configuration(), sources=sources)

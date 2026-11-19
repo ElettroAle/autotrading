@@ -46,6 +46,7 @@ from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.recorded_decision import RecordedDecision
+from autotrading.domain.flows.selections import ActiveSource
 
 operations = logging.getLogger("autotrading.cycles")
 
@@ -132,9 +133,9 @@ class CycleState[S = object, D = object, C = object, A = object, O = object, E =
 
 
 class SourceTask[S = object](TypedDict):
-    """What one source node receives: the source to ask and the state of the flow it asks with."""
+    """What one source node receives: the adapter of the source to ask and the state of the flow it asks with."""
 
-    source: str
+    source: ActiveSource
     snapshot: FlowSnapshot[S]
 
 
@@ -150,9 +151,10 @@ def recorded(cycles: CycleRepositoryPort, record: CycleRecord) -> CycleRecord:
 class CycleGraph[S = object, D = object, C = object, A = object, O = object, E = object]:
     """The decision cycle of a flow as a LangGraph graph (docs/architecture.md §5, ADR 0104).
 
-    START → load_state → one source node for each active source, together → collect_sources → compose_context →
-    decide → risk_filter → execute → reverse, only with a reversal → update_ledger → persist → END. Every node calls
-    the port of its step; the checkpointer keeps the state after each node, so a cycle resumes from the last node done.
+    START → load_state → one source node for each adapter of each active source, together → collect_sources →
+    compose_context → decide → risk_filter → execute → reverse, only with a reversal → update_ledger → persist → END.
+    Every node calls the port of its step; the checkpointer keeps the state after each node, so a cycle resumes from
+    the last node done.
     The two executions of a cycle with a reversal are one step of its record (ADR inversione-in-due-passi-nel-ciclo).
     """
 
@@ -222,9 +224,9 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         request = SourceRequest(cycle.flow_id, cycle.planned_at, task["snapshot"])
         wait = cycle.schedule.source_wait
         outcomes = self._steps.calls.call_all(
-            {source: lambda: self._steps.sources.execute(request, source)}, self._seconds_of(wait)
+            {source.label: lambda: self._steps.sources.execute(request, source)}, self._seconds_of(wait)
         )
-        result = _result_of(source, outcomes[source], wait)
+        result = _result_of(source, outcomes[source.label], wait)
         if isinstance(result, AbsentSource):
             return {"absent": [result]}
         return {"readings": [result]}
@@ -310,12 +312,12 @@ def _reversing[S](state: CycleState[S]) -> str:
     return "reverse" if state["review"].reversing else "update_ledger"
 
 
-def _result_of[D](source: str, outcome: CallOutcome[D], wait: timedelta) -> SourceReading[D] | AbsentSource:
+def _result_of[D](source: ActiveSource, outcome: CallOutcome[D], wait: timedelta) -> SourceReading[D] | AbsentSource:
     if isinstance(outcome, CallAnswered):
-        return SourceReading(source, outcome.value)
+        return SourceReading(source.label, outcome.value)
     if isinstance(outcome, CallFailed):
-        return AbsentSource(source, str(outcome.error))
-    return AbsentSource(source, f"nessuna risposta entro {int(wait.total_seconds())} secondi")
+        return AbsentSource(source.source, str(outcome.error), source.adapter)
+    return AbsentSource(source.source, f"nessuna risposta entro {int(wait.total_seconds())} secondi", source.adapter)
 
 
 def _last_state[S, D, C, A, O, E](state: CycleState[S, D, C, A, O, E]) -> S | None:

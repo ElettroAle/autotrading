@@ -131,6 +131,9 @@ services:
       AUTH_SCOPE: ${AUTH_SCOPE:-}
       WORKER_URL: http://worker:8000
       WORKER_TOKEN_FILE: /run/secrets/worker_token
+      # The API lists the sources as their adapters declare themselves, the forecaster among them; the declaration
+      # needs no call to the service (R4.1.1, ADR fonti-con-adapter-dichiarati).
+      FORECASTER_URL: http://forecaster:8000
     secrets:
       - postgres_app_password
       - credentials_public_key

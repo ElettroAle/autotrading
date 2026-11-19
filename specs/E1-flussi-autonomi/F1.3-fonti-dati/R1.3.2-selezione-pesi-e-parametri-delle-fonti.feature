@@ -68,7 +68,7 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
     Allora la modifica è rifiutata con il motivo "<motivo>"
 
     Esempi:
-      | valore                                 | motivo                                          |
-      | peso 0 per la fonte "indicatori"       | peso fuori da 1-10: indicatori                  |
-      | peso 11 per la fonte "indicatori"      | peso fuori da 1-10: indicatori                  |
-      | numero notizie 51 per la fonte "notizie" | parametro fuori dai valori ammessi: numero notizie |
+      | valore                                   | motivo                                                       |
+      | peso 0 per la fonte "indicatori"         | peso fuori da 1-10: indicatori                               |
+      | peso 11 per la fonte "indicatori"        | peso fuori da 1-10: indicatori                               |
+      | numero notizie 51 per la fonte "notizie" | parametro fuori dai valori ammessi: numero notizie, da 1 a 50 |

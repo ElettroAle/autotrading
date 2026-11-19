@@ -12,6 +12,8 @@ from autotrading.adapters.inbound.api.strategy_document import (
     StrategyFormatNotSupportedError,
     attachment_of,
 )
+from autotrading.application.flows.create_flow import SourceRequest
+from autotrading.application.flows.ports import AdapterRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow_strategy import FlowStrategy
@@ -19,11 +21,12 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 from tests.support.flows import OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
+from tests.support.source_selections import a_source
 
 Client = Callable[[str], TestClient]
 
@@ -63,7 +66,7 @@ def an_original(client: TestClient, platform: Platform, user: str, name: str = "
         "cycle_minutes": 60,
         "model": OPENROUTER_MODEL,
         "model_parameters": {"temperature": "0.5"},
-        "sources": [{"name": "notizie", "weight": 2}],
+        "sources": [{"name": "notizie", "adapters": [{"name": "RSS", "weight": 2}]}],
         "instructions": "compra in tendenza",
         "max_leverage": 5,
         "max_margin_exposure_percent": "10",
@@ -86,7 +89,7 @@ def a_strategy() -> FlowStrategy:
     return FlowStrategy(
         cycle_interval=CycleInterval(60),
         model=ModelSelection(OPENROUTER_MODEL, {"temperature": Decimal("0.5")}),
-        sources=(SourceSelection("notizie", 2, {"articoli": 10}),),
+        sources=(a_source("notizie", 2, {"articoli": 10}),),
         instructions="compra in tendenza",
         risk_limits=RiskLimits(5, Decimal(10), None, Decimal(30), Decimal(200)),
         bring_to_minimum=True,
@@ -105,11 +108,13 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
 
     assert document == {
         "format": "autotrading-strategy",
-        "format_version": 1,
+        "format_version": 2,
         "strategy": {
             "cycle_minutes": 60,
             "model": {"name": OPENROUTER_MODEL, "parameters": {"temperature": "0.5"}},
-            "sources": [{"name": "notizie", "weight": 2, "parameters": {"articoli": 10}}],
+            "sources": [
+                {"name": "notizie", "adapters": [{"name": "RSS", "weight": 2, "parameters": {"articoli": 10}}]}
+            ],
             "instructions": "compra in tendenza",
             "risk_limits": {
                 "max_leverage": 5,
@@ -142,9 +147,7 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         {"temperature": Decimal("0.5")},
         60,
     )
-    assert [(source.name, source.weight, source.parameters) for source in command.sources] == [
-        ("notizie", 2, {"articoli": 10})
-    ]
+    assert command.sources == (SourceRequest("notizie", (AdapterRequest("RSS", 2, {"articoli": 10}),)),)
     assert (command.max_leverage, command.max_margin_exposure_percent, command.max_value_exposure_percent) == (
         5,
         Decimal(10),
@@ -170,7 +173,7 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
-    document = StrategyDocument(format="autotrading-strategy", format_version=1, strategy=StrategyBody())
+    document = StrategyDocument(format="autotrading-strategy", format_version=2, strategy=StrategyBody())
 
     command = document.command("alfa bis")
 
@@ -184,7 +187,34 @@ def test_a_document_without_model_or_limits_gives_them_empty() -> None:
     assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (None, None)
 
 
-@pytest.mark.parametrize(("format_name", "version"), [("altro-formato", 1), ("autotrading-strategy", 2)])
+def test_a_document_before_the_adapters_gives_every_source_the_adapter_it_became() -> None:
+    """A file of the first version still imports: its sources pass to the new model as the flows did (R4.1.1, ADR
+    migrazione-delle-fonti-al-modello-ad-adapter)."""
+    document = StrategyDocument.model_validate(
+        {
+            "format": "autotrading-strategy",
+            "format_version": 1,
+            "strategy": {
+                "sources": [
+                    {"name": "sentiment-alternative-me", "weight": 4},
+                    {"name": "notizie", "weight": 2, "parameters": {"articoli": 10}},
+                    {"name": "sentiment-coinmarketcap", "weight": 6},
+                    {"name": "oroscopo"},
+                ]
+            },
+        }
+    )
+
+    command = document.command("alfa bis")
+
+    assert command.sources == (
+        SourceRequest("sentiment", (AdapterRequest("alternative.me", 4), AdapterRequest("CoinMarketCap", 6))),
+        SourceRequest("notizie", (AdapterRequest("RSS", 2, {"articoli": 10}),)),
+        SourceRequest("oroscopo", (AdapterRequest("oroscopo"),)),
+    )
+
+
+@pytest.mark.parametrize(("format_name", "version"), [("altro-formato", 2), ("autotrading-strategy", 3)])
 def test_a_document_of_another_format_or_version_is_refused(format_name: str, version: int) -> None:
     document = StrategyDocument(format=format_name, format_version=version, strategy=StrategyBody())
 
@@ -219,10 +249,14 @@ def test_the_export_downloads_the_strategy_without_account_capital_or_assets(
     assert response.status_code == 200
     assert response.headers["content-disposition"] == attachment_of("alfa")
     document = response.json()
-    assert (document["format"], document["format_version"]) == ("autotrading-strategy", 1)
+    assert (document["format"], document["format_version"]) == ("autotrading-strategy", 2)
     assert document["strategy"]["model"]["name"] == OPENROUTER_MODEL
     assert document["strategy"]["model"]["parameters"]["temperature"] == "0.5"
-    assert [(source["name"], source["weight"]) for source in document["strategy"]["sources"]] == [("notizie", 2)]
+    assert [
+        (source["name"], adapter["name"], adapter["weight"])
+        for source in document["strategy"]["sources"]
+        for adapter in source["adapters"]
+    ] == [("notizie", "RSS", 2)]
     assert (document["strategy"]["cycle_minutes"], document["strategy"]["bring_to_minimum"]) == (60, True)
     assert original["account_id"] not in response.text
     assert {"account_id", "allocated_capital", "assets"}.isdisjoint(document["strategy"])
@@ -295,16 +329,16 @@ def test_an_import_of_a_model_out_of_the_catalog_answers_with_the_reason(client_
 def test_an_import_of_another_format_answers_400_with_the_reason(client_of: Client) -> None:
     anna = client_of("anna")
     document = StrategyDocument.of(a_strategy()).model_dump(mode="json")
-    document["format_version"] = 2
+    document["format_version"] = 3
 
     response = anna.post("/flows/import", params={"name": "alfa bis"}, json=document)
 
     assert (response.status_code, reason_of(response)) == (
         400,
         {
-            "detail": "formato del file non supportato: autotrading-strategy versione 2",
+            "detail": "formato del file non supportato: autotrading-strategy versione 3",
             "format": "autotrading-strategy",
-            "format_version": 2,
+            "format_version": 3,
         },
     )
 

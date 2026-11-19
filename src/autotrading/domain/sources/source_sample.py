@@ -31,6 +31,8 @@ class SourceSample:
 
     cycle: CycleReference
     source: str
+    # The adapter of the source that read the value (R4.1.1).
+    adapter: str
     asset: str | None
     reference_at: datetime
     collected_at: datetime
@@ -43,6 +45,13 @@ class SourceSample:
 
     @classmethod
     def of(
-        cls, cycle: CycleReference, source: str, asset: str | None, value: SourceValue, collected_at: datetime
+        cls,
+        cycle: CycleReference,
+        reader: tuple[str, str],
+        asset: str | None,
+        value: SourceValue,
+        collected_at: datetime,
     ) -> SourceSample:
-        return cls(cycle, source, asset, value.reference_at, collected_at, dict(value.values))
+        """The value read by the reader, the source and its adapter, for the asset or the whole market."""
+        source, adapter = reader
+        return cls(cycle, source, adapter, asset, value.reference_at, collected_at, dict(value.values))

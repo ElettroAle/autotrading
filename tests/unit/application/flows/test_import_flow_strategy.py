@@ -10,6 +10,7 @@ from autotrading.application.flows.export_flow_strategy import (
     ExportFlowStrategyCommand,
 )
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
+from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import (
@@ -27,8 +28,9 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ModelSelection
 from tests.support.flows import OPENROUTER_MODEL
+from tests.support.source_selections import a_source, a_source_request
 from tests.support.strategies import Strategies
 
 
@@ -42,7 +44,7 @@ def a_command(**changes: object) -> ImportFlowStrategyCommand:
         max_total_margin_exposure_percent=Decimal(30),
         max_total_value_exposure_percent=Decimal(120),
         model_parameters={"max_tokens": "2048"},
-        sources=(SourceRequest("indicatori", 2, {"periodo": 14}), SourceRequest("notizie")),
+        sources=(a_source_request("indicatori", 2, {"periodo": 14}), a_source_request("notizie")),
         instructions="  compra basso  ",
         cycle_minutes=60,
         bring_to_minimum=True,
@@ -79,7 +81,7 @@ def test_the_import_saves_a_draft_at_its_first_version_with_the_strategy_checked
     assert draft.configuration == FlowStrategy(
         cycle_interval=CycleInterval(60),
         model=ModelSelection(OPENROUTER_MODEL, {"temperature": Decimal(1), "max_tokens": "2048"}),
-        sources=(SourceSelection("indicatori", 2, {"periodo": 14}), SourceSelection("notizie")),
+        sources=(a_source("indicatori", 2, {"periodo": 14}), a_source("notizie")),
         instructions="compra basso",
         risk_limits=RiskLimits(3, Decimal(10), Decimal(50), Decimal(30), Decimal(120)),
         bring_to_minimum=True,
@@ -105,7 +107,12 @@ def test_the_exported_strategy_imports_as_it_was(strategies: Strategies) -> None
         max_leverage=strategy.risk_limits.max_leverage,
         max_margin_exposure_percent=strategy.risk_limits.max_margin_exposure_percent,
         max_value_exposure_percent=strategy.risk_limits.max_value_exposure_percent,
-        sources=tuple(SourceRequest(source.name, source.weight) for source in strategy.sources),
+        sources=tuple(
+            SourceRequest(
+                source.name, tuple(AdapterRequest(adapter.name, adapter.weight) for adapter in source.adapters)
+            )
+            for source in strategy.sources
+        ),
         instructions=strategy.instructions,
         cycle_minutes=strategy.cycle_interval.minutes,
     )
@@ -123,7 +130,7 @@ def test_the_exported_strategy_imports_as_it_was(strategies: Strategies) -> None
         ({"model": "openrouter/ritirato"}, InvalidFlowSettingError, "modello non disponibile: openrouter/ritirato"),
         ({"sources": (SourceRequest("balene"),)}, InvalidFlowSettingError, "fonte non disponibile: balene"),
         (
-            {"sources": (SourceRequest("notizie"), SourceRequest("notizie"))},
+            {"sources": (a_source_request("notizie"), a_source_request("notizie"))},
             RepeatedSourceError,
             "fonte ripetuta: notizie",
         ),

@@ -100,6 +100,8 @@ class StepDocumentResponse(BaseModel):
 class AbsentSourceResponse(BaseModel):
     source: str
     reason: str
+    # The adapter that gave no data; null in the cycles recorded before the adapters (R4.1.1).
+    adapter: str | None
 
 
 class CycleDetailResponse(BaseModel):
@@ -129,7 +131,8 @@ class CycleDetailResponse(BaseModel):
             failure=FailureResponse.of(record.failure),
             steps=[step.value for step in record.steps],
             absent_sources=[
-                AbsentSourceResponse(source=item.source, reason=item.reason) for item in record.absent_sources
+                AbsentSourceResponse(source=item.source, reason=item.reason, adapter=item.adapter)
+                for item in record.absent_sources
             ],
             documents=[
                 StepDocumentResponse(step=document.step.value, content=dict(document.content))

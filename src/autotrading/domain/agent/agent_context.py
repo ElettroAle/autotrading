@@ -54,9 +54,12 @@ class FlowStateView:
 
 @dataclass(frozen=True, slots=True)
 class SourceData:
-    """The values one active source collected in the cycle; asset is None for a source of the whole market."""
+    """The values one adapter of an active source collected in the cycle; asset is None for a source of the whole
+    market. The agent reads the source and the adapter of every datum (R4.1.1).
+    """
 
     source: str
+    adapter: str
     weight: int
     asset: str | None
     values: Mapping[str, str]
@@ -154,4 +157,10 @@ def _text_or_none(price: Decimal | None) -> str | None:
 
 
 def _source_document(source: SourceData) -> dict[str, object]:
-    return {"fonte": source.source, "peso": source.weight, "asset": source.asset, "valori": dict(source.values)}
+    return {
+        "fonte": source.source,
+        "adapter": source.adapter,
+        "peso": source.weight,
+        "asset": source.asset,
+        "valori": dict(source.values),
+    }

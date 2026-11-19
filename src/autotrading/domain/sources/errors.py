@@ -18,11 +18,38 @@ class SourceNotAvailableError(DomainError):
 
 
 class SourceParameterOutOfRangeError(DomainError):
+    """The refusal names the parameter and the values it admits (R4.1.1)."""
+
     status_code = 422
 
-    def __init__(self, label: str) -> None:
-        super().__init__(f"parametro fuori dai valori ammessi: {label}")
+    def __init__(self, label: str, minimum: int, maximum: int) -> None:
+        super().__init__(f"parametro fuori dai valori ammessi: {label}, da {minimum} a {maximum}")
         self.label = label
+        self.minimum = minimum
+        self.maximum = maximum
+
+
+class SourceAdapterNotAvailableError(DomainError):
+    status_code = 404
+
+    def __init__(self, source: str, adapter: str) -> None:
+        super().__init__(f"adapter non disponibile per la fonte {source}: {adapter}")
+        self.source = source
+        self.adapter = adapter
+
+
+class InvalidSourceAdapterDeclarationError(DomainError):
+    """An adapter of a source declared without a name or with a field twice: a defect of the adapter."""
+
+    status_code = 500
+
+    def __init__(self, adapter: str, repeated_field: str | None = None) -> None:
+        if repeated_field is None:
+            super().__init__("adapter della fonte senza nome")
+        else:
+            super().__init__(f"campo ripetuto nell'adapter {adapter}: {repeated_field}")
+        self.adapter = adapter
+        self.repeated_field = repeated_field
 
 
 class UnknownSourceParameterError(DomainError):

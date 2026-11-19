@@ -34,6 +34,7 @@ from tests.fakes.markets import FakeMarketsAdapter
 from tests.fakes.model_settings import FakeModelSettingsAdapter
 from tests.fakes.source_settings import FakeSourceSettingsAdapter
 from tests.support.flows import a_configuration, a_flow
+from tests.support.source_selections import a_source_request
 
 MODEL = "openrouter/deepseek-chat"
 
@@ -75,7 +76,7 @@ def flows() -> Flows:
 
 def test_a_valid_flow_is_saved_stopped_with_its_whole_configuration(flows: Flows) -> None:
     command = flows.command(
-        sources=(SourceRequest("notizie", 7, {"hours": 6}),), instructions="  prudente ", cycle_minutes=30
+        sources=(a_source_request("notizie", 7, {"hours": 6}),), instructions="  prudente ", cycle_minutes=30
     )
 
     flow = flows.create.execute(command)
@@ -94,9 +95,11 @@ def test_a_valid_flow_is_saved_stopped_with_its_whole_configuration(flows: Flows
         30,
     )
     assert configuration.model.name == MODEL
-    assert [(source.name, source.weight, dict(source.parameters)) for source in configuration.sources] == [
-        ("notizie", 7, {"hours": 6})
-    ]
+    assert [
+        (source.name, adapter.name, adapter.weight, dict(adapter.parameters))
+        for source in configuration.sources
+        for adapter in source.adapters
+    ] == [("notizie", "RSS", 7, {"hours": 6})]
     assert configuration.instructions == "prudente"
     assert (configuration.risk_limits.max_leverage, configuration.allocated_capital) == (5, Decimal(400))
     assert configuration.bring_to_minimum is False

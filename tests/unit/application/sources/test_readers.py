@@ -13,6 +13,7 @@ from autotrading.application.sources.read_news import ReadNewsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_sample import SourceValue
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
@@ -26,6 +27,9 @@ class FixedSentiment:
     def __init__(self, index: SentimentIndex) -> None:
         self._index = index
 
+    def declaration(self) -> SourceAdapterDeclaration:
+        return SourceAdapterDeclaration("alternative.me", "indice", (), (), offers_history=True)
+
     def read_index(self) -> SentimentIndex:
         return self._index
 
@@ -33,6 +37,9 @@ class FixedSentiment:
 class FixedNews:
     def __init__(self, items: Sequence[NewsItem]) -> None:
         self._items = items
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        return SourceAdapterDeclaration("RSS", "feed", (), (), offers_history=False)
 
     def read_latest(self) -> Sequence[NewsItem]:
         return self._items
