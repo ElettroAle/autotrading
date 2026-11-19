@@ -2,6 +2,7 @@ import { expect, type Locator } from '@playwright/test';
 
 import { fakeClock } from '@/testing/mocks/clock';
 import { fakePlatform } from '@/testing/mocks/platform';
+import { fakeSourceCredentials } from '@/testing/mocks/source-credentials';
 
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When } from '../../../support/fixtures';
@@ -11,6 +12,7 @@ const REGISTERED_AT = '2026-11-14T09:00:00+00:00';
 // The day the scenario runs on: the dates of the scenario are within or beyond 30 days of it as the scenario says.
 const TODAY = new Date('2026-11-15T06:00:00Z');
 const WALLET_VALID_UNTIL = '2026-12-30';
+const SOURCE_ADAPTER = 'LunarCrush';
 
 const expiryOf = (place: Locator): Locator => place.getByLabel('Scadenza della chiave');
 
@@ -78,4 +80,24 @@ When(
 Then('la chiave mostra la scadenza 15 dicembre 2026', async ({ dashboard }) => {
   const item = keyItem(dashboard, 'openrouter');
   await expect(expiryOf(item)).toHaveText('scade tra 30 giorni · 15/12/2026');
+});
+
+// The credentials of an adapter of a source, saved without a date (R4.1.2).
+Given('che la chiave di un adapter di fonte non ha una data di scadenza', async ({ memory }) => {
+  fakeSourceCredentials.offerAdapter('sentiment', SOURCE_ADAPTER);
+  fakeSourceCredentials.configure(memory.account, SOURCE_ADAPTER, { api_key: 'K' }, REGISTERED_AT);
+  expect(fakeSourceCredentials.of(memory.account, SOURCE_ADAPTER)?.expiry).toBeUndefined();
+});
+
+When('{string} apre la pagina Chiavi', async ({ dashboard, memory }, account: string) => {
+  expect(account).toBe(memory.account);
+  await openAs(dashboard, '/provider-keys', account);
+});
+
+Then('la chiave mostra {string} e non genera avvisi', async ({ dashboard }, state: string) => {
+  const item = dashboard.page
+    .getByRole('region', { name: 'Fonti' })
+    .getByRole('listitem', { name: SOURCE_ADAPTER, exact: true });
+  await expect(expiryOf(item)).toHaveText(state);
+  await expect(dashboard.page.getByRole('region', { name: 'Chiavi da rinnovare' })).toHaveCount(0);
 });

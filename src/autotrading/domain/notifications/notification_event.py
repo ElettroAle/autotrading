@@ -37,6 +37,8 @@ class NotificationEvent(StrEnum):
     EMERGENCY_CLOSING = "chiusura di emergenza eseguita"
     # A key may serve several flows, or none (R6.2.2).
     KEY_EXPIRY = "scadenza di una chiave"
+    # The credentials of an adapter of a source serve every flow that chose it, or none (R4.1.2).
+    SOURCE_CREDENTIALS_REJECTED = "credenziali di una fonte rifiutate"
 
     @property
     def of_flow(self) -> bool:
@@ -62,6 +64,7 @@ _OF_ACCOUNT = frozenset(
         NotificationEvent.RECONCILIATION_ALARM,
         NotificationEvent.EMERGENCY_CLOSING,
         NotificationEvent.KEY_EXPIRY,
+        NotificationEvent.SOURCE_CREDENTIALS_REJECTED,
     }
 )
 # The reasons of closing as the flows write them in their history (R1.7.2, R3.1.2, R3.5.1).
@@ -90,4 +93,5 @@ _ICONS = {
     NotificationEvent.CASH_OUT: PROFIT_ICON,
     NotificationEvent.EMERGENCY_CLOSING: ALARM_ICON,
     NotificationEvent.KEY_EXPIRY: KEY_ICON,
+    NotificationEvent.SOURCE_CREDENTIALS_REJECTED: KEY_ICON,
 }

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -30,7 +30,8 @@ class FixedSentiment:
     def declaration(self) -> SourceAdapterDeclaration:
         return SourceAdapterDeclaration("alternative.me", "indice", (), (), offers_history=True)
 
-    def read_index(self) -> SentimentIndex:
+    def read_index(self, credentials: Mapping[str, str]) -> SentimentIndex:
+        self.credentials = credentials
         return self._index
 
 
@@ -138,3 +139,16 @@ def test_a_forecast_without_prices_leaves_the_source_unavailable() -> None:
         forecast_reader(FakePriceHistoryAdapter(missing={"BTC"})).execute(
             SourceRequest(FLOW, "BTC", {"profondita_storico_giorni": 7}, NOW)
         )
+
+
+def test_the_sentiment_reads_its_provider_with_the_credentials_of_the_request() -> None:
+    sentiment = FixedSentiment(SentimentIndex(72, "Greed", NOW))
+    request = SourceRequest(FLOW, None, {}, NOW, {"api_key": "K-1"})
+
+    ReadSentimentUseCase(sentiment).execute(request)
+
+    assert sentiment.credentials == {"api_key": "K-1"}
+
+
+def test_a_request_never_shows_its_credentials() -> None:
+    assert "K-1" not in repr(SourceRequest(FLOW, None, {}, NOW, {"api_key": "K-1"}))

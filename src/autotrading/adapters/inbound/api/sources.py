@@ -6,8 +6,8 @@ from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.sources.get_source import GetSourceCommand
+from autotrading.application.sources.source_offer import SourceOffer
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
-from autotrading.domain.sources.source_catalog import OfferedSource
 from autotrading.domain.sources.source_parameter import SourceParameter
 
 
@@ -40,7 +40,10 @@ class SourceConfigurationFieldResponse(BaseModel):
 
 
 class SourceAdapterResponse(BaseModel):
-    """An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1)."""
+    """An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1).
+
+    One that needs configuration says whether the tenant gave it and, when not, why it is not activatable (R4.1.2).
+    """
 
     name: str
     description: str
@@ -48,15 +51,21 @@ class SourceAdapterResponse(BaseModel):
     parameters: list[SourceParameterResponse]
     configuration_fields: list[SourceConfigurationFieldResponse]
     offers_history: bool
+    # None when the adapter needs no configuration.
+    configured: bool | None
+    unavailable_reason: str | None
 
     @classmethod
-    def of(cls, source: OfferedSource, adapter: SourceAdapterDeclaration) -> SourceAdapterResponse:
+    def of(cls, offer: SourceOffer, adapter: SourceAdapterDeclaration) -> SourceAdapterResponse:
+        source = offer.source
         return cls(
             name=adapter.name,
             description=adapter.description,
             parameters=[SourceParameterResponse.of(parameter) for parameter in source.parameters_of(adapter.name)],
             configuration_fields=[SourceConfigurationFieldResponse.of(field) for field in adapter.configuration_fields],
             offers_history=adapter.offers_history,
+            configured=offer.configured(adapter),
+            unavailable_reason=offer.missing_configuration(adapter),
         )
 
 
@@ -68,13 +77,14 @@ class SourceResponse(BaseModel):
     adapters: list[SourceAdapterResponse]
 
     @classmethod
-    def of(cls, source: OfferedSource) -> SourceResponse:
+    def of(cls, offer: SourceOffer) -> SourceResponse:
+        source = offer.source
         return cls(
             name=source.name,
             description=source.description,
             per_asset=source.per_asset,
             parameters=[SourceParameterResponse.of(parameter) for parameter in source.definition.parameters],
-            adapters=[SourceAdapterResponse.of(source, adapter) for adapter in source.adapters],
+            adapters=[SourceAdapterResponse.of(offer, adapter) for adapter in source.adapters],
         )
 
 
@@ -83,7 +93,7 @@ def sources_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRo
 
     @router.get("")
     def list_sources(use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> list[SourceResponse]:
-        return [SourceResponse.of(source) for source in use_cases.list_sources.execute().sources]
+        return [SourceResponse.of(offer) for offer in use_cases.list_source_offers.execute()]
 
     @router.get("/{name}", responses={404: {"description": "fonte non disponibile"}})
     def get_source(name: str, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> SourceResponse:

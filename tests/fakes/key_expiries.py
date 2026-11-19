@@ -13,26 +13,58 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore
 from tests.fakes.flow_repository import FlowStore
 from tests.fakes.provider_keys import ProviderKeyStore
+from tests.fakes.source_credentials import SourceCredentialsStore
 
 
 def provider_key_id(provider: str) -> UUID:
     return uuid5(NAMESPACE_URL, f"provider-key:{provider}")
 
 
+def source_credentials_id(adapter: str) -> UUID:
+    return uuid5(NAMESPACE_URL, f"source-credentials:{adapter}")
+
+
 class InMemoryKeyExpiriesAdapter:
     """Bound to a tenant, like the SQLAlchemy adapter under row level security: the keys with an expiry and the flows
-    not archived that use each."""
+    not archived that use each; the credentials of the adapters of the sources are told, never paused for (R4.1.2)."""
 
-    def __init__(self, accounts: AccountStore, keys: ProviderKeyStore, flows: FlowStore, tenant_id: TenantId) -> None:
+    def __init__(
+        self,
+        accounts: AccountStore,
+        keys: ProviderKeyStore,
+        flows: FlowStore,
+        tenant_id: TenantId,
+        sources: SourceCredentialsStore | None = None,
+    ) -> None:
         self._accounts = accounts
         self._keys = keys
         self._flows = flows
         self._tenant_id = tenant_id
+        self._sources = SourceCredentialsStore() if sources is None else sources
 
     def expiring_keys(self) -> tuple[ExpiringKey, ...]:
-        return tuple(
+        keys = tuple(
             ExpiringKey(kind, key_id, key.name, key.expires_on, self._users_of(key))
             for kind, key_id, key in self._keyed()
+        )
+        return (*keys, *self._source_keys())
+
+    def _source_keys(self) -> tuple[ExpiringKey, ...]:
+        flows = sorted(self._flows_in_use(), key=lambda flow: flow.name.value)
+        return tuple(
+            ExpiringKey(
+                KeyKind.SOURCE,
+                source_credentials_id(credentials.adapter),
+                credentials.adapter,
+                credentials.expiry.expires_on,
+                tuple(
+                    flow.name.value
+                    for flow in flows
+                    if any(active.adapter == credentials.adapter for active in flow.configuration.active_sources)
+                ),
+            )
+            for credentials in self._sources.of(self._tenant_id)
+            if credentials.expiry is not None
         )
 
     def dated_keys(self) -> tuple[FlowKey, ...]:

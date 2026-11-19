@@ -22,6 +22,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
 )
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
+from autotrading.adapters.outbound.libsodium.source_secrets_sealer import SodiumSourceSecretsSealerAdapter
 from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
@@ -98,6 +99,7 @@ def _sealers(public_key: bytes) -> SealersOfTenant:
         partial(SodiumCredentialSealerAdapter, public_key, 1),
         partial(SodiumProviderKeySealerAdapter, public_key, 1),
         partial(SodiumMailPasswordSealerAdapter, public_key, 1),
+        partial(SodiumSourceSecretsSealerAdapter, public_key, 1),
     )
 
 

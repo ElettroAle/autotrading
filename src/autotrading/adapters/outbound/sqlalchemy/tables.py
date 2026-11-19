@@ -143,6 +143,25 @@ provider_keys = Table(
     CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="provider_keys_expiry_complete"),
 )
 
+# The credentials a tenant gave an adapter of a source: the public values in clear, the secret ones sealed, the expiry
+# the user gave and the instant the provider refused them (R4.1.2, R6.2.2).
+source_credentials = Table(
+    "source_credentials",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("adapter", Text, primary_key=True),
+    Column("public_values", JSON, nullable=False),
+    Column("key_version", Integer, nullable=False),
+    Column("ciphertext", LargeBinary, nullable=False),
+    Column("expires_on", Date),
+    Column("expiry_source", Text),
+    Column("rejected_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("expiry_source IN ('read', 'entered')", name="source_credentials_expiry_source_known"),
+    CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="source_credentials_expiry_complete"),
+)
+
 # A flow keeps its name unique among the flows of the tenant not archived (R1.1.1, ADR 0031).
 # Only a draft, or a draft archived, has no account (ADR 0124).
 flows = Table(
@@ -616,7 +635,7 @@ key_expiry_notices = Table(
     Column("expires_on", Date, primary_key=True),
     Column("threshold", Integer, primary_key=True),
     Column("notified_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    CheckConstraint("key_kind IN ('account', 'provider')", name="key_expiry_notices_kind_known"),
+    CheckConstraint("key_kind IN ('account', 'provider', 'source')", name="key_expiry_notices_kind_known"),
 )
 
 inbox_notifications = Table(

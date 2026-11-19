@@ -48,6 +48,9 @@ from autotrading.application.notifications.notify_order_rejected import NotifyOr
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
 from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
+from autotrading.application.notifications.notify_source_credentials_rejected import (
+    NotifySourceCredentialsRejectedUseCase,
+)
 from autotrading.application.notifications.notify_unattributable_fill import NotifyUnattributableFillUseCase
 from autotrading.application.notifications.notify_unattributable_position import (
     NotifyUnattributablePositionUseCase,
@@ -111,6 +114,7 @@ from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
 )
+from tests.fakes.source_credentials import FakeSourceSecretsOpenerAdapter, InMemorySourceCredentialsRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.cycle_composition import (
@@ -276,6 +280,8 @@ class FlowCycles:
             provider_keys=InMemoryProviderKeyRepositoryAdapter(platform.provider_keys, tenant_id),
             forecasts=self.forecasts_of(tenant_id),
             samples=self.samples_of(tenant_id),
+            source_credentials=InMemorySourceCredentialsRepositoryAdapter(platform.source_credentials, tenant_id),
+            source_credentials_rejected_notice=NotifySourceCredentialsRejectedUseCase(notify),
             send_orders=SendCycleOrdersUseCase(
                 ExecuteCycleOrdersUseCase(
                     execute_flow_orders,
@@ -302,7 +308,9 @@ class FlowCycles:
             openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify_flow),
             opening_reduced_notice=NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
             opening_blocked_notice=NotifyOpeningBlockedUseCase(notify_flow),
-            flow_keys=InMemoryKeyExpiriesAdapter(platform.accounts, platform.provider_keys, platform.flows, tenant_id),
+            flow_keys=InMemoryKeyExpiriesAdapter(
+                platform.accounts, platform.provider_keys, platform.flows, tenant_id, platform.source_credentials
+            ),
         )
 
     def services(self) -> CycleServices:
@@ -315,6 +323,7 @@ class FlowCycles:
             provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),
             pause=self.pause,
             sources=self.systems(),
+            source_secrets_opener=FakeSourceSecretsOpenerAdapter(self.platform.source_vault),
             exchange_limits={HYPERLIQUID: self.limits},
         )
 

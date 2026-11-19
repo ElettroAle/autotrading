@@ -9,6 +9,7 @@ import { fakeNotificationChannels } from './notification-channels';
 import { fakeInbox } from './notification-inbox';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 import { fakeReconciliation } from './reconciliation';
+import { fakeSourceCredentials } from './source-credentials';
 
 /**
  * The platform behind the fakes: the users of the identity provider, their role, the accounts and the flows of their
@@ -664,6 +665,7 @@ export const fakePlatform = {
     fakeNotificationChannels.reset();
     fakeAlerts.reset();
     fakeInbox.reset();
+    fakeSourceCredentials.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {

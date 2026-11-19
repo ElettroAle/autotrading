@@ -159,8 +159,14 @@ from autotrading.application.notifications.set_notification_email import SetNoti
 from autotrading.application.notifications.unlink_chat import UnlinkChatUseCase
 from autotrading.application.orders.close_position import ClosePositionUseCase
 from autotrading.application.orders.ports import ManualClosingRecorderPort, PositionClosingPort
+from autotrading.application.sources.configure_source_adapter import ConfigureSourceAdapterUseCase
 from autotrading.application.sources.get_source import GetSourceUseCase
+from autotrading.application.sources.list_source_credentials import ListSourceCredentialsUseCase
+from autotrading.application.sources.list_source_offers import ListSourceOffersUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
+from autotrading.application.sources.ports import SourceCredentialsRepositoryPort, SourceSecretsSealerPort
+from autotrading.application.sources.remove_source_credentials import RemoveSourceCredentialsUseCase
+from autotrading.application.sources.set_source_credentials_expiry import SetSourceCredentialsExpiryUseCase
 from autotrading.application.verification.ports import VerificationPort
 from autotrading.application.verification.run_verification import RunVerificationUseCase
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -180,6 +186,9 @@ class TenantPorts:
     verification: VerificationPort
     # The sources with the adapters the installation composes (R4.1.1).
     sources: ListSourcesUseCase
+    # The credentials the tenant gave the adapters of the sources, and their seal: the API never opens them (R4.1.2).
+    source_credentials: SourceCredentialsRepositoryPort
+    source_secrets_sealer: SourceSecretsSealerPort
     provider_keys: ProviderKeyRepositoryPort
     provider_key_sealer: ProviderKeySealerPort
     provider_key_usage: ProviderKeyUsagePort
@@ -248,7 +257,12 @@ class TenantUseCases:
     close_position: ClosePositionUseCase
     run_verification: RunVerificationUseCase
     list_sources: ListSourcesUseCase
+    list_source_offers: ListSourceOffersUseCase
     get_source: GetSourceUseCase
+    list_source_credentials: ListSourceCredentialsUseCase
+    configure_source_adapter: ConfigureSourceAdapterUseCase
+    remove_source_credentials: RemoveSourceCredentialsUseCase
+    set_source_credentials_expiry: SetSourceCredentialsExpiryUseCase
     register_provider_key: RegisterProviderKeyUseCase
     replace_provider_key: ReplaceProviderKeyUseCase
     remove_provider_key: RemoveProviderKeyUseCase
@@ -330,6 +344,7 @@ class TenantUseCases:
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
         accounts, sealer, exchanges = ports.accounts, ports.sealer, ports.exchanges
         keys = ports.provider_keys
+        source_offers = ListSourceOffersUseCase(ports.sources, ports.source_credentials)
         key_services = ProviderKeyServices(ports.model_catalogs, ports.provider_key_sealer)
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
@@ -352,7 +367,14 @@ class TenantUseCases:
             close_position=ClosePositionUseCase(ports.position_closing, ports.manual_closings),
             run_verification=RunVerificationUseCase(ports.verification),
             list_sources=ports.sources,
-            get_source=GetSourceUseCase(ports.sources),
+            list_source_offers=source_offers,
+            get_source=GetSourceUseCase(source_offers),
+            list_source_credentials=ListSourceCredentialsUseCase(ports.sources, ports.source_credentials, ports.clock),
+            configure_source_adapter=ConfigureSourceAdapterUseCase(
+                tenant_id, ports.sources, ports.source_credentials, ports.source_secrets_sealer
+            ),
+            remove_source_credentials=RemoveSourceCredentialsUseCase(ports.source_credentials),
+            set_source_credentials_expiry=SetSourceCredentialsExpiryUseCase(ports.source_credentials),
             register_provider_key=RegisterProviderKeyUseCase(tenant_id, keys, key_services),
             replace_provider_key=ReplaceProviderKeyUseCase(keys, key_services),
             remove_provider_key=RemoveProviderKeyUseCase(keys, ports.provider_key_usage),

@@ -1228,6 +1228,172 @@
         }
       }
     },
+    "/source-credentials": {
+      "get": {
+        "tags": [
+          "credenziali delle fonti"
+        ],
+        "summary": "List Source Credentials",
+        "operationId": "list_source_credentials_source_credentials_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceCredentialsResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Source Credentials Source Credentials Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/source-credentials/{adapter}": {
+      "put": {
+        "tags": [
+          "credenziali delle fonti"
+        ],
+        "summary": "Configure Source Adapter",
+        "description": "Saves the credentials of the adapter, or replaces them: the secret values are sealed and never answered.",
+        "operationId": "configure_source_adapter_source_credentials__adapter__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "adapter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceCredentialsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "adapter non disponibile"
+          },
+          "422": {
+            "description": "valori non validi"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "credenziali delle fonti"
+        ],
+        "summary": "Remove Source Credentials",
+        "operationId": "remove_source_credentials_source_credentials__adapter__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "adapter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/source-credentials/{adapter}/expiry": {
+      "put": {
+        "tags": [
+          "credenziali delle fonti"
+        ],
+        "summary": "Set Source Credentials Expiry",
+        "description": "The day the user says the credentials stop working, none to forget it (R6.2.2).",
+        "operationId": "set_source_credentials_expiry_source_credentials__adapter__expiry_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "adapter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyExpiryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/provider-keys": {
       "get": {
         "tags": [
@@ -10184,7 +10350,8 @@
           "allarme di riconciliazione",
           "incasso eseguito",
           "chiusura di emergenza eseguita",
-          "scadenza di una chiave"
+          "scadenza di una chiave",
+          "credenziali di una fonte rifiutate"
         ],
         "title": "NotificationEvent",
         "description": "The types of event told to the user, by the name the user chooses their channels by (R1.8.2, R3.5.1, R3.5.3).\n\nAn event belongs to a flow, or to the account when no single flow explains it."
@@ -11010,6 +11177,28 @@
           "offers_history": {
             "type": "boolean",
             "title": "Offers History"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
           }
         },
         "type": "object",
@@ -11018,10 +11207,12 @@
           "description",
           "parameters",
           "configuration_fields",
-          "offers_history"
+          "offers_history",
+          "configured",
+          "unavailable_reason"
         ],
         "title": "SourceAdapterResponse",
-        "description": "An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1)."
+        "description": "An adapter of a source as it declares itself: no configuration field means no configuration needed (R4.1.1).\n\nOne that needs configuration says whether the tenant gave it and, when not, why it is not activatable (R4.1.2)."
       },
       "SourceConfigurationFieldResponse": {
         "properties": {
@@ -11045,6 +11236,123 @@
           "secret"
         ],
         "title": "SourceConfigurationFieldResponse"
+      },
+      "SourceCredentialsRequest": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
+          }
+        },
+        "type": "object",
+        "title": "SourceCredentialsRequest"
+      },
+      "SourceCredentialsResponse": {
+        "properties": {
+          "adapter": {
+            "type": "string",
+            "title": "Adapter"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "configuration_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SourceConfigurationFieldResponse"
+            },
+            "type": "array",
+            "title": "Configuration Fields"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "public_values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Public Values"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered At"
+          },
+          "rejected": {
+            "type": "boolean",
+            "title": "Rejected"
+          },
+          "expiry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyExpiryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiry_status": {
+            "$ref": "#/components/schemas/ExpiryStatus"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adapter",
+          "sources",
+          "configuration_fields",
+          "configured",
+          "public_values",
+          "registered_at",
+          "rejected",
+          "expiry",
+          "expiry_status",
+          "days_left",
+          "expiry_editable"
+        ],
+        "title": "SourceCredentialsResponse",
+        "description": "An adapter that needs configuration on the page of the keys: the sources it offers, the fields it declares,\nwhether the tenant configured it, the values that are not secret and when they were saved, the expiry as of today\nand whether the provider refused the credentials; never a secret (R4.1.2, R6.2.2)."
       },
       "SourceParameterResponse": {
         "properties": {

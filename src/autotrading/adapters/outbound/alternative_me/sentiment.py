@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import TypedDict, cast
 
@@ -39,7 +40,7 @@ class AlternativeMeSentimentAdapter:
     def declaration(self) -> SourceAdapterDeclaration:
         return DECLARATION
 
-    def read_index(self) -> SentimentIndex:
+    def read_index(self, credentials: Mapping[str, str]) -> SentimentIndex:  # noqa: ARG002 - the endpoint is public, no field declared
         source = DECLARATION.name
         document = cast("_AlternativeMeDocument", _document(self._client, ALTERNATIVE_ME_URL, source))
         try:

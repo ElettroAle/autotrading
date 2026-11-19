@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { FAKE_SYSTEM_PROMPT } from '@/testing/mocks/catalogs';
 import { configurationOf, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
+import { fakeSourceCredentials } from '@/testing/mocks/source-credentials';
 import { renderApp } from '@/testing/test-utils';
 
 const NEW_FLOW = '/flows/new';
@@ -423,6 +424,33 @@ describe('CreateFlow', () => {
       'Crypto Fear & Greed Index di alternative.me. nessuna configurazione necessaria',
     );
     expect(screen.queryByLabelText('Peso di sentiment · alternative.me')).not.toBeInTheDocument();
+  });
+
+  // R4.1.2, ADR credenziali-degli-adapter-delle-fonti.
+  it('shows an adapter the tenant did not configure with the reason, not activatable', async () => {
+    fakeSourceCredentials.offerAdapter('sentiment', 'LunarCrush');
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'sentiment' }));
+
+    const paid = screen.getByRole('checkbox', { name: 'LunarCrush' });
+    expect(paid).toBeDisabled();
+    expect(paid).toHaveAccessibleDescription(
+      "Indice di LunarCrush. Chiave API configura l'adapter LunarCrush in Impostazioni › Chiavi",
+    );
+  });
+
+  it('lets the tenant choose an adapter once configured', async () => {
+    fakeSourceCredentials.offerAdapter('sentiment', 'LunarCrush');
+    fakeSourceCredentials.configure('anna', 'LunarCrush', { api_key: 'K' }, '2026-11-14T09:00:00Z');
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'sentiment' }));
+
+    expect(screen.getByRole('checkbox', { name: 'LunarCrush' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'LunarCrush' })).toHaveAccessibleDescription(
+      'Indice di LunarCrush. Chiave API',
+    );
   });
 
   it('sends two adapters of the same source, each with its own weight', async () => {

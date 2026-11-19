@@ -1,17 +1,20 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
 from autotrading.domain.sources.candle import Candle
+from autotrading.domain.sources.key_expiry import KeyExpiry
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, PricePoint
+from autotrading.domain.sources.sealed_source_secrets import SealedSourceSecrets
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
+from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.timeframe import Timeframe
 
@@ -23,8 +26,11 @@ class SentimentPort(Protocol):
         """What the adapter declares of itself, without asking the provider (R4.1.1)."""
         ...
 
-    def read_index(self) -> SentimentIndex:
-        """The current index of the provider; raises SourceUnavailableError when it cannot be read."""
+    def read_index(self, credentials: Mapping[str, str]) -> SentimentIndex:
+        """The current index of the provider, read with the credentials the tenant gave the adapter, none when it
+        declares no field (R4.1.2); raises SourceUnavailableError when it cannot be read and
+        SourceCredentialsRejectedError when the provider refuses the credentials.
+        """
         ...
 
 
@@ -120,6 +126,9 @@ class SourceRequest:
     asset: str | None
     settings: Mapping[str, int]
     now: datetime
+    # The values the tenant gave the adapter, secrets included: only the worker opens them, and none appears in a
+    # log or in the record of the cycle (R4.1.2).
+    credentials: Mapping[str, str] = field(default_factory=dict, repr=False)
 
 
 class SourceReaderPort(Protocol):
@@ -165,3 +174,61 @@ class CycleSourceAskPort(Protocol):
 
     @property
     def asked_at(self) -> datetime: ...
+
+
+class SourceSecretsSealerPort(Protocol):
+    """Bound to the tenant of the request: the sealed text names tenant and adapter (R4.1.2, ADR
+    credenziali-degli-adapter-delle-fonti)."""
+
+    def seal(self, adapter: str, secrets: Mapping[str, str]) -> SealedSourceSecrets: ...
+
+
+class SourceSecretsOpenerPort(Protocol):
+    """In the worker only: the private key of the installation never reaches the API (ADR 0007, R4.1.2)."""
+
+    def open(self, credentials: SourceCredentials) -> Mapping[str, str]:
+        """The secret values; raises SourceSecretsNotOpenedError when the sealed text is not of the tenant and adapter
+        of the credentials."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class SourceCredentialsRegistration:
+    """The credentials of an adapter with the instant of their last configuration (R4.1.2)."""
+
+    credentials: SourceCredentials
+    registered_at: datetime
+
+
+class SourceCredentialsRepositoryPort(Protocol):
+    """Bound to the tenant of the request: it never sees the credentials of another tenant (R4.1.2)."""
+
+    def registrations(self) -> tuple[SourceCredentialsRegistration, ...]:
+        """The credentials of the tenant, by adapter, each with the instant they were saved."""
+        ...
+
+    def get(self, adapter: str) -> SourceCredentials | None: ...
+
+    def save(self, credentials: SourceCredentials) -> None:
+        """Adds the credentials of the adapter, or puts them in place of the saved ones."""
+        ...
+
+    def remove(self, adapter: str) -> None:
+        """Raises SourceCredentialsNotFoundError when the tenant gave the adapter no credentials."""
+        ...
+
+    def set_expiry(self, adapter: str, expiry: KeyExpiry | None) -> None:
+        """Keeps the expiry, none to forget it; raises SourceCredentialsNotFoundError without credentials (R6.2.2)."""
+        ...
+
+    def mark_rejected(self, adapter: str, at: datetime) -> bool:
+        """Keeps the instant the provider refused the credentials; False when they were already refused, or are
+        missing, so the user is told once until they are replaced."""
+        ...
+
+
+class SourceCredentialsRejectionNoticePort(Protocol):
+    """Tells the tenant the provider refused the credentials of an adapter: it is NotifySourceCredentialsRejectedUseCase
+    of the notifications (R4.1.2)."""
+
+    def execute(self, adapter: str) -> None: ...

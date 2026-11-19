@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import datetime
 from typing import TypedDict, cast
 
@@ -40,7 +41,7 @@ class CoinMarketCapSentimentAdapter:
     def declaration(self) -> SourceAdapterDeclaration:
         return DECLARATION
 
-    def read_index(self) -> SentimentIndex:
+    def read_index(self, credentials: Mapping[str, str]) -> SentimentIndex:  # noqa: ARG002 - the endpoint is public, no field declared
         source = DECLARATION.name
         document = cast("_CoinMarketCapDocument", _document(self._client, COINMARKETCAP_URL, source))
         try:

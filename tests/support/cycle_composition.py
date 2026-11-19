@@ -57,11 +57,14 @@ from autotrading.application.notifications.notify_opening_blocked import NotifyO
 from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersUseCase
-from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase
+from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceCredentialServices
 from autotrading.application.sources.list_sources import SourceSystems
 from autotrading.application.sources.ports import (
     ForecastRepositoryPort,
     SampleRepositoryPort,
+    SourceCredentialsRejectionNoticePort,
+    SourceCredentialsRepositoryPort,
+    SourceSecretsOpenerPort,
 )
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
@@ -84,6 +87,8 @@ class TenantCyclePorts:
     provider_keys: ProviderKeyRepositoryPort
     forecasts: ForecastRepositoryPort
     samples: SampleRepositoryPort
+    source_credentials: SourceCredentialsRepositoryPort
+    source_credentials_rejected_notice: SourceCredentialsRejectionNoticePort
     send_orders: SendCycleOrdersUseCase
     openings: FlowOpeningsPort
     closed_positions: ClosedPositionRepositoryPort
@@ -112,6 +117,7 @@ class CycleServices:
     provider_key_opener: ProviderKeyOpenerPort
     pause: PausePort
     sources: SourceSystems
+    source_secrets_opener: SourceSecretsOpenerPort
     exchange_limits: Mapping[str, ExchangeLimitsPort]
     environment: str
 
@@ -143,6 +149,9 @@ def run_cycle_for(
                 services.sources,
                 ports.forecasts,
                 ports.samples,
+                SourceCredentialServices(
+                    ports.source_credentials, services.source_secrets_opener, ports.source_credentials_rejected_notice
+                ),
             ),
             services.clock,
         ),

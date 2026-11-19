@@ -314,8 +314,15 @@ class SourceCatalogPort(Protocol):
     def execute(self) -> SourceCatalog: ...
 
 
+class ConfiguredSourceAdaptersPort(Protocol):
+    """Bound to the tenant of the request: the adapters of the sources it gave credentials to (R4.1.2, ADR
+    credenziali-degli-adapter-delle-fonti)."""
+
+    def configured_adapters(self) -> frozenset[str]: ...
+
+
 class SourceSettingsPort(Protocol):
-    """It is SelectSourceUseCase (R1.3.1, R4.1.1)."""
+    """It is SelectSourceUseCase (R1.3.1, R4.1.1, R4.1.2)."""
 
     def execute(self, source: str, adapters: Sequence[AdapterRequest]) -> SourceSelection:
         """The source with the adapters chosen and their parameters resolved. Raises InvalidFlowSettingError with the
