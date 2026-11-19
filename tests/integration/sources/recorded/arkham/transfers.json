@@ -1,0 +1,103 @@
+{
+  "count": 10000,
+  "transfers": [
+    {
+      "blockHash": "0xf65f6387d2b83c76197d5358b0bfbf7de6d082dc6861a7772b494729bd0af455",
+      "blockNumber": 25495862,
+      "blockTimestamp": "2026-07-09T15:16:47Z",
+      "chain": "ethereum",
+      "fromAddress": {
+        "address": "0xEe7aE85f2Fe2239E27D9c1E23fFFe168D63b4055",
+        "arkhamEntity": {
+          "crunchbase": "https://www.crunchbase.com/organization/binance",
+          "id": "binance",
+          "linkedin": "https://www.linkedin.com/company/binance",
+          "name": "Binance",
+          "note": "",
+          "service": null,
+          "twitter": "https://twitter.com/binance",
+          "type": "cex",
+          "website": "https://binance.com"
+        },
+        "arkhamLabel": {
+          "address": "0xEe7aE85f2Fe2239E27D9c1E23fFFe168D63b4055",
+          "chainType": "evm",
+          "name": "Hot Wallet"
+        },
+        "chain": "ethereum",
+        "contract": true,
+        "isUserAddress": false
+      },
+      "fromIsContract": true,
+      "historicalUSD": 2995710.06,
+      "id": "0xaf33dc1e353cc2ba85f67cd25889e79889a7ce41bf28773f904ac27ce8fc2ff3_68",
+      "toAddress": {
+        "address": "0xB5f80b0d276Bc4eCC2E95F9Bd36BC368361f87A6",
+        "chain": "ethereum",
+        "contract": false,
+        "isUserAddress": false
+      },
+      "toIsContract": false,
+      "tokenAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "tokenDecimals": 6,
+      "tokenId": "usd-coin",
+      "tokenName": "USD Coin",
+      "tokenSymbol": "USDC",
+      "transactionHash": "0xaf33dc1e353cc2ba85f67cd25889e79889a7ce41bf28773f904ac27ce8fc2ff3",
+      "type": "",
+      "unitValue": 2995710.06
+    },
+    {
+      "blockHash": "0xfa69e420c70184c582d8cd5c6a84992372bf447b3b5656404be8c1f16c0b9ed7",
+      "blockNumber": 109001701,
+      "blockTimestamp": "2026-07-09T15:13:10Z",
+      "chain": "bsc",
+      "fromAddress": {
+        "address": "0xdFD961Dc7B7A18f45F041507115a2Fe922250AaC",
+        "arkhamLabel": {
+          "address": "0xdFD961Dc7B7A18f45F041507115a2Fe922250AaC",
+          "chainType": "evm",
+          "name": "Binance Deposit"
+        },
+        "chain": "bsc",
+        "contract": false,
+        "depositServiceID": "binance",
+        "isUserAddress": false
+      },
+      "fromIsContract": false,
+      "historicalUSD": 1637110.638546851,
+      "id": "0x0349d63753ac6feb7de638455074354c672fa9bd7ba9b7d0b1da61ae3cddd029_258",
+      "toAddress": {
+        "address": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
+        "arkhamEntity": {
+          "crunchbase": "https://www.crunchbase.com/organization/binance",
+          "id": "binance",
+          "linkedin": "https://www.linkedin.com/company/binance",
+          "name": "Binance",
+          "note": "",
+          "service": null,
+          "twitter": "https://twitter.com/binance",
+          "type": "cex",
+          "website": "https://binance.com"
+        },
+        "arkhamLabel": {
+          "address": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
+          "chainType": "evm",
+          "name": "Hot Wallet"
+        },
+        "chain": "bsc",
+        "contract": false,
+        "isUserAddress": false
+      },
+      "toIsContract": false,
+      "tokenAddress": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+      "tokenDecimals": 18,
+      "tokenId": "binance-bridged-usdc-bnb-smart-chain",
+      "tokenName": "USD Coin",
+      "tokenSymbol": "USDC",
+      "transactionHash": "0x0349d63753ac6feb7de638455074354c672fa9bd7ba9b7d0b1da61ae3cddd029",
+      "type": "",
+      "unitValue": 1637110.638546851
+    }
+  ]
+}

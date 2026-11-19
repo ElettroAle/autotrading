@@ -13,6 +13,7 @@ from pathlib import Path
 
 from autotrading.adapters.inbound.api import strategy_document
 from autotrading.adapters.outbound.alternative_me import sentiment as alternative_me
+from autotrading.adapters.outbound.arkham import whale_transfers as arkham
 from autotrading.adapters.outbound.coinmarketcap import sentiment as coinmarketcap
 from autotrading.adapters.outbound.forecaster import price_forecast
 from autotrading.adapters.outbound.hyperliquid import market_data
@@ -24,7 +25,7 @@ from tests.support.architecture import SourceModule, source_modules
 REPOSITORY = Path(__file__).resolve().parents[2]
 DECLARATION = "SourceAdapterDeclaration"
 DECLARATION_METHOD = "declaration"
-SOURCE_PORTS = frozenset({"SentimentPort", "NewsPort", "MarketDataPort", "PriceForecasterPort"})
+SOURCE_PORTS = frozenset({"SentimentPort", "NewsPort", "MarketDataPort", "PriceForecasterPort", "WhaleTransfersPort"})
 SOURCE_PORTS_MODULE = "application/sources/ports.py"
 MIGRATION = REPOSITORY / "migrations" / "versions" / "0050_sources_with_adapters.py"
 CORRESPONDENCE_MODULE = "autotrading.adapters.outbound.sqlalchemy.source_correspondence"
@@ -34,6 +35,7 @@ DECLARED = (
     price_forecast.DECLARATION,
     market_data.DECLARATION,
     news.DECLARATION,
+    arkham.DECLARATION,
 )
 
 DECLARED_IN_THE_CORE = SourceModule.parse(

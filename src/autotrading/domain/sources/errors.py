@@ -92,6 +92,13 @@ class InvalidNewsItemError(DomainError):
         super().__init__("notizia non valida")
 
 
+class InvalidWhaleTransferError(DomainError):
+    """A transfer without the time zone of its instant, without asset, with no quantity or with a negative value."""
+
+    def __init__(self) -> None:
+        super().__init__("trasferimento non valido")
+
+
 class InvalidPriceForecastError(DomainError):
     """A forecast without the time zone of its instant or with a price that is not positive: a defect."""
 

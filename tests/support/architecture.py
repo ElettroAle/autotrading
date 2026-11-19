@@ -118,6 +118,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/alternative_me": frozenset({"httpx"}),
     # The scheduler of the cycles of the worker (docs/architecture.md:144, ADR 0112).
     "adapters/outbound/apscheduler": frozenset({"apscheduler"}),
+    # The Intel API of Arkham, reached with the transport of the platform (ADR fonte-whale-con-adapter-arkham).
+    "adapters/outbound/arkham": frozenset({"httpx"}),
     "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
     # The routes of the dashboard and its address, composed with the standard library: no request reaches it (ADR
     # destinazioni-delle-notifiche-nella-dashboard).

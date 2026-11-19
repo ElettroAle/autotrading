@@ -4,6 +4,7 @@ from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
 from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.whale import MINIMUM_USD, WHALE
 
 
 def ranges(parameters: tuple[SourceParameter, ...]) -> list[tuple[object, ...]]:
@@ -42,5 +43,15 @@ def test_the_news_concern_the_whole_market_with_count_and_age() -> None:
     )
 
 
+def test_the_whale_transfers_concern_the_whole_market_with_the_threshold_left_to_the_adapter() -> None:
+    assert (WHALE.name, WHALE.per_asset, WHALE.parameters, MINIMUM_USD) == ("whale", False, (), "soglia_usd")
+
+
+def test_no_large_transfer_is_itself_a_datum_for_the_agent() -> None:
+    assert WHALE.silence_note({MINIMUM_USD: 1_000_000}) == {
+        "nota": "nessun grande trasferimento nell'ultimo intervallo"
+    }
+
+
 def test_every_source_describes_itself() -> None:
-    assert all(source.description for source in (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS))
+    assert all(source.description for source in (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE))
