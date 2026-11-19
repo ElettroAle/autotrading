@@ -27,8 +27,8 @@ chiaro.
   comandi «Configura» o «Sostituisci», «Indica scadenza» (solo con `expiry_editable`) e «Rimuovi» con conferma, dai
   componenti condivisi dei comandi. Gli adapter senza configurazione non compaiono; senza adapter da configurare la
   sezione dice «nessun adapter di fonte richiede configurazione».
-- Il modulo genera un campo per ogni campo dichiarato: i segreti `type="password"` con `autocomplete="off"`, mai
-  precompilati; nella sostituzione i segreti si reinseriscono e i non segreti partono dai valori salvati; campo
+- Il modulo genera un campo per ogni campo dichiarato: i segreti con il componente condiviso dei campi dichiarati (ADR
+  campi-delle-credenziali-fuori-dall-autocompletamento), mai precompilati; nella sostituzione i segreti si reinseriscono e i non segreti partono dai valori salvati; campo
   facoltativo «Scadenza».
 - Una credenziale rifiutata dal fornitore mostra «rifiutata dal fornitore» con il comando «Sostituisci».
 - Responsive: righe come schede impilate sotto i 640 px, nessuno scorrimento orizzontale.
