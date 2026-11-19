@@ -107,6 +107,7 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.notification_inbox import InboxStore, InMemoryNotificationInboxAdapter
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.notified_flows import InMemoryNotifiedFlowsAdapter
 from tests.fakes.on_demand_cycles import FakeOnDemandCycleAdapter
@@ -135,7 +136,7 @@ from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
 from tests.support.mail_servers import MailServers
 from tests.support.model_catalog import PLATFORM_MODELS
-from tests.support.notifications import notification_routes
+from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.procedure_orders import procedure_orders
 
 HYPERLIQUID = "Hyperliquid"
@@ -152,6 +153,9 @@ def new_credentials() -> Credentials:
 
 
 class Platform:
+    alerts: AlertStore
+    inbox: InboxStore
+
     def __init__(self) -> None:
         self.directory = Directory()
         self.tenants = InMemoryTenantRepositoryAdapter()
@@ -212,8 +216,9 @@ class Platform:
         self.cycle_run_of: Callable[[TenantId], CycleRun] = no_cycle_run_of
         # The emergency closings of every tenant, as their record keeps them (R3.2.3).
         self.emergency_closings: list[EmergencyClosing] = []
-        # The alerts of every tenant, opened by the worker and read by the API (R6.2.3).
-        self.alerts: AlertStore = {}
+        # The alerts of every tenant, opened by the worker and read by the API (R6.2.3), and the bell of every tenant,
+        # where the worker keeps each notification and the API reads it (R6.2.1).
+        self.alerts, self.inbox = {}, {}
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -334,6 +339,7 @@ class Platform:
             emergency_closings=InMemoryEmergencyClosingLogAdapter(self.emergency_closings, tenant_id),
             alerts=self.alerts_of(tenant_id),
             alert_resolution=self.alerts_of(tenant_id),
+            notification_inbox=self.inbox_of(tenant_id),
             environment="dev",
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -353,6 +359,10 @@ class Platform:
     def alerts_of(self, tenant_id: TenantId) -> InMemoryAlertRepositoryAdapter:
         """The alerts of the tenant: each tenant reads its own, as with row level security."""
         return InMemoryAlertRepositoryAdapter(self.alerts, tenant_id, lambda: self.now)
+
+    def inbox_of(self, tenant_id: TenantId) -> InMemoryNotificationInboxAdapter:
+        """The bell of the tenant: each tenant reads its own, as with row level security (R6.2.1)."""
+        return InMemoryNotificationInboxAdapter(self.inbox, tenant_id, lambda: self.now)
 
     def history_of(self, tenant_id: TenantId) -> InMemoryFlowHistoryAdapter:
         """The histories of the tenant: each tenant reads its own store, as row level security does (R2.5.1)."""
@@ -416,6 +426,7 @@ class Platform:
             self.mail_servers.repository(tenant_id),
             self.outbox,
             notification_routes(tenant_id, self.channel_preferences, self.links),
+            notification_inbox(tenant_id, self.inbox, self.worker_clock),
         )
 
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:

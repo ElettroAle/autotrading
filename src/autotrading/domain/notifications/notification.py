@@ -60,9 +60,14 @@ class Notification:
             raise InvalidNotificationError
 
     @property
+    def heading(self) -> str:
+        """The flow or account and the event, without the icon: the title the bell shows beside the icon (R6.2.1)."""
+        return f"{self.subject}: {self.headline}"
+
+    @property
     def title(self) -> str:
         """The first line of the message and the subject of its email (R3.5.4)."""
-        return f"{self.icon} {self.subject}: {self.headline}"
+        return f"{self.icon} {self.heading}"
 
     def body_lines(self) -> tuple[str, ...]:
         status = () if self.flow_status is None else (self.flow_status.text,)

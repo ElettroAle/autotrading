@@ -1,5 +1,6 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -8,6 +9,8 @@ from autotrading.domain.notifications.alert_page import AlertCursor, AlertFilter
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.flow_status import FlowStatusFigures
+from autotrading.domain.notifications.inbox_notification import InboxNotificationId
+from autotrading.domain.notifications.inbox_page import InboxCursor, InboxPage
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.mail_server import MailServer
 from autotrading.domain.notifications.notification import Notification
@@ -272,3 +275,39 @@ class AlertRepositoryPort(Protocol):
         ...
 
     def open_count(self) -> int: ...
+
+
+class NotificationInboxPort(Protocol):
+    """Bound to the tenant of the request: every notification the platform generated for it, read or not, for the bell
+    (R6.2.1, ADR notifiche-nell-app-salvate-per-tenant). Not a channel: it keeps the notifications, it delivers nothing.
+    """
+
+    def add(self, notification: Notification, at: datetime) -> None:
+        """Keeps the notification generated at the instant, unread, and forgets those older than INBOX_RETENTION;
+        raises NotificationInboxUnavailableError when it cannot."""
+        ...
+
+    def list(self, cursor: InboxCursor | None) -> InboxPage:
+        """INBOX_PAGE_SIZE notifications, newest first, from the cursor (ADR 0074)."""
+        ...
+
+    def unread_count(self) -> int: ...
+
+    def mark_read(self, notification_id: InboxNotificationId) -> None:
+        """Marks the notification read; one read before keeps the instant it was first read. Raises
+        InboxNotificationNotFoundError for a notification that does not exist and for one of another tenant."""
+        ...
+
+    def mark_all_read(self) -> None: ...
+
+
+class ClockPort(Protocol):
+    def now(self) -> datetime: ...
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationInbox:
+    """Where every notification of the tenant is kept for the bell, and the clock that dates it."""
+
+    notifications: NotificationInboxPort
+    clock: ClockPort

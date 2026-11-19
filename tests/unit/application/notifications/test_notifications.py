@@ -56,7 +56,7 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import notification_routes
+from tests.support.notifications import notification_inbox, notification_routes
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 ANNA, BRUNO = TenantId.new(), TenantId.new()
@@ -114,6 +114,7 @@ class Telegram:
             self.mail_servers.repository(tenant_id),
             self.outbox,
             notification_routes(tenant_id),
+            notification_inbox(tenant_id),
         )
 
     def notify(self, tenant_id: TenantId, notification: Notification = FAILED) -> None:

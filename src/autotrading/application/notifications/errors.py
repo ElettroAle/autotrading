@@ -141,3 +141,29 @@ class AlertCursorInvalidError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("cursore degli avvisi non valido")
+
+
+class NotificationInboxUnavailableError(ApplicationError):
+    """The bell could not keep the notification: recorded, never raised, and the channels get their messages (ADR
+    notifiche-nell-app-salvate-per-tenant)."""
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("notifiche del campanello non disponibili")
+
+
+class InboxNotificationNotFoundError(ApplicationError):
+    """The same answer for a notification that does not exist and for one of another tenant (R0.1.3)."""
+
+    status_code = 404
+
+    def __init__(self) -> None:
+        super().__init__("notifica non trovata")
+
+
+class InboxCursorInvalidError(ApplicationError):
+    """The cursor of a page of the bell is not one the list gave: the user starts again from the first page."""
+
+    def __init__(self) -> None:
+        super().__init__("cursore delle notifiche non valido")

@@ -55,3 +55,25 @@ describe('paths.alerts', () => {
     expect(paths.alert.getHref('alert 1')).toBe('/alerts/alert%201');
   });
 });
+
+// ADR campanello-delle-notifiche-nella-dashboard: a notification leads to the position it tells, by its asset and, once
+// closed, by the instant it closed (ADR posizione-evidenziata-dall-indirizzo).
+describe('paths of the positions a notification leads to', () => {
+  it('leads to the open positions of the flow, the one of the asset when given', () => {
+    expect(paths.flowPositions.getHref('flow-alfa')).toBe('/flows/flow-alfa/positions');
+    expect(paths.flowPositions.getHref('flow-alfa', 'BTC')).toBe(
+      '/flows/flow-alfa/positions?asset=BTC',
+    );
+  });
+
+  it('leads to the closed positions of the flow, the closing of the asset at the instant when given', () => {
+    const closing = { asset: 'BTC', closedAt: '2026-11-19T08:00:00Z' };
+
+    expect(paths.flowClosedPositions.getHref('flow-alfa', 2)).toBe(
+      '/flows/flow-alfa/closed-positions?page=2',
+    );
+    expect(paths.flowClosedPositions.getHref('flow-alfa', 1, closing)).toBe(
+      '/flows/flow-alfa/closed-positions?asset=BTC&closed_at=2026-11-19T08%3A00%3A00Z',
+    );
+  });
+});

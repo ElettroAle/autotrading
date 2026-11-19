@@ -41,7 +41,7 @@ from tests.fakes.notification_email_repository import (
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import chat_named, notification_routes
+from tests.support.notifications import chat_named, notification_inbox, notification_routes
 from tests.support.steps import quoted
 
 scenarios("E3-rischio-capitale-e-qualita/F3.5-notifiche/R3.5.6-link-alla-dashboard-nelle-notifiche.feature")
@@ -92,7 +92,7 @@ class Notices:
         chats = InMemoryLinkedChatRepositoryAdapter(self.chats, self.tenant_id)
         emails = InMemoryNotificationEmailRepositoryAdapter(self.emails, self.tenant_id)
         servers = self.mail_servers.repository(self.tenant_id)
-        return NotifyUseCase(chats, emails, servers, self.outbox, self.routes)
+        return NotifyUseCase(chats, emails, servers, self.outbox, self.routes, notification_inbox(self.tenant_id))
 
     @property
     def routes(self) -> NotificationRoutes:

@@ -26,7 +26,7 @@ from tests.fakes.notification_email_repository import InMemoryNotificationEmailR
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import notification_routes
+from tests.support.notifications import notification_inbox, notification_routes
 
 ANNA = TenantId.new()
 CHAT = ChatId(1001)
@@ -62,6 +62,7 @@ class Channels:
             self.mail_servers.repository(ANNA),
             self.outbox,
             notification_routes(ANNA, {ANNA: preferences}, self.links),
+            notification_inbox(ANNA),
         ).execute(notification)
 
     def link_to(self, target: NotificationTarget) -> NotificationLink:

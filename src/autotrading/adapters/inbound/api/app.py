@@ -27,6 +27,7 @@ from autotrading.adapters.inbound.api.mail_server import mail_server_router
 from autotrading.adapters.inbound.api.models import models_router
 from autotrading.adapters.inbound.api.notification_channels import notification_channels_router
 from autotrading.adapters.inbound.api.notification_email import notification_email_router
+from autotrading.adapters.inbound.api.notification_inbox import notification_inbox_router
 from autotrading.adapters.inbound.api.operations import operations_router
 from autotrading.adapters.inbound.api.orders import orders_router
 from autotrading.adapters.inbound.api.provider_keys import provider_keys_router
@@ -123,6 +124,7 @@ def create_api(
     protected.include_router(notification_email_router(use_cases_of_request))
     protected.include_router(mail_server_router(use_cases_of_request))
     protected.include_router(notification_channels_router(use_cases_of_request))
+    protected.include_router(notification_inbox_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request, current_user))
     protected.include_router(capital_changes_router(use_cases_of_request))
     protected.include_router(assets_router(use_cases_of_request))

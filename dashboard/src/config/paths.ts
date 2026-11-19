@@ -105,14 +105,31 @@ export const paths = {
     path: '/flows/:flowId/capital',
     getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/capital`,
   },
+  // The position a notification tells is pointed at by its asset (ADR posizione-evidenziata-dall-indirizzo).
   flowPositions: {
     path: '/flows/:flowId/positions',
-    getHref: (flowId: string) => `/flows/${encodeURIComponent(flowId)}/positions`,
+    getHref: (flowId: string, asset?: string) =>
+      `/flows/${encodeURIComponent(flowId)}/positions${asset === undefined ? '' : `?${new URLSearchParams({ asset }).toString()}`}`,
   },
+  // A closing a notification tells is pointed at by its asset and the instant it closed.
   flowClosedPositions: {
     path: '/flows/:flowId/closed-positions',
-    getHref: (flowId: string, page = 1) =>
-      `/flows/${encodeURIComponent(flowId)}/closed-positions${page === 1 ? '' : `?page=${page}`}`,
+    getHref: (
+      flowId: string,
+      page = 1,
+      closing?: { readonly asset: string; readonly closedAt: string },
+    ) => {
+      const search = new URLSearchParams();
+      if (closing !== undefined) {
+        search.set('asset', closing.asset);
+        search.set('closed_at', closing.closedAt);
+      }
+      if (page !== 1) {
+        search.set('page', String(page));
+      }
+      const query = search.toString();
+      return `/flows/${encodeURIComponent(flowId)}/closed-positions${query === '' ? '' : `?${query}`}`;
+    },
   },
   // A cycle has a page of its own, so it can be shared as a link (ADR 0129).
   cycle: {

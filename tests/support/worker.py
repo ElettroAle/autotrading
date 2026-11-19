@@ -45,6 +45,7 @@ from tests.fakes.notification_email_repository import (
     InMemoryNotificationEmailRepositoryAdapter,
     NotificationEmailStore,
 )
+from tests.fakes.notification_inbox import InboxStore
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
@@ -55,7 +56,7 @@ from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapte
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import notification_routes
+from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.platform import HYPERLIQUID, new_credentials
 from tests.support.procedure_orders import procedure_orders
 
@@ -96,6 +97,8 @@ class Worker:
         self.exchange.trades_on(self.order_exchange)
         # The cycle the worker runs on request, on its clock: none until a test gives one.
         self.clock = FakeClockAdapter(STARTED_AT)
+        # The bell of every tenant, where the worker keeps each notification (R6.2.1).
+        self.inbox: InboxStore = {}
         self.cycle_run: CycleRun = lambda _command: None
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
@@ -126,6 +129,7 @@ class Worker:
                 self.mail_servers.repository(tenant_id),
                 self.outbox,
                 notification_routes(tenant_id, self.channel_preferences, self.links),
+                notification_inbox(tenant_id, self.inbox, self.clock),
             ),
             send_test_email=SendTestEmailUseCase(
                 InMemoryNotificationEmailRepositoryAdapter(self.emails, tenant_id),

@@ -80,6 +80,7 @@ from autotrading.adapters.outbound.sqlalchemy.mail_server_repository import SqlA
 from autotrading.adapters.outbound.sqlalchemy.notification_email_repository import (
     SqlAlchemyNotificationEmailRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.notification_inbox import SqlAlchemyNotificationInboxAdapter
 from autotrading.adapters.outbound.sqlalchemy.notified_flows import SqlAlchemyNotifiedFlowsAdapter
 from autotrading.adapters.outbound.sqlalchemy.openings_suspension import SqlAlchemyOpeningsSuspensionAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
@@ -194,6 +195,7 @@ from autotrading.application.notifications.ports import (
     MailerPort,
     MailServerAccess,
     MessengerPort,
+    NotificationInbox,
     NotificationLinkPort,
     NotificationRoutes,
     OutboxPort,
@@ -361,6 +363,7 @@ def tenant_use_cases(
             emergency_closings=SqlAlchemyEmergencyClosingLogAdapter(engine, tenant_id),
             alerts=alerts,
             alert_resolution=alerts,
+            notification_inbox=SqlAlchemyNotificationInboxAdapter(engine, tenant_id),
             environment=environment,
             settlement_currency=HYPERLIQUID_SETTLEMENT_CURRENCY,
         )
@@ -629,6 +632,7 @@ def notify_for(
         SqlAlchemyMailServerRepositoryAdapter(engine, tenant_id),
         outbox,
         NotificationRoutes(SqlAlchemyChannelPreferencesRepositoryAdapter(engine, tenant_id), links),
+        NotificationInbox(SqlAlchemyNotificationInboxAdapter(engine, tenant_id), system_clock_adapters()),
     )
 
 

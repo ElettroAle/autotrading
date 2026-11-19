@@ -135,4 +135,34 @@ describe('AppHeader', () => {
 
     expect(screen.queryByRole('button', { name: 'anna' })).not.toBeInTheDocument();
   });
+
+  // ADR campanello-delle-notifiche-nella-dashboard: the bell only on the pages of the data, between environment and user.
+  it('shows the bell of the notifications between the environment and the user on the pages of the data', async () => {
+    const client = await authClientFor('anna');
+    const router = createMemoryRouter([{ path: '/', element: <AppHeader withNotifications /> }]);
+    render(
+      <AuthProvider client={client} scope={FAKE_IDENTITY_PROVIDER.scope}>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: queryConfig })}>
+          <RuntimeConfigProvider config={TEST_CONFIG}>
+            <RouterProvider router={router} />
+          </RuntimeConfigProvider>
+        </QueryClientProvider>
+      </AuthProvider>,
+    );
+
+    const banner = screen.getByRole('banner');
+    const bell = await within(banner).findByRole('button', { name: 'Notifiche, 0 non lette' });
+    const environment = screen.getByLabelText("Ambiente dell'installazione");
+    const user = within(banner).getByRole('button', { name: 'anna' });
+    expect(environment.compareDocumentPosition(bell) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(
+      0,
+    );
+    expect(bell.compareDocumentPosition(user) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it('shows no bell before the dashboard admits the user', () => {
+    openDashboardAt(['/']);
+
+    expect(screen.queryByRole('button', { name: /^Notifiche/ })).not.toBeInTheDocument();
+  });
 });

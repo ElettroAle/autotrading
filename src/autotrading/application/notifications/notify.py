@@ -1,10 +1,11 @@
 import logging
 
-from autotrading.application.notifications.errors import OutboxUnavailableError
+from autotrading.application.notifications.errors import NotificationInboxUnavailableError, OutboxUnavailableError
 from autotrading.application.notifications.ports import (
     LinkedChatRepositoryPort,
     MailServerRepositoryPort,
     NotificationEmailRepositoryPort,
+    NotificationInbox,
     NotificationRoutes,
     OutboxPort,
 )
@@ -25,27 +26,43 @@ class NotifyUseCase:
     Without a channel nothing is queued; the outbox delivers each message and retries a failed sending (ADR
     outbox-delle-integrazioni-esterne-con-procrastinate). A message not queued is recorded and never fails the
     caller, nor keeps the other channel from its message.
+
+    Before any channel, every notification is kept in the bell of the tenant, whatever its channels and their links
+    (R6.2.1, ADR notifiche-nell-app-salvate-per-tenant); a bell out of reach is recorded like a message not queued.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913, PLR0917 - the addresses of the channels, the queue, the routes and the bell of the tenant
         self,
         chats: LinkedChatRepositoryPort,
         emails: NotificationEmailRepositoryPort,
         mail_servers: MailServerRepositoryPort,
         outbox: OutboxPort,
         routes: NotificationRoutes,
+        inbox: NotificationInbox,
     ) -> None:
         self._chats = chats
         self._emails = emails
         self._mail_servers = mail_servers
         self._outbox = outbox
         self._routes = routes
+        self._inbox = inbox
 
     def execute(self, notification: Notification) -> None:
+        self._keep_in_inbox(notification)
         channels = self._channels_of(notification)
         links = self._links_of(notification)
         for message in self._messages_of(notification, channels, links):
             self._enqueue(message, notification)
+
+    def _keep_in_inbox(self, notification: Notification) -> None:
+        try:
+            self._inbox.notifications.add(notification, self._inbox.clock.now())
+        except NotificationInboxUnavailableError:
+            operations.warning(
+                "notifica non salvata nel campanello",
+                exc_info=True,
+                extra={"subject": notification.subject},
+            )
 
     def _channels_of(self, notification: Notification) -> Channels:
         # The test notification is no event: it reaches every channel the tenant linked.
