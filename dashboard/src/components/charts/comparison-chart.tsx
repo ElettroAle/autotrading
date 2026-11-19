@@ -7,7 +7,15 @@ import {
   type DotItemDotProps,
 } from 'recharts';
 
-import { ChartFrame, ChartTooltip, dotRadius, TimeAxis, useChartWidth } from './chart-frame';
+import {
+  ChartFrame,
+  ChartTooltip,
+  DOT_RADIUS,
+  dotRadius,
+  TimeAxis,
+  useChartWidth,
+} from './chart-frame';
+import { ChartLegend, type LegendEntry } from './chart-legend';
 
 /** A point of a compared curve: the change of the equity from the first point of the period, null if not defined. */
 export type ChangePoint = { readonly plannedAt: string; readonly changePercent: number | null };
@@ -85,20 +93,9 @@ const ChangeDot = ({
   );
 };
 
-const Legend = ({ series }: { series: readonly ColoredSeries[] }) => (
-  <ul aria-label="Legenda" className="mt-2 flex flex-wrap gap-4">
-    {series.map((flow) => (
-      <li key={flow.id} data-color={flow.color} className="flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="inline-block h-3 w-3 rounded-full"
-          style={{ backgroundColor: flow.color }}
-        />
-        {flow.name}
-      </li>
-    ))}
-  </ul>
-);
+// Each flow in the legend has a point of its colour, as on its curve (ADR legenda-condivisa-dei-grafici).
+const legendOf = (series: readonly ColoredSeries[]): LegendEntry[] =>
+  series.map((flow) => ({ mark: <circle r={DOT_RADIUS} fill={flow.color} />, label: flow.name }));
 
 // The points of the longest curve decide how crowded the chart is.
 const mostPoints = (series: readonly ComparedSeries[]): number =>
@@ -108,7 +105,7 @@ const mostPoints = (series: readonly ComparedSeries[]): number =>
  * The equity curves of up to five flows on the same time axis, each as the change in percent from its first point
  * of the period, so flows with different capitals compare (R2.4.3, ADR 0121, ADR 0137). The chart is as wide as its
  * room, never wider, with fewer dates and smaller points as they crowd, in the frame every chart shares (ADR
- * grafici-condivisi-larghi-come-lo-schermo).
+ * grafici-condivisi-larghi-come-lo-schermo), with the shared legend below it (ADR legenda-condivisa-dei-grafici).
  */
 export const ComparisonChart = ({ series }: { series: readonly ComparedSeries[] }) => {
   const curves = colored(series);
@@ -118,7 +115,7 @@ export const ComparisonChart = ({ series }: { series: readonly ComparedSeries[] 
     <ChartFrame
       label="Equity curve sovrapposte"
       onResize={setWidth}
-      footer={<Legend series={curves} />}
+      footer={<ChartLegend entries={legendOf(curves)} />}
     >
       <LineChart accessibilityLayer>
         <CartesianGrid strokeDasharray="3 3" />
