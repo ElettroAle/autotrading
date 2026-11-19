@@ -7,13 +7,14 @@ roles the installation has: the owner that runs the migrations and the applicati
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from functools import partial
 from pathlib import Path
 from uuid import uuid4
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Connection, Engine, Executable, create_engine, event, inspect, text
+from sqlalchemy.sql.dml import Insert
+from sqlalchemy.util import immutabledict
 
 from autotrading.adapters.outbound.sqlalchemy.database import APPLICATION_ROLE, SqlAlchemyDatabaseAdapter
 
@@ -67,6 +68,50 @@ def _migrate(database: str, password_file: Path, revision: str = "head") -> None
                 os.environ[name] = value
 
 
+class _ColumnsOfTheRevision:
+    """Keeps the inserts of the adapters within the columns the database has at its revision: a row saved at a past
+    revision carries only what the platform saved then, not the columns a later migration adds to the current tables.
+    """
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+        self._columns: dict[str, frozenset[str]] = {}
+        self.refresh()
+        event.listen(engine, "before_execute", self._within_the_revision, retval=True)
+
+    def refresh(self) -> None:
+        inspector = inspect(self._engine)
+        self._columns = {
+            table: frozenset(column["name"] for column in inspector.get_columns(table))
+            for table in inspector.get_table_names()
+        }
+
+    def _within_the_revision(
+        self,
+        _connection: Connection,
+        statement: Executable,
+        multiparams: object,
+        params: object,
+        _options: object,
+    ) -> tuple[Executable, object, object]:
+        if not isinstance(statement, Insert) or not statement._values:
+            return statement, multiparams, params
+        known = self._columns.get(statement.table.name)
+        if known is None:
+            return statement, multiparams, params
+        values = {column: value for column, value in statement._values.items() if _name_of(column) in known}
+        if len(values) == len(statement._values):
+            return statement, multiparams, params
+        # A copy of the same statement, so a returning or a conflict clause stays as the adapter wrote it.
+        trimmed = statement._generate()
+        trimmed._values = immutabledict(values)
+        return trimmed, multiparams, params
+
+
+def _name_of(column: object) -> str:
+    return str(getattr(column, "key", column))
+
+
 @contextmanager
 def migrated_database(workspace: Path) -> Iterator[Engine]:
     """Yields an engine connected as the application role to a new database with every migration applied."""
@@ -90,7 +135,13 @@ def database_migrated_to(workspace: Path, revision: str) -> Iterator[tuple[Engin
         application = SqlAlchemyDatabaseAdapter(
             host=host, port=port, name=database, user=APPLICATION_ROLE, password=TEST_PASSWORD
         ).engine()
-        yield application, partial(_migrate, database, workspace / "owner-password")
+        columns = _ColumnsOfTheRevision(application)
+
+        def migrate_the_rest() -> None:
+            _migrate(database, workspace / "owner-password")
+            columns.refresh()
+
+        yield application, migrate_the_rest
         application.dispose()
     finally:
         with admin.connect() as connection:
