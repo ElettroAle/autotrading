@@ -1,5 +1,5 @@
-"""The secret values of the credentials of an adapter of a source: sealed by the API with the public key, opened only by
-the worker, and refused when copied onto another tenant or adapter (R4.1.2, ADR credenziali-degli-adapter-delle-fonti).
+"""The secret values of the credentials of an adapter of a source, opened only by the worker and refused when copied
+onto another tenant or adapter (R4.1.2, ADR credenziali-degli-adapter-delle-fonti).
 """
 
 import json
@@ -45,18 +45,7 @@ def test_opens_what_the_sealer_sealed_for_the_same_tenant_and_adapter(private_ke
     assert opener(private_key).open(credentials(private_key)) == SECRETS
 
 
-def test_the_sealed_secrets_carry_the_version_and_hide_the_values(private_key: PrivateKey) -> None:
-    sealed = credentials(private_key, version=3).sealed
-
-    assert sealed.key_version == 3
-    assert b"LC-SEGRETA" not in sealed.ciphertext
-    assert "LC-SEGRETA" not in repr(sealed)
-
-
-def test_the_sealer_and_the_opener_never_show_their_keys(private_key: PrivateKey) -> None:
-    sealer = SodiumSourceSecretsSealerAdapter(bytes(private_key.public_key), 4, TENANT)
-
-    assert repr(sealer) == "SodiumSourceSecretsSealerAdapter(key_version=4)"
+def test_the_opener_never_shows_its_keys(private_key: PrivateKey) -> None:
     assert repr(opener(private_key)) == "SodiumSourceSecretsOpenerAdapter(key_versions=[1])"
 
 
