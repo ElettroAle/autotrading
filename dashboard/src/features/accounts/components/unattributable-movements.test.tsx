@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
@@ -33,8 +33,9 @@ const record = (...cases: FakeUnattributable[]): void => {
   cases.forEach((recorded) => fakeReconciliation.recordUnattributable(ACCOUNT_ID, recorded));
 };
 
-const movements = (): Promise<HTMLElement> =>
-  screen.findByRole('region', { name: 'Movimenti non spiegati del conto test-1' });
+const MOVEMENTS = 'Movimenti non spiegati del conto test-1';
+
+const movements = (): Promise<HTMLElement> => screen.findByRole('region', { name: MOVEMENTS });
 
 const table = async (): Promise<HTMLElement> =>
   within(await movements()).findByRole('table', { name: 'Movimenti non spiegati' });
@@ -159,9 +160,14 @@ describe('UnattributableMovements', () => {
 
     await userEvent.click(within(await movements()).getByRole('button', { name: 'Altri' }));
 
-    expect(await within(await table()).findAllByRole('row')).toHaveLength(52);
-    expect(
-      within(await movements()).queryByRole('button', { name: 'Altri' }),
-    ).not.toBeInTheDocument();
+    // The rows already shown answer at once: the last page has arrived only when «Altri» is gone (Bug 628).
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('region', { name: MOVEMENTS })).queryByRole('button', {
+          name: 'Altri',
+        }),
+      ).toBeNull();
+    });
+    expect(rowsOf(await table())).toHaveLength(51);
   });
 });
