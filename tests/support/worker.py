@@ -5,6 +5,7 @@ from decimal import Decimal
 from secrets import token_hex
 
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
+from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateUseCase
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
@@ -20,12 +21,15 @@ from autotrading.application.orders.close_exchange_position import CloseExchange
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
+from autotrading.application.sources.open_source_credentials import OpenSourceCredentialsUseCase
+from autotrading.application.sources.try_source_adapter import TrialServices, TrySourceAdapterUseCase
 from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationUseCase,
     VerificationReadings,
 )
 from autotrading.domain.accounts.account import Account
+from autotrading.domain.flows.cycle_interval import DEFAULT_CYCLE_INTERVAL
 from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -38,6 +42,7 @@ from tests.fakes.cycles import FakeClockAdapter
 from tests.fakes.exchange import FakeExchangeAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
+from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.linked_chat_repository import InMemoryLinkedChatRepositoryAdapter, LinkedChatStore
 from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
@@ -53,12 +58,19 @@ from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
+from tests.fakes.source_credentials import (
+    FakeSourceSecretsOpenerAdapter,
+    InMemorySourceCredentialsRepositoryAdapter,
+    SourceCredentialsStore,
+    SourceSecretsVault,
+)
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
 from tests.support.mail_servers import MailServers
 from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.platform import HYPERLIQUID, new_credentials
 from tests.support.procedure_orders import procedure_orders
+from tests.support.source_selections import platform_systems
 
 TOKEN = token_hex(16)
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -100,6 +112,11 @@ class Worker:
         # The bell of every tenant, where the worker keeps each notification (R6.2.1).
         self.inbox: InboxStore = {}
         self.cycle_run: CycleRun = lambda _command: None
+        # The adapters of the sources, the credentials the tenants gave them and what their private key opens (R6.3.1).
+        self.source_systems = platform_systems()
+        self.source_credentials = SourceCredentialsStore()
+        self.source_vault: SourceSecretsVault = {}
+        self.forecasts = InMemoryForecastRepositoryAdapter()
 
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = InMemoryAccountRepositoryAdapter(self.store, tenant_id)
@@ -149,6 +166,15 @@ class Worker:
                 InMemoryFlowTimingAdapter(self.flows, tenant_id),
                 self.clock,
                 self.run_cycle,
+            ),
+            try_source_adapter=TrySourceAdapterUseCase(
+                self.source_systems,
+                self.forecasts,
+                OpenSourceCredentialsUseCase(
+                    InMemorySourceCredentialsRepositoryAdapter(self.source_credentials, tenant_id),
+                    FakeSourceSecretsOpenerAdapter(self.source_vault),
+                ),
+                TrialServices(ThreadPoolConcurrentCallsAdapter(), self.clock, DEFAULT_CYCLE_INTERVAL),
             ),
         )
 

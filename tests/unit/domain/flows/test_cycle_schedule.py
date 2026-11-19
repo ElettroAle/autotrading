@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
+from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds, source_wait_of
 from autotrading.domain.flows.errors import InvalidScheduleError
 
 ANCHOR = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
@@ -70,3 +70,8 @@ def test_a_running_flow_with_its_anchor_has_its_cycles_planned() -> None:
 def test_a_flow_not_running_or_without_anchor_has_no_cycle_planned() -> None:
     assert CycleSchedule.planned(False, ANCHOR, QUARTER) is None
     assert CycleSchedule.planned(True, None, QUARTER) is None
+
+
+def test_the_wait_of_a_schedule_is_the_wait_of_its_interval() -> None:
+    assert CycleSchedule(ANCHOR, timedelta(minutes=2)).source_wait == source_wait_of(timedelta(minutes=2))
+    assert source_wait_of(timedelta(minutes=2)) == timedelta(seconds=30)

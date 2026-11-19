@@ -56,3 +56,21 @@ class SourceCredentialsRejectedError(ApplicationError):
     def __init__(self, adapter: str) -> None:
         super().__init__(f"credenziali rifiutate dal fornitore: {adapter}")
         self.adapter = adapter
+
+
+class SourceUnansweredError(ApplicationError):
+    """A source still reading at the end of its wait: transient, as in a cycle (R1.2.5)."""
+
+    def __init__(self, seconds: float) -> None:
+        super().__init__(f"nessuna risposta entro {int(seconds)} secondi")
+        self.seconds = seconds
+
+
+class SourceTrialWorkerUnavailableError(ApplicationError):
+    """The worker, the only service that opens the credentials of the adapters, cannot be reached or answers in an
+    unexpected shape (R6.3.1)."""
+
+    status_code = 503
+
+    def __init__(self) -> None:
+        super().__init__("servizio di esecuzione non raggiungibile, riprovare")

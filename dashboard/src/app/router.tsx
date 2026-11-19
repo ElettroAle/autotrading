@@ -29,6 +29,7 @@ import { PositionsRoute } from './routes/app/positions';
 import { ProviderKeysRoute } from './routes/app/provider-keys';
 import { RankingRoute } from './routes/app/ranking';
 import { AppRoot } from './routes/app/root';
+import { SourcesRoute } from './routes/app/sources';
 import { LoginRoute } from './routes/login';
 import { NotFoundRoute } from './routes/not-found';
 
@@ -73,6 +74,7 @@ export const routes: RouteObject[] = [
       { path: paths.notifications.path, element: <NotificationsRoute /> },
       { path: paths.alerts.path, element: <AlertsRoute /> },
       { path: paths.alert.path, element: <AlertRoute /> },
+      { path: paths.sources.path, element: <SourcesRoute /> },
       { path: paths.history.path, element: <HistoryRoute /> },
       { path: paths.generalSettings.path, element: <GeneralSettingsRoute /> },
       { path: paths.providerKeys.path, element: <ProviderKeysRoute /> },

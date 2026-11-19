@@ -8,6 +8,7 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
+from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.close_flow_positions import ClosingPorts
@@ -46,6 +47,8 @@ from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
+from autotrading.application.sources.open_source_credentials import OpenSourceCredentialsUseCase
+from autotrading.application.sources.try_source_adapter import TrialServices, TrySourceAdapterUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantCommand, ResolveTenantUseCase
 from autotrading.application.verification.read_account_for_verification import ReadAccountForVerificationUseCase
 from autotrading.application.verification.run_exchange_verification import (
@@ -56,6 +59,7 @@ from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.flows.account_activity import AccountActivity
+from autotrading.domain.flows.cycle_interval import DEFAULT_CYCLE_INTERVAL
 from autotrading.domain.flows.emergency_closing import EmergencyClosing
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
@@ -141,11 +145,13 @@ from tests.fakes.reconciliation_repository import InMemoryReconciliationReposito
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
 from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
 from tests.fakes.source_credentials import (
+    FakeSourceSecretsOpenerAdapter,
     FakeSourceSecretsSealerAdapter,
     InMemorySourceCredentialsRepositoryAdapter,
     SourceCredentialsStore,
     SourceSecretsVault,
 )
+from tests.fakes.source_trials import FakeSourceTrialAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
@@ -278,8 +284,9 @@ class Platform:
         on_demand_cycles = FakeOnDemandCycleAdapter(
             lambda flow_id: self.worker_for(tenant_id).run_cycle_on_demand.execute(RunCycleOnDemandCommand(flow_id))
         )
+        source_trials = FakeSourceTrialAdapter(self.worker_for(tenant_id).try_source_adapter.execute)
         account_state.reachable = position_closing.reachable = verification.reachable = self.worker_reachable
-        on_demand_cycles.reachable = self.worker_reachable
+        on_demand_cycles.reachable = source_trials.reachable = self.worker_reachable
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
@@ -310,6 +317,7 @@ class Platform:
             sources=sources,
             source_credentials=source_credentials,
             source_secrets_sealer=FakeSourceSecretsSealerAdapter(tenant_id, self.source_vault),
+            source_trials=source_trials,
             provider_keys=provider_keys,
             provider_key_sealer=FakeProviderKeySealerAdapter(tenant_id, self.key_vault),
             provider_key_usage=flows,
@@ -445,6 +453,15 @@ class Platform:
                 InMemoryFlowTimingAdapter(self.flows, tenant_id),
                 self.worker_clock,
                 self.cycle_run_of(tenant_id),
+            ),
+            try_source_adapter=TrySourceAdapterUseCase(
+                self.source_systems,
+                self.forecasts_of(tenant_id),
+                OpenSourceCredentialsUseCase(
+                    InMemorySourceCredentialsRepositoryAdapter(self.source_credentials, tenant_id),
+                    FakeSourceSecretsOpenerAdapter(self.source_vault),
+                ),
+                TrialServices(ThreadPoolConcurrentCallsAdapter(), self.worker_clock, DEFAULT_CYCLE_INTERVAL),
             ),
         )
 

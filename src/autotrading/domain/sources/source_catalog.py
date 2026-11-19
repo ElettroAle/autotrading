@@ -6,6 +6,7 @@ from autotrading.domain.sources.errors import (
     SourceAdapterNotFoundError,
     SourceAdapterWithoutConfigurationError,
     SourceNotAvailableError,
+    TrialAssetRequiredError,
 )
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
@@ -52,6 +53,14 @@ class OfferedSource:
     def settings(self, adapter: str, requested: Mapping[str, int]) -> dict[str, int]:
         """The parameters of an adapter of the flow: the requested values checked, the defaults for the others."""
         return self.definition.settings(requested, self.adapter(adapter).parameters)
+
+    def asset_of_trial(self, asset: str | None) -> str | None:
+        """A trial reads a per-asset source for the asset chosen, a market source for the whole market (R6.3.1)."""
+        if not self.per_asset:
+            return None
+        if asset is None or not asset.strip():
+            raise TrialAssetRequiredError(self.name)
+        return asset.strip()
 
 
 @dataclass(frozen=True, slots=True)

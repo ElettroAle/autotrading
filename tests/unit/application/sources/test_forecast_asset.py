@@ -33,6 +33,20 @@ def test_the_asset_is_forecast_at_every_horizon_and_recorded() -> None:
     assert forecaster.requests == [("BTC", 7, (ForecastHorizon.MINUTES_15, ForecastHorizon.HOUR_1))]
 
 
+def test_the_forecast_of_a_trial_outside_every_flow_is_made_and_never_recorded() -> None:
+    forecasts = InMemoryForecastRepositoryAdapter()
+
+    made = ForecastAssetUseCase(FakePriceHistoryAdapter(), FakePriceForecasterAdapter(), forecasts).execute(
+        ForecastAssetCommand(None, "BTC", 7, NOW)
+    )
+
+    assert [(forecast.flow_id, forecast.horizon) for forecast in made] == [
+        (None, ForecastHorizon.MINUTES_15),
+        (None, ForecastHorizon.HOUR_1),
+    ]
+    assert forecasts.forecasts == []
+
+
 def test_a_shorter_history_is_declared_by_every_forecast() -> None:
     prices = FakePriceHistoryAdapter(available_days=3)
 

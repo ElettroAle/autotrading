@@ -3,6 +3,7 @@ import { createBdd, defineParameterType, test as base } from 'playwright-bdd';
 import type { FakeSource, FakeSourceParameter } from '@/testing/mocks/catalogs';
 import type { FakeCycle } from '@/testing/mocks/cycles';
 import { fakePlatform, type FakeFlowHistory, type FakeVersion } from '@/testing/mocks/platform';
+import type { FakeSourceTrial } from '@/testing/mocks/source-trials';
 
 import { BrowserRestart } from './browser-restart';
 import { DashboardPages } from './dashboard-pages';
@@ -62,6 +63,8 @@ export type ScenarioMemory = {
   sourceCatalog: FakeSource[];
   /** The parameter of an adapter the user set to a value it does not admit (R4.1.1). */
   sourceParameter: FakeSourceParameter | undefined;
+  /** The last trial of a source the API answered, whose outcome the page should show (R6.3.1). */
+  sourceTrial: FakeSourceTrial | undefined;
 };
 
 type Fixtures = {
@@ -122,6 +125,7 @@ export const test = base.extend<Fixtures>({
       policyViolations: [],
       sourceCatalog: [],
       sourceParameter: undefined,
+      sourceTrial: undefined,
     });
   },
 });

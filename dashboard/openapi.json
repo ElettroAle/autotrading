@@ -1228,6 +1228,72 @@
         }
       }
     },
+    "/sources/{name}/adapters/{adapter}/trials": {
+      "post": {
+        "tags": [
+          "fonti dati"
+        ],
+        "summary": "Try Source Adapter",
+        "description": "Reads the adapter now as a cycle does and records nothing: a source that fails is the outcome (R6.3.1).",
+        "operationId": "try_source_adapter_sources__name__adapters__adapter__trials_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "adapter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Adapter"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceTrialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTrialResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "fonte o adapter non disponibile"
+          },
+          "422": {
+            "description": "parametro fuori dai valori ammessi o asset mancante: la prova non parte"
+          },
+          "503": {
+            "description": "servizio di esecuzione non raggiungibile"
+          }
+        }
+      }
+    },
     "/source-credentials": {
       "get": {
         "tags": [
@@ -11468,6 +11534,109 @@
         ],
         "title": "SourceSelectionResponse"
       },
+      "SourceTrialRequest": {
+        "properties": {
+          "asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "title": "SourceTrialRequest",
+        "description": "The asset, only for a per-asset source, and the parameters the user set: the others take their default."
+      },
+      "SourceTrialResponse": {
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/TrialOutcome"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/SourceTrialValueResponse"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "data_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data At"
+          },
+          "response_milliseconds": {
+            "type": "integer",
+            "title": "Response Milliseconds"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "permanent": {
+            "type": "boolean",
+            "title": "Permanent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "values",
+          "data_at",
+          "response_milliseconds",
+          "reason",
+          "permanent"
+        ],
+        "title": "SourceTrialResponse",
+        "description": "What the adapter answered the trial: a source that fails is the outcome, not an error of the request (R6.3.1)."
+      },
+      "SourceTrialValueResponse": {
+        "properties": {
+          "reference_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reference At"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_at",
+          "values"
+        ],
+        "title": "SourceTrialValueResponse"
+      },
       "StepDocumentResponse": {
         "properties": {
           "step": {
@@ -12162,6 +12331,14 @@
         ],
         "title": "TargetKind",
         "description": "What a notification leads to: a flow, one of its positions, open or closed, or the alert it opened."
+      },
+      "TrialOutcome": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "failed"
+        ],
+        "title": "TrialOutcome"
       },
       "UnattributableKind": {
         "type": "string",

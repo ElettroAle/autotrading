@@ -74,9 +74,12 @@ class PriceHistory:
 
 @dataclass(frozen=True, slots=True)
 class PriceForecast:
-    """A forecast of the flow for one asset and horizon, then the actual price once the horizon expires (R1.3.5)."""
+    """A forecast of the flow for one asset and horizon, then the actual price once the horizon expires (R1.3.5).
 
-    flow_id: UUID
+    A forecast of a trial belongs to no flow and is never recorded (R6.3.1).
+    """
+
+    flow_id: UUID | None
     asset: str
     horizon: ForecastHorizon
     made_at: datetime
@@ -92,7 +95,7 @@ class PriceForecast:
 
     @classmethod
     def of(
-        cls, flow_id: UUID, asset: str, history: PriceHistory, horizon: ForecastHorizon, predicted: Decimal
+        cls, flow_id: UUID | None, asset: str, history: PriceHistory, horizon: ForecastHorizon, predicted: Decimal
     ) -> PriceForecast:
         """The forecast of the model for the horizon, with the history it was made on."""
         return cls(

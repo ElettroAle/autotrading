@@ -4,8 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.source_trials import SourceTrialRequest, SourceTrialResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.sources.get_source import GetSourceCommand
+from autotrading.application.sources.request_source_trial import RequestSourceTrialCommand
 from autotrading.application.sources.source_offer import SourceOffer
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
 from autotrading.domain.sources.source_parameter import SourceParameter
@@ -98,5 +100,23 @@ def sources_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRo
     @router.get("/{name}", responses={404: {"description": "fonte non disponibile"}})
     def get_source(name: str, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> SourceResponse:
         return SourceResponse.of(use_cases.get_source.execute(GetSourceCommand(name)))
+
+    @router.post(
+        "/{name}/adapters/{adapter}/trials",
+        responses={
+            404: {"description": "fonte o adapter non disponibile"},
+            422: {"description": "parametro fuori dai valori ammessi o asset mancante: la prova non parte"},
+            503: {"description": "servizio di esecuzione non raggiungibile"},
+        },
+    )
+    def try_source_adapter(
+        name: str,
+        adapter: str,
+        request: SourceTrialRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> SourceTrialResponse:
+        """Reads the adapter now as a cycle does and records nothing: a source that fails is the outcome (R6.3.1)."""
+        command = RequestSourceTrialCommand(name, adapter, request.asset, request.parameters)
+        return SourceTrialResponse.of(use_cases.request_source_trial.execute(command))
 
     return router

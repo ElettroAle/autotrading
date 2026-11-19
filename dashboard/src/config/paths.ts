@@ -81,6 +81,11 @@ export const paths = {
     path: '/provider-keys',
     getHref: () => '/provider-keys',
   },
+  // The sources of the catalog, each with its trial (ADR pagina-fonti-con-la-prova).
+  sources: {
+    path: '/fonti',
+    getHref: () => '/fonti',
+  },
   // The cycles of a flow filtered on an outcome, as the failed cycles of its results lead to them (R6.4.2).
   flowCycles: {
     path: '/flows/:flowId/cycles',

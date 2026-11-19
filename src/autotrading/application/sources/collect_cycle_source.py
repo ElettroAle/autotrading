@@ -5,10 +5,8 @@ from autotrading.application.sources.collect_source import (
     CollectedSource,
     CollectSourceCommand,
     CollectSourceUseCase,
-    Reader,
 )
 from autotrading.application.sources.errors import SourceCredentialsRejectedError
-from autotrading.application.sources.forecast_asset import ForecastAssetUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.application.sources.open_source_credentials import OpenSourceCredentialsUseCase
 from autotrading.application.sources.ports import (
@@ -17,22 +15,12 @@ from autotrading.application.sources.ports import (
     SampleRepositoryPort,
     SourceCredentialsRejectionNoticePort,
     SourceCredentialsRepositoryPort,
-    SourceReaderPort,
     SourceSecretsOpenerPort,
 )
-from autotrading.application.sources.read_forecast import ReadForecastUseCase
-from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase
-from autotrading.application.sources.read_news import ReadNewsUseCase
-from autotrading.application.sources.read_pivots import ReadPivotsUseCase
-from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
 from autotrading.application.sources.record_source_credentials_rejection import (
     RecordSourceCredentialsRejectionUseCase,
 )
-from autotrading.domain.sources.forecast import FORECAST
-from autotrading.domain.sources.indicators import INDICATORS
-from autotrading.domain.sources.news import NEWS
-from autotrading.domain.sources.pivots import PIVOTS
-from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.application.sources.source_readers import readers_of
 from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.sources.source_sample import CycleReference
 
@@ -88,7 +76,9 @@ class CollectCycleSourceUseCase:
         return OpenSourceCredentialsUseCase(self._credentials.repository, self._credentials.opener).execute(adapter)
 
     def _collected(self, catalog: SourceCatalog, command: CollectSourceCommand, cycle_minutes: int) -> CollectedSource:
-        collect = CollectSourceUseCase(catalog, self._readers_of(cycle_minutes), self._samples)
+        collect = CollectSourceUseCase(
+            catalog, readers_of(self._systems, self._forecasts, cycle_minutes), self._samples
+        )
         try:
             return collect.execute(command)
         except SourceCredentialsRejectedError:
@@ -97,18 +87,3 @@ class CollectCycleSourceUseCase:
                 self._credentials.repository, self._credentials.rejection_notice
             ).execute(command.adapter, command.collected_at)
             raise
-
-    def _readers_of(self, cycle_minutes: int) -> dict[Reader, SourceReaderPort]:
-        systems = self._systems
-        market = systems.market.declaration().name
-        readers: dict[Reader, SourceReaderPort] = {
-            (SENTIMENT.name, sentiment.declaration().name): ReadSentimentUseCase(sentiment)
-            for sentiment in systems.sentiments
-        }
-        readers[NEWS.name, systems.news.declaration().name] = ReadNewsUseCase(systems.news)
-        readers[FORECAST.name, systems.forecaster.declaration().name] = ReadForecastUseCase(
-            ForecastAssetUseCase(systems.prices, systems.forecaster, self._forecasts)
-        )
-        readers[INDICATORS.name, market] = ReadIndicatorsUseCase(systems.market, cycle_minutes)
-        readers[PIVOTS.name, market] = ReadPivotsUseCase(systems.market)
-        return readers

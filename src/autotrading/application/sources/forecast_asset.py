@@ -8,14 +8,16 @@ from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceFore
 
 @dataclass(frozen=True, slots=True)
 class ForecastAssetCommand:
-    flow_id: UUID
+    # None for a trial outside every flow: its forecast is never recorded (R6.3.1).
+    flow_id: UUID | None
     asset: str
     history_days: int
     now: datetime
 
 
 class ForecastAssetUseCase:
-    """Forecasts the price of an asset at every horizon from the history of the exchange, and records it (R1.3.5).
+    """Forecasts the price of an asset at every horizon from the history of the exchange, and records it for the flow
+    that asked (R1.3.5); a trial asks for no flow and records nothing (R6.3.1).
 
     The history comes from the exchange, the prediction from the forecasting model (ADR 0107).
     """
@@ -35,6 +37,7 @@ class ForecastAssetUseCase:
             PriceForecast.of(command.flow_id, command.asset, history, horizon, predicted[horizon])
             for horizon in ForecastHorizon
         )
-        for forecast in forecasts:
-            self._forecasts.add(forecast)
+        if command.flow_id is not None:
+            for forecast in forecasts:
+                self._forecasts.add(forecast)
         return forecasts

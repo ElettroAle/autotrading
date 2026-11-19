@@ -39,6 +39,7 @@ const NAVIGATION: readonly NavigationGroup[] = [
         area: [paths.alerts.path],
         countsOpenAlerts: true,
       },
+      { name: 'Fonti', to: paths.sources.getHref(), area: [paths.sources.path] },
     ],
   },
   {

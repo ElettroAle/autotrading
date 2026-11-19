@@ -56,6 +56,7 @@ import { reconciliationHandlers } from './reconciliation-handlers';
 import { problem, withUser } from './responses';
 import { sourceCredentialHandlers } from './source-credential-handlers';
 import { fakeSourceCredentials } from './source-credentials';
+import { sourceTrialHandlers } from './source-trial-handlers';
 
 const NO_LINKED_CHAT = 'nessuna chat collegata';
 
@@ -461,6 +462,7 @@ export const handlers = [
   ...alertHandlers,
   ...providerKeyHandlers,
   ...sourceCredentialHandlers,
+  ...sourceTrialHandlers,
   ...notificationEmailHandlers,
   ...notificationChannelHandlers,
   ...notificationInboxHandlers,

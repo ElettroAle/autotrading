@@ -24,11 +24,17 @@ class SourceParameterOutOfRangeError(DomainError):
 
     status_code = 422
 
-    def __init__(self, label: str, minimum: int, maximum: int) -> None:
+    def __init__(self, label: str, minimum: int, maximum: int, key: str) -> None:
         super().__init__(f"parametro fuori dai valori ammessi: {label}, da {minimum} a {maximum}")
         self.label = label
         self.minimum = minimum
         self.maximum = maximum
+        self.key = key
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        """The parameter and its limits, so the page of a trial shows them beside its field (R6.3.1)."""
+        return {"field": self.key, "minimum": self.minimum, "maximum": self.maximum}
 
 
 class SourceAdapterNotAvailableError(DomainError):
@@ -167,3 +173,26 @@ class UnknownSourceConfigurationFieldError(DomainError):
     @property
     def details(self) -> Mapping[str, object]:
         return {"field": self.field}
+
+
+class TrialAssetRequiredError(DomainError):
+    """A per-asset source is tried for one asset (R6.3.1)."""
+
+    status_code = 422
+
+    def __init__(self, source: str) -> None:
+        super().__init__(f"scegli l'asset su cui provare la fonte {source}")
+        self.source = source
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": "asset"}
+
+
+class InvalidSourceTrialError(DomainError):
+    """A trial failed without a reason, succeeded with one, or lasted less than nothing: a defect of who builds it."""
+
+    status_code = 500
+
+    def __init__(self) -> None:
+        super().__init__("prova della fonte non valida")
