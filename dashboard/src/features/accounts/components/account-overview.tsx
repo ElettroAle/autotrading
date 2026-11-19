@@ -5,6 +5,7 @@ import type { Account } from '../api/get-accounts';
 import { useAccount } from '../hooks/use-account';
 
 import { AccountBalance, AccountFreeCapital } from './account-amounts';
+import { CredentialsExpiry } from './credentials-expiry';
 import { Detail } from './detail';
 import { FlowsValue } from './flows-value';
 import { PublicFields } from './public-fields';
@@ -21,8 +22,9 @@ const hasPublicFields = (account: Account): boolean =>
 
 /**
  * The tab Panoramica of the page of the account: where it is on the exchange, then its balance read as the value of
- * the flows plus the free capital (Bug 601, ADR scomposizione-del-saldo-nel-riquadro-del-conto, ADR
- * elenco-dei-conti-e-pagina-del-conto). The page has read the account before its tabs show.
+ * the flows plus the free capital, then the expiry of its credentials (Bug 601, R6.2.2, ADR
+ * scomposizione-del-saldo-nel-riquadro-del-conto, ADR elenco-dei-conti-e-pagina-del-conto, ADR
+ * scadenza-nelle-pagine-chiavi-e-conti). The page has read the account before its tabs show.
  */
 export const AccountOverview = ({ accountId }: { readonly accountId: string }) => {
   const account = useAccount(accountId);
@@ -48,6 +50,9 @@ export const AccountOverview = ({ accountId }: { readonly accountId: string }) =
         </Detail>
         <Detail term="Capitale libero">
           <AccountFreeCapital account={account} />
+        </Detail>
+        <Detail term="Scadenza delle credenziali">
+          <CredentialsExpiry account={account} />
         </Detail>
       </dl>
     </section>

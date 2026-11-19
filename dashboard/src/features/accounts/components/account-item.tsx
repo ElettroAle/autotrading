@@ -9,13 +9,15 @@ import type { Account } from '../api/get-accounts';
 
 import { AccountActions } from './account-actions';
 import { AccountBalance, AccountFreeCapital } from './account-amounts';
+import { CredentialsExpiryStatus } from './credentials-expiry';
 import { Detail } from './detail';
 import { ReconciliationState } from './reconciliation-state';
 
 /**
  * An account in the list, compact as a resource in the list of a cloud portal: its name, network and state of the
- * reconciliation, its balance and free capital, and the menu of its actions. Touching it opens its page, where the
- * rest of the account is (Bug 616, ADR elenco-dei-conti-e-pagina-del-conto).
+ * reconciliation, the expiry of its credentials, its balance and free capital, and the menu of its actions. Touching it
+ * opens its page, where the rest of the account is (Bug 616, ADR elenco-dei-conti-e-pagina-del-conto, ADR
+ * scadenza-nelle-pagine-chiavi-e-conti).
  */
 export const AccountItem = ({ account }: { readonly account: Account }) => {
   const titleId = useId();
@@ -37,8 +39,9 @@ export const AccountItem = ({ account }: { readonly account: Account }) => {
         </h2>
         <NetworkBadge network={account.network} networkName={account.network_name} />
       </header>
-      <div className="mt-1">
+      <div className="mt-1 flex flex-col gap-1">
         <ReconciliationState account={account} />
+        <CredentialsExpiryStatus account={account} />
       </div>
       <dl className={`${DETAILS_GRID} mt-2`}>
         <Detail term="Saldo (con risultato aperto)">

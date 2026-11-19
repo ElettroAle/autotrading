@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
+import { enteredExpiryOf, keyExpiryResponse } from './key-expiry';
 import { fakePlatform, type FakeProviderKey, type FakeUser } from './platform';
 import { problem, textFieldsWithin, withUser } from './responses';
 
@@ -14,6 +15,12 @@ const providerOf = (name: string): string => name.trim().toLowerCase();
 const responseOf = (key: FakeProviderKey) => ({
   provider: key.provider,
   registered_at: key.registeredAt,
+});
+
+// No gateway of the fake catalog reads the expiry of its keys: the user gives it (R6.2.2).
+const summaryOf = (key: FakeProviderKey) => ({
+  ...responseOf(key),
+  ...keyExpiryResponse(key.expiry, true),
 });
 
 // The key is never asked to the provider: only presence and catalog (R1.4.1, ADR 0108).
@@ -47,7 +54,7 @@ export const providerKeyHandlers = [
       HttpResponse.json(
         [...user.providerKeys]
           .sort((one, other) => one.provider.localeCompare(other.provider))
-          .map(responseOf),
+          .map(summaryOf),
       ),
     ),
   ),
@@ -62,13 +69,18 @@ export const providerKeyHandlers = [
       if (keyOf(user, provider) !== undefined) {
         return problem(409, 'Conflict', `chiave già registrata per il fornitore: ${provider}`);
       }
-      const saved = fakePlatform.saveProviderKey(user.account, provider, new Date().toISOString());
+      const saved = fakePlatform.saveProviderKey(
+        user.account,
+        provider,
+        new Date().toISOString(),
+        enteredExpiryOf(fields.expires_on),
+      );
       return HttpResponse.json(responseOf(saved), { status: 201 });
     }),
   ),
   http.put('*/provider-keys/:provider', ({ request, params }) =>
     withUser(request, async (user) => {
-      const { within } = await textFieldsWithin(request, 'key');
+      const { fields, within } = await textFieldsWithin(request, 'key');
       const provider = providerOf(String(params.provider));
       const refusal = refusalOfKey(provider, within);
       if (refusal !== undefined) {
@@ -77,8 +89,24 @@ export const providerKeyHandlers = [
       if (keyOf(user, provider) === undefined) {
         return notRegistered(provider);
       }
-      const saved = fakePlatform.saveProviderKey(user.account, provider, new Date().toISOString());
+      const saved = fakePlatform.saveProviderKey(
+        user.account,
+        provider,
+        new Date().toISOString(),
+        enteredExpiryOf(fields.expires_on),
+      );
       return HttpResponse.json(responseOf(saved));
+    }),
+  ),
+  http.put('*/provider-keys/:provider/expiry', ({ request, params }) =>
+    withUser(request, async (user) => {
+      const { fields } = await textFieldsWithin(request, 'key');
+      const key = keyOf(user, providerOf(String(params.provider)));
+      if (key === undefined) {
+        return notRegistered(providerOf(String(params.provider)));
+      }
+      key.expiry = enteredExpiryOf(fields.expires_on);
+      return new HttpResponse(null, { status: 204 });
     }),
   ),
   http.delete('*/provider-keys/:provider', ({ request, params }) =>

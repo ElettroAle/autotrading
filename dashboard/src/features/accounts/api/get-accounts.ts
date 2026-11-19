@@ -3,9 +3,11 @@ import { z } from 'zod';
 
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
+import { keyExpiryFields } from '@/types/key-expiry';
 
 // The secret credentials are only declared present, never returned (R0.2.3); the public fields the exchange declares,
-// as the account address, are shown by name (Bug 401); the balance is read apart (ADR 0126).
+// as the account address, are shown by name (Bug 401); the balance is read apart (ADR 0126); the expiry of the
+// credentials as the API reads it today (R6.2.2).
 export const accountSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -16,6 +18,7 @@ export const accountSchema = z.object({
   network_name: z.string(),
   allocated_capital: z.string(),
   currency: z.string(),
+  ...keyExpiryFields,
 });
 
 export type Account = z.infer<typeof accountSchema>;

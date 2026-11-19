@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 
-from autotrading.adapters.inbound.api.key_expiry import KeyExpiryRequest, KeyExpiryResponse
+from autotrading.adapters.inbound.api.key_expiry import ExpiryStatus, KeyExpiryRequest, KeyExpiryResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.agent.ports import ProviderKeyRegistration
 from autotrading.application.agent.provider_key_summary import ProviderKeySummary
@@ -51,7 +51,7 @@ class ProviderKeySummaryResponse(ProviderKeyResponse):
     days, `expired`) and the days left, and whether the user may give it (R6.2.2)."""
 
     expiry: KeyExpiryResponse | None
-    expiry_status: str
+    expiry_status: ExpiryStatus
     days_left: int | None
     expiry_editable: bool
 
@@ -62,7 +62,7 @@ class ProviderKeySummaryResponse(ProviderKeyResponse):
             provider=summary.provider.value,
             registered_at=summary.registered_at.isoformat(),
             expiry=None if expiry is None else KeyExpiryResponse.of(expiry.expires_on, expiry.source),
-            expiry_status=summary.reading.status.value,
+            expiry_status=ExpiryStatus(summary.reading.status.value),
             days_left=summary.reading.days_left,
             expiry_editable=summary.expiry_editable,
         )

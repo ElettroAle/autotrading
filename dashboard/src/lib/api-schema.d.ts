@@ -91,6 +91,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Key Expiry
+         * @description The day the user says the credentials stop working, only when the exchange does not read it (R6.2.2).
+         */
+        put: operations["set_key_expiry_accounts__account_id__expiry_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{account_id}/state": {
         parameters: {
             query?: never;
@@ -398,6 +418,26 @@ export interface paths {
         post?: never;
         /** Remove Provider Key */
         delete: operations["remove_provider_key_provider_keys__provider__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/provider-keys/{provider}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Key Expiry
+         * @description The day the user says the key stops working, only when no gateway reads it (R6.2.2).
+         */
+        put: operations["set_key_expiry_provider_keys__provider__expiry_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1408,6 +1448,8 @@ export interface components {
             credentials?: {
                 [key: string]: string;
             };
+            /** Expires On */
+            expires_on?: string | null;
         };
         /** AccountRegistrationResponse */
         AccountRegistrationResponse: {
@@ -1440,7 +1482,9 @@ export interface components {
         /**
          * AccountSummaryResponse
          * @description An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,
-         *     which the exchange gives at /accounts/{id}/state.
+         *     which the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state
+         *     (`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it
+         *     (R6.2.2).
          */
         AccountSummaryResponse: {
             /** Id */
@@ -1463,6 +1507,12 @@ export interface components {
             allocated_capital: string;
             /** Currency */
             currency: string;
+            expiry: components["schemas"]["KeyExpiryResponse"] | null;
+            expiry_status: components["schemas"]["ExpiryStatus"];
+            /** Days Left */
+            days_left: number | null;
+            /** Expiry Editable */
+            expiry_editable: boolean;
         };
         /**
          * AlertDetailResponse
@@ -1498,7 +1548,7 @@ export interface components {
          *     avvisi-nel-contesto-delle-notifiche): only a kind without a resolution of its own is resolved by hand.
          * @enum {string}
          */
-        AlertKind: "reconciliation_alarm" | "flow_paused" | "unattributable_position" | "unattributable_fill";
+        AlertKind: "reconciliation_alarm" | "flow_paused" | "unattributable_position" | "unattributable_fill" | "key_expiring" | "key_expired";
         /**
          * AlertPageResponse
          * @description At most 50 alerts, newest first; `next` is the `cursor` of the following page, null on the last one. `count`
@@ -1840,6 +1890,8 @@ export interface components {
             credentials?: {
                 [key: string]: string;
             };
+            /** Expires On */
+            expires_on?: string | null;
         };
         /**
          * CycleDetailResponse
@@ -2088,6 +2140,18 @@ export interface components {
             /** Fields */
             fields: components["schemas"]["CredentialFieldResponse"][];
         };
+        /**
+         * ExpirySource
+         * @description Who gave the day a key stops working, the same names for every key (R6.2.2).
+         * @enum {string}
+         */
+        ExpirySource: "read" | "entered";
+        /**
+         * ExpiryStatus
+         * @description The state of the expiry of a key as of today, the same names for every key (R6.2.2).
+         * @enum {string}
+         */
+        ExpiryStatus: "unknown" | "valid" | "expiring" | "expired";
         /** FailureResponse */
         FailureResponse: {
             /** Step */
@@ -2798,6 +2862,26 @@ export interface components {
             /** Alert Id */
             alert_id: string | null;
         };
+        /**
+         * KeyExpiryRequest
+         * @description The day the user says a key stops working; none forgets it (R6.2.2).
+         */
+        KeyExpiryRequest: {
+            /** Expires On */
+            expires_on?: string | null;
+        };
+        /**
+         * KeyExpiryResponse
+         * @description The day a key stops working, in UTC, and who gave it: `read` by the adapter, `entered` by the user (R6.2.2).
+         */
+        KeyExpiryResponse: {
+            /**
+             * Expires On
+             * Format: date
+             */
+            expires_on: string;
+            source: components["schemas"]["ExpirySource"];
+        };
         /** LastCycleResponse */
         LastCycleResponse: {
             /**
@@ -2978,7 +3062,7 @@ export interface components {
          *     An event belongs to a flow, or to the account when no single flow explains it.
          * @enum {string}
          */
-        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita";
+        NotificationEvent: "apertura di una posizione" | "chiusura di una posizione" | "stop loss attivato" | "take profit attivato" | "liquidazione di una posizione" | "ciclo fallito" | "ordine rifiutato" | "pausa automatica di un flusso" | "perdita massima raggiunta" | "decisione ridotta dal rischio" | "decisione bloccata dal rischio" | "posizione non attribuibile" | "esecuzione non attribuibile" | "allarme di riconciliazione" | "incasso eseguito" | "chiusura di emergenza eseguita" | "scadenza di una chiave";
         /**
          * OpeningsResume
          * @description How the openings of a flow suspended for maximum loss resume (R3.2.2).
@@ -3199,6 +3283,8 @@ export interface components {
             key?: {
                 [key: string]: string;
             };
+            /** Expires On */
+            expires_on?: string | null;
         };
         /** ProviderKeyReplacementRequest */
         ProviderKeyReplacementRequest: {
@@ -3206,6 +3292,8 @@ export interface components {
             key?: {
                 [key: string]: string;
             };
+            /** Expires On */
+            expires_on?: string | null;
         };
         /**
          * ProviderKeyResponse
@@ -3216,6 +3304,23 @@ export interface components {
             provider: string;
             /** Registered At */
             registered_at: string;
+        };
+        /**
+         * ProviderKeySummaryResponse
+         * @description A key on the page of the keys: the expiry as of today, with its state (`unknown`, `valid`, `expiring` within 30
+         *     days, `expired`) and the days left, and whether the user may give it (R6.2.2).
+         */
+        ProviderKeySummaryResponse: {
+            /** Provider */
+            provider: string;
+            /** Registered At */
+            registered_at: string;
+            expiry: components["schemas"]["KeyExpiryResponse"] | null;
+            expiry_status: components["schemas"]["ExpiryStatus"];
+            /** Days Left */
+            days_left: number | null;
+            /** Expiry Editable */
+            expiry_editable: boolean;
         };
         /** ProviderResponse */
         ProviderResponse: {
@@ -3797,6 +3902,39 @@ export interface operations {
             };
         };
     };
+    set_key_expiry_accounts__account_id__expiry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyExpiryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_account_state_accounts__account_id__state_get: {
         parameters: {
             query?: never;
@@ -4307,7 +4445,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProviderKeyResponse"][];
+                    "application/json": components["schemas"]["ProviderKeySummaryResponse"][];
                 };
             };
         };
@@ -4390,6 +4528,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_key_expiry_provider_keys__provider__expiry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyExpiryRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {

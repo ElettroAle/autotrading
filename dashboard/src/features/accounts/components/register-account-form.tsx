@@ -16,9 +16,14 @@ import {
   type AccountRegistrationInput,
 } from '../api/register-account';
 
-const FIELDS = ['name', 'exchange'] as const;
+const FIELDS = ['name', 'exchange', 'expires_on'] as const;
 
-const EMPTY_FORM: AccountRegistrationInput = { name: '', exchange: '', credentials: {} };
+const EMPTY_FORM: AccountRegistrationInput = {
+  name: '',
+  exchange: '',
+  credentials: {},
+  expires_on: '',
+};
 
 /**
  * Registers an account on an exchange the API supports (R2.3.8), asking the data that exchange declares (R2.3.9): the
@@ -104,6 +109,13 @@ export const RegisterAccountForm = () => {
           fields={fields}
           registerField={(name) => register(`credentials.${name}`)}
           reasonOf={(name) => errors.credentials?.[name]?.message}
+        />
+        {/* Optional: the API refuses it where the exchange reads the expiry itself (R6.2.2). */}
+        <InputField
+          label="Scadenza"
+          type="date"
+          error={errors.expires_on}
+          {...register('expires_on')}
         />
         <CommandButton
           tone="primary"

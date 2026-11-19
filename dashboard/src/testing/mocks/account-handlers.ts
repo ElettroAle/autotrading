@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
+import { enteredExpiryOf, keyExpiryResponse, type FakeKeyExpiry } from './key-expiry';
 import {
   EXCHANGE_REFUSAL,
   FAKE_EXCHANGE,
@@ -33,7 +34,15 @@ const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   network_name: fakePlatform.exchangeNetworkName(),
   allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
   currency: CURRENCY,
+  // The exchange of the fake platform reads the expiry of the credentials, unless a test says otherwise (R6.2.2).
+  ...keyExpiryResponse(account.expiry, account.expiryEditable ?? false),
 });
+
+const EXPIRY_READ_BY_EXCHANGE = "la scadenza di queste credenziali la legge l'exchange";
+
+const expiryRefusal = () => problem(409, 'Conflict', EXPIRY_READ_BY_EXCHANGE);
+
+const givesExpiry = (fields: Record<string, string>): boolean => (fields.expires_on ?? '') !== '';
 
 const amountOf = (amount: string) => ({ amount, currency: CURRENCY });
 
@@ -112,6 +121,7 @@ const replacementOf = (
   user: FakeUser,
   account: FakeAccount,
   sent: Record<string, string>,
+  expiry?: FakeKeyExpiry,
 ): Response => {
   const kept = Object.keys(account.publicFields).length > 0;
   const sentPublic = CREDENTIAL_FIELDS.find((field) => !field.secret && field.name in sent);
@@ -130,6 +140,10 @@ const replacementOf = (
     return refusal;
   }
   account.publicFields = publicFieldsOf(credentials);
+  // New credentials keep only the date given with them where the user gives it (R6.2.2).
+  if (account.expiryEditable === true) {
+    account.expiry = expiry;
+  }
   return HttpResponse.json(accountResponse(user, account));
 };
 
@@ -203,6 +217,9 @@ export const accountHandlers = [
   http.post('*/accounts', ({ request }) =>
     withUser(request, async (user) => {
       const { fields, within } = await textFieldsWithin(request, 'credentials');
+      if (givesExpiry(fields)) {
+        return expiryRefusal();
+      }
       const refusal = refusalOfRegistration(user, fields, within);
       if (refusal !== undefined) {
         return refusal;
@@ -222,10 +239,24 @@ export const accountHandlers = [
   ),
   http.put('*/accounts/:accountId/credentials', ({ request, params }) =>
     withUser(request, async (user) => {
-      const { within } = await textFieldsWithin(request, 'credentials');
+      const { fields, within } = await textFieldsWithin(request, 'credentials');
       return withAccount(user, String(params.accountId), (account) =>
-        replacementOf(user, account, within),
+        givesExpiry(fields) && account.expiryEditable !== true
+          ? expiryRefusal()
+          : replacementOf(user, account, within, enteredExpiryOf(fields.expires_on)),
       );
+    }),
+  ),
+  http.put('*/accounts/:accountId/expiry', ({ request, params }) =>
+    withUser(request, async (user) => {
+      const { fields } = await textFieldsWithin(request, 'credentials');
+      return withAccount(user, String(params.accountId), (account) => {
+        if (account.expiryEditable !== true) {
+          return expiryRefusal();
+        }
+        account.expiry = enteredExpiryOf(fields.expires_on);
+        return new HttpResponse(null, { status: 204 });
+      });
     }),
   ),
   http.delete('*/accounts/:accountId', ({ request, params }) =>

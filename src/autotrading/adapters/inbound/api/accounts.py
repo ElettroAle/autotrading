@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.amounts import amount_text
-from autotrading.adapters.inbound.api.key_expiry import KeyExpiryRequest, KeyExpiryResponse
+from autotrading.adapters.inbound.api.key_expiry import ExpiryStatus, KeyExpiryRequest, KeyExpiryResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.accounts.account_details import AccountDetails
 from autotrading.application.accounts.account_summary import AccountSummary
@@ -75,7 +75,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
     allocated_capital: str
     currency: str
     expiry: KeyExpiryResponse | None
-    expiry_status: str
+    expiry_status: ExpiryStatus
     days_left: int | None
     expiry_editable: bool
 
@@ -92,7 +92,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
             allocated_capital=amount_text(summary.allocated_capital),
             currency=summary.currency,
             expiry=_expiry_response_of(summary),
-            expiry_status=summary.expiry.reading.status.value,
+            expiry_status=ExpiryStatus(summary.expiry.reading.status.value),
             days_left=summary.expiry.reading.days_left,
             expiry_editable=summary.expiry.editable,
         )

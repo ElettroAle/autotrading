@@ -14,6 +14,8 @@ export const alertSchema = z.object({
     'flow_paused',
     'unattributable_position',
     'unattributable_fill',
+    'key_expiring',
+    'key_expired',
   ]),
   title: z.string(),
   severity: z.enum(['critical', 'warning']),

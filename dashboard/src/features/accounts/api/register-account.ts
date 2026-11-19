@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { readData, useApiClient } from '@/lib/api-client';
+import { dayOrNothing } from '@/utils/format-day';
 
 import { ACCOUNTS_QUERY_KEY } from './get-accounts';
 
@@ -13,6 +14,8 @@ export const accountRegistrationInputSchema = z.object({
   exchange: z.string().trim().min(1, REQUIRED),
   // The fields the chosen exchange declares: the API tells which one is missing, by its label (R2.3.9).
   credentials: z.record(z.string(), z.string()),
+  // The day the credentials expire, when the user knows it and the exchange does not read it (R6.2.2).
+  expires_on: z.string().optional(),
 });
 
 export type AccountRegistrationInput = z.infer<typeof accountRegistrationInputSchema>;
@@ -28,7 +31,12 @@ export const useRegisterAccount = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: AccountRegistrationInput) =>
-      readData(await api.POST('/accounts', { body: input }), registeredAccountSchema),
+      readData(
+        await api.POST('/accounts', {
+          body: { ...input, expires_on: dayOrNothing(input.expires_on) },
+        }),
+        registeredAccountSchema,
+      ),
     gcTime: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY }),
   });
