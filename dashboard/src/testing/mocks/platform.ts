@@ -447,6 +447,7 @@ const state = {
   exchangesListed: true,
   exchangeNetwork: 'test' as FakeNetwork,
   exchangeNetworkName: 'testnet',
+  exchangeReadsExpiry: true,
   apiAnswers: true,
 };
 
@@ -634,6 +635,7 @@ export const fakePlatform = {
     state.exchangesListed = true;
     state.exchangeNetwork = 'test';
     state.exchangeNetworkName = 'testnet';
+    state.exchangeReadsExpiry = true;
     state.apiAnswers = true;
     fakeReconciliation.reset();
     fakeNotificationChannels.reset();
@@ -801,6 +803,16 @@ export const fakePlatform = {
   /** The name the adapter of the exchange gives its network (R2.3.10). */
   exchangeNetworkName(): string {
     return state.exchangeNetworkName;
+  },
+
+  /** Whether the exchange reads the expiry of the credentials, as Hyperliquid does; the user gives it otherwise (R6.2.2). */
+  exchangeReadsExpiry(): boolean {
+    return state.exchangeReadsExpiry;
+  },
+
+  /** From now on the exchange does not read the expiry of the credentials: the user gives it (R6.2.2). */
+  stopReadingExpiry(): void {
+    state.exchangeReadsExpiry = false;
   },
 
   /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */

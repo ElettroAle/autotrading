@@ -190,6 +190,7 @@ export const accountHandlers = [
               network: fakePlatform.exchangeNetwork(),
               network_name: fakePlatform.exchangeNetworkName(),
               fields: CREDENTIAL_FIELDS,
+              expiry_editable: !fakePlatform.exchangeReadsExpiry(),
             })),
           )
         : problem(500, 'Internal Server Error', 'errore interno'),
@@ -217,7 +218,7 @@ export const accountHandlers = [
   http.post('*/accounts', ({ request }) =>
     withUser(request, async (user) => {
       const { fields, within } = await textFieldsWithin(request, 'credentials');
-      if (givesExpiry(fields)) {
+      if (givesExpiry(fields) && fakePlatform.exchangeReadsExpiry()) {
         return expiryRefusal();
       }
       const refusal = refusalOfRegistration(user, fields, within);
@@ -226,6 +227,8 @@ export const accountHandlers = [
       }
       const account = fakePlatform.addAccount(user.account, (fields.name ?? '').trim());
       account.publicFields = publicFieldsOf(within);
+      account.expiryEditable = !fakePlatform.exchangeReadsExpiry();
+      account.expiry = enteredExpiryOf(fields.expires_on);
       return HttpResponse.json(
         {
           id: account.id,

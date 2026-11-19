@@ -1,8 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 
 import { fakeClock } from '@/testing/mocks/clock';
 import { fakePlatform } from '@/testing/mocks/platform';
+import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
 const PROVIDER_KEYS = '/provider-keys';
@@ -101,5 +103,31 @@ describe('the expiry of the keys of the providers (R6.2.2)', () => {
 
     await waitFor(() => expect(region).toHaveTextContent('Chiave di openrouter registrata'));
     expect(expiryOf(await keyItem('openrouter'))).toHaveTextContent('scade il 15/01/2027');
+  });
+
+  it('does not ask the expiry at the registration where a gateway reads it', async () => {
+    server.use(
+      http.get('*/models', () =>
+        HttpResponse.json({
+          providers: [
+            {
+              name: 'openrouter',
+              key_registered: false,
+              key_fields: [{ name: 'api_key', label: 'Chiave API', secret: true }],
+              expiry_editable: false,
+            },
+          ],
+          models: [],
+        }),
+      ),
+    );
+    await renderApp({ account: 'anna', url: PROVIDER_KEYS });
+    const region = await screen.findByRole('region', { name: 'Nuova chiave' });
+    await within(region).findByRole('option', { name: 'openrouter' });
+
+    await userEvent.selectOptions(within(region).getByLabelText('Fornitore'), 'openrouter');
+
+    expect(within(region).getByLabelText('Chiave API')).toBeVisible();
+    expect(within(region).queryByLabelText('Scadenza')).not.toBeInTheDocument();
   });
 });

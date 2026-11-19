@@ -100,21 +100,35 @@ describe('the expiry of the credentials of the accounts (R6.2.2)', () => {
     expect(account.expiry).toEqual({ expiresOn: '2027-03-15', source: 'entered' });
   });
 
-  it('tells the exchange reads the expiry when the user gives one at the registration', async () => {
-    fakePlatform.addUser('anna', { hasUserRole: true });
-    await renderApp({ account: 'anna', url: ACCOUNTS });
-    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+  const fillRegistration = async (region: HTMLElement) => {
     await within(region).findByRole('option', { name: 'Hyperliquid' });
-
     await userEvent.type(within(region).getByLabelText('Nome'), 'secondo');
     await userEvent.selectOptions(within(region).getByLabelText('Exchange'), 'Hyperliquid');
     await userEvent.type(within(region).getByLabelText('Indirizzo del conto'), '0xb2');
     await userEvent.type(within(region).getByLabelText("Chiave dell'API wallet"), '0xchiave');
+  };
+
+  it('does not ask the expiry at the registration where the exchange reads it', async () => {
+    fakePlatform.addUser('anna', { hasUserRole: true });
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    await fillRegistration(region);
+
+    expect(within(region).queryByLabelText('Scadenza')).not.toBeInTheDocument();
+  });
+
+  it('registers an account with the expiry where the exchange does not read it', async () => {
+    fakePlatform.addUser('anna', { hasUserRole: true });
+    fakePlatform.stopReadingExpiry();
+    await renderApp({ account: 'anna', url: ACCOUNTS });
+    const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+
+    await fillRegistration(region);
     await userEvent.type(within(region).getByLabelText('Scadenza'), '2027-03-15');
     await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
 
-    expect(await within(region).findByRole('alert')).toHaveTextContent(
-      "la scadenza di queste credenziali la legge l'exchange",
-    );
+    const item = await screen.findByRole('article', { name: 'secondo' });
+    expect(expiryIn(item)).toHaveTextContent('scade il 15/03/2027');
   });
 });

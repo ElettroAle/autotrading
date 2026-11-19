@@ -220,8 +220,10 @@ def test_the_catalog_says_for_each_provider_whether_the_tenant_has_its_key(keys:
 
     assert listing.models == CATALOG.models
     assert listing.providers == (
-        ProviderListing(ProviderName("anthropic"), key_registered=False, key_fields=(API_KEY_FIELD,)),
-        ProviderListing(OPENROUTER, key_registered=True, key_fields=(API_KEY_FIELD,)),
+        ProviderListing(
+            ProviderName("anthropic"), key_registered=False, key_fields=(API_KEY_FIELD,), expiry_editable=True
+        ),
+        ProviderListing(OPENROUTER, key_registered=True, key_fields=(API_KEY_FIELD,), expiry_editable=True),
     )
 
 
@@ -271,3 +273,15 @@ def test_a_date_is_refused_for_a_provider_whose_gateway_reads_the_expiry(keys: K
     assert keys.store.keys == []
     keys.register("openrouter", "K-OR")
     assert not keys.listed()[0].expiry_editable
+
+
+def test_the_catalog_says_for_each_provider_whether_the_user_gives_the_expiry_of_its_key(keys: Keys) -> None:
+    """R6.2.2: the registration asks the expiry only where no gateway reads it."""
+    catalog = InMemoryModelCatalogAdapter(CATALOG, reading_expiry=frozenset({"anthropic"}))
+
+    listing = ListModelsUseCase({"models": catalog}, keys.repository).execute()
+
+    assert [(listed.provider.value, listed.expiry_editable) for listed in listing.providers] == [
+        ("anthropic", False),
+        ("openrouter", True),
+    ]

@@ -2139,6 +2139,8 @@ export interface components {
             network_name: string;
             /** Fields */
             fields: components["schemas"]["CredentialFieldResponse"][];
+            /** Expiry Editable */
+            expiry_editable: boolean;
         };
         /**
          * ExpirySource
@@ -3330,6 +3332,8 @@ export interface components {
             key_registered: boolean;
             /** Key Fields */
             key_fields: components["schemas"]["ProviderKeyFieldResponse"][];
+            /** Expiry Editable */
+            expiry_editable: boolean;
         };
         /**
          * ReconciliationAlarmResponse

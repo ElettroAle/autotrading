@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from autotrading.application.agent.model_gateways import ModelCatalogs, joined_catalog
 from autotrading.application.agent.ports import ProviderKeyRepositoryPort
+from autotrading.application.agent.provider_keys import expiry_editable
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.provider_key_field import ProviderKeyField
 from autotrading.domain.agent.provider_name import ProviderName
@@ -12,6 +13,8 @@ class ProviderListing:
     provider: ProviderName
     key_registered: bool
     key_fields: tuple[ProviderKeyField, ...]
+    # The user gives the expiry of the key only where no gateway reads it (R6.2.2).
+    expiry_editable: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +25,7 @@ class ModelListing:
 
 class ListModelsUseCase:
     """The catalog of the models, with the providers the tenant can already use (R1.4.2) and the fields of the key each
-    one asks (R2.3.9)."""
+    one asks (R2.3.9), and whether the user gives the expiry of the key (R6.2.2)."""
 
     def __init__(self, catalogs: ModelCatalogs, keys: ProviderKeyRepositoryPort) -> None:
         self._catalogs = catalogs
@@ -32,7 +35,12 @@ class ListModelsUseCase:
         catalog = joined_catalog(self._catalogs)
         registered = {key.provider for key in self._keys.list()}
         providers = tuple(
-            ProviderListing(provider, provider in registered, catalog.key_fields_of(provider))
+            ProviderListing(
+                provider,
+                provider in registered,
+                catalog.key_fields_of(provider),
+                expiry_editable=expiry_editable(self._catalogs, provider),
+            )
             for provider in catalog.providers
         )
         return ModelListing(catalog.models, providers)

@@ -146,8 +146,12 @@ def test_the_catalog_shows_models_parameters_and_the_providers_with_a_key(client
     catalog = anna.get("/models").json()
 
     api_key = [{"name": "api_key", "label": "Chiave API", "secret": True}]
-    assert {"name": "openrouter", "key_registered": True, "key_fields": api_key} in catalog["providers"]
-    assert {"name": "anthropic", "key_registered": False, "key_fields": api_key} in catalog["providers"]
+    assert {"name": "openrouter", "key_registered": True, "key_fields": api_key, "expiry_editable": True} in catalog[
+        "providers"
+    ]
+    assert {"name": "anthropic", "key_registered": False, "key_fields": api_key, "expiry_editable": True} in catalog[
+        "providers"
+    ]
     (sonnet,) = [model for model in catalog["models"] if model["name"] == "anthropic/claude-sonnet-5-5"]
     assert sonnet["provider"] == "anthropic"
     assert sonnet["parameters"] == [

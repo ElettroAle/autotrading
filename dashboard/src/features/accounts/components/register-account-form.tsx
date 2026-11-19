@@ -110,13 +110,15 @@ export const RegisterAccountForm = () => {
           registerField={(name) => register(`credentials.${name}`)}
           reasonOf={(name) => errors.credentials?.[name]?.message}
         />
-        {/* Optional: the API refuses it where the exchange reads the expiry itself (R6.2.2). */}
-        <InputField
-          label="Scadenza"
-          type="date"
-          error={errors.expires_on}
-          {...register('expires_on')}
-        />
+        {/* Only where the exchange does not read the expiry of the credentials, as the API says (R6.2.2). */}
+        {exchange?.expiry_editable === true && (
+          <InputField
+            label="Scadenza"
+            type="date"
+            error={errors.expires_on}
+            {...register('expires_on')}
+          />
+        )}
         <CommandButton
           tone="primary"
           type="submit"

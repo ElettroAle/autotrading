@@ -48,8 +48,8 @@ export const RegisterProviderKeyForm = () => {
     shouldUnregister: true,
   });
   const chosenProvider = useWatch({ control, name: 'provider' });
-  const fields =
-    providers.data?.find((provider) => provider.name === chosenProvider)?.key_fields ?? [];
+  const chosen = providers.data?.find((provider) => provider.name === chosenProvider);
+  const fields = chosen?.key_fields ?? [];
 
   const onSubmit = handleSubmit((input) => {
     setRegistered(null);
@@ -98,13 +98,15 @@ export const RegisterProviderKeyForm = () => {
           registerField={(name) => register(`key.${name}`)}
           reasonOf={(name) => errors.key?.[name]?.message}
         />
-        {/* Optional: the API refuses it where the provider reads the expiry itself (R6.2.2). */}
-        <InputField
-          label="Scadenza"
-          type="date"
-          error={errors.expires_on}
-          {...register('expires_on')}
-        />
+        {/* Only where no gateway reads the expiry of the keys of the provider, as the API says (R6.2.2). */}
+        {chosen?.expiry_editable === true && (
+          <InputField
+            label="Scadenza"
+            type="date"
+            error={errors.expires_on}
+            {...register('expires_on')}
+          />
+        )}
         <button
           type="submit"
           disabled={registration.isPending || !providers.isSuccess}

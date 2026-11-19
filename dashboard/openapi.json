@@ -7409,6 +7409,10 @@
             },
             "type": "array",
             "title": "Fields"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
           }
         },
         "type": "object",
@@ -7416,7 +7420,8 @@
           "name",
           "network",
           "network_name",
-          "fields"
+          "fields",
+          "expiry_editable"
         ],
         "title": "ExchangeResponse"
       },
@@ -10783,13 +10788,18 @@
             },
             "type": "array",
             "title": "Key Fields"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
           }
         },
         "type": "object",
         "required": [
           "name",
           "key_registered",
-          "key_fields"
+          "key_fields",
+          "expiry_editable"
         ],
         "title": "ProviderResponse"
       },
