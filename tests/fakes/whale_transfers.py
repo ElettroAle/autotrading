@@ -27,12 +27,14 @@ class TransfersAsked:
 @dataclass
 class FakeWhaleTransfersAdapter:
     """A provider that answers, as the real one, the transfers the test publishes within the window and at or above the
-    threshold asked; it may be out of reach, or refuse the credentials."""
+    threshold asked; it may be out of reach, refuse the credentials, or ignore the threshold and answer every
+    transfer of the window."""
 
     name: str
     published: list[WhaleTransfer] = field(default_factory=list)
     reachable: bool = True
     rejects_credentials: bool = False
+    ignores_threshold: bool = False
     asked: list[TransfersAsked] = field(default_factory=list)
 
     def declaration(self) -> SourceAdapterDeclaration:
@@ -51,5 +53,5 @@ class FakeWhaleTransfersAdapter:
         return [
             transfer
             for transfer in self.published
-            if since <= transfer.at <= until and transfer.usd_value >= minimum_usd
+            if since <= transfer.at <= until and (self.ignores_threshold or transfer.usd_value >= minimum_usd)
         ]

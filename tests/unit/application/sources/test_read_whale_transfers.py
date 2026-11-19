@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -69,21 +68,10 @@ def test_a_transfer_with_both_ends_unknown_has_no_description() -> None:
 
 
 def test_a_transfer_below_the_threshold_the_provider_answered_stays_out() -> None:
-    class LenientProvider(FakeWhaleTransfersAdapter):
-        """Answers every transfer of the window, whatever the threshold asked."""
-
-        def transfers(
-            self,
-            since: datetime,  # noqa: ARG002 - answers every transfer, whatever the window and the threshold asked
-            until: datetime,  # noqa: ARG002
-            minimum_usd: int,  # noqa: ARG002
-            credentials: Mapping[str, str],  # noqa: ARG002
-        ) -> list[WhaleTransfer]:
-            return list(self.published)
-
     small = WhaleTransfer(NOW - timedelta(minutes=1), "BTC", Decimal(1), Decimal(90000), None, None)
+    lenient = FakeWhaleTransfersAdapter("Balene", published=[small], ignores_threshold=True)
 
-    assert ReadWhaleTransfersUseCase(LenientProvider("Balene", published=[small]), 60).execute(request()) == ()
+    assert ReadWhaleTransfersUseCase(lenient, 60).execute(request()) == ()
 
 
 def test_no_large_transfer_reads_no_value() -> None:
