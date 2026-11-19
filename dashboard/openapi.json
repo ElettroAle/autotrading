@@ -279,6 +279,58 @@
         }
       }
     },
+    "/accounts/{account_id}/expiry": {
+      "put": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Set Key Expiry",
+        "description": "The day the user says the credentials stop working, only when the exchange does not read it (R6.2.2).",
+        "operationId": "set_key_expiry_accounts__account_id__expiry_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyExpiryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/accounts/{account_id}/state": {
       "get": {
         "tags": [
@@ -1190,7 +1242,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/ProviderKeyResponse"
+                    "$ref": "#/components/schemas/ProviderKeySummaryResponse"
                   },
                   "type": "array",
                   "title": "Response List Provider Keys Provider Keys Get"
@@ -1328,6 +1380,57 @@
             }
           }
         ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provider-keys/{provider}/expiry": {
+      "put": {
+        "tags": [
+          "chiavi dei fornitori IA"
+        ],
+        "summary": "Set Key Expiry",
+        "description": "The day the user says the key stops working, only when no gateway reads it (R6.2.2).",
+        "operationId": "set_key_expiry_provider_keys__provider__expiry_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyExpiryRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -5518,6 +5621,18 @@
             },
             "type": "object",
             "title": "Credentials"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
           }
         },
         "type": "object",
@@ -5629,6 +5744,34 @@
           "currency": {
             "type": "string",
             "title": "Currency"
+          },
+          "expiry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyExpiryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiry_status": {
+            "$ref": "#/components/schemas/ExpiryStatus"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
           }
         },
         "type": "object",
@@ -5641,10 +5784,14 @@
           "network",
           "network_name",
           "allocated_capital",
-          "currency"
+          "currency",
+          "expiry",
+          "expiry_status",
+          "days_left",
+          "expiry_editable"
         ],
         "title": "AccountSummaryResponse",
-        "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state."
+        "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state\n(`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it\n(R6.2.2)."
       },
       "AlertDetailResponse": {
         "properties": {
@@ -5723,7 +5870,9 @@
           "reconciliation_alarm",
           "flow_paused",
           "unattributable_position",
-          "unattributable_fill"
+          "unattributable_fill",
+          "key_expiring",
+          "key_expired"
         ],
         "title": "AlertKind",
         "description": "A fact that asks the user to act, with its severity and how it resolves (R6.2.3, ADR\navvisi-nel-contesto-delle-notifiche): only a kind without a resolution of its own is resolved by hand."
@@ -6600,6 +6749,18 @@
             },
             "type": "object",
             "title": "Credentials"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
           }
         },
         "type": "object",
@@ -7248,6 +7409,10 @@
             },
             "type": "array",
             "title": "Fields"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
           }
         },
         "type": "object",
@@ -7255,9 +7420,30 @@
           "name",
           "network",
           "network_name",
-          "fields"
+          "fields",
+          "expiry_editable"
         ],
         "title": "ExchangeResponse"
+      },
+      "ExpirySource": {
+        "type": "string",
+        "enum": [
+          "read",
+          "entered"
+        ],
+        "title": "ExpirySource",
+        "description": "Who gave the day a key stops working, the same names for every key (R6.2.2)."
+      },
+      "ExpiryStatus": {
+        "type": "string",
+        "enum": [
+          "unknown",
+          "valid",
+          "expiring",
+          "expired"
+        ],
+        "title": "ExpiryStatus",
+        "description": "The state of the expiry of a key as of today, the same names for every key (R6.2.2)."
       },
       "FailureResponse": {
         "properties": {
@@ -9451,6 +9637,44 @@
         "title": "InboxTargetResponse",
         "description": "A page the notification leads to, by what finds it: the flow and, for a position, its asset and the instant it\nclosed; or the alert it opened. The dashboard builds the address (ADR notifiche-nell-app-salvate-per-tenant)."
       },
+      "KeyExpiryRequest": {
+        "properties": {
+          "expires_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
+          }
+        },
+        "type": "object",
+        "title": "KeyExpiryRequest",
+        "description": "The day the user says a key stops working; none forgets it (R6.2.2)."
+      },
+      "KeyExpiryResponse": {
+        "properties": {
+          "expires_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Expires On"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExpirySource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expires_on",
+          "source"
+        ],
+        "title": "KeyExpiryResponse",
+        "description": "The day a key stops working, in UTC, and who gave it: `read` by the adapter, `entered` by the user (R6.2.2)."
+      },
       "LastCycleResponse": {
         "properties": {
           "planned_at": {
@@ -9890,7 +10114,8 @@
           "esecuzione non attribuibile",
           "allarme di riconciliazione",
           "incasso eseguito",
-          "chiusura di emergenza eseguita"
+          "chiusura di emergenza eseguita",
+          "scadenza di una chiave"
         ],
         "title": "NotificationEvent",
         "description": "The types of event told to the user, by the name the user chooses their channels by (R1.8.2, R3.5.1, R3.5.3).\n\nAn event belongs to a flow, or to the account when no single flow explains it."
@@ -10435,6 +10660,18 @@
             },
             "type": "object",
             "title": "Key"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
           }
         },
         "type": "object",
@@ -10448,6 +10685,18 @@
             },
             "type": "object",
             "title": "Key"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
           }
         },
         "type": "object",
@@ -10472,6 +10721,57 @@
         "title": "ProviderKeyResponse",
         "description": "A registered key as its owner reads it: the provider and when it was saved, never the key (R1.4.1, ADR 0130)."
       },
+      "ProviderKeySummaryResponse": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "registered_at": {
+            "type": "string",
+            "title": "Registered At"
+          },
+          "expiry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyExpiryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiry_status": {
+            "$ref": "#/components/schemas/ExpiryStatus"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "registered_at",
+          "expiry",
+          "expiry_status",
+          "days_left",
+          "expiry_editable"
+        ],
+        "title": "ProviderKeySummaryResponse",
+        "description": "A key on the page of the keys: the expiry as of today, with its state (`unknown`, `valid`, `expiring` within 30\ndays, `expired`) and the days left, and whether the user may give it (R6.2.2)."
+      },
       "ProviderResponse": {
         "properties": {
           "name": {
@@ -10488,13 +10788,18 @@
             },
             "type": "array",
             "title": "Key Fields"
+          },
+          "expiry_editable": {
+            "type": "boolean",
+            "title": "Expiry Editable"
           }
         },
         "type": "object",
         "required": [
           "name",
           "key_registered",
-          "key_fields"
+          "key_fields",
+          "expiry_editable"
         ],
         "title": "ProviderResponse"
       },

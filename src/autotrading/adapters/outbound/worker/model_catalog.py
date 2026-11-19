@@ -77,6 +77,10 @@ class WorkerModelCatalogAdapter:
     def __repr__(self) -> str:
         return "WorkerModelCatalogAdapter()"
 
+    def reads_key_expiry(self, provider: ProviderName) -> bool:  # noqa: ARG002 - the signature of the port
+        """The catalog of the worker reads no expiry of the keys, as the library it describes (R6.2.2)."""
+        return False
+
     def catalog(self) -> ModelCatalog:
         now = self._clock()
         if self._read is not None and now - self._read[0] < REFRESH_SECONDS:

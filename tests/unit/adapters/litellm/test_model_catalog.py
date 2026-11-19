@@ -228,3 +228,8 @@ def test_a_provider_whose_library_requires_nothing_asks_the_key_alone() -> None:
     assert LiteLlmModelCatalogAdapter(library, PROVIDERS).catalog().key_fields_of(ProviderName("openai")) == (
         API_KEY_FIELD,
     )
+
+
+def test_no_provider_behind_the_library_tells_until_when_its_keys_work() -> None:
+    """R6.2.2: the user gives the date of every key."""
+    assert not catalog_of().reads_key_expiry(ProviderName("anthropic"))

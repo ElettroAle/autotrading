@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import date
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -9,6 +10,7 @@ from autotrading.adapters.inbound.api.accounts import CredentialsReplacementRequ
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.accounts.position import Position, PositionSide
 from tests.fakes.exchange import READ_AT, REDACTED_REJECTION
 from tests.support.credentials import hyperliquid_credentials
@@ -80,6 +82,10 @@ def test_the_list_shows_the_accounts_of_the_tenant(
             "allocated_capital": "0",
             "currency": "USDC",
             "public_fields": {"account_address": credentials.value("account_address")},
+            "expiry": None,
+            "expiry_status": "unknown",
+            "days_left": None,
+            "expiry_editable": True,
         }
     ]
 
@@ -324,3 +330,64 @@ def test_a_removed_name_can_be_registered_again(client_of: Client, account_id: s
     )
 
     assert response.status_code == 201
+
+
+def test_the_user_gives_the_expiry_the_exchange_does_not_read_and_the_list_shows_its_state(
+    client_of: Client, account_id: str
+) -> None:
+    anna = client_of("anna")
+
+    response = anna.put(f"/accounts/{account_id}/expiry", json={"expires_on": "2026-12-08"})
+    [listed] = anna.get("/accounts").json()
+    details = anna.get(f"/accounts/{account_id}").json()
+
+    assert response.status_code == 204
+    assert (listed["expiry"], listed["expiry_status"], listed["days_left"], listed["expiry_editable"]) == (
+        {"expires_on": "2026-12-08", "source": "entered"},
+        "expiring",
+        28,
+        True,
+    )
+    assert details["expiry"] == listed["expiry"]
+
+
+def test_the_expiry_the_exchange_reads_is_shown_and_cannot_be_given(
+    client_of: Client, platform: Platform, account_id: str
+) -> None:
+    platform.hyperliquid.reads_expiry = True
+    account = platform.account_named("anna", "test-1")
+    platform.accounts.accounts[:] = [account.with_expiry(KeyExpiry.read(date(2026, 11, 9)))]
+    anna = client_of("anna")
+
+    response = anna.put(f"/accounts/{account_id}/expiry", json={"expires_on": "2026-12-08"})
+    [listed] = anna.get("/accounts").json()
+
+    assert (response.status_code, reason_of(response)) == (
+        409,
+        {"detail": "la scadenza di queste credenziali la legge l'exchange"},
+    )
+    assert (listed["expiry"], listed["expiry_status"], listed["days_left"], listed["expiry_editable"]) == (
+        {"expires_on": "2026-11-09", "source": "read"},
+        "expired",
+        -1,
+        False,
+    )
+
+
+def test_the_expiry_of_an_account_of_another_tenant_is_not_found(client_of: Client, account_id: str) -> None:
+    response = client_of("bruno").put(f"/accounts/{account_id}/expiry", json={"expires_on": "2026-12-08"})
+
+    assert response.status_code == 404
+
+
+def test_the_replacement_carries_the_expiry_given_with_the_new_credentials(
+    client_of: Client, platform: Platform, account_id: str, credentials: Credentials
+) -> None:
+    anna = client_of("anna")
+
+    response = anna.put(
+        f"/accounts/{account_id}/credentials", json={**rotated(platform, credentials), "expires_on": "2027-03-15"}
+    )
+
+    assert response.status_code == 200
+    assert anna.get(f"/accounts/{account_id}").json()["expiry"] == {"expires_on": "2027-03-15", "source": "entered"}

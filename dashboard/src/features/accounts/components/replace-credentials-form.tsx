@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 
 import { CommandButton } from '@/components/ui/command-button';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
-import { FormAlert } from '@/components/ui/form/input-field';
+import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -16,7 +16,7 @@ import {
 
 import { PublicFields } from './public-fields';
 
-const EMPTY_FORM: CredentialsInput = { credentials: {} };
+const EMPTY_FORM: CredentialsInput = { credentials: {}, expires_on: '' };
 
 type ReplaceCredentialsFormProps = {
   readonly account: Account;
@@ -50,9 +50,9 @@ export const ReplaceCredentialsForm = ({
     defaultValues: EMPTY_FORM,
   });
 
-  const onSubmit = handleSubmit(({ credentials }) => {
+  const onSubmit = handleSubmit(({ credentials, expires_on }) => {
     replacement.mutate(
-      { accountId: account.id, credentials },
+      { accountId: account.id, credentials, expires_on },
       {
         onSuccess: onReplaced,
         onError: (error) => {
@@ -82,6 +82,15 @@ export const ReplaceCredentialsForm = ({
         registerField={(name) => register(`credentials.${name}`)}
         reasonOf={(name) => errors.credentials?.[name]?.message}
       />
+      {/* Only where the exchange does not read the expiry of the credentials (R6.2.2). */}
+      {account.expiry_editable && (
+        <InputField
+          label="Scadenza"
+          type="date"
+          error={errors.expires_on}
+          {...register('expires_on')}
+        />
+      )}
       <div className="flex gap-2">
         <CommandButton
           tone="primary"

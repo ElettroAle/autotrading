@@ -25,6 +25,7 @@ from tests.fakes.cycles import (
     FakeCycleJournalAdapter,
     FakeCycleSchedulerAdapter,
     FakeCycleStartAdapter,
+    FakeExpiredKeysAdapter,
     FakeFlow,
     FakeFlowActivityAdapter,
     FakeFlowsAdapter,
@@ -71,6 +72,7 @@ class Cycles:
         self.failure_notices = RecordedCycleFailuresAdapter()
         self.consecutive_failures = RecordedConsecutiveFailurePausesAdapter(self.failure_notices)
         self.equity = InMemoryCycleEquityAdapter()
+        self.expired_keys = FakeExpiredKeysAdapter(self.flows)
         self.scheduler = FakeCycleSchedulerAdapter()
         self.raised: AutotradingError | None = None
         self.planned = ThreadsPlannedFlowsAdapter()
@@ -90,6 +92,7 @@ class Cycles:
             self.failure_notices,
             activity,
             self.consecutive_failures,
+            self.expired_keys,
         )
 
     def graph(self) -> CycleGraph:

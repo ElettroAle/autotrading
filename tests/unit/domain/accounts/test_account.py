@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -6,6 +7,7 @@ from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
+from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
@@ -95,3 +97,22 @@ def test_an_account_takes_a_new_deviation_threshold() -> None:
 
     assert changed.deviation_threshold == DeviationThreshold(Decimal(3))
     assert changed.id == account.id
+
+
+def test_the_account_keeps_the_expiry_of_its_credentials() -> None:
+    expiry = KeyExpiry.read(date(2026, 12, 30))
+
+    assert an_account(TenantId.new()).with_expiry(expiry).expiry == expiry
+    assert an_account(TenantId.new()).expiry is None
+
+
+def test_new_credentials_forget_the_date_the_user_gave_for_the_old_ones() -> None:
+    account = an_account(TenantId.new()).with_expiry(KeyExpiry.entered(date(2026, 12, 15)))
+
+    assert account.with_credentials(SealedCredentials(1, b"new")).expiry is None
+
+
+def test_new_credentials_keep_a_date_read_by_the_exchange_until_it_is_read_again() -> None:
+    account = an_account(TenantId.new()).with_expiry(KeyExpiry.read(date(2026, 12, 30)))
+
+    assert account.with_credentials(SealedCredentials(1, b"new")).expiry == KeyExpiry.read(date(2026, 12, 30))

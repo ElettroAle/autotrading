@@ -1,5 +1,6 @@
 import secrets
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import cast
 
@@ -131,6 +132,27 @@ class HyperliquidExchangeAdapter:
         except (ServerError, requests.RequestException) as error:
             raise ExchangeUnavailableError from error
         return _account_state_of(perps, mode, spot)
+
+    def reads_credential_expiry(self) -> bool:
+        """Hyperliquid tells until when every API wallet approved by an account works (R6.2.2)."""
+        return True
+
+    def credential_expiry(self, credentials: Credentials) -> date | None:
+        """The day the API wallet of the credentials stops working, from the agents the account approved (ADR
+        scadenza-delle-chiavi-letta-o-indicata); none when the account signs for itself or the exchange lists no
+        validity for the wallet.
+        """
+        address = _address_of(credentials)
+        wallet = _wallet_of(credentials)
+        if wallet.address.lower() == address.lower():
+            return None
+        try:
+            agents = self._sdk.info(self._base_url, self._timeout).extra_agents(address)
+        except ClientError as error:
+            raise ExchangeRejectedCredentialsError(_masked(str(error.error_message), credentials)) from error
+        except (ServerError, requests.RequestException) as error:
+            raise ExchangeUnavailableError from error
+        return _validity_of(agents, wallet.address)
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         """The same reading for the verification procedure, which keeps only the reason of a failure (ADR 0024)."""
@@ -265,6 +287,19 @@ def _require_signer_of(role: object, signer: str, address: str) -> None:
 def _require_not_agent(declared: object) -> None:
     if declared == AGENT_ROLE:
         raise ExchangeRejectedCredentialsError(SIGNER_IS_AGENT_MESSAGE)
+
+
+def _validity_of(agents: object, signer: str) -> date | None:
+    """The day, in UTC, the agent of the signer is valid until: the exchange gives it in milliseconds."""
+    try:
+        entries = cast("Sequence[Mapping[str, object]]", agents)
+        valid_until = next(
+            (entry["validUntil"] for entry in entries if str(entry["address"]).lower() == signer.lower()), None
+        )
+        return None if valid_until is None else datetime.fromtimestamp(int(str(valid_until)) / 1000, UTC).date()
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        # An answer of unexpected shape is a fault of the exchange, never a reason to report an invented date.
+        raise ExchangeUnavailableError from error
 
 
 def _account_state_of(perps: object, mode: object, spot: object) -> AccountState:

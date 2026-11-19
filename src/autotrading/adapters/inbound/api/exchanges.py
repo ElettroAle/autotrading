@@ -19,6 +19,8 @@ class ExchangeResponse(BaseModel):
     network: str
     network_name: str
     fields: list[CredentialFieldResponse]
+    # False where the exchange reads the expiry of the credentials: the registration does not ask it (R6.2.2).
+    expiry_editable: bool
 
     @classmethod
     def of(cls, exchange: SupportedExchange) -> ExchangeResponse:
@@ -31,6 +33,7 @@ class ExchangeResponse(BaseModel):
             network=exchange.network.kind.value,
             network_name=exchange.network.name,
             fields=fields,
+            expiry_editable=exchange.expiry_editable,
         )
 
 

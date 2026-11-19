@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
 from autotrading.domain.notifications.errors import AlertNotResolvableByHandError, InvalidAlertError
+from autotrading.domain.notifications.expiring_key import ExpiringKey
 from autotrading.domain.notifications.notification import Amount, NotificationLine
 
 
@@ -50,6 +51,8 @@ class AlertKind(StrEnum):
     FLOW_PAUSED = "flow_paused"
     UNATTRIBUTABLE_POSITION = "unattributable_position"
     UNATTRIBUTABLE_FILL = "unattributable_fill"
+    KEY_EXPIRING = "key_expiring"
+    KEY_EXPIRED = "key_expired"
 
     @property
     def severity(self) -> AlertSeverity:
@@ -102,6 +105,9 @@ _TRAITS = {
         AlertResourceKind.ACCOUNT,
         (AlertRemedy.RESOLVE,),
     ),
+    # Resolved by the daily check when the key is renewed, its date moves or the key goes (R6.2.2).
+    AlertKind.KEY_EXPIRING: _KindTraits(AlertSeverity.WARNING, "Chiave in scadenza", AlertResourceKind.KEY, ()),
+    AlertKind.KEY_EXPIRED: _KindTraits(AlertSeverity.CRITICAL, "Chiave scaduta", AlertResourceKind.KEY, ()),
 }
 
 
@@ -163,6 +169,13 @@ class AlertCause:
     def unattributable_fill(cls, account_id: UUID, account: str, asset: str) -> AlertCause:
         values = (NotificationLine("Asset", asset),)
         return cls(AlertKind.UNATTRIBUTABLE_FILL, _account(account_id, account), values, asset)
+
+    @classmethod
+    def key_expiry(cls, key: ExpiringKey, today: date) -> AlertCause:
+        """«Attenzione» within 30 days of the expiry, «critica» from its day on (R6.2.2)."""
+        kind = AlertKind.KEY_EXPIRED if key.is_expired(today) else AlertKind.KEY_EXPIRING
+        values = (NotificationLine("Scadenza", key.expiry_text), NotificationLine("Flussi", key.flows_text))
+        return cls(kind, AlertResource(AlertResourceKind.KEY, key.key_id, key.name), values)
 
 
 @dataclass(frozen=True, slots=True)

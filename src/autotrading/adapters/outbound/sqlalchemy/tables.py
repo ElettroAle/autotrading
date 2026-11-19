@@ -3,7 +3,9 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -57,6 +59,11 @@ accounts = Table(
     Column("removed_at", DateTime(timezone=True)),
     # In percent of the expected balance, 1 unless the user sets another (R3.3.1).
     Column("deviation_threshold", Numeric, nullable=False, server_default=text("1")),
+    # The day the credentials stop working and who gave it, both empty while unknown (R6.2.2).
+    Column("expires_on", Date),
+    Column("expiry_source", Text),
+    CheckConstraint("expiry_source IN ('read', 'entered')", name="accounts_expiry_source_known"),
+    CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="accounts_expiry_complete"),
     Index(
         "accounts_name_unique_in_tenant",
         "tenant_id",
@@ -129,6 +136,11 @@ provider_keys = Table(
     Column("ciphertext", LargeBinary, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # The day the key stops working and who gave it, both empty while unknown (R6.2.2).
+    Column("expires_on", Date),
+    Column("expiry_source", Text),
+    CheckConstraint("expiry_source IN ('read', 'entered')", name="provider_keys_expiry_source_known"),
+    CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="provider_keys_expiry_complete"),
 )
 
 # A flow keeps its name unique among the flows of the tenant not archived (R1.1.1, ADR 0031).
@@ -590,6 +602,19 @@ alerts = Table(
         "alerts_open_cause_unique", "tenant_id", "cause_key", unique=True, postgresql_where=text("resolved_at IS NULL")
     ),
     Index("alerts_newest", "tenant_id", text("opened_at DESC"), text("id DESC")),
+)
+
+# The thresholds told for each expiry of a key, once each: a new date of the key is told again (R6.2.2).
+key_expiry_notices = Table(
+    "key_expiry_notices",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("key_kind", Text, primary_key=True),
+    Column("key_id", Uuid, primary_key=True),
+    Column("expires_on", Date, primary_key=True),
+    Column("threshold", Integer, primary_key=True),
+    Column("notified_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("key_kind IN ('account', 'provider')", name="key_expiry_notices_kind_known"),
 )
 
 inbox_notifications = Table(

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -16,9 +16,10 @@ from autotrading.domain.notifications.alert import (
     AlertState,
 )
 from autotrading.domain.notifications.errors import AlertNotResolvableByHandError, InvalidAlertError
+from autotrading.domain.notifications.expiring_key import ExpiringKey, KeyKind
 from autotrading.domain.notifications.notification import Amount, NotificationLine
 
-ACCOUNT_ID, FLOW_ID = uuid4(), uuid4()
+ACCOUNT_ID, FLOW_ID, KEY_ID = uuid4(), uuid4(), uuid4()
 OPENED_AT = datetime(2026, 11, 18, 9, 0, tzinfo=UTC)
 RESOLVED_AT = datetime(2026, 11, 18, 10, 0, tzinfo=UTC)
 
@@ -85,10 +86,10 @@ def test_a_resource_without_a_name_does_not_exist() -> None:
 
 def test_the_kinds_of_a_severity_are_those_that_declare_it() -> None:
     assert AlertKind.of_severity(AlertSeverity.CRITICAL) == frozenset(
-        {AlertKind.RECONCILIATION_ALARM, AlertKind.FLOW_PAUSED}
+        {AlertKind.RECONCILIATION_ALARM, AlertKind.FLOW_PAUSED, AlertKind.KEY_EXPIRED}
     )
     assert AlertKind.of_severity(AlertSeverity.WARNING) == frozenset(
-        {AlertKind.UNATTRIBUTABLE_POSITION, AlertKind.UNATTRIBUTABLE_FILL}
+        {AlertKind.UNATTRIBUTABLE_POSITION, AlertKind.UNATTRIBUTABLE_FILL, AlertKind.KEY_EXPIRING}
     )
 
 
@@ -98,6 +99,8 @@ def test_every_kind_has_a_heading() -> None:
         "Flusso in pausa automatica",
         "Posizione su un asset di nessun flusso",
         "Esecuzione senza identificativo della piattaforma",
+        "Chiave in scadenza",
+        "Chiave scaduta",
     ]
 
 
@@ -142,3 +145,17 @@ def test_an_alert_id_is_new_every_time() -> None:
     first, second = AlertId.new(), AlertId.new()
 
     assert first != second
+
+
+def test_a_key_within_30_days_of_its_expiry_asks_attention_and_an_expired_one_is_critical() -> None:
+    key = ExpiringKey(KeyKind.PROVIDER, KEY_ID, "openrouter", date(2026, 12, 15), ("alfa", "beta"))
+
+    expiring = AlertCause.key_expiry(key, date(2026, 11, 25))
+    expired = AlertCause.key_expiry(key, date(2026, 12, 15))
+
+    assert (expiring.kind, expiring.kind.severity) == (AlertKind.KEY_EXPIRING, AlertSeverity.WARNING)
+    assert (expired.kind, expired.kind.severity) == (AlertKind.KEY_EXPIRED, AlertSeverity.CRITICAL)
+    assert expiring.resource == AlertResource(AlertResourceKind.KEY, KEY_ID, "openrouter")
+    assert expiring.values == (NotificationLine("Scadenza", "15/12/2026"), NotificationLine("Flussi", "alfa, beta"))
+    assert alert_of(expired).commands == ()
+    assert expiring.key != expired.key

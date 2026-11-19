@@ -88,3 +88,13 @@ class WorkerUnavailableError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("servizio di esecuzione non raggiungibile, riprovare")
+
+
+class KeyExpiryReadByAdapterError(ApplicationError):
+    """The exchange of the account gives the expiry of its credentials, read at every check: the user cannot give
+    another one (R6.2.2, ADR scadenza-delle-chiavi-letta-o-indicata)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("la scadenza di queste credenziali la legge l'exchange")

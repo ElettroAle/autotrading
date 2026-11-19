@@ -169,3 +169,10 @@ def test_the_request_representation_never_shows_the_credentials() -> None:
 
     assert "0xaddr" not in shown
     assert "0xsk" not in shown
+
+
+def test_the_registration_keeps_the_expiry_the_user_gives(client: TestClient, platform: Platform) -> None:
+    response = register(client, **accepted_body(platform), expires_on="2026-12-15")
+
+    assert response.status_code == 201
+    assert client.get("/accounts").json()[0]["expiry"] == {"expires_on": "2026-12-15", "source": "entered"}

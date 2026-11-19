@@ -11,6 +11,8 @@ const providerSchema = z.object({
   name: z.string(),
   key_registered: z.boolean(),
   key_fields: z.array(keyFieldSchema),
+  // False where a gateway reads the expiry of the keys of the provider (R6.2.2).
+  expiry_editable: z.boolean(),
 });
 
 /**

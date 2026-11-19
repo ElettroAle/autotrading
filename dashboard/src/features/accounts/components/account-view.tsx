@@ -6,6 +6,7 @@ import { NetworkBadge } from '@/components/ui/network-notice';
 
 import { useAccounts } from '../api/get-accounts';
 
+import { ExpiringCredentialsNotice } from './credentials-expiry';
 import { ReconciliationState } from './reconciliation-state';
 
 type AccountViewProps = {
@@ -33,6 +34,7 @@ export const AccountView = ({ accountId, children }: AccountViewProps) => {
   }
   return (
     <>
+      <ExpiringCredentialsNotice accounts={[account]} />
       <section
         aria-label={account.name}
         className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded border border-slate-200 bg-white p-4"

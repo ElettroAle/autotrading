@@ -514,6 +514,8 @@ export const handlers = [
           name: provider,
           key_registered: user.providerKeys.some((key) => key.provider === provider),
           key_fields: [API_KEY_FIELD],
+          // No gateway of the fake catalog reads the expiry of its keys (R6.2.2).
+          expiry_editable: true,
         })),
         models: FAKE_MODELS,
       }),

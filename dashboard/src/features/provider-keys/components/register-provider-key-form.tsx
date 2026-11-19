@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
-import { FormAlert } from '@/components/ui/form/input-field';
+import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -14,9 +14,9 @@ import {
   type ProviderKeyInput,
 } from '../api/register-provider-key';
 
-const FIELDS = ['provider'] as const;
+const FIELDS = ['provider', 'expires_on'] as const;
 
-const EMPTY_FORM: ProviderKeyInput = { provider: '', key: {} };
+const EMPTY_FORM: ProviderKeyInput = { provider: '', key: {}, expires_on: '' };
 
 // A provider whose key is registered is not chosen here: its key is replaced from the list (R2.3.2).
 const optionOf = ({ name, key_registered }: ModelProvider): SelectOption =>
@@ -48,8 +48,8 @@ export const RegisterProviderKeyForm = () => {
     shouldUnregister: true,
   });
   const chosenProvider = useWatch({ control, name: 'provider' });
-  const fields =
-    providers.data?.find((provider) => provider.name === chosenProvider)?.key_fields ?? [];
+  const chosen = providers.data?.find((provider) => provider.name === chosenProvider);
+  const fields = chosen?.key_fields ?? [];
 
   const onSubmit = handleSubmit((input) => {
     setRegistered(null);
@@ -98,6 +98,15 @@ export const RegisterProviderKeyForm = () => {
           registerField={(name) => register(`key.${name}`)}
           reasonOf={(name) => errors.key?.[name]?.message}
         />
+        {/* Only where no gateway reads the expiry of the keys of the provider, as the API says (R6.2.2). */}
+        {chosen?.expiry_editable === true && (
+          <InputField
+            label="Scadenza"
+            type="date"
+            error={errors.expires_on}
+            {...register('expires_on')}
+          />
+        )}
         <button
           type="submit"
           disabled={registration.isPending || !providers.isSuccess}

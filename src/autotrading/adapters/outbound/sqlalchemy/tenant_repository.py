@@ -20,6 +20,14 @@ class SqlAlchemyTenantRepositoryAdapter:
             return None
         return Tenant(TenantId(tenant_id), user_id)
 
+    def tenant_ids(self) -> tuple[TenantId, ...]:
+        """Every tenant, for the daily check of the expiries of their keys (R6.2.2): the tenants have no row level
+        security, as the resolution of the tenant reads them before one is known."""
+        with self._engine.connect() as connection:
+            return tuple(
+                TenantId(row) for row in connection.execute(select(tenants.c.id).order_by(tenants.c.id)).scalars()
+            )
+
     def add(self, tenant: Tenant) -> None:
         try:
             with self._engine.begin() as connection:

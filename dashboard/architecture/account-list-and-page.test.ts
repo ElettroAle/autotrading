@@ -29,7 +29,8 @@ const read = (paths: readonly string[]): SourceFile[] =>
 const importsOf = (source: string): string[] =>
   [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1] ?? '');
 
-// What the element of the list may show of the account: its link, its network and state, its two amounts, its menu.
+// What the element of the list may show of the account: its link, its network and state, its two amounts, its menu,
+// and the expiry of its credentials (ADR-scadenza-nelle-pagine-chiavi-e-conti).
 const ITEM_PARTS = [
   'react',
   'react-router',
@@ -39,6 +40,7 @@ const ITEM_PARTS = [
   '../api/get-accounts',
   './account-actions',
   './account-amounts',
+  './credentials-expiry',
   './detail',
   './reconciliation-state',
 ];

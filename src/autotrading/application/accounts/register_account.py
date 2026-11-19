@@ -1,9 +1,15 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import date
 
 from autotrading.application.accounts.errors import AccountNameInUseError
 from autotrading.application.accounts.ports import AccountRepositoryPort, CredentialSealerPort, ExchangePort
-from autotrading.application.accounts.verification import operations, read_state_proving, supported_exchange
+from autotrading.application.accounts.verification import (
+    expiry_at_check,
+    operations,
+    read_state_proving,
+    supported_exchange,
+)
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
@@ -19,6 +25,8 @@ class RegisterAccountCommand:
     name: str
     exchange: str
     credentials: Mapping[str, str] = field(repr=False)
+    # The day the credentials stop working, given only for an exchange that does not read it (R6.2.2).
+    expires_on: date | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,7 +36,9 @@ class AccountRegistration:
 
 
 class RegisterAccountUseCase:
-    """Saves an account in the tenant after the exchange has accepted its credentials (R0.2.1)."""
+    """Saves an account in the tenant after the exchange has accepted its credentials (R0.2.1), with the expiry the
+    exchange reads for them or the one the user gave (R6.2.2).
+    """
 
     def __init__(
         self,
@@ -50,7 +60,9 @@ class RegisterAccountUseCase:
         credentials = Credentials.declared(fields, command.credentials)
         self._require_free(name)
         balance = read_state_proving(exchange, credentials).balance
+        expiry = expiry_at_check(exchange, credentials, command.expires_on)
         account = self._sealed_account(name, exchange_name, credentials, ExchangeAccount.of(credentials, fields))
+        account = account.with_expiry(expiry)
         self._accounts.add(account)
         operations.info("conto registrato", extra={"account_id": str(account.id.value)})
         return AccountRegistration(account, balance)

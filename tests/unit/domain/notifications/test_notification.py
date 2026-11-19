@@ -2,7 +2,7 @@
 per line (R1.8.2, R3.5.1, R3.5.4).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -10,6 +10,7 @@ import pytest
 
 from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.notifications.errors import InvalidNotificationError
+from autotrading.domain.notifications.expiring_key import ExpiringKey, KeyKind
 from autotrading.domain.notifications.flow_status import FlowStatusLine
 from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Amount, Notification, NotificationLine
@@ -28,7 +29,9 @@ PAUSE = "⏸️"
 ALARM = "\U0001f6a8"
 FLOW_ID = uuid4()
 ALERT_ID = uuid4()
+KEY = "🔑"
 CLOSED_AT = datetime(2026, 11, 17, 10, 15, tzinfo=UTC)
+OPENROUTER_KEY = ExpiringKey(KeyKind.PROVIDER, uuid4(), "openrouter", date(2026, 12, 15), ("alfa", "beta"))
 STATUS = FlowStatusLine("Flusso: 312,40 USDC · PnL +12,40 USDC · 2 posizioni aperte · attivo")
 
 
@@ -134,6 +137,11 @@ def usdc(value: str | int) -> Amount:
             Notification.reconciliation_alarm(ALERT_ID, "test-1", usdc(980), usdc(1000)),
             f"{ALARM} test-1: allarme di riconciliazione",
             ("Saldo letto: 980 USDC", "Saldo atteso: 1000 USDC"),
+        ),
+        (
+            Notification.key_expiry(ALERT_ID, OPENROUTER_KEY, date(2026, 12, 8)),
+            f"{KEY} chiave openrouter: scade tra 7 giorni",
+            ("Scadenza: 15/12/2026", "Flussi: alfa, beta"),
         ),
     ],
 )
@@ -360,3 +368,11 @@ def test_the_state_of_the_flow_keeps_the_pages_of_the_notification() -> None:
 
 def test_a_flow_paused_leads_to_its_alert_and_still_names_its_flow() -> None:
     assert Notification.flow_paused(FLOW_ID, "alfa", "credito esaurito", ALERT_ID).flow_id == FLOW_ID
+
+
+def test_the_notice_of_an_expiring_key_leads_to_its_alert_and_belongs_to_no_flow() -> None:
+    notification = Notification.key_expiry(ALERT_ID, OPENROUTER_KEY, date(2026, 12, 15))
+
+    assert notification.heading == "chiave openrouter: è scaduta"
+    assert notification.targets == (NotificationTarget.alert(ALERT_ID),)
+    assert (notification.event, notification.flow, notification.flow_id) == (NotificationEvent.KEY_EXPIRY, None, None)

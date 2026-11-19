@@ -169,3 +169,14 @@ class ModelCatalogUnavailableError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("catalogo dei modelli non disponibile")
+
+
+class KeyExpiryReadByAdapterError(ApplicationError):
+    """The gateway of the provider gives the expiry of its keys: the user cannot give another one (R6.2.2, ADR
+    scadenza-delle-chiavi-letta-o-indicata)."""
+
+    status_code = 409
+
+    def __init__(self, provider: ProviderName) -> None:
+        super().__init__(f"la scadenza della chiave la legge il fornitore: {provider.value}")
+        self.provider = provider

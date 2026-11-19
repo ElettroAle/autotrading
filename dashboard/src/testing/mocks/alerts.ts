@@ -1,7 +1,12 @@
 import { fakeReconciliation } from './reconciliation';
 
 export type FakeAlertKind =
-  'reconciliation_alarm' | 'flow_paused' | 'unattributable_position' | 'unattributable_fill';
+  | 'reconciliation_alarm'
+  | 'flow_paused'
+  | 'unattributable_position'
+  | 'unattributable_fill'
+  | 'key_expiring'
+  | 'key_expired';
 
 export type FakeAlertResource = {
   readonly kind: 'account' | 'flow' | 'key';
@@ -67,6 +72,8 @@ const TRAITS: Readonly<Record<FakeAlertKind, Traits>> = {
     severity: 'warning',
     commands: ['resolve'],
   },
+  key_expiring: { title: 'Chiave in scadenza', severity: 'warning', commands: [] },
+  key_expired: { title: 'Chiave scaduta', severity: 'critical', commands: [] },
 };
 
 /** The alerts of a page, as the API gives them (ADR 0074). */

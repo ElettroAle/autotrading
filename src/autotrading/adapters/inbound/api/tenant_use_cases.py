@@ -15,6 +15,7 @@ from autotrading.application.accounts.ports import (
 from autotrading.application.accounts.read_account_state import ReadAccountStateUseCase
 from autotrading.application.accounts.register_account import RegisterAccountUseCase
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
+from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryUseCase
 from autotrading.application.accounts.set_deviation_threshold import SetDeviationThresholdUseCase
 from autotrading.application.agent.list_models import ListModelsUseCase
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
@@ -27,6 +28,7 @@ from autotrading.application.agent.ports import (
 from autotrading.application.agent.register_provider_key import ProviderKeyServices, RegisterProviderKeyUseCase
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyUseCase
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyUseCase
+from autotrading.application.agent.set_provider_key_expiry import SetProviderKeyExpiryUseCase
 from autotrading.application.flows.archive_flow import ArchiveFlowUseCase
 from autotrading.application.flows.cash_out_profits import CashOutPorts, CashOutProfitsUseCase
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalUseCase
@@ -240,6 +242,7 @@ class TenantUseCases:
     list_supported_exchanges: ListSupportedExchangesUseCase
     get_account: GetAccountUseCase
     replace_credentials: ReplaceCredentialsUseCase
+    set_account_key_expiry: SetAccountKeyExpiryUseCase
     read_account_state: ReadAccountStateUseCase
     remove_account_with_flows: RemoveAccountWithFlowsUseCase
     close_position: ClosePositionUseCase
@@ -250,6 +253,7 @@ class TenantUseCases:
     replace_provider_key: ReplaceProviderKeyUseCase
     remove_provider_key: RemoveProviderKeyUseCase
     list_provider_keys: ListProviderKeysUseCase
+    set_provider_key_expiry: SetProviderKeyExpiryUseCase
     list_models: ListModelsUseCase
     create_flow: CreateFlowUseCase
     list_flows: ListFlowsUseCase
@@ -329,10 +333,15 @@ class TenantUseCases:
         key_services = ProviderKeyServices(ports.model_catalogs, ports.provider_key_sealer)
         return cls(
             register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
-            list_accounts=ListAccountsUseCase(accounts, ports.allocated_capital, exchanges, ports.settlement_currency),
+            list_accounts=ListAccountsUseCase(
+                accounts, ports.allocated_capital, exchanges, ports.settlement_currency, ports.clock
+            ),
             list_supported_exchanges=ListSupportedExchangesUseCase(exchanges),
-            get_account=GetAccountUseCase(accounts, ports.allocated_capital, exchanges, ports.settlement_currency),
+            get_account=GetAccountUseCase(
+                accounts, ports.allocated_capital, exchanges, ports.settlement_currency, ports.clock
+            ),
             replace_credentials=ReplaceCredentialsUseCase(accounts, sealer, exchanges),
+            set_account_key_expiry=SetAccountKeyExpiryUseCase(accounts, exchanges),
             read_account_state=ReadAccountStateUseCase(accounts, ports.account_state),
             remove_account_with_flows=RemoveAccountWithFlowsUseCase(
                 ports.flows,
@@ -347,7 +356,8 @@ class TenantUseCases:
             register_provider_key=RegisterProviderKeyUseCase(tenant_id, keys, key_services),
             replace_provider_key=ReplaceProviderKeyUseCase(keys, key_services),
             remove_provider_key=RemoveProviderKeyUseCase(keys, ports.provider_key_usage),
-            list_provider_keys=ListProviderKeysUseCase(keys),
+            list_provider_keys=ListProviderKeysUseCase(keys, ports.model_catalogs, ports.clock),
+            set_provider_key_expiry=SetProviderKeyExpiryUseCase(keys, ports.model_catalogs),
             list_models=ListModelsUseCase(ports.model_catalogs, keys),
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),

@@ -35,6 +35,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_cost import CycleCost
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_key import FlowKey
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_timing import FlowTiming
 from autotrading.domain.flows.history import (
@@ -69,6 +70,7 @@ from autotrading.domain.tenancy.user_id import UserId
 
 if TYPE_CHECKING:
     from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
+    from autotrading.application.flows.pause_flows_on_expired_keys import PauseFlowsOnExpiredKeysCommand
     from autotrading.application.flows.read_cycle_flow import ReadCycleFlowCommand
     from autotrading.application.flows.record_account_executions import RecordAccountExecutionsCommand
 
@@ -1249,6 +1251,19 @@ class CycleOrderExecutionPort(Protocol):
 class FlowPausePort(Protocol):
     def execute(self, command: PauseAffectedFlowsCommand) -> object:
         """Pauses every active flow the permanent error involves, with the message of the error as reason (R1.2.4)."""
+        ...
+
+
+class FlowKeysPort(Protocol):
+    """Bound to the tenant of the request or of the cycle: the keys of its accounts and providers that have an expiry
+    (R6.2.2, ADR controllo-giornaliero-delle-scadenze)."""
+
+    def dated_keys(self) -> tuple[FlowKey, ...]: ...
+
+
+class ExpiredKeysPausePort(Protocol):
+    def execute(self, command: PauseFlowsOnExpiredKeysCommand) -> bool:
+        """Pauses the active flows of every expired key of the flows of the command; True when there is one (R6.2.2)."""
         ...
 
 

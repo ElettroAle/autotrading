@@ -13,6 +13,7 @@ from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParameter, RangeParameter
 from autotrading.domain.agent.model_usage import ModelPrices
 from autotrading.domain.agent.provider_key_field import API_KEY_FIELD
+from autotrading.domain.agent.provider_name import ProviderName
 
 CATALOG_TIMEOUT_SECONDS = 10.0
 # OpenRouter adds and retires models every day; a few minutes are enough to see them.
@@ -41,6 +42,10 @@ class OpenRouterModelCatalogAdapter:
         self._client = client
         self._clock = clock
         self._read: tuple[float, ModelCatalog] | None = None
+
+    def reads_key_expiry(self, provider: ProviderName) -> bool:  # noqa: ARG002 - the signature of the port
+        """OpenRouter does not tell until when a key works: the user gives the date (R6.2.2)."""
+        return False
 
     def catalog(self) -> ModelCatalog:
         now = self._clock()

@@ -8,6 +8,7 @@ from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, Tenan
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
     CyclePolling,
+    DailyChecks,
     OutboxProcessing,
     WorkerAnswers,
     WorkerLoops,
@@ -15,7 +16,7 @@ from autotrading.adapters.inbound.api.worker import (
     bot_polling,
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
-from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters
+from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters, apscheduler_daily_check_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.dashboard.composition import dashboard_adapters
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
@@ -68,6 +69,10 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyF
 from autotrading.adapters.outbound.sqlalchemy.flow_status import SqlAlchemyFlowStatusAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_timing import SqlAlchemyFlowTimingAdapter
 from autotrading.adapters.outbound.sqlalchemy.forecast_repository import SqlAlchemyForecastRepositoryAdapter
+from autotrading.adapters.outbound.sqlalchemy.key_expiries import (
+    SqlAlchemyKeyExpiriesAdapter,
+    SqlAlchemyKeyExpiryNoticeRepositoryAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.link_code_repository import (
     SqlAlchemyLinkCodeLookupAdapter,
     SqlAlchemyLinkCodeRepositoryAdapter,
@@ -133,6 +138,10 @@ from autotrading.application.flows.notify_unattributable import (
 )
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
 from autotrading.application.flows.pause_after_consecutive_failures import PauseAfterConsecutiveFailuresUseCase
+from autotrading.application.flows.pause_flows_on_expired_keys import (
+    PauseFlowsOnExpiredKeysCommand,
+    PauseFlowsOnExpiredKeysUseCase,
+)
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     AccountRemovalPorts,
@@ -172,6 +181,7 @@ from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.check_key_expiries import CheckKeyExpiriesUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
@@ -201,6 +211,7 @@ from autotrading.application.notifications.ports import (
     OutboxPort,
 )
 from autotrading.application.notifications.process_outbox import ProcessOutboxUseCase
+from autotrading.application.notifications.schedule_key_expiry_checks import ScheduleKeyExpiryChecksUseCase
 from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
 from autotrading.application.notifications.send_test_notification import SendTestNotificationUseCase
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
@@ -615,12 +626,36 @@ def cycle_of(
             failures=NotifyCycleFailureUseCase(flows, NotifyCycleFailedUseCase(notify_flow)),
             activity=ReadFlowActivityUseCase(flows),
             consecutive_failures=PauseAfterConsecutiveFailuresUseCase(flows, cycles, pause),
+            expired_keys=PauseFlowsOnExpiredKeysUseCase(
+                SqlAlchemyKeyExpiriesAdapter(engine, tenant_id), flows, pause, clock
+            ),
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
         equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))
         return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints), guards, equity)
 
     return cycle_for
+
+
+def check_key_expiries(
+    engine: SqlAlchemyEngine, notifications: tuple[OutboxPort, NotificationLinkPort], tenant_id: TenantId
+) -> None:
+    """The daily check of one tenant: the notices and alerts of its keys, then the pause of the flows of an expired key
+    (R6.2.2, ADR controllo-giornaliero-delle-scadenze)."""
+    clock = system_clock_adapters()
+    keys = SqlAlchemyKeyExpiriesAdapter(engine, tenant_id)
+    alerts = SqlAlchemyAlertRepositoryAdapter(engine, tenant_id)
+    notify = notify_for(engine, *notifications, tenant_id)
+    notices = SqlAlchemyKeyExpiryNoticeRepositoryAdapter(engine, tenant_id)
+    CheckKeyExpiriesUseCase(keys, notices, alerts, notify, clock).execute()
+    flows = SqlAlchemyFlowRepositoryAdapter(engine, tenant_id)
+    notify_flow = NotifyFlowEventUseCase(
+        notify, SqlAlchemyFlowStatusAdapter(engine, tenant_id, HYPERLIQUID_SETTLEMENT_CURRENCY)
+    )
+    pause = PauseAffectedFlowsUseCase(
+        flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify_flow, alerts)
+    )
+    PauseFlowsOnExpiredKeysUseCase(keys, flows, pause, clock).execute(PauseFlowsOnExpiredKeysCommand())
 
 
 def notify_for(
@@ -702,7 +737,14 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
         messenger, mailer, partial(mail_server_access_for, engine, mail_password_opener)
     )
     delivery = OutboxProcessing(ProcessOutboxUseCase(outbox, deliver).execute)
-    loops = WorkerLoops(bot, cycles, delivery)
+    daily = DailyChecks(
+        ScheduleKeyExpiryChecksUseCase(
+            apscheduler_daily_check_adapters(),
+            SqlAlchemyTenantRepositoryAdapter(engine),
+            partial(check_key_expiries, engine, (outbox, links)),
+        ).execute
+    )
+    loops = WorkerLoops(bot, cycles, delivery, daily)
     return worker_api_adapters(source, for_tenant, loops, WorkerAnswers(start_link, library_catalog))
 
 

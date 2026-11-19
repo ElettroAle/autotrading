@@ -38,6 +38,8 @@ def test_a_row_carries_tenant_name_exchange_account_and_the_sealed_credentials()
         "credentials_key_version": 3,
         "credentials_ciphertext": b"\x01\x02",
         "deviation_threshold": Decimal(1),
+        "expires_on": None,
+        "expiry_source": None,
     }
 
 

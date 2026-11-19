@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
-import { FormAlert } from '@/components/ui/form/input-field';
+import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { showRefusal } from '@/lib/form-errors';
 
 import { useModelProviders } from '../api/get-model-providers';
@@ -37,12 +37,12 @@ export const ReplaceProviderKeyForm = ({
     formState: { errors },
   } = useForm<NewKeyInput>({
     resolver: zodResolver(newKeyInputSchema),
-    defaultValues: { key: {} },
+    defaultValues: { key: {}, expires_on: '' },
   });
 
-  const onSubmit = handleSubmit(({ key }) => {
+  const onSubmit = handleSubmit(({ key, expires_on }) => {
     replacement.mutate(
-      { provider: providerKey.provider, key },
+      { provider: providerKey.provider, key, expires_on },
       {
         onSuccess: onReplaced,
         onError: (error) => {
@@ -71,6 +71,15 @@ export const ReplaceProviderKeyForm = ({
         registerField={(name) => register(`key.${name}`)}
         reasonOf={(name) => errors.key?.[name]?.message}
       />
+      {/* Only where the provider does not read the expiry of its keys (R6.2.2). */}
+      {providerKey.expiry_editable && (
+        <InputField
+          label="Scadenza"
+          type="date"
+          error={errors.expires_on}
+          {...register('expires_on')}
+        />
+      )}
       <div className="flex gap-2">
         <button
           type="submit"

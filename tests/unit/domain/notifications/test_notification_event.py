@@ -9,6 +9,7 @@ OF_ACCOUNT = frozenset(
         NotificationEvent.UNATTRIBUTABLE_FILL,
         NotificationEvent.RECONCILIATION_ALARM,
         NotificationEvent.EMERGENCY_CLOSING,
+        NotificationEvent.KEY_EXPIRY,
     }
 )
 TOLD_AS_THEIR_REASON = frozenset({CloseReason.STOP_LOSS, CloseReason.TAKE_PROFIT, CloseReason.LIQUIDATION})
@@ -32,6 +33,7 @@ def test_each_type_of_event_has_the_name_the_user_chooses_its_channels_by() -> N
         "allarme di riconciliazione",
         "incasso eseguito",
         "chiusura di emergenza eseguita",
+        "scadenza di una chiave",
     ]
 
 
@@ -83,6 +85,7 @@ def test_every_other_closing_is_the_closing_of_a_position(reason: CloseReason) -
         (NotificationEvent.RECONCILIATION_ALARM, "\U0001f6a8"),
         (NotificationEvent.CASH_OUT, "\u2705"),
         (NotificationEvent.EMERGENCY_CLOSING, "\U0001f6a8"),
+        (NotificationEvent.KEY_EXPIRY, "\U0001f511"),
     ],
 )
 def test_each_type_of_event_has_the_icon_that_tells_what_happened(event: NotificationEvent, icon: str) -> None:

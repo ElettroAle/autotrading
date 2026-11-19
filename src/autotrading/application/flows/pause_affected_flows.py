@@ -9,9 +9,10 @@ from autotrading.domain.flows.flow_status import FlowStatus
 
 @dataclass(frozen=True, slots=True)
 class PauseAffectedFlowsCommand:
-    """A permanent error of a cycle, with the account or the provider it concerns when it concerns one (R1.2.4)."""
+    """A permanent error of a cycle, with the account or the provider it concerns when it concerns one (R1.2.4); an
+    expired key found by the daily check concerns no single flow (R6.2.2)."""
 
-    flow_id: UUID
+    flow_id: UUID | None
     reason: str
     account_id: UUID | None = None
     provider: str | None = None

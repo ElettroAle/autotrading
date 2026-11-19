@@ -53,6 +53,8 @@ class ProviderResponse(BaseModel):
     name: str
     key_registered: bool
     key_fields: list[ProviderKeyFieldResponse]
+    # False where a gateway reads the expiry of the keys: the registration does not ask it (R6.2.2).
+    expiry_editable: bool
 
     @classmethod
     def of(cls, listing: ProviderListing) -> ProviderResponse:
@@ -60,7 +62,12 @@ class ProviderResponse(BaseModel):
             ProviderKeyFieldResponse(name=field.name, label=field.label, secret=field.secret)
             for field in listing.key_fields
         ]
-        return cls(name=listing.provider.value, key_registered=listing.key_registered, key_fields=fields)
+        return cls(
+            name=listing.provider.value,
+            key_registered=listing.key_registered,
+            key_fields=fields,
+            expiry_editable=listing.expiry_editable,
+        )
 
 
 class ModelCatalogResponse(BaseModel):

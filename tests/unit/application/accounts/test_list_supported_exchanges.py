@@ -17,8 +17,12 @@ def test_each_exchange_is_listed_with_the_network_its_adapter_is_configured_on()
     exchanges = {"Zeta": FakeExchangeAdapter(real=False), "Hyperliquid": FakeExchangeAdapter(real=True)}
 
     assert ListSupportedExchangesUseCase(exchanges).execute() == (
-        SupportedExchange("Hyperliquid", DeclaredNetwork.of(real=True, name="mainnet"), HYPERLIQUID_FIELDS),
-        SupportedExchange("Zeta", DeclaredNetwork.of(real=False, name="testnet"), HYPERLIQUID_FIELDS),
+        SupportedExchange(
+            "Hyperliquid", DeclaredNetwork.of(real=True, name="mainnet"), HYPERLIQUID_FIELDS, expiry_editable=True
+        ),
+        SupportedExchange(
+            "Zeta", DeclaredNetwork.of(real=False, name="testnet"), HYPERLIQUID_FIELDS, expiry_editable=True
+        ),
     )
 
 
@@ -31,7 +35,9 @@ def test_lists_the_exchanges_even_when_one_is_out_of_reach() -> None:
     exchange.reachable = False
 
     assert ListSupportedExchangesUseCase({"Hyperliquid": exchange}).execute() == (
-        SupportedExchange("Hyperliquid", DeclaredNetwork.of(real=False, name="testnet"), HYPERLIQUID_FIELDS),
+        SupportedExchange(
+            "Hyperliquid", DeclaredNetwork.of(real=False, name="testnet"), HYPERLIQUID_FIELDS, expiry_editable=True
+        ),
     )
 
 
@@ -49,3 +55,13 @@ def test_each_exchange_is_listed_with_the_name_its_adapter_gives_the_network() -
     [listed] = ListSupportedExchangesUseCase({"Okx": FakeExchangeAdapter(network_name="sandbox")}).execute()
 
     assert listed.network == DeclaredNetwork.of(real=False, name="sandbox")
+
+
+def test_each_exchange_says_whether_the_user_gives_the_expiry_of_its_credentials() -> None:
+    """R6.2.2: the registration asks the expiry only where the exchange does not read it."""
+    reading = FakeExchangeAdapter()
+    reading.reads_expiry = True
+
+    listed = ListSupportedExchangesUseCase({"Hyperliquid": reading, "Okx": FakeExchangeAdapter()}).execute()
+
+    assert [(exchange.name, exchange.expiry_editable) for exchange in listed] == [("Hyperliquid", False), ("Okx", True)]

@@ -10,6 +10,7 @@ from autotrading.application.agent.errors import (
 )
 from autotrading.application.agent.ports import ModelUse, ProviderKeyRegistration
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.agent.key_expiry import KeyExpiry
 from autotrading.domain.agent.provider_key import ProviderKey
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
@@ -52,7 +53,7 @@ class ProviderKeyStore:
         return self.registration_of(key)
 
     def registration_of(self, key: RegisteredProviderKey) -> ProviderKeyRegistration:
-        return ProviderKeyRegistration(key.provider, self.saved_at[(key.tenant_id, key.provider)])
+        return ProviderKeyRegistration(key.provider, self.saved_at[(key.tenant_id, key.provider)], key.expiry)
 
 
 class InMemoryProviderKeyRepositoryAdapter:
@@ -95,6 +96,12 @@ class InMemoryProviderKeyRepositoryAdapter:
         if current is None:
             raise ProviderKeyNotFoundError(provider)
         self._store.keys.remove(current)
+
+    def set_expiry(self, provider: ProviderName, expiry: KeyExpiry | None) -> None:
+        current = self.get(provider)
+        if current is None:
+            raise ProviderKeyNotFoundError(provider)
+        self._store.keys[self._store.keys.index(current)] = current.with_expiry(expiry)
 
     def _require_own(self, key: RegisteredProviderKey) -> None:
         if key.tenant_id != self._tenant_id:

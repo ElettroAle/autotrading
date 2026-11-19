@@ -91,3 +91,11 @@ def test_lists_each_exchange_with_the_name_its_adapter_gives_the_network(platfor
     [exchange] = client_of("anna").get("/exchanges").json()
 
     assert (exchange["network"], exchange["network_name"]) == ("test", "sandbox")
+
+
+def test_lists_whether_the_user_gives_the_expiry_of_the_credentials(platform: Platform, client_of: Client) -> None:
+    """R6.2.2: the dashboard shows the field of the expiry only where the exchange does not read it."""
+    assert [exchange["expiry_editable"] for exchange in client_of("anna").get("/exchanges").json()] == [True]
+    platform.hyperliquid.reads_expiry = True
+
+    assert [exchange["expiry_editable"] for exchange in client_of("anna").get("/exchanges").json()] == [False]

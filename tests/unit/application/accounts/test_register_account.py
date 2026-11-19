@@ -1,4 +1,6 @@
 import logging
+from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -8,6 +10,7 @@ from autotrading.application.accounts.errors import (
     CredentialFieldMalformedError,
     ExchangeRejectedCredentialsError,
     ExchangeUnavailableError,
+    KeyExpiryReadByAdapterError,
     UnsupportedExchangeError,
 )
 from autotrading.application.accounts.register_account import RegisterAccountCommand, RegisterAccountUseCase
@@ -17,12 +20,13 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.errors import AccountNameRequiredError, CredentialsRequiredError, ExchangeRequiredError
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
+from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.errors import DomainError
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter
-from tests.fakes.exchange import REDACTED_REJECTION, FakeExchangeAdapter
+from tests.fakes.exchange import REDACTED_REJECTION, FakeExchangeAdapter, rejection_message
 from tests.support.accounts import an_account
 from tests.support.credentials import HYPERLIQUID_FIELDS, credentials_of
 from tests.support.platform import HYPERLIQUID, new_credentials, registration
@@ -199,3 +203,60 @@ def test_a_registration_is_recorded_by_account_id_only(
     (record,) = caplog.records
     assert record.getMessage() == "conto registrato"
     assert record.__dict__["account_id"] == str(account.id.value)
+
+
+def test_the_account_keeps_the_expiry_the_exchange_reads_for_its_credentials(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    command = accepted(exchange)
+    exchange.valid_until(Credentials(command.credentials), date(2026, 12, 30))
+
+    use_case.execute(command)
+
+    assert store.accounts[0].expiry == KeyExpiry.read(date(2026, 12, 30))
+
+
+def test_an_exchange_that_reads_no_expiry_for_the_credentials_leaves_it_unknown(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    exchange.reads_expiry = True
+
+    use_case.execute(accepted(exchange))
+
+    assert store.accounts[0].expiry is None
+
+
+def test_the_account_keeps_the_expiry_the_user_gives_when_the_exchange_reads_none(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    command = replace(accepted(exchange), expires_on=date(2026, 12, 15))
+
+    use_case.execute(command)
+
+    assert store.accounts[0].expiry == KeyExpiry.entered(date(2026, 12, 15))
+
+
+def test_a_date_given_for_credentials_whose_expiry_the_exchange_reads_is_refused(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    exchange.reads_expiry = True
+
+    with pytest.raises(KeyExpiryReadByAdapterError) as raised:
+        use_case.execute(replace(accepted(exchange), expires_on=date(2026, 12, 15)))
+
+    assert raised.value.status_code == 409
+    assert store.accounts == []
+
+
+def test_a_refusal_while_reading_the_expiry_keeps_the_text_of_the_exchange_masked(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    command = accepted(exchange)
+    exchange.reads_expiry = True
+    exchange.expiry_refusal = ExchangeRejectedCredentialsError(rejection_message(Credentials(command.credentials)))
+
+    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
+        use_case.execute(command)
+
+    assert raised.value.exchange_message == REDACTED_REJECTION
+    assert store.accounts == []

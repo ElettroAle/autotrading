@@ -7,7 +7,7 @@ from uuid import UUID
 
 import pytest
 
-from autotrading.application.flows.errors import CycleInProgressError, FlowNotActiveError
+from autotrading.application.flows.errors import CycleInProgressError, FlowKeyExpiredError, FlowNotActiveError
 from autotrading.application.flows.ports import RiskReview
 from autotrading.application.flows.run_cycle import RunCycleCommand, RunCycleUseCase
 from autotrading.domain.flows.call_cost import CallCost
@@ -413,3 +413,25 @@ def test_a_permanent_error_of_a_cycle_asked_for_now_pauses_the_flows_and_is_rais
     assert record.failure == CycleFailure(CycleStep.AGENT_DECISION, "FakePermanentError", str(error))
     assert record.trigger is CycleTrigger.ON_DEMAND
     assert (cycles.flow("alfa").status, cycles.flow("alfa").pause_reason) == (PAUSED, str(error))
+
+
+def test_a_flow_that_uses_an_expired_key_goes_in_pause_before_its_cycle_starts_and_leaves_no_trace(
+    cycles: Cycles,
+) -> None:
+    """R6.2.2: the pause of a revoked key (R1.2.4), before any step reads the flow."""
+    cycles.expired_keys.expired_for[cycles.id_of("alfa")] = "chiave openrouter scaduta"
+
+    assert run(cycles) is None
+
+    assert (cycles.flow("alfa").status, cycles.flow("alfa").pause_reason) == (PAUSED, "chiave openrouter scaduta")
+    assert (cycles.flows.reads, cycles.agent.calls, cycles.records.records) == ([], [], [])
+
+
+def test_a_cycle_asked_for_now_on_a_flow_with_an_expired_key_is_refused(cycles: Cycles) -> None:
+    cycles.expired_keys.expired_for[cycles.id_of("alfa")] = "chiave openrouter scaduta"
+
+    with pytest.raises(FlowKeyExpiredError) as raised:
+        run_on_demand(cycles)
+
+    assert (raised.value.status_code, str(raised.value)) == (409, "una chiave del flusso è scaduta")
+    assert cycles.flow("alfa").status == PAUSED

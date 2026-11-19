@@ -4,6 +4,7 @@ import { fakeClock } from './clock';
 import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
+import type { FakeKeyExpiry } from './key-expiry';
 import { fakeNotificationChannels } from './notification-channels';
 import { fakeInbox } from './notification-inbox';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
@@ -145,6 +146,10 @@ export type FakeAccount = {
   publicFields: Record<string, string>;
   /** The currency the account settles in, which the results of its flows are written in (R6.4.2). */
   currency: string;
+  /** The expiry of its credentials, read by the exchange or entered; none when unknown (R6.2.2). */
+  expiry?: FakeKeyExpiry;
+  /** The exchange of the account does not read the expiry: the user gives it (R6.2.2). */
+  expiryEditable?: boolean;
 };
 
 /**
@@ -255,7 +260,12 @@ const LINK_CODE_MINUTES = 15;
 const FIRST_CHAT_ID = 1001;
 
 /** The key of a provider of models, as the API shows it: the provider and when the key was saved, never the key. */
-export type FakeProviderKey = { readonly provider: string; registeredAt: string };
+export type FakeProviderKey = {
+  readonly provider: string;
+  registeredAt: string;
+  /** The expiry the user entered for the key; none when unknown (R6.2.2). */
+  expiry?: FakeKeyExpiry;
+};
 
 export const FAKE_EXCHANGE = 'Hyperliquid';
 
@@ -437,6 +447,7 @@ const state = {
   exchangesListed: true,
   exchangeNetwork: 'test' as FakeNetwork,
   exchangeNetworkName: 'testnet',
+  exchangeReadsExpiry: true,
   apiAnswers: true,
 };
 
@@ -624,6 +635,7 @@ export const fakePlatform = {
     state.exchangesListed = true;
     state.exchangeNetwork = 'test';
     state.exchangeNetworkName = 'testnet';
+    state.exchangeReadsExpiry = true;
     state.apiAnswers = true;
     fakeReconciliation.reset();
     fakeNotificationChannels.reset();
@@ -643,15 +655,24 @@ export const fakePlatform = {
     });
   },
 
-  /** The key of the user for the provider, saved at the instant: a new instant on every replacement. */
-  saveProviderKey(account: string, provider: string, registeredAt: string): FakeProviderKey {
+  /**
+   * The key of the user for the provider, saved at the instant: a new instant on every replacement, which keeps only the
+   * expiry given with the new key (R6.2.2).
+   */
+  saveProviderKey(
+    account: string,
+    provider: string,
+    registeredAt: string,
+    expiry?: FakeKeyExpiry,
+  ): FakeProviderKey {
     const user = userNamed(account);
     const saved = user.providerKeys.find((key) => key.provider === provider);
     if (saved !== undefined) {
       saved.registeredAt = registeredAt;
+      saved.expiry = expiry;
       return saved;
     }
-    const created = { provider, registeredAt };
+    const created = { provider, registeredAt, expiry };
     user.providerKeys.push(created);
     return created;
   },
@@ -782,6 +803,16 @@ export const fakePlatform = {
   /** The name the adapter of the exchange gives its network (R2.3.10). */
   exchangeNetworkName(): string {
     return state.exchangeNetworkName;
+  },
+
+  /** Whether the exchange reads the expiry of the credentials, as Hyperliquid does; the user gives it otherwise (R6.2.2). */
+  exchangeReadsExpiry(): boolean {
+    return state.exchangeReadsExpiry;
+  },
+
+  /** From now on the exchange does not read the expiry of the credentials: the user gives it (R6.2.2). */
+  stopReadingExpiry(): void {
+    state.exchangeReadsExpiry = false;
   },
 
   /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */

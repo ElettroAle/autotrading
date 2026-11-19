@@ -23,6 +23,7 @@ from autotrading.application.flows.guard_flow_loss import GuardFlowLossUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
 from autotrading.application.flows.pause_after_consecutive_failures import PauseAfterConsecutiveFailuresUseCase
+from autotrading.application.flows.pause_flows_on_expired_keys import PauseFlowsOnExpiredKeysUseCase
 from autotrading.application.flows.ports import (
     AutomaticPausePort,
     ClockPort,
@@ -32,6 +33,7 @@ from autotrading.application.flows.ports import (
     CycleDecisions,
     CycleRepositoryPort,
     ExchangeLimitsPort,
+    FlowKeysPort,
     FlowLockPort,
     FlowOpeningsPort,
     FlowRepositoryPort,
@@ -103,6 +105,7 @@ class TenantCyclePorts:
     openings_suspended_notice: NotifyOpeningsSuspendedUseCase
     opening_reduced_notice: NotifyOpeningReducedUseCase
     opening_blocked_notice: NotifyOpeningBlockedUseCase
+    flow_keys: FlowKeysPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +192,7 @@ def run_cycle_for(
         failures=ports.cycle_failure,
         activity=ReadFlowActivityUseCase(ports.flows),
         consecutive_failures=PauseAfterConsecutiveFailuresUseCase(ports.flows, ports.consecutive_failures, pause),
+        expired_keys=PauseFlowsOnExpiredKeysUseCase(ports.flow_keys, ports.flows, pause, services.clock),
     )
     return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
 
